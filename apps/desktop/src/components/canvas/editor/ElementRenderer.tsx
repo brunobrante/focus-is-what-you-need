@@ -1,6 +1,4 @@
-import { useEffect, useRef } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
-import { updateElementText } from "@/lib/editor/actions";
+import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/lib/editor/geometry";
 import { useEditor } from "@/lib/editor/store";
 import type { CanvasDocument, ElementNode } from "@/lib/editor/types";
@@ -150,55 +148,22 @@ export function ElementRenderer({
   preview?: boolean;
   renderScale?: number;
 }) {
-  const { state, dispatch } = useEditor();
+  const { state } = useEditor();
   const canvasDocument = documentOverride ?? state.document;
   const node = canvasDocument.elements[id];
-  const textRef = useRef<HTMLDivElement | null>(null);
   const isolatedParentId = preview ? null : state.isolatedParentId;
   const isEditing = !preview && state.editingTextId === id;
   const isIsolatedParent = !preview && state.isolatedParentId === id;
 
-  useEffect(() => {
-    if (!isEditing || !textRef.current) return;
-    const element = textRef.current;
-    element.focus();
-    const range = globalThis.document.createRange();
-    range.selectNodeContents(element);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  }, [isEditing]);
-
   if (!node || node.visible === false) return null;
-
-  const commitText = () => {
-    if (!textRef.current) return;
-    const content = textRef.current.innerText;
-    dispatch({ type: "commitDocument", document: updateElementText(state.document, node.id, content) });
-    dispatch({ type: "setEditingText", editingTextId: null });
-  };
-
-  const stopTextShortcutPropagation = (event: KeyboardEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    if (event.key === "Escape") { event.preventDefault(); commitText(); }
-    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); commitText(); }
-  };
 
   if (node.type === "text") {
     return (
       <div
-        ref={textRef}
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element text-element", isEditing, isolatedParentId, canvasDocument.elements)}
         style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, isEditing, renderScale)}
-        contentEditable={isEditing}
-        suppressContentEditableWarning
-        spellCheck={false}
-        onBlur={isEditing ? commitText : undefined}
-        onKeyDown={isEditing ? stopTextShortcutPropagation : undefined}
-        onPointerDown={isEditing ? (e) => e.stopPropagation() : undefined}
-        onClick={isEditing ? (e) => e.stopPropagation() : undefined}
       >
         {node.content}
       </div>
