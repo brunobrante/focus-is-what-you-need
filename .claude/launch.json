@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "desktop",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--cwd", "apps/desktop", "dev", "--port", "1420"],
+      "port": 1420
+    },
+    {
+      "name": "canvas",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--cwd", "canvas", "dev", "--port", "5173"],
+      "port": 5173
+    }
+  ]
+}

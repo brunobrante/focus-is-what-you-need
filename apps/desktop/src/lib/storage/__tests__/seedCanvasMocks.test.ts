@@ -1,0 +1,348 @@
+import { beforeEach, expect, test } from "bun:test";
+
+import {
+  getCanvasMockBundleForScreen,
+  getCanvasMockDataset,
+} from "@/components/mocks/data/canvasMocks";
+import { canvasDocumentFromHtmlGraphJSON } from "@/lib/editor/htmlSceneAdapter";
+import { createDefaultDesignSystem } from "@/lib/storage/defaults";
+import { ensureSeededAndMigrated } from "@/lib/storage/seed";
+import { TABLES, getTable, setTable, store } from "@/lib/storage/store";
+import type {
+  ComponentPlacementRow,
+  ComponentRow,
+  Meta,
+  ProjectRow,
+  SceneRow,
+  ScreenRow,
+  ScreenVersionRow,
+  ThumbnailRow,
+  VariantRow,
+} from "@/lib/storage/schema";
+
+class MemoryStorage {
+  private rows = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.rows.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.rows.set(key, value);
+  }
+}
+
+beforeEach(() => {
+  globalThis.localStorage = new MemoryStorage() as unknown as Storage;
+});
+
+test("fresh seed writes screen and component canvas scenes for hierarchical mocks", async () => {
+  await ensureSeededAndMigrated();
+
+  const mocks = await getCanvasMockDataset();
+  const projects = await getTable<ProjectRow>(TABLES.projects);
+  const screens = await getTable<ScreenRow>(TABLES.screens);
+  const components = await getTable<ComponentRow>(TABLES.components);
+  const variants = await getTable<VariantRow>(TABLES.variants);
+  const scenes = await getTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+
+  const mobileProject = projects.find((project) => project.type === "mobile");
+  const desktopProject = projects.find((project) => project.type === "desktop");
+  const alignmentProject = projects.find((project) => project.name === "Alignment Debug");
+  const mobileHome = screens.find(
+    (screen) => screen.projectId === mobileProject?.id && screen.title === "Home",
+  );
+  const desktopForm = screens.find(
+    (screen) =>
+      screen.projectId === desktopProject?.id && screen.title === "Formulário",
+  );
+  const mobileList = screens.find(
+    (screen) =>
+      screen.projectId === mobileProject?.id && screen.title === "Listagem",
+  );
+  const alignmentScreen = screens.find(
+    (screen) =>
+      screen.projectId === alignmentProject?.id && screen.title === "Alignment Debug",
+  );
+
+  expect(mobileHome).toBeDefined();
+  expect(desktopForm).toBeDefined();
+  expect(mobileList).toBeDefined();
+  expect(alignmentProject).toBeDefined();
+  expect(alignmentScreen).toBeDefined();
+  expect(
+    screens
+      .filter((screen) => screen.projectId === desktopProject?.id)
+      .map((screen) => screen.title),
+  ).toEqual(["Home", "Listagem", "Detalhe", "Formulário"]);
+
+  const sceneFor = (ownerId: string) =>
+    scenes.find((scene) => scene.ownerType === "screen" && scene.ownerId === ownerId);
+  const thumbFor = (ownerId: string) =>
+    thumbnails.find(
+      (thumb) => thumb.ownerType === "screen" && thumb.ownerId === ownerId,
+    );
+
+  expect(sceneFor(mobileHome!.id)?.graphJSON).toBe(
+    mocks["mock-mobile-home"].graphJSON,
+  );
+  expect(sceneFor(desktopForm!.id)?.graphJSON).toBe(
+    mocks["mock-desktop-formulario"].graphJSON,
+  );
+  expect(sceneFor(mobileList!.id)?.graphJSON).toBe(
+    mocks["mock-mobile-list"].graphJSON,
+  );
+  expect(sceneFor(alignmentScreen!.id)?.graphJSON).toBe(
+    mocks["mock-mobile-alignment-debug"].graphJSON,
+  );
+  expect(thumbFor(mobileHome!.id)?.dataUrl).toBe(
+    mocks["mock-mobile-home"].snapshot,
+  );
+
+  const mobileHomeDocument = canvasDocumentFromHtmlGraphJSON(
+    sceneFor(mobileHome!.id)!.graphJSON,
+  )!;
+  expect(mobileHomeDocument.rootIds).toHaveLength(1);
+  const mobileHomeRoot = mobileHomeDocument.elements[mobileHomeDocument.rootIds[0]!];
+  expect(mobileHomeRoot?.name).toBe("Home");
+  expect(mobileHomeRoot?.locked).toBe(true);
+
+  const mobileHomeComponents = components.filter(
+    (component) =>
+      component.screenId === mobileHome!.id && component.parentVariantId === null,
+  );
+  expect(mobileHomeComponents.map((component) => component.name)).toEqual([
+    "Header",
+    "Hero Banner",
+    "Category Strip",
+    "Featured List",
+    "Mobile App Cart",
+  ]);
+
+  const header = mobileHomeComponents.find((component) => component.name === "Header");
+  expect(header).toBeDefined();
+
+  const alignmentComponents = components.filter(
+    (component) =>
+      component.screenId === alignmentScreen!.id && component.parentVariantId === null,
+  );
+  expect(alignmentComponents.map((component) => component.name)).toEqual([
+    "Red Alignment Box",
+  ]);
+
+  const headerVariant = variants.find(
+    (variant) => variant.componentId === header?.id,
+  );
+  expect(headerVariant).toBeDefined();
+  expect(
+    scenes.some(
+      (scene) =>
+        scene.ownerType === "variant" && scene.ownerId === headerVariant!.id,
+    ),
+  ).toBe(true);
+  const headerScene = scenes.find(
+    (scene) =>
+      scene.ownerType === "variant" && scene.ownerId === headerVariant!.id,
+  );
+  const headerDocument = canvasDocumentFromHtmlGraphJSON(headerScene!.graphJSON)!;
+  expect(headerDocument.rootIds).toHaveLength(1);
+  const headerRoot = headerDocument.elements[headerDocument.rootIds[0]!];
+  expect(headerRoot?.name).toBe("Header");
+  expect(headerRoot?.locked).toBe(true);
+  expect(headerRoot?.children.map((id) => headerDocument.elements[id]?.name)).toEqual([
+    "Logo Design",
+    "Header Copy",
+    "Search Button",
+  ]);
+  expect(
+    thumbnails.some(
+      (thumbnail) =>
+        thumbnail.ownerType === "variant" &&
+        thumbnail.ownerId === headerVariant!.id,
+    ),
+  ).toBe(true);
+  expect(variants.every((variant) => variant.seedKey === null)).toBe(true);
+});
+
+test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and placements", async () => {
+  await store.set<Meta>(TABLES.meta, { schemaVersion: 7, seededAt: 1 });
+  const project: ProjectRow = {
+    id: "project-1",
+    name: "App de delivery",
+    type: "mobile",
+    thumbnailDataUrl: null,
+    description: null,
+    previewScreenId: null,
+    designSystem: createDefaultDesignSystem(),
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const screen: ScreenRow = {
+    id: "screen-home",
+    projectId: project.id,
+    title: "Home",
+    variant: "hero",
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  await setTable<ProjectRow>(TABLES.projects, [project]);
+  await setTable<ScreenRow>(TABLES.screens, [screen]);
+  await setTable<ComponentRow>(TABLES.components, []);
+  await setTable<VariantRow>(TABLES.variants, []);
+  await setTable<SceneRow>(TABLES.scenes, []);
+  await setTable<ThumbnailRow>(TABLES.thumbnails, []);
+  await setTable<ScreenVersionRow>(TABLES.screenVersions, []);
+  await setTable<ComponentPlacementRow>(TABLES.placements, []);
+
+  await ensureSeededAndMigrated();
+
+  const components = await getTable<ComponentRow>(TABLES.components);
+  const variants = await getTable<VariantRow>(TABLES.variants);
+  const scenes = await getTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
+  const placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  const homeVersion = screenVersions.find((version) => version.screenId === screen.id);
+  const homePlacements = placements.filter(
+    (placement) => placement.screenVersionId === homeVersion?.id,
+  );
+
+  const topLevel = components
+    .filter((component) => component.screenId === screen.id && component.parentVariantId === null)
+    .sort((a, b) => a.order - b.order);
+  expect(topLevel.map((component) => component.name)).toEqual([
+    "Header",
+    "Hero Banner",
+    "Category Strip",
+    "Featured List",
+    "Mobile App Cart",
+  ]);
+  expect(
+    components.some((component) => component.parentVariantId === topLevel[0]!.activeVariantId),
+  ).toBe(true);
+  expect(variants).toHaveLength(components.length);
+  expect(
+    scenes.some((scene) => scene.ownerType === "screen" && scene.ownerId === screen.id),
+  ).toBe(true);
+  expect(
+    thumbnails.some(
+      (thumbnail) => thumbnail.ownerType === "screen" && thumbnail.ownerId === screen.id,
+    ),
+  ).toBe(true);
+  expect(homeVersion).toBeDefined();
+  expect(homePlacements).toHaveLength(topLevel.length);
+  expect(homePlacements.map((placement) => placement.componentId).sort()).toEqual(
+    topLevel.map((component) => component.id).sort(),
+  );
+});
+
+test("v9 migration replaces stale full-screen component scenes with component-sized scenes", async () => {
+  await store.set<Meta>(TABLES.meta, { schemaVersion: 9, seededAt: 1 });
+
+  const project: ProjectRow = {
+    id: "project-1",
+    name: "App de delivery",
+    type: "mobile",
+    thumbnailDataUrl: null,
+    description: null,
+    previewScreenId: null,
+    designSystem: createDefaultDesignSystem(),
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const screen: ScreenRow = {
+    id: "screen-home",
+    projectId: project.id,
+    title: "Home",
+    variant: "hero",
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const staleHeader: ComponentRow = {
+    id: "component-header",
+    projectId: project.id,
+    screenId: screen.id,
+    parentVariantId: null,
+    name: "Header",
+    kind: "Layout",
+    category: null,
+    description: null,
+    assignedScreenIds: [],
+    activeVariantId: "variant-header",
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const staleVariant: VariantRow = {
+    id: staleHeader.activeVariantId,
+    componentId: staleHeader.id,
+    name: "Default",
+    order: 0,
+    seedKey: null,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const staleBundle = await getCanvasMockBundleForScreen(screen, "mobile");
+
+  await setTable<ProjectRow>(TABLES.projects, [project]);
+  await setTable<ScreenRow>(TABLES.screens, [screen]);
+  await setTable<ComponentRow>(TABLES.components, [staleHeader]);
+  await setTable<VariantRow>(TABLES.variants, [staleVariant]);
+  await setTable<SceneRow>(TABLES.scenes, [
+    {
+      id: "scene-screen",
+      ownerType: "screen",
+      ownerId: screen.id,
+      graphJSON: staleBundle!.screen.graphJSON,
+      sceneVersion: 1,
+      updatedAt: 1,
+    },
+    {
+      id: "scene-stale-header",
+      ownerType: "variant",
+      ownerId: staleVariant.id,
+      graphJSON: staleBundle!.screen.graphJSON,
+      sceneVersion: 1,
+      updatedAt: 1,
+    },
+  ]);
+  await setTable<ThumbnailRow>(TABLES.thumbnails, []);
+  await setTable<ScreenVersionRow>(TABLES.screenVersions, []);
+  await setTable<ComponentPlacementRow>(TABLES.placements, []);
+
+  await ensureSeededAndMigrated();
+
+  const components = await getTable<ComponentRow>(TABLES.components);
+  const scenes = await getTable<SceneRow>(TABLES.scenes);
+  const header = components.find(
+    (component) => component.screenId === screen.id && component.name === "Header",
+  );
+  expect(header).toBeDefined();
+  const headerScene = scenes.find(
+    (scene) => scene.ownerType === "variant" && scene.ownerId === header!.activeVariantId,
+  );
+  expect(headerScene).toBeDefined();
+
+  const headerDocument = canvasDocumentFromHtmlGraphJSON(headerScene!.graphJSON)!;
+  expect(headerDocument.canvas.width).toBe(342);
+  expect(headerDocument.canvas.height).toBe(72);
+  const headerRoot = headerDocument.elements[headerDocument.rootIds[0]!];
+  expect(headerRoot?.name).toBe("Header");
+  expect(headerRoot?.locked).toBe(true);
+
+  const logo = components.find(
+    (component) => component.parentVariantId === header!.activeVariantId && component.name === "Logo Design",
+  );
+  expect(logo).toBeDefined();
+  const logoScene = scenes.find(
+    (scene) => scene.ownerType === "variant" && scene.ownerId === logo!.activeVariantId,
+  );
+  const logoDocument = canvasDocumentFromHtmlGraphJSON(logoScene!.graphJSON)!;
+  expect(logoDocument.canvas.width).toBe(52);
+  expect(logoDocument.canvas.height).toBe(52);
+  expect(logoDocument.elements[logoDocument.rootIds[0]!]?.name).toBe("Logo Design");
+});

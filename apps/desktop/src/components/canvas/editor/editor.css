@@ -1,0 +1,309 @@
+.canvas-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+
+.stage-space {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  box-sizing: border-box;
+  user-select: none;
+  touch-action: none;
+  backface-visibility: hidden;
+}
+
+.canvas-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 18px 46px rgba(0, 0, 0, 0.4);
+}
+
+.canvas-shell.is-space-panning,
+.canvas-shell.is-panning,
+.canvas-shell.is-space-panning .canvas-stage,
+.canvas-shell.is-panning .canvas-stage,
+.canvas-shell.is-space-panning .stage-space,
+.canvas-shell.is-panning .stage-space {
+  cursor: grab;
+}
+
+.canvas-shell.is-panning,
+.canvas-shell.is-panning .canvas-stage,
+.canvas-shell.is-panning .stage-space {
+  cursor: grabbing;
+}
+
+.canvas-shell.is-draw-tool,
+.canvas-shell.is-draw-tool .canvas-stage,
+.canvas-shell.is-draw-tool .stage-space {
+  cursor: crosshair;
+}
+
+.render-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
+.render-layer--draft {
+  overflow: visible;
+}
+
+.isolated-children-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.element {
+  min-width: 0;
+  min-height: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.text-element {
+  line-height: 1.12;
+  cursor: default;
+}
+
+.text-element.editing {
+  cursor: text;
+  user-select: text;
+  outline: none;
+  box-shadow: 0 0 0 1px #0d99ff;
+  z-index: 10;
+}
+
+.image-element img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+.image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #888;
+  font-size: 12px;
+  font-weight: 800;
+  background:
+    linear-gradient(135deg, transparent 49%, rgba(255, 255, 255, 0.12) 50%, transparent 51%),
+    linear-gradient(45deg, transparent 49%, rgba(255, 255, 255, 0.08) 50%, transparent 51%);
+}
+
+.editing-outline {
+  box-shadow: none;
+  border: none;
+  opacity: 0;
+}
+
+.canvas-shell.is-rotating,
+.canvas-shell.is-rotating * {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%230d99ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M11 4.4A5 5 0 1 0 13 8M13 2.5V7h-4.5'/%3E%3C/svg%3E")
+      8 8,
+    grab !important;
+}
+
+.canvas-shell.is-resizing,
+.canvas-shell.is-resizing * {
+  cursor: var(--resize-cursor) !important;
+}
+
+
+.render-layer--canvas-active {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.element--isolated-child {
+  opacity: 1 !important;
+  pointer-events: none;
+}
+
+.element--isolated-parent {
+  outline: 1px solid rgba(13, 153, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.selection-size-tag {
+  position: absolute;
+  z-index: 9;
+  height: 22px;
+  min-width: 48px;
+  max-width: 160px;
+  padding: 0 8px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: #0d99ff;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.context-toolbar {
+  position: absolute;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  transform: translateX(-50%);
+  border-radius: 11px;
+  background: #1c1c1c;
+  border: 1px solid #313131;
+  box-shadow:
+    0 6px 22px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  pointer-events: auto;
+  user-select: none;
+  animation: context-toolbar-in 110ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes context-toolbar-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0px) scale(1);
+  }
+}
+
+.context-toolbar-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: transparent;
+  color: #7a7a7a;
+  flex-shrink: 0;
+  cursor: default;
+  transition: background 80ms ease, color 80ms ease;
+}
+
+.context-toolbar-btn:hover {
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.context-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: #2c2c2c;
+  flex-shrink: 0;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 200px;
+  padding: 4px;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  animation: context-menu-in 0.1s ease-out;
+}
+
+@keyframes context-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.context-menu-item:hover:not(:disabled) {
+  background: #0d99ff;
+  color: #ffffff;
+}
+
+.context-menu-item:hover:not(:disabled) .context-menu-shortcut {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.context-menu-item:disabled {
+  color: #555;
+  cursor: default;
+}
+
+.context-menu-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.context-menu-shortcut {
+  flex-shrink: 0;
+  margin-left: 24px;
+  color: #666;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 4px 8px;
+  background: #333;
+}
