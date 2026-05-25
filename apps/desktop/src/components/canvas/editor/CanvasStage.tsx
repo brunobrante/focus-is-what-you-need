@@ -11,7 +11,6 @@ import {
   duplicateElements,
   insertElement,
   reparentElements,
-  updateElementText,
 } from "@/lib/editor/actions";
 import { copyElements, pasteElements } from "@/lib/editor/clipboard";
 import {
@@ -239,174 +238,6 @@ function buildViewportTransform(
     canvasWidth: canvasSize.width,
     canvasHeight: canvasSize.height,
   });
-}
-
-type TextEditingSession = {
-  id: string;
-  beforeDocument: CanvasDocument;
-  draftValue: string;
-};
-
-function TextEditingTextarea({
-  latestDocumentRef,
-  viewportRef,
-  viewportTransform,
-}: {
-  latestDocumentRef: { current: CanvasDocument };
-  viewportRef: { current: HTMLDivElement | null };
-  viewportTransform: ViewportTransform;
-}) {
-  const { state, dispatch } = useEditor();
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const sessionRef = useRef<TextEditingSession | null>(null);
-  const composingRef = useRef(false);
-  const editingNode = state.editingTextId
-    ? state.document.elements[state.editingTextId]
-    : null;
-  const activeTextNode =
-    editingNode?.type === "text" && editingNode.visible !== false
-      ? editingNode
-      : null;
-
-  const writeRenderedText = useCallback((id: string, value: string) => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const element = getRenderedElement(viewport, id);
-    if (element && element.textContent !== value) element.textContent = value;
-  }, [viewportRef]);
-
-  const finishEditing = useCallback((mode: "commit" | "cancel") => {
-    const session = sessionRef.current;
-    if (!session) return;
-    sessionRef.current = null;
-
-    if (mode === "cancel") {
-      const beforeContent = session.beforeDocument.elements[session.id]?.content ?? "";
-      writeRenderedText(session.id, beforeContent);
-      dispatch({ type: "setEditingText", editingTextId: null });
-      return;
-    }
-
-    const value = textareaRef.current?.value ?? session.draftValue;
-    const finalDocument = updateElementText(
-      session.beforeDocument,
-      session.id,
-      value,
-    );
-    latestDocumentRef.current = finalDocument;
-    const beforeContent = session.beforeDocument.elements[session.id]?.content ?? "";
-    const afterContent = finalDocument.elements[session.id]?.content ?? "";
-
-    if (beforeContent === afterContent) {
-      dispatch({ type: "setEditingText", editingTextId: null });
-      return;
-    }
-
-    dispatch({
-      type: "commitDocument",
-      beforeDocument: session.beforeDocument,
-      document: finalDocument,
-      selectedIds: state.selectedIds.length > 0 ? state.selectedIds : [session.id],
-    });
-  }, [dispatch, latestDocumentRef, state.selectedIds, writeRenderedText]);
-
-  useLayoutEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    if (!activeTextNode) {
-      if (sessionRef.current) finishEditing("commit");
-      textarea.value = "";
-      return;
-    }
-
-    if (sessionRef.current?.id === activeTextNode.id) return;
-    if (sessionRef.current) finishEditing("commit");
-
-    const beforeDocument = latestDocumentRef.current;
-    sessionRef.current = {
-      id: activeTextNode.id,
-      beforeDocument,
-      draftValue: activeTextNode.content ?? "",
-    };
-
-    textarea.value = activeTextNode.content ?? "";
-    writeRenderedText(activeTextNode.id, textarea.value);
-    textarea.focus({ preventScroll: true });
-    textarea.setSelectionRange(0, textarea.value.length);
-  }, [activeTextNode?.id, activeTextNode?.content, finishEditing, latestDocumentRef, writeRenderedText]);
-
-  useLayoutEffect(() => {
-    const textarea = textareaRef.current;
-    const viewport = viewportRef.current;
-    if (!textarea || !viewport || !activeTextNode) return;
-
-    const rect = elementToPaintViewportRect(
-      state.document,
-      activeTextNode.id,
-      viewportTransform,
-    );
-    const viewportRect = viewport.getBoundingClientRect();
-    const x = viewportRect.left + (rect?.x ?? 0);
-    const y = viewportRect.top + (rect?.y ?? 0);
-    textarea.style.transform = `translate(${x}px, ${y}px)`;
-    const session = sessionRef.current;
-    if (session?.id === activeTextNode.id) {
-      writeRenderedText(activeTextNode.id, session.draftValue);
-    }
-  }, [activeTextNode, state.document, viewportRef, viewportTransform, writeRenderedText]);
-
-  const updateDraft = (value: string) => {
-    const session = sessionRef.current;
-    if (!session) return;
-    session.draftValue = value;
-    writeRenderedText(session.id, value);
-  };
-
-  return (
-    <textarea
-      id="text-editing-textarea"
-      ref={textareaRef}
-      tabIndex={-1}
-      spellCheck={false}
-      onChange={(event) => updateDraft(event.currentTarget.value)}
-      onBlur={() => finishEditing("commit")}
-      onCompositionStart={() => {
-        composingRef.current = true;
-      }}
-      onCompositionEnd={(event) => {
-        composingRef.current = false;
-        updateDraft(event.currentTarget.value);
-      }}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (composingRef.current) return;
-        if (event.key === "Escape") {
-          event.preventDefault();
-          finishEditing("cancel");
-          return;
-        }
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          finishEditing("commit");
-        }
-      }}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        opacity: 0,
-        zIndex: -1,
-        backgroundColor: "white",
-        pointerEvents: "none",
-        width: 1,
-        height: 1,
-        fontSize: 1,
-        lineHeight: 1,
-        transform: "translate(0px, 0px)",
-      }}
-    />
-  );
 }
 
 export function CanvasStage({
@@ -1588,11 +1419,6 @@ export function CanvasStage({
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
     >
-      <TextEditingTextarea
-        latestDocumentRef={latestDocumentRef}
-        viewportRef={viewportRef}
-        viewportTransform={viewportTransform}
-      />
       <div
         ref={stageRef}
         className={`stage-space${draftMode ? " stage-space--draft" : ""}`}
