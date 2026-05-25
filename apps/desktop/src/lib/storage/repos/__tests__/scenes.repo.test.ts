@@ -6,6 +6,7 @@ import {
   serializeHtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
 import { getCanvasMockBundleForScreen } from "@/components/mocks/data/canvasMocks";
+import { flushThumbnailJobs } from "@/application/thumbnails/thumbnailQueue";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import { TABLES, getTable, setTable } from "@/lib/storage/store";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
@@ -23,6 +24,7 @@ class MemoryStorage {
 }
 
 beforeEach(async () => {
+  await flushThumbnailJobs();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
   await setTable<ComponentRow>(TABLES.components, []);
   await setTable<SceneRow>(TABLES.scenes, []);
@@ -44,6 +46,7 @@ test("upsertScene keeps the derived snapshot thumbnail in sync", async () => {
     ownerId: "variant-1",
     graphJSON,
   });
+  await flushThumbnailJobs();
 
   const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
   expect(thumbnails).toHaveLength(1);
@@ -121,6 +124,7 @@ test("upsertScene propagates connected component snapshots to parent screen", as
     ownerId: "variant-header",
     graphJSON: editedHeaderGraphJSON,
   });
+  await flushThumbnailJobs();
 
   const scenes = await getTable<SceneRow>(TABLES.scenes);
   const screenScene = scenes.find(
@@ -235,6 +239,7 @@ test("upsertScene propagates connected nested component snapshots through every 
     ownerId: "variant-logo",
     graphJSON: editedLogoGraphJSON,
   });
+  await flushThumbnailJobs();
 
   const scenes = await getTable<SceneRow>(TABLES.scenes);
   const headerScene = scenes.find(

@@ -1,13 +1,14 @@
-export interface KVStore {
-  get<T>(key: string): Promise<T | null>;
-  set<T>(key: string, value: T): Promise<void>;
-}
+import type { KVStore } from "@/domain/persistence/kvStore";
+import { getStorageDriver } from "@/infrastructure/persistence/createStorageDriver";
+import { notifyInvalidation, tableInvalidationKey } from "@/application/persistence/invalidationBus";
+import type { TableKey } from "@/lib/storage/storeKeys";
 
-const PREFIX = "fwyn:";
+export { TABLES, type TableKey } from "@/lib/storage/storeKeys";
 
-const localStorageAdapter: KVStore = {
+export const store: KVStore = {
   async get<T>(key: string): Promise<T | null> {
-    const raw = localStorage.getItem(PREFIX + key);
+    const driver = await getStorageDriver();
+    const raw = await driver.getRaw(key);
     if (raw == null) return null;
     try {
       return JSON.parse(raw) as T;
@@ -16,28 +17,10 @@ const localStorageAdapter: KVStore = {
     }
   },
   async set<T>(key: string, value: T): Promise<void> {
-    localStorage.setItem(PREFIX + key, JSON.stringify(value));
+    const driver = await getStorageDriver();
+    await driver.setRaw(key, JSON.stringify(value));
   },
 };
-
-export const store: KVStore = localStorageAdapter;
-
-export const TABLES = {
-  meta: "meta",
-  projects: "projects",
-  screens: "screens",
-  components: "components",
-  variants: "variants",
-  references: "references",
-  scenes: "scenes",
-  thumbnails: "thumbnails",
-  workspaces: "workspaces",
-  screenVersions: "screen_versions",
-  placements: "placements",
-  history: "history",
-} as const;
-
-export type TableKey = (typeof TABLES)[keyof typeof TABLES];
 
 export async function getTable<T>(key: TableKey): Promise<T[]> {
   return (await store.get<T[]>(key)) ?? [];
@@ -50,6 +33,7 @@ export async function setTable<T>(key: TableKey, rows: T[]): Promise<void> {
 const listeners = new Map<TableKey, Set<() => void>>();
 
 export function notify(key: TableKey): void {
+  notifyInvalidation(tableInvalidationKey(key));
   listeners.get(key)?.forEach((fn) => fn());
 }
 

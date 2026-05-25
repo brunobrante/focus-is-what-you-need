@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
 import type { Dispatch, ReactNode } from "react";
+import { store as persistenceStore } from "@/lib/storage/store";
 import type { CanvasDocument, EditorState, SnapGuide, Tool } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
@@ -19,6 +20,7 @@ type EditorAction =
   | { type: "setCanvasStageActive"; active: boolean }
   | { type: "setGuides"; guides: SnapGuide[] }
   | { type: "setExportOpen"; exportOpen: boolean }
+  | { type: "hydrateDocument"; document: CanvasDocument }
   | { type: "setDocumentTransient"; document: CanvasDocument; guides?: SnapGuide[] }
   | {
       type: "commitDocument";
@@ -184,6 +186,22 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         ...state,
         exportOpen: action.exportOpen
       };
+    case "hydrateDocument":
+      return {
+        ...state,
+        document: constrainAll(action.document),
+        selectedIds: [],
+        isolatedParentId: null,
+        hoveredId: null,
+        editingTextId: null,
+        canvasStageActive: false,
+        zoom: getInitialZoomForSubjectSize(action.document.canvas),
+        offsetX: 0,
+        offsetY: 0,
+        guides: [],
+        past: [],
+        future: [],
+      };
     case "setDocumentTransient":
       return {
         ...state,
@@ -289,6 +307,7 @@ export function EditorProvider({
   persistStorage?: boolean;
   onDocumentChange?: (document: CanvasDocument) => void;
 }) {
+  const hydratedRef = useRef(!persistStorage);
   const [state, dispatch] = useReducer(
     reducer,
     undefined,
@@ -296,15 +315,44 @@ export function EditorProvider({
   );
 
   useEffect(() => {
-    if (persistStorage) {
-      localStorage.setItem(storageKey, JSON.stringify(state.document));
-      window.dispatchEvent(
-        new CustomEvent(CANVAS_DOCUMENT_SAVED_EVENT, {
-          detail: { storageKey, document: state.document },
-        }),
-      );
+    hydratedRef.current = !persistStorage;
+    if (!persistStorage) return;
+
+    let cancelled = false;
+    void persistenceStore.get<CanvasDocument>(storageKey).then((stored) => {
+      if (cancelled) return;
+      hydratedRef.current = true;
+      if (stored && isCanvasDocument(stored)) {
+        dispatch({ type: "hydrateDocument", document: stored });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [persistStorage, storageKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    if (persistStorage && hydratedRef.current) {
+      timeout = setTimeout(() => {
+        void persistenceStore.set(storageKey, state.document).then(() => {
+          if (cancelled) return;
+          window.dispatchEvent(
+            new CustomEvent(CANVAS_DOCUMENT_SAVED_EVENT, {
+              detail: { storageKey, document: state.document },
+            }),
+          );
+        });
+      }, 250);
     }
     onDocumentChange?.(state.document);
+    return () => {
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
+    };
   }, [onDocumentChange, persistStorage, state.document, storageKey]);
 
   const value = useMemo(() => ({ state, dispatch }), [state]);

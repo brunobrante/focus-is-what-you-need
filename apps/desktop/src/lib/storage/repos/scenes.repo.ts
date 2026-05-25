@@ -4,9 +4,10 @@ import {
   type HtmlCanvasDocument,
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
+import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/application/scenes/dependencyIndex";
+import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
+import { scheduleThumbnailRefresh } from "@/application/thumbnails/thumbnailQueue";
 import { newId, now } from "@/lib/storage/ids";
-import { snapshotDataUrlFromGraphJSON } from "@/lib/storage/sceneSnapshots";
-import { deleteThumbnailByOwner, upsertThumbnail } from "@/lib/storage/repos/thumbnails.repo";
 import type { ComponentRow, SceneOwnerType, SceneRow, VariantRow } from "@/lib/storage/schema";
 import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
 
@@ -47,10 +48,11 @@ export async function upsertScene(input: {
     };
     const next = rows.map((r) => (r.id === existing.id ? updated : r));
     await setTable<SceneRow>(KEY, next);
-    await upsertDerivedThumbnail(input);
+    scheduleDerivedThumbnail(input);
     if (options.propagate !== false) {
       await propagateVariantSceneToParents(input, t);
     }
+    notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
     notify(KEY);
     return updated;
   }
@@ -63,10 +65,11 @@ export async function upsertScene(input: {
     updatedAt: t,
   };
   await setTable<SceneRow>(KEY, [created, ...rows]);
-  await upsertDerivedThumbnail(input);
+  scheduleDerivedThumbnail(input);
   if (options.propagate !== false) {
     await propagateVariantSceneToParents(input, t);
   }
+  notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
   notify(KEY);
   return created;
 }
@@ -74,28 +77,11 @@ export async function upsertScene(input: {
 export async function syncConnectedSceneSnapshots(): Promise<void> {
   const variants = await getTable<VariantRow>(TABLES.variants);
   const components = await getTable<ComponentRow>(TABLES.components);
-  const componentById = new Map(components.map((component) => [component.id, component]));
-  const variantById = new Map(variants.map((variant) => [variant.id, variant]));
-  const depthByVariantId = new Map<string, number>();
+  const dependencyIndex = createSceneDependencyIndex({ components, variants });
   const t = now();
 
-  const depthForVariant = (variantId: string, seen = new Set<string>()): number => {
-    const cached = depthByVariantId.get(variantId);
-    if (cached !== undefined) return cached;
-    if (seen.has(variantId)) return 0;
-    seen.add(variantId);
-
-    const variant = variantById.get(variantId);
-    const component = variant ? componentById.get(variant.componentId) : null;
-    const depth = component?.parentVariantId
-      ? 1 + depthForVariant(component.parentVariantId, seen)
-      : 0;
-    depthByVariantId.set(variantId, depth);
-    return depth;
-  };
-
   const orderedVariants = variants
-    .map((variant) => ({ variant, depth: depthForVariant(variant.id) }))
+    .map((variant) => ({ variant, depth: dependencyIndex.getVariantDepth(variant.id) }))
     .sort((a, b) => b.depth - a.depth);
 
   for (const { variant } of orderedVariants) {
@@ -108,7 +94,7 @@ export async function syncConnectedSceneSnapshots(): Promise<void> {
         graphJSON: scene.graphJSON,
       },
       t,
-      { variants, components },
+      dependencyIndex,
     );
   }
 
@@ -146,20 +132,15 @@ export async function removeComponentSubtreeFromParentScene(
   });
 }
 
-async function upsertDerivedThumbnail(input: {
+function scheduleDerivedThumbnail(input: {
   ownerType: SceneOwnerType;
   ownerId: string;
   graphJSON: string;
-}): Promise<void> {
-  const dataUrl = snapshotDataUrlFromGraphJSON(input.graphJSON);
-  if (!dataUrl) {
-    await deleteThumbnailByOwner(input.ownerType, input.ownerId);
-    return;
-  }
-  await upsertThumbnail({
+}): void {
+  scheduleThumbnailRefresh({
     ownerType: input.ownerType,
     ownerId: input.ownerId,
-    dataUrl,
+    graphJSON: input.graphJSON,
   });
 }
 
@@ -170,7 +151,7 @@ async function propagateVariantSceneToParents(
     graphJSON: string;
   },
   t: number,
-  preloaded?: { variants: VariantRow[]; components: ComponentRow[] },
+  preloadedIndex?: SceneDependencyIndex,
 ): Promise<void> {
   if (input.ownerType !== "variant") return;
 
@@ -178,25 +159,19 @@ async function propagateVariantSceneToParents(
   let currentGraphJSON = input.graphJSON;
   const visited = new Set<string>();
 
-  const variants = preloaded?.variants ?? await getTable<VariantRow>(TABLES.variants);
-  const components = preloaded?.components ?? await getTable<ComponentRow>(TABLES.components);
+  const dependencyIndex = preloadedIndex ?? createSceneDependencyIndex({
+    variants: await getTable<VariantRow>(TABLES.variants),
+    components: await getTable<ComponentRow>(TABLES.components),
+  });
 
   for (let depth = 0; currentVariantId && depth < 64; depth += 1) {
     if (visited.has(currentVariantId)) return;
     visited.add(currentVariantId);
 
-    const variant = variants.find((row) => row.id === currentVariantId);
-    const component = variant
-      ? components.find((row) => row.id === variant.componentId)
-      : null;
+    const component = dependencyIndex.getComponentForVariant(currentVariantId);
     if (!component) return;
 
-    const parentOwner =
-      component.parentVariantId
-        ? { ownerType: "variant" as const, ownerId: component.parentVariantId }
-        : component.screenId
-          ? { ownerType: "screen" as const, ownerId: component.screenId }
-          : null;
+    const parentOwner = dependencyIndex.getParentOwnerForVariant(currentVariantId);
     if (!parentOwner) return;
 
     const parentScene = await getSceneByOwner(parentOwner.ownerType, parentOwner.ownerId);
@@ -259,7 +234,8 @@ async function upsertSceneRowWithoutPropagation(input: {
       ),
     );
   }
-  await upsertDerivedThumbnail(input);
+  scheduleDerivedThumbnail(input);
+  notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
 }
 
 function replaceComponentSubtreeInGraph(

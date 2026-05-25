@@ -6,8 +6,8 @@ import {
   serializeHtmlCanvasDocument,
   type HtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
+import { saveScene } from "@/application/scenes/saveScene";
 import type { ProjectType } from "@/lib/data/types";
-import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import type { ScreenRow, VariantRow } from "@/lib/storage/schema";
 
 export type HtmlCanvasTarget =
@@ -81,7 +81,7 @@ export function useHtmlCanvasDocument(
     if (serialized === lastSavedRef.current) return;
 
     const timeout = window.setTimeout(() => {
-      void upsertScene({
+      void saveScene({
         ownerType: target.kind,
         ownerId: target.row.id,
         graphJSON: serialized,

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
 import {
+  ownerInvalidationKey,
+  subscribeInvalidation,
+} from "@/application/persistence/invalidationBus";
+import {
   getComponent,
   listChildrenOfVariant,
   listComponents,
@@ -82,6 +86,42 @@ function useTableQuery<T>(
     return () => {
       cancelled = true;
       unsubs.forEach((u) => u());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return state;
+}
+
+function useInvalidationQuery<T>(
+  keys: string[],
+  load: () => Promise<T>,
+  initial: T,
+  deps: ReadonlyArray<unknown>,
+): State<T> {
+  const [state, setState] = useState<State<T>>({ loading: true, data: initial });
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await ensureSeededOnce();
+        const data = await load();
+        if (!cancelled) setState({ loading: false, data });
+      } catch (error) {
+        console.error("Failed to load storage data", error);
+        if (!cancelled) setState({ loading: false, data: initial });
+      }
+    };
+    void run();
+
+    const unsubscribe = subscribeInvalidation(keys, () => {
+      void run();
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -307,8 +347,9 @@ export function useScene(
   ownerType: SceneOwnerType | null | undefined,
   ownerId: string | null | undefined,
 ): State<SceneRow | null> {
-  return useTableQuery<SceneRow | null>(
-    [TABLES.scenes],
+  const key = ownerType && ownerId ? ownerInvalidationKey("scene", ownerType, ownerId) : "scene:none";
+  return useInvalidationQuery<SceneRow | null>(
+    [key],
     async () =>
       ownerType && ownerId ? getSceneByOwner(ownerType, ownerId) : null,
     null,
@@ -320,8 +361,9 @@ export function useThumbnail(
   ownerType: SceneOwnerType | null | undefined,
   ownerId: string | null | undefined,
 ): State<ThumbnailRow | null> {
-  return useTableQuery<ThumbnailRow | null>(
-    [TABLES.thumbnails],
+  const key = ownerType && ownerId ? ownerInvalidationKey("thumbnail", ownerType, ownerId) : "thumbnail:none";
+  return useInvalidationQuery<ThumbnailRow | null>(
+    [key],
     async () =>
       ownerType && ownerId ? getThumbnailByOwner(ownerType, ownerId) : null,
     null,

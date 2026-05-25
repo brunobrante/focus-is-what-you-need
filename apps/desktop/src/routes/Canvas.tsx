@@ -36,7 +36,7 @@ import {
   findComponentBySourceNode,
   updateComponent,
 } from "@/lib/storage/repos/components.repo";
-import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { readSceneByOwner, saveScene } from "@/application/scenes/saveScene";
 import type { ComponentRow, SceneOwnerType, ScreenRow } from "@/lib/storage/schema";
 import type { CanvasToolId } from "@/lib/canvas/tools";
 import type { ProjectType } from "@/lib/data/types";
@@ -282,7 +282,7 @@ function CanvasPageContent() {
     if (latestOwnerKeyRef.current === pending.ownerKey) {
       latestGraphJSONRef.current = graphJSON;
     }
-    return upsertScene({
+    return saveScene({
       ownerType: pending.ownerType,
       ownerId: pending.ownerId,
       graphJSON,
@@ -430,7 +430,7 @@ function CanvasPageContent() {
   useEffect(() => {
     if (!sceneOwner || !currentReady || !resolvedSceneGraphJSON) return;
     if (resolvedSceneGraphJSON === effectiveSceneGraphJSON) return;
-    void upsertScene({
+    void saveScene({
       ownerType: sceneOwner.ownerType,
       ownerId: sceneOwner.ownerId,
       graphJSON: resolvedSceneGraphJSON,
@@ -1084,7 +1084,7 @@ async function createOrFindComponent(input: {
       kind: "Custom",
       sourceNodeId: input.sourceNodeId,
     });
-    await upsertScene({
+    await saveScene({
       ownerType: "variant",
       ownerId: result.component.activeVariantId,
       graphJSON: input.graphJSON,
@@ -1108,9 +1108,9 @@ async function upsertComponentSceneIfChanged(
   component: ComponentRow,
   graphJSON: string,
 ): Promise<void> {
-  const existingScene = await getSceneByOwner("variant", component.activeVariantId);
+  const existingScene = await readSceneByOwner("variant", component.activeVariantId);
   if (existingScene?.graphJSON === graphJSON) return;
-  await upsertScene({
+  await saveScene({
     ownerType: "variant",
     ownerId: component.activeVariantId,
     graphJSON,

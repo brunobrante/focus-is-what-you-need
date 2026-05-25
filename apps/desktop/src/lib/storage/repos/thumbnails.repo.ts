@@ -1,4 +1,5 @@
 import { newId, now } from "@/lib/storage/ids";
+import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
 import type { SceneOwnerType, ThumbnailRow } from "@/lib/storage/schema";
 import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
 
@@ -36,6 +37,7 @@ export async function upsertThumbnail(input: {
     };
     const next = rows.map((r) => (r.id === existing.id ? updated : r));
     await setTable<ThumbnailRow>(KEY, next);
+    notifyInvalidation(ownerInvalidationKey("thumbnail", input.ownerType, input.ownerId));
     notify(KEY);
     return updated;
   }
@@ -47,6 +49,7 @@ export async function upsertThumbnail(input: {
     capturedAt: t,
   };
   await setTable<ThumbnailRow>(KEY, [created, ...rows]);
+  notifyInvalidation(ownerInvalidationKey("thumbnail", input.ownerType, input.ownerId));
   notify(KEY);
   return created;
 }
@@ -61,5 +64,6 @@ export async function deleteThumbnailByOwner(
   );
   if (nextRows.length === rows.length) return;
   await setTable<ThumbnailRow>(KEY, nextRows);
+  notifyInvalidation(ownerInvalidationKey("thumbnail", ownerType, ownerId));
   notify(KEY);
 }
