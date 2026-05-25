@@ -247,18 +247,6 @@ type TextEditingSession = {
   draftValue: string;
 };
 
-type TextCaretStyle = CSSProperties & {
-  "--caret-height"?: string;
-};
-
-function clearNativeTextSelection(): void {
-  try {
-    globalThis.getSelection?.()?.removeAllRanges();
-  } catch {
-    // Selection cleanup is best-effort and must never break editing state.
-  }
-}
-
 function TextEditingTextarea({
   latestDocumentRef,
   viewportRef,
@@ -272,7 +260,6 @@ function TextEditingTextarea({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sessionRef = useRef<TextEditingSession | null>(null);
   const composingRef = useRef(false);
-  const [caretStyle, setCaretStyle] = useState<TextCaretStyle | null>(null);
   const editingNode = state.editingTextId
     ? state.document.elements[state.editingTextId]
     : null;
@@ -288,68 +275,10 @@ function TextEditingTextarea({
     if (element && element.textContent !== value) element.textContent = value;
   }, [viewportRef]);
 
-  const refreshCaret = useCallback(() => {
-    const textarea = textareaRef.current;
-    const session = sessionRef.current;
-    const viewport = viewportRef.current;
-    if (!textarea || !session || !viewport) {
-      setCaretStyle(null);
-      return;
-    }
-
-    const element = getRenderedElement(viewport, session.id);
-    if (!element || textarea.selectionStart !== textarea.selectionEnd) {
-      setCaretStyle(null);
-      return;
-    }
-
-    const textNode = element.firstChild;
-    const offset = Math.min(
-      textarea.selectionStart ?? session.draftValue.length,
-      session.draftValue.length,
-    );
-    const elementRect = element.getBoundingClientRect();
-    const computed = getComputedStyle(element);
-    const fontSize = Number.parseFloat(computed.fontSize) || 12;
-    const lineHeight =
-      Number.parseFloat(computed.lineHeight) || fontSize * 1.12;
-    let left = elementRect.left;
-    let top = elementRect.top;
-    let height = lineHeight;
-
-    if (textNode?.nodeType === Node.TEXT_NODE) {
-      const range = globalThis.document.createRange();
-      range.setStart(textNode, offset);
-      range.collapse(true);
-      const rect = range.getBoundingClientRect();
-      range.detach();
-      if (Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
-        left = rect.left;
-        top = rect.top || elementRect.top;
-        height = rect.height || lineHeight;
-      }
-    }
-
-    setCaretStyle({
-      position: "fixed",
-      left,
-      top,
-      width: 1,
-      height,
-      background: computed.color || "#0d99ff",
-      pointerEvents: "none",
-      zIndex: 12,
-      transform: "translateZ(0)",
-      "--caret-height": `${height}px`,
-    });
-  }, [viewportRef]);
-
   const finishEditing = useCallback((mode: "commit" | "cancel") => {
     const session = sessionRef.current;
     if (!session) return;
     sessionRef.current = null;
-    setCaretStyle(null);
-    clearNativeTextSelection();
 
     if (mode === "cancel") {
       const beforeContent = session.beforeDocument.elements[session.id]?.content ?? "";
@@ -388,8 +317,6 @@ function TextEditingTextarea({
     if (!activeTextNode) {
       if (sessionRef.current) finishEditing("commit");
       textarea.value = "";
-      setCaretStyle(null);
-      clearNativeTextSelection();
       return;
     }
 
@@ -405,11 +332,9 @@ function TextEditingTextarea({
 
     textarea.value = activeTextNode.content ?? "";
     writeRenderedText(activeTextNode.id, textarea.value);
-    clearNativeTextSelection();
     textarea.focus({ preventScroll: true });
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    globalThis.requestAnimationFrame?.(refreshCaret);
-  }, [activeTextNode?.id, activeTextNode?.content, finishEditing, latestDocumentRef, refreshCaret, writeRenderedText]);
+    textarea.setSelectionRange(0, textarea.value.length);
+  }, [activeTextNode?.id, activeTextNode?.content, finishEditing, latestDocumentRef, writeRenderedText]);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -429,67 +354,58 @@ function TextEditingTextarea({
     if (session?.id === activeTextNode.id) {
       writeRenderedText(activeTextNode.id, session.draftValue);
     }
-    refreshCaret();
-  }, [activeTextNode, refreshCaret, state.document, viewportRef, viewportTransform, writeRenderedText]);
+  }, [activeTextNode, state.document, viewportRef, viewportTransform, writeRenderedText]);
 
   const updateDraft = (value: string) => {
     const session = sessionRef.current;
     if (!session) return;
     session.draftValue = value;
     writeRenderedText(session.id, value);
-    globalThis.requestAnimationFrame?.(refreshCaret);
   };
 
   return (
-    <>
-      <textarea
-        id="text-editing-textarea"
-        ref={textareaRef}
-        tabIndex={-1}
-        spellCheck={false}
-        onChange={(event) => updateDraft(event.currentTarget.value)}
-        onBlur={() => finishEditing("commit")}
-        onCompositionStart={() => {
-          composingRef.current = true;
-        }}
-        onCompositionEnd={(event) => {
-          composingRef.current = false;
-          updateDraft(event.currentTarget.value);
-        }}
-        onSelect={refreshCaret}
-        onKeyUp={refreshCaret}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (composingRef.current) return;
-          if (event.key === "Escape") {
-            event.preventDefault();
-            finishEditing("cancel");
-            return;
-          }
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            finishEditing("commit");
-            return;
-          }
-          globalThis.requestAnimationFrame?.(refreshCaret);
-        }}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          opacity: 0,
-          zIndex: -1,
-          backgroundColor: "white",
-          pointerEvents: "none",
-          width: 1,
-          height: 1,
-          fontSize: 1,
-          lineHeight: 1,
-          transform: "translate(0px, 0px)",
-        }}
-      />
-      {caretStyle ? <div className="text-editing-caret" style={caretStyle} /> : null}
-    </>
+    <textarea
+      id="text-editing-textarea"
+      ref={textareaRef}
+      tabIndex={-1}
+      spellCheck={false}
+      onChange={(event) => updateDraft(event.currentTarget.value)}
+      onBlur={() => finishEditing("commit")}
+      onCompositionStart={() => {
+        composingRef.current = true;
+      }}
+      onCompositionEnd={(event) => {
+        composingRef.current = false;
+        updateDraft(event.currentTarget.value);
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (composingRef.current) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finishEditing("cancel");
+          return;
+        }
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          finishEditing("commit");
+        }
+      }}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        opacity: 0,
+        zIndex: -1,
+        backgroundColor: "white",
+        pointerEvents: "none",
+        width: 1,
+        height: 1,
+        fontSize: 1,
+        lineHeight: 1,
+        transform: "translate(0px, 0px)",
+      }}
+    />
   );
 }
 
