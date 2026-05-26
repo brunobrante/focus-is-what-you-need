@@ -1,8 +1,6 @@
-import { useEffect, useRef } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
-import { updateElementText } from "@/lib/editor/actions";
+import { memo } from "react";
+import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/lib/editor/geometry";
-import { useEditor } from "@/lib/editor/store";
 import type { CanvasDocument, ElementNode } from "@/lib/editor/types";
 
 function rotationTransform(rotation: number, width: number, height: number): string | undefined {
@@ -105,6 +103,51 @@ function isDescendantOf(
   return false;
 }
 
+function subtreeContains(
+  elements: Record<string, ElementNode>,
+  id: string,
+  targetId: string | null | undefined,
+): boolean {
+  if (!targetId) return false;
+  if (id === targetId) return true;
+  const node = elements[id];
+  if (!node) return false;
+  return node.children.some((childId) => subtreeContains(elements, childId, targetId));
+}
+
+function hierarchyStateAffectsNode(
+  previous: ElementRendererProps,
+  next: ElementRendererProps,
+): boolean {
+  if (previous.isolatedParentId !== next.isolatedParentId) {
+    return (
+      subtreeContains(previous.document.elements, previous.id, previous.isolatedParentId) ||
+      subtreeContains(previous.document.elements, previous.id, next.isolatedParentId) ||
+      subtreeContains(next.document.elements, next.id, previous.isolatedParentId) ||
+      subtreeContains(next.document.elements, next.id, next.isolatedParentId) ||
+      Boolean(
+        previous.isolatedParentId &&
+          isDescendantOf(previous.document.elements, previous.id, previous.isolatedParentId),
+      ) ||
+      Boolean(
+        next.isolatedParentId &&
+          isDescendantOf(next.document.elements, next.id, next.isolatedParentId),
+      )
+    );
+  }
+
+  if (previous.editingTextId !== next.editingTextId) {
+    return (
+      subtreeContains(previous.document.elements, previous.id, previous.editingTextId) ||
+      subtreeContains(previous.document.elements, previous.id, next.editingTextId) ||
+      subtreeContains(next.document.elements, next.id, previous.editingTextId) ||
+      subtreeContains(next.document.elements, next.id, next.editingTextId)
+    );
+  }
+
+  return false;
+}
+
 function elementClassName(
   node: ElementNode,
   base: string,
@@ -121,84 +164,81 @@ function elementClassName(
   return classes.join(" ");
 }
 
-export function DetachedIsolatedChildren({ renderScale = 1 }: { renderScale?: number }) {
-  const { state } = useEditor();
-  const isolatedParentId = state.isolatedParentId;
-  const isolatedParent = isolatedParentId ? state.document.elements[isolatedParentId] : null;
+type ElementRendererProps = {
+  id: string;
+  detached?: boolean;
+  document: CanvasDocument;
+  isolatedParentId?: string | null;
+  editingTextId?: string | null;
+  affectedElementIds?: ReadonlySet<string>;
+  preview?: boolean;
+  renderScale?: number;
+};
+
+type DetachedIsolatedChildrenProps = {
+  document: CanvasDocument;
+  isolatedParentId: string | null;
+  editingTextId?: string | null;
+  affectedElementIds?: ReadonlySet<string>;
+  renderScale?: number;
+};
+
+function DetachedIsolatedChildrenImpl({
+  document,
+  isolatedParentId,
+  editingTextId = null,
+  affectedElementIds,
+  renderScale = 1,
+}: DetachedIsolatedChildrenProps) {
+  const isolatedParent = isolatedParentId ? document.elements[isolatedParentId] : null;
 
   if (!isolatedParent) return null;
 
   return (
     <div className="isolated-children-layer" aria-hidden>
       {isolatedParent.children.map((childId) => (
-        <ElementRenderer key={childId} id={childId} detached renderScale={renderScale} />
+        <ElementRenderer
+          key={childId}
+          id={childId}
+          detached
+          document={document}
+          isolatedParentId={isolatedParentId}
+          editingTextId={editingTextId}
+          affectedElementIds={affectedElementIds}
+          renderScale={renderScale}
+        />
       ))}
     </div>
   );
 }
 
-export function ElementRenderer({
+export const DetachedIsolatedChildren = memo(DetachedIsolatedChildrenImpl);
+
+function ElementRendererImpl({
   id,
   detached = false,
-  documentOverride,
+  document,
+  isolatedParentId: isolatedParentIdProp = null,
+  editingTextId = null,
+  affectedElementIds,
   preview = false,
   renderScale = 1,
-}: {
-  id: string;
-  detached?: boolean;
-  documentOverride?: CanvasDocument;
-  preview?: boolean;
-  renderScale?: number;
-}) {
-  const { state, dispatch } = useEditor();
-  const canvasDocument = documentOverride ?? state.document;
+}: ElementRendererProps) {
+  const canvasDocument = document;
   const node = canvasDocument.elements[id];
-  const textRef = useRef<HTMLDivElement | null>(null);
-  const isolatedParentId = preview ? null : state.isolatedParentId;
-  const isEditing = !preview && state.editingTextId === id;
-  const isIsolatedParent = !preview && state.isolatedParentId === id;
-
-  useEffect(() => {
-    if (!isEditing || !textRef.current) return;
-    const element = textRef.current;
-    element.focus();
-    const range = globalThis.document.createRange();
-    range.selectNodeContents(element);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  }, [isEditing]);
+  const isolatedParentId = preview ? null : isolatedParentIdProp;
+  const isEditing = !preview && editingTextId === id;
+  const isIsolatedParent = !preview && isolatedParentIdProp === id;
 
   if (!node || node.visible === false) return null;
-
-  const commitText = () => {
-    if (!textRef.current) return;
-    const content = textRef.current.innerText;
-    dispatch({ type: "commitDocument", document: updateElementText(state.document, node.id, content) });
-    dispatch({ type: "setEditingText", editingTextId: null });
-  };
-
-  const stopTextShortcutPropagation = (event: KeyboardEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    if (event.key === "Escape") { event.preventDefault(); commitText(); }
-    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); commitText(); }
-  };
 
   if (node.type === "text") {
     return (
       <div
-        ref={textRef}
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element text-element", isEditing, isolatedParentId, canvasDocument.elements)}
         style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, isEditing, renderScale)}
-        contentEditable={isEditing}
-        suppressContentEditableWarning
-        spellCheck={false}
-        onBlur={isEditing ? commitText : undefined}
-        onKeyDown={isEditing ? stopTextShortcutPropagation : undefined}
-        onPointerDown={isEditing ? (e) => e.stopPropagation() : undefined}
-        onClick={isEditing ? (e) => e.stopPropagation() : undefined}
       >
         {node.content}
       </div>
@@ -233,7 +273,10 @@ export function ElementRenderer({
         <ElementRenderer
           key={childId}
           id={childId}
-          documentOverride={documentOverride}
+          document={canvasDocument}
+          isolatedParentId={isolatedParentIdProp}
+          editingTextId={editingTextId}
+          affectedElementIds={affectedElementIds}
           preview={preview}
           renderScale={renderScale}
         />
@@ -241,3 +284,30 @@ export function ElementRenderer({
     </div>
   );
 }
+
+function areElementRendererPropsEqual(
+  previous: ElementRendererProps,
+  next: ElementRendererProps,
+): boolean {
+  if (
+    previous.id !== next.id ||
+    previous.detached !== next.detached ||
+    previous.preview !== next.preview ||
+    previous.renderScale !== next.renderScale
+  ) {
+    return false;
+  }
+
+  if (hierarchyStateAffectsNode(previous, next)) {
+    return false;
+  }
+
+  if (previous.document !== next.document) {
+    if (!next.affectedElementIds) return false;
+    return !next.affectedElementIds?.has(next.id);
+  }
+
+  return true;
+}
+
+export const ElementRenderer = memo(ElementRendererImpl, areElementRendererPropsEqual);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
@@ -11,6 +11,7 @@ import {
   duplicateElements,
   insertElement,
   reparentElements,
+  updateElementText,
 } from "@/lib/editor/actions";
 import { copyElements, pasteElements } from "@/lib/editor/clipboard";
 import {
@@ -28,18 +29,19 @@ import {
 } from "@/lib/editor/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/lib/editor/hitTesting";
 import { useEditor } from "@/lib/editor/store";
-import type { CanvasDocument, Point, Rect, ResizeHandle } from "@/lib/editor/types";
+import type { CanvasDocument, ElementNode, Point, Rect, ResizeHandle } from "@/lib/editor/types";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
   canvasPointToViewport,
   clampViewportState,
-  clientPointToCanvas,
   createViewportTransform,
   getCanvasDisplayScale,
   getInitialZoomForCanvas,
   snapViewportOffset,
   shouldUseScaledDomProjection,
+  viewportPointToCanvas,
+  type Size,
   type ViewportTransform,
   viewportChanged,
 } from "@/lib/editor/viewport";
@@ -78,6 +80,12 @@ import {
   containmentOutlineSegments,
   snapOutlineRect,
 } from "./canvasToolingRenderer";
+import {
+  getCaretRect,
+  getIndexFromPoint,
+  getSelectionRects,
+  getTextLayout,
+} from "./textEditingLayout";
 import "./editor.css";
 
 type CanvasAlignmentLogInput = {
@@ -240,6 +248,777 @@ function buildViewportTransform(
   });
 }
 
+type TextEditState = {
+  nodeId: string;
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
+  anchorIndex: number;
+};
+
+type TextEditSession = {
+  nodeId: string;
+  beforeDocument: CanvasDocument;
+};
+
+type TextDragState = {
+  pointerId: number;
+  nodeId: string;
+  anchorIndex: number;
+};
+
+type ViewportClientRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+const ZERO_VIEWPORT_SIZE: Size = { width: 0, height: 0 };
+const ZERO_VIEWPORT_RECT: ViewportClientRect = {
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+};
+
+function sizesEqual(a: Size, b: Size): boolean {
+  return Math.abs(a.width - b.width) <= 0.01 && Math.abs(a.height - b.height) <= 0.01;
+}
+
+function arrayValuesEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
+function elementStylesEqual(a: ElementNode["styles"], b: ElementNode["styles"]): boolean {
+  return (
+    a.background === b.background &&
+    a.color === b.color &&
+    a.fontFamily === b.fontFamily &&
+    a.fontSize === b.fontSize &&
+    a.fontWeight === b.fontWeight &&
+    a.textAlign === b.textAlign &&
+    a.borderRadius === b.borderRadius &&
+    a.borderWidth === b.borderWidth &&
+    a.borderColor === b.borderColor &&
+    a.opacity === b.opacity &&
+    a.display === b.display &&
+    a.justifyContent === b.justifyContent &&
+    a.alignItems === b.alignItems &&
+    a.gap === b.gap &&
+    a.padding === b.padding &&
+    a.overflow === b.overflow &&
+    a.objectFit === b.objectFit
+  );
+}
+
+function elementNodesEqual(a: ElementNode | undefined, b: ElementNode | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.type === b.type &&
+    a.parentId === b.parentId &&
+    arrayValuesEqual(a.children, b.children) &&
+    a.name === b.name &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.rotation === b.rotation &&
+    a.content === b.content &&
+    a.src === b.src &&
+    a.locked === b.locked &&
+    a.visible === b.visible &&
+    elementStylesEqual(a.styles, b.styles)
+  );
+}
+
+function addElementAncestors(
+  document: CanvasDocument | null,
+  id: string,
+  affectedIds: Set<string>,
+): void {
+  let parentId = document?.elements[id]?.parentId ?? null;
+  while (parentId) {
+    affectedIds.add(parentId);
+    parentId = document?.elements[parentId]?.parentId ?? null;
+  }
+}
+
+function getAffectedElementRenderIds(
+  previousDocument: CanvasDocument | null,
+  nextDocument: CanvasDocument,
+): ReadonlySet<string> {
+  if (!previousDocument) {
+    return new Set(Object.keys(nextDocument.elements));
+  }
+
+  const changedIds = new Set<string>();
+  for (const id of Object.keys(previousDocument.elements)) {
+    if (!elementNodesEqual(previousDocument.elements[id], nextDocument.elements[id])) {
+      changedIds.add(id);
+    }
+  }
+  for (const id of Object.keys(nextDocument.elements)) {
+    if (!previousDocument.elements[id]) {
+      changedIds.add(id);
+    }
+  }
+
+  if (!arrayValuesEqual(previousDocument.rootIds, nextDocument.rootIds)) {
+    for (const id of previousDocument.rootIds) changedIds.add(id);
+    for (const id of nextDocument.rootIds) changedIds.add(id);
+  }
+
+  const affectedIds = new Set<string>(changedIds);
+  for (const id of changedIds) {
+    addElementAncestors(previousDocument, id, affectedIds);
+    addElementAncestors(nextDocument, id, affectedIds);
+  }
+  return affectedIds;
+}
+
+type RenderedSceneProps = {
+  draftMode: boolean;
+  document: CanvasDocument;
+  canvasStageActive: boolean;
+  isolatedParentId: string | null;
+  editingTextId: string | null;
+  affectedElementIds: ReadonlySet<string>;
+  renderScale: number;
+};
+
+function RenderedSceneImpl({
+  draftMode,
+  document,
+  canvasStageActive,
+  isolatedParentId,
+  editingTextId,
+  affectedElementIds,
+  renderScale,
+}: RenderedSceneProps) {
+  if (draftMode) {
+    return (
+      <div className="render-layer render-layer--draft">
+        {document.rootIds.map((id) => (
+          <ElementRenderer
+            key={id}
+            id={id}
+            document={document}
+            isolatedParentId={isolatedParentId}
+            editingTextId={editingTextId}
+            affectedElementIds={affectedElementIds}
+            renderScale={renderScale}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`render-layer${canvasStageActive ? " render-layer--canvas-active" : ""}`}>
+      {document.rootIds.map((id) => (
+        <ElementRenderer
+          key={id}
+          id={id}
+          document={document}
+          isolatedParentId={isolatedParentId}
+          editingTextId={editingTextId}
+          affectedElementIds={affectedElementIds}
+          renderScale={renderScale}
+        />
+      ))}
+      <DetachedIsolatedChildren
+        document={document}
+        isolatedParentId={isolatedParentId}
+        editingTextId={editingTextId}
+        affectedElementIds={affectedElementIds}
+        renderScale={renderScale}
+      />
+    </div>
+  );
+}
+
+const RenderedScene = memo(RenderedSceneImpl, (previous, next) => {
+  if (
+    previous.draftMode !== next.draftMode ||
+    previous.canvasStageActive !== next.canvasStageActive ||
+    previous.isolatedParentId !== next.isolatedParentId ||
+    previous.editingTextId !== next.editingTextId ||
+    previous.renderScale !== next.renderScale
+  ) {
+    return false;
+  }
+
+  if (previous.document === next.document) return true;
+  return (
+    next.affectedElementIds.size === 0 &&
+    arrayValuesEqual(previous.document.rootIds, next.document.rootIds)
+  );
+});
+
+function selectionRangeFromAnchor(
+  anchorIndex: number,
+  focusIndex: number,
+): Pick<TextEditState, "selectionStart" | "selectionEnd" | "anchorIndex"> {
+  return {
+    selectionStart: Math.min(anchorIndex, focusIndex),
+    selectionEnd: Math.max(anchorIndex, focusIndex),
+    anchorIndex,
+  };
+}
+
+function clampTextIndex(value: number, text: string): number {
+  return clamp(Math.round(value), 0, text.length);
+}
+
+function replaceTextRange(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  insert: string,
+): { value: string; caretIndex: number } {
+  const start = clampTextIndex(Math.min(selectionStart, selectionEnd), value);
+  const end = clampTextIndex(Math.max(selectionStart, selectionEnd), value);
+  const nextValue = `${value.slice(0, start)}${insert}${value.slice(end)}`;
+  return {
+    value: nextValue,
+    caretIndex: start + insert.length,
+  };
+}
+
+function clearNativeTextSelection(): void {
+  try {
+    globalThis.getSelection?.()?.removeAllRanges();
+  } catch {
+    // Best effort only. Browser selection cleanup must not break editing.
+  }
+}
+
+function localPointForTextNode(input: {
+  document: CanvasDocument;
+  nodeId: string;
+  clientX: number;
+  clientY: number;
+  viewport: HTMLElement;
+  viewportRect?: ViewportClientRect;
+  viewportTransform: ViewportTransform;
+}): Point | null {
+  const node = input.document.elements[input.nodeId];
+  if (!node) return null;
+  const rect = elementToPaintViewportRect(
+    input.document,
+    input.nodeId,
+    input.viewportTransform,
+  );
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  const viewportRect = input.viewportRect ?? input.viewport.getBoundingClientRect();
+  const x = input.clientX - viewportRect.left - rect.x;
+  const y = input.clientY - viewportRect.top - rect.y;
+  return {
+    x: x / (rect.width / Math.max(node.width, 1)),
+    y: y / (rect.height / Math.max(node.height, 1)),
+  };
+}
+
+function textIndexFromClientPoint(input: {
+  document: CanvasDocument;
+  nodeId: string;
+  clientX: number;
+  clientY: number;
+  viewport: HTMLElement;
+  viewportRect?: ViewportClientRect;
+  viewportTransform: ViewportTransform;
+}): number | null {
+  const node = input.document.elements[input.nodeId];
+  if (!node || node.type !== "text") return null;
+  const local = localPointForTextNode(input);
+  if (!local) return null;
+  return getIndexFromPoint(node, local.x, local.y);
+}
+
+function isClientPointInsideTextNode(input: {
+  document: CanvasDocument;
+  nodeId: string;
+  clientX: number;
+  clientY: number;
+  viewport: HTMLElement;
+  viewportRect?: ViewportClientRect;
+  viewportTransform: ViewportTransform;
+}): boolean {
+  const node = input.document.elements[input.nodeId];
+  if (!node || node.type !== "text") return false;
+  const local = localPointForTextNode(input);
+  if (!local) return false;
+  const layout = getTextLayout(node);
+  const lastLine = layout.lines[layout.lines.length - 1];
+  const textBottom = lastLine
+    ? lastLine.y + layout.lineHeight
+    : layout.contentY + layout.lineHeight;
+  return (
+    local.x >= 0 &&
+    local.y >= 0 &&
+    local.x <= node.width &&
+    local.y <= Math.max(node.height, textBottom)
+  );
+}
+
+function isClientPointInsideTextContent(input: {
+  document: CanvasDocument;
+  nodeId: string;
+  clientX: number;
+  clientY: number;
+  viewport: HTMLElement;
+  viewportRect?: ViewportClientRect;
+  viewportTransform: ViewportTransform;
+}): boolean {
+  const node = input.document.elements[input.nodeId];
+  if (!node || node.type !== "text") return false;
+  const local = localPointForTextNode(input);
+  if (!local) return false;
+  const layout = getTextLayout(node);
+
+  return layout.lines.some((line) => (
+    local.y >= line.y &&
+    local.y <= line.y + layout.lineHeight &&
+    local.x >= line.x &&
+    local.x <= line.x + line.width
+  ));
+}
+
+function viewportRectForLocalTextRect(input: {
+  document: CanvasDocument;
+  nodeId: string;
+  localRect: Rect;
+  viewportTransform: ViewportTransform;
+}): Rect | null {
+  const node = input.document.elements[input.nodeId];
+  if (!node) return null;
+  const elementRect = elementToPaintViewportRect(
+    input.document,
+    input.nodeId,
+    input.viewportTransform,
+  );
+  if (!elementRect) return null;
+  const scaleX = elementRect.width / Math.max(node.width, 1);
+  const scaleY = elementRect.height / Math.max(node.height, 1);
+  return {
+    x: elementRect.x + input.localRect.x * scaleX,
+    y: elementRect.y + input.localRect.y * scaleY,
+    width: input.localRect.width * scaleX,
+    height: input.localRect.height * scaleY,
+  };
+}
+
+function TextEditingOverlay({
+  textEdit,
+  document,
+  viewportTransform,
+}: {
+  textEdit: TextEditState | null;
+  document: CanvasDocument;
+  viewportTransform: ViewportTransform;
+}) {
+  if (!textEdit) return null;
+  const node = document.elements[textEdit.nodeId];
+  if (!node || node.type !== "text" || node.visible === false) return null;
+  const elementRect = elementToPaintViewportRect(
+    document,
+    textEdit.nodeId,
+    viewportTransform,
+  );
+  if (!elementRect) return null;
+  const scaleX = elementRect.width / Math.max(node.width, 1);
+  const scaleY = elementRect.height / Math.max(node.height, 1);
+  const layout = getTextLayout(node);
+  const lastLine = layout.lines[layout.lines.length - 1];
+  const textBottom = lastLine
+    ? lastLine.y + layout.lineHeight
+    : layout.contentY + layout.lineHeight;
+  const toOverlayRect = (rect: Rect): Rect => ({
+    x: rect.x * scaleX,
+    y: rect.y * scaleY,
+    width: rect.width * scaleX,
+    height: rect.height * scaleY,
+  });
+
+  const selectionRects = getSelectionRects(
+    node,
+    textEdit.selectionStart,
+    textEdit.selectionEnd,
+  ).map(toOverlayRect);
+  const isCollapsed = textEdit.selectionStart === textEdit.selectionEnd;
+  const caretRect = isCollapsed
+    ? toOverlayRect(getCaretRect(node, textEdit.selectionEnd))
+    : null;
+
+  return (
+    <div
+      className="text-editing-overlay"
+      style={{
+        left: elementRect.x,
+        top: elementRect.y,
+        width: elementRect.width,
+        height: Math.max(elementRect.height, textBottom * scaleY),
+      }}
+    >
+      <div className="text-editing-selection-clip">
+        {selectionRects.map((rect, index) => (
+          <div
+            key={`selection-${textEdit.nodeId}-${index}`}
+            className="text-editing-selection"
+            style={{
+              left: rect.x,
+              top: rect.y,
+              width: rect.width,
+              height: rect.height,
+            }}
+          />
+        ))}
+      </div>
+      {caretRect ? (
+        <div
+          className="text-editing-caret"
+          style={{
+            left: caretRect.x,
+            top: caretRect.y,
+            height: caretRect.height,
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function HiddenTextEditingTextarea({
+  textEdit,
+  document,
+  viewportRef,
+  viewportTransform,
+  onSelectionChange,
+  onInputValue,
+  onCommit,
+  onCancel,
+}: {
+  textEdit: TextEditState | null;
+  document: CanvasDocument;
+  viewportRef: { current: HTMLDivElement | null };
+  viewportTransform: ViewportTransform;
+  onSelectionChange: (selectionStart: number, selectionEnd: number, anchorIndex?: number) => void;
+  onInputValue: (value: string, selectionStart: number, selectionEnd: number) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const latestTextEditRef = useRef<TextEditState | null>(textEdit);
+  const composingRef = useRef(false);
+
+  const updateHiddenTextareaPosition = useCallback(() => {
+    const textarea = textareaRef.current;
+    const viewport = viewportRef.current;
+    if (!textarea || !viewport || !textEdit) return;
+    const node = document.elements[textEdit.nodeId];
+    if (!node || node.type !== "text") return;
+    const caretLocalRect = getCaretRect(node, textEdit.selectionEnd);
+    const caretViewportRect = viewportRectForLocalTextRect({
+      document,
+      nodeId: textEdit.nodeId,
+      localRect: caretLocalRect,
+      viewportTransform,
+    });
+    if (!caretViewportRect) return;
+    const viewportRect = viewport.getBoundingClientRect();
+    textarea.style.transform = `translate(${viewportRect.left + caretViewportRect.x}px, ${viewportRect.top + caretViewportRect.y}px)`;
+  }, [document, textEdit, viewportRef, viewportTransform]);
+
+  const applyTextareaSelection = useCallback((
+    textarea: HTMLTextAreaElement,
+    selectionStart: number,
+    selectionEnd: number,
+    anchorIndex?: number,
+  ) => {
+    const current = latestTextEditRef.current;
+    if (!current) return;
+    const start = clampTextIndex(selectionStart, current.value);
+    const end = clampTextIndex(selectionEnd, current.value);
+    const nextStart = Math.min(start, end);
+    const nextEnd = Math.max(start, end);
+    const nextAnchor = anchorIndex ?? nextEnd;
+    latestTextEditRef.current = {
+      ...current,
+      selectionStart: nextStart,
+      selectionEnd: nextEnd,
+      anchorIndex: nextAnchor,
+    };
+    textarea.setSelectionRange(nextStart, nextEnd);
+    onSelectionChange(nextStart, nextEnd, nextAnchor);
+  }, [onSelectionChange]);
+
+  const applyTextareaValue = useCallback((
+    textarea: HTMLTextAreaElement,
+    value: string,
+    selectionStart: number,
+    selectionEnd: number,
+  ) => {
+    const current = latestTextEditRef.current;
+    if (!current) return;
+    const start = clampTextIndex(selectionStart, value);
+    const end = clampTextIndex(selectionEnd, value);
+    const nextStart = Math.min(start, end);
+    const nextEnd = Math.max(start, end);
+    latestTextEditRef.current = {
+      ...current,
+      value,
+      selectionStart: nextStart,
+      selectionEnd: nextEnd,
+      anchorIndex: nextEnd,
+    };
+    textarea.value = value;
+    textarea.setSelectionRange(nextStart, nextEnd);
+    onInputValue(value, nextStart, nextEnd);
+  }, [onInputValue]);
+
+  const replaceCurrentTextSelection = useCallback((
+    textarea: HTMLTextAreaElement,
+    insert: string,
+  ) => {
+    const current = latestTextEditRef.current;
+    if (!current) return;
+    const next = replaceTextRange(
+      current.value,
+      current.selectionStart,
+      current.selectionEnd,
+      insert,
+    );
+    applyTextareaValue(textarea, next.value, next.caretIndex, next.caretIndex);
+  }, [applyTextareaValue]);
+
+  useLayoutEffect(() => {
+    latestTextEditRef.current = textEdit;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    if (!textEdit) {
+      textarea.value = "";
+      return;
+    }
+    if (textarea.value !== textEdit.value) textarea.value = textEdit.value;
+    textarea.focus({ preventScroll: true });
+    textarea.setSelectionRange(textEdit.selectionStart, textEdit.selectionEnd);
+    updateHiddenTextareaPosition();
+  }, [textEdit, updateHiddenTextareaPosition]);
+
+  useLayoutEffect(() => {
+    updateHiddenTextareaPosition();
+  }, [updateHiddenTextareaPosition]);
+
+  const syncNativeTextareaValue = (textarea: HTMLTextAreaElement) => {
+    applyTextareaValue(textarea, textarea.value, textarea.selectionStart, textarea.selectionEnd);
+  };
+
+  const syncTextareaSelection = (textarea: HTMLTextAreaElement) => {
+    if (!latestTextEditRef.current) return;
+    applyTextareaSelection(textarea, textarea.selectionStart, textarea.selectionEnd);
+  };
+
+  return (
+    <textarea
+      id="text-editing-textarea"
+      ref={textareaRef}
+      tabIndex={-1}
+      spellCheck={false}
+      onBeforeInput={(event) => {
+        clearNativeTextSelection();
+        const current = latestTextEditRef.current;
+        if (!current || composingRef.current) return;
+        const nativeEvent = event.nativeEvent as InputEvent;
+        const inputType = nativeEvent.inputType;
+        const textarea = event.currentTarget;
+        if (inputType === "insertText" || inputType === "insertReplacementText") {
+          const data = nativeEvent.data;
+          if (data == null) return;
+          event.preventDefault();
+          replaceCurrentTextSelection(textarea, data);
+          return;
+        }
+        if (inputType === "deleteContentBackward") {
+          event.preventDefault();
+          if (current.selectionStart !== current.selectionEnd) {
+            replaceCurrentTextSelection(textarea, "");
+            return;
+          }
+          if (current.selectionStart <= 0) return;
+          const next = replaceTextRange(
+            current.value,
+            current.selectionStart - 1,
+            current.selectionStart,
+            "",
+          );
+          applyTextareaValue(textarea, next.value, next.caretIndex, next.caretIndex);
+          return;
+        }
+        if (inputType === "deleteContentForward") {
+          event.preventDefault();
+          if (current.selectionStart !== current.selectionEnd) {
+            replaceCurrentTextSelection(textarea, "");
+            return;
+          }
+          if (current.selectionEnd >= current.value.length) return;
+          const next = replaceTextRange(
+            current.value,
+            current.selectionEnd,
+            current.selectionEnd + 1,
+            "",
+          );
+          applyTextareaValue(textarea, next.value, current.selectionEnd, current.selectionEnd);
+        }
+      }}
+      onInput={(event) => {
+        const textarea = event.currentTarget;
+        if (composingRef.current) return;
+        if (latestTextEditRef.current?.value === textarea.value) return;
+        syncNativeTextareaValue(textarea);
+      }}
+      onSelect={(event) => {
+        if (composingRef.current) syncTextareaSelection(event.currentTarget);
+      }}
+      onCompositionStart={() => {
+        composingRef.current = true;
+      }}
+      onCompositionEnd={(event) => {
+        composingRef.current = false;
+        const textarea = event.currentTarget;
+        syncNativeTextareaValue(textarea);
+      }}
+      onCopy={(event) => {
+        const current = latestTextEditRef.current;
+        if (!current || current.selectionStart === current.selectionEnd) return;
+        event.clipboardData.setData(
+          "text/plain",
+          current.value.slice(current.selectionStart, current.selectionEnd),
+        );
+        event.preventDefault();
+      }}
+      onCut={(event) => {
+        const current = latestTextEditRef.current;
+        if (!current || current.selectionStart === current.selectionEnd) return;
+        event.clipboardData.setData(
+          "text/plain",
+          current.value.slice(current.selectionStart, current.selectionEnd),
+        );
+        replaceCurrentTextSelection(event.currentTarget, "");
+        event.preventDefault();
+      }}
+      onPaste={(event) => {
+        if (!latestTextEditRef.current) return;
+        const pastedText = event.clipboardData.getData("text/plain");
+        replaceCurrentTextSelection(event.currentTarget, pastedText);
+        event.preventDefault();
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        const current = latestTextEditRef.current;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onCancel();
+          return;
+        }
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          onCommit();
+          return;
+        }
+        if (!current || composingRef.current) return;
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+          event.preventDefault();
+          applyTextareaSelection(event.currentTarget, 0, current.value.length, 0);
+          return;
+        }
+        if (event.key === "Backspace") {
+          event.preventDefault();
+          if (current.selectionStart !== current.selectionEnd) {
+            replaceCurrentTextSelection(event.currentTarget, "");
+            return;
+          }
+          if (current.selectionStart <= 0) return;
+          const next = replaceTextRange(
+            current.value,
+            current.selectionStart - 1,
+            current.selectionStart,
+            "",
+          );
+          applyTextareaValue(event.currentTarget, next.value, next.caretIndex, next.caretIndex);
+          return;
+        }
+        if (event.key === "Delete") {
+          event.preventDefault();
+          if (current.selectionStart !== current.selectionEnd) {
+            replaceCurrentTextSelection(event.currentTarget, "");
+            return;
+          }
+          if (current.selectionEnd >= current.value.length) return;
+          const next = replaceTextRange(
+            current.value,
+            current.selectionEnd,
+            current.selectionEnd + 1,
+            "",
+          );
+          applyTextareaValue(event.currentTarget, next.value, current.selectionEnd, current.selectionEnd);
+          return;
+        }
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          const direction = event.key === "ArrowLeft" ? -1 : 1;
+          if (event.shiftKey) {
+            const anchor = current.anchorIndex;
+            const focus =
+              current.selectionStart === current.selectionEnd
+                ? current.selectionEnd
+                : anchor === current.selectionStart
+                  ? current.selectionEnd
+                  : current.selectionStart;
+            const nextFocus = clampTextIndex(focus + direction, current.value);
+            const nextRange = selectionRangeFromAnchor(anchor, nextFocus);
+            applyTextareaSelection(
+              event.currentTarget,
+              nextRange.selectionStart,
+              nextRange.selectionEnd,
+              nextRange.anchorIndex,
+            );
+            return;
+          }
+          const nextCaret =
+            current.selectionStart !== current.selectionEnd
+              ? event.key === "ArrowLeft"
+                ? current.selectionStart
+                : current.selectionEnd
+              : clampTextIndex(current.selectionEnd + direction, current.value);
+          applyTextareaSelection(event.currentTarget, nextCaret, nextCaret, nextCaret);
+        }
+      }}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        opacity: 0,
+        zIndex: -1,
+        backgroundColor: "white",
+        pointerEvents: "none",
+        width: 1,
+        height: 1,
+        fontSize: 1,
+        lineHeight: 1,
+        transform: "translate(0px, 0px)",
+      }}
+    />
+  );
+}
+
 export function CanvasStage({
   draftMode = false,
   activeTool,
@@ -262,18 +1041,87 @@ export function CanvasStage({
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const toolingRef = useRef<CanvasToolingRef | null>(null);
   const interactionRef = useRef<Interaction | null>(null);
+  const textDragRef = useRef<TextDragState | null>(null);
+  const textEditSessionRef = useRef<TextEditSession | null>(null);
+  const pendingTextEditClientPointRef = useRef<Point | null>(null);
+  const pendingTextEditSelectAllRef = useRef(false);
   const latestStateRef = useRef(state);
   const latestDocumentRef = useRef(state.document);
+  const previousRenderDocumentRef = useRef<CanvasDocument | null>(null);
   const viewportInitializedSubjectRef = useRef<string | null>(null);
+  const viewportMetricsFrameRef = useRef<number | null>(null);
+  const viewportSizeRef = useRef<Size>(ZERO_VIEWPORT_SIZE);
+  const viewportRectRef = useRef<ViewportClientRect>(ZERO_VIEWPORT_RECT);
   const spacePressedRef = useRef(false);
   const commandModeRef = useRef(false);
   const dropTargetIdRef = useRef<string | null>(null);
+  const [viewportSize, setViewportSize] = useState<Size>(ZERO_VIEWPORT_SIZE);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
   const [interactionActive, setInteractionActive] = useState(false);
+  const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
   const canvasAlignmentDebugEnabled = useMemo(isCanvasAlignmentDebugEnabled, []);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const affectedElementIds = useMemo(
+    () => getAffectedElementRenderIds(previousRenderDocumentRef.current, state.document),
+    [state.document],
+  );
+
+  const syncViewportMetrics = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const rect = viewport.getBoundingClientRect();
+    const nextRect: ViewportClientRect = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    const nextSize: Size = {
+      width: viewport.clientWidth,
+      height: viewport.clientHeight,
+    };
+
+    viewportRectRef.current = nextRect;
+    viewportSizeRef.current = nextSize;
+    setViewportSize((previous) => (sizesEqual(previous, nextSize) ? previous : nextSize));
+  }, []);
+
+  const scheduleViewportMetricsSync = useCallback(() => {
+    if (viewportMetricsFrameRef.current !== null) return;
+    viewportMetricsFrameRef.current = globalThis.requestAnimationFrame(() => {
+      viewportMetricsFrameRef.current = null;
+      syncViewportMetrics();
+    });
+  }, [syncViewportMetrics]);
+
+  const getCurrentViewportSize = useCallback((): Size => {
+    const cached = viewportSizeRef.current;
+    if (cached.width > 0 || cached.height > 0) return cached;
+    const viewport = viewportRef.current;
+    if (!viewport) return ZERO_VIEWPORT_SIZE;
+    const next = getViewportSize(viewport);
+    viewportSizeRef.current = next;
+    return next;
+  }, []);
+
+  const getCurrentViewportRect = useCallback((): ViewportClientRect => {
+    const cached = viewportRectRef.current;
+    if (cached.width > 0 || cached.height > 0) return cached;
+    const viewport = viewportRef.current;
+    if (!viewport) return ZERO_VIEWPORT_RECT;
+    const rect = viewport.getBoundingClientRect();
+    const next = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    viewportRectRef.current = next;
+    return next;
+  }, []);
 
   const updateDropTarget = useCallback((id: string | null) => {
     dropTargetIdRef.current = id;
@@ -285,6 +1133,194 @@ export function CanvasStage({
     latestDocumentRef.current = state.document;
   }, [state]);
 
+  useLayoutEffect(() => {
+    previousRenderDocumentRef.current = state.document;
+  }, [state.document]);
+
+  useLayoutEffect(() => {
+    syncViewportMetrics();
+
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const observer = new ResizeObserver(scheduleViewportMetricsSync);
+    observer.observe(viewport);
+    globalThis.addEventListener("resize", scheduleViewportMetricsSync);
+    globalThis.visualViewport?.addEventListener("resize", scheduleViewportMetricsSync);
+    globalThis.visualViewport?.addEventListener("scroll", scheduleViewportMetricsSync);
+
+    return () => {
+      observer.disconnect();
+      globalThis.removeEventListener("resize", scheduleViewportMetricsSync);
+      globalThis.visualViewport?.removeEventListener("resize", scheduleViewportMetricsSync);
+      globalThis.visualViewport?.removeEventListener("scroll", scheduleViewportMetricsSync);
+      if (viewportMetricsFrameRef.current !== null) {
+        globalThis.cancelAnimationFrame(viewportMetricsFrameRef.current);
+        viewportMetricsFrameRef.current = null;
+      }
+    };
+  }, [scheduleViewportMetricsSync, syncViewportMetrics]);
+
+  const syncTextSelection = useCallback((
+    selectionStart: number,
+    selectionEnd: number,
+    anchorIndex?: number,
+  ) => {
+    setTextEdit((current) => {
+      if (!current) return current;
+      const start = clampTextIndex(selectionStart, current.value);
+      const end = clampTextIndex(selectionEnd, current.value);
+      return {
+        ...current,
+        selectionStart: Math.min(start, end),
+        selectionEnd: Math.max(start, end),
+        anchorIndex: anchorIndex ?? end,
+      };
+    });
+  }, []);
+
+  const updateTextNodeFromTextareaInput = useCallback((
+    value: string,
+    selectionStart: number,
+    selectionEnd: number,
+  ) => {
+    setTextEdit((current) => {
+      if (!current) return current;
+      const start = clampTextIndex(selectionStart, value);
+      const end = clampTextIndex(selectionEnd, value);
+      const nextDocument = updateElementText(
+        latestDocumentRef.current,
+        current.nodeId,
+        value,
+      );
+      latestDocumentRef.current = nextDocument;
+      dispatch({ type: "setDocumentTransient", document: nextDocument });
+      return {
+        ...current,
+        value,
+        selectionStart: Math.min(start, end),
+        selectionEnd: Math.max(start, end),
+        anchorIndex: end,
+      };
+    });
+  }, [dispatch]);
+
+  const commitTextEditing = useCallback(() => {
+    const session = textEditSessionRef.current;
+    if (!session) return;
+    textEditSessionRef.current = null;
+    clearNativeTextSelection();
+
+    const current = textEdit;
+    const value =
+      current?.nodeId === session.nodeId
+        ? current.value
+        : latestDocumentRef.current.elements[session.nodeId]?.content ?? "";
+    const finalDocument = updateElementText(
+      latestDocumentRef.current,
+      session.nodeId,
+      value,
+    );
+    latestDocumentRef.current = finalDocument;
+    setTextEdit(null);
+
+    const beforeValue = session.beforeDocument.elements[session.nodeId]?.content ?? "";
+    if (beforeValue === value) {
+      dispatch({ type: "setEditingText", editingTextId: null });
+      return;
+    }
+
+    dispatch({
+      type: "commitDocument",
+      beforeDocument: session.beforeDocument,
+      document: finalDocument,
+      selectedIds: state.selectedIds.includes(session.nodeId)
+        ? state.selectedIds
+        : [session.nodeId],
+    });
+  }, [dispatch, state.selectedIds, textEdit]);
+
+  const cancelTextEditing = useCallback(() => {
+    const session = textEditSessionRef.current;
+    if (!session) return;
+    textEditSessionRef.current = null;
+    latestDocumentRef.current = session.beforeDocument;
+    setTextEdit(null);
+    clearNativeTextSelection();
+    dispatch({ type: "setDocumentTransient", document: session.beforeDocument });
+    dispatch({ type: "setEditingText", editingTextId: null });
+  }, [dispatch]);
+
+  const enterTextEditing = useCallback((nodeId: string, clientPoint?: Point, selectAll = false) => {
+    pendingTextEditClientPointRef.current = clientPoint ?? null;
+    pendingTextEditSelectAllRef.current = selectAll;
+    dispatch({ type: "setEditingText", editingTextId: nodeId });
+  }, [dispatch]);
+
+  useLayoutEffect(() => {
+    const activeId = state.editingTextId;
+    const activeNode = activeId ? state.document.elements[activeId] : null;
+    if (!activeId || !activeNode || activeNode.type !== "text") {
+      if (textEditSessionRef.current) commitTextEditing();
+      setTextEdit(null);
+      return;
+    }
+
+    if (textEditSessionRef.current?.nodeId === activeId) return;
+    if (textEditSessionRef.current) commitTextEditing();
+
+    const beforeDocument = latestDocumentRef.current;
+    const node = beforeDocument.elements[activeId] ?? activeNode;
+    const value = node.content ?? "";
+    const viewport = viewportRef.current;
+    const requestedPoint = pendingTextEditClientPointRef.current;
+    pendingTextEditClientPointRef.current = null;
+    const selectAllOnEnter = pendingTextEditSelectAllRef.current;
+    pendingTextEditSelectAllRef.current = false;
+    const activeViewportSize = getCurrentViewportSize();
+    const activeViewportRect = getCurrentViewportRect();
+    const activeViewportTransform = viewport
+      ? buildViewportTransform(
+          beforeDocument,
+          activeViewportSize,
+          latestStateRef.current.zoom,
+          latestStateRef.current.offsetX,
+          latestStateRef.current.offsetY,
+        )
+      : null;
+    const caretIndex =
+      viewport && requestedPoint && activeViewportTransform
+        ? textIndexFromClientPoint({
+            document: beforeDocument,
+            nodeId: activeId,
+            clientX: requestedPoint.x,
+            clientY: requestedPoint.y,
+            viewport,
+            viewportRect: activeViewportRect,
+            viewportTransform: activeViewportTransform,
+          }) ?? value.length
+        : value.length;
+
+    textEditSessionRef.current = {
+      nodeId: activeId,
+      beforeDocument,
+    };
+    setTextEdit({
+      nodeId: activeId,
+      value,
+      selectionStart: selectAllOnEnter ? 0 : caretIndex,
+      selectionEnd: selectAllOnEnter ? value.length : caretIndex,
+      anchorIndex: selectAllOnEnter ? 0 : caretIndex,
+    });
+    clearNativeTextSelection();
+  }, [
+    commitTextEditing,
+    getCurrentViewportRect,
+    getCurrentViewportSize,
+    state.document,
+    state.editingTextId,
+  ]);
+
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -294,47 +1330,47 @@ export function CanvasStage({
   }, []);
 
   useLayoutEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
     // The user-facing camera (zoom + offset) is owned by document state. The
     // browser window can affect only the internal display scale that fits large
     // subjects at 100%; it must not dispatch fresh zoom/offset values on every
     // resize.
     //
-    // The ResizeObserver here only triggers the *initial* sync, which runs
-    // once per subject (first time the viewport has a non-zero size). After
-    // that, no window-driven dispatches happen.
-    const syncOnce = () => {
-      const viewportSize = getViewportSize(viewport);
-      const canvasSize = getCanvasSize(state.document);
-      const subjectKey = viewportSubjectKey ?? `${canvasSize.width}x${canvasSize.height}`;
-      if (draftMode) return;
-      if (viewportInitializedSubjectRef.current === subjectKey) return;
-      if (viewportSize.width <= 0 || viewportSize.height <= 0) return;
+    // Viewport measurement is cached by the ResizeObserver above; this effect
+    // only consumes the cached size for the once-per-subject initial sync.
+    const canvasSize = getCanvasSize(state.document);
+    const subjectKey = viewportSubjectKey ?? `${canvasSize.width}x${canvasSize.height}`;
+    if (draftMode) return;
+    if (viewportInitializedSubjectRef.current === subjectKey) return;
+    if (viewportSize.width <= 0 || viewportSize.height <= 0) return;
 
-      const zoom = getInitialZoomForCanvas(viewportSize, canvasSize);
-      const next = clampViewportState(
-        { zoom, offsetX: state.offsetX, offsetY: state.offsetY },
-        viewportSize,
-        canvasSize,
-        state.canvasStageActive,
-      );
-      viewportInitializedSubjectRef.current = subjectKey;
-      if (viewportChanged(next, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
-        dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
-      }
-    };
-    syncOnce();
-    const observer = new ResizeObserver(syncOnce);
-    observer.observe(viewport);
-    return () => observer.disconnect();
-  }, [dispatch, draftMode, state.canvasStageActive, state.document.canvas.height, state.document.canvas.width, state.offsetX, state.offsetY, state.zoom, viewportSubjectKey]);
+    const zoom = getInitialZoomForCanvas(viewportSize, canvasSize);
+    const next = clampViewportState(
+      { zoom, offsetX: state.offsetX, offsetY: state.offsetY },
+      viewportSize,
+      canvasSize,
+      state.canvasStageActive,
+    );
+    viewportInitializedSubjectRef.current = subjectKey;
+    if (viewportChanged(next, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
+      dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
+    }
+  }, [
+    dispatch,
+    draftMode,
+    state.canvasStageActive,
+    state.document.canvas.height,
+    state.document.canvas.width,
+    state.offsetX,
+    state.offsetY,
+    state.zoom,
+    viewportSize,
+    viewportSubjectKey,
+  ]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const currentState = latestStateRef.current;
       if (isEditableTarget(event.target) || currentState.editingTextId) {
-        if (event.key === "Escape") dispatch({ type: "setEditingText", editingTextId: null });
         return;
       }
 
@@ -403,7 +1439,7 @@ export function CanvasStage({
   const getCanvasPoint = (event: ReactPointerEvent): Point | null => {
     const viewport = viewportRef.current;
     if (!viewport) return null;
-    const viewportSize = getViewportSize(viewport);
+    const viewportSize = getCurrentViewportSize();
     const transform = buildViewportTransform(
       state.document,
       viewportSize,
@@ -411,7 +1447,11 @@ export function CanvasStage({
       state.offsetX,
       state.offsetY,
     );
-    return clientPointToCanvas(viewport, event.clientX, event.clientY, transform);
+    const viewportRect = getCurrentViewportRect();
+    return viewportPointToCanvas(
+      { x: event.clientX - viewportRect.left, y: event.clientY - viewportRect.top },
+      transform,
+    );
   };
 
   const getInteractiveElementId = (target: EventTarget | null): string | null =>
@@ -421,11 +1461,144 @@ export function CanvasStage({
       getElementIdFromTarget(target),
     );
 
+  const textIndexAtClientPoint = (
+    nodeId: string,
+    clientX: number,
+    clientY: number,
+  ): number | null => {
+    const viewport = viewportRef.current;
+    if (!viewport) return null;
+    const viewportSize = getCurrentViewportSize();
+    const viewportRect = getCurrentViewportRect();
+    return textIndexFromClientPoint({
+      document: latestDocumentRef.current,
+      nodeId,
+      clientX,
+      clientY,
+      viewport,
+      viewportRect,
+      viewportTransform: buildViewportTransform(
+        latestDocumentRef.current,
+        viewportSize,
+        latestStateRef.current.zoom,
+        latestStateRef.current.offsetX,
+        latestStateRef.current.offsetY,
+      ),
+    });
+  };
+
+  const isTextNodeAtClientPoint = (
+    nodeId: string,
+    clientX: number,
+    clientY: number,
+  ): boolean => {
+    const viewport = viewportRef.current;
+    if (!viewport) return false;
+    const viewportSize = getCurrentViewportSize();
+    const viewportRect = getCurrentViewportRect();
+    return isClientPointInsideTextNode({
+      document: latestDocumentRef.current,
+      nodeId,
+      clientX,
+      clientY,
+      viewport,
+      viewportRect,
+      viewportTransform: buildViewportTransform(
+        latestDocumentRef.current,
+        viewportSize,
+        latestStateRef.current.zoom,
+        latestStateRef.current.offsetX,
+        latestStateRef.current.offsetY,
+      ),
+    });
+  };
+
+  const isTextContentAtClientPoint = (
+    nodeId: string,
+    clientX: number,
+    clientY: number,
+  ): boolean => {
+    const viewport = viewportRef.current;
+    if (!viewport) return false;
+    const viewportSize = getCurrentViewportSize();
+    const viewportRect = getCurrentViewportRect();
+    return isClientPointInsideTextContent({
+      document: latestDocumentRef.current,
+      nodeId,
+      clientX,
+      clientY,
+      viewport,
+      viewportRect,
+      viewportTransform: buildViewportTransform(
+        latestDocumentRef.current,
+        viewportSize,
+        latestStateRef.current.zoom,
+        latestStateRef.current.offsetX,
+        latestStateRef.current.offsetY,
+      ),
+    });
+  };
+
+  const getSelectedTextBoxAtClientPoint = (
+    clientX: number,
+    clientY: number,
+  ): string | null => {
+    const viewport = viewportRef.current;
+    if (!viewport) return null;
+    const viewportRect = getCurrentViewportRect();
+    const viewportPoint = {
+      x: clientX - viewportRect.left,
+      y: clientY - viewportRect.top,
+    };
+    const viewportTransform = buildViewportTransform(
+      state.document,
+      getCurrentViewportSize(),
+      state.zoom,
+      state.offsetX,
+      state.offsetY,
+    );
+
+    for (const id of [...state.selectedIds].reverse()) {
+      const node = state.document.elements[id];
+      if (!node || node.type !== "text" || node.locked || node.visible === false) continue;
+      const rect = elementToPaintViewportRect(state.document, id, viewportTransform);
+      if (
+        rect &&
+        viewportPoint.x >= rect.x &&
+        viewportPoint.x <= rect.x + rect.width &&
+        viewportPoint.y >= rect.y &&
+        viewportPoint.y <= rect.y + rect.height
+      ) {
+        return id;
+      }
+    }
+
+    return null;
+  };
+
+  const setTextSelectionFromPoint = (
+    nodeId: string,
+    clientX: number,
+    clientY: number,
+    anchorIndex?: number,
+  ): number | null => {
+    const index = textIndexAtClientPoint(nodeId, clientX, clientY);
+    if (index === null) return null;
+    const anchor = anchorIndex ?? index;
+    const nextSelection = selectionRangeFromAnchor(anchor, index);
+    syncTextSelection(
+      nextSelection.selectionStart,
+      nextSelection.selectionEnd,
+      nextSelection.anchorIndex,
+    );
+    return index;
+  };
+
   const logCanvasAlignment = (input: CanvasAlignmentLogInput) => {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
-    const viewportSize = getViewportSize(viewport);
+    const viewportSize = getCurrentViewportSize();
     const canvasSize = getCanvasSize(input.document);
     const t = buildViewportTransform(
       input.document,
@@ -816,7 +1989,7 @@ export function CanvasStage({
     if (!point || !viewport) return;
     if (state.canvasStageActive) {
       const displayScale = getCanvasDisplayScale(
-        getViewportSize(viewport),
+        getCurrentViewportSize(),
         getCanvasSize(state.document),
       );
       interactionRef.current = {
@@ -977,8 +2150,8 @@ export function CanvasStage({
   const onWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    const containerSize = getViewportSize(viewport);
-    const viewportRect = viewport.getBoundingClientRect();
+    const containerSize = getCurrentViewportSize();
+    const viewportRect = getCurrentViewportRect();
     const canvasSize = getCanvasSize(state.document);
     let nextViewport;
     if (event.ctrlKey || event.metaKey) {
@@ -995,7 +2168,7 @@ export function CanvasStage({
         canvasWidth: canvasSize.width,
         canvasHeight: canvasSize.height,
       });
-      const cursorCanvas = clientPointToCanvas(viewport, event.clientX, event.clientY, currentTransform);
+      const cursorCanvas = viewportPointToCanvas(cursor, currentTransform);
       const nextBaseTransform = createViewportTransform({
         displayZoom: nextDisplayZoom,
         offsetX: 0,
@@ -1023,10 +2196,31 @@ export function CanvasStage({
     if (contextMenu) setContextMenu(null);
     if (event.button === 1 || (event.button === 0 && spacePressedRef.current)) { beginPan(event); return; }
     if (event.button !== 0) return;
+    clearNativeTextSelection();
 
     const viewport = viewportRef.current;
+    const initialTargetId = getInteractiveElementId(event.target);
+    const initialTargetNode = initialTargetId ? state.document.elements[initialTargetId] : null;
+    const selectedTextBoxTargetId = initialTargetId
+      ? null
+      : getSelectedTextBoxAtClientPoint(event.clientX, event.clientY);
+    const textDoubleClickTarget =
+      initialTargetNode?.type === "text"
+        ? initialTargetNode
+        : selectedTextBoxTargetId
+          ? state.document.elements[selectedTextBoxTargetId]
+          : null;
+    if (
+      event.detail > 1 &&
+      textDoubleClickTarget?.type === "text" &&
+      !textDoubleClickTarget.locked
+    ) {
+      event.preventDefault();
+      return;
+    }
+
     if (viewport && toolingRef.current && !state.editingTextId) {
-      const vpRect = viewport.getBoundingClientRect();
+      const vpRect = getCurrentViewportRect();
       const hit: ToolingHit = toolingRef.current.hitTest(
         event.clientX - vpRect.left,
         event.clientY - vpRect.top,
@@ -1045,8 +2239,27 @@ export function CanvasStage({
 
     if (state.canvasStageActive) return;
     if (state.editingTextId) {
-      const targetId = getInteractiveElementId(event.target);
-      if (targetId === state.editingTextId) return;
+      if (isTextNodeAtClientPoint(
+        state.editingTextId,
+        event.clientX,
+        event.clientY,
+      )) {
+        const index = setTextSelectionFromPoint(
+          state.editingTextId,
+          event.clientX,
+          event.clientY,
+        );
+        if (index !== null) {
+          textDragRef.current = {
+            pointerId: event.pointerId,
+            nodeId: state.editingTextId,
+            anchorIndex: index,
+          };
+          event.preventDefault();
+          viewport?.setPointerCapture(event.pointerId);
+        }
+        return;
+      }
       dispatch({ type: "setEditingText", editingTextId: null });
     }
     const point = getCanvasPoint(event);
@@ -1075,7 +2288,7 @@ export function CanvasStage({
       viewport.setPointerCapture(event.pointerId);
       return;
     }
-    const targetId = getInteractiveElementId(event.target);
+    const targetId = initialTargetId;
     if (!targetId) {
       dispatch({ type: "setSelected", selectedIds: [] });
       interactionRef.current = { type: "marquee", pointerId: event.pointerId, startPoint: point, currentPoint: point, moved: false };
@@ -1098,7 +2311,7 @@ export function CanvasStage({
     const transformIds = getTransformIds(state.document, selectedIds);
     const startBox = getDragBox(state.document, transformIds);
     if (transformIds.length === 0 || !startBox) return;
-    const viewportSize = getViewportSize(viewport);
+    const viewportSize = getCurrentViewportSize();
     const startTransform = buildViewportTransform(
       state.document,
       viewportSize,
@@ -1137,11 +2350,24 @@ export function CanvasStage({
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const textDrag = textDragRef.current;
+    if (textDrag) {
+      if (textDrag.pointerId !== event.pointerId) return;
+      setTextSelectionFromPoint(
+        textDrag.nodeId,
+        event.clientX,
+        event.clientY,
+        textDrag.anchorIndex,
+      );
+      event.preventDefault();
+      return;
+    }
+
     const interaction = interactionRef.current;
     if (!interaction) {
       const viewport = viewportRef.current;
       if (viewport && toolingRef.current && !state.editingTextId) {
-        const vpRect = viewport.getBoundingClientRect();
+        const vpRect = getCurrentViewportRect();
         const hit = toolingRef.current.hitTest(
           event.clientX - vpRect.left,
           event.clientY - vpRect.top,
@@ -1167,7 +2393,11 @@ export function CanvasStage({
         offsetX: interaction.startOffsetX + event.clientX - interaction.startScreenPoint.x,
         offsetY: interaction.startOffsetY + event.clientY - interaction.startScreenPoint.y,
       };
-      const nextViewport = clampViewportState(rawPanViewport, getViewportSize(viewport), getCanvasSize(state.document));
+      const nextViewport = clampViewportState(
+        rawPanViewport,
+        getCurrentViewportSize(),
+        getCanvasSize(state.document),
+      );
       interaction.moved = interaction.moved || Math.hypot(event.clientX - interaction.startScreenPoint.x, event.clientY - interaction.startScreenPoint.y) > 0.5;
       dispatch({ type: "setViewport", zoom: nextViewport.zoom, offsetX: nextViewport.offsetX, offsetY: nextViewport.offsetY });
       return;
@@ -1269,6 +2499,17 @@ export function CanvasStage({
   };
 
   const finishInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const textDrag = textDragRef.current;
+    if (textDrag?.pointerId === event.pointerId) {
+      const viewport = viewportRef.current;
+      if (viewport?.hasPointerCapture(event.pointerId)) {
+        viewport.releasePointerCapture(event.pointerId);
+      }
+      textDragRef.current = null;
+      event.preventDefault();
+      return;
+    }
+
     const interaction = interactionRef.current;
     if (!interaction || interaction.pointerId !== event.pointerId) return;
     const viewport = viewportRef.current;
@@ -1335,17 +2576,40 @@ export function CanvasStage({
       }
     } else {
       dispatch({ type: "setGuides", guides: [] });
-      if (interaction.type === "drag" && interaction.wasAlreadySelected && interaction.clickedId) {
-        const clickedNode = latestDocumentRef.current.elements[interaction.clickedId];
-        if (clickedNode?.type === "text" && !clickedNode.locked) dispatch({ type: "setEditingText", editingTextId: interaction.clickedId });
-      }
     }
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const targetId = getInteractiveElementId(event.target);
-    const node = targetId ? state.document.elements[targetId] : null;
-    if (node?.type === "text" && !node.locked) dispatch({ type: "setEditingText", editingTextId: node.id });
+    const targetNode = targetId ? state.document.elements[targetId] : null;
+    const selectedTextBoxTargetId = targetId
+      ? null
+      : getSelectedTextBoxAtClientPoint(event.clientX, event.clientY);
+    const node =
+      targetNode?.type === "text"
+        ? targetNode
+        : selectedTextBoxTargetId
+          ? state.document.elements[selectedTextBoxTargetId]
+          : null;
+    if (node?.type === "text" && !node.locked) {
+      event.preventDefault();
+      clearNativeTextSelection();
+      const clickedTextContent = isTextContentAtClientPoint(
+        node.id,
+        event.clientX,
+        event.clientY,
+      );
+      if (state.editingTextId === node.id) {
+        const value = textEdit?.nodeId === node.id ? textEdit.value : node.content ?? "";
+        syncTextSelection(0, value.length, 0);
+        return;
+      }
+      enterTextEditing(
+        node.id,
+        { x: event.clientX, y: event.clientY },
+        !clickedTextContent || (targetId === null && selectedTextBoxTargetId === node.id),
+      );
+    }
   };
 
   const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -1357,30 +2621,52 @@ export function CanvasStage({
 
   const isDrawTool = state.tool !== "select";
   const shellClassName = `canvas-shell${isDrawTool ? " is-draw-tool" : ""}`;
-  const shellStyle = getShellPatternStyle(state.document);
-  const canvasSize = getCanvasSize(state.document);
+  const shellStyle = useMemo(
+    () => getShellPatternStyle(state.document),
+    [state.document.shellBackground, state.document.shellPattern],
+  );
+  const canvasSize = useMemo(
+    () => getCanvasSize(state.document),
+    [state.document.canvas.height, state.document.canvas.width],
+  );
   const stageWidth = canvasSize.width;
   const stageHeight = canvasSize.height;
-  const viewportSize = viewportRef.current
-    ? getViewportSize(viewportRef.current)
-    : { width: 0, height: 0 };
-  const displayScale =
-    viewportSize.width > 0 && viewportSize.height > 0
-      ? getCanvasDisplayScale(viewportSize, canvasSize)
-      : 1;
-  const displayZoom = state.zoom * displayScale;
-  const viewportTransform = buildViewportTransform(
-    state.document,
-    viewportSize,
-    state.zoom,
-    state.offsetX,
-    state.offsetY,
+  const displayScale = useMemo(
+    () =>
+      viewportSize.width > 0 && viewportSize.height > 0
+        ? getCanvasDisplayScale(viewportSize, canvasSize)
+        : 1,
+    [canvasSize, viewportSize],
   );
-  const scaledDomProjection = shouldUseScaledDomProjection({
-    canvasSize,
-    displayZoom,
-    canvasRotation: state.document.canvas.rotation ?? 0,
-  });
+  const displayZoom = state.zoom * displayScale;
+  const viewportTransform = useMemo(
+    () =>
+      buildViewportTransform(
+        state.document,
+        viewportSize,
+        state.zoom,
+        state.offsetX,
+        state.offsetY,
+      ),
+    [
+      state.document.canvas.height,
+      state.document.canvas.rotation,
+      state.document.canvas.width,
+      state.offsetX,
+      state.offsetY,
+      state.zoom,
+      viewportSize,
+    ],
+  );
+  const scaledDomProjection = useMemo(
+    () =>
+      shouldUseScaledDomProjection({
+        canvasSize,
+        displayZoom,
+        canvasRotation: state.document.canvas.rotation ?? 0,
+      }),
+    [canvasSize, displayZoom, state.document.canvas.rotation],
+  );
   const renderScale = scaledDomProjection ? displayZoom : 1;
   const projectedStageWidth = stageWidth * renderScale;
   const projectedStageHeight = stageHeight * renderScale;
@@ -1425,11 +2711,15 @@ export function CanvasStage({
         style={stageSpaceStyle}
       >
         {draftMode ? (
-          <div className="render-layer render-layer--draft">
-            {state.document.rootIds.map((id) => (
-              <ElementRenderer key={id} id={id} renderScale={renderScale} />
-            ))}
-          </div>
+          <RenderedScene
+            draftMode
+            document={state.document}
+            canvasStageActive={state.canvasStageActive}
+            isolatedParentId={state.isolatedParentId}
+            editingTextId={state.editingTextId}
+            affectedElementIds={affectedElementIds}
+            renderScale={renderScale}
+          />
         ) : (
           <div
             ref={canvasStageRef}
@@ -1447,22 +2737,46 @@ export function CanvasStage({
               "--zoom": displayZoom,
             } as CSSProperties}
           >
-            <div className={`render-layer${state.canvasStageActive ? " render-layer--canvas-active" : ""}`}>
-              {state.document.rootIds.map((id) => (
-                <ElementRenderer key={id} id={id} renderScale={renderScale} />
-              ))}
-              <DetachedIsolatedChildren renderScale={renderScale} />
-            </div>
+            <RenderedScene
+              draftMode={false}
+              document={state.document}
+              canvasStageActive={state.canvasStageActive}
+              isolatedParentId={state.isolatedParentId}
+              editingTextId={state.editingTextId}
+              affectedElementIds={affectedElementIds}
+              renderScale={renderScale}
+            />
           </div>
         )}
       </div>
       <CanvasToolingLayer
         ref={toolingRef}
+        document={state.document}
+        selectedIds={state.selectedIds}
+        hoveredId={state.hoveredId}
+        editingTextId={state.editingTextId}
+        canvasStageActive={state.canvasStageActive}
+        guides={state.guides}
         viewportTransform={viewportTransform}
         suppressHover={interactionActive}
         interactionType={interactionActive ? (interactionRef.current?.type ?? null) : null}
         marqueeRect={marqueeRect}
         dropTargetId={dropTargetId}
+      />
+      <HiddenTextEditingTextarea
+        textEdit={textEdit}
+        document={state.document}
+        viewportRef={viewportRef}
+        viewportTransform={viewportTransform}
+        onSelectionChange={syncTextSelection}
+        onInputValue={updateTextNodeFromTextareaInput}
+        onCommit={commitTextEditing}
+        onCancel={cancelTextEditing}
+      />
+      <TextEditingOverlay
+        textEdit={textEdit}
+        document={state.document}
+        viewportTransform={viewportTransform}
       />
       {contextMenu && <CanvasContextMenu menu={contextMenu} onClose={closeContextMenu} />}
     </div>

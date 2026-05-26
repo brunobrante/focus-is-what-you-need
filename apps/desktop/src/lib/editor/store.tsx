@@ -73,6 +73,34 @@ function sanitizeSelection(document: CanvasDocument, ids: string[]): string[] {
   return ids.filter((id) => Boolean(document.elements[id]));
 }
 
+function idsEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
+function guidesEqual(a: readonly SnapGuide[], b: readonly SnapGuide[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    const left = a[index];
+    const right = b[index];
+    if (
+      left.id !== right.id ||
+      left.orientation !== right.orientation ||
+      left.position !== right.position ||
+      left.from !== right.from ||
+      left.to !== right.to
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function sanitizeIsolatedParent(
   document: CanvasDocument,
   isolatedParentId: string | null,
@@ -111,37 +139,66 @@ function createInitialState(
 
 function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
-    case "setTool":
+    case "setTool": {
+      const isolatedParentId = action.tool === "select" ? state.isolatedParentId : null;
+      if (
+        state.tool === action.tool &&
+        state.isolatedParentId === isolatedParentId &&
+        state.editingTextId === null
+      ) {
+        return state;
+      }
       return {
         ...state,
         tool: action.tool,
-        isolatedParentId: action.tool === "select" ? state.isolatedParentId : null,
+        isolatedParentId,
         editingTextId: null
       };
-    case "setZoom":
+    }
+    case "setZoom": {
+      const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom));
+      if (state.zoom === zoom) return state;
       return {
         ...state,
-        zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom))
+        zoom
       };
-    case "setViewport":
+    }
+    case "setViewport": {
+      const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom ?? state.zoom));
+      const offsetX = action.offsetX ?? state.offsetX;
+      const offsetY = action.offsetY ?? state.offsetY;
+      if (state.zoom === zoom && state.offsetX === offsetX && state.offsetY === offsetY) {
+        return state;
+      }
       return {
         ...state,
-        zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom ?? state.zoom)),
-        offsetX: action.offsetX ?? state.offsetX,
-        offsetY: action.offsetY ?? state.offsetY
+        zoom,
+        offsetX,
+        offsetY
       };
+    }
     case "setSelected":
       {
         const selectedIds = sanitizeSelection(state.document, action.selectedIds);
+        const isolatedParentId = sanitizeIsolatedParent(
+          state.document,
+          state.isolatedParentId,
+          selectedIds,
+        );
+        const canvasStageActive = selectedIds.length > 0 ? false : state.canvasStageActive;
+        if (
+          idsEqual(state.selectedIds, selectedIds) &&
+          state.isolatedParentId === isolatedParentId &&
+          state.canvasStageActive === canvasStageActive &&
+          state.editingTextId === null
+        ) {
+          return state;
+        }
         return {
           ...state,
           selectedIds,
-          isolatedParentId: sanitizeIsolatedParent(
-            state.document,
-            state.isolatedParentId,
-            selectedIds,
-          ),
-          canvasStageActive: selectedIds.length > 0 ? false : state.canvasStageActive,
+          isolatedParentId,
+          canvasStageActive,
           editingTextId: null
         };
       }
@@ -150,38 +207,62 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         action.isolatedParentId && state.document.elements[action.isolatedParentId]?.children.length
           ? action.isolatedParentId
           : null;
+      const selectedIds = isolatedParentId ? [isolatedParentId] : state.selectedIds;
+      if (
+        idsEqual(state.selectedIds, selectedIds) &&
+        state.isolatedParentId === isolatedParentId &&
+        !state.canvasStageActive &&
+        state.editingTextId === null
+      ) {
+        return state;
+      }
       return {
         ...state,
-        selectedIds: isolatedParentId ? [isolatedParentId] : state.selectedIds,
+        selectedIds,
         isolatedParentId,
         canvasStageActive: false,
         editingTextId: null
       };
     }
     case "setHovered":
+      if (state.hoveredId === action.hoveredId) return state;
       return {
         ...state,
         hoveredId: action.hoveredId
       };
     case "setEditingText":
+      if (state.editingTextId === action.editingTextId) return state;
       return {
         ...state,
         editingTextId: action.editingTextId
       };
-    case "setCanvasStageActive":
+    case "setCanvasStageActive": {
+      const selectedIds = action.active ? [] : state.selectedIds;
+      const isolatedParentId = action.active ? null : state.isolatedParentId;
+      if (
+        state.canvasStageActive === action.active &&
+        idsEqual(state.selectedIds, selectedIds) &&
+        state.isolatedParentId === isolatedParentId &&
+        state.editingTextId === null
+      ) {
+        return state;
+      }
       return {
         ...state,
         canvasStageActive: action.active,
-        selectedIds: action.active ? [] : state.selectedIds,
-        isolatedParentId: action.active ? null : state.isolatedParentId,
+        selectedIds,
+        isolatedParentId,
         editingTextId: null
       };
+    }
     case "setGuides":
+      if (guidesEqual(state.guides, action.guides)) return state;
       return {
         ...state,
         guides: action.guides
       };
     case "setExportOpen":
+      if (state.exportOpen === action.exportOpen) return state;
       return {
         ...state,
         exportOpen: action.exportOpen
@@ -203,6 +284,12 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         future: [],
       };
     case "setDocumentTransient":
+      if (
+        state.document === action.document &&
+        (action.guides === undefined || guidesEqual(state.guides, action.guides))
+      ) {
+        return state;
+      }
       return {
         ...state,
         document: action.document,

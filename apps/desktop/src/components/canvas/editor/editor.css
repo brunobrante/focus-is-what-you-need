@@ -8,6 +8,7 @@
   cursor: default;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .stage-space {
@@ -17,6 +18,7 @@
   transform-origin: 0 0;
   box-sizing: border-box;
   user-select: none;
+  -webkit-user-select: none;
   touch-action: none;
   backface-visibility: hidden;
 }
@@ -30,6 +32,7 @@
   padding: 0;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
   touch-action: none;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
@@ -83,6 +86,8 @@
   min-height: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .text-element {
@@ -92,10 +97,51 @@
 
 .text-element.editing {
   cursor: text;
-  user-select: text;
+  user-select: none;
+  -webkit-user-select: none;
   outline: none;
   box-shadow: 0 0 0 1px #0d99ff;
   z-index: 10;
+}
+
+.text-editing-overlay {
+  position: absolute;
+  z-index: 11;
+  pointer-events: none;
+}
+
+.text-editing-selection-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.text-editing-caret {
+  position: absolute;
+  z-index: 2;
+  width: 1px;
+  background: #0d99ff;
+  pointer-events: none;
+  animation: text-editing-caret-blink 1s steps(2, start) infinite;
+}
+
+.text-editing-selection {
+  position: absolute;
+  z-index: 1;
+  background: rgba(13, 153, 255, 0.28);
+  pointer-events: none;
+}
+
+@keyframes text-editing-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .image-element img {

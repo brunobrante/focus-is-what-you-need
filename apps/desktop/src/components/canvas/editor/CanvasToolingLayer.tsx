@@ -1,8 +1,7 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { filterTopLevelIds, getCommonParentId, getSelectionBox } from "@/lib/editor/geometry";
-import { useEditor } from "@/lib/editor/store";
-import type { CanvasDocument, Point, Rect } from "@/lib/editor/types";
+import type { CanvasDocument, Point, Rect, SnapGuide } from "@/lib/editor/types";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasToolingHitTest";
 import { hitTestTooling } from "./canvasToolingHitTest";
 import {
@@ -21,7 +20,11 @@ import {
   type ToolingBox,
 } from "./canvasToolingRenderer";
 import { createToolingRendererAdapter } from "./toolingRendererFactory";
-import type { ToolingDropTargetCommand, ToolingRendererAdapter } from "./toolingRenderAdapter";
+import type {
+  ToolingDropTargetCommand,
+  ToolingOutlineCommand,
+  ToolingRendererAdapter,
+} from "./toolingRenderAdapter";
 
 export type { RadiusCorner } from "./canvasToolingHitTest";
 
@@ -30,6 +33,12 @@ export type CanvasToolingRef = {
 };
 
 export type CanvasToolingLayerProps = {
+  document: CanvasDocument;
+  selectedIds: string[];
+  hoveredId: string | null;
+  editingTextId: string | null;
+  canvasStageActive: boolean;
+  guides: SnapGuide[];
   viewportTransform: ViewportTransform;
   suppressHover: boolean;
   interactionType: string | null;
@@ -177,7 +186,20 @@ function boxFromRects(rects: Rect[]): ToolingBox | null {
   return rect ? rectToToolingBox(rect) : null;
 }
 
-export const CanvasToolingLayer = forwardRef<CanvasToolingRef, CanvasToolingLayerProps>(
+type ToolingRenderData = {
+  transformIds: string[];
+  sizeLabelCanvasRect: Rect | null;
+  sizeLabelViewportRect: Rect | null;
+  hitGeometry: ToolingGeometry;
+  outlines: ToolingOutlineCommand[];
+  resizeBox: ToolingBox | null;
+  radiusHandlePositions: Point[] | null;
+  dropTarget: ToolingDropTargetCommand | null;
+  isDragging: boolean;
+  isEditingText: boolean;
+};
+
+const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerProps>(
   (props, ref) => {
     const hostRef = useRef<HTMLDivElement>(null);
     const adapterRef = useRef<ToolingRendererAdapter | null>(null);
@@ -189,8 +211,7 @@ export const CanvasToolingLayer = forwardRef<CanvasToolingRef, CanvasToolingLaye
       width: 1,
       height: 1,
     });
-    const { state } = useEditor();
-    const doc = state.document;
+    const doc = props.document;
     const t = props.viewportTransform;
 
     const [altKeyDown, setAltKeyDown] = useState(false);
@@ -207,89 +228,241 @@ export const CanvasToolingLayer = forwardRef<CanvasToolingRef, CanvasToolingLaye
         window.removeEventListener("blur", onBlur);
       };
     }, []);
-    const overlaySize = {
+    const overlaySize = useMemo(() => ({
       width: hostRect.width,
       height: hostRect.height,
-    };
+    }), [hostRect.height, hostRect.width]);
 
-    const isEditingText = Boolean(state.editingTextId);
-    const isDragging =
-      props.interactionType === "drag" || props.interactionType === "draw";
-    const isRadiusDragging = props.interactionType === "radius";
-    const suppressHandles = isDragging || isEditingText;
-    const visibleSelectedIds = state.selectedIds.filter(
-      (id) => doc.elements[id]?.visible !== false,
-    );
-    const transformIds = computeTransformIds(doc, visibleSelectedIds);
-    const sizeLabelCanvasRect = getSelectionBox(doc, transformIds);
-    const sizeLabelViewportRect = unionRects(
-      transformIds
-        .map((id) => getElementViewportRect(doc, id, t))
-        .filter((rect): rect is Rect => rect !== null),
-    );
-    const commonParentId =
-      transformIds.length > 0 ? getCommonParentId(doc, transformIds) : undefined;
-    const canSelectionResize =
-      transformIds.length > 0 && commonParentId !== undefined;
-    const canSelectionRotate = transformIds.length === 1;
-    const radiusElement =
-      transformIds.length === 1 ? doc.elements[transformIds[0]] : null;
-    const radiusEligible = Boolean(
-      radiusElement &&
-        !radiusElement.locked &&
-        (radiusElement.type === "rect" || radiusElement.type === "image"),
-    );
-    const radiusElementHovered = Boolean(
-      radiusElement && state.hoveredId === radiusElement.id,
-    );
-    const showRadiusHandles = radiusEligible && (radiusElementHovered || isRadiusDragging);
-    const hoveredEligibleId =
-      !props.suppressHover &&
-      !isEditingText &&
-      state.hoveredId &&
-      !state.selectedIds.includes(state.hoveredId) &&
-      doc.elements[state.hoveredId]
-        ? state.hoveredId
+    const renderData = useMemo<ToolingRenderData>(() => {
+      const isEditingText = Boolean(props.editingTextId);
+      const isDragging =
+        props.interactionType === "drag" || props.interactionType === "draw";
+      const isRadiusDragging = props.interactionType === "radius";
+      const suppressHandles = isDragging || isEditingText;
+      const visibleSelectedIds = props.selectedIds.filter(
+        (id) => doc.elements[id]?.visible !== false,
+      );
+      const transformIds = computeTransformIds(doc, visibleSelectedIds);
+      const sizeLabelCanvasRect = getSelectionBox(doc, transformIds);
+
+      const boxCache = new Map<string, ToolingBox | null>();
+      const resolveBox = (id: string): ToolingBox | null => {
+        if (!boxCache.has(id)) {
+          boxCache.set(id, getElementViewportBox(doc, id, t));
+        }
+        return boxCache.get(id) ?? null;
+      };
+      const resolveRect = (id: string): Rect | null =>
+        resolveBox(id)?.rect ?? getElementViewportRect(doc, id, t);
+
+      const selectedViewportBoxes = visibleSelectedIds
+        .map((id) => resolveBox(id))
+        .filter((box): box is ToolingBox => box !== null);
+      const selectedViewportRects = selectedViewportBoxes.map((box) => box.rect);
+      const transformViewportBoxes = transformIds
+        .map((id) => resolveBox(id))
+        .filter((box): box is ToolingBox => box !== null);
+      const transformViewportRects = transformViewportBoxes.map((box) => box.rect);
+      const sizeLabelViewportRect = unionRects(transformViewportRects);
+      const commonParentId =
+        transformIds.length > 0 ? getCommonParentId(doc, transformIds) : undefined;
+      const canSelectionResize =
+        transformIds.length > 0 && commonParentId !== undefined;
+      const canSelectionRotate = transformIds.length === 1;
+      const selectionBox =
+        transformIds.length === 1
+          ? transformViewportBoxes[0] ?? null
+          : boxFromRects(transformViewportRects);
+      const canResize = Boolean(selectionBox && canSelectionResize);
+      const canRotate = Boolean(selectionBox && canSelectionRotate);
+      const radiusElement =
+        transformIds.length === 1 ? doc.elements[transformIds[0]] : null;
+      const radiusEligible = Boolean(
+        radiusElement &&
+          !radiusElement.locked &&
+          (radiusElement.type === "rect" || radiusElement.type === "image"),
+      );
+      const radiusElementHovered = Boolean(
+        radiusElement && props.hoveredId === radiusElement.id,
+      );
+      const showRadiusHandles = radiusEligible && (radiusElementHovered || isRadiusDragging);
+
+      let radiusHandlePositions: Point[] | null = null;
+      let hasRadiusHandles = false;
+      if (showRadiusHandles && radiusElement) {
+        const elemBox = resolveBox(radiusElement.id);
+        const elemRect = elemBox?.rect ?? null;
+        if (
+          elemRect &&
+          elemRect.width >= RADIUS_MIN_ELEMENT_SCREEN &&
+          elemRect.height >= RADIUS_MIN_ELEMENT_SCREEN
+        ) {
+          hasRadiusHandles = true;
+          radiusHandlePositions = elemBox
+            ? getOrientedRadiusHandlePositions(
+                elemBox,
+                radiusElement.styles.borderRadius ?? 0,
+                t.displayZoom,
+                isRadiusDragging ? 0 : undefined,
+              )
+            : getRadiusHandlePositions(
+                elemRect,
+                radiusElement.styles.borderRadius ?? 0,
+                t.displayZoom,
+                isRadiusDragging ? 0 : undefined,
+              );
+        }
+      }
+
+      const hoveredEligibleId =
+        !props.suppressHover &&
+        !isEditingText &&
+        props.hoveredId &&
+        !props.selectedIds.includes(props.hoveredId) &&
+        doc.elements[props.hoveredId]
+          ? props.hoveredId
+          : null;
+      const hoverBox = hoveredEligibleId ? resolveBox(hoveredEligibleId) : null;
+      const hoverRect = hoveredEligibleId ? resolveRect(hoveredEligibleId) : null;
+      const groupRect =
+        !props.canvasStageActive && !isDragging && selectedViewportRects.length > 1
+          ? unionRects(selectedViewportRects)
+          : null;
+      const groupBox = groupRect ? rectToToolingBox(groupRect) : null;
+      const renderedSelectedBoxes =
+        !props.canvasStageActive && !isDragging ? selectedViewportBoxes : [];
+
+      const canvasRect = props.canvasStageActive
+        ? canvasRectToViewport(
+            { x: 0, y: 0, width: doc.canvas.width, height: doc.canvas.height },
+            t,
+          )
         : null;
-    const dropTargetNode = props.dropTargetId ? doc.elements[props.dropTargetId] : null;
-    const sizeLabel =
-      !state.canvasStageActive &&
-      !isDragging &&
-      !isEditingText &&
-      sizeLabelCanvasRect &&
-      sizeLabelViewportRect
+      const canvasBox = canvasRect ? rectToToolingBox(canvasRect) : null;
+
+      const dropTargetNode = props.dropTargetId ? doc.elements[props.dropTargetId] : null;
+      const dropTargetRect =
+        dropTargetNode && props.dropTargetId ? resolveRect(props.dropTargetId) : null;
+      const dropTarget: ToolingDropTargetCommand | null =
+        dropTargetNode && dropTargetRect
+          ? {
+              rect: dropTargetRect,
+              borderRadius: dropTargetNode.styles.borderRadius ?? 0,
+              displayZoom: t.displayZoom,
+            }
+          : null;
+
+      const hitGeometry = props.canvasStageActive
         ? {
-            text: `${formatSizeValue(sizeLabelCanvasRect.width)} × ${formatSizeValue(sizeLabelCanvasRect.height)}`,
+            selectionBox: canvasBox,
+            radiusHandlePositions: null,
+            canResize: true,
+            canRotate: true,
+            hasRadiusHandles: false,
+            cursorRotation: doc.canvas.rotation ?? 0,
+          }
+        : {
+            selectionBox: suppressHandles ? null : selectionBox,
+            radiusHandlePositions: suppressHandles ? null : radiusHandlePositions,
+            canResize: suppressHandles ? false : canResize,
+            canRotate: suppressHandles ? false : canRotate,
+            hasRadiusHandles: suppressHandles ? false : hasRadiusHandles,
+            cursorRotation: selectionBox ? getToolingBoxRotation(selectionBox) : 0,
+          };
+
+      return {
+        transformIds,
+        sizeLabelCanvasRect,
+        sizeLabelViewportRect,
+        hitGeometry,
+        outlines: props.canvasStageActive
+          ? [{ rect: canvasBox?.rect ?? null, corners: canvasBox?.corners, color: SELECTION_COLOR }]
+          : [
+              { rect: groupBox?.rect ?? null, corners: groupBox?.corners, color: SELECTION_COLOR, fill: GROUP_FILL },
+              ...renderedSelectedBoxes.map((box) => ({ rect: box.rect, corners: box.corners, color: SELECTION_COLOR })),
+              { rect: hoverBox?.rect ?? hoverRect, corners: hoverBox?.corners, color: HOVER_COLOR },
+            ],
+        resizeBox: props.canvasStageActive
+          ? canvasBox
+          : !suppressHandles && canResize
+            ? selectionBox
+            : null,
+        radiusHandlePositions:
+          !props.canvasStageActive && !suppressHandles && hasRadiusHandles
+            ? radiusHandlePositions
+            : null,
+        dropTarget,
+        isDragging,
+        isEditingText,
+      };
+    }, [
+      doc,
+      props.canvasStageActive,
+      props.dropTargetId,
+      props.editingTextId,
+      props.hoveredId,
+      props.interactionType,
+      props.selectedIds,
+      props.suppressHover,
+      t,
+    ]);
+
+    const sizeLabel = useMemo(() => (
+      !props.canvasStageActive &&
+      !renderData.isDragging &&
+      !renderData.isEditingText &&
+      renderData.sizeLabelCanvasRect &&
+      renderData.sizeLabelViewportRect
+        ? {
+            text: `${formatSizeValue(renderData.sizeLabelCanvasRect.width)} × ${formatSizeValue(renderData.sizeLabelCanvasRect.height)}`,
             left: clampLabelCenter(
-              sizeLabelViewportRect.x + sizeLabelViewportRect.width / 2,
+              renderData.sizeLabelViewportRect.x + renderData.sizeLabelViewportRect.width / 2,
               overlaySize.width,
             ),
             top:
-              sizeLabelViewportRect.y + sizeLabelViewportRect.height + 30 <= overlaySize.height
-                ? sizeLabelViewportRect.y + sizeLabelViewportRect.height + 8
-                : Math.max(0, sizeLabelViewportRect.y - 30),
+              renderData.sizeLabelViewportRect.y + renderData.sizeLabelViewportRect.height + 30 <= overlaySize.height
+                ? renderData.sizeLabelViewportRect.y + renderData.sizeLabelViewportRect.height + 8
+                : Math.max(0, renderData.sizeLabelViewportRect.y - 30),
           }
-        : null;
+        : null
+    ), [
+      overlaySize.height,
+      overlaySize.width,
+      props.canvasStageActive,
+      renderData.isDragging,
+      renderData.isEditingText,
+      renderData.sizeLabelCanvasRect,
+      renderData.sizeLabelViewportRect,
+    ]);
 
     const CONTEXT_TOOLBAR_HEIGHT = 36;
-    const contextualToolbar =
+    const contextualToolbar = useMemo(() => (
       altKeyDown &&
-      !state.canvasStageActive &&
-      !isDragging &&
-      !isEditingText &&
-      transformIds.length === 1 &&
-      sizeLabelViewportRect
+      !props.canvasStageActive &&
+      !renderData.isDragging &&
+      !renderData.isEditingText &&
+      renderData.transformIds.length === 1 &&
+      renderData.sizeLabelViewportRect
         ? {
             left: clampToolbarCenter(
-              sizeLabelViewportRect.x + sizeLabelViewportRect.width / 2,
+              renderData.sizeLabelViewportRect.x + renderData.sizeLabelViewportRect.width / 2,
               overlaySize.width,
             ),
             top:
-              sizeLabelViewportRect.y - CONTEXT_TOOLBAR_HEIGHT - 10 >= 4
-                ? sizeLabelViewportRect.y - CONTEXT_TOOLBAR_HEIGHT - 10
-                : sizeLabelViewportRect.y + sizeLabelViewportRect.height + 10,
+              renderData.sizeLabelViewportRect.y - CONTEXT_TOOLBAR_HEIGHT - 10 >= 4
+                ? renderData.sizeLabelViewportRect.y - CONTEXT_TOOLBAR_HEIGHT - 10
+                : renderData.sizeLabelViewportRect.y + renderData.sizeLabelViewportRect.height + 10,
           }
-        : null;
+        : null
+    ), [
+      altKeyDown,
+      overlaySize.width,
+      props.canvasStageActive,
+      renderData.isDragging,
+      renderData.isEditingText,
+      renderData.sizeLabelViewportRect,
+      renderData.transformIds.length,
+    ]);
 
     useEffect(() => {
       const host = hostRef.current;
@@ -354,134 +527,30 @@ export const CanvasToolingLayer = forwardRef<CanvasToolingRef, CanvasToolingLaye
     }, []);
 
     useLayoutEffect(() => {
-      const boxCache = new Map<string, ToolingBox | null>();
-      const resolveBox = (id: string): ToolingBox | null => {
-        if (!boxCache.has(id)) {
-          boxCache.set(id, getElementViewportBox(doc, id, t));
-        }
-        return boxCache.get(id) ?? null;
-      };
-      const resolveRect = (id: string): Rect | null =>
-        resolveBox(id)?.rect ?? getElementViewportRect(doc, id, t);
-
-      const selectedViewportBoxes = visibleSelectedIds
-        .map((id) => resolveBox(id))
-        .filter((box): box is ToolingBox => box !== null);
-      const selectedViewportRects = selectedViewportBoxes.map((box) => box.rect);
-      const transformViewportBoxes = transformIds
-        .map((id) => resolveBox(id))
-        .filter((box): box is ToolingBox => box !== null);
-      const transformViewportRects = transformViewportBoxes.map((box) => box.rect);
-      const selectionBox =
-        transformIds.length === 1
-          ? transformViewportBoxes[0] ?? null
-          : boxFromRects(transformViewportRects);
-      const canResize = Boolean(selectionBox && canSelectionResize);
-      const canRotate = Boolean(selectionBox && canSelectionRotate);
-
-      let radiusHandlePositions: Point[] | null = null;
-      let hasRadiusHandles = false;
-      if (showRadiusHandles && radiusElement) {
-        const elemBox = resolveBox(radiusElement.id);
-        const elemRect = elemBox?.rect ?? null;
-        if (
-          elemRect &&
-          elemRect.width >= RADIUS_MIN_ELEMENT_SCREEN &&
-          elemRect.height >= RADIUS_MIN_ELEMENT_SCREEN
-        ) {
-          hasRadiusHandles = true;
-          radiusHandlePositions = elemBox
-            ? getOrientedRadiusHandlePositions(
-                elemBox,
-                radiusElement.styles.borderRadius ?? 0,
-                t.displayZoom,
-                isRadiusDragging ? 0 : undefined,
-              )
-            : getRadiusHandlePositions(
-                elemRect,
-                radiusElement.styles.borderRadius ?? 0,
-                t.displayZoom,
-                isRadiusDragging ? 0 : undefined,
-              );
-        }
-      }
-
-      const hoverRect = hoveredEligibleId ? resolveRect(hoveredEligibleId) : null;
-      const hoverBox = hoveredEligibleId ? resolveBox(hoveredEligibleId) : null;
-      const groupRect =
-        !state.canvasStageActive && !isDragging && selectedViewportRects.length > 1
-          ? unionRects(selectedViewportRects)
-          : null;
-      const groupBox = groupRect ? rectToToolingBox(groupRect) : null;
-      const renderedSelectedBoxes =
-        !state.canvasStageActive && !isDragging ? selectedViewportBoxes : [];
-
-      const canvasRect = state.canvasStageActive
-        ? canvasRectToViewport(
-            { x: 0, y: 0, width: doc.canvas.width, height: doc.canvas.height },
-            t,
-          )
-        : null;
-      const canvasBox = canvasRect ? rectToToolingBox(canvasRect) : null;
-
-      const dropTargetRect =
-        dropTargetNode && props.dropTargetId ? resolveRect(props.dropTargetId) : null;
-      const dropTarget: ToolingDropTargetCommand | null =
-        dropTargetNode && dropTargetRect
-          ? {
-              rect: dropTargetRect,
-              borderRadius: dropTargetNode.styles.borderRadius ?? 0,
-              displayZoom: t.displayZoom,
-            }
-          : null;
-
-      if (state.canvasStageActive) {
-        geometryRef.current = {
-          selectionBox: canvasBox,
-          radiusHandlePositions: null,
-          canResize: true,
-          canRotate: true,
-          hasRadiusHandles: false,
-          cursorRotation: doc.canvas.rotation ?? 0,
-        };
-      } else {
-        geometryRef.current = {
-          selectionBox: suppressHandles ? null : selectionBox,
-          radiusHandlePositions: suppressHandles ? null : radiusHandlePositions,
-          canResize: suppressHandles ? false : canResize,
-          canRotate: suppressHandles ? false : canRotate,
-          hasRadiusHandles: suppressHandles ? false : hasRadiusHandles,
-          cursorRotation: selectionBox ? getToolingBoxRotation(selectionBox) : 0,
-        };
-      }
-
+      geometryRef.current = renderData.hitGeometry;
       adapterRef.current?.render({
         left: hostRect.left,
         top: hostRect.top,
         width: overlaySize.width,
         height: overlaySize.height,
-        outlines: state.canvasStageActive
-          ? [{ rect: canvasBox?.rect ?? null, corners: canvasBox?.corners, color: SELECTION_COLOR }]
-          : [
-              { rect: groupBox?.rect ?? null, corners: groupBox?.corners, color: SELECTION_COLOR, fill: GROUP_FILL },
-              ...renderedSelectedBoxes.map((box) => ({ rect: box.rect, corners: box.corners, color: SELECTION_COLOR })),
-              { rect: hoverBox?.rect ?? hoverRect, corners: hoverBox?.corners, color: HOVER_COLOR },
-            ],
-        resizeBox: state.canvasStageActive
-          ? canvasBox
-          : !suppressHandles && canResize
-            ? selectionBox
-            : null,
-        radiusHandlePositions:
-          !state.canvasStageActive && !suppressHandles && hasRadiusHandles
-            ? radiusHandlePositions
-            : null,
-        guides: state.guides,
+        outlines: renderData.outlines,
+        resizeBox: renderData.resizeBox,
+        radiusHandlePositions: renderData.radiusHandlePositions,
+        guides: props.guides,
         viewportTransform: t,
         marqueeRect: props.marqueeRect,
-        dropTarget,
+        dropTarget: renderData.dropTarget,
       });
-    });
+    }, [
+      hostRect.left,
+      hostRect.top,
+      overlaySize.height,
+      overlaySize.width,
+      props.guides,
+      props.marqueeRect,
+      renderData,
+      t,
+    ]);
 
     useImperativeHandle(
       ref,
@@ -540,3 +609,5 @@ export const CanvasToolingLayer = forwardRef<CanvasToolingRef, CanvasToolingLaye
     );
   },
 );
+
+export const CanvasToolingLayer = memo(CanvasToolingLayerImpl);
