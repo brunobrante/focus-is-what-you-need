@@ -13,6 +13,7 @@ export type StoredRefMeta = {
   duration?: number;
   description?: string;
   sourceUrl?: string;
+  contentHash?: string;
   tags: string[];
   added: string;
   ext: string;

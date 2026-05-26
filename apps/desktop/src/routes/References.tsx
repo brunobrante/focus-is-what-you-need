@@ -67,6 +67,7 @@ type ReferenceItem = {
   duration?: number;
   description?: string;
   sourceUrl?: string;
+  contentHash?: string;
   tags: string[];
   added: string;
   ext?: string; // file extension used on disk (set after save)
@@ -74,6 +75,11 @@ type ReferenceItem = {
 };
 
 type StagedItem = ReferenceItem & { desc: string };
+type DuplicateDecision = "existing" | "both";
+type PendingDuplicate = {
+  existing: ReferenceItem;
+  imported: StagedItem;
+};
 
 type StoredMeta = Omit<ReferenceItem, "url">;
 
@@ -93,7 +99,8 @@ async function loadLibrary(): Promise<ReferenceItem[]> {
     const ext = meta.ext || extFromName(meta.name);
     const blob = await loadReferenceFile(meta.id, ext).catch(() => null);
     if (!blob) continue;
-    items.push({ ...meta, ext, url: URL.createObjectURL(blob) });
+    const contentHash = meta.contentHash ?? (await hashBlob(blob).catch(() => undefined));
+    items.push({ ...meta, contentHash, ext, url: URL.createObjectURL(blob) });
   }
   return items;
 }
@@ -320,9 +327,14 @@ export function References() {
 
       <ImportModal
         open={importOpen}
+        existingItems={library}
         onClose={() => setImportOpen(false)}
         onAdd={(items) => {
           addItems(items);
+          setImportOpen(false);
+        }}
+        onUseExisting={(item) => {
+          setSelectedId(item.id);
           setImportOpen(false);
         }}
       />
@@ -817,57 +829,70 @@ function SelectControl({
 
 function ImportModal({
   open,
+  existingItems,
   onClose,
   onAdd,
+  onUseExisting,
 }: {
   open: boolean;
+  existingItems: ReferenceItem[];
   onClose: () => void;
   onAdd: (items: ReferenceItem[]) => void;
+  onUseExisting: (item: ReferenceItem) => void;
 }) {
   const [tab, setTab] = useState<ImportTab>("local");
   const [dragActive, setDragActive] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<string[]>([]);
   const [staged, setStaged] = useState<StagedItem[]>([]);
+  const [duplicateQueue, setDuplicateQueue] = useState<PendingDuplicate[]>([]);
+  const [duplicateDecision, setDuplicateDecision] = useState<DuplicateDecision>("existing");
   const [processing, setProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirmedRef = useRef(false);
+  const pendingDuplicate = duplicateQueue[0] ?? null;
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && duplicateQueue.length === 0) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, duplicateQueue.length]);
 
   useEffect(() => {
     if (!open) {
       if (!confirmedRef.current) {
         setStaged((prev) => {
           for (const item of prev) {
-            URL.revokeObjectURL(item.url);
-            void removeReferenceFile(item.id);
+            discardReferenceItem(item);
           }
+          return [];
+        });
+        setDuplicateQueue((prev) => {
+          for (const duplicate of prev) discardReferenceItem(duplicate.imported);
           return [];
         });
       } else {
         setStaged([]);
+        setDuplicateQueue([]);
         confirmedRef.current = false;
       }
       setTab("local");
       setDragActive(false);
       setRejectedFiles([]);
+      setDuplicateDecision("existing");
       setProcessing(false);
     }
   }, [open]);
 
   function doCancel() {
     for (const item of staged) {
-      URL.revokeObjectURL(item.url);
-      void removeReferenceFile(item.id);
+      discardReferenceItem(item);
     }
+    for (const duplicate of duplicateQueue) discardReferenceItem(duplicate.imported);
     setStaged([]);
+    setDuplicateQueue([]);
     setRejectedFiles([]);
   }
 
@@ -894,13 +919,35 @@ function ImportModal({
     try {
       const created = await Promise.all(accepted.map(fileToReference));
       const valid = created.filter(Boolean) as ReferenceItem[];
-      setStaged(valid.map((item) => ({ ...item, desc: "" })));
+      const nextStaged: StagedItem[] = [];
+      const nextDuplicates: PendingDuplicate[] = [];
+
+      for (const item of valid) {
+        const imported: StagedItem = { ...item, desc: "" };
+        const duplicate = findDuplicateReference(item, [...existingItems, ...nextStaged]);
+        if (duplicate) {
+          nextDuplicates.push({ existing: duplicate, imported });
+        } else {
+          nextStaged.push(imported);
+        }
+      }
+
+      setStaged((prev) => {
+        for (const item of prev) discardReferenceItem(item);
+        return nextStaged;
+      });
+      setDuplicateQueue((prev) => {
+        for (const duplicate of prev) discardReferenceItem(duplicate.imported);
+        return nextDuplicates;
+      });
+      setDuplicateDecision("existing");
     } finally {
       setProcessing(false);
     }
   }
 
   function handleConfirm() {
+    if (duplicateQueue.length > 0) return;
     confirmedRef.current = true;
     const items: ReferenceItem[] = staged.map(({ desc, ...item }) => ({
       ...item,
@@ -908,6 +955,25 @@ function ImportModal({
       sourceUrl: item.sourceUrl?.trim() || undefined,
     }));
     onAdd(items);
+  }
+
+  function resolveDuplicate() {
+    if (!pendingDuplicate) return;
+    const remaining = duplicateQueue.slice(1);
+    if (duplicateDecision === "existing") {
+      discardReferenceItem(pendingDuplicate.imported);
+      setDuplicateQueue(remaining);
+      setDuplicateDecision("existing");
+      if (remaining.length === 0 && staged.length === 0) {
+        confirmedRef.current = true;
+        onUseExisting(pendingDuplicate.existing);
+      }
+      return;
+    }
+
+    setStaged((prev) => [pendingDuplicate.imported, ...prev]);
+    setDuplicateQueue(remaining);
+    setDuplicateDecision("existing");
   }
 
   if (!open) return null;
@@ -998,8 +1064,7 @@ function ImportModal({
                     )
                   }
                   onRemove={() => {
-                    URL.revokeObjectURL(item.url);
-                    void removeReferenceFile(item.id);
+                    discardReferenceItem(item);
                     setStaged((prev) => prev.filter((s) => s.id !== item.id));
                   }}
                 />
@@ -1134,7 +1199,175 @@ function ImportModal({
           )}
         </div>
       </div>
+
+      <DuplicateFileAlert
+        duplicate={pendingDuplicate}
+        decision={duplicateDecision}
+        onDecisionChange={setDuplicateDecision}
+        onClose={() => {
+          if (pendingDuplicate) discardReferenceItem(pendingDuplicate.imported);
+          setDuplicateQueue((prev) => prev.slice(1));
+          setDuplicateDecision("existing");
+        }}
+        onConfirm={resolveDuplicate}
+      />
     </div>
+  );
+}
+
+function DuplicateFileAlert({
+  duplicate,
+  decision,
+  onDecisionChange,
+  onClose,
+  onConfirm,
+}: {
+  duplicate: PendingDuplicate | null;
+  decision: DuplicateDecision;
+  onDecisionChange: (decision: DuplicateDecision) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    if (!duplicate) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [duplicate, onClose]);
+
+  if (!duplicate) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal
+      aria-label="Arquivo duplicado"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(0,0,0,0.72)] p-5 backdrop-blur-[7px]"
+    >
+      <div
+        role="document"
+        className="flex max-h-[calc(100vh-32px)] w-[min(1120px,100%)] flex-col overflow-hidden rounded-[14px] border border-[var(--border-strong)] bg-[var(--bg-elev)]"
+        style={{ boxShadow: "var(--shadow-pop)" }}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-4">
+          <h3 className="m-0 text-[18px] font-semibold text-[var(--text)]">
+            Alerta de arquivo duplicado
+          </h3>
+          <button
+            type="button"
+            aria-label="Fechar"
+            onClick={onClose}
+            className="grid h-8 w-8 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
+          <div className="grid gap-7 md:grid-cols-2">
+            <DuplicatePreview
+              item={duplicate.existing}
+              badge="Existente"
+              muted={decision !== "existing"}
+            />
+            <DuplicatePreview
+              item={duplicate.imported}
+              badge="Importado"
+              muted={decision !== "both"}
+            />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-5 border-t border-[var(--border)] px-5 py-4">
+          <DuplicateChoice
+            checked={decision === "existing"}
+            label="Usar arquivo existente"
+            onChange={() => onDecisionChange("existing")}
+          />
+          <DuplicateChoice
+            checked={decision === "both"}
+            label="Manter os dois"
+            onChange={() => onDecisionChange("both")}
+          />
+          <SmallButton type="button" primary className="ml-auto min-w-[132px]" onClick={onConfirm}>
+            Importar
+          </SmallButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DuplicatePreview({
+  item,
+  badge,
+  muted,
+}: {
+  item: ReferenceItem;
+  badge: string;
+  muted: boolean;
+}) {
+  return (
+    <div className={["flex min-w-0 flex-col gap-4", muted ? "opacity-55" : ""].join(" ")}>
+      <div className="relative flex h-[min(34vw,360px)] min-h-[220px] items-center justify-center overflow-hidden rounded-[10px] border border-[var(--border-strong)] bg-[var(--bg)]">
+        {item.mediaKind === "video" ? (
+          <video src={item.url} muted preload="metadata" className="max-h-full max-w-full" />
+        ) : (
+          <img
+            src={item.url}
+            alt={item.name}
+            draggable={false}
+            className="block max-h-full max-w-full object-contain"
+          />
+        )}
+        <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[8px] bg-[rgba(20,20,20,0.88)] px-4 py-2 text-[18px] font-medium text-[var(--text)] shadow-[0_8px_26px_rgba(0,0,0,0.35)]">
+          {badge}
+        </span>
+      </div>
+      <div className="text-center">
+        <p className="mx-auto mb-1.5 mt-0 max-w-[440px] break-words text-[17px] font-medium leading-[1.3] text-[var(--text)]">
+          {item.name}
+        </p>
+        <p className="m-0 text-[14px] tabular-nums text-[var(--text-muted)]">
+          {item.w && item.h ? `${item.w} × ${item.h} / ` : ""}
+          {formatSize(item.size || 0)}
+        </p>
+        {item.tags.length > 0 ? (
+          <div className="mt-2 flex justify-center">
+            <span className="rounded-[6px] border border-[var(--border)] px-2 py-1 text-[12px] text-[var(--text-muted)]">
+              {item.tags[0]}
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DuplicateChoice({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2.5 text-[17px] font-medium text-[var(--text)]">
+      <input
+        type="radio"
+        checked={checked}
+        onChange={onChange}
+        className="h-5 w-5 accent-[#2f8ee8]"
+      />
+      {label}
+    </label>
   );
 }
 
@@ -1407,6 +1640,7 @@ function isVideoFile(file: File): boolean {
 async function fileToReference(file: File): Promise<ReferenceItem | null> {
   const id = newId();
   const blob: Blob = file;
+  const contentHash = await hashBlob(blob).catch(() => undefined);
 
   let ext: string;
   try {
@@ -1443,11 +1677,47 @@ async function fileToReference(file: File): Promise<ReferenceItem | null> {
     h,
     size: Math.max(1, Math.round(file.size / 1024)),
     duration,
+    contentHash,
     ext,
     tags: [mediaKind],
     added: new Date().toISOString(),
     url,
   };
+}
+
+async function hashBlob(blob: Blob): Promise<string> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error("SHA-256 is not available in this environment");
+  }
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function findDuplicateReference(
+  item: ReferenceItem,
+  candidates: ReferenceItem[],
+): ReferenceItem | null {
+  const byHash = item.contentHash
+    ? candidates.find((candidate) => candidate.id !== item.id && candidate.contentHash === item.contentHash)
+    : null;
+  if (byHash) return byHash;
+
+  return (
+    candidates.find(
+      (candidate) =>
+        candidate.id !== item.id &&
+        candidate.mediaKind === item.mediaKind &&
+        candidate.name === item.name &&
+        candidate.size === item.size &&
+        candidate.w === item.w &&
+        candidate.h === item.h,
+    ) ?? null
+  );
+}
+
+function discardReferenceItem(item: ReferenceItem): void {
+  URL.revokeObjectURL(item.url);
+  void removeReferenceFile(item.id);
 }
 
 function measureImage(src: string): Promise<{ w: number; h: number }> {
