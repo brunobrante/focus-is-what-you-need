@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { AddCard } from "@/components/screen/AddCard";
+import { FastEditModal } from "@/components/screen/FastEditModal";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
 import { PreviewShell } from "@/components/screen/PreviewShell";
 import { HistoryModal, type HistoryModalHandle } from "@/components/modals/HistoryModal";
@@ -23,7 +24,6 @@ import {
   AddReferenceModal,
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
-import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
 import {
   PROJECT_TYPE_DIMS,
   templateForScreenName,
@@ -103,9 +103,18 @@ export function Components() {
     `/project/${encodeURIComponent(project?.id ?? projectId)}/screen/${encodeURIComponent(id)}`;
   const { prevScreen, nextScreen } = useMemo(() => {
     const idx = screens.findIndex((s) => s.id === screen?.id);
+    const hasMultipleScreens = screens.length > 1;
+    if (idx < 0 || !hasMultipleScreens) {
+      return {
+        prevScreen: null,
+        nextScreen: null,
+      };
+    }
+    const prevIdx = (idx - 1 + screens.length) % screens.length;
+    const nextIdx = (idx + 1) % screens.length;
     return {
-      prevScreen: idx > 0 ? screens[idx - 1] : null,
-      nextScreen: idx >= 0 && idx < screens.length - 1 ? screens[idx + 1] : null,
+      prevScreen: screens[prevIdx] ?? null,
+      nextScreen: screens[nextIdx] ?? null,
     };
   }, [screen?.id, screens]);
   const canvasHref = screen
@@ -245,14 +254,20 @@ export function Components() {
       {/* Split layout */}
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
         <PreviewShell
-          versions={versions.map((v) => ({ id: v.id, title: v.title }))}
-          activeVersionId={activeVersionId}
-          onVersionChange={setActiveVersionId}
           onFastEdit={() => setFastEditOpen(true)}
-          onSettings={() => {}}
           canvasHref={canvasHref}
-          prev={prevScreen ? { name: prevScreen.title, href: buildScreenHref(prevScreen.id), screenId: prevScreen.id } : undefined}
-          next={nextScreen ? { name: nextScreen.title, href: buildScreenHref(nextScreen.id), screenId: nextScreen.id } : undefined}
+          prev={prevScreen ? {
+            name: prevScreen.title,
+            details: [`${components.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            href: buildScreenHref(prevScreen.id),
+            screenId: prevScreen.id,
+          } : undefined}
+          next={nextScreen ? {
+            name: nextScreen.title,
+            details: [`${components.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            href: buildScreenHref(nextScreen.id),
+            screenId: nextScreen.id,
+          } : undefined}
         >
           {screen ? (
             <Snapshot
@@ -440,17 +455,14 @@ export function Components() {
           await createOrAttachReference(input);
         }}
       />
-      <ScreenFastEditModal
+      <FastEditModal
+        mode="screen"
         open={fastEditOpen}
         onClose={() => setFastEditOpen(false)}
         screen={screen}
-        screenName={screenName}
+        components={components}
         type={type}
-        tplLabel={tplLabel[tpl]}
-        componentsCount={components.length}
         canvasHref={canvasHref}
-        activeTpl={activeTpl}
-        allowMock={canUseFactoryMocks}
       />
       <NewComponentModal
         ref={newComponentRef}
@@ -540,124 +552,6 @@ function EditableTitle({
         </svg>
       </span>
     </button>
-  );
-}
-
-function ScreenFastEditModal({
-  open,
-  onClose,
-  screen,
-  screenName,
-  type,
-  tplLabel,
-  componentsCount,
-  canvasHref,
-  activeTpl,
-  allowMock,
-}: {
-  open: boolean;
-  onClose: () => void;
-  screen: ScreenRow | null;
-  screenName: string;
-  type: ProjectType;
-  tplLabel: string;
-  componentsCount: number;
-  canvasHref: string;
-  activeTpl: ScreenVersion["tpl"];
-  allowMock: boolean;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} ariaLabel="FastEdit" size="wide">
-      <ModalHeader
-        title="FastEdit"
-        subtitle="Mini canvas para ajustes rápidos da tela."
-        onClose={onClose}
-        actions={
-          <Link to={canvasHref} className="btn btn-ghost h-9 px-3">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="14" rx="2" />
-              <path d="M3 9h18" />
-            </svg>
-            Abrir canvas
-          </Link>
-        }
-      />
-      <ModalBody className="min-h-0 p-0">
-        <div className="grid h-full min-h-[560px] grid-cols-[minmax(0,1fr)_340px]">
-          <div
-            className="relative grid min-h-0 place-items-center overflow-auto border-r border-[var(--border)] p-8"
-            style={{
-              background:
-                "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.045) 1px, transparent 0) 0 0/20px 20px, var(--surface)",
-            }}
-          >
-            <div className="absolute left-4 top-4 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 text-[11px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
-              mini canvas
-            </div>
-            <div className="relative grid max-h-full max-w-full place-items-center rounded-[16px] border border-[var(--border)] bg-[var(--bg)] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
-              {screen ? (
-                <Snapshot
-                  kind="screen"
-                  ownerType="screen"
-                  ownerId={screen.id}
-                  variant={screen.variant}
-                  type={type}
-                  emptyMode="preview"
-                  display="natural"
-                />
-              ) : (
-                <PreviewMockImage tpl={activeTpl} type={type} allowMock={allowMock} />
-              )}
-            </div>
-          </div>
-          <aside className="flex min-h-0 flex-col bg-[var(--bg)]">
-            <div className="border-b border-[var(--border)] px-5 py-4">
-              <div className="text-[15px] font-semibold text-[var(--text)]">{screen?.title ?? screenName}</div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-                <span className="rounded border border-[var(--border)] px-1.5 py-0.5 uppercase tracking-[0.35px] text-[var(--text-faint)]">
-                  {type}
-                </span>
-                <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--text-faint)]">
-                  {tplLabel}
-                </span>
-              </div>
-            </div>
-            <div className="grid gap-4 overflow-y-auto p-5">
-              <FastEditSection title="Informações">
-                <InfoMeta label="Nome" value={screen?.title ?? screenName} />
-                <InfoMeta label="Tipo" value={type} />
-                <InfoMeta label="Componentes" value={`${componentsCount}`} />
-              </FastEditSection>
-              <FastEditSection title="Ajustes rápidos">
-                <div className="grid gap-2">
-                  <button type="button" className="btn btn-ghost justify-start">Editar copy</button>
-                  <button type="button" className="btn btn-ghost justify-start">Reordenar seções</button>
-                  <button type="button" className="btn btn-ghost justify-start">Ajustar layout</button>
-                </div>
-              </FastEditSection>
-            </div>
-          </aside>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
-}
-
-function FastEditSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3.5">
-      <h3 className="m-0 text-[11px] font-semibold uppercase tracking-[0.45px] text-[var(--text-faint)]">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function InfoMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-3 text-[12px] text-[var(--text-muted)]">
-      <span className="text-[var(--text-faint)]">{label}</span>
-      <span className="min-w-0 truncate font-medium text-[var(--text)]">{value}</span>
-    </div>
   );
 }
 

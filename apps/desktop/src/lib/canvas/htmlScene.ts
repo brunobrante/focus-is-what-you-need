@@ -134,7 +134,7 @@ export function createDefaultHtmlCanvasDocument(input: {
     props: {
       name: input.name || "Frame",
       bg: "#F7F7F2",
-      rounded: input.projectType === "desktop" ? 0 : 32,
+      rounded: 0,
       overflow: "hidden",
       px: rootPaddingX,
       py: rootPaddingY,

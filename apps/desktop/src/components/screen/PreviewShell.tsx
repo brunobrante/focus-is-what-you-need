@@ -1,18 +1,26 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { NavTooltip } from "./NavTooltip";
 import { ZOOM_DEFAULT_IDX, ZOOM_STEPS, ZoomControls } from "./ZoomControls";
-type VersionOption = { id: string; title: string };
 
-type NeighborScreen = { name: string; href?: string; screenId?: string };
+type NeighborScreen = { name: string; details?: string[]; href?: string; screenId?: string };
+
+type DeviceOption = {
+  id: string;
+  label: string;
+  note: string;
+};
+
+const DEVICE_OPTIONS: DeviceOption[] = [
+  { id: "iphone-15", label: "iPhone 15", note: "390 × 844" },
+  { id: "iphone-xr", label: "iPhone XR", note: "414 × 896" },
+  { id: "iphone-se", label: "iPhone SE", note: "320 × 568" },
+];
 
 type Props = {
   children: ReactNode;
-  versions?: VersionOption[];
-  activeVersionId?: string;
-  onVersionChange?: (id: string) => void;
   onFastEdit?: () => void;
-  onSettings?: () => void;
   canvasHref?: string;
   prev?: NeighborScreen;
   next?: NeighborScreen;
@@ -20,17 +28,19 @@ type Props = {
 
 export function PreviewShell({
   children,
-  versions,
-  activeVersionId,
-  onVersionChange,
   onFastEdit,
-  onSettings,
   canvasHref,
   prev,
   next,
 }: Props) {
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
   const [paneHover, setPaneHover] = useState(false);
+  const [deviceActive, setDeviceActive] = useState(false);
+  const [deviceId, setDeviceId] = useState(DEVICE_OPTIONS[0]?.id ?? "iphone-15");
+  const [deviceMenuOpen, setDeviceMenuOpen] = useState(false);
+  const [deviceMenuPos, setDeviceMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const deviceTriggerRef = useRef<HTMLButtonElement>(null);
+  const deviceMenuRef = useRef<HTMLDivElement>(null);
   const z = ZOOM_STEPS[zoomIdx] ?? 1;
   const isZoomed = zoomIdx !== ZOOM_DEFAULT_IDX;
   const overlayHidden = isZoomed && !paneHover;
@@ -38,6 +48,39 @@ export function PreviewShell({
     "transition-opacity duration-[180ms]",
     overlayHidden ? "pointer-events-none opacity-0" : "opacity-100",
   ].join(" ");
+  const activeDevice = DEVICE_OPTIONS.find((device) => device.id === deviceId) ?? DEVICE_OPTIONS[0] ?? null;
+
+  useEffect(() => {
+    if (!deviceMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!deviceTriggerRef.current?.contains(target) && !deviceMenuRef.current?.contains(target)) {
+        setDeviceMenuOpen(false);
+        setDeviceMenuPos(null);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDeviceMenuOpen(false);
+        setDeviceMenuPos(null);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [deviceMenuOpen]);
+
+  const openDeviceMenu = (rect: DOMRect) => {
+    const width = 240;
+    setDeviceMenuPos({
+      top: rect.top,
+      left: Math.max(8, Math.min(window.innerWidth - width - 8, rect.right + 8)),
+    });
+    setDeviceMenuOpen(true);
+  };
 
   return (
     <div
@@ -75,30 +118,98 @@ export function PreviewShell({
         </div>
       </div>
 
-      {/* version dropdown top-left */}
-      {versions && versions.length > 0 ? (
-        <div className={["absolute left-4 top-4 z-[6]", overlayClass].join(" ")}>
-          <div className="relative">
-            <select
-              aria-label="Versão da tela"
-              value={activeVersionId}
-              onChange={(e) => onVersionChange?.(e.target.value)}
-              className="h-[34px] min-w-[160px] cursor-pointer rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] py-0 pl-3 pr-7 text-[12px] text-[var(--text)] outline-none transition-colors hover:border-white hover:bg-white hover:text-[#111]"
-              style={{ appearance: "none", WebkitAppearance: "none" as never }}
-            >
-              {versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.title}
-                </option>
-              ))}
-            </select>
-            <span
-              aria-hidden
-              className="pointer-events-none absolute right-3 top-1/2 h-[6px] w-[6px] -translate-y-[70%] rotate-45 border-b-[1.5px] border-r-[1.5px] border-[var(--text-muted)]"
-            />
-          </div>
+      {/* device switch top-left */}
+      <div className={["absolute left-4 top-4 z-[6]", overlayClass].join(" ")}>
+        <div className="inline-flex items-center">
+          <button
+            ref={deviceTriggerRef}
+            type="button"
+            aria-label={activeDevice ? `Dispositivo ativo: ${activeDevice.label}` : "Dispositivo ativo"}
+            aria-pressed={deviceActive}
+            title={activeDevice ? activeDevice.label : "Dispositivo"}
+            onClick={() => setDeviceActive((current) => !current)}
+            className={[
+              "grid h-[34px] w-[38px] cursor-pointer place-items-center rounded-l-md border border-[var(--border-strong)] bg-[var(--surface-2)] transition-colors hover:border-[var(--blue)] hover:bg-[rgba(31,122,224,0.08)]",
+              deviceActive
+                ? "border-[var(--blue)] bg-[rgba(31,122,224,0.08)] text-[var(--blue)]"
+                : "text-[var(--text)]",
+            ].join(" ")}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect
+                x="4"
+                y="3"
+                width="16"
+                height="18"
+                rx="3"
+                className={deviceActive ? "fill-current" : ""}
+                opacity={deviceActive ? 0.18 : 0.5}
+              />
+              <circle cx="12" cy="18" r="0.9" fill="currentColor" opacity={deviceActive ? 1 : 0.8} />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label="Abrir lista de dispositivos"
+            aria-haspopup="menu"
+            aria-expanded={deviceMenuOpen}
+            onClick={(event) => openDeviceMenu(event.currentTarget.getBoundingClientRect())}
+            className={[
+              "grid h-[34px] w-[24px] cursor-pointer place-items-center rounded-r-md border-y border-r border-[var(--border-strong)] border-l-0 bg-[var(--surface-2)] text-[var(--text-soft)] transition-colors",
+              deviceMenuOpen ? "border-[var(--blue)] bg-[rgba(31,122,224,0.08)] text-[var(--blue)]" : "",
+            ].join(" ")}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
         </div>
-      ) : null}
+      </div>
+      {deviceMenuOpen && deviceMenuPos
+        ? createPortal(
+            <div
+              ref={deviceMenuRef}
+              role="menu"
+              aria-label="Dispositivos"
+              className="fixed z-[80] min-w-[240px] overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)] backdrop-blur-md"
+              style={{ top: deviceMenuPos.top, left: deviceMenuPos.left }}
+            >
+              <div className="border-b border-[var(--border)] px-3 py-2.5">
+                <div className="text-[12px] font-semibold text-[var(--text)]">Dispositivos</div>
+                <div className="mt-1 text-[11px] text-[var(--text-faint)]">Escolha o modelo para o preview</div>
+              </div>
+              <div className="py-1">
+                {DEVICE_OPTIONS.map((device) => {
+                  const active = device.id === deviceId;
+                  return (
+                    <button
+                      key={device.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={active}
+                      onClick={() => {
+                        setDeviceId(device.id);
+                        setDeviceActive(true);
+                        setDeviceMenuOpen(false);
+                        setDeviceMenuPos(null);
+                      }}
+                      className={[
+                        "flex h-9 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] transition-colors",
+                        active
+                          ? "bg-[var(--surface)] text-[var(--text)]"
+                          : "text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
+                      ].join(" ")}
+                    >
+                      <span>{device.label}</span>
+                      <span className="text-[11px] text-[var(--text-faint)]">{device.note}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* preview-actions top-right */}
       <div className={["absolute right-4 top-4 z-[6] flex items-center gap-2", overlayClass].join(" ")}>
@@ -114,20 +225,6 @@ export function PreviewShell({
               <path d="M12 20h9" />
               <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
               <path d="M4 4h7" />
-            </svg>
-          </button>
-        ) : null}
-        {onSettings ? (
-          <button
-            type="button"
-            aria-label="Configurações"
-            title="Configurações"
-            onClick={onSettings}
-            className="grid h-[34px] w-[34px] cursor-pointer place-items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
           </button>
         ) : null}
@@ -157,7 +254,7 @@ export function PreviewShell({
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </Link>
-          <NavTooltip side="prev" name={prev.name} screenId={prev.screenId} />
+          <NavTooltip side="prev" name={prev.name} details={prev.details} screenId={prev.screenId} />
         </div>
       ) : null}
 
@@ -173,7 +270,7 @@ export function PreviewShell({
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </Link>
-          <NavTooltip side="next" name={next.name} screenId={next.screenId} />
+          <NavTooltip side="next" name={next.name} details={next.details} screenId={next.screenId} />
         </div>
       ) : null}
 

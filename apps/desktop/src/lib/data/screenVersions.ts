@@ -1,6 +1,7 @@
 export type ScreenVersion = {
   id: string;
   title: string;
+  device?: string;
   tpl: "hero" | "list" | "detail" | "form" | "profile";
   updated: string;
   author: string;
@@ -8,9 +9,9 @@ export type ScreenVersion = {
 };
 
 export const DEFAULT_SCREEN_VERSIONS: ScreenVersion[] = [
-  { id: "v3", title: "v3 · atual", tpl: "hero", updated: "agora", author: "Você", initials: "VC" },
-  { id: "v2", title: "v2 · ontem", tpl: "hero", updated: "ontem", author: "Você", initials: "VC" },
-  { id: "v1", title: "v1 · inicial", tpl: "detail", updated: "3 d", author: "Marina", initials: "MR" },
+  { id: "v3", title: "v3 · atual", device: "iPhone 15", tpl: "hero", updated: "agora", author: "Você", initials: "VC" },
+  { id: "v2", title: "v2 · ontem", device: "iPhone XR", tpl: "hero", updated: "ontem", author: "Você", initials: "VC" },
+  { id: "v1", title: "v1 · inicial", device: "iPhone SE", tpl: "detail", updated: "3 d", author: "Marina", initials: "MR" },
 ];
 
 export type GitChange = {

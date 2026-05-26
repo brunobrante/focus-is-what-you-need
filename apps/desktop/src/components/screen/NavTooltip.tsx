@@ -3,10 +3,12 @@ import { useThumbnail } from "@/lib/storage/hooks";
 export function NavTooltip({
   side,
   name,
+  details,
   screenId,
 }: {
   side: "prev" | "next";
   name: string;
+  details?: string[];
   screenId?: string;
 }) {
   const { data: thumbnail } = useThumbnail("screen", screenId ?? null);
@@ -16,16 +18,16 @@ export function NavTooltip({
       aria-hidden
       className={[
         "pointer-events-none absolute top-1/2 z-[5] -translate-y-1/2 translate-y-2 scale-[0.94]",
-        "opacity-0 transition-[opacity,transform] duration-[150ms]",
-        "group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-hover:[transition-delay:220ms]",
-        "flex w-[200px] items-center gap-2.5 rounded-[10px] border border-[var(--border-strong)]",
+        "opacity-0 transition-[opacity,transform] duration-[180ms]",
+        "group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-hover:[transition-delay:420ms]",
+        "flex w-[236px] items-start gap-2.5 rounded-[10px] border border-[var(--border-strong)]",
         "bg-[var(--surface-2)] p-2 shadow-[0_8px_28px_rgba(0,0,0,0.6)]",
         side === "prev" ? "left-[50px]" : "right-[50px]",
       ].join(" ")}
     >
       <div
         className="shrink-0 overflow-hidden rounded-[5px] border border-[var(--border-strong)] bg-[var(--bg)]"
-        style={{ width: 36, height: 52 }}
+        style={{ width: 40, height: 58 }}
       >
         {thumbnail?.dataUrl ? (
           <img
@@ -35,12 +37,21 @@ export function NavTooltip({
             draggable={false}
           />
         ) : (
-          <div className="h-full w-full bg-[var(--surface)]" />
+          <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--text-faint)]/80" />
+          </div>
         )}
       </div>
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--text)]">
-        {name}
-      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12px] font-medium text-[var(--text)]">{name}</div>
+        <div className="mt-1 space-y-[2px] text-[11px] leading-[1.35] text-[var(--text-faint)]">
+          {(details ?? ["Abrir para inspecionar o preview desta tela."]).map((line) => (
+            <div key={line} className="truncate">
+              {line}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

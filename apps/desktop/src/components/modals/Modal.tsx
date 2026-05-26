@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 let openModalCount = 0;
 let previousBodyOverflow = "";
@@ -132,7 +133,7 @@ export function ModalHeader({
 
 export function ModalBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={["flex-1 overflow-y-auto px-7 pb-7 pt-6", className ?? ""].join(" ")}>
+    <div className={cn("flex-1 overflow-y-auto px-7 pb-7 pt-6", className)}>
       {children}
     </div>
   );

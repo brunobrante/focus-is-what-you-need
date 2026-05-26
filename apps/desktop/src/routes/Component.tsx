@@ -24,6 +24,7 @@ import {
   DEFAULT_HISTORY,
   DEFAULT_SCREEN_VERSIONS,
 } from "@/lib/data/screenVersions";
+import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
 import type {
   ComponentKind,
   ComponentVariant,
@@ -165,8 +166,15 @@ export function Component() {
 
   const componentsInScope = scopedComponents.length > 0 ? scopedComponents : meta ? [meta] : [];
   const componentIdx = componentsInScope.findIndex((c) => c.id === componentId);
-  const prevComponent = componentIdx > 0 ? componentsInScope[componentIdx - 1] : null;
-  const nextComponent = componentIdx >= 0 && componentIdx < componentsInScope.length - 1 ? componentsInScope[componentIdx + 1] : null;
+  const hasMultipleComponents = componentsInScope.length > 1;
+  const prevComponent =
+    hasMultipleComponents && componentIdx >= 0
+      ? componentsInScope[(componentIdx - 1 + componentsInScope.length) % componentsInScope.length] ?? null
+      : null;
+  const nextComponent =
+    hasMultipleComponents && componentIdx >= 0
+      ? componentsInScope[(componentIdx + 1) % componentsInScope.length] ?? null
+      : null;
   const buildComponentHref = (id: string) =>
     `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screenId)}/component/${encodeURIComponent(id)}`;
   const screenHref = `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screenId)}`;
@@ -298,13 +306,17 @@ export function Component() {
         style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}
       >
         <PreviewShell
-          versions={versions.map((v) => ({ id: v.id, title: v.title }))}
-          activeVersionId={activeVersionId}
-          onVersionChange={setActiveVersionId}
-          onSettings={() => {}}
           canvasHref={canvasHref}
-          prev={prevComponent ? { name: prevComponent.name, href: buildComponentHref(prevComponent.id) } : undefined}
-          next={nextComponent ? { name: nextComponent.name, href: buildComponentHref(nextComponent.id) } : undefined}
+          prev={prevComponent ? {
+            name: prevComponent.name,
+            details: [`${componentsInScope.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            href: buildComponentHref(prevComponent.id),
+          } : undefined}
+          next={nextComponent ? {
+            name: nextComponent.name,
+            details: [`${componentsInScope.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            href: buildComponentHref(nextComponent.id),
+          } : undefined}
         >
           <div
             className="flex w-full flex-col overflow-hidden rounded-[10px] border border-[var(--border-strong)] bg-[var(--bg)] shadow-[0_8px_32px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.3)]"

@@ -14,15 +14,19 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Check,
   ChevronRight,
+  Circle,
   Crop,
-  Layers3,
+  Layers,
   Image as ImageIcon,
   Minus,
   Move,
   Pencil,
   Pipette,
   Plus,
+  RotateCcw,
+  Square,
   Trash2,
+  Type,
   Upload,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
@@ -40,7 +44,7 @@ const TOOL_SOURCE_STORAGE_KEY = "workspace.tools.source.v1";
 const COMPONENT_STORAGE_PREFIX = "workspace.tools.components.";
 const PRIMARY_COMPONENT_STORAGE_PREFIX = "workspace.tools.primary.";
 
-type EditorTool = "move" | "crop";
+type EditorTool = "move" | "crop" | "annotate";
 type ViewMode = "original" | "stack" | "component";
 
 type ToolReference = {
@@ -325,16 +329,20 @@ export function Tools() {
     resetToolViewport();
   }, [cancelSelection, resetToolViewport]);
 
-  const toggleStack = useCallback(() => {
+  const openBuilderMode = useCallback(() => {
     cancelSelection();
     setCurrentTool("move");
     resetToolViewport();
-    if (viewMode === "stack") {
-      setViewMode(selectedComponentId && selectedComponent ? "component" : "original");
-      return;
-    }
+    setViewMode(selectedComponentId && selectedComponent ? "component" : "original");
+  }, [cancelSelection, resetToolViewport, selectedComponent, selectedComponentId]);
+
+  const openStackMode = useCallback(() => {
+    if (stackedComponents.length === 0) return;
+    cancelSelection();
+    setCurrentTool("move");
+    resetToolViewport();
     setViewMode("stack");
-  }, [cancelSelection, resetToolViewport, selectedComponent, selectedComponentId, viewMode]);
+  }, [cancelSelection, resetToolViewport, stackedComponents.length]);
 
   const openComponent = useCallback(
     (id: string) => {
@@ -917,7 +925,11 @@ export function Tools() {
               <Crop size={18} strokeWidth={1.7} />
             </RailToolButton>
             <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
-            <RailToolButton label="Anotação" disabled>
+            <RailToolButton
+              active={currentTool === "annotate"}
+              label="Anotação"
+              onClick={() => setTool("annotate")}
+            >
               <Pencil size={18} strokeWidth={1.7} />
             </RailToolButton>
             <RailToolButton label="Conta-gotas" disabled>
@@ -933,89 +945,6 @@ export function Tools() {
               backgroundSize: "22px 22px",
             }}
           >
-            <div className="flex shrink-0 flex-wrap items-center gap-2.5 border-b border-[var(--border)] bg-[rgba(15,15,16,0.6)] px-3.5 py-2.5 backdrop-blur-[6px]">
-              <div className="flex min-w-0 items-center gap-2.5 text-[12px] text-[var(--text-muted)]">
-                <span className="max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap font-medium text-[var(--text)]">
-                  {headerSubject.name || "—"}
-                </span>
-                <span className="text-[var(--text-faint)]">·</span>
-                <span>
-                  {headerSubject.w && headerSubject.h
-                    ? `${Math.round(headerSubject.w)} × ${Math.round(headerSubject.h)}`
-                    : "—"}
-                </span>
-                <span className="text-[var(--text-faint)]">·</span>
-                <span>{activeSubject.kind === "stack" && !selectedComponent ? "Tudo junto" : headerSubject.type || "—"}</span>
-                {selectedComponent && selectedComponent.id !== primaryScopeId ? (
-                  <>
-                    <span className="text-[var(--text-faint)]">·</span>
-                    <button
-                      type="button"
-                      onClick={() => requestPrimaryConfirmation(selectedComponent.id)}
-                      className="h-7 cursor-pointer rounded-[7px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-                    >
-                      Tornar primário
-                    </button>
-                  </>
-                ) : null}
-              </div>
-              <div className="ml-auto inline-flex items-center gap-1.5">
-                <StackToggleButton
-                  checked={viewMode === "stack"}
-                  disabled={stackedComponents.length === 0}
-                  onClick={toggleStack}
-                />
-                <ModeButton active={viewMode === "original"} onClick={openOriginal}>
-                  <ImageIcon size={13} strokeWidth={1.8} />
-                  Mostrar original
-                </ModeButton>
-                <ModeButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                  <Upload size={13} strokeWidth={1.8} />
-                  {uploading ? "Enviando..." : "Upload"}
-                </ModeButton>
-              </div>
-              <div className="flex basis-full flex-wrap items-center gap-2 text-[11px] text-[var(--text-faint)]">
-                {selection ? (
-                  <div className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-[5px]">
-                    <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
-                      {Math.round(selectionSize.w)} × {Math.round(selectionSize.h)}
-                    </span>
-                    <button
-                      type="button"
-                      data-selection-action
-                      onClick={cancelSelection}
-                      className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      data-selection-action
-                      disabled={!canSaveSelection}
-                      onClick={() => void saveSelection()}
-                      className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
-                    >
-                      <Check size={11} strokeWidth={2.2} />
-                      Salvar componente
-                    </button>
-                  </div>
-                ) : null}
-                <span className="ml-auto" />
-                {!canCrop ? (
-                  <span>Abra um componente da árvore para recortar. Original e tudo junto são apenas visualização.</span>
-                ) : currentTool === "crop" ? (
-                  <span>
-                    Clique e arraste sobre o assunto aberto. Áreas filhas já recortadas aparecem como aviso. <Key>Enter</Key> salva ·{" "}
-                    <Key>Esc</Key> cancela
-                  </span>
-                ) : (
-                  <span>
-                    Selecione um componente na lateral para recortar dentro dele, ou use <Key>C</Key>.
-                  </span>
-                )}
-              </div>
-            </div>
-
             <div
               ref={stageViewportRef}
               className={[
@@ -1028,6 +957,27 @@ export function Tools() {
               onPointerUp={handlePointerUp}
               onPointerCancel={cancelSelection}
             >
+              <BuilderStackTabs
+                active={viewMode === "stack" ? "stack" : "builder"}
+                stackDisabled={stackedComponents.length === 0}
+                onBuilder={openBuilderMode}
+                onStack={openStackMode}
+              />
+
+              <ElementInfoCard
+                name={headerSubject.name || "—"}
+                width={headerSubject.w}
+                height={headerSubject.h}
+                type={activeSubject.kind === "stack" && !selectedComponent ? "Tudo junto" : headerSubject.type || "—"}
+                thumbnailUrl={activeSubject.kind === "component" ? activeSubject.url : selectedComponent?.dataUrl ?? activeSubject.url}
+                canPromote={Boolean(selectedComponent && selectedComponent.id !== primaryScopeId)}
+                onPromote={() => {
+                  if (selectedComponent && selectedComponent.id !== primaryScopeId) {
+                    requestPrimaryConfirmation(selectedComponent.id);
+                  }
+                }}
+              />
+
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
                   <ImageIcon size={24} strokeWidth={1.6} />
@@ -1203,12 +1153,73 @@ export function Tools() {
                 </IconButton>
               </div>
             </div>
+
+            <div className="sticky bottom-0 z-20 flex min-h-[56px] shrink-0 items-center gap-2.5 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3.5 py-2.5 backdrop-blur-[8px]">
+              <div className="inline-flex shrink-0 items-center gap-1.5">
+                <ModeButton active={viewMode === "original"} onClick={openOriginal}>
+                  <ImageIcon size={13} strokeWidth={1.8} />
+                  Mostrar original
+                </ModeButton>
+                <ModeButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                  <Upload size={13} strokeWidth={1.8} />
+                  {uploading ? "Enviando..." : "Upload"}
+                </ModeButton>
+              </div>
+
+              {currentTool === "annotate" ? <AnnotationToolbar /> : null}
+
+              {selection ? (
+                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-[5px]">
+                  <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                    {Math.round(selectionSize.w)} × {Math.round(selectionSize.h)}
+                  </span>
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={cancelSelection}
+                    className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    data-selection-action
+                    disabled={!canSaveSelection}
+                    onClick={() => void saveSelection()}
+                    className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
+                  >
+                    <Check size={11} strokeWidth={2.2} />
+                    Salvar componente
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
+                {!canCrop ? (
+                  <span>Abra um componente da árvore para recortar. Original e tudo junto são apenas visualização.</span>
+                ) : currentTool === "crop" ? (
+                  <span>
+                    Clique e arraste sobre o assunto aberto. Áreas filhas já recortadas aparecem como aviso. <Key>Enter</Key> salva ·{" "}
+                    <Key>Esc</Key> cancela
+                  </span>
+                ) : (
+                  <span>
+                    Selecione um componente na lateral para recortar dentro dele, ou use <Key>C</Key>.
+                  </span>
+                )}
+              </div>
+            </div>
           </section>
 
           <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--bg)]">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
-                <h3 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">Componentes</h3>
+                <div className="flex min-w-0 items-center gap-2">
+                  <h3 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">Componentes</h3>
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
+                    {scopedComponents.length}
+                  </span>
+                </div>
                 <p className="m-0 mt-0.5 max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--text-faint)]">
                   Primário: {primaryComponent.name}
                 </p>
@@ -1217,15 +1228,14 @@ export function Tools() {
                 {primaryScopeId !== rootComponentId ? (
                   <button
                     type="button"
+                    aria-label="Resetar root"
+                    title="Resetar root"
                     onClick={requestResetConfirmation}
-                    className="h-6 cursor-pointer rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2 text-[10.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+                    className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
                   >
-                    Reset
+                    <RotateCcw size={13} strokeWidth={1.8} />
                   </button>
                 ) : null}
-                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
-                  {scopedComponents.length}
-                </span>
               </div>
             </div>
 
@@ -1302,49 +1312,161 @@ function ModeButton({
   );
 }
 
-function StackToggleButton({
-  checked,
+function BuilderStackTabs({
+  active,
+  stackDisabled,
+  onBuilder,
+  onStack,
+}: {
+  active: "builder" | "stack";
+  stackDisabled: boolean;
+  onBuilder: () => void;
+  onStack: () => void;
+}) {
+  return (
+    <div
+      data-selection-action
+      className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-[8px]"
+    >
+      <FloatingTabButton active={active === "builder"} onClick={onBuilder}>
+        Builder
+      </FloatingTabButton>
+      <FloatingTabButton active={active === "stack"} disabled={stackDisabled} onClick={onStack}>
+        Stack
+      </FloatingTabButton>
+    </div>
+  );
+}
+
+function FloatingTabButton({
+  active,
   disabled = false,
+  children,
   onClick,
 }: {
-  checked: boolean;
+  active: boolean;
   disabled?: boolean;
+  children: ReactNode;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      aria-pressed={checked}
       disabled={disabled}
       onClick={onClick}
       className={[
-        "inline-flex h-8 items-center gap-2 rounded-[7px] border px-2.5 text-[11.5px] font-medium transition-colors duration-[120ms]",
-        "disabled:cursor-not-allowed disabled:opacity-40",
-        checked
-          ? "cursor-pointer border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
-          : "cursor-pointer border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] enabled:hover:border-[var(--border-strong)] enabled:hover:bg-[var(--surface-hover)] enabled:hover:text-[var(--text)]",
+        "h-8 min-w-[86px] cursor-pointer rounded-[8px] border px-4 text-[14px] font-medium transition-colors duration-[120ms]",
+        active
+          ? "border-transparent bg-[var(--surface-hover)] text-[var(--text)]"
+          : "border-transparent bg-transparent text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text)]",
+        disabled ? "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-[var(--text-muted)]" : "",
       ].join(" ")}
     >
-      <Layers3 size={13} strokeWidth={1.8} />
-      <span>Mostrar tudo junto</span>
-      <span
-        aria-hidden
+      {children}
+    </button>
+  );
+}
+
+function ElementInfoCard({
+  name,
+  width,
+  height,
+  type,
+  thumbnailUrl,
+  canPromote,
+  onPromote,
+}: {
+  name: string;
+  width: number;
+  height: number;
+  type: string;
+  thumbnailUrl: string;
+  canPromote: boolean;
+  onPromote: () => void;
+}) {
+  return (
+    <div
+      data-selection-action
+      className="absolute left-3 top-3 z-30 w-[210px] rounded-[12px] border border-[var(--border)] bg-[rgba(20,20,22,0.88)] p-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-[5px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
+          <ImageIcon size={12} strokeWidth={1.7} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5 text-[11.5px]">
+            <span className="min-w-0 max-w-[76px] truncate font-semibold text-[var(--text)]">{name}</span>
+            <span className="shrink-0 text-[var(--text-faint)]">·</span>
+            <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{Math.round(width)} × {Math.round(height)}</span>
+            <span className="shrink-0 text-[var(--text-faint)]">·</span>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[4.5px] font-medium text-[var(--text-muted)]">
+          {type}
+        </span>
+      </div>
+      <button
+        type="button"
+        disabled={!canPromote}
+        onClick={onPromote}
         className={[
-          "relative ml-0.5 h-[18px] w-8 rounded-full border transition-colors duration-[120ms]",
-          checked
-            ? "border-[rgba(0,0,0,0.2)] bg-[var(--bg)]"
-            : "border-[var(--border-strong)] bg-[rgba(255,255,255,0.07)]",
+          "mt-2 h-7 w-full cursor-pointer rounded-[8px] border px-3 text-[11.5px] font-semibold transition-colors duration-[120ms]",
+          canPromote
+            ? "border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+            : "cursor-not-allowed border-[var(--border)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)]",
         ].join(" ")}
       >
-        <span
-          className={[
-            "absolute top-[2px] h-[12px] w-[12px] rounded-full shadow-sm transition-all duration-[150ms]",
-            checked
-              ? "left-[calc(100%-14px)] bg-[var(--text)]"
-              : "left-[2px] bg-[var(--text-faint)]",
-          ].join(" ")}
-        />
-      </span>
+        <Layers size={12} strokeWidth={1.7} className="mr-1.5 inline-block align-[-2px]" />
+        Tornar root
+      </button>
+    </div>
+  );
+}
+
+function AnnotationToolbar() {
+  return (
+    <div
+      data-selection-action
+      className="absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[rgba(20,20,22,0.92)] p-1 shadow-[0_10px_34px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
+    >
+      <AnnotationToolButton label="Lápis" active>
+        <Pencil size={13} strokeWidth={1.8} />
+      </AnnotationToolButton>
+      <AnnotationToolButton label="Texto">
+        <Type size={13} strokeWidth={1.8} />
+      </AnnotationToolButton>
+      <AnnotationToolButton label="Retângulo">
+        <Square size={13} strokeWidth={1.8} />
+      </AnnotationToolButton>
+      <AnnotationToolButton label="Círculo">
+        <Circle size={13} strokeWidth={1.8} />
+      </AnnotationToolButton>
+    </div>
+  );
+}
+
+function AnnotationToolButton({
+  label,
+  active = false,
+  children,
+}: {
+  label: string;
+  active?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={[
+        "grid h-8 w-8 cursor-pointer place-items-center rounded-[8px] border transition-colors duration-[120ms]",
+        active
+          ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+          : "border-transparent bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+      ].join(" ")}
+    >
+      {children}
     </button>
   );
 }

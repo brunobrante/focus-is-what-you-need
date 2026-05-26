@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
@@ -23,7 +23,6 @@ import {
   AddReferenceModal,
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
-import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
 import { deleteComponentTree, getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
 import { createOrAttachReference } from "@/lib/storage/repos/references.repo";
 import { getVariant } from "@/lib/storage/repos/variants.repo";
@@ -46,6 +45,7 @@ import {
   type ScreenVersion,
 } from "@/lib/data/screenVersions";
 import { getCanvasMockForTemplate } from "@/components/mocks/data/canvasMocks";
+import { FastEditModal } from "@/components/screen/FastEditModal";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 
 type SideTab = "components" | "info" | "versions" | "references";
@@ -217,11 +217,7 @@ export function ComponentDetail() {
         style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}
       >
         <PreviewShell
-          versions={versions.map((v) => ({ id: v.id, title: v.title }))}
-          activeVersionId={activeVersionId}
-          onVersionChange={setActiveVersionId}
           onFastEdit={() => setFastEditOpen(true)}
-          onSettings={() => {}}
           canvasHref={canvasHref}
         >
           <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
@@ -408,6 +404,7 @@ export function ComponentDetail() {
       />
       <ReferencesModal ref={referencesRef} references={filteredReferences} />
       <FastEditModal
+        mode="component"
         open={fastEditOpen}
         onClose={() => setFastEditOpen(false)}
         component={component}
@@ -678,116 +675,6 @@ function VersionPreviewImage({
       className="block h-full w-full object-cover"
       draggable={false}
     />
-  );
-}
-
-function FastEditModal({
-  open,
-  onClose,
-  component,
-  variant,
-  type,
-  canvasHref,
-}: {
-  open: boolean;
-  onClose: () => void;
-  component: ComponentRow;
-  variant: VariantRow | null;
-  type: ProjectType;
-  canvasHref: string;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} ariaLabel="FastEdit" size="wide">
-      <ModalHeader
-        title="FastEdit"
-        subtitle="Mini canvas para ajustes rápidos do componente."
-        onClose={onClose}
-        actions={
-          <Link to={canvasHref} className="btn btn-ghost h-9 px-3">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="14" rx="2" />
-              <path d="M3 9h18" />
-            </svg>
-            Abrir canvas
-          </Link>
-        }
-      />
-      <ModalBody className="min-h-0 p-0">
-        <div className="grid h-full min-h-[560px] grid-cols-[minmax(0,1fr)_340px]">
-          <div
-            className="relative grid min-h-0 place-items-center overflow-auto border-r border-[var(--border)] p-8"
-            style={{
-              background:
-                "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.045) 1px, transparent 0) 0 0/20px 20px, var(--surface)",
-            }}
-          >
-            <div className="absolute left-4 top-4 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 text-[11px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
-              mini canvas
-            </div>
-            <div className="relative grid max-h-full max-w-full place-items-center rounded-[16px] border border-[var(--border)] bg-[var(--bg)] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
-              {variant ? (
-                <Snapshot
-                  kind="component"
-                  ownerType="variant"
-                  ownerId={variant.id}
-                  seedKey={variant.seedKey}
-                  type={type}
-                  emptyMode="preview"
-                  display="natural"
-                />
-              ) : (
-                <div className="grid h-[240px] w-[320px] place-items-center rounded-[12px] border border-dashed border-[var(--border)] text-[13px] text-[var(--text-muted)]">
-                  Componente vazio
-                </div>
-              )}
-            </div>
-          </div>
-          <aside className="flex min-h-0 flex-col bg-[var(--bg)]">
-            <div className="border-b border-[var(--border)] px-5 py-4">
-              <div className="text-[15px] font-semibold text-[var(--text)]">{component.name}</div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-                <span className="rounded border border-[var(--border)] px-1.5 py-0.5 uppercase tracking-[0.35px] text-[var(--text-faint)]">
-                  {component.kind ?? "Component"}
-                </span>
-                {component.category ? (
-                  <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--text-faint)]">
-                    {component.category}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="grid gap-4 overflow-y-auto p-5">
-              <FastEditSection title="Informações">
-                <InfoMeta label="ID" value={component.id} />
-                <InfoMeta label="Tipo" value={component.kind ?? "Sem tipo"} />
-                <InfoMeta label="Categoria" value={component.category ?? "Sem categoria"} />
-              </FastEditSection>
-              <FastEditSection title="Descrição">
-                <p className="m-0 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-                  {component.description || "Sem descrição definida para este componente."}
-                </p>
-              </FastEditSection>
-              <FastEditSection title="Ajustes rápidos">
-                <div className="grid gap-2">
-                  <button type="button" className="btn btn-ghost justify-start">Editar texto</button>
-                  <button type="button" className="btn btn-ghost justify-start">Trocar imagem</button>
-                  <button type="button" className="btn btn-ghost justify-start">Ajustar espaçamento</button>
-                </div>
-              </FastEditSection>
-            </div>
-          </aside>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
-}
-
-function FastEditSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3.5">
-      <h3 className="m-0 text-[11px] font-semibold uppercase tracking-[0.45px] text-[var(--text-faint)]">{title}</h3>
-      {children}
-    </section>
   );
 }
 
