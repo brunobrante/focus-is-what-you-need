@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
+import { Monitor, Smartphone } from "lucide-react";
+
 import type { SplitMode } from "@/routes/Canvas";
 import { EditorBridgePublisher } from "@/lib/editor/bridge";
 import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY } from "@/lib/editor/storageKeys";
 import { EditorProvider, useEditor } from "@/lib/editor/store";
 import { createDraftDocument } from "@/lib/editor/actions";
 import type { CanvasDocument } from "@/lib/editor/types";
+import type { ProjectType } from "@/lib/data/types";
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "@/lib/editor/viewport";
 import { CanvasStage } from "./editor/CanvasStage";
 
@@ -16,6 +19,10 @@ const PANEL_MARGIN = 12;
 const HEADER_HEIGHT = 64;
 
 export type ZoomSetter = (next: number | ((zoom: number) => number)) => void;
+type CanvasParentTarget = {
+  name: string;
+  kind: "screen" | "component";
+};
 
 export function CanvasRender({
   treeOpen,
@@ -27,9 +34,12 @@ export function CanvasRender({
   currentDocument,
   currentStorageKey = CURRENT_CANVAS_STORAGE_KEY,
   currentReady = true,
+  projectType = "desktop",
+  parentTarget,
   onCurrentDocumentChange,
   onActiveCanvasChange,
   onToggleExpand,
+  onBackToParent,
 }: {
   treeOpen: boolean;
   inspectorOpen: boolean;
@@ -40,9 +50,12 @@ export function CanvasRender({
   currentDocument?: CanvasDocument;
   currentStorageKey?: string;
   currentReady?: boolean;
+  projectType?: ProjectType;
+  parentTarget?: CanvasParentTarget | null;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
   onActiveCanvasChange?: (canvas: "left" | "right") => void;
   onToggleExpand?: () => void;
+  onBackToParent?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const activeCanvas = split !== "none" && activeTab === "drafts" ? "right" : "left";
@@ -89,6 +102,9 @@ export function CanvasRender({
             ready={currentReady}
             onDocumentChange={onCurrentDocumentChange}
             activeTool={activeTool}
+            projectType={projectType}
+            parentTarget={parentTarget}
+            onBackToParent={onBackToParent}
           />
           <CanvasSurface
             active={activeCanvas === "right"}
@@ -101,6 +117,7 @@ export function CanvasRender({
             draftMode
             fallbackDocument={draftsFallbackDoc}
             activeTool={activeTool}
+            projectType={projectType}
           />
         </div>
       ) : split === "horizontal" ? (
@@ -119,6 +136,9 @@ export function CanvasRender({
             ready={currentReady}
             onDocumentChange={onCurrentDocumentChange}
             activeTool={activeTool}
+            projectType={projectType}
+            parentTarget={parentTarget}
+            onBackToParent={onBackToParent}
           />
           <CanvasSurface
             active={activeCanvas === "right"}
@@ -131,6 +151,7 @@ export function CanvasRender({
             draftMode
             fallbackDocument={draftsFallbackDoc}
             activeTool={activeTool}
+            projectType={projectType}
           />
         </div>
       ) : (
@@ -146,6 +167,7 @@ export function CanvasRender({
               draftMode
               fallbackDocument={draftsFallbackDoc}
               activeTool={activeTool}
+              projectType={projectType}
             />
           ) : (
             <CanvasSurface
@@ -161,6 +183,9 @@ export function CanvasRender({
               ready={currentReady}
               onDocumentChange={onCurrentDocumentChange}
               activeTool={activeTool}
+              projectType={projectType}
+              parentTarget={parentTarget}
+              onBackToParent={onBackToParent}
             />
           )}
         </div>
@@ -213,6 +238,9 @@ function CanvasSurface({
   activeTool,
   sourceId,
   publishBridge,
+  projectType,
+  parentTarget,
+  onBackToParent,
 }: {
   active: boolean;
   showActiveBorder: boolean;
@@ -227,6 +255,9 @@ function CanvasSurface({
   activeTool?: string;
   sourceId: string;
   publishBridge: boolean;
+  projectType: ProjectType;
+  parentTarget?: CanvasParentTarget | null;
+  onBackToParent?: () => void;
 }) {
   const viewportSubjectKey = [
     storageKey,
@@ -260,7 +291,10 @@ function CanvasSurface({
             activeTool={activeTool}
             viewportSubjectKey={viewportSubjectKey}
           />
-          {!expanded ? <SurfaceZoomControl /> : null}
+          {!draftMode && parentTarget ? (
+            <CanvasParentBackButton parentTarget={parentTarget} onBack={onBackToParent} />
+          ) : null}
+          {!expanded ? <SurfaceCanvasControls projectType={projectType} /> : null}
         </EditorProvider>
       ) : (
         <div className="grid h-full w-full place-items-center text-[12px] text-[#777]">
@@ -271,8 +305,68 @@ function CanvasSurface({
   );
 }
 
-function SurfaceZoomControl() {
+function CanvasParentBackButton({
+  parentTarget,
+  onBack,
+}: {
+  parentTarget: CanvasParentTarget;
+  onBack?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onBack?.();
+      }}
+      className="group absolute left-3 top-3 z-[10] flex max-w-[180px] items-center gap-2 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A]/95 px-2 py-1.5 text-left text-[#9A9A9A] transition-colors duration-[100ms] hover:bg-[#242424] hover:text-[#F2F2F2]"
+      style={{
+        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 18px rgba(0,0,0,0.42)",
+      }}
+    >
+      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-[#6B6B6B] transition-colors duration-[100ms] group-hover:text-[#CFCFCF]">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 6l-6 6 6 6" />
+        </svg>
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[9.5px] font-medium uppercase leading-none text-[#5A5A5A] transition-colors duration-[100ms] group-hover:text-[#777]">
+          Voltar para
+        </span>
+        <span className="truncate text-[11.5px] font-medium leading-none text-[#CFCFCF]">
+          {parentTarget.name}
+        </span>
+      </span>
+      <span className="ml-1 shrink-0 text-[#5A5A5A] transition-colors duration-[100ms] group-hover:text-[#888]">
+        {parentTarget.kind === "screen" ? <ParentScreenIcon /> : <ParentComponentIcon />}
+      </span>
+    </button>
+  );
+}
+
+function ParentScreenIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </svg>
+  );
+}
+
+function ParentComponentIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+function SurfaceCanvasControls({ projectType }: { projectType: ProjectType }) {
   const { state, dispatch } = useEditor();
+  const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
 
   const setZoom: ZoomSetter = (next) => {
     const zoom = typeof next === "function" ? next(state.zoom) : next;
@@ -280,9 +374,49 @@ function SurfaceZoomControl() {
   };
 
   return (
-    <div className="absolute bottom-3 left-3 z-[10]">
+    <div className="absolute bottom-3 left-3 z-[10] flex items-center gap-2">
+      <DeviceSwitch
+        enabled={deviceOverlayEnabled}
+        projectType={projectType}
+        onToggle={() => setDeviceOverlayEnabled((value) => !value)}
+      />
       <ZoomControl zoom={state.zoom} setZoom={setZoom} />
     </div>
+  );
+}
+
+function DeviceSwitch({
+  enabled,
+  projectType,
+  onToggle,
+}: {
+  enabled: boolean;
+  projectType: ProjectType;
+  onToggle: () => void;
+}) {
+  const isMobile = projectType === "mobile";
+  const label = `${enabled ? "Desativar" : "Ativar"} modo ${isMobile ? "mobile" : "desktop"}`;
+  const Icon = isMobile ? Smartphone : Monitor;
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={enabled}
+      title={label}
+      onClick={onToggle}
+      className={[
+        "grid h-[34px] w-[34px] place-items-center rounded-lg border transition-colors duration-[100ms]",
+        enabled
+          ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
+          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#CFCFCF] hover:bg-[#2A2A2A]",
+      ].join(" ")}
+      style={{
+        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)",
+      }}
+    >
+      <Icon size={16} strokeWidth={1.8} />
+    </button>
   );
 }
 

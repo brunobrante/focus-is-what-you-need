@@ -228,6 +228,7 @@ export function Tree({
   };
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerAnchor, setPickerAnchor] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -251,45 +252,8 @@ export function Tree({
       className="pointer-events-auto fixed bottom-3 left-3 top-16 z-[6] flex w-[300px] flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
-      {/* Header: title with icon + close */}
-      <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-[#2C2C2C] bg-[#141414] pl-3.5 pr-2.5">
-        <button
-          type="button"
-          onClick={() => setPickerOpen((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-[#1E1E1E]"
-        >
-          <span className="grid shrink-0 place-items-center text-[#9A9A9A]">
-            {isScreen ? <DeviceIcon device={projectType ?? "mobile"} /> : <TypeIcon type="component" hasChildren />}
-          </span>
-          <span
-            className="truncate text-[13px] font-medium"
-            style={{ color: "#F2F2F2", letterSpacing: "0.1px" }}
-          >
-            {headerName}
-          </span>
-          <svg
-            width="10" height="10" viewBox="0 0 24 24" fill="none"
-            stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            className="ml-auto shrink-0"
-            style={{ transform: pickerOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Fechar painel"
-          className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex h-[34px] shrink-0 items-stretch justify-between gap-2 border-b border-[#2C2C2C] bg-[#171717] px-1.5">
+      {/* Header: tabs + count + close */}
+      <div className="flex h-11 shrink-0 items-stretch justify-between border-b border-[#2C2C2C] bg-[#141414] pl-1.5 pr-2">
         <div className="flex items-stretch gap-0.5">
           {([
             { id: "layers", label: "Camadas" },
@@ -319,27 +283,42 @@ export function Tree({
             );
           })}
         </div>
-        <div className="flex items-center pr-1.5">
+        <div className="flex items-center gap-2">
           <span
             className="text-[11px] text-[#6B6B6B]"
             style={{ fontFeatureSettings: '"tnum"' }}
           >
             {activeTab === "layers" ? totalCount : draftsCount}
           </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar painel"
+            className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
       </div>
 
       {activeTab === "layers" ? (
         <>
-          {document ? (
-            <CanvasStageRow
-              active={canvasActive}
-              label={tree.root.name}
-              width={document.canvas.width}
-              height={document.canvas.height}
-              onToggle={() => onToggleCanvasActive?.(!canvasActive)}
-            />
-          ) : null}
+          <CurrentSceneTreeRow
+            active={canvasActive}
+            label={headerName}
+            width={document?.canvas.width}
+            height={document?.canvas.height}
+            isScreen={isScreen}
+            projectType={projectType ?? "mobile"}
+            pickerOpen={pickerOpen}
+            onOpenPicker={(rect) => {
+              setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+              setPickerOpen((v) => !v);
+            }}
+            onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
+          />
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -349,7 +328,7 @@ export function Tree({
               items={visibleLayerIds}
               strategy={verticalListSortingStrategy}
             >
-              <div role="tree" className="flex-1 overflow-y-auto pb-3 pt-1.5">
+              <div role="tree" className="flex-1 overflow-y-auto pb-3 pt-1">
                 {(tree.root.children || []).map((c) => (
                   <TreeRow
                     key={c.id}
@@ -369,54 +348,43 @@ export function Tree({
               </div>
             </SortableContext>
           </DndContext>
-          {/* <Footer
-            indicator={<span className="h-1.5 w-1.5 rounded-full bg-[#3FB950]" />}
-            label="sincronizado"
-            value={selectedId ? (findNode(tree.root, selectedId) ? nodeTypeLabel(findNode(tree.root, selectedId)!) : null) : null}
-          /> */}
-          <BackFooter
-            parentNode={parentNode}
-            onBack={() => parentNode && onOpenProjectNode?.(parentNode)}
-          />
         </>
       ) : (
-        <>
-          <div role="tree" className="flex-1 overflow-y-auto pb-3 pt-1.5">
-            {(draftsTree.root.children || []).length > 0 ? (
-              (draftsTree.root.children || []).map((c) => (
-                <TreeRow
-                  key={c.id}
-                  node={c}
-                  depth={0}
-                  openSet={draftsOpenSet}
-                  setOpenSet={setDraftsOpenSet}
-                  selectedId={draftsSelectedId}
-                  setSelectedId={setDraftsSelectedId}
-                />
-              ))
-            ) : (
-              <div className="px-4 py-8 text-center text-[12px] leading-5 text-[#6B6B6B]">
-                Canvas livre, sem elementos.
-              </div>
-            )}
-          </div>
-          {/* <Footer
-            indicator={<span className="h-1.5 w-1.5 rounded-full bg-[#E0A33A]" />}
-            label={`${draftsCount} rascunhos`}
-            value={draftsSelectedId ? (findNode(draftsTree.root, draftsSelectedId) ? nodeTypeLabel(findNode(draftsTree.root, draftsSelectedId)!) : null) : null}
-          /> */}
-        </>
+        <div role="tree" className="flex-1 overflow-y-auto pb-3 pt-1.5">
+          {(draftsTree.root.children || []).length > 0 ? (
+            (draftsTree.root.children || []).map((c) => (
+              <TreeRow
+                key={c.id}
+                node={c}
+                depth={0}
+                openSet={draftsOpenSet}
+                setOpenSet={setDraftsOpenSet}
+                selectedId={draftsSelectedId}
+                setSelectedId={setDraftsSelectedId}
+              />
+            ))
+          ) : (
+            <div className="px-4 py-8 text-center text-[12px] leading-5 text-[#6B6B6B]">
+              Canvas livre, sem elementos.
+            </div>
+          )}
+        </div>
       )}
+
+      <BackFooter
+        parentNode={parentNode}
+        onBack={() => parentNode && onOpenProjectNode?.(parentNode)}
+      />
     </aside>
 
     {/* Component picker dropdown */}
-    {pickerOpen && (
+    {pickerOpen && pickerAnchor && (
       <div
         ref={pickerRef}
         className="fixed z-[20] overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#141414]"
         style={{
-          left: 12,
-          top: 64 + 44 + 2,
+          left: pickerAnchor.left,
+          ...(pickerAnchor.top != null ? { top: pickerAnchor.top } : { bottom: pickerAnchor.bottom }),
           width: 300,
           maxHeight: 320,
           boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03) inset",
@@ -585,56 +553,78 @@ function BackFooter({
   );
 }
 
-function CanvasStageRow({
+function CurrentSceneTreeRow({
   active,
   label,
   width,
   height,
-  onToggle,
+  isScreen,
+  projectType,
+  pickerOpen,
+  onOpenPicker,
+  onToggleEdit,
 }: {
   active: boolean;
   label: string;
-  width: number;
-  height: number;
-  onToggle: () => void;
+  width?: number;
+  height?: number;
+  isScreen: boolean;
+  projectType: DeviceType;
+  pickerOpen: boolean;
+  onOpenPicker: (rect: DOMRect) => void;
+  onToggleEdit: () => void;
 }) {
   return (
-    <div className="border-b border-[#2C2C2C] px-2 py-2">
+    <div
+      className="relative flex h-[46px] shrink-0 select-none items-center gap-1.5 border-b border-[#242424] pr-2.5 text-[13px]"
+      style={{
+        paddingLeft: 6,
+        color: active ? "#FFFFFF" : "#CFCFCF",
+        background: active ? "rgba(13,153,255,0.07)" : "#171717",
+        cursor: "default",
+        boxShadow: active ? "inset 2px 0 0 rgba(13,153,255,0.5)" : undefined,
+      }}
+    >
+      <span className="grid h-[46px] w-4 shrink-0 place-items-center" />
       <button
         type="button"
-        onClick={onToggle}
-        className="flex h-9 w-full items-center gap-2 rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2.5 text-left hover:bg-[#242424]"
+        onClick={(event) => onOpenPicker(event.currentTarget.parentElement?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect())}
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border-0 bg-transparent p-0 text-left"
+      >
+        <span className="grid w-[18px] shrink-0 place-items-center" style={{ color: "#9A9A9A" }}>
+          {isScreen ? <DeviceIcon device={projectType} /> : <TypeIcon type="component" hasChildren />}
+        </span>
+        <span
+          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+          style={{ fontWeight: 500, letterSpacing: "0.05px" }}
+        >
+          {label}
+          {width && height ? (
+            <span className="ml-1.5 text-[10.5px]" style={{ color: "#4A4A4A", fontWeight: 400 }}>
+              {width}×{height}
+            </span>
+          ) : null}
+        </span>
+        <svg
+          width="10" height="10" viewBox="0 0 24 24" fill="none"
+          stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          className="shrink-0"
+          style={{ transform: pickerOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleEdit}
+        className="cursor-pointer rounded border px-1.5 py-0.5 text-[10px] font-medium hover:opacity-80"
         style={{
-          borderColor: active ? "rgba(13,153,255,0.65)" : "#2C2C2C",
-          boxShadow: active ? "0 0 0 1px rgba(13,153,255,0.12) inset" : undefined,
+          borderColor: active ? "rgba(13,153,255,0.5)" : "#333",
+          color: active ? "#7CC7FF" : "#8A8A8A",
+          background: active ? "rgba(13,153,255,0.08)" : "transparent",
         }}
       >
-        <span
-          className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] text-[10px] font-bold"
-          style={{
-            background: active ? "rgba(13,153,255,0.18)" : "#2A2A2A",
-            color: active ? "#7CC7FF" : "#9A9A9A",
-          }}
-        >
-          C
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12.5px] font-medium text-[#F2F2F2]">
-            {label}
-          </span>
-          <span className="block text-[10.5px] text-[#6B6B6B]">
-            {width}×{height}px
-          </span>
-        </span>
-        <span
-          className="rounded border px-1.5 py-0.5 text-[10px] font-medium"
-          style={{
-            borderColor: active ? "rgba(13,153,255,0.5)" : "#333",
-            color: active ? "#7CC7FF" : "#8A8A8A",
-          }}
-        >
-          {active ? "Done" : "Edit"}
-        </span>
+        {active ? "Done" : "Edit"}
       </button>
     </div>
   );

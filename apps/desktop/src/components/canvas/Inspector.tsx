@@ -30,6 +30,8 @@ type InspectorProps = {
 };
 
 type InspectorTab = "element" | "canvas" | "shell";
+type ShellControlVisibility = "show" | "hidden" | "hover";
+type ShellWindowOption = "draft" | "reference";
 
 export function Inspector({ open, onClose, editor }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
@@ -448,24 +450,85 @@ function ShellTab({
   onUpdateBackground: (background: string) => void;
   onUpdatePattern: (pattern: ShellPattern) => void;
 }) {
+  const [deviceButtonVisibility, setDeviceButtonVisibility] = useState<ShellControlVisibility>("show");
+  const [zoomVisibility, setZoomVisibility] = useState<ShellControlVisibility>("show");
+  const [expandVisibility, setExpandVisibility] = useState<ShellControlVisibility>("hover");
+  const [showDots, setShowDots] = useState(true);
+  const [showSquares, setShowSquares] = useState(false);
+  const [enabledWindows, setEnabledWindows] = useState<ShellWindowOption[]>(["draft"]);
+
   return (
-    <InsSection title="Shell">
-      <InsRow label="BG">
-        <InsColor value={background} onChange={onUpdateBackground} />
-      </InsRow>
-      <InsRow label="Padrão">
-        <InsToggle
-          value={pattern}
-          onChange={(value) => onUpdatePattern(value as ShellPattern)}
-          options={[
-            { value: "dots", label: "Pontilhado" },
-            { value: "grid", label: "Quadrados" },
-          ]}
-        />
-      </InsRow>
-    </InsSection>
+    <>
+      <InsSection title="Shell">
+        <InsRow label="BG">
+          <InsColor value={background} onChange={onUpdateBackground} />
+        </InsRow>
+        <InsRow label="Padrão">
+          <InsToggle
+            value={pattern}
+            onChange={(value) => onUpdatePattern(value as ShellPattern)}
+            options={[
+              { value: "dots", label: "Pontilhado" },
+              { value: "grid", label: "Quadrados" },
+            ]}
+          />
+        </InsRow>
+      </InsSection>
+
+      <InsSection title="Feats">
+        <InsRow label="Janelas">
+          <InsMultiSelect
+            value={enabledWindows}
+            onChange={(value) => setEnabledWindows(value as ShellWindowOption[])}
+            options={[
+              { value: "draft", label: "Draft" },
+              { value: "reference", label: "Referência" },
+            ]}
+          />
+        </InsRow>
+      </InsSection>
+
+      <InsSection title="Controles">
+        <InsRow label="Device">
+          <InsToggle
+            value={deviceButtonVisibility}
+            onChange={(value) => setDeviceButtonVisibility(value as ShellControlVisibility)}
+            options={SHELL_VISIBILITY_OPTIONS}
+          />
+        </InsRow>
+        <InsRow label="Zoom">
+          <InsToggle
+            value={zoomVisibility}
+            onChange={(value) => setZoomVisibility(value as ShellControlVisibility)}
+            options={SHELL_VISIBILITY_OPTIONS}
+          />
+        </InsRow>
+        <InsRow label="Expand">
+          <InsToggle
+            value={expandVisibility}
+            onChange={(value) => setExpandVisibility(value as ShellControlVisibility)}
+            options={SHELL_VISIBILITY_OPTIONS}
+          />
+        </InsRow>
+      </InsSection>
+
+      <InsSection title="Grade">
+        <InsRow label="Dots">
+          <InsSwitch checked={showDots} onChange={setShowDots} label="Pontilhado" />
+        </InsRow>
+        <InsRow label="Squares">
+          <InsSwitch checked={showSquares} onChange={setShowSquares} label="Quadrados" />
+        </InsRow>
+      </InsSection>
+    </>
   );
 }
+
+const SHELL_VISIBILITY_OPTIONS: Array<{ value: ShellControlVisibility; label: string }> = [
+  { value: "show", label: "Show" },
+  { value: "hidden", label: "Hidden" },
+  { value: "hover", label: "Hover" },
+];
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
@@ -692,5 +755,82 @@ function InsToggle({
         );
       })}
     </div>
+  );
+}
+
+function InsMultiSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-md border border-[#2C2C2C] bg-[#1E1E1E] p-0.5">
+      {options.map((option) => {
+        const isActive = value.includes(option.value);
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => {
+              const next = isActive
+                ? value.filter((item) => item !== option.value)
+                : [...value, option.value];
+              onChange(next);
+            }}
+            className="h-[22px] min-w-0 flex-1 cursor-pointer truncate rounded border-0 text-[11px]"
+            style={{
+              letterSpacing: "0.2px",
+              background: isActive ? "rgba(13,153,255,0.18)" : "transparent",
+              color: isActive ? "#B9E1FF" : "#9A9A9A",
+            }}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function InsSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      onClick={() => onChange(!checked)}
+      className={[
+        "flex h-7 min-w-0 flex-1 cursor-pointer items-center justify-between rounded-md border px-2 transition-colors duration-[100ms]",
+        checked
+          ? "border-[#0D99FF]/50 bg-[#0D99FF]/15 text-[#F2F2F2]"
+          : "border-[#2C2C2C] bg-[#1E1E1E] text-[#9A9A9A]",
+      ].join(" ")}
+    >
+      <span className="truncate text-[11.5px] font-medium">{label}</span>
+      <span
+        aria-hidden
+        className={[
+          "relative h-4 w-7 shrink-0 rounded-full transition-colors duration-[100ms]",
+          checked ? "bg-[#0D99FF]" : "bg-[#383838]",
+        ].join(" ")}
+      >
+        <span
+          className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-[100ms]"
+          style={{ transform: checked ? "translateX(13px)" : "translateX(2px)" }}
+        />
+      </span>
+    </button>
   );
 }

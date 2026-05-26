@@ -535,9 +535,14 @@ function CanvasPageContent() {
         currentDocument={currentDocument}
         currentStorageKey={currentStorageKey}
         currentReady={currentReady}
+        projectType={projectType}
+        parentTarget={parentProjectNode}
         onCurrentDocumentChange={handleCurrentDocumentChange}
         onActiveCanvasChange={(canvas) => changeCanvasTab(canvas === "right" ? "drafts" : "current")}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}
+        onBackToParent={() => {
+          if (parentProjectNode) openProjectNodeCanvas(parentProjectNode);
+        }}
       />
 
       {/* Top-center canvas tabs */}
@@ -664,6 +669,11 @@ function CanvasPageContent() {
           canvasExpanded={canvasExpanded}
           zoom={activeZoom}
           onZoomChange={setActiveZoom}
+          projectType={projectType}
+          parentTarget={parentProjectNode}
+          onBackToParent={() => {
+            if (parentProjectNode) openProjectNodeCanvas(parentProjectNode);
+          }}
           onCollapseCanvas={() => setCanvasExpanded(false)}
         />
       </div>

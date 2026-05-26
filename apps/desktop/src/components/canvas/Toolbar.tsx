@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { Monitor, Smartphone } from "lucide-react";
 
 import type { CanvasToolId } from "@/lib/canvas/tools";
 import {
@@ -6,7 +7,13 @@ import {
   type ToolbarConfig,
   type ToolEntry,
 } from "@/lib/canvas/toolbarConfig";
+import type { ProjectType } from "@/lib/data/types";
 import { ZoomControl, type ZoomSetter } from "@/components/canvas/CanvasRender";
+
+type ToolbarParentTarget = {
+  name: string;
+  kind: "screen" | "component";
+};
 
 export function Toolbar({
   activeTool,
@@ -16,6 +23,9 @@ export function Toolbar({
   onCollapseCanvas,
   zoom,
   onZoomChange,
+  projectType = "desktop",
+  parentTarget,
+  onBackToParent,
   config = DEFAULT_TOOLBAR_CONFIG,
 }: {
   activeTool?: CanvasToolId;
@@ -25,9 +35,13 @@ export function Toolbar({
   onCollapseCanvas?: () => void;
   zoom?: number;
   onZoomChange?: ZoomSetter;
+  projectType?: ProjectType;
+  parentTarget?: ToolbarParentTarget | null;
+  onBackToParent?: () => void;
   config?: ToolbarConfig;
 }) {
   const [uncontrolledActive, setUncontrolledActive] = useState<CanvasToolId>(defaultTool);
+  const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
   const active = activeTool ?? uncontrolledActive;
   const selectTool = (tool: CanvasToolId) => {
     setUncontrolledActive(tool);
@@ -77,6 +91,11 @@ export function Toolbar({
           <CanvasExpandedControls
             zoom={zoom}
             onZoomChange={onZoomChange}
+            projectType={projectType}
+            deviceEnabled={deviceOverlayEnabled}
+            onToggleDevice={() => setDeviceOverlayEnabled((value) => !value)}
+            parentTarget={parentTarget}
+            onBackToParent={onBackToParent}
             onCollapse={onCollapseCanvas}
           />
         </div>
@@ -228,10 +247,20 @@ function ToolButton({
 function CanvasExpandedControls({
   zoom,
   onZoomChange,
+  projectType,
+  deviceEnabled,
+  onToggleDevice,
+  parentTarget,
+  onBackToParent,
   onCollapse,
 }: {
   zoom?: number;
   onZoomChange?: ZoomSetter;
+  projectType: ProjectType;
+  deviceEnabled: boolean;
+  onToggleDevice: () => void;
+  parentTarget?: ToolbarParentTarget | null;
+  onBackToParent?: () => void;
   onCollapse?: () => void;
 }) {
   return (
@@ -239,6 +268,15 @@ function CanvasExpandedControls({
       className="inline-flex items-center gap-1.5 rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-[3px]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35)" }}
     >
+      <ToolbarDeviceButton
+        enabled={deviceEnabled}
+        projectType={projectType}
+        onClick={onToggleDevice}
+      />
+      {parentTarget ? (
+        <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
+      ) : null}
+      <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
       {zoom != null && onZoomChange ? (
         <>
           <ZoomControl zoom={zoom} setZoom={onZoomChange} bare />
@@ -259,6 +297,61 @@ function CanvasExpandedControls({
         </svg>
       </button>
     </div>
+  );
+}
+
+function ToolbarDeviceButton({
+  enabled,
+  projectType,
+  onClick,
+}: {
+  enabled: boolean;
+  projectType: ProjectType;
+  onClick: () => void;
+}) {
+  const isMobile = projectType === "mobile";
+  const Icon = isMobile ? Smartphone : Monitor;
+  const label = `${enabled ? "Desativar" : "Ativar"} modo ${isMobile ? "mobile" : "desktop"}`;
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={enabled}
+      title={label}
+      onClick={onClick}
+      className={[
+        "grid h-9 w-9 place-items-center rounded-lg transition-colors duration-[90ms]",
+        enabled
+          ? "bg-[#0D99FF]/15 text-[#8CCBFF]"
+          : "text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
+      ].join(" ")}
+    >
+      <Icon size={16} strokeWidth={1.8} />
+    </button>
+  );
+}
+
+function ToolbarBackButton({
+  parentTarget,
+  onClick,
+}: {
+  parentTarget: ToolbarParentTarget;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Voltar para ${parentTarget.name}`}
+      title={`Voltar para ${parentTarget.name}`}
+      onClick={onClick}
+      className="grid h-9 w-9 place-items-center rounded-lg text-[#888] transition-colors duration-[90ms] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 6l-6 6 6 6" />
+        {parentTarget.kind === "component" ? <path d="M20 5h-4v4M4 19h4v-4" /> : null}
+      </svg>
+    </button>
   );
 }
 
