@@ -24,6 +24,7 @@ import {
   Pipette,
   Plus,
   RotateCcw,
+  Save,
   Square,
   Trash2,
   Type,
@@ -978,6 +979,8 @@ export function Tools() {
                 }}
               />
 
+              {currentTool === "annotate" ? <AnnotationToolbar /> : null}
+
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
                   <ImageIcon size={24} strokeWidth={1.6} />
@@ -1166,8 +1169,6 @@ export function Tools() {
                 </ModeButton>
               </div>
 
-              {currentTool === "annotate" ? <AnnotationToolbar /> : null}
-
               {selection ? (
                 <div className="inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-[5px]">
                   <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
@@ -1266,6 +1267,16 @@ export function Tools() {
                   }}
                 />
               ))}
+            </div>
+
+            <div className="flex shrink-0 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3 py-3 backdrop-blur-[8px]">
+              <button
+                type="button"
+                className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-[var(--accent)] bg-[var(--accent)] px-3 text-[12.5px] font-semibold text-[var(--accent-fg)] transition-colors duration-[120ms] hover:bg-white"
+              >
+                <Save size={14} strokeWidth={1.9} />
+                Salvar
+              </button>
             </div>
           </aside>
         </div>
@@ -1427,7 +1438,7 @@ function AnnotationToolbar() {
   return (
     <div
       data-selection-action
-      className="absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[rgba(20,20,22,0.92)] p-1 shadow-[0_10px_34px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
+      className="absolute bottom-3.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[rgba(20,20,22,0.92)] p-1 shadow-[0_10px_34px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
     >
       <AnnotationToolButton label="Lápis" active>
         <Pencil size={13} strokeWidth={1.8} />
