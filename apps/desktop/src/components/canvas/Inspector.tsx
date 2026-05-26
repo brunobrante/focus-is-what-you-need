@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { EditorBridgeValue } from "@/lib/editor/bridge";
 import {
@@ -60,13 +60,13 @@ export function Inspector({ open, onClose, editor }: InspectorProps) {
 
   const commitDocument = (
     nextDocument = document,
-    selectedIds = state?.selectedIds,
+    selectedIds?: string[],
   ) => {
     if (!editor || !nextDocument) return;
     editor.dispatch({
       type: "commitDocument",
       document: nextDocument,
-      selectedIds,
+      ...(selectedIds !== undefined ? { selectedIds } : {}),
     });
   };
 
@@ -169,6 +169,7 @@ export function Inspector({ open, onClose, editor }: InspectorProps) {
           <EmptyState title="Nenhum elemento selecionado" body="Selecione um elemento na árvore ou no canvas." />
         ) : (
           <ElementTab
+            key={node.id}
             node={node}
             parentName={parentName}
             document={document}
@@ -549,10 +550,12 @@ function Readout({ label, value }: { label: string; value: string }) {
   );
 }
 
-function updateNumber(value: string, commit: (value: number) => void) {
-  if (value.trim() === "") return;
+function updateNumber(value: string, commit: (value: number) => void): boolean {
+  if (value.trim() === "") return false;
   const next = Number(value);
-  if (Number.isFinite(next)) commit(next);
+  if (!Number.isFinite(next)) return false;
+  commit(next);
+  return true;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -635,6 +638,78 @@ function InsRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+type CommitResult = boolean | void;
+
+function useDeferredCommitField(value: string, onChange: (v: string) => CommitResult) {
+  const [draftValue, setDraftValueState] = useState(value);
+  const draftValueRef = useRef(value);
+  const committedValueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+
+  committedValueRef.current = value;
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    draftValueRef.current = value;
+    setDraftValueState(value);
+  }, [value]);
+
+  const setDraftValue = useCallback((nextValue: string) => {
+    draftValueRef.current = nextValue;
+    setDraftValueState(nextValue);
+  }, []);
+
+  const commitDraft = useCallback(() => {
+    const draft = draftValueRef.current;
+    const committed = committedValueRef.current;
+    if (draft === committed) return;
+    const result = onChangeRef.current(draft);
+    if (result === false) {
+      draftValueRef.current = committed;
+      setDraftValueState(committed);
+    }
+  }, []);
+
+  const resetDraft = useCallback(() => {
+    const committed = committedValueRef.current;
+    draftValueRef.current = committed;
+    setDraftValueState(committed);
+  }, []);
+
+  return {
+    draftValue,
+    setDraftValue,
+    commitDraft,
+    resetDraft,
+  };
+}
+
+function useCommitOnOutsideInteraction<T extends HTMLElement>(
+  ref: { current: T | null },
+  commitDraft: () => void,
+) {
+  useEffect(() => {
+    const ownerDocument = globalThis.document;
+    if (!ownerDocument) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const element = ref.current;
+      const target = event.target;
+      if (element && target instanceof Node && element.contains(target)) return;
+      commitDraft();
+    };
+    const handleWindowBlur = () => commitDraft();
+
+    ownerDocument.addEventListener("pointerdown", handlePointerDown, true);
+    globalThis.addEventListener("blur", handleWindowBlur);
+    return () => {
+      ownerDocument.removeEventListener("pointerdown", handlePointerDown, true);
+      globalThis.removeEventListener("blur", handleWindowBlur);
+      commitDraft();
+    };
+  }, [commitDraft, ref]);
+}
+
 function InsInput({
   value,
   onChange,
@@ -642,16 +717,34 @@ function InsInput({
   suffix,
 }: {
   value: string;
-  onChange: (v: string) => void;
+  onChange: (v: string) => CommitResult;
   placeholder?: string;
   suffix?: string;
 }) {
+  const inputWrapperRef = useRef<HTMLDivElement | null>(null);
+  const { draftValue, setDraftValue, commitDraft, resetDraft } = useDeferredCommitField(value, onChange);
+
+  useCommitOnOutsideInteraction(inputWrapperRef, commitDraft);
+
   return (
-    <div className="flex h-7 min-w-0 flex-1 items-center rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2">
+    <div
+      ref={inputWrapperRef}
+      className="flex h-7 min-w-0 flex-1 items-center rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2"
+    >
       <input
         type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={draftValue}
+        onChange={(e) => setDraftValue(e.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitDraft();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            resetDraft();
+          }
+        }}
         placeholder={placeholder}
         className="w-full min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#F2F2F2] outline-none placeholder:text-[#6B6B6B]"
         style={{ fontFeatureSettings: '"tnum"' }}
@@ -666,12 +759,28 @@ function InsTextarea({
   onChange,
 }: {
   value: string;
-  onChange: (v: string) => void;
+  onChange: (v: string) => CommitResult;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { draftValue, setDraftValue, commitDraft, resetDraft } = useDeferredCommitField(value, onChange);
+
+  useCommitOnOutsideInteraction(textareaRef, commitDraft);
+
   return (
     <textarea
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
+      ref={textareaRef}
+      value={draftValue}
+      onChange={(event) => setDraftValue(event.target.value)}
+      onBlur={commitDraft}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          commitDraft();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          resetDraft();
+        }
+      }}
       rows={3}
       className="min-h-[72px] w-full resize-none rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2 py-1.5 text-[12px] leading-5 text-[#F2F2F2] outline-none"
     />
