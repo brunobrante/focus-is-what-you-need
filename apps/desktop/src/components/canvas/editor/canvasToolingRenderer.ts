@@ -1,5 +1,6 @@
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/lib/editor/types";
 import {
+  bboxFromPoints,
   getElementAABB,
   getElementTransformedCorners,
   maxBorderRadiusForSize,
@@ -63,16 +64,7 @@ export function canvasRectToViewport(rect: Rect, t: ViewportTransform): Rect {
 }
 
 function rectFromPoints(points: Point[]): Rect {
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return {
-    x,
-    y,
-    width: Math.max(...xs) - x,
-    height: Math.max(...ys) - y,
-  };
+  return bboxFromPoints(points) ?? { x: 0, y: 0, width: 0, height: 0 };
 }
 
 export function rectToToolingBox(rect: Rect): ToolingBox {

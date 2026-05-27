@@ -1,5 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { cloneDocument } from "@/lib/editor/actions";
+import { mutateElementShallow, mutateElementWithStyles, shallowCloneDocument } from "@/lib/editor/actions";
 import {
   angleBetweenPoints,
   angleDelta,
@@ -143,12 +143,13 @@ export function commitDragMove(
   interaction: DragInteraction,
   delta: Point,
 ): CanvasDocument {
-  const next = cloneDocument(interaction.beforeDocument);
+  const next = shallowCloneDocument(interaction.beforeDocument);
   for (const id of interaction.transformIds) {
     const source = interaction.beforeDocument.elements[id];
-    const node = next.elements[id];
     const sourceRect = getAbsoluteRect(interaction.beforeDocument, id);
-    if (!source || !node || !sourceRect) continue;
+    if (!source || !sourceRect) continue;
+    const node = mutateElementShallow(next, id);
+    if (!node) continue;
     // Use interaction.parentBounds so draft mode (DRAFT_BOUNDS) is respected
     const parentBounds = source.parentId
       ? getParentBounds(interaction.beforeDocument, id)
@@ -214,16 +215,22 @@ function resizeSingleElement(
     absX = clamp(absX, parentBounds.x, parentBounds.x + parentBounds.width - width);
     absY = clamp(absY, parentBounds.y, parentBounds.y + parentBounds.height - height);
   }
-  const next = cloneDocument(interaction.beforeDocument);
-  const node = next.elements[id];
-  if (node) {
-    node.width = width;
-    node.height = height;
-    if (node.styles.borderRadius !== undefined) {
-      node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, width, height));
+  const next = shallowCloneDocument(interaction.beforeDocument);
+  const sourceNode = next.elements[id];
+  if (sourceNode) {
+    const node =
+      sourceNode.styles.borderRadius !== undefined
+        ? mutateElementWithStyles(next, id)
+        : mutateElementShallow(next, id);
+    if (node) {
+      node.width = width;
+      node.height = height;
+      if (node.styles.borderRadius !== undefined) {
+        node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, width, height));
+      }
+      node.x = roundPixel(absX - parentBounds.x);
+      node.y = roundPixel(absY - parentBounds.y);
     }
-    node.x = roundPixel(absX - parentBounds.x);
-    node.y = roundPixel(absY - parentBounds.y);
   }
   return { document: next, guides: [] };
 }
@@ -241,11 +248,16 @@ export function resizeDocument(
   nextBox = clampRectToBounds(nextBox, interaction.parentBounds);
   const scaleX = nextBox.width / Math.max(interaction.startBox.width, 1);
   const scaleY = nextBox.height / Math.max(interaction.startBox.height, 1);
-  const next = cloneDocument(interaction.beforeDocument);
+  const next = shallowCloneDocument(interaction.beforeDocument);
   for (const id of interaction.transformIds) {
-    const node = next.elements[id];
+    const sourceNode = next.elements[id];
     const sourceRect = interaction.startRects[id];
-    if (!node || !sourceRect) continue;
+    if (!sourceNode || !sourceRect) continue;
+    const node =
+      sourceNode.styles.borderRadius !== undefined
+        ? mutateElementWithStyles(next, id)
+        : mutateElementShallow(next, id);
+    if (!node) continue;
     const parentBounds = getParentBounds(interaction.beforeDocument, id);
     const parentSize = getParentSize(next, id);
     const absoluteRect = {
@@ -277,9 +289,9 @@ export function rotateDocument(
 ): { document: CanvasDocument; guides: SnapGuide[] } {
   const currentAngle = angleBetweenPoints(interaction.center, currentPoint);
   const delta = angleDelta(interaction.startAngle, currentAngle);
-  const next = cloneDocument(interaction.beforeDocument);
+  const next = shallowCloneDocument(interaction.beforeDocument);
   for (const id of interaction.transformIds) {
-    const node = next.elements[id];
+    const node = mutateElementShallow(next, id);
     if (!node) continue;
     const rawRotation = (interaction.startRotations[id] ?? 0) + delta;
     node.rotation = roundAngle(normalizeAngle(snapAngle(rawRotation, event.shiftKey)));
@@ -316,9 +328,9 @@ export function radiusDocument(
     case "sw": dx = local.x - rect.x; dy = rect.y + rect.height - local.y; break;
   }
   const newRadius = roundPixel(clampBorderRadiusForSize(Math.min(dx!, dy!), rect.width, rect.height));
-  const next = cloneDocument(interaction.beforeDocument);
-  const node = next.elements[interaction.elementId];
-  if (node) node.styles = { ...node.styles, borderRadius: newRadius };
+  const next = shallowCloneDocument(interaction.beforeDocument);
+  const node = mutateElementWithStyles(next, interaction.elementId);
+  if (node) node.styles.borderRadius = newRadius;
   return { document: next, guides: [] };
 }
 
@@ -345,10 +357,11 @@ export function resizeCanvasDocument(
     if (Math.abs(delta.x) > Math.abs(delta.y)) newHeight = newWidth / aspect;
     else newWidth = newHeight * aspect;
   }
-  const next = cloneDocument(interaction.beforeDocument);
+  const next = shallowCloneDocument(interaction.beforeDocument);
   const width = Math.round(Math.max(50, newWidth));
   const height = Math.round(Math.max(50, newHeight));
-  next.canvas = { ...next.canvas, width, height };
+  next.canvas.width = width;
+  next.canvas.height = height;
   const originShift = canvasDeltaToScreenDelta(
     handle.includes("w") ? interaction.startWidth - width : 0,
     handle.includes("n") ? interaction.startHeight - height : 0,
@@ -374,7 +387,7 @@ export function rotateCanvasDocument(
   const delta = angleDelta(interaction.startAngle, currentAngle);
   const rawRotation = interaction.startRotation + delta;
   const newRotation = roundAngle(normalizeAngle(snapAngle(rawRotation, event.shiftKey)));
-  const next = cloneDocument(interaction.beforeDocument);
-  next.canvas = { ...next.canvas, rotation: newRotation };
+  const next = shallowCloneDocument(interaction.beforeDocument);
+  next.canvas.rotation = newRotation;
   return next;
 }

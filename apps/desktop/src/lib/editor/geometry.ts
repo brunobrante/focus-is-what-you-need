@@ -87,17 +87,7 @@ export function getRotatedRectCorners(rect: Rect, rotation: number): [Point, Poi
 
 export function getRotatedAABB(rect: Rect, rotation: number): Rect {
   const corners = getRotatedRectCorners(rect, rotation);
-  const xs = corners.map((corner) => corner.x);
-  const ys = corners.map((corner) => corner.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-
-  return {
-    x,
-    y,
-    width: Math.max(...xs) - x,
-    height: Math.max(...ys) - y
-  };
+  return bboxFromPoints(corners) ?? { x: 0, y: 0, width: 0, height: 0 };
 }
 
 export function clampRotatedRectToBounds(rect: Rect, rotation: number, bounds: Rect): Rect {
@@ -125,6 +115,50 @@ export function clampRotatedRectToBounds(rect: Rect, rotation: number, bounds: R
     ...rect,
     x: rect.x + dx,
     y: rect.y + dy
+  };
+}
+
+export function bboxFromPoints(points: readonly Point[]): Rect | null {
+  if (points.length === 0) return null;
+  let minX = points[0].x;
+  let minY = points[0].y;
+  let maxX = minX;
+  let maxY = minY;
+  for (let i = 1; i < points.length; i += 1) {
+    const p = points[i];
+    if (p.x < minX) minX = p.x;
+    else if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    else if (p.y > maxY) maxY = p.y;
+  }
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+export function unionRects(rects: readonly Rect[]): Rect | null {
+  if (rects.length === 0) return null;
+  let left = rects[0].x;
+  let top = rects[0].y;
+  let right = left + rects[0].width;
+  let bottom = top + rects[0].height;
+  for (let i = 1; i < rects.length; i += 1) {
+    const r = rects[i];
+    if (r.x < left) left = r.x;
+    if (r.y < top) top = r.y;
+    const rRight = r.x + r.width;
+    const rBottom = r.y + r.height;
+    if (rRight > right) right = rRight;
+    if (rBottom > bottom) bottom = rBottom;
+  }
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
   };
 }
 
@@ -411,65 +445,27 @@ export function getCommonParentId(document: CanvasDocument, ids: string[]): stri
 }
 
 export function getSelectionBox(document: CanvasDocument, ids: string[]): Rect | null {
-  const rects = ids
-    .map((id) => getAbsoluteRect(document, id))
-    .filter((rect): rect is Rect => Boolean(rect));
-
-  if (rects.length === 0) {
-    return null;
+  const rects: Rect[] = [];
+  for (const id of ids) {
+    const rect = getAbsoluteRect(document, id);
+    if (rect) rects.push(rect);
   }
-
-  const left = Math.min(...rects.map((rect) => rect.x));
-  const top = Math.min(...rects.map((rect) => rect.y));
-  const right = Math.max(...rects.map(rectRight));
-  const bottom = Math.max(...rects.map(rectBottom));
-
-  return {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top
-  };
+  return unionRects(rects);
 }
 
 export function getElementAABB(document: CanvasDocument, id: string): Rect | null {
   const corners = getElementTransformedCorners(document, id);
-  if (!corners) {
-    return null;
-  }
-  const xs = corners.map((corner) => corner.x);
-  const ys = corners.map((corner) => corner.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-
-  return {
-    x,
-    y,
-    width: Math.max(...xs) - x,
-    height: Math.max(...ys) - y
-  };
+  if (!corners) return null;
+  return bboxFromPoints(corners);
 }
 
 export function getSelectionAABB(document: CanvasDocument, ids: string[]): Rect | null {
-  const rects = ids
-    .map((id) => getElementAABB(document, id))
-    .filter((rect): rect is Rect => Boolean(rect));
-
-  if (rects.length === 0) {
-    return null;
+  const rects: Rect[] = [];
+  for (const id of ids) {
+    const rect = getElementAABB(document, id);
+    if (rect) rects.push(rect);
   }
-
-  const left = Math.min(...rects.map((rect) => rect.x));
-  const top = Math.min(...rects.map((rect) => rect.y));
-  const right = Math.max(...rects.map(rectRight));
-  const bottom = Math.max(...rects.map(rectBottom));
-
-  return {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top
-  };
+  return unionRects(rects);
 }
 
 export function clampRectToBounds(rect: Rect, bounds: Rect): Rect {

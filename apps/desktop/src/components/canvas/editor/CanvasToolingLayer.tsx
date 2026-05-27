@@ -1,6 +1,6 @@
 import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { filterTopLevelIds, getCommonParentId, getSelectionBox } from "@/lib/editor/geometry";
+import { filterTopLevelIds, getCommonParentId, getSelectionBox, unionRects } from "@/lib/editor/geometry";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/lib/editor/types";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasToolingHitTest";
 import { hitTestTooling } from "./canvasToolingHitTest";
@@ -51,15 +51,6 @@ function computeTransformIds(doc: CanvasDocument, selectedIds: string[]): string
     const node = doc.elements[id];
     return Boolean(node && !node.locked && node.visible !== false);
   });
-}
-
-function unionRects(rects: Rect[]): Rect | null {
-  if (rects.length === 0) return null;
-  const left = Math.min(...rects.map((r) => r.x));
-  const top = Math.min(...rects.map((r) => r.y));
-  const right = Math.max(...rects.map((r) => r.x + r.width));
-  const bottom = Math.max(...rects.map((r) => r.y + r.height));
-  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 function formatSizeValue(value: number): string {

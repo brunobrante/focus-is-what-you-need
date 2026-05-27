@@ -1,7 +1,85 @@
-import type { CanvasDocument } from "./types";
+import type { CanvasDocument, CanvasProperties, ElementNode, ElementStyles } from "./types";
+
+function arrayValuesEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
+function elementStylesEqual(a: ElementStyles, b: ElementStyles): boolean {
+  return (
+    a.background === b.background &&
+    a.color === b.color &&
+    a.fontFamily === b.fontFamily &&
+    a.fontSize === b.fontSize &&
+    a.fontWeight === b.fontWeight &&
+    a.textAlign === b.textAlign &&
+    a.borderRadius === b.borderRadius &&
+    a.borderWidth === b.borderWidth &&
+    a.borderColor === b.borderColor &&
+    a.opacity === b.opacity &&
+    a.display === b.display &&
+    a.justifyContent === b.justifyContent &&
+    a.alignItems === b.alignItems &&
+    a.gap === b.gap &&
+    a.padding === b.padding &&
+    a.overflow === b.overflow &&
+    a.objectFit === b.objectFit
+  );
+}
+
+export function elementNodesEqual(a: ElementNode | undefined, b: ElementNode | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.type === b.type &&
+    a.parentId === b.parentId &&
+    arrayValuesEqual(a.children, b.children) &&
+    a.name === b.name &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.rotation === b.rotation &&
+    a.content === b.content &&
+    a.src === b.src &&
+    a.locked === b.locked &&
+    a.visible === b.visible &&
+    elementStylesEqual(a.styles, b.styles)
+  );
+}
+
+function canvasPropertiesEqual(a: CanvasProperties, b: CanvasProperties): boolean {
+  return (
+    a.width === b.width &&
+    a.height === b.height &&
+    a.background === b.background &&
+    a.rotation === b.rotation &&
+    a.borderRadius === b.borderRadius &&
+    a.borderWidth === b.borderWidth &&
+    a.borderColor === b.borderColor &&
+    a.opacity === b.opacity &&
+    a.padding === b.padding
+  );
+}
 
 export function documentsEqual(a: CanvasDocument, b: CanvasDocument): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  if (a === b) return true;
+  if (a.shellBackground !== b.shellBackground) return false;
+  if (a.shellPattern !== b.shellPattern) return false;
+  if (!canvasPropertiesEqual(a.canvas, b.canvas)) return false;
+  if (!arrayValuesEqual(a.rootIds, b.rootIds)) return false;
+
+  const aKeys = Object.keys(a.elements);
+  if (aKeys.length !== Object.keys(b.elements).length) return false;
+  for (const key of aKeys) {
+    if (!elementNodesEqual(a.elements[key], b.elements[key])) return false;
+  }
+  return true;
 }
 
 export function limitHistory(history: CanvasDocument[], maxLength = 80): CanvasDocument[] {

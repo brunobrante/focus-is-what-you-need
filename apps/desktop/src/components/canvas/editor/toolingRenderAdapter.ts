@@ -1,7 +1,7 @@
 import type { Point, Rect, SnapGuide } from "@/lib/editor/types";
 import type { ViewportTransform } from "@/lib/editor/viewport";
 
-export type ToolingRendererKind = "pixi" | "skia";
+export type ToolingRendererKind = "skia";
 
 export type ToolingOutlineCommand = {
   rect: Rect | null;

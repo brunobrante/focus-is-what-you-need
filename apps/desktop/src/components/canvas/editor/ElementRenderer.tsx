@@ -103,6 +103,10 @@ function isDescendantOf(
   return false;
 }
 
+// `subtreeContains(id, targetId)` is true iff `targetId` is a descendant of `id`
+// (or equal to it). The naive form walks the subtree under `id` (O(N)); walking
+// up from `targetId` via parentId is O(depth), which is much smaller for any
+// real scene tree.
 function subtreeContains(
   elements: Record<string, ElementNode>,
   id: string,
@@ -110,9 +114,12 @@ function subtreeContains(
 ): boolean {
   if (!targetId) return false;
   if (id === targetId) return true;
-  const node = elements[id];
-  if (!node) return false;
-  return node.children.some((childId) => subtreeContains(elements, childId, targetId));
+  let parentId = elements[targetId]?.parentId ?? null;
+  while (parentId) {
+    if (parentId === id) return true;
+    parentId = elements[parentId]?.parentId ?? null;
+  }
+  return false;
 }
 
 function hierarchyStateAffectsNode(

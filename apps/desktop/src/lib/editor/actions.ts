@@ -37,6 +37,49 @@ export function cloneDocument(document: CanvasDocument): CanvasDocument {
   return JSON.parse(JSON.stringify(document)) as CanvasDocument;
 }
 
+/**
+ * Shallow-clones a document so individual element mutations don't bleed into the
+ * source. Callers must replace entries in `next.elements` (and clone nested
+ * arrays/objects like `children` or `styles`) before mutating them, but can
+ * leave untouched elements as shared references with the source.
+ *
+ * Used by hot interaction paths (drag, resize, rotate) to avoid the cost of
+ * `structuredClone` on every pointer move.
+ */
+export function shallowCloneDocument(document: CanvasDocument): CanvasDocument {
+  return {
+    ...document,
+    canvas: { ...document.canvas },
+    rootIds: [...document.rootIds],
+    elements: { ...document.elements },
+  };
+}
+
+/**
+ * Replaces `doc.elements[id]` with a shallow copy of the source node so the
+ * caller can mutate scalar fields (x, y, width, height, rotation) safely. Does
+ * not clone `styles` or `children` — use `mutateElementStyles` for style edits.
+ */
+export function mutateElementShallow(doc: CanvasDocument, id: string): ElementNode | null {
+  const source = doc.elements[id];
+  if (!source) return null;
+  const clone: ElementNode = { ...source };
+  doc.elements[id] = clone;
+  return clone;
+}
+
+/**
+ * Same as `mutateElementShallow` but also clones `styles` so the caller can
+ * mutate style fields (borderRadius, color, etc.) safely.
+ */
+export function mutateElementWithStyles(doc: CanvasDocument, id: string): ElementNode | null {
+  const source = doc.elements[id];
+  if (!source) return null;
+  const clone: ElementNode = { ...source, styles: { ...source.styles } };
+  doc.elements[id] = clone;
+  return clone;
+}
+
 export const DEFAULT_SHELL_BACKGROUND = "#000000";
 export const DEFAULT_SHELL_PATTERN: ShellPattern = "dots";
 

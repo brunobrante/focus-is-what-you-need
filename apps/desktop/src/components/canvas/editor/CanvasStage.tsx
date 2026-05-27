@@ -5,15 +5,16 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from "react";
 import {
-  cloneDocument,
   createElementForTool,
   deleteElements,
   duplicateElements,
   insertElement,
   reparentElements,
+  shallowCloneDocument,
   updateElementText,
 } from "@/lib/editor/actions";
 import { copyElements, pasteElements } from "@/lib/editor/clipboard";
+import { elementNodesEqual } from "@/lib/editor/history";
 import {
   angleBetweenPoints,
   clamp,
@@ -26,10 +27,11 @@ import {
   rectCenterX,
   rectCenterY,
   roundPixel,
+  unionRects,
 } from "@/lib/editor/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/lib/editor/hitTesting";
 import { useEditor } from "@/lib/editor/store";
-import type { CanvasDocument, ElementNode, Point, Rect, ResizeHandle } from "@/lib/editor/types";
+import type { CanvasDocument, Point, Rect, ResizeHandle } from "@/lib/editor/types";
 import {
   MAX_ZOOM,
   MIN_ZOOM,
@@ -128,12 +130,7 @@ function rectEdgesForDebug(rect: Rect | null): {
 }
 
 function unionViewportRects(rects: Rect[]): Rect | null {
-  if (rects.length === 0) return null;
-  const left = Math.min(...rects.map((rect) => rect.x));
-  const top = Math.min(...rects.map((rect) => rect.y));
-  const right = Math.max(...rects.map((rect) => rect.x + rect.width));
-  const bottom = Math.max(...rects.map((rect) => rect.y + rect.height));
-  return { x: left, y: top, width: right - left, height: bottom - top };
+  return unionRects(rects);
 }
 
 function getRenderedElement(viewport: HTMLElement, id: string): HTMLElement | null {
@@ -293,50 +290,6 @@ function arrayValuesEqual(a: readonly string[], b: readonly string[]): boolean {
     if (a[index] !== b[index]) return false;
   }
   return true;
-}
-
-function elementStylesEqual(a: ElementNode["styles"], b: ElementNode["styles"]): boolean {
-  return (
-    a.background === b.background &&
-    a.color === b.color &&
-    a.fontFamily === b.fontFamily &&
-    a.fontSize === b.fontSize &&
-    a.fontWeight === b.fontWeight &&
-    a.textAlign === b.textAlign &&
-    a.borderRadius === b.borderRadius &&
-    a.borderWidth === b.borderWidth &&
-    a.borderColor === b.borderColor &&
-    a.opacity === b.opacity &&
-    a.display === b.display &&
-    a.justifyContent === b.justifyContent &&
-    a.alignItems === b.alignItems &&
-    a.gap === b.gap &&
-    a.padding === b.padding &&
-    a.overflow === b.overflow &&
-    a.objectFit === b.objectFit
-  );
-}
-
-function elementNodesEqual(a: ElementNode | undefined, b: ElementNode | undefined): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.id === b.id &&
-    a.type === b.type &&
-    a.parentId === b.parentId &&
-    arrayValuesEqual(a.children, b.children) &&
-    a.name === b.name &&
-    a.x === b.x &&
-    a.y === b.y &&
-    a.width === b.width &&
-    a.height === b.height &&
-    a.rotation === b.rotation &&
-    a.content === b.content &&
-    a.src === b.src &&
-    a.locked === b.locked &&
-    a.visible === b.visible &&
-    elementStylesEqual(a.styles, b.styles)
-  );
 }
 
 function addElementAncestors(
@@ -2411,7 +2364,7 @@ export function CanvasStage({
       const y = Math.min(interaction.startPoint.y, point.y);
       const w = Math.abs(point.x - interaction.startPoint.x);
       const h = event.shiftKey ? w : Math.abs(point.y - interaction.startPoint.y);
-      const next = cloneDocument(interaction.beforeDocument);
+      const next = shallowCloneDocument(interaction.beforeDocument);
       const node = createElementForTool(interaction.tool, 0, 0, interaction.beforeDocument.canvas);
       node.id = interaction.elementId;
       node.x = roundPixel(x);
@@ -2534,7 +2487,7 @@ export function CanvasStage({
       } else {
         const node = createElementForTool(interaction.tool, interaction.startPoint.x, interaction.startPoint.y, interaction.beforeDocument.canvas);
         node.id = interaction.elementId;
-        const next = cloneDocument(interaction.beforeDocument);
+        const next = shallowCloneDocument(interaction.beforeDocument);
         next.elements[node.id] = node;
         if (!next.rootIds.includes(node.id)) next.rootIds.push(node.id);
         dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [node.id] });
