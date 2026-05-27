@@ -90,6 +90,11 @@ function RefSidePin({
               className="block h-auto w-full"
               draggable={false}
             />
+            {reference.stack?.enabled ? (
+              <span className="pointer-events-none absolute right-2 top-2 rounded-[5px] border border-white/15 bg-black/65 px-1.5 py-[2px] text-[8.5px] font-semibold uppercase tracking-[0.35px] text-white backdrop-blur">
+                Stack
+              </span>
+            ) : null}
             <div
               className="pointer-events-none absolute inset-0 flex items-end p-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
               style={{ background: "linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0) 54%)" }}

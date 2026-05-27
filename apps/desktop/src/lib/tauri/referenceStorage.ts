@@ -1,4 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import {
+  stackSummaryFromData,
+  type ReferenceStackData,
+  type ReferenceStackSummary,
+} from "@/lib/references/stackTypes";
 
 // Matches StoredMeta from References.tsx (Omit<ReferenceItem, "url">),
 // with ext required so we know which filename to look up on disk.
@@ -17,6 +22,7 @@ export type StoredRefMeta = {
   tags: string[];
   added: string;
   ext: string;
+  stack?: ReferenceStackSummary;
 };
 
 export function blobToExt(blob: Blob): string {
@@ -91,15 +97,57 @@ export async function removeReferenceFile(id: string): Promise<void> {
   await invoke("delete_reference_file", { id }).catch(() => {});
 }
 
+export async function saveReferenceStackFile(
+  id: string,
+  fileName: string,
+  blob: Blob,
+): Promise<void> {
+  const dataB64 = await blobToBase64(blob);
+  await invoke("write_reference_stack_file", { id, fileName, dataB64 });
+}
+
+export async function loadReferenceStackFile(
+  id: string,
+  fileName: string,
+  mimeType = "image/png",
+): Promise<Blob | null> {
+  try {
+    const b64 = await invoke<string>("read_reference_stack_file", { id, fileName });
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return new Blob([bytes], { type: mimeType });
+  } catch {
+    return null;
+  }
+}
+
+export async function writeReferenceStackData(id: string, data: ReferenceStackData): Promise<void> {
+  await invoke("write_reference_stack_data", { id, content: JSON.stringify(data, null, 2) });
+}
+
+export async function readReferenceStackData(id: string): Promise<ReferenceStackData | null> {
+  try {
+    const raw = await invoke<string>("read_reference_stack_data", { id });
+    const parsed: unknown = JSON.parse(raw);
+    return normalizeReferenceStackData(parsed, id);
+  } catch {
+    return null;
+  }
+}
+
+export async function removeReferenceStack(id: string): Promise<void> {
+  await invoke("delete_reference_stack", { id }).catch(() => {});
+}
+
 export async function readRefsMeta(): Promise<StoredRefMeta[]> {
   try {
     const raw = await invoke<string>("read_references_meta");
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
+    const metas = parsed.filter(
       (x): x is StoredRefMeta =>
         Boolean(x && typeof x === "object" && "id" in x && "mediaKind" in x),
     );
+    return Promise.all(metas.map(refreshReferenceStackSummary));
   } catch {
     return [];
   }
@@ -108,3 +156,61 @@ export async function readRefsMeta(): Promise<StoredRefMeta[]> {
 export async function writeRefsMeta(items: StoredRefMeta[]): Promise<void> {
   await invoke("write_references_meta", { content: JSON.stringify(items) });
 }
+
+export async function refreshReferenceStackSummary(meta: StoredRefMeta): Promise<StoredRefMeta> {
+  const data = await readReferenceStackData(meta.id);
+  const stack = stackSummaryFromData(data);
+  if (!stack) return { ...meta, stack: undefined };
+  return { ...meta, stack };
+}
+
+function normalizeReferenceStackData(value: unknown, fallbackReferenceId: string): ReferenceStackData | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Partial<ReferenceStackData>;
+  if (!Array.isArray(input.components)) return null;
+  const mediaKind = input.mediaKind === "video" || input.mediaKind === "figx" ? input.mediaKind : "image";
+  const original = input.original && typeof input.original === "object"
+    ? input.original
+    : null;
+  const components = input.components
+    .filter((component) => component && typeof component === "object")
+    .map((component) => {
+      const item = component as ReferenceStackData["components"][number];
+      return {
+        id: String(item.id || ""),
+        name: String(item.name || "Component"),
+        type: String(item.type || "PNG"),
+        box: {
+          x: Number(item.box?.x ?? 0),
+          y: Number(item.box?.y ?? 0),
+          w: Number(item.box?.w ?? 0),
+          h: Number(item.box?.h ?? 0),
+          r: item.box?.r === undefined ? undefined : Number(item.box.r),
+        },
+        file: item.file ? String(item.file) : null,
+        parentId: item.parentId ? String(item.parentId) : null,
+        createdAt: String(item.createdAt || new Date(0).toISOString()),
+      };
+    })
+    .filter((component) => component.id && component.box.w >= 0 && component.box.h >= 0);
+
+  const rootComponentId = String(input.rootComponentId || components[0]?.id || `root-${fallbackReferenceId}`);
+  return {
+    version: 1,
+    referenceId: String(input.referenceId || fallbackReferenceId),
+    mediaKind,
+    original: {
+      name: String(original?.name || ""),
+      type: String(original?.type || "IMG"),
+      ext: String(original?.ext || "bin"),
+      w: Number(original?.w ?? 0),
+      h: Number(original?.h ?? 0),
+    },
+    rootComponentId,
+    primaryComponentId: String(input.primaryComponentId || rootComponentId),
+    components,
+    updatedAt: String(input.updatedAt || new Date(0).toISOString()),
+  };
+}
+
+export type { ReferenceStackData, ReferenceStackSummary };

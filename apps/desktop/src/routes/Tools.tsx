@@ -39,9 +39,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { readFileAsDataUrl } from "@/lib/utils";
+import {
+  extFromName,
+  loadReferenceFile,
+  loadReferenceStackFile,
+  readReferenceStackData,
+  readRefsMeta,
+  removeReferenceStack,
+  saveReferenceFile,
+  saveReferenceStackFile,
+  writeReferenceStackData,
+  writeRefsMeta,
+} from "@/lib/tauri/referenceStorage";
+import { stackSummaryFromData, type ReferenceStackData } from "@/lib/references/stackTypes";
 
-const REFERENCES_STORAGE_KEY = "workspace.references.v3";
-const TOOL_SOURCE_STORAGE_KEY = "workspace.tools.source.v1";
 const COMPONENT_STORAGE_PREFIX = "workspace.tools.components.";
 const PRIMARY_COMPONENT_STORAGE_PREFIX = "workspace.tools.primary.";
 
@@ -148,11 +159,77 @@ type ActiveSubject =
 export function Tools() {
   const [searchParams, setSearchParams] = useSearchParams();
   const referenceId = searchParams.get("id");
-  const [localSource, setLocalSource] = useState<ToolReference | null>(() => readToolSource());
-  const item = useMemo(
-    () => (referenceId ? readReference(referenceId) : localSource ?? MOCK_ITEM),
-    [localSource, referenceId],
+  const [localSource, setLocalSource] = useState<ToolReference | null>(null);
+  const [diskReference, setDiskReference] = useState<ToolReference | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(false);
+
+  useEffect(() => {
+    if (!referenceId) {
+      setDiskReference(null);
+      setReferenceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDiskReference(null);
+    setReferenceLoading(true);
+    void readDiskReference(referenceId)
+      .then((reference) => {
+        if (!cancelled) setDiskReference(reference);
+      })
+      .finally(() => {
+        if (!cancelled) setReferenceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceId]);
+
+  const item = referenceId ? diskReference : localSource;
+
+  const handleEmptyUpload = useCallback((next: ToolReference) => {
+    writeSavedComponents(
+      `${COMPONENT_STORAGE_PREFIX}${next.id}`,
+      ensureRootComponent([], next),
+    );
+    writePrimaryComponentId(
+      `${COMPONENT_STORAGE_PREFIX}${next.id}`,
+      sourceRootComponentId(next.id),
+    );
+    setLocalSource(next);
+  }, []);
+
+  if (referenceId && referenceLoading) {
+    return <ToolsLoadingShell />;
+  }
+  if (referenceId && !diskReference) {
+    return <ToolsNotFoundShell />;
+  }
+  if (!item) {
+    return <ToolsEmptyShell onUpload={handleEmptyUpload} />;
+  }
+
+  return (
+    <ToolsEditor
+      key={item.id}
+      item={item}
+      referenceId={referenceId}
+      onUploadedLocally={(next) => {
+        setLocalSource(next);
+        setSearchParams({});
+      }}
+    />
   );
+}
+
+type ToolsEditorProps = {
+  item: ToolReference;
+  referenceId: string | null;
+  onUploadedLocally: (next: ToolReference) => void;
+};
+
+function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps) {
   const componentKey = `${COMPONENT_STORAGE_PREFIX}${item.id}`;
   const rootComponentId = sourceRootComponentId(item.id);
 
@@ -175,6 +252,8 @@ export function Tools() {
   const [uploading, setUploading] = useState(false);
   const [imagePaintVersion, setImagePaintVersion] = useState(0);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [savingStack, setSavingStack] = useState(false);
+  const [stackSaveStatus, setStackSaveStatus] = useState<string | null>(null);
   const [expandedComponentIds, setExpandedComponentIds] = useState<Set<string>>(
     () => new Set([rootComponentId]),
   );
@@ -193,6 +272,7 @@ export function Tools() {
 
   const updateComponents = useCallback(
     (updater: (items: SavedComponent[]) => SavedComponent[]) => {
+      setStackSaveStatus(null);
       setComponentState((current) => {
         const base = ensureRootComponent(
           current.key === componentKey ? current.items : readSavedComponents(componentKey),
@@ -470,6 +550,36 @@ export function Tools() {
     resetToOriginalRoot();
   }, [pendingConfirmation, resetToOriginalRoot, setPrimaryComponent]);
 
+  const persistReferenceStack = useCallback(async () => {
+    if (savingStack) return;
+    setSavingStack(true);
+    setStackSaveStatus(null);
+    try {
+      writeSavedComponents(componentKey, components);
+      if (!referenceId || item.id !== referenceId) {
+        setStackSaveStatus("Estado local salvo");
+        return;
+      }
+
+      const data = await writeReferenceStackFromComponents({
+        components,
+        item,
+        primaryComponentId: primaryScopeId,
+        rootComponentId,
+      });
+      setStackSaveStatus(
+        data
+          ? `${data.components.length - 1} ${data.components.length - 1 === 1 ? "componente salvo" : "componentes salvos"}`
+          : "Stack removido",
+      );
+    } catch (err) {
+      console.error("[tools] stack save failed:", err);
+      setStackSaveStatus("Falha ao salvar stack");
+    } finally {
+      setSavingStack(false);
+    }
+  }, [componentKey, components, item, primaryScopeId, referenceId, rootComponentId, savingStack]);
+
   const handleZoomIn = useCallback(() => {
     changeToolZoom(1);
   }, [changeToolZoom]);
@@ -618,43 +728,65 @@ export function Tools() {
           h: dims.h,
           url,
         };
-        writeToolSource(next);
         writeSavedComponents(`${COMPONENT_STORAGE_PREFIX}${next.id}`, ensureRootComponent([], next));
         writePrimaryComponentId(`${COMPONENT_STORAGE_PREFIX}${next.id}`, sourceRootComponentId(next.id));
-        setLocalSource(next);
-        setSearchParams({});
-        setPrimaryComponentId(sourceRootComponentId(next.id));
-        setSelectedComponentId(null);
-        setViewMode("original");
-        resetToolViewport();
-        cancelSelection();
+        onUploadedLocally(next);
       } finally {
         setUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [cancelSelection, resetToolViewport, setSearchParams],
+    [onUploadedLocally],
   );
 
   useEffect(() => {
-    const next = ensureRootComponent(readSavedComponents(componentKey), item);
+    let cancelled = false;
+
+    const applyState = (items: SavedComponent[], preferredPrimaryId: string | null) => {
+      const next = ensureRootComponent(items, item);
+      const nextPrimaryId = preferredPrimaryId && next.some((component) => component.id === preferredPrimaryId)
+        ? preferredPrimaryId
+        : rootComponentId;
+      const hasStack = next.some((component) => component.id !== rootComponentId);
+      writeSavedComponents(componentKey, next);
+      writePrimaryComponentId(componentKey, nextPrimaryId);
+      setComponentState({ key: componentKey, items: next });
+      setPrimaryComponentId(nextPrimaryId);
+      setExpandedComponentIds(new Set([nextPrimaryId]));
+      setImageError(false);
+      setHoveredComponentId(null);
+      setSelectedComponentId(hasStack ? null : nextPrimaryId);
+      setViewMode(hasStack ? "original" : "component");
+      resetToolViewport();
+      cancelSelection();
+      setCurrentTool("move");
+      setStackSaveStatus(null);
+    };
+
+    const localComponents = ensureRootComponent(readSavedComponents(componentKey), item);
     const storedPrimaryId = readPrimaryComponentId(componentKey);
-    const nextPrimaryId = storedPrimaryId && next.some((component) => component.id === storedPrimaryId)
-      ? storedPrimaryId
-      : rootComponentId;
-    writeSavedComponents(componentKey, next);
-    writePrimaryComponentId(componentKey, nextPrimaryId);
-    setComponentState({ key: componentKey, items: next });
-    setPrimaryComponentId(nextPrimaryId);
-    setExpandedComponentIds(new Set([nextPrimaryId]));
-    setImageError(false);
-    setHoveredComponentId(null);
-    setSelectedComponentId(null);
-    setViewMode("original");
-    resetToolViewport();
-    cancelSelection();
-    setCurrentTool("move");
-  }, [cancelSelection, componentKey, item, resetToolViewport, rootComponentId]);
+    const hasLocalStack = localComponents.some((component) => component.id !== rootComponentId);
+
+    if (!referenceId || item.id !== referenceId || hasLocalStack) {
+      applyState(localComponents, storedPrimaryId);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void readReferenceStackComponents(item).then((savedStack) => {
+      if (cancelled) return;
+      if (!savedStack) {
+        applyState(localComponents, storedPrimaryId);
+        return;
+      }
+      applyState(savedStack.items, savedStack.primaryComponentId);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cancelSelection, componentKey, item, referenceId, resetToolViewport, rootComponentId]);
 
   useEffect(() => {
     if ((viewMode !== "component" && viewMode !== "stack") || !selectedComponentId || selectedComponent) return;
@@ -1114,9 +1246,15 @@ export function Tools() {
                                       type="button"
                                       aria-label={`Redimensionar ${handle}`}
                                       data-selection-handle={handle}
-                                      className="pointer-events-auto absolute h-[11px] w-[11px] rounded-full border border-black bg-white shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-                                      style={resizeHandleStyle(handle, toolZoom)}
-                                    />
+                                      className="pointer-events-auto absolute border-0 bg-transparent p-0"
+                                      style={resizeHandleHitAreaStyle(handle, toolZoom)}
+                                    >
+                                      <span
+                                        aria-hidden
+                                        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black bg-white shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                                        style={resizeHandleVisualStyle(toolZoom)}
+                                      />
+                                    </button>
                                   ))}
                                   {RESIZE_HANDLES.map((handle) => (
                                     <button
@@ -1272,10 +1410,16 @@ export function Tools() {
             <div className="flex shrink-0 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3 py-3 backdrop-blur-[8px]">
               <button
                 type="button"
+                disabled={savingStack}
+                onClick={() => void persistReferenceStack()}
                 className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-[var(--accent)] bg-[var(--accent)] px-3 text-[12.5px] font-semibold text-[var(--accent-fg)] transition-colors duration-[120ms] hover:bg-white"
               >
-                <Save size={14} strokeWidth={1.9} />
-                Salvar
+                {savingStack ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[rgba(0,0,0,0.25)] border-t-[var(--accent-fg)]" />
+                ) : (
+                  <Save size={14} strokeWidth={1.9} />
+                )}
+                {savingStack ? "Salvando..." : stackSaveStatus ?? "Salvar"}
               </button>
             </div>
           </aside>
@@ -1291,6 +1435,156 @@ export function Tools() {
         />
       ) : null}
     </TooltipProvider>
+  );
+}
+
+function ToolsShellContainer({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+      <TopBar
+        extra={
+          <div className="inline-flex min-w-0 items-center gap-2 text-[12.5px] font-medium">
+            <span className="text-[var(--text-muted)]">Generate</span>
+          </div>
+        }
+      />
+      <div
+        className="flex flex-1 items-center justify-center"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0)",
+          backgroundSize: "22px 22px",
+          backgroundColor: "#0A0A0B",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ToolsLoadingShell() {
+  return (
+    <ToolsShellContainer>
+      <div className="flex flex-col items-center gap-3 text-[var(--text-muted)]">
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-[var(--text)]" />
+        <span className="text-[13px]">Carregando referência…</span>
+      </div>
+    </ToolsShellContainer>
+  );
+}
+
+function ToolsNotFoundShell() {
+  return (
+    <ToolsShellContainer>
+      <div className="flex flex-col items-center gap-2.5 text-[var(--text-muted)]">
+        <ImageIcon size={24} strokeWidth={1.6} />
+        <h2 className="m-0 text-[16px] text-[var(--text)]">Referência não encontrada</h2>
+        <p className="m-0 text-[13px]">
+          Volte para{" "}
+          <Link
+            className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline"
+            to="/references"
+          >
+            Referências
+          </Link>
+          .
+        </p>
+      </div>
+    </ToolsShellContainer>
+  );
+}
+
+function ToolsEmptyShell({ onUpload }: { onUpload: (next: ToolReference) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const ingest = useCallback(
+    async (file: File | null | undefined) => {
+      if (!file) return;
+      if (!file.type.startsWith("image/")) return;
+      setUploading(true);
+      try {
+        const url = await readFileAsDataUrl(file);
+        const dims = await measureImage(url).catch(() => ({ w: 0, h: 0 }));
+        onUpload({
+          id: `tool-upload-${Date.now().toString(36)}`,
+          name: file.name,
+          type: inferType(file.name),
+          w: dims.w,
+          h: dims.h,
+          url,
+        });
+      } finally {
+        setUploading(false);
+        if (inputRef.current) inputRef.current.value = "";
+      }
+    },
+    [onUpload],
+  );
+
+  return (
+    <ToolsShellContainer>
+      <div className="mx-auto flex w-full max-w-[520px] px-6">
+        <label
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragActive(false);
+            void ingest(event.dataTransfer.files?.[0]);
+          }}
+          className={[
+            "flex w-full cursor-pointer flex-col items-center gap-4 rounded-[14px] border-[1.5px] border-dashed bg-[rgba(20,20,22,0.55)] px-10 py-16 text-center transition-colors backdrop-blur-[6px]",
+            uploading
+              ? "pointer-events-none border-[var(--border-strong)] opacity-70"
+              : dragActive
+                ? "border-[var(--text)]"
+                : "border-[var(--border-strong)] hover:border-[var(--text)]",
+          ].join(" ")}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            disabled={uploading}
+            onChange={(event) => {
+              void ingest(event.target.files?.[0]);
+            }}
+          />
+          <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]">
+            {uploading ? (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-[var(--text)]" />
+            ) : (
+              <Upload size={22} strokeWidth={1.7} />
+            )}
+          </span>
+          <div>
+            <p className="m-0 text-[15px] font-semibold text-[var(--text)]">
+              {uploading ? "Processando…" : "Arraste uma imagem aqui"}
+            </p>
+            <p className="m-0 mt-1.5 text-[12.5px] text-[var(--text-muted)]">
+              Clique para selecionar do disco. PNG, JPG, GIF, WebP ou SVG.
+            </p>
+            <p className="m-0 mt-2 text-[11.5px] text-[var(--text-faint)]">
+              Ou abra uma referência salva em{" "}
+              <Link
+                to="/references"
+                className="border-b border-[var(--border-strong)] text-[var(--text-muted)] no-underline hover:text-[var(--text)]"
+              >
+                Referências
+              </Link>
+              .
+            </p>
+          </div>
+        </label>
+      </div>
+    </ToolsShellContainer>
   );
 }
 
@@ -1765,18 +2059,150 @@ function IconButton({
   );
 }
 
-function readReference(id: string | null): ToolReference {
-  const library = readReferenceLibrary();
-  const item = id ? library.find((entry) => entry.id === id) : null;
-  if (!item) return MOCK_ITEM;
+async function readDiskReference(id: string): Promise<ToolReference | null> {
+  const metas = await readRefsMeta().catch(() => []);
+  const meta = metas.find((entry) => entry.id === id);
+  if (!meta || meta.mediaKind !== "image") return null;
+  const ext = meta.ext || extFromName(meta.name);
+  const blob = await loadReferenceFile(meta.id, ext).catch(() => null);
+  if (!blob) return null;
+  const url = await blobToDataUrl(blob);
   return {
-    id: String(item.id || MOCK_ITEM.id),
-    name: String(item.name || MOCK_ITEM.name),
-    type: String(item.type || "IMG"),
-    w: Number(item.w || 0),
-    h: Number(item.h || 0),
-    url: String(item.url || MOCK_ITEM.url),
+    id: meta.id,
+    name: meta.name,
+    type: meta.type || inferType(meta.name),
+    w: Number(meta.w || 0),
+    h: Number(meta.h || 0),
+    url,
   };
+}
+
+async function readReferenceStackComponents(
+  item: ToolReference,
+): Promise<{ items: SavedComponent[]; primaryComponentId: string } | null> {
+  const data = await readReferenceStackData(item.id);
+  if (!data || data.components.length === 0) return null;
+
+  const items: SavedComponent[] = [];
+  for (const component of data.components) {
+    if (component.id === data.rootComponentId) {
+      items.push({
+        id: component.id,
+        name: "root",
+        box: { x: 0, y: 0, w: item.w || component.box.w, h: item.h || component.box.h },
+        dataUrl: item.url,
+        type: item.type || component.type || "IMG",
+        createdAt: component.createdAt,
+        parentId: null,
+      });
+      continue;
+    }
+
+    if (!component.file) continue;
+    const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
+    if (!blob) continue;
+    items.push({
+      id: component.id,
+      name: component.name,
+      box: component.box,
+      dataUrl: await blobToDataUrl(blob),
+      type: component.type || "PNG",
+      createdAt: component.createdAt,
+      parentId: component.parentId,
+    });
+  }
+
+  if (items.length <= 1) return null;
+  return {
+    items: ensureRootComponent(items, item),
+    primaryComponentId: data.primaryComponentId,
+  };
+}
+
+async function writeReferenceStackFromComponents(input: {
+  item: ToolReference;
+  components: SavedComponent[];
+  rootComponentId: string;
+  primaryComponentId: string;
+}): Promise<ReferenceStackData | null> {
+  const components = ensureRootComponent(input.components, input.item);
+  const stackComponents = components.filter((component) => component.id !== input.rootComponentId);
+  await saveReferenceFile(input.item.id, await dataUrlToBlob(input.item.url));
+  await removeReferenceStack(input.item.id);
+
+  if (stackComponents.length === 0) {
+    await updateReferenceStackMeta(input.item.id, null);
+    return null;
+  }
+
+  const data = referenceStackDataFromComponents({
+    ...input,
+    components,
+  });
+
+  for (const component of stackComponents) {
+    const fileName = safeStackFileName(component.id);
+    const blob = await dataUrlToBlob(component.dataUrl);
+    await saveReferenceStackFile(input.item.id, fileName, blob);
+  }
+
+  await writeReferenceStackData(input.item.id, data);
+  await updateReferenceStackMeta(input.item.id, data);
+  return data;
+}
+
+function referenceStackDataFromComponents(input: {
+  item: ToolReference;
+  components: SavedComponent[];
+  rootComponentId: string;
+  primaryComponentId: string;
+}): ReferenceStackData {
+  const updatedAt = new Date().toISOString();
+  return {
+    version: 1,
+    referenceId: input.item.id,
+    mediaKind: "image",
+    original: {
+      name: input.item.name,
+      type: input.item.type || "IMG",
+      ext: extFromName(input.item.name),
+      w: input.item.w,
+      h: input.item.h,
+    },
+    rootComponentId: input.rootComponentId,
+    primaryComponentId: input.primaryComponentId,
+    components: input.components.map((component) => ({
+      id: component.id,
+      name: component.id === input.rootComponentId ? "root" : component.name,
+      type: component.type || "PNG",
+      box: component.box,
+      file: component.id === input.rootComponentId ? null : safeStackFileName(component.id),
+      parentId: component.id === input.rootComponentId ? null : component.parentId ?? input.rootComponentId,
+      createdAt: component.createdAt || updatedAt,
+    })),
+    updatedAt,
+  };
+}
+
+async function updateReferenceStackMeta(
+  referenceId: string,
+  data: ReferenceStackData | null,
+): Promise<void> {
+  const summary = stackSummaryFromData(data);
+  const metas = await readRefsMeta().catch(() => []);
+  await writeRefsMeta(
+    metas.map((meta) =>
+      meta.id === referenceId
+        ? {
+            ...meta,
+            stack: summary,
+            tags: summary?.enabled
+              ? Array.from(new Set([...(meta.tags ?? []), "stack"]))
+              : (meta.tags ?? []).filter((tag) => tag !== "stack"),
+          }
+        : meta,
+    ),
+  );
 }
 
 function sourceRootComponentId(sourceId: string) {
@@ -1956,33 +2382,26 @@ function componentAreaAlreadyExists(
   });
 }
 
-function readToolSource(): ToolReference | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const item = JSON.parse(window.localStorage.getItem(TOOL_SOURCE_STORAGE_KEY) || "null") as
-      | Partial<ToolReference>
-      | null;
-    if (!item?.id || !item.url) return null;
-    return {
-      id: String(item.id),
-      name: String(item.name || "upload.png"),
-      type: String(item.type || "IMG"),
-      w: Number(item.w || 0),
-      h: Number(item.h || 0),
-      url: String(item.url),
-    };
-  } catch {
-    return null;
-  }
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read blob"));
+    reader.readAsDataURL(blob);
+  });
 }
 
-function writeToolSource(item: ToolReference) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(TOOL_SOURCE_STORAGE_KEY, JSON.stringify(item));
-  } catch {
-    // ignore quota errors
-  }
+async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  const response = await fetch(dataUrl);
+  return response.blob();
+}
+
+function safeStackFileName(componentId: string): string {
+  const base = componentId
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${base || `component-${Date.now()}`}.png`;
 }
 
 function readPrimaryComponentId(componentKey: string): string | null {
@@ -2000,16 +2419,6 @@ function writePrimaryComponentId(componentKey: string, id: string) {
     window.localStorage.setItem(`${PRIMARY_COMPONENT_STORAGE_PREFIX}${componentKey}`, id);
   } catch {
     // ignore quota errors
-  }
-}
-
-function readReferenceLibrary(): ToolReference[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(REFERENCES_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.filter((item) => item && item.url) : [];
-  } catch {
-    return [];
   }
 }
 
@@ -2254,38 +2663,39 @@ function roundCropBox(
   };
 }
 
-function resizeHandleStyle(handle: ResizeHandle, zoom: number): CSSProperties {
+function resizeHandleHitAreaStyle(handle: ResizeHandle, zoom: number): CSSProperties {
   const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const size = 11 / safeZoom;
-  const edgeOffset = -size / 2;
+  const hitSize = 22 / safeZoom;
+  const edgeOffset = -hitSize / 2;
   const style: CSSProperties = {
     cursor: resizeCursor(handle),
-    width: size,
-    height: size,
-    borderWidth: 1 / safeZoom,
+    width: hitSize,
+    height: hitSize,
   };
-  const transform: string[] = [];
 
   if (handle.includes("n")) {
     style.top = edgeOffset;
   } else if (handle.includes("s")) {
     style.bottom = edgeOffset;
-  } else {
-    style.top = "50%";
-    transform.push("translateY(-50%)");
   }
 
   if (handle.includes("w")) {
     style.left = edgeOffset;
   } else if (handle.includes("e")) {
     style.right = edgeOffset;
-  } else {
-    style.left = "50%";
-    transform.push("translateX(-50%)");
   }
 
-  if (transform.length > 0) style.transform = transform.join(" ");
   return style;
+}
+
+function resizeHandleVisualStyle(zoom: number): CSSProperties {
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const size = 11 / safeZoom;
+  return {
+    width: size,
+    height: size,
+    borderWidth: 1 / safeZoom,
+  };
 }
 
 function radiusHandleStyle(handle: ResizeHandle, box: CropBox, zoom: number): CSSProperties {
@@ -2344,60 +2754,3 @@ function measureImage(src: string): Promise<{ w: number; h: number }> {
   });
 }
 
-function mockSvg() {
-  const w = 1440;
-  const h = 900;
-  const bg = "#0F1226";
-  const accent = "#A6B7FF";
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">
-    <rect width="${w}" height="${h}" fill="${bg}"/>
-    <rect x="0" y="0" width="${w}" height="56" fill="${accent}" opacity="0.06"/>
-    <circle cx="28" cy="28" r="6" fill="${accent}" opacity="0.55"/>
-    <rect x="60" y="22" width="120" height="12" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="${w - 220}" y="18" width="90" height="20" rx="6" fill="${accent}" opacity="0.18"/>
-    <rect x="${w - 120}" y="18" width="90" height="20" rx="6" fill="${accent}"/>
-    <rect x="0" y="56" width="220" height="${h - 56}" fill="${accent}" opacity="0.04"/>
-    <rect x="24" y="92" width="160" height="14" rx="3" fill="${accent}" opacity="0.5"/>
-    <rect x="24" y="120" width="120" height="10" rx="3" fill="${accent}" opacity="0.3"/>
-    <rect x="24" y="140" width="140" height="10" rx="3" fill="${accent}" opacity="0.3"/>
-    <rect x="24" y="160" width="100" height="10" rx="3" fill="${accent}" opacity="0.3"/>
-    <rect x="24" y="200" width="160" height="14" rx="3" fill="${accent}" opacity="0.5"/>
-    <rect x="24" y="228" width="120" height="10" rx="3" fill="${accent}" opacity="0.3"/>
-    <rect x="24" y="248" width="140" height="10" rx="3" fill="${accent}" opacity="0.3"/>
-    <rect x="260" y="100" width="${w - 300}" height="180" rx="10" fill="${accent}" opacity="0.10"/>
-    <rect x="288" y="138" width="380" height="26" rx="5" fill="${accent}"/>
-    <rect x="288" y="180" width="540" height="12" rx="3" fill="${accent}" opacity="0.55"/>
-    <rect x="288" y="200" width="480" height="12" rx="3" fill="${accent}" opacity="0.55"/>
-    <rect x="288" y="232" width="130" height="32" rx="6" fill="${accent}"/>
-    <rect x="260" y="320" width="370" height="220" rx="10" fill="${accent}" opacity="0.16"/>
-    <rect x="650" y="320" width="370" height="220" rx="10" fill="${accent}" opacity="0.16"/>
-    <rect x="1040" y="320" width="${w - 1060}" height="220" rx="10" fill="${accent}" opacity="0.16"/>
-    <rect x="284" y="350" width="120" height="14" rx="3" fill="${accent}" opacity="0.7"/>
-    <rect x="284" y="378" width="320" height="10" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="284" y="396" width="280" height="10" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="284" y="500" width="80" height="22" rx="5" fill="${accent}" opacity="0.6"/>
-    <rect x="674" y="350" width="120" height="14" rx="3" fill="${accent}" opacity="0.7"/>
-    <rect x="674" y="378" width="320" height="10" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="674" y="396" width="280" height="10" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="674" y="500" width="80" height="22" rx="5" fill="${accent}" opacity="0.6"/>
-    <rect x="1064" y="350" width="120" height="14" rx="3" fill="${accent}" opacity="0.7"/>
-    <rect x="1064" y="378" width="280" height="10" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="1064" y="396" width="240" height="10" rx="3" fill="${accent}" opacity="0.4"/>
-    <rect x="1064" y="500" width="80" height="22" rx="5" fill="${accent}" opacity="0.6"/>
-    <rect x="260" y="580" width="${w - 300}" height="240" rx="10" fill="${accent}" opacity="0.08"/>
-    <rect x="288" y="610" width="200" height="14" rx="3" fill="${accent}" opacity="0.6"/>
-    <rect x="288" y="640" width="${w - 360}" height="8" rx="2" fill="${accent}" opacity="0.25"/>
-    <rect x="288" y="658" width="${w - 420}" height="8" rx="2" fill="${accent}" opacity="0.25"/>
-    <rect x="288" y="676" width="${w - 380}" height="8" rx="2" fill="${accent}" opacity="0.25"/>
-  </svg>`;
-}
-
-const MOCK_ITEM: ToolReference = {
-  id: "mock-default",
-  name: "exemplo-landing.png",
-  type: "PNG",
-  w: 1440,
-  h: 900,
-  url: `data:image/svg+xml;utf8,${encodeURIComponent(mockSvg())}`,
-};

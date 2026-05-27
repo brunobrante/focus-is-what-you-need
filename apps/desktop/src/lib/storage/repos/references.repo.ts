@@ -48,6 +48,7 @@ export async function createOrAttachReference(input: {
   description?: string;
   metadata?: string[];
   thumbnailUrl?: string | null;
+  stack?: ReferenceRow["stack"];
   attachment: ReferenceAttachment;
 }): Promise<ReferenceRow> {
   const rows = await listReferences();
@@ -76,6 +77,7 @@ export async function createOrAttachReference(input: {
       description: input.description ?? current.description,
       metadata: input.metadata ?? current.metadata,
       thumbnailUrl: input.thumbnailUrl ?? current.thumbnailUrl,
+      stack: input.stack ?? current.stack,
       attachments,
       projectIds: Array.from(new Set([nextAttachment.projectId, ...attachments.map((attachment) => attachment.projectId)])),
     });
@@ -98,6 +100,7 @@ export async function createOrAttachReference(input: {
     description: input.description ?? "",
     metadata: input.metadata ?? [],
     thumbnailUrl: input.thumbnailUrl ?? null,
+    stack: input.stack,
     projectIds: [nextAttachment.projectId],
     attachments: [nextAttachment],
     createdAt: now(),
@@ -112,7 +115,7 @@ export async function updateReference(
   patch: Partial<
     Pick<
       ReferenceRow,
-      "title" | "source" | "visibility" | "description" | "metadata" | "thumbnailUrl" | "attachments" | "projectIds"
+      "title" | "source" | "visibility" | "description" | "metadata" | "thumbnailUrl" | "stack" | "attachments" | "projectIds"
     >
   >,
 ): Promise<ReferenceRow | null> {

@@ -4,6 +4,7 @@ import type {
   ProjectType,
   ScreenVariant,
 } from "@/lib/data/types";
+import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 
 export const SCHEMA_VERSION = 14;
 
@@ -89,6 +90,7 @@ export type ReferenceRow = {
   description: string;
   metadata: string[];
   thumbnailUrl: string | null;
+  stack?: ReferenceStackSummary;
   projectIds: string[];
   attachments: ReferenceAttachment[];
   // Legacy fields kept for backward compatibility with older persisted rows.

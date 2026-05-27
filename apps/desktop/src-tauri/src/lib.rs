@@ -125,8 +125,16 @@ fn references_dir(cfg: &WorkspaceConfig) -> PathBuf {
     app_root(cfg).join("references")
 }
 
+fn reference_dir(cfg: &WorkspaceConfig, id: &str) -> PathBuf {
+    references_dir(cfg).join(id)
+}
+
 fn legacy_references_dir(cfg: &WorkspaceConfig) -> PathBuf {
     app_root(cfg).join(&cfg.workspace_name).join("references")
+}
+
+fn legacy_reference_dir(cfg: &WorkspaceConfig, id: &str) -> PathBuf {
+    legacy_references_dir(cfg).join(id)
 }
 
 fn workspaces_dir(cfg: &WorkspaceConfig) -> PathBuf {
@@ -168,6 +176,46 @@ fn ensure_local_structure(cfg: &WorkspaceConfig) -> Result<(), String> {
         )?;
     }
     Ok(())
+}
+
+fn safe_path_segment(value: &str, label: &str) -> Result<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty()
+        || trimmed == "."
+        || trimmed == ".."
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+    {
+        return Err(format!("invalid {} path segment", label));
+    }
+    Ok(trimmed.into())
+}
+
+fn safe_extension(value: &str) -> String {
+    let ext = value
+        .trim()
+        .trim_start_matches('.')
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if ext.is_empty() { "bin".into() } else { ext }
+}
+
+fn read_reference_blob(cfg: &WorkspaceConfig, id: &str, ext: &str) -> Result<Vec<u8>, String> {
+    let id = safe_path_segment(id, "reference id")?;
+    let ext = safe_extension(ext);
+    let candidates = [
+        reference_dir(cfg, &id).join(format!("original.{}", ext)),
+        references_dir(cfg).join(format!("{}.{}", id, ext)),
+        legacy_reference_dir(cfg, &id).join(format!("original.{}", ext)),
+        legacy_references_dir(cfg).join(format!("{}.{}", id, ext)),
+    ];
+    let path = candidates
+        .into_iter()
+        .find(|path| path.exists())
+        .ok_or_else(|| "reference file not found".to_string())?;
+    fs::read(&path).map_err(|e| e.to_string())
 }
 
 fn read_workspace_meta(cfg: &WorkspaceConfig) -> WorkspaceMeta {
@@ -270,7 +318,11 @@ fn write_reference_file(
     let data = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
-    fs::write(references_dir(&cfg).join(format!("{}.{}", id, ext)), &data)
+    let id = safe_path_segment(&id, "reference id")?;
+    let ext = safe_extension(&ext);
+    let dir = reference_dir(&cfg, &id);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::write(dir.join(format!("original.{}", ext)), &data)
         .map_err(|e| e.to_string())
 }
 
@@ -281,17 +333,19 @@ fn read_reference_file(
     ext: String,
 ) -> Result<String, String> {
     let cfg = read_config(&app);
-    let primary = references_dir(&cfg).join(format!("{}.{}", id, ext));
-    let fallback = legacy_references_dir(&cfg).join(format!("{}.{}", id, ext));
-    let path = if primary.exists() { primary } else { fallback };
-    let data = fs::read(&path).map_err(|e| e.to_string())?;
+    let data = read_reference_blob(&cfg, &id, &ext)?;
     Ok(BASE64.encode(&data))
 }
 
 #[tauri::command]
 fn delete_reference_file(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let cfg = read_config(&app);
+    let id = safe_path_segment(&id, "reference id")?;
     for dir in [references_dir(&cfg), legacy_references_dir(&cfg)] {
+        let reference_folder = dir.join(&id);
+        if reference_folder.exists() {
+            let _ = fs::remove_dir_all(reference_folder);
+        }
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
@@ -300,6 +354,86 @@ fn delete_reference_file(app: tauri::AppHandle, id: String) -> Result<(), String
                     let _ = fs::remove_file(entry.path());
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn write_reference_stack_file(
+    app: tauri::AppHandle,
+    id: String,
+    file_name: String,
+    data_b64: String,
+) -> Result<(), String> {
+    let data = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
+    let cfg = read_config(&app);
+    ensure_local_structure(&cfg)?;
+    let id = safe_path_segment(&id, "reference id")?;
+    let file_name = safe_path_segment(&file_name, "stack file name")?;
+    let stack_dir = reference_dir(&cfg, &id).join("stack");
+    fs::create_dir_all(&stack_dir).map_err(|e| e.to_string())?;
+    fs::write(stack_dir.join(file_name), &data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_reference_stack_file(
+    app: tauri::AppHandle,
+    id: String,
+    file_name: String,
+) -> Result<String, String> {
+    let cfg = read_config(&app);
+    let id = safe_path_segment(&id, "reference id")?;
+    let file_name = safe_path_segment(&file_name, "stack file name")?;
+    let candidates = [
+        reference_dir(&cfg, &id).join("stack").join(&file_name),
+        legacy_reference_dir(&cfg, &id).join("stack").join(&file_name),
+    ];
+    let path = candidates
+        .into_iter()
+        .find(|path| path.exists())
+        .ok_or_else(|| "reference stack file not found".to_string())?;
+    let data = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(BASE64.encode(&data))
+}
+
+#[tauri::command]
+fn write_reference_stack_data(
+    app: tauri::AppHandle,
+    id: String,
+    content: String,
+) -> Result<(), String> {
+    let cfg = read_config(&app);
+    ensure_local_structure(&cfg)?;
+    let id = safe_path_segment(&id, "reference id")?;
+    let stack_dir = reference_dir(&cfg, &id).join("stack");
+    fs::create_dir_all(&stack_dir).map_err(|e| e.to_string())?;
+    fs::write(stack_dir.join("data.json"), content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_reference_stack_data(app: tauri::AppHandle, id: String) -> Result<String, String> {
+    let cfg = read_config(&app);
+    let id = safe_path_segment(&id, "reference id")?;
+    let candidates = [
+        reference_dir(&cfg, &id).join("stack").join("data.json"),
+        legacy_reference_dir(&cfg, &id).join("stack").join("data.json"),
+    ];
+    let path = candidates
+        .into_iter()
+        .find(|path| path.exists())
+        .ok_or_else(|| "reference stack data not found".to_string())?;
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_reference_stack(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let cfg = read_config(&app);
+    let id = safe_path_segment(&id, "reference id")?;
+    for dir in [reference_dir(&cfg, &id), legacy_reference_dir(&cfg, &id)] {
+        let stack_dir = dir.join("stack");
+        if stack_dir.exists() {
+            let _ = fs::remove_dir_all(stack_dir);
         }
     }
     Ok(())
@@ -539,6 +673,19 @@ fn reference_archive_entries(
         let Some(id) = meta.get("id").and_then(|value| value.as_str()) else {
             continue;
         };
+        let Ok(safe_id) = safe_path_segment(id, "reference id") else {
+            continue;
+        };
+        let primary_dir = reference_dir(cfg, &safe_id);
+        let fallback_dir = legacy_reference_dir(cfg, &safe_id);
+        if primary_dir.is_dir() {
+            push_reference_dir_entries(&primary_dir, &format!("references/{}", safe_id), &mut entries)?;
+            continue;
+        }
+        if fallback_dir.is_dir() {
+            push_reference_dir_entries(&fallback_dir, &format!("references/{}", safe_id), &mut entries)?;
+            continue;
+        }
         let ext = meta
             .get("ext")
             .and_then(|value| value.as_str())
@@ -548,18 +695,38 @@ fn reference_archive_entries(
                     .and_then(|name| name.rsplit('.').next())
             })
             .unwrap_or("bin");
-        let primary = references_dir(cfg).join(format!("{}.{}", id, ext));
-        let fallback = legacy_references_dir(cfg).join(format!("{}.{}", id, ext));
+        let ext = safe_extension(ext);
+        let primary = references_dir(cfg).join(format!("{}.{}", safe_id, ext));
+        let fallback = legacy_references_dir(cfg).join(format!("{}.{}", safe_id, ext));
         let path = if primary.exists() { primary } else { fallback };
         if let Ok(data) = fs::read(path) {
             entries.push(ZipEntry {
-                name: format!("references/{}.{}", id, ext),
+                name: format!("references/{}.{}", safe_id, ext),
                 data,
             });
         }
     }
 
     Ok(entries)
+}
+
+fn push_reference_dir_entries(
+    dir: &Path,
+    zip_prefix: &str,
+    entries: &mut Vec<ZipEntry>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let zip_name = format!("{}/{}", zip_prefix, name);
+        if path.is_dir() {
+            push_reference_dir_entries(&path, &zip_name, entries)?;
+        } else if let Ok(data) = fs::read(&path) {
+            entries.push(ZipEntry { name: zip_name, data });
+        }
+    }
+    Ok(())
 }
 
 fn read_reference_meta_values(cfg: &WorkspaceConfig) -> Result<Vec<Value>, String> {
@@ -732,6 +899,11 @@ pub fn run() {
             write_reference_file,
             read_reference_file,
             delete_reference_file,
+            write_reference_stack_file,
+            read_reference_stack_file,
+            write_reference_stack_data,
+            read_reference_stack_data,
+            delete_reference_stack,
             read_references_meta,
             write_references_meta,
             read_local_figx_projects,

@@ -10,10 +10,12 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react";
+import { Link } from "react-router-dom";
 import {
   ExternalLink,
   Film,
   Image as ImageIcon,
+  Layers,
   Play,
   Plus,
   Search,
@@ -32,6 +34,7 @@ import {
   writeRefsMeta,
   extFromName,
 } from "@/lib/tauri/referenceStorage";
+import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 import { ensureWorkspaceFolders } from "@/lib/tauri/workspace";
 
 /* ---------- Constants ---------- */
@@ -71,6 +74,7 @@ type ReferenceItem = {
   tags: string[];
   added: string;
   ext?: string; // file extension used on disk (set after save)
+  stack?: ReferenceStackSummary;
   url: string; // runtime only — Object URL created from the file blob
 };
 
@@ -451,6 +455,12 @@ function Pin({
           </span>
         ) : null}
 
+        {item.stack?.enabled ? (
+          <span className="pointer-events-none absolute right-2 top-2 rounded-[4px] border border-[rgba(94,162,255,0.28)] bg-[rgba(24,72,140,0.82)] px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
+            Stack
+          </span>
+        ) : null}
+
         <div
           className="pointer-events-none absolute inset-0 flex items-end p-3 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 45%)" }}
@@ -652,6 +662,9 @@ function Inspector({
                 ? [["Dimensões", `${display.w} × ${display.h}`] as [string, string]]
                 : []),
               ["Tamanho", formatSize(display.size || 0)],
+              ...(display.stack?.enabled
+                ? [["Stack", `${display.stack.itemCount} ${display.stack.itemCount === 1 ? "componente" : "componentes"}`] as [string, string]]
+                : []),
               ...(display.duration !== undefined
                 ? [["Duração", formatDuration(display.duration)] as [string, string]]
                 : []),
@@ -675,6 +688,13 @@ function Inspector({
           label="Abrir"
           onClick={() => onOpenLightbox(display)}
         />
+        {display.mediaKind === "image" ? (
+          <InspectorLinkAction
+            icon={<Layers size={12} />}
+            label="Builder"
+            to={`/tools?id=${encodeURIComponent(display.id)}`}
+          />
+        ) : null}
         <InspectorAction
           icon={<Trash2 size={12} />}
           label="Remover"
@@ -744,6 +764,26 @@ function InspectorAction({
       {icon}
       {label}
     </button>
+  );
+}
+
+function InspectorLinkAction({
+  icon,
+  label,
+  to,
+}: {
+  icon: ReactNode;
+  label: string;
+  to: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex h-[30px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[7px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] no-underline transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }
 

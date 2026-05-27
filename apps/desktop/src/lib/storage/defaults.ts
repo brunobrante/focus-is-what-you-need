@@ -114,6 +114,7 @@ export function normalizeReferenceRow(row: ReferenceRow): ReferenceRow {
     description: row.description ?? "",
     metadata: Array.isArray(row.metadata) ? row.metadata : [],
     thumbnailUrl: row.thumbnailUrl ?? null,
+    stack: row.stack,
     projectIds,
     attachments,
   };

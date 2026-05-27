@@ -2146,6 +2146,7 @@ function ReferenceProjectCard({
             >
               <div className="flex flex-wrap gap-1.5">
                 <ReferenceBadge>{reference.visibility === "external" ? "External" : "Local"}</ReferenceBadge>
+                {reference.stack?.enabled ? <ReferenceBadge>Stack</ReferenceBadge> : null}
                 {primaryLabels.map((label) => (
                   <ReferenceBadge key={label}>{label}</ReferenceBadge>
                 ))}
@@ -2197,6 +2198,11 @@ function ReferenceProjectCard({
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
           <span className="truncate">{reference.source}</span>
+          {reference.stack?.enabled ? (
+            <span className="rounded-full border border-[rgba(94,162,255,0.28)] bg-[rgba(94,162,255,0.1)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.35px] text-[#82b8ff]">
+              Stack
+            </span>
+          ) : null}
           {(reference.metadata ?? []).slice(0, 2).map((tag) => (
             <span key={tag} className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
               {tag}
@@ -2258,6 +2264,7 @@ function ReferenceProjectRow({
         <div className="flex flex-wrap items-center gap-2">
           <div className="text-[14px] font-semibold text-[var(--text)]">{reference.title}</div>
           <ReferenceBadge>{reference.visibility === "external" ? "External" : "Local"}</ReferenceBadge>
+          {reference.stack?.enabled ? <ReferenceBadge>Stack</ReferenceBadge> : null}
           {labels.slice(0, 3).map((label) => (
             <ReferenceBadge key={label}>{label}</ReferenceBadge>
           ))}

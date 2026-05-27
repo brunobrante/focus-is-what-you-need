@@ -57,6 +57,7 @@ type Props = {
     description?: string;
     metadata?: string[];
     thumbnailUrl?: string | null;
+    stack?: ReferenceRow["stack"];
     attachment: ReferenceAttachment;
   }) => Promise<void> | void;
 };
@@ -214,6 +215,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
         description: item.description ?? "",
         metadata: item.tags ?? [],
         thumbnailUrl,
+        stack: item.stack,
         attachment,
       });
       close();
@@ -468,6 +470,11 @@ function GridCard({
             </svg>
           </span>
         )}
+        {item.stack?.enabled ? (
+          <span className="absolute left-1.5 top-1.5 rounded-[5px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[2px] text-[8.5px] font-semibold uppercase tracking-[0.35px] text-white">
+            Stack
+          </span>
+        ) : null}
       </div>
       <span className="truncate px-0.5 text-[11px] text-[var(--text-muted)]">{item.name}</span>
     </button>
@@ -550,6 +557,11 @@ function SearchRow({
           <span className="shrink-0 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.4)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.3px] text-[var(--text-faint)]">
             {item.type}
           </span>
+          {item.stack?.enabled ? (
+            <span className="shrink-0 rounded-full border border-[rgba(94,162,255,0.24)] bg-[rgba(94,162,255,0.12)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.3px] text-[#9fc9ff]">
+              Stack
+            </span>
+          ) : null}
         </div>
         {item.tags.length > 0 && (
           <div className="mt-0.5 flex gap-1">
