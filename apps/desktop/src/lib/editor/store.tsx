@@ -199,7 +199,7 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
           selectedIds,
           isolatedParentId,
           canvasStageActive,
-          editingTextId: null
+          editingTextId: selectedIds.includes(state.editingTextId ?? "") ? state.editingTextId : null,
         };
       }
     case "setIsolatedParent": {
