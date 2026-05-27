@@ -777,6 +777,8 @@ export function rectFromPoints(start: Point, current: Point): Rect {
 }
 
 export function isPointInElement(document: CanvasDocument, id: string, point: Point): boolean {
+  const node = document.elements[id];
+  if (!node || node.width <= 0 || node.height <= 0) return false;
   const corners = getElementTransformedCorners(document, id);
   if (!corners) {
     return false;

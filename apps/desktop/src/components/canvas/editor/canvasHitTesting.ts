@@ -11,8 +11,8 @@ export function findChildAtPoint(document: CanvasDocument, parentId: string, poi
       if (!node || node.visible === false || node.locked) continue;
       if (isPointInElement(document, id, point)) {
         bestId = id;
-        walk(node.children);
       }
+      walk(node.children);
     }
   }
   walk(parent.children);

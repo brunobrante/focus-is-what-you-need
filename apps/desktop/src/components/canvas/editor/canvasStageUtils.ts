@@ -72,8 +72,8 @@ export function findElementsInMarquee(document: CanvasDocument, marquee: Rect): 
       const aabb = getElementAABB(document, id);
       if (aabb && rectsIntersect(marquee, aabb)) {
         result.push(id);
-        if (node.children.length > 0) walk(node.children);
       }
+      if (node.children.length > 0) walk(node.children);
     }
   }
   walk(document.rootIds);
