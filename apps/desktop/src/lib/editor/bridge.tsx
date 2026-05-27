@@ -39,11 +39,17 @@ function createBridgeStore(): BridgeStore {
       };
     },
     set(sourceId, value) {
-      // The store always swaps the snapshot when the publisher fires, even if
-      // the new EditorBridgeValue references the same `state` and `dispatch`.
-      // Subscribers re-derive their selector value from the snapshot and only
-      // re-render when *that* value changes (see `useEditorBridge`).
-      current = { sourceId, ...value };
+      const next: EditorBridgeValue = { sourceId, ...value };
+      // Skip notification when the snapshot is identical — state is a new ref on
+      // every action, but dispatch is stable, so this guard mainly helps when the
+      // publisher re-fires without a real state change (e.g. effect deps re-run).
+      if (
+        current &&
+        current.sourceId === next.sourceId &&
+        current.state === next.state &&
+        current.dispatch === next.dispatch
+      ) return;
+      current = next;
       notify();
     },
     clear(sourceId) {

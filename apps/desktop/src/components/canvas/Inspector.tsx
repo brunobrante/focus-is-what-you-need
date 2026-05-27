@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { useEditorBridge, type EditorBridgeValue } from "@/lib/editor/bridge";
+import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/lib/editor/bridge";
 import {
   renameElement,
   setElementLocked,
@@ -42,22 +42,27 @@ type ShellWindowOption = "draft" | "reference";
 export function Inspector({ open, onClose, editor: editorProp }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
 
-  const bridgeEditor = useEditorBridge();
-  const editor = editorProp !== undefined ? editorProp : bridgeEditor;
-  const state = editor?.state ?? null;
-  const document = state?.document ?? null;
-  const selectedId = state?.selectedIds[0] ?? null;
+  const bridgeDocument = useEditorBridge((v) => v?.state.document ?? null);
+  const bridgeSelectedId = useEditorBridge((v) => v?.state.selectedIds[0] ?? null);
+  const bridgeSelectedCount = useEditorBridge((v) => v?.state.selectedIds.length ?? 0);
+  const bridgeCanvasStageActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
+  const bridgeSourceId = useEditorBridge((v) => v?.sourceId ?? null);
+  const getEditorSnapshot = useEditorBridgeReader();
+
+  const document = editorProp !== undefined ? (editorProp?.state.document ?? null) : bridgeDocument;
+  const selectedId = editorProp !== undefined ? (editorProp?.state.selectedIds[0] ?? null) : bridgeSelectedId;
+  const selectedCount = editorProp !== undefined ? (editorProp?.state.selectedIds.length ?? 0) : bridgeSelectedCount;
+  const canvasStageActive = editorProp !== undefined ? (editorProp?.state.canvasStageActive ?? false) : bridgeCanvasStageActive;
+  const sourceLabel = ((editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId) === "drafts") ? "Drafts" : "Current";
   const node = document && selectedId ? document.elements[selectedId] ?? null : null;
-  const selectedCount = state?.selectedIds.length ?? 0;
-  const sourceLabel = editor?.sourceId === "drafts" ? "Drafts" : "Current";
 
   useEffect(() => {
-    if (state?.canvasStageActive) {
+    if (canvasStageActive) {
       setActiveTab("canvas");
     } else if (node) {
       setActiveTab("element");
     }
-  }, [node?.id, state?.canvasStageActive]);
+  }, [node?.id, canvasStageActive]);
 
   const parentName = useMemo(() => {
     if (!document || !node?.parentId) return "Canvas";
@@ -70,8 +75,8 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
     nextDocument = document,
     selectedIds?: string[],
   ) => {
-    if (!editor || !nextDocument) return;
-    editor.dispatch({
+    if (!nextDocument) return;
+    (editorProp ?? getEditorSnapshot())?.dispatch({
       type: "commitDocument",
       document: nextDocument,
       ...(selectedIds !== undefined ? { selectedIds } : {}),
@@ -88,12 +93,12 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
     commitDocument(updateElementStyles(document, node.id, styles));
   };
 
-  const headerTitle = state?.canvasStageActive
+  const headerTitle = canvasStageActive
     ? "Canvas"
     : node
       ? node.name
       : "Inspector";
-  const headerMeta = state?.canvasStageActive
+  const headerMeta = canvasStageActive
     ? `${document?.canvas.width ?? 0}×${document?.canvas.height ?? 0}px`
     : node
       ? elementTypeLabel(node.type)
@@ -138,8 +143,8 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
               type="button"
               onClick={() => {
                 setActiveTab(tab.id);
-                if (tab.id === "element" && state?.canvasStageActive) {
-                  editor?.dispatch({ type: "setCanvasStageActive", active: false });
+                if (tab.id === "element" && canvasStageActive) {
+                  (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active: false });
                 }
               }}
               className="relative cursor-pointer border-0 bg-transparent px-2.5 py-2.5 text-[12px] font-medium"
@@ -155,13 +160,13 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-        {!editor || !document ? (
+        {!document ? (
           <EmptyState title="Nenhum canvas ativo" body="Selecione Current ou Drafts para inspecionar." />
         ) : activeTab === "canvas" ? (
           <CanvasTab
             canvas={document.canvas}
-            active={state.canvasStageActive}
-            onToggleActive={(active) => editor.dispatch({ type: "setCanvasStageActive", active })}
+            active={canvasStageActive}
+            onToggleActive={(active) => (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active })}
             onUpdate={commitCanvas}
           />
         ) : activeTab === "shell" ? (
@@ -177,7 +182,6 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
           <EmptyState title="Nenhum elemento selecionado" body="Selecione um elemento na árvore ou no canvas." />
         ) : (
           <ElementTab
-            key={node.id}
             node={node}
             parentName={parentName}
             document={document}
@@ -188,12 +192,13 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
             onUpdateRotation={(rotation) => commitDocument(updateElementRotation(document, node.id, rotation))}
             onUpdateStyle={commitStyle}
             onToggleLocked={(locked) => commitDocument(setElementLocked(document, node.id, locked))}
-            onToggleVisible={(visible) =>
+            onToggleVisible={(visible) => {
+              const ids = (editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [];
               commitDocument(
                 setElementVisible(document, node.id, visible),
-                visible ? state.selectedIds : [],
-              )
-            }
+                visible ? ids : [],
+              );
+            }}
           />
         )}
       </div>
