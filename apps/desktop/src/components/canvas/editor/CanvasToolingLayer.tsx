@@ -1,6 +1,7 @@
 import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { filterTopLevelIds, getCommonParentId, getSelectionBox, unionRects } from "@/lib/editor/geometry";
+import { useHoveredId } from "@/lib/editor/store";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/lib/editor/types";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasToolingHitTest";
 import { hitTestTooling } from "./canvasToolingHitTest";
@@ -35,7 +36,6 @@ export type CanvasToolingRef = {
 export type CanvasToolingLayerProps = {
   document: CanvasDocument;
   selectedIds: string[];
-  hoveredId: string | null;
   editingTextId: string | null;
   canvasStageActive: boolean;
   guides: SnapGuide[];
@@ -204,6 +204,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
     });
     const doc = props.document;
     const t = props.viewportTransform;
+    const hoveredId = useHoveredId();
 
     const [altKeyDown, setAltKeyDown] = useState(false);
     useEffect(() => {
@@ -274,7 +275,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           (radiusElement.type === "rect" || radiusElement.type === "image"),
       );
       const radiusElementHovered = Boolean(
-        radiusElement && props.hoveredId === radiusElement.id,
+        radiusElement && hoveredId === radiusElement.id,
       );
       const showRadiusHandles = radiusEligible && (radiusElementHovered || isRadiusDragging);
 
@@ -308,10 +309,10 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       const hoveredEligibleId =
         !props.suppressHover &&
         !isEditingText &&
-        props.hoveredId &&
-        !props.selectedIds.includes(props.hoveredId) &&
-        doc.elements[props.hoveredId]
-          ? props.hoveredId
+        hoveredId &&
+        !props.selectedIds.includes(hoveredId) &&
+        doc.elements[hoveredId]
+          ? hoveredId
           : null;
       const hoverBox = hoveredEligibleId ? resolveBox(hoveredEligibleId) : null;
       const hoverRect = hoveredEligibleId ? resolveRect(hoveredEligibleId) : null;
@@ -388,10 +389,10 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       };
     }, [
       doc,
+      hoveredId,
       props.canvasStageActive,
       props.dropTargetId,
       props.editingTextId,
-      props.hoveredId,
       props.interactionType,
       props.selectedIds,
       props.suppressHover,

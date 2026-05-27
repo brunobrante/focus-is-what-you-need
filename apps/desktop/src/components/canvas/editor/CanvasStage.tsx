@@ -29,7 +29,7 @@ import {
   roundPixel,
 } from "@/lib/editor/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/lib/editor/hitTesting";
-import { useEditor } from "@/lib/editor/store";
+import { useEditor, useHoverStore } from "@/lib/editor/store";
 import type { CanvasDocument, Point, Rect, ResizeHandle } from "@/lib/editor/types";
 import {
   MAX_ZOOM,
@@ -853,6 +853,7 @@ export function CanvasStage({
   viewportSubjectKey?: string;
 }) {
   const { state, dispatch } = useEditor();
+  const hoverStore = useHoverStore();
 
   useEffect(() => {
     if (!activeTool) return;
@@ -1887,14 +1888,12 @@ export function CanvasStage({
         );
         if (hit.cursor) {
           viewport.style.cursor = hit.cursor;
-          const hoveredId = getInteractiveElementId(event.target);
-          if (hoveredId !== state.hoveredId) dispatch({ type: "setHovered", hoveredId: null });
+          hoverStore.set(null);
           return;
         }
         viewport.style.cursor = "";
       }
-      const hoveredId = getInteractiveElementId(event.target);
-      if (hoveredId !== state.hoveredId) dispatch({ type: "setHovered", hoveredId });
+      hoverStore.set(getInteractiveElementId(event.target));
       return;
     }
     if (interaction.pointerId !== event.pointerId) return;
@@ -2266,7 +2265,6 @@ export function CanvasStage({
         ref={toolingRef}
         document={state.document}
         selectedIds={state.selectedIds}
-        hoveredId={state.hoveredId}
         editingTextId={state.editingTextId}
         canvasStageActive={state.canvasStageActive}
         guides={state.guides}

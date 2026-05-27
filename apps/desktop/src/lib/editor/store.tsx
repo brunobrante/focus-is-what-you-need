@@ -1,9 +1,18 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import type { Dispatch, ReactNode } from "react";
 import { store as persistenceStore } from "@/lib/storage/store";
 import type { CanvasDocument, EditorState, SnapGuide, Tool } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
+import { createHoverStore, type HoverStore } from "./hoverStore";
 import { CANVAS_DOCUMENT_SAVED_EVENT, CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
 import { getInitialZoomForSubjectSize, MAX_ZOOM, MIN_ZOOM } from "./viewport";
 
@@ -15,7 +24,6 @@ type EditorAction =
   | { type: "setViewport"; zoom?: number; offsetX?: number; offsetY?: number }
   | { type: "setSelected"; selectedIds: string[] }
   | { type: "setIsolatedParent"; isolatedParentId: string | null }
-  | { type: "setHovered"; hoveredId: string | null }
   | { type: "setEditingText"; editingTextId: string | null }
   | { type: "setCanvasStageActive"; active: boolean }
   | { type: "setGuides"; guides: SnapGuide[] }
@@ -36,6 +44,7 @@ type EditorAction =
 type EditorContextValue = {
   state: EditorState;
   dispatch: Dispatch<EditorAction>;
+  hoverStore: HoverStore;
 };
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -124,7 +133,6 @@ function createInitialState(
     document,
     selectedIds: [],
     isolatedParentId: null,
-    hoveredId: null,
     editingTextId: null,
     canvasStageActive: false,
     tool: "select",
@@ -225,12 +233,6 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         editingTextId: null
       };
     }
-    case "setHovered":
-      if (state.hoveredId === action.hoveredId) return state;
-      return {
-        ...state,
-        hoveredId: action.hoveredId
-      };
     case "setEditingText":
       if (state.editingTextId === action.editingTextId) return state;
       return {
@@ -274,7 +276,6 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         document: constrainAll(action.document),
         selectedIds: [],
         isolatedParentId: null,
-        hoveredId: null,
         editingTextId: null,
         canvasStageActive: false,
         zoom: getInitialZoomForSubjectSize(action.document.canvas),
@@ -417,6 +418,10 @@ export function EditorProvider({
     () => createInitialState(storageKey, fallbackDocument, persistStorage),
   );
 
+  const hoverStoreRef = useRef<HoverStore | null>(null);
+  if (hoverStoreRef.current === null) hoverStoreRef.current = createHoverStore();
+  const hoverStore = hoverStoreRef.current;
+
   useEffect(() => {
     hydratedRef.current = !persistStorage;
     if (!persistStorage) return;
@@ -426,6 +431,7 @@ export function EditorProvider({
       if (cancelled) return;
       hydratedRef.current = true;
       if (stored && isCanvasDocument(stored)) {
+        hoverStore.set(null);
         dispatch({ type: "hydrateDocument", document: stored });
       }
     });
@@ -433,7 +439,7 @@ export function EditorProvider({
     return () => {
       cancelled = true;
     };
-  }, [persistStorage, storageKey]);
+  }, [hoverStore, persistStorage, storageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -458,7 +464,7 @@ export function EditorProvider({
     };
   }, [onDocumentChange, persistStorage, state.document, storageKey]);
 
-  const value = useMemo(() => ({ state, dispatch }), [state]);
+  const value = useMemo(() => ({ state, dispatch, hoverStore }), [hoverStore, state]);
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }
 
@@ -468,4 +474,13 @@ export function useEditor(): EditorContextValue {
     throw new Error("useEditor must be used inside EditorProvider");
   }
   return context;
+}
+
+export function useHoverStore(): HoverStore {
+  return useEditor().hoverStore;
+}
+
+export function useHoveredId(): string | null {
+  const store = useHoverStore();
+  return useSyncExternalStore(store.subscribe, store.get, store.get);
 }

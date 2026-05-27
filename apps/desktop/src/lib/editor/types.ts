@@ -96,7 +96,6 @@ export type EditorState = {
   document: CanvasDocument;
   selectedIds: string[];
   isolatedParentId: string | null;
-  hoveredId: string | null;
   editingTextId: string | null;
   canvasStageActive: boolean;
   tool: Tool;
