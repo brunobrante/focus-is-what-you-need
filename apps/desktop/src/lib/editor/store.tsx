@@ -28,6 +28,7 @@ type EditorAction =
       beforeDocument?: CanvasDocument;
       selectedIds?: string[];
     }
+  | { type: "cancelTextEditing"; document: CanvasDocument }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "reset" };
@@ -369,6 +370,21 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
         guides: [],
         past: limitHistory([...state.past, state.document]),
         future: state.future.slice(1)
+      };
+    }
+    case "cancelTextEditing": {
+      const selectedIds = sanitizeSelection(action.document, state.selectedIds);
+      if (state.document === action.document && state.editingTextId === null) return state;
+      return {
+        ...state,
+        document: action.document,
+        selectedIds,
+        isolatedParentId: sanitizeIsolatedParent(
+          action.document,
+          state.isolatedParentId,
+          selectedIds,
+        ),
+        editingTextId: null,
       };
     }
     case "reset":

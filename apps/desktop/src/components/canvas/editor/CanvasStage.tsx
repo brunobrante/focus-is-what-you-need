@@ -867,8 +867,7 @@ export function CanvasStage({
   const interactionRef = useRef<Interaction | null>(null);
   const textDragRef = useRef<TextDragState | null>(null);
   const textEditSessionRef = useRef<TextEditSession | null>(null);
-  const pendingTextEditClientPointRef = useRef<Point | null>(null);
-  const pendingTextEditSelectAllRef = useRef(false);
+  const pendingTextEditParamsRef = useRef(new Map<string, { clientPoint: Point | null; selectAll: boolean }>());
   const latestStateRef = useRef(state);
   const latestDocumentRef = useRef(state.document);
   const previousRenderDocumentRef = useRef<CanvasDocument | null>(null);
@@ -885,6 +884,8 @@ export function CanvasStage({
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
   const [interactionActive, setInteractionActive] = useState(false);
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
+  const latestTextEditRef = useRef<TextEditState | null>(null);
+  latestTextEditRef.current = textEdit;
   const canvasAlignmentDebugEnabled = useMemo(isCanvasAlignmentDebugEnabled, []);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const affectedElementIds = useMemo(
@@ -1035,7 +1036,7 @@ export function CanvasStage({
     textEditSessionRef.current = null;
     clearNativeTextSelection();
 
-    const current = textEdit;
+    const current = latestTextEditRef.current;
     const value =
       current?.nodeId === session.nodeId
         ? current.value
@@ -1062,7 +1063,7 @@ export function CanvasStage({
         ? state.selectedIds
         : [session.nodeId],
     });
-  }, [dispatch, state.selectedIds, textEdit]);
+  }, [dispatch, state.selectedIds]);
 
   const cancelTextEditing = useCallback(() => {
     const session = textEditSessionRef.current;
@@ -1071,13 +1072,11 @@ export function CanvasStage({
     latestDocumentRef.current = session.beforeDocument;
     setTextEdit(null);
     clearNativeTextSelection();
-    dispatch({ type: "setDocumentTransient", document: session.beforeDocument });
-    dispatch({ type: "setEditingText", editingTextId: null });
+    dispatch({ type: "cancelTextEditing", document: session.beforeDocument });
   }, [dispatch]);
 
   const enterTextEditing = useCallback((nodeId: string, clientPoint?: Point, selectAll = false) => {
-    pendingTextEditClientPointRef.current = clientPoint ?? null;
-    pendingTextEditSelectAllRef.current = selectAll;
+    pendingTextEditParamsRef.current.set(nodeId, { clientPoint: clientPoint ?? null, selectAll });
     dispatch({ type: "setEditingText", editingTextId: nodeId });
   }, [dispatch]);
 
@@ -1097,10 +1096,10 @@ export function CanvasStage({
     const node = beforeDocument.elements[activeId] ?? activeNode;
     const value = node.content ?? "";
     const viewport = viewportRef.current;
-    const requestedPoint = pendingTextEditClientPointRef.current;
-    pendingTextEditClientPointRef.current = null;
-    const selectAllOnEnter = pendingTextEditSelectAllRef.current;
-    pendingTextEditSelectAllRef.current = false;
+    const pendingParams = pendingTextEditParamsRef.current.get(activeId);
+    pendingTextEditParamsRef.current.delete(activeId);
+    const requestedPoint = pendingParams?.clientPoint ?? null;
+    const selectAllOnEnter = pendingParams?.selectAll ?? false;
     const activeViewportSize = getCurrentViewportSize();
     const activeViewportRect = getCurrentViewportRect();
     const activeViewportTransform = viewport
@@ -1162,7 +1161,9 @@ export function CanvasStage({
     // Viewport measurement is cached by the ResizeObserver above; this effect
     // only consumes the cached size for the once-per-subject initial sync.
     const canvasSize = getCanvasSize(state.document);
-    const subjectKey = viewportSubjectKey ?? `${canvasSize.width}x${canvasSize.height}`;
+    const subjectKey = viewportSubjectKey
+      ? `${viewportSubjectKey}:${canvasSize.width}x${canvasSize.height}`
+      : `${canvasSize.width}x${canvasSize.height}`;
     if (draftMode) return;
     if (viewportInitializedSubjectRef.current === subjectKey) return;
     if (viewportSize.width <= 0 || viewportSize.height <= 0) return;

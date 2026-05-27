@@ -259,11 +259,7 @@ function CanvasSurface({
   parentTarget?: CanvasParentTarget | null;
   onBackToParent?: () => void;
 }) {
-  const viewportSubjectKey = [
-    storageKey,
-    fallbackDocument?.canvas.width ?? "auto",
-    fallbackDocument?.canvas.height ?? "auto",
-  ].join(":");
+  const viewportSubjectKey = storageKey;
 
   return (
     <div
