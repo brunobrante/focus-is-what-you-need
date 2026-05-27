@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import type { EditorBridgeValue } from "@/lib/editor/bridge";
+import { useEditorBridge, type EditorBridgeValue } from "@/lib/editor/bridge";
 import {
   renameElement,
   setElementLocked,
@@ -26,6 +26,12 @@ import type {
 type InspectorProps = {
   open: boolean;
   onClose: () => void;
+  /**
+   * Optional editor handle. When omitted, the Inspector subscribes to the
+   * editor bridge directly so it can keep its own re-render scope (avoiding
+   * the cascade that happens when callers pass the editor through props and
+   * re-render at the editor's 60 Hz cadence).
+   */
   editor?: EditorBridgeValue | null;
 };
 
@@ -33,9 +39,11 @@ type InspectorTab = "element" | "canvas" | "shell";
 type ShellControlVisibility = "show" | "hidden" | "hover";
 type ShellWindowOption = "draft" | "reference";
 
-export function Inspector({ open, onClose, editor }: InspectorProps) {
+export function Inspector({ open, onClose, editor: editorProp }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
 
+  const bridgeEditor = useEditorBridge();
+  const editor = editorProp !== undefined ? editorProp : bridgeEditor;
   const state = editor?.state ?? null;
   const document = state?.document ?? null;
   const selectedId = state?.selectedIds[0] ?? null;

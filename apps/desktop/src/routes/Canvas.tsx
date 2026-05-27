@@ -12,7 +12,7 @@ import {
   getCanvasMockBundleForScreen,
   type MockComponentSeed,
 } from "@/components/mocks/data/canvasMocks";
-import { EditorBridgeProvider, useEditorBridge } from "@/lib/editor/bridge";
+import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/lib/editor/bridge";
 import { createBlankDocument, moveElementBefore, setElementLocked, setElementVisible, wrapElements } from "@/lib/editor/actions";
 import {
   canvasDocumentFromHtmlGraphJSON,
@@ -141,9 +141,27 @@ function CanvasPageContent() {
   const [treeTab, setTreeTab] = useState<"layers" | "drafts">("layers");
   const [split, setSplit] = useState<SplitMode>("none");
   const [canvasExpanded, setCanvasExpanded] = useState(false);
-  const editor = useEditorBridge();
+  // Fine-grained selectors. Reading the whole bridge would re-render this
+  // entire page (Tree, Inspector, Toolbar, CanvasRender) on every transient
+  // document update during drag/resize. The selectors below subscribe only
+  // to the slices this component renders, so transient document updates
+  // (where `tool`, `zoom`, `selectedIds`, etc. don't change) don't trigger
+  // a page-wide re-render.
+  const editorTool = useEditorBridge((value) => value?.state.tool);
+  const activeZoom = useEditorBridge((value) => value?.state.zoom);
+  const selectedNodeId = useEditorBridge((value) => {
+    if (!value) return null;
+    if (value.state.canvasStageActive) return null;
+    return value.state.selectedIds[0] ?? null;
+  });
+  const editorCanvasActive = useEditorBridge((value) => value?.state.canvasStageActive ?? false);
+  // Handlers grab the latest editor on demand without subscribing — they're
+  // called from user events (not render), so they don't need to re-render
+  // when the bridge updates.
+  const getEditor = useEditorBridgeReader();
 
   const handleToolChange = useCallback((tool: CanvasToolId) => {
+    const editor = getEditor();
     if (tool === "wrapper" && editor && editor.state.selectedIds.length > 0) {
       const { document: next, wrapperId } = wrapElements(editor.state.document, editor.state.selectedIds);
       editor.dispatch({
@@ -154,20 +172,16 @@ function CanvasPageContent() {
       return;
     }
     setActiveTool(tool);
-  }, [editor]);
+  }, [getEditor]);
 
-  const editorTool = editor?.state.tool;
   useEffect(() => {
     if (editorTool === "select") {
       setActiveTool((prev) => (prev === "cursor" || prev === "hand") ? prev : "cursor");
     }
   }, [editorTool]);
 
-  const editorState = editor?.state ?? null;
-  const selectedNodeId =
-    editorState && !editorState.canvasStageActive ? editorState.selectedIds[0] ?? null : null;
-  const activeZoom = editorState?.zoom;
   const setActiveZoom: ZoomSetter = (next) => {
+    const editor = getEditor();
     if (!editor) return;
     const zoom = typeof next === "function" ? next(editor.state.zoom) : next;
     editor.dispatch({ type: "setZoom", zoom });
@@ -596,13 +610,13 @@ function CanvasPageContent() {
         onClose={() => setTreeOpen(false)}
         componentName={componentName || undefined}
         screenName={screenTitle || undefined}
-        document={editorState?.document ?? null}
         selectedNodeId={selectedNodeId}
-        canvasActive={editorState?.canvasStageActive ?? false}
+        canvasActive={editorCanvasActive}
         onSelectNode={(nodeId) => {
-          editor?.dispatch({ type: "setSelected", selectedIds: [nodeId] });
+          getEditor()?.dispatch({ type: "setSelected", selectedIds: [nodeId] });
         }}
         onReorderNode={(activeNodeId, overNodeId) => {
+          const editor = getEditor();
           if (!editor) return;
           editor.dispatch({
             type: "commitDocument",
@@ -610,6 +624,7 @@ function CanvasPageContent() {
           });
         }}
         onToggleVisible={(nodeId, visible) => {
+          const editor = getEditor();
           if (!editor) return;
           editor.dispatch({
             type: "commitDocument",
@@ -618,6 +633,7 @@ function CanvasPageContent() {
           });
         }}
         onToggleLocked={(nodeId, locked) => {
+          const editor = getEditor();
           if (!editor) return;
           editor.dispatch({
             type: "commitDocument",
@@ -625,7 +641,7 @@ function CanvasPageContent() {
           });
         }}
         onToggleCanvasActive={(active) => {
-          editor?.dispatch({ type: "setCanvasStageActive", active });
+          getEditor()?.dispatch({ type: "setCanvasStageActive", active });
         }}
         canOpenNodeCanvas={canOpenCanvasNode}
         onOpenNodeCanvas={openCanvasForNode}
@@ -645,7 +661,7 @@ function CanvasPageContent() {
       <div className="pointer-events-none fixed bottom-3 right-3 top-3 z-[6] flex items-stretch gap-3">
         {/* <GalleryPanel open={galleryOpen} onClose={() => setGalleryOpen(false)} /> */}
         {/* <Chat open={chatOpen} onClose={() => setChatOpen(false)} /> */}
-        <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} editor={editor} />
+        <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
       </div>
 
       {/* Bottom-right toggles */}

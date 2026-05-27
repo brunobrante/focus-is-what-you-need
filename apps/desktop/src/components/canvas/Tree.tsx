@@ -17,6 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { constrainAll } from "@/lib/editor/actions";
+import { useEditorBridge } from "@/lib/editor/bridge";
 import { CANVAS_DOCUMENT_SAVED_EVENT, DRAFTS_CANVAS_STORAGE_KEY } from "@/lib/editor/storageKeys";
 import type { CanvasDocument, ElementNode, ElementType } from "@/lib/editor/types";
 
@@ -129,7 +130,7 @@ export function Tree({
   onClose,
   componentName,
   screenName,
-  document,
+  document: documentProp,
   selectedNodeId,
   canvasActive = false,
   onSelectNode,
@@ -146,6 +147,12 @@ export function Tree({
   projectTree,
   parentNode,
 }: Props) {
+  // Subscribe directly to the editor bridge instead of relying on the caller
+  // passing `document` through props on every editor change. The bridge
+  // selector keeps the re-render scope local to this component, so transient
+  // document updates during drag don't ripple up to the page root.
+  const bridgeDocument = useEditorBridge((value) => value?.state.document ?? null);
+  const document = documentProp !== undefined ? documentProp : bridgeDocument;
   const tree = useMemo(() => {
     if (document) return treeFromCanvasDocument(document, componentName || screenName || "Canvas");
     return treeFromCanvasDocument(null, componentName || screenName || "Canvas");
