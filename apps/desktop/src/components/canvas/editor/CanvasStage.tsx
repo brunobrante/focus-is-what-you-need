@@ -1678,6 +1678,10 @@ export function CanvasStage({
         canvasHeight: canvasSize.height,
       });
       const cursorCanvas = viewportPointToCanvas(cursor, currentTransform);
+      const clampedCursorCanvas = {
+        x: clamp(cursorCanvas.x, 0, canvasSize.width),
+        y: clamp(cursorCanvas.y, 0, canvasSize.height),
+      };
       const nextBaseTransform = createViewportTransform({
         displayZoom: nextDisplayZoom,
         offsetX: 0,
@@ -1686,7 +1690,7 @@ export function CanvasStage({
         canvasWidth: canvasSize.width,
         canvasHeight: canvasSize.height,
       });
-      const nextBaseCursor = canvasPointToViewport(cursorCanvas, nextBaseTransform);
+      const nextBaseCursor = canvasPointToViewport(clampedCursorCanvas, nextBaseTransform);
       nextViewport = {
         zoom: nextZoom,
         offsetX: cursor.x - nextBaseCursor.x,

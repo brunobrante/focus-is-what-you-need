@@ -65,12 +65,13 @@ export function getRotatedCursor(handle: ResizeHandle, rotation: number): string
     const index = Math.round(angle / 45) % 8;
     return cursorAt45[index];
   }
-  const key = `${Math.round(angle)}`;
+  const roundedAngle = Math.round(angle);
+  const key = `${roundedAngle}`;
   let cached = svgCursorCache.get(key);
   if (!cached) {
-    const svg = buildArrowSvg(angle);
+    const svg = buildArrowSvg(roundedAngle);
     const encoded = encodeURIComponent(svg);
-    const fallbackIndex = Math.round(angle / 45) % 8;
+    const fallbackIndex = Math.round(roundedAngle / 45) % 8;
     cached = `url("data:image/svg+xml,${encoded}") 12 12, ${cursorAt45[fallbackIndex]}`;
     svgCursorCache.set(key, cached);
   }
