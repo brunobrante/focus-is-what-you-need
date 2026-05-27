@@ -38,6 +38,22 @@ type ParsedColor = {
 
 let canvasKitPromise: Promise<CanvasKit> | null = null;
 
+function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
+  return (
+    a.left === b.left &&
+    a.top === b.top &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.outlines === b.outlines &&
+    a.resizeBox === b.resizeBox &&
+    a.radiusHandlePositions === b.radiusHandlePositions &&
+    a.guides === b.guides &&
+    a.viewportTransform === b.viewportTransform &&
+    a.marqueeRect === b.marqueeRect &&
+    a.dropTarget === b.dropTarget
+  );
+}
+
 type PaintKey = string;
 
 class PaintPool {
@@ -85,11 +101,13 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
   private destroyed = false;
   private contextLost = false;
   private pendingFrame: ToolingRenderFrame | null = null;
+  private lastRenderedFrame: ToolingRenderFrame | null = null;
   private size = { width: 0, height: 0, resolution: 1 };
 
   private readonly handleContextLost = (event: Event): void => {
     event.preventDefault();
     this.contextLost = true;
+    this.lastRenderedFrame = null;
     this.disposeSurface();
   };
 
@@ -138,6 +156,7 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
   render(frame: ToolingRenderFrame): void {
     this.pendingFrame = frame;
     if (!this.ready || !this.canvasKit || !this.canvas || !this.paintPool || this.contextLost) return;
+    if (this.lastRenderedFrame !== null && framesEqual(this.lastRenderedFrame, frame)) return;
 
     try {
       this.syncCanvasStyle(frame);
@@ -179,6 +198,7 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
       canvas.restore();
       surface.flush();
+      this.lastRenderedFrame = frame;
     } catch (error) {
       if (isContextLossError(error)) {
         this.contextLost = true;
@@ -193,6 +213,7 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.destroyed = true;
     this.ready = false;
     this.pendingFrame = null;
+    this.lastRenderedFrame = null;
     this.contextLost = false;
     this.disposeSurface();
     this.paintPool?.dispose();

@@ -69,8 +69,19 @@ export function snapRect(
     { value: rectBottom(bounds), from: bounds.x, to: rectRight(bounds) }
   ];
 
-  for (const node of Object.values(document.elements)) {
-    if (ignore.has(node.id) || node.visible === false || (parentId !== undefined && node.parentId !== parentId)) {
+  const allNodes = Object.values(document.elements);
+  const candidateNodes: typeof allNodes =
+    typeof parentId === "string"
+      ? (document.elements[parentId]?.children ?? []).flatMap((id) => {
+          const n = document.elements[id];
+          return n ? [n] : [];
+        })
+      : parentId === null
+        ? allNodes.filter((n) => n.parentId === null)
+        : allNodes;
+
+  for (const node of candidateNodes) {
+    if (ignore.has(node.id) || node.visible === false) {
       continue;
     }
     const candidateRect = getElementAABB(document, node.id) ?? getAbsoluteRect(document, node.id);
