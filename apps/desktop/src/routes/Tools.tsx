@@ -1,10 +1,10 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ComponentProps,
   type PointerEvent,
   type ReactNode,
@@ -14,8 +14,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Check,
   ChevronRight,
-  Circle,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Crop,
+  Eye,
   Layers,
   Image as ImageIcon,
   Minus,
@@ -25,9 +27,8 @@ import {
   Plus,
   RotateCcw,
   Save,
-  Square,
+  SquarePen,
   Trash2,
-  Type,
   Upload,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
@@ -55,8 +56,21 @@ import { stackSummaryFromData, type ReferenceStackData } from "@/lib/references/
 
 const COMPONENT_STORAGE_PREFIX = "workspace.tools.components.";
 const PRIMARY_COMPONENT_STORAGE_PREFIX = "workspace.tools.primary.";
+const CROPS_OVERLAY_COLOR_STORAGE_KEY = "workspace.tools.cropsOverlayColor";
+const CROPS_OVERLAY_ALPHA = 0.22;
+const CROPS_OVERLAY_DEFAULT_COLOR = "#FFFFFF";
+const CROPS_OVERLAY_PRESETS = [
+  "#FFFFFF",
+  "#4C8DFF",
+  "#22C55E",
+  "#F59E0B",
+  "#EF4444",
+  "#EC4899",
+] as const;
 
-type EditorTool = "move" | "crop" | "annotate";
+type SidebarTab = "components" | "config";
+
+type EditorTool = "move" | "crop" | "draw";
 type ViewMode = "original" | "stack" | "component";
 
 type ToolReference = {
@@ -81,12 +95,22 @@ const MIN_TOOL_ZOOM = 1;
 const MAX_TOOL_ZOOM = 25;
 const CUT_MATCH_IOU_THRESHOLD = 0.88;
 const HIERARCHY_MIN_AREA_DELTA = 16;
-const RESIZE_HANDLES = ["nw", "ne", "se", "sw"] as const;
+const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+const RADIUS_HANDLES = ["nw", "ne", "se", "sw"] as const;
+const HANDLE_HIT_AREA = 28;
+const HANDLE_DOT_SIZE = 8;
+const RADIUS_DOT_SIZE = 6;
+const RADIUS_HANDLE_MIN_INSET = 12;
 
 type ResizeHandle = (typeof RESIZE_HANDLES)[number];
+type RadiusHandle = (typeof RADIUS_HANDLES)[number];
+
+type DrawingPath = { points: Array<{ x: number; y: number }> };
 
 type SelectionInteraction =
   | { type: "draw"; pointerId: number; startPoint: { x: number; y: number } }
+  | { type: "free-draw"; pointerId: number }
+  | { type: "move"; pointerId: number; startPoint: { x: number; y: number }; startBox: CropBox }
   | {
       type: "resize";
       pointerId: number;
@@ -97,7 +121,7 @@ type SelectionInteraction =
   | {
       type: "radius";
       pointerId: number;
-      handle: ResizeHandle;
+      handle: RadiusHandle;
       startPoint: { x: number; y: number };
       startBox: CropBox;
     }
@@ -236,7 +260,9 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageViewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropsCanvasRef = useRef<HTMLCanvasElement>(null);
+  const componentImageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const selectionInteractionRef = useRef<SelectionInteraction | null>(null);
 
   const [currentTool, setCurrentTool] = useState<EditorTool>("move");
@@ -245,6 +271,9 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   const [selection, setSelection] = useState<CropBox | null>(null);
   const [selectionLocked, setSelectionLocked] = useState(false);
   const [drawing, setDrawing] = useState(false);
+  const [drawingPath, setDrawingPath] = useState<DrawingPath | null>(null);
+  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
+  const [showCropsOverlay, setShowCropsOverlay] = useState(false);
   const [toolZoom, setToolZoom] = useState(MIN_TOOL_ZOOM);
   const [toolPan, setToolPan] = useState({ x: 0, y: 0 });
   const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
@@ -264,6 +293,18 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   const [primaryComponentId, setPrimaryComponentId] = useState(
     () => readPrimaryComponentId(componentKey) ?? rootComponentId,
   );
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("components");
+  const [cropsOverlayColor, setCropsOverlayColor] = useState<string>(
+    () => readCropsOverlayColor(),
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CROPS_OVERLAY_COLOR_STORAGE_KEY, cropsOverlayColor);
+    } catch {
+      // ignore quota errors
+    }
+  }, [cropsOverlayColor]);
 
   const components =
     componentState.key === componentKey
@@ -356,6 +397,8 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
     setDrawing(false);
     setSelection(null);
     setSelectionLocked(false);
+    setDrawingPath(null);
+    setEditingComponentId(null);
   }, []);
 
   const resetToolViewport = useCallback(() => {
@@ -389,9 +432,17 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
     });
   }, []);
 
+  const expandAllComponents = useCallback(() => {
+    setExpandedComponentIds(new Set(components.map((entry) => entry.id)));
+  }, [components]);
+
+  const collapseAllComponents = useCallback(() => {
+    setExpandedComponentIds(new Set());
+  }, []);
+
   const setTool = useCallback(
     (tool: EditorTool) => {
-      if (tool === "crop" && !canCrop) {
+      if ((tool === "crop" || tool === "draw") && !canCrop) {
         setCurrentTool("move");
         cancelSelection();
         return;
@@ -436,6 +487,34 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
     [cancelSelection, expandComponentPath, resetToolViewport],
   );
 
+  const startEditComponent = useCallback(
+    (id: string) => {
+      const component = components.find((entry) => entry.id === id);
+      if (!component || id === rootComponentId) return;
+      const parentId = component.parentId ?? rootComponentId;
+
+      selectionInteractionRef.current = null;
+      setDrawing(false);
+      setSelection(null);
+      setSelectionLocked(false);
+      setDrawingPath(null);
+
+      expandComponentPath(parentId);
+      if (parentId === rootComponentId) {
+        setSelectedComponentId(null);
+        setViewMode("original");
+      } else {
+        setSelectedComponentId(parentId);
+        setViewMode("component");
+      }
+
+      resetToolViewport();
+      setEditingComponentId(id);
+      setCurrentTool("crop");
+    },
+    [components, expandComponentPath, resetToolViewport, rootComponentId],
+  );
+
   const setPrimaryComponent = useCallback(
     (id: string) => {
       if (!components.some((component) => component.id === id)) return;
@@ -477,7 +556,7 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
       const multiplier = direction > 0 ? 1.14 : 1 / 1.14;
       const next = clamp(current * multiplier, MIN_TOOL_ZOOM, MAX_TOOL_ZOOM);
       const rounded = Number(next.toFixed(2));
-      setToolPan((pan) => clampToolPan(pan, rounded, stageViewportRef.current, overlayRef.current));
+      setToolPan((pan) => clampToolPan(pan, rounded, stageViewportRef.current, imgRef.current));
       return rounded;
     });
   }, []);
@@ -504,7 +583,7 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
           },
           toolZoom,
           stageViewportRef.current,
-          overlayRef.current,
+          imgRef.current,
         ),
       );
     },
@@ -676,6 +755,28 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
       }
     }
 
+    if (editingComponentId) {
+      const editedId = editingComponentId;
+      updateComponents((current) =>
+        current.map((entry) =>
+          entry.id === editedId
+            ? { ...entry, box: sourceBox, dataUrl, type: entry.type || "PNG" }
+            : entry,
+        ),
+      );
+      setEditingComponentId(null);
+      setExpandedComponentIds((current) => {
+        const next = new Set(current);
+        next.add(editedId);
+        return next;
+      });
+      setSelectedComponentId(editedId);
+      setViewMode("component");
+      resetToolViewport();
+      cancelSelection();
+      return;
+    }
+
     const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
     const parentId = activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
     updateComponents((current) => [
@@ -704,6 +805,7 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
     activeSubject,
     canCrop,
     cancelSelection,
+    editingComponentId,
     resetToolViewport,
     rootComponent.id,
     selection,
@@ -795,12 +897,73 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   }, [selectedComponent, selectedComponentId, viewMode]);
 
   useEffect(() => {
+    const cache = componentImageCacheRef.current;
+    const activeIds = new Set(components.map((component) => component.id));
+    for (const id of Array.from(cache.keys())) {
+      if (!activeIds.has(id)) cache.delete(id);
+    }
+    for (const component of components) {
+      const existing = cache.get(component.id);
+      if (existing && existing.src === component.dataUrl) continue;
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.decoding = "async";
+      const handleSettled = () => setImagePaintVersion((value) => value + 1);
+      image.onload = handleSettled;
+      image.onerror = handleSettled;
+      image.src = component.dataUrl;
+      cache.set(component.id, image);
+    }
+  }, [components]);
+
+  useEffect(() => {
+    if (!editingComponentId || selection) return;
+    const component = components.find((entry) => entry.id === editingComponentId);
+    if (!component) {
+      setEditingComponentId(null);
+      return;
+    }
+    const expectedSubjectId = component.parentId ?? rootComponentId;
+    let activeSubjectId: string | null = null;
+    if (activeSubject.kind === "component") {
+      activeSubjectId = activeSubject.id;
+    } else if (activeSubject.kind === "original") {
+      activeSubjectId = rootComponentId;
+    }
+    if (activeSubjectId !== expectedSubjectId) return;
+
+    const img = imgRef.current;
+    if (!img || !img.clientWidth || !img.clientHeight || !img.naturalWidth || !img.naturalHeight) {
+      return;
+    }
+
+    const subjectBox = componentBoxInSubject(component.box, activeSubject);
+    if (!subjectBox) {
+      setEditingComponentId(null);
+      return;
+    }
+
+    const sx = img.naturalWidth / img.clientWidth;
+    const sy = img.naturalHeight / img.clientHeight;
+    const avgScale = (sx + sy) / 2;
+
+    setSelection({
+      x: subjectBox.x / sx,
+      y: subjectBox.y / sy,
+      w: subjectBox.w / sx,
+      h: subjectBox.h / sy,
+      r: (component.box.r ?? 0) / (avgScale || 1),
+    });
+    setSelectionLocked(true);
+  }, [activeSubject, components, editingComponentId, imagePaintVersion, rootComponentId, selection]);
+
+  useEffect(() => {
     if (!selectedComponentId) return;
     expandComponentPath(selectedComponentId);
   }, [expandComponentPath, selectedComponentId]);
 
   useEffect(() => {
-    if (canCrop || currentTool !== "crop") return;
+    if (canCrop || (currentTool !== "crop" && currentTool !== "draw")) return;
     setCurrentTool("move");
     cancelSelection();
   }, [canCrop, cancelSelection, currentTool]);
@@ -814,8 +977,10 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
         setTool("move");
       } else if (event.key === "c" || event.key === "C") {
         setTool("crop");
+      } else if (event.key === "d" || event.key === "D") {
+        setTool("draw");
       } else if (event.key === "Escape") {
-        if (selection) cancelSelection();
+        if (selection || drawingPath) cancelSelection();
       } else if (event.key === "Enter") {
         if (selectionLocked) void saveSelection();
       }
@@ -828,7 +993,7 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   useEffect(() => {
     const onResize = () => {
       setImagePaintVersion((current) => current + 1);
-      setToolPan((pan) => clampToolPan(pan, toolZoom, stageViewportRef.current, overlayRef.current));
+      setToolPan((pan) => clampToolPan(pan, toolZoom, stageViewportRef.current, imgRef.current));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -846,32 +1011,103 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   );
   const canSaveSelection = Boolean(selectionLocked && selectionCrop && canCrop);
   const selectionSize = selectionCrop ?? { x: 0, y: 0, w: 0, h: 0 };
-  const imageContentSize = {
-    w: imgRef.current?.clientWidth ?? 0,
-    h: imgRef.current?.clientHeight ?? 0,
-  };
   const zoomPercent = Math.round(toolZoom * 100);
-
-  const hoveredComponent = components.find((component) => component.id === hoveredComponentId);
-  const hoveredSubjectBox = hoveredComponent
-    ? componentBoxInSubject(hoveredComponent.box, activeSubject)
-    : null;
-  const hoverStyle = hoveredSubjectBox
-    ? renderedBoxStyle(hoveredSubjectBox, imgRef.current, imagePaintVersion)
-    : null;
-  const stackFocusedComponent =
-    viewMode === "stack"
-      ? components.find((component) => component.id === (hoveredComponentId ?? selectedComponentId)) ?? null
-      : null;
-  const stackFocusedSubjectBox = stackFocusedComponent
-    ? componentBoxInSubject(stackFocusedComponent.box, activeSubject)
-    : null;
-  const stackFocusedStyle = stackFocusedSubjectBox
-    ? renderedBoxStyle(stackFocusedSubjectBox, imgRef.current, imagePaintVersion)
-    : null;
   const confirmationCopy = pendingConfirmation
     ? confirmationDialogCopy(pendingConfirmation, components)
     : null;
+
+  useLayoutEffect(() => {
+    const overlayCanvas = overlayCanvasRef.current;
+    if (overlayCanvas) {
+      paintOverlayCanvas({
+        canvas: overlayCanvas,
+        img: imgRef.current,
+        toolZoom,
+        selection,
+        selectionLocked,
+        drawingPath,
+        viewMode,
+        components,
+        stackedComponents,
+        activeSubject,
+        rootComponentId,
+        selectedComponentId,
+        hoveredComponentId,
+        editingComponentId,
+        selectionMatchesExistingCut,
+        selectionCrop,
+        componentImageCache: componentImageCacheRef.current,
+      });
+    }
+    const cropsCanvas = cropsCanvasRef.current;
+    if (cropsCanvas) {
+      paintCropsCanvas({
+        canvas: cropsCanvas,
+        img: imgRef.current,
+        toolZoom,
+        components,
+        activeSubject,
+        rootComponentId,
+        editingComponentId,
+        showCropsOverlay,
+        viewMode,
+        overlayFill: hexToRgba(cropsOverlayColor, CROPS_OVERLAY_ALPHA),
+      });
+    }
+  }, [
+    activeSubject,
+    components,
+    cropsOverlayColor,
+    drawingPath,
+    editingComponentId,
+    hoveredComponentId,
+    imagePaintVersion,
+    rootComponentId,
+    selectedComponentId,
+    selection,
+    selectionCrop,
+    selectionLocked,
+    selectionMatchesExistingCut,
+    showCropsOverlay,
+    stackedComponents,
+    toolPan,
+    toolZoom,
+    viewMode,
+  ]);
+
+  function updateIdleCursorAndHover(event: PointerEvent<HTMLDivElement>) {
+    const stage = stageViewportRef.current;
+    const point = getContentPoint(event);
+    let cursor = "";
+    let nextHovered: string | null = null;
+
+    if (point) {
+      const cropOrDraw = currentTool === "crop" || currentTool === "draw";
+      if (canCrop && selection && selectionLocked && cropOrDraw) {
+        const hit = selectionHitTest(point, selection, true, toolZoom);
+        if (hit?.kind === "radius") cursor = "grab";
+        else if (hit?.kind === "resize") cursor = resizeCursor(hit.handle);
+        else if (hit?.kind === "move" && currentTool === "crop") cursor = "move";
+      }
+
+      if (viewMode === "stack") {
+        const hovered = componentHitTest(point, stackedComponents, activeSubject, imgRef.current);
+        nextHovered = hovered?.id ?? null;
+        if (!cursor && hovered) cursor = "pointer";
+      }
+    }
+
+    if (stage && stage.style.cursor !== cursor) stage.style.cursor = cursor;
+    if (viewMode === "stack" && nextHovered !== hoveredComponentId) {
+      setHoveredComponentId(nextHovered);
+    }
+  }
+
+  function handleStagePointerLeave() {
+    const stage = stageViewportRef.current;
+    if (stage) stage.style.cursor = "";
+    if (viewMode === "stack" && hoveredComponentId) setHoveredComponentId(null);
+  }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.button === 1 && toolZoom > MIN_TOOL_ZOOM) {
@@ -887,44 +1123,69 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
       return;
     }
 
-    if (!canCrop || currentTool !== "crop" || event.button !== 0) return;
+    if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest("[data-selection-action]")) return;
-    if ((event.target as HTMLElement).closest("[data-layer-component]")) return;
+
     const point = getContentPoint(event);
     if (!point) return;
 
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const radiusElement = (event.target as HTMLElement).closest("[data-selection-radius-handle]") as
-      | HTMLElement
-      | null;
-    const radiusHandle = radiusElement?.dataset.selectionRadiusHandle;
-    const handleElement = (event.target as HTMLElement).closest("[data-selection-handle]") as
-      | HTMLElement
-      | null;
-    const handle = handleElement?.dataset.selectionHandle;
-
-    if (selection && selectionLocked && isResizeHandle(radiusHandle)) {
-      selectionInteractionRef.current = {
-        type: "radius",
-        pointerId: event.pointerId,
-        handle: radiusHandle,
-        startPoint: point,
-        startBox: selection,
-      };
-      setDrawing(true);
+    if (viewMode === "stack") {
+      const hit = componentHitTest(point, stackedComponents, activeSubject, imgRef.current);
+      if (hit) {
+        event.preventDefault();
+        selectStackComponent(hit.id);
+      }
       return;
     }
 
-    if (selection && selectionLocked && isResizeHandle(handle)) {
-      selectionInteractionRef.current = {
-        type: "resize",
-        pointerId: event.pointerId,
-        handle,
-        startPoint: point,
-        startBox: selection,
-      };
+    if (!canCrop) return;
+    if (currentTool !== "crop" && currentTool !== "draw") return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    if (selection && selectionLocked) {
+      const hit = selectionHitTest(point, selection, true, toolZoom);
+      if (hit?.kind === "radius") {
+        selectionInteractionRef.current = {
+          type: "radius",
+          pointerId: event.pointerId,
+          handle: hit.handle,
+          startPoint: point,
+          startBox: selection,
+        };
+        setDrawing(true);
+        return;
+      }
+      if (hit?.kind === "resize") {
+        selectionInteractionRef.current = {
+          type: "resize",
+          pointerId: event.pointerId,
+          handle: hit.handle,
+          startPoint: point,
+          startBox: selection,
+        };
+        setDrawing(true);
+        return;
+      }
+      if (hit?.kind === "move" && currentTool === "crop") {
+        selectionInteractionRef.current = {
+          type: "move",
+          pointerId: event.pointerId,
+          startPoint: point,
+          startBox: selection,
+        };
+        setDrawing(true);
+        return;
+      }
+    }
+
+    if (currentTool === "draw") {
+      selectionInteractionRef.current = { type: "free-draw", pointerId: event.pointerId };
       setDrawing(true);
+      setSelectionLocked(false);
+      setSelection(null);
+      setDrawingPath({ points: [point] });
       return;
     }
 
@@ -936,7 +1197,10 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     const interaction = selectionInteractionRef.current;
-    if (!drawing || !interaction) return;
+    if (!drawing || !interaction) {
+      updateIdleCursorAndHover(event);
+      return;
+    }
 
     if (interaction.type === "pan") {
       setToolPan(
@@ -947,7 +1211,7 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
           },
           toolZoom,
           stageViewportRef.current,
-          overlayRef.current,
+          imgRef.current,
         ),
       );
       return;
@@ -955,24 +1219,52 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
 
     const point = getContentPoint(event);
     if (!point) return;
+    const imageBounds = getImageContentBounds();
 
     if (interaction.type === "resize") {
-      const contentBounds = getVisibleContentBounds();
-      if (!contentBounds) return;
+      const bounds = imageBounds ?? getVisibleContentBounds();
+      if (!bounds) return;
       setSelection(
-        resizeCropBox(interaction.startBox, interaction.handle, point, contentBounds),
+        resizeCropBox(interaction.startBox, interaction.handle, point, bounds),
       );
       setSelectionLocked(true);
       return;
     }
 
     if (interaction.type === "radius") {
-      setSelection(roundCropBox(interaction.startBox, interaction.handle, point));
+      setSelection(
+        roundCropBox(interaction.startBox, interaction.handle, interaction.startPoint, point),
+      );
       setSelectionLocked(true);
       return;
     }
 
-    setSelection(cropBoxFromPoints(interaction.startPoint, point));
+    if (interaction.type === "move") {
+      const bounds = imageBounds ?? getVisibleContentBounds();
+      setSelection(moveCropBox(interaction.startBox, interaction.startPoint, point, bounds));
+      setSelectionLocked(true);
+      return;
+    }
+
+    if (interaction.type === "free-draw") {
+      setDrawingPath((current) => {
+        if (!current) return { points: [point] };
+        const last = current.points[current.points.length - 1];
+        if (last && Math.abs(last.x - point.x) < 0.5 && Math.abs(last.y - point.y) < 0.5) {
+          return current;
+        }
+        return { points: [...current.points, point] };
+      });
+      return;
+    }
+
+    const rawBox = cropBoxFromPoints(interaction.startPoint, point);
+    if (imageBounds) {
+      const clipped = intersectCropBoxes(rawBox, imageBounds);
+      setSelection(clipped ?? { x: rawBox.x, y: rawBox.y, w: 0, h: 0 });
+    } else {
+      setSelection(rawBox);
+    }
   }
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
@@ -982,6 +1274,28 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
     setDrawing(false);
     selectionInteractionRef.current = null;
     if (interaction.type === "pan") return;
+
+    if (interaction.type === "free-draw") {
+      const points = drawingPath?.points ?? [];
+      setDrawingPath(null);
+      const bounds = boundsFromDrawingPath(points);
+      if (!bounds) {
+        setSelection(null);
+        setSelectionLocked(false);
+        return;
+      }
+      const imageBounds = getImageContentBounds();
+      const clipped = imageBounds ? intersectCropBoxes(bounds, imageBounds) : bounds;
+      if (!clipped || clipped.w < SELECTION_MIN_SIZE || clipped.h < SELECTION_MIN_SIZE) {
+        setSelection(null);
+        setSelectionLocked(false);
+        return;
+      }
+      setSelection(clipped);
+      setSelectionLocked(true);
+      return;
+    }
+
     setSelection((current) => {
       if (!current || current.w < SELECTION_MIN_SIZE || current.h < SELECTION_MIN_SIZE) {
         setSelectionLocked(false);
@@ -993,9 +1307,9 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
   }
 
   function getContentPoint(event: PointerEvent<HTMLDivElement>) {
-    const overlay = overlayRef.current;
-    if (!overlay) return null;
-    const rect = overlay.getBoundingClientRect();
+    const img = imgRef.current;
+    if (!img) return null;
+    const rect = img.getBoundingClientRect();
     return {
       x: (event.clientX - rect.left) / toolZoom,
       y: (event.clientY - rect.top) / toolZoom,
@@ -1004,16 +1318,22 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
 
   function getVisibleContentBounds(): CropBox | null {
     const stage = stageViewportRef.current;
-    const overlay = overlayRef.current;
-    if (!stage || !overlay) return null;
+    const img = imgRef.current;
+    if (!stage || !img) return null;
     const stageRect = stage.getBoundingClientRect();
-    const overlayRect = overlay.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
     return {
-      x: (stageRect.left - overlayRect.left) / toolZoom,
-      y: (stageRect.top - overlayRect.top) / toolZoom,
+      x: (stageRect.left - imgRect.left) / toolZoom,
+      y: (stageRect.top - imgRect.top) / toolZoom,
       w: stageRect.width / toolZoom,
       h: stageRect.height / toolZoom,
     };
+  }
+
+  function getImageContentBounds(): CropBox | null {
+    const img = imgRef.current;
+    if (!img || !img.clientWidth || !img.clientHeight) return null;
+    return { x: 0, y: 0, w: img.clientWidth, h: img.clientHeight };
   }
 
   return (
@@ -1057,14 +1377,16 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
             >
               <Crop size={18} strokeWidth={1.7} />
             </RailToolButton>
-            <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
             <RailToolButton
-              active={currentTool === "annotate"}
-              label="Anotação"
-              onClick={() => setTool("annotate")}
+              active={currentTool === "draw"}
+              disabled={!canCrop}
+              label="Desenhar"
+              shortcut="D"
+              onClick={() => setTool("draw")}
             >
               <Pencil size={18} strokeWidth={1.7} />
             </RailToolButton>
+            <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
             <RailToolButton label="Conta-gotas" disabled>
               <Pipette size={18} strokeWidth={1.7} />
             </RailToolButton>
@@ -1082,12 +1404,13 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
               ref={stageViewportRef}
               className={[
                 "relative flex flex-1 items-center justify-center overflow-hidden p-8",
-                currentTool === "crop" ? "cursor-crosshair" : "cursor-default",
+                currentTool === "crop" || currentTool === "draw" ? "cursor-crosshair" : "cursor-default",
               ].join(" ")}
               onWheel={handleStageWheel}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
+              onPointerLeave={handleStagePointerLeave}
               onPointerCancel={cancelSelection}
             >
               <BuilderStackTabs
@@ -1111,7 +1434,11 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
                 }}
               />
 
-              {currentTool === "annotate" ? <AnnotationToolbar /> : null}
+              <CropsOverlayToggle
+                active={showCropsOverlay}
+                onToggle={() => setShowCropsOverlay((value) => !value)}
+              />
+
 
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
@@ -1122,158 +1449,39 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
                   </p>
                 </div>
               ) : (
-                <div
-                  className="relative max-h-full max-w-full overflow-visible rounded-[8px] bg-[#0E0E0E] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
-                  style={{
-                    transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
-                    transformOrigin: "center center",
-                  }}
-                >
-                  <img
-                    ref={imgRef}
-                    src={activeSubject.url}
-                    alt={activeSubject.name}
-                    crossOrigin="anonymous"
-                    draggable={false}
-                    onLoad={() => {
-                      setImageError(false);
-                      setImagePaintVersion((current) => current + 1);
-                    }}
-                    onError={() => setImageError(true)}
-                    className="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px]"
-                    style={{ imageRendering: toolZoom > MIN_TOOL_ZOOM ? "pixelated" : "auto" }}
-                  />
+                <>
                   <div
-                    ref={overlayRef}
-                    className="absolute inset-0"
+                    className="relative max-h-full max-w-full overflow-visible rounded-[8px] bg-[#0E0E0E] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
+                    style={{
+                      transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
+                      transformOrigin: "center center",
+                    }}
                   >
-                    {viewMode === "stack"
-                      ? stackedComponents.map((component, index) => {
-                          const layerStyle = renderedBoxStyle(
-                            componentBoxInSubject(component.box, activeSubject) ?? component.box,
-                            imgRef.current,
-                            imagePaintVersion,
-                          );
-                          if (!layerStyle) return null;
-                          const active = selectedComponentId === component.id;
-                          const highlighted = active || hoveredComponentId === component.id;
-                          return (
-                            <button
-                              key={component.id}
-                              type="button"
-                              data-layer-component
-                              onPointerDown={(event) => {
-                                if (event.button !== 1) event.stopPropagation();
-                              }}
-                              onClick={() => selectStackComponent(component.id)}
-                              onMouseEnter={() => setHoveredComponentId(component.id)}
-                              onMouseLeave={() => setHoveredComponentId(null)}
-                              className={[
-                                "absolute cursor-pointer overflow-hidden rounded-[2px] border bg-transparent p-0 transition-colors duration-[120ms]",
-                                highlighted
-                                  ? "border-[#4C8DFF]"
-                                  : "border-transparent hover:border-[#4C8DFF]",
-                              ].join(" ")}
-                              style={{ ...layerStyle, zIndex: index + 1 }}
-                            >
-                              <img
-                                src={component.dataUrl}
-                                alt={component.name}
-                                draggable={false}
-                                className="h-full w-full select-none object-fill"
-                                style={{ imageRendering: toolZoom > MIN_TOOL_ZOOM ? "pixelated" : "auto" }}
-                              />
-                            </button>
-                          );
-                        })
-                      : null}
-                    {viewMode === "stack" && stackFocusedStyle ? (
-                      <div
-                        className="pointer-events-none absolute rounded-[2px] border-[1.5px] border-[#4C8DFF]"
-                        style={{ ...stackFocusedStyle, zIndex: stackedComponents.length + 2 }}
-                      />
-                    ) : null}
-                    {viewMode !== "stack" && hoveredComponent && hoverStyle ? (
-                      <div
-                        className="pointer-events-none absolute rounded-[2px] border-[1.5px] border-[rgba(255,255,255,0.55)] bg-[rgba(255,255,255,0.04)]"
-                        style={hoverStyle}
-                      >
-                        <span className="absolute left-0 top-[-22px] rounded-[4px] bg-white px-1.5 py-0.5 text-[10px] font-medium text-black">
-                          {hoveredComponent.name}
-                        </span>
-                      </div>
-                    ) : null}
-                    {selection ? (
-                      <div className="pointer-events-none absolute inset-0 z-20 overflow-visible">
-                        <SelectionDimmer
-                          selection={selection}
-                          width={imageContentSize.w}
-                          height={imageContentSize.h}
-                        />
-                        <div
-                          className="pointer-events-none absolute border-[1.5px] border-dashed border-white bg-[rgba(255,255,255,0.08)]"
-                          style={{
-                            left: selection.x,
-                            top: selection.y,
-                            width: selection.w,
-                            height: selection.h,
-                            borderRadius: selection.r ?? 0,
-                            borderWidth: 1.5 / toolZoom,
-                          }}
-                        >
-                          <span
-                            className="absolute right-0 rounded-[4px] bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-black shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
-                            style={{
-                              bottom: -24 / toolZoom,
-                              transform: `scale(${1 / toolZoom})`,
-                              transformOrigin: "bottom right",
-                            }}
-                          >
-                            {selectionMatchesExistingCut
-                              ? "área já recortada"
-                              : selectionCrop
-                                ? `${Math.round(selectionSize.w)} × ${Math.round(selectionSize.h)}${
-                                    selectionSize.r ? ` · r ${Math.round(selectionSize.r)}` : ""
-                                  }`
-                                : "fora da imagem"}
-                          </span>
-                          {selectionLocked
-                            ? (
-                                <>
-                                  {RESIZE_HANDLES.map((handle) => (
-                                    <button
-                                      key={handle}
-                                      type="button"
-                                      aria-label={`Redimensionar ${handle}`}
-                                      data-selection-handle={handle}
-                                      className="pointer-events-auto absolute border-0 bg-transparent p-0"
-                                      style={resizeHandleHitAreaStyle(handle, toolZoom)}
-                                    >
-                                      <span
-                                        aria-hidden
-                                        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black bg-white shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-                                        style={resizeHandleVisualStyle(toolZoom)}
-                                      />
-                                    </button>
-                                  ))}
-                                  {RESIZE_HANDLES.map((handle) => (
-                                    <button
-                                      key={`radius-${handle}`}
-                                      type="button"
-                                      aria-label={`Arredondar ${handle}`}
-                                      data-selection-radius-handle={handle}
-                                      className="pointer-events-auto absolute h-[9px] w-[9px] rounded-full border border-[#0A0A0B] bg-[#4C8DFF] shadow-[0_2px_8px_rgba(0,0,0,0.45)]"
-                                      style={radiusHandleStyle(handle, selection, toolZoom)}
-                                    />
-                                  ))}
-                                </>
-                              )
-                            : null}
-                        </div>
-                      </div>
-                    ) : null}
+                    <img
+                      ref={imgRef}
+                      src={activeSubject.url}
+                      alt={activeSubject.name}
+                      crossOrigin="anonymous"
+                      draggable={false}
+                      onLoad={() => {
+                        setImageError(false);
+                        setImagePaintVersion((current) => current + 1);
+                      }}
+                      onError={() => setImageError(true)}
+                      className="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px]"
+                      style={{ imageRendering: toolZoom > MIN_TOOL_ZOOM ? "pixelated" : "auto" }}
+                    />
                   </div>
-                </div>
+                  <canvas
+                    ref={cropsCanvasRef}
+                    className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+                    style={{ mixBlendMode: "screen" }}
+                  />
+                  <canvas
+                    ref={overlayCanvasRef}
+                    className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+                  />
+                </>
               )}
 
               <div
@@ -1336,14 +1544,23 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
                 {!canCrop ? (
                   <span>Abra um componente da árvore para recortar. Original e tudo junto são apenas visualização.</span>
+                ) : editingComponentId ? (
+                  <span>
+                    Editando recorte existente. Ajuste a caixa e <Key>Enter</Key> salva · <Key>Esc</Key> cancela
+                  </span>
                 ) : currentTool === "crop" ? (
                   <span>
                     Clique e arraste sobre o assunto aberto. Áreas filhas já recortadas aparecem como aviso. <Key>Enter</Key> salva ·{" "}
                     <Key>Esc</Key> cancela
                   </span>
+                ) : currentTool === "draw" ? (
+                  <span>
+                    Desenhe livremente sobre a imagem. A área desenhada vira o recorte. <Key>Enter</Key> salva ·{" "}
+                    <Key>Esc</Key> cancela
+                  </span>
                 ) : (
                   <span>
-                    Selecione um componente na lateral para recortar dentro dele, ou use <Key>C</Key>.
+                    Selecione um componente para recortar dentro dele, ou use <Key>C</Key> para recortar ou <Key>D</Key> para desenhar.
                   </span>
                 )}
               </div>
@@ -1351,77 +1568,110 @@ function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEditorProps)
           </section>
 
           <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--bg)]">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <h3 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">Componentes</h3>
-                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
-                    {scopedComponents.length}
-                  </span>
+            <SidebarTabs active={sidebarTab} onChange={setSidebarTab} />
+
+            {sidebarTab === "components" ? (
+              <>
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h3 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">Componentes</h3>
+                      <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
+                        {scopedComponents.length}
+                      </span>
+                    </div>
+                    <p className="m-0 mt-0.5 max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--text-faint)]">
+                      Primário: {primaryComponent.name}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      aria-label="Abrir tudo"
+                      title="Abrir toda a árvore"
+                      onClick={expandAllComponents}
+                      disabled={scopedComponents.length <= 1}
+                      className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border)] disabled:hover:bg-[var(--surface)] disabled:hover:text-[var(--text-muted)]"
+                    >
+                      <ChevronsUpDown size={13} strokeWidth={1.8} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Fechar tudo"
+                      title="Fechar toda a árvore"
+                      onClick={collapseAllComponents}
+                      disabled={scopedComponents.length <= 1}
+                      className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border)] disabled:hover:bg-[var(--surface)] disabled:hover:text-[var(--text-muted)]"
+                    >
+                      <ChevronsDownUp size={13} strokeWidth={1.8} />
+                    </button>
+                    {primaryScopeId !== rootComponentId ? (
+                      <button
+                        type="button"
+                        aria-label="Resetar root"
+                        title="Resetar root"
+                        onClick={requestResetConfirmation}
+                        className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+                      >
+                        <RotateCcw size={13} strokeWidth={1.8} />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="m-0 mt-0.5 max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--text-faint)]">
-                  Primário: {primaryComponent.name}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {primaryScopeId !== rootComponentId ? (
+
+                <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-3">
+                  {componentTree.map((node) => (
+                    <ComponentTreeItem
+                      key={node.component.id}
+                      node={node}
+                      activeId={viewMode === "component" || viewMode === "stack" ? selectedComponentId : null}
+                      hoveredId={hoveredComponentId}
+                      editingId={editingComponentId}
+                      expandedIds={expandedComponentIds}
+                      rootId={rootComponentId}
+                      primaryId={primaryScopeId}
+                      onOpen={openTreeComponent}
+                      onToggle={toggleComponentExpanded}
+                      onHover={setHoveredComponentId}
+                      onEdit={startEditComponent}
+                      onRemove={(id) => {
+                        const removedIds = componentSubtreeIds(components, id);
+                        updateComponents((current) =>
+                          current.filter((entry) => !removedIds.has(entry.id)),
+                        );
+                        if (removedIds.has(primaryScopeId)) {
+                          resetToOriginalRoot();
+                        }
+                        if (selectedComponentId && removedIds.has(selectedComponentId)) {
+                          openOriginal();
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div className="flex shrink-0 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3 py-3 backdrop-blur-[8px]">
                   <button
                     type="button"
-                    aria-label="Resetar root"
-                    title="Resetar root"
-                    onClick={requestResetConfirmation}
-                    className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+                    disabled={savingStack}
+                    onClick={() => void persistReferenceStack()}
+                    className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-[var(--accent)] bg-[var(--accent)] px-3 text-[12.5px] font-semibold text-[var(--accent-fg)] transition-colors duration-[120ms] hover:bg-white"
                   >
-                    <RotateCcw size={13} strokeWidth={1.8} />
+                    {savingStack ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[rgba(0,0,0,0.25)] border-t-[var(--accent-fg)]" />
+                    ) : (
+                      <Save size={14} strokeWidth={1.9} />
+                    )}
+                    {savingStack ? "Salvando..." : stackSaveStatus ?? "Salvar"}
                   </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-3">
-              {componentTree.map((node) => (
-                <ComponentTreeItem
-                  key={node.component.id}
-                  node={node}
-                  activeId={viewMode === "component" || viewMode === "stack" ? selectedComponentId : null}
-                  hoveredId={hoveredComponentId}
-                  expandedIds={expandedComponentIds}
-                  rootId={rootComponentId}
-                  primaryId={primaryScopeId}
-                  onOpen={openTreeComponent}
-                  onToggle={toggleComponentExpanded}
-                  onHover={setHoveredComponentId}
-                  onRemove={(id) => {
-                    const removedIds = componentSubtreeIds(components, id);
-                    updateComponents((current) =>
-                      current.filter((entry) => !removedIds.has(entry.id)),
-                    );
-                    if (removedIds.has(primaryScopeId)) {
-                      resetToOriginalRoot();
-                    }
-                    if (selectedComponentId && removedIds.has(selectedComponentId)) {
-                      openOriginal();
-                    }
-                  }}
-                />
-              ))}
-            </div>
-
-            <div className="flex shrink-0 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3 py-3 backdrop-blur-[8px]">
-              <button
-                type="button"
-                disabled={savingStack}
-                onClick={() => void persistReferenceStack()}
-                className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-[var(--accent)] bg-[var(--accent)] px-3 text-[12.5px] font-semibold text-[var(--accent-fg)] transition-colors duration-[120ms] hover:bg-white"
-              >
-                {savingStack ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[rgba(0,0,0,0.25)] border-t-[var(--accent-fg)]" />
-                ) : (
-                  <Save size={14} strokeWidth={1.9} />
-                )}
-                {savingStack ? "Salvando..." : stackSaveStatus ?? "Salvar"}
-              </button>
-            </div>
+                </div>
+              </>
+            ) : (
+              <SidebarConfigPanel
+                cropsOverlayColor={cropsOverlayColor}
+                onChangeCropsOverlayColor={setCropsOverlayColor}
+              />
+            )}
           </aside>
         </div>
       </div>
@@ -1672,6 +1922,142 @@ function FloatingTabButton({
   );
 }
 
+function SidebarTabs({
+  active,
+  onChange,
+}: {
+  active: SidebarTab;
+  onChange: (tab: SidebarTab) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1 border-b border-[var(--border)] px-2 py-2">
+      <SidebarTabButton active={active === "components"} onClick={() => onChange("components")}>
+        Componentes
+      </SidebarTabButton>
+      <SidebarTabButton active={active === "config"} onClick={() => onChange("config")}>
+        Config
+      </SidebarTabButton>
+    </div>
+  );
+}
+
+function SidebarTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "h-7 cursor-pointer rounded-[7px] border px-2.5 text-[11.5px] font-medium transition-colors duration-[120ms]",
+        active
+          ? "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
+          : "border-transparent bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SidebarConfigPanel({
+  cropsOverlayColor,
+  onChangeCropsOverlayColor,
+}: {
+  cropsOverlayColor: string;
+  onChangeCropsOverlayColor: (color: string) => void;
+}) {
+  const alphaPct = Math.round(CROPS_OVERLAY_ALPHA * 100);
+  return (
+    <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+      <div className="flex flex-col gap-2">
+        <div>
+          <h4 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">
+            Cor do overlay de recortes
+          </h4>
+          <p className="m-0 mt-1 text-[10.5px] leading-[1.4] text-[var(--text-faint)]">
+            Cor base aplicada sobre áreas já recortadas. Opacidade {alphaPct}% e blend
+            (screen) são mantidos — cores mais claras aparecem mais.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="relative inline-flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-[7px] border border-[var(--border-strong)]">
+            <input
+              type="color"
+              value={cropsOverlayColor}
+              onChange={(event) => onChangeCropsOverlayColor(event.target.value.toUpperCase())}
+              className="absolute inset-0 h-full w-full cursor-pointer border-0 bg-transparent p-0 opacity-0"
+            />
+            <span
+              aria-hidden
+              className="block h-full w-full"
+              style={{ background: cropsOverlayColor }}
+            />
+          </label>
+          <span className="font-mono text-[11.5px] uppercase tabular-nums text-[var(--text-muted)]">
+            {cropsOverlayColor}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          {CROPS_OVERLAY_PRESETS.map((preset) => {
+            const isActive = preset.toUpperCase() === cropsOverlayColor.toUpperCase();
+            return (
+              <button
+                key={preset}
+                type="button"
+                aria-label={`Selecionar cor ${preset}`}
+                onClick={() => onChangeCropsOverlayColor(preset)}
+                className={[
+                  "h-6 w-6 cursor-pointer rounded-full border transition-transform duration-[120ms] hover:scale-110",
+                  isActive
+                    ? "border-[var(--text)] ring-2 ring-[var(--text)] ring-offset-2 ring-offset-[var(--bg)]"
+                    : "border-[var(--border-strong)]",
+                ].join(" ")}
+                style={{ background: preset }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CropsOverlayToggle({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-selection-action
+      aria-label={active ? "Esconder áreas recortadas" : "Mostrar áreas recortadas"}
+      title={active ? "Esconder áreas recortadas" : "Mostrar áreas recortadas"}
+      onClick={onToggle}
+      className={[
+        "absolute right-3 top-3 z-30 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-medium backdrop-blur-[8px] transition-colors duration-[120ms]",
+        active
+          ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+          : "border-[var(--border)] bg-[rgba(20,20,22,0.88)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
+      ].join(" ")}
+    >
+      <Eye size={13} strokeWidth={1.8} />
+      <span>Recortes</span>
+    </button>
+  );
+}
+
 function ElementInfoCard({
   name,
   width,
@@ -1725,54 +2111,6 @@ function ElementInfoCard({
         Tornar root
       </button>
     </div>
-  );
-}
-
-function AnnotationToolbar() {
-  return (
-    <div
-      data-selection-action
-      className="absolute bottom-3.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[rgba(20,20,22,0.92)] p-1 shadow-[0_10px_34px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
-    >
-      <AnnotationToolButton label="Lápis" active>
-        <Pencil size={13} strokeWidth={1.8} />
-      </AnnotationToolButton>
-      <AnnotationToolButton label="Texto">
-        <Type size={13} strokeWidth={1.8} />
-      </AnnotationToolButton>
-      <AnnotationToolButton label="Retângulo">
-        <Square size={13} strokeWidth={1.8} />
-      </AnnotationToolButton>
-      <AnnotationToolButton label="Círculo">
-        <Circle size={13} strokeWidth={1.8} />
-      </AnnotationToolButton>
-    </div>
-  );
-}
-
-function AnnotationToolButton({
-  label,
-  active = false,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={[
-        "grid h-8 w-8 cursor-pointer place-items-center rounded-[8px] border transition-colors duration-[120ms]",
-        active
-          ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
-          : "border-transparent bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -1833,52 +2171,11 @@ function confirmationDialogCopy(action: PendingConfirmation, components: SavedCo
   };
 }
 
-function SelectionDimmer({
-  selection,
-  width,
-  height,
-}: {
-  selection: CropBox;
-  width: number;
-  height: number;
-}) {
-  if (width <= 0 || height <= 0) return null;
-  const visibleSelection = intersectCropBoxes(selection, { x: 0, y: 0, w: width, h: height });
-
-  if (!visibleSelection) {
-    return <div className="pointer-events-none absolute inset-0 bg-[rgba(0,0,0,0.42)]" />;
-  }
-
-  return (
-    <>
-      <div
-        className="pointer-events-none absolute left-0 top-0 bg-[rgba(0,0,0,0.42)]"
-        style={{ width: "100%", height: visibleSelection.y }}
-      />
-      <div
-        className="pointer-events-none absolute left-0 bg-[rgba(0,0,0,0.42)]"
-        style={{ top: visibleSelection.y, width: visibleSelection.x, height: visibleSelection.h }}
-      />
-      <div
-        className="pointer-events-none absolute right-0 bg-[rgba(0,0,0,0.42)]"
-        style={{
-          top: visibleSelection.y,
-          left: visibleSelection.x + visibleSelection.w,
-          height: visibleSelection.h,
-        }}
-      />
-      <div
-        className="pointer-events-none absolute bottom-0 left-0 bg-[rgba(0,0,0,0.42)]"
-        style={{ top: visibleSelection.y + visibleSelection.h, width: "100%" }}
-      />
-    </>
-  );
-}
-
 function ComponentTreeItem({
   node,
   activeId,
   hoveredId,
+  editingId,
   expandedIds,
   rootId,
   primaryId,
@@ -1886,10 +2183,12 @@ function ComponentTreeItem({
   onToggle,
   onHover,
   onRemove,
+  onEdit,
 }: {
   node: ComponentTreeNode;
   activeId: string | null;
   hoveredId: string | null;
+  editingId: string | null;
   expandedIds: Set<string>;
   rootId: string;
   primaryId: string;
@@ -1897,13 +2196,16 @@ function ComponentTreeItem({
   onToggle: (id: string) => void;
   onHover: (id: string | null) => void;
   onRemove: (id: string) => void;
+  onEdit: (id: string) => void;
 }) {
   const { component, children, depth } = node;
   const active = activeId === component.id;
   const hovered = hoveredId === component.id;
+  const editing = editingId === component.id;
   const isRoot = component.id === rootId;
   const isPrimary = component.id === primaryId;
   const isProtected = isRoot || isPrimary;
+  const canEdit = !isRoot;
   const hasChildren = children.length > 0;
   const expanded = expandedIds.has(component.id);
 
@@ -1915,9 +2217,11 @@ function ComponentTreeItem({
         onMouseLeave={() => onHover(null)}
         className={[
           "flex h-11 cursor-pointer items-center gap-1.5 rounded-[8px] border bg-[var(--bg-elev)] px-1.5 py-1 transition-colors duration-[120ms]",
-          active || hovered
-            ? "border-[var(--text)]"
-            : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)]",
+          editing
+            ? "border-[#4C8DFF]"
+            : active || hovered
+              ? "border-[var(--text)]"
+              : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)]",
         ].join(" ")}
         style={{ marginLeft: depth * 10 }}
       >
@@ -1949,6 +2253,20 @@ function ComponentTreeItem({
         </span>
         <div className="flex shrink-0">
           <IconButton
+            aria-label="Editar recorte"
+            disabled={!canEdit}
+            className={[
+              !canEdit ? "cursor-not-allowed opacity-35 hover:bg-transparent hover:text-[var(--text-muted)]" : "",
+              editing ? "text-[#4C8DFF] hover:text-[#4C8DFF]" : "",
+            ].join(" ")}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (canEdit) onEdit(component.id);
+            }}
+          >
+            <SquarePen size={13} strokeWidth={1.8} />
+          </IconButton>
+          <IconButton
             aria-label="Remover"
             danger
             disabled={isProtected}
@@ -1969,6 +2287,7 @@ function ComponentTreeItem({
               node={child}
               activeId={activeId}
               hoveredId={hoveredId}
+              editingId={editingId}
               expandedIds={expandedIds}
               rootId={rootId}
               primaryId={primaryId}
@@ -1976,6 +2295,7 @@ function ComponentTreeItem({
               onToggle={onToggle}
               onHover={onHover}
               onRemove={onRemove}
+              onEdit={onEdit}
             />
           ))
         : null}
@@ -2354,21 +2674,26 @@ function findSpatialParent(
 
 function isSpatialParent(parent: CropBox, child: CropBox) {
   if (boxesRepresentSameCut(parent, child)) return false;
-  const tolerance = cropBoxTolerance(parent, child);
+
+  const containmentTolerance = cropBoxContainmentTolerance(parent, child);
   const parentRight = parent.x + parent.w;
   const parentBottom = parent.y + parent.h;
   const childRight = child.x + child.w;
   const childBottom = child.y + child.h;
   const contains =
-    child.x >= parent.x - tolerance &&
-    child.y >= parent.y - tolerance &&
-    childRight <= parentRight + tolerance &&
-    childBottom <= parentBottom + tolerance;
+    child.x >= parent.x - containmentTolerance &&
+    child.y >= parent.y - containmentTolerance &&
+    childRight <= parentRight + containmentTolerance &&
+    childBottom <= parentBottom + containmentTolerance;
 
   if (!contains) return false;
 
+  // Use strict tolerance for the area-delta check so we don't accidentally
+  // pair boxes that are basically the same cut once you account for the
+  // generous containment slack above.
+  const strictTolerance = cropBoxTolerance(parent, child);
   const areaDelta = cropBoxArea(parent) - cropBoxArea(child);
-  return areaDelta > Math.max(HIERARCHY_MIN_AREA_DELTA, tolerance * tolerance);
+  return areaDelta > Math.max(HIERARCHY_MIN_AREA_DELTA, strictTolerance * strictTolerance);
 }
 
 function componentAreaAlreadyExists(
@@ -2463,11 +2788,10 @@ function componentBoxInSubject(box: CropBox, subject: ActiveSubject): CropBox | 
   };
 }
 
-function renderedBoxStyle(
+function imageClientFromSubjectBox(
   box: CropBox,
   img: HTMLImageElement | null,
-  _paintVersion: number,
-): CSSProperties | null {
+): { left: number; top: number; width: number; height: number } | null {
   if (!img || !img.clientWidth || !img.clientHeight || !img.naturalWidth || !img.naturalHeight) {
     return null;
   }
@@ -2479,6 +2803,184 @@ function renderedBoxStyle(
     width: box.w / sx,
     height: box.h / sy,
   };
+}
+
+function resizeHandleCenter(handle: ResizeHandle, box: CropBox): { x: number; y: number } {
+  const x = handle.includes("w")
+    ? box.x
+    : handle.includes("e")
+      ? box.x + box.w
+      : box.x + box.w / 2;
+  const y = handle.includes("n")
+    ? box.y
+    : handle.includes("s")
+      ? box.y + box.h
+      : box.y + box.h / 2;
+  return { x, y };
+}
+
+function radiusHandleCenter(
+  handle: RadiusHandle,
+  box: CropBox,
+  zoom: number,
+): { x: number; y: number } {
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const maxOffset = Math.max(0, maxCropRadius(box) - 4);
+  const inset = Math.min(maxOffset, Math.max(RADIUS_HANDLE_MIN_INSET / safeZoom, box.r ?? 0));
+  const x = handle.includes("w") ? box.x + inset : box.x + box.w - inset;
+  const y = handle.includes("n") ? box.y + inset : box.y + box.h - inset;
+  return { x, y };
+}
+
+type SelectionHit =
+  | { kind: "radius"; handle: RadiusHandle }
+  | { kind: "resize"; handle: ResizeHandle }
+  | { kind: "move" }
+  | null;
+
+function selectionHitTest(
+  point: { x: number; y: number },
+  selection: CropBox,
+  locked: boolean,
+  zoom: number,
+): SelectionHit {
+  if (!locked) return null;
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const radiusHit = HANDLE_HIT_AREA / 2 / safeZoom;
+  const resizeHit = HANDLE_HIT_AREA / 2 / safeZoom;
+
+  for (const handle of RADIUS_HANDLES) {
+    const center = radiusHandleCenter(handle, selection, zoom);
+    if (Math.abs(point.x - center.x) <= radiusHit && Math.abs(point.y - center.y) <= radiusHit) {
+      return { kind: "radius", handle };
+    }
+  }
+  for (const handle of RESIZE_HANDLES) {
+    const center = resizeHandleCenter(handle, selection);
+    if (Math.abs(point.x - center.x) <= resizeHit && Math.abs(point.y - center.y) <= resizeHit) {
+      return { kind: "resize", handle };
+    }
+  }
+  if (
+    point.x >= selection.x &&
+    point.x <= selection.x + selection.w &&
+    point.y >= selection.y &&
+    point.y <= selection.y + selection.h
+  ) {
+    return { kind: "move" };
+  }
+  return null;
+}
+
+function componentHitTest(
+  point: { x: number; y: number },
+  candidates: SavedComponent[],
+  activeSubject: ActiveSubject,
+  img: HTMLImageElement | null,
+): SavedComponent | null {
+  if (!img) return null;
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    const component = candidates[i];
+    const subjectBox = componentBoxInSubject(component.box, activeSubject);
+    if (!subjectBox) continue;
+    const rect = imageClientFromSubjectBox(subjectBox, img);
+    if (!rect) continue;
+    if (
+      point.x >= rect.left &&
+      point.x <= rect.left + rect.width &&
+      point.y >= rect.top &&
+      point.y <= rect.top + rect.height
+    ) {
+      return component;
+    }
+  }
+  return null;
+}
+
+function drawLabelBadge(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  anchorX: number,
+  anchorY: number,
+  zoom: number,
+) {
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const scale = 1 / safeZoom;
+  ctx.save();
+  ctx.translate(anchorX, anchorY);
+  ctx.scale(scale, scale);
+  ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  const metrics = ctx.measureText(text);
+  const padX = 6;
+  const padY = 3;
+  const ascent = metrics.actualBoundingBoxAscent || 8;
+  const descent = metrics.actualBoundingBoxDescent || 2;
+  const textHeight = ascent + descent;
+  const width = metrics.width + padX * 2;
+  const height = textHeight + padY * 2;
+  const top = -height;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.beginPath();
+  roundedRectPath(ctx, 0, top, width, height, 4);
+  ctx.fill();
+  ctx.fillStyle = "#000000";
+  ctx.fillText(text, padX, top + padY + ascent);
+  ctx.restore();
+}
+
+function drawSizeBadge(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  anchorX: number,
+  anchorY: number,
+  zoom: number,
+) {
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const scale = 1 / safeZoom;
+  ctx.save();
+  ctx.translate(anchorX, anchorY);
+  ctx.scale(scale, scale);
+  ctx.font =
+    '500 10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "right";
+  const metrics = ctx.measureText(text);
+  const padX = 6;
+  const padY = 3;
+  const ascent = metrics.actualBoundingBoxAscent || 8;
+  const descent = metrics.actualBoundingBoxDescent || 2;
+  const textHeight = ascent + descent;
+  const width = metrics.width + padX * 2;
+  const height = textHeight + padY * 2;
+  const offset = 4;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.beginPath();
+  roundedRectPath(ctx, -width, offset, width, height, 4);
+  ctx.fill();
+  ctx.fillStyle = "#000000";
+  ctx.fillText(text, -padX, offset + padY + ascent);
+  ctx.restore();
+}
+
+function drawCircleHandle(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  fill: string,
+  stroke: string,
+  strokeWidth: number,
+) {
+  if (radius <= 0) return;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = strokeWidth;
+  ctx.strokeStyle = stroke;
+  ctx.stroke();
 }
 
 function waitForImage(img: HTMLImageElement): Promise<void> {
@@ -2540,6 +3042,22 @@ function cropBoxTolerance(a: CropBox, b: CropBox) {
   return clamp(Math.round(smallestEdge * 0.012), 2, 14);
 }
 
+// More generous tolerance used to decide if a box is contained inside another.
+// Allows for "logical" parent-child relationships where the child slightly
+// overshoots the parent's edges (rounded corners, floating overlays, small
+// drawing imprecisions, elements that visually span two adjacent containers).
+function cropBoxContainmentTolerance(parent: CropBox, child: CropBox) {
+  const childSmallest = Math.max(1, Math.min(child.w, child.h));
+  const parentSmallest = Math.max(1, Math.min(parent.w, parent.h));
+  const tolerance = Math.max(
+    8, // base minimum so small overshoots always pass
+    childSmallest * 0.35, // half-edge of the child (catches floating overlays)
+    parentSmallest * 0.08, // proportional to parent for bigger scenes
+  );
+  // Cap so a child can't "drift" arbitrarily far and still count as inside.
+  return Math.min(tolerance, parentSmallest * 0.4);
+}
+
 function cropBoxIoU(a: CropBox, b: CropBox) {
   const intersection = intersectCropBoxes(a, b);
   if (!intersection) return 0;
@@ -2568,23 +3086,19 @@ function clampToolPan(
   pan: { x: number; y: number },
   zoom: number,
   viewport: HTMLDivElement | null,
-  overlay: HTMLDivElement | null,
+  content: HTMLElement | null,
 ) {
-  if (zoom <= MIN_TOOL_ZOOM || !viewport || !overlay) return { x: 0, y: 0 };
+  if (zoom <= MIN_TOOL_ZOOM || !viewport || !content) return { x: 0, y: 0 };
   const viewportWidth = Math.max(1, viewport.clientWidth - 64);
   const viewportHeight = Math.max(1, viewport.clientHeight - 64);
-  const scaledWidth = overlay.clientWidth * zoom;
-  const scaledHeight = overlay.clientHeight * zoom;
+  const scaledWidth = content.clientWidth * zoom;
+  const scaledHeight = content.clientHeight * zoom;
   const maxX = Math.max(0, (scaledWidth - viewportWidth) / 2);
   const maxY = Math.max(0, (scaledHeight - viewportHeight) / 2);
   return {
     x: clamp(pan.x, -maxX, maxX),
     y: clamp(pan.y, -maxY, maxY),
   };
-}
-
-function isResizeHandle(value: string | undefined): value is ResizeHandle {
-  return RESIZE_HANDLES.includes(value as ResizeHandle);
 }
 
 function cropBoxFromPoints(
@@ -2601,6 +3115,39 @@ function cropBoxFromPoints(
 
 function maxCropRadius(box: CropBox) {
   return Math.max(0, Math.min(box.w, box.h) / 2);
+}
+
+function moveCropBox(
+  startBox: CropBox,
+  startPoint: { x: number; y: number },
+  point: { x: number; y: number },
+  bounds: CropBox | null,
+): CropBox {
+  const dx = point.x - startPoint.x;
+  const dy = point.y - startPoint.y;
+  let nextX = startBox.x + dx;
+  let nextY = startBox.y + dy;
+  if (bounds) {
+    nextX = clamp(nextX, bounds.x, bounds.x + bounds.w - startBox.w);
+    nextY = clamp(nextY, bounds.y, bounds.y + bounds.h - startBox.h);
+  }
+  return { ...startBox, x: nextX, y: nextY };
+}
+
+function boundsFromDrawingPath(points: Array<{ x: number; y: number }>): CropBox | null {
+  if (points.length < 2) return null;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+  return { x: minX, y: minY, w: Math.max(0, maxX - minX), h: Math.max(0, maxY - minY) };
 }
 
 function resizeCropBox(
@@ -2642,93 +3189,27 @@ function resizeCropBox(
 
 function roundCropBox(
   startBox: CropBox,
-  handle: ResizeHandle,
+  handle: RadiusHandle,
+  startPoint: { x: number; y: number },
   point: { x: number; y: number },
 ): CropBox {
-  const left = startBox.x;
-  const top = startBox.y;
-  const right = startBox.x + startBox.w;
-  const bottom = startBox.y + startBox.h;
-  const maxRadius = maxCropRadius(startBox);
-  let radius = startBox.r ?? 0;
-
-  if (handle === "nw") radius = Math.max(point.x - left, point.y - top);
-  if (handle === "ne") radius = Math.max(right - point.x, point.y - top);
-  if (handle === "se") radius = Math.max(right - point.x, bottom - point.y);
-  if (handle === "sw") radius = Math.max(point.x - left, bottom - point.y);
-
+  const dx = point.x - startPoint.x;
+  const dy = point.y - startPoint.y;
+  const inwardX = handle.includes("w") ? dx : -dx;
+  const inwardY = handle.includes("n") ? dy : -dy;
+  const delta = (inwardX + inwardY) / 2;
+  const startRadius = startBox.r ?? 0;
   return {
     ...startBox,
-    r: clamp(radius, 0, maxRadius),
+    r: clamp(startRadius + delta, 0, maxCropRadius(startBox)),
   };
-}
-
-function resizeHandleHitAreaStyle(handle: ResizeHandle, zoom: number): CSSProperties {
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const hitSize = 22 / safeZoom;
-  const edgeOffset = -hitSize / 2;
-  const style: CSSProperties = {
-    cursor: resizeCursor(handle),
-    width: hitSize,
-    height: hitSize,
-  };
-
-  if (handle.includes("n")) {
-    style.top = edgeOffset;
-  } else if (handle.includes("s")) {
-    style.bottom = edgeOffset;
-  }
-
-  if (handle.includes("w")) {
-    style.left = edgeOffset;
-  } else if (handle.includes("e")) {
-    style.right = edgeOffset;
-  }
-
-  return style;
-}
-
-function resizeHandleVisualStyle(zoom: number): CSSProperties {
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const size = 11 / safeZoom;
-  return {
-    width: size,
-    height: size,
-    borderWidth: 1 / safeZoom,
-  };
-}
-
-function radiusHandleStyle(handle: ResizeHandle, box: CropBox, zoom: number): CSSProperties {
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const size = 9 / safeZoom;
-  const maxOffset = Math.max(0, maxCropRadius(box) - 5);
-  const centerOffset = Math.min(maxOffset, Math.max(14 / safeZoom, box.r ?? 0));
-  const offset = centerOffset - size / 2;
-  const style: CSSProperties = {
-    cursor: "grab",
-    width: size,
-    height: size,
-    borderWidth: 1 / safeZoom,
-  };
-
-  if (handle.includes("n")) {
-    style.top = offset;
-  } else {
-    style.bottom = offset;
-  }
-
-  if (handle.includes("w")) {
-    style.left = offset;
-  } else {
-    style.right = offset;
-  }
-
-  return style;
 }
 
 function resizeCursor(handle: ResizeHandle) {
   if (handle === "ne" || handle === "sw") return "nesw-resize";
-  return "nwse-resize";
+  if (handle === "nw" || handle === "se") return "nwse-resize";
+  if (handle === "n" || handle === "s") return "ns-resize";
+  return "ew-resize";
 }
 
 function inferType(name: string): string {
@@ -2752,5 +3233,294 @@ function measureImage(src: string): Promise<{ w: number; h: number }> {
     img.onerror = () => reject(new Error("Could not measure image"));
     img.src = src;
   });
+}
+
+function readCropsOverlayColor(): string {
+  if (typeof window === "undefined") return CROPS_OVERLAY_DEFAULT_COLOR;
+  try {
+    const stored = window.localStorage.getItem(CROPS_OVERLAY_COLOR_STORAGE_KEY);
+    if (stored && /^#[0-9a-fA-F]{6}$/.test(stored)) return stored;
+  } catch {
+    // ignore
+  }
+  return CROPS_OVERLAY_DEFAULT_COLOR;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const cleaned = hex.replace("#", "");
+  if (cleaned.length !== 6) return `rgba(255,255,255,${alpha})`;
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+type PaintOverlayArgs = {
+  canvas: HTMLCanvasElement;
+  img: HTMLImageElement | null;
+  toolZoom: number;
+  selection: CropBox | null;
+  selectionLocked: boolean;
+  drawingPath: DrawingPath | null;
+  viewMode: ViewMode;
+  components: SavedComponent[];
+  stackedComponents: SavedComponent[];
+  activeSubject: ActiveSubject;
+  rootComponentId: string;
+  selectedComponentId: string | null;
+  hoveredComponentId: string | null;
+  editingComponentId: string | null;
+  selectionMatchesExistingCut: boolean;
+  selectionCrop: CropBox | null;
+  componentImageCache: Map<string, HTMLImageElement>;
+};
+
+type PaintCropsArgs = {
+  canvas: HTMLCanvasElement;
+  img: HTMLImageElement | null;
+  toolZoom: number;
+  components: SavedComponent[];
+  activeSubject: ActiveSubject;
+  rootComponentId: string;
+  editingComponentId: string | null;
+  showCropsOverlay: boolean;
+  viewMode: ViewMode;
+  overlayFill: string;
+};
+
+function prepareImageCanvas(
+  canvas: HTMLCanvasElement,
+  img: HTMLImageElement | null,
+  toolZoom: number,
+): { ctx: CanvasRenderingContext2D; cssW: number; cssH: number } | null {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const dpr = window.devicePixelRatio || 1;
+  const stageW = canvas.clientWidth;
+  const stageH = canvas.clientHeight;
+  const backingW = Math.max(1, Math.round(stageW * dpr));
+  const backingH = Math.max(1, Math.round(stageH * dpr));
+  if (canvas.width !== backingW) canvas.width = backingW;
+  if (canvas.height !== backingH) canvas.height = backingH;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, stageW, stageH);
+
+  if (!img || !img.clientWidth || !img.clientHeight) return null;
+
+  const cssW = img.clientWidth;
+  const cssH = img.clientHeight;
+  const imgRect = img.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  ctx.translate(imgRect.left - canvasRect.left, imgRect.top - canvasRect.top);
+  ctx.scale(toolZoom, toolZoom);
+  return { ctx, cssW, cssH };
+}
+
+function paintCropsCanvas(args: PaintCropsArgs) {
+  const {
+    canvas,
+    img,
+    toolZoom,
+    components,
+    activeSubject,
+    rootComponentId,
+    editingComponentId,
+    showCropsOverlay,
+    viewMode,
+    overlayFill,
+  } = args;
+
+  const setup = prepareImageCanvas(canvas, img, toolZoom);
+  if (!setup || !img) return;
+  if (!showCropsOverlay || viewMode === "stack") return;
+
+  const { ctx } = setup;
+  ctx.fillStyle = overlayFill;
+  for (const component of components) {
+    if (component.id === rootComponentId) continue;
+    if (activeSubject.kind === "component" && component.id === activeSubject.id) continue;
+    if (component.id === editingComponentId) continue;
+    const subjectBox = componentBoxInSubject(component.box, activeSubject);
+    if (!subjectBox) continue;
+    const rect = imageClientFromSubjectBox(subjectBox, img);
+    if (!rect) continue;
+    const radius =
+      img.naturalWidth && component.box.r
+        ? (component.box.r * img.clientWidth) / img.naturalWidth
+        : 0;
+    ctx.beginPath();
+    roundedRectPath(ctx, rect.left, rect.top, rect.width, rect.height, radius);
+    ctx.fill();
+  }
+}
+
+function paintOverlayCanvas(args: PaintOverlayArgs) {
+  const {
+    canvas,
+    img,
+    toolZoom,
+    selection,
+    selectionLocked,
+    drawingPath,
+    viewMode,
+    components,
+    stackedComponents,
+    activeSubject,
+    rootComponentId,
+    selectedComponentId,
+    hoveredComponentId,
+    editingComponentId,
+    selectionMatchesExistingCut,
+    selectionCrop,
+    componentImageCache,
+  } = args;
+
+  const setup = prepareImageCanvas(canvas, img, toolZoom);
+  if (!setup || !img) return;
+  const { ctx, cssW, cssH } = setup;
+
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, toolZoom);
+  const stroke = 1 / safeZoom;
+
+  if (viewMode === "stack") {
+    ctx.imageSmoothingEnabled = toolZoom <= MIN_TOOL_ZOOM;
+    for (let i = 0; i < stackedComponents.length; i++) {
+      const component = stackedComponents[i];
+      const subjectBox = componentBoxInSubject(component.box, activeSubject);
+      if (!subjectBox) continue;
+      const rect = imageClientFromSubjectBox(subjectBox, img);
+      if (!rect) continue;
+      const cached = componentImageCache.get(component.id);
+      if (cached && cached.complete && cached.naturalWidth) {
+        ctx.drawImage(cached, rect.left, rect.top, rect.width, rect.height);
+      }
+      const highlighted =
+        selectedComponentId === component.id || hoveredComponentId === component.id;
+      if (highlighted) {
+        ctx.strokeStyle = "#4C8DFF";
+        ctx.lineWidth = stroke;
+        ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+      }
+    }
+
+    const focusedId = hoveredComponentId ?? selectedComponentId;
+    const focused = focusedId ? components.find((c) => c.id === focusedId) : null;
+    if (focused) {
+      const subjectBox = componentBoxInSubject(focused.box, activeSubject);
+      if (subjectBox) {
+        const rect = imageClientFromSubjectBox(subjectBox, img);
+        if (rect) {
+          ctx.strokeStyle = "#4C8DFF";
+          ctx.lineWidth = 1.5 * stroke;
+          ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+        }
+      }
+    }
+  }
+
+  if (viewMode !== "stack" && hoveredComponentId) {
+    const hovered = components.find((c) => c.id === hoveredComponentId);
+    if (hovered && hovered.id !== rootComponentId) {
+      const subjectBox = componentBoxInSubject(hovered.box, activeSubject);
+      if (subjectBox) {
+        const rect = imageClientFromSubjectBox(subjectBox, img);
+        if (rect) {
+          ctx.fillStyle = "rgba(255,255,255,0.04)";
+          ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
+          ctx.strokeStyle = "rgba(255,255,255,0.55)";
+          ctx.lineWidth = 1.5 * stroke;
+          ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+          drawLabelBadge(ctx, hovered.name, rect.left, rect.top - 4 * stroke, toolZoom);
+        }
+      }
+    }
+  }
+
+  if (selection) {
+    const imageBounds: CropBox = { x: 0, y: 0, w: cssW, h: cssH };
+    const visible = intersectCropBoxes(selection, imageBounds);
+    ctx.fillStyle = "rgba(0,0,0,0.42)";
+    if (!visible) {
+      ctx.fillRect(0, 0, cssW, cssH);
+    } else {
+      ctx.fillRect(0, 0, cssW, visible.y);
+      ctx.fillRect(0, visible.y, visible.x, visible.h);
+      ctx.fillRect(
+        visible.x + visible.w,
+        visible.y,
+        cssW - (visible.x + visible.w),
+        visible.h,
+      );
+      ctx.fillRect(0, visible.y + visible.h, cssW, cssH - (visible.y + visible.h));
+    }
+
+    const sw = Math.max(0, selection.w);
+    const sh = Math.max(0, selection.h);
+    ctx.beginPath();
+    roundedRectPath(ctx, selection.x, selection.y, sw, sh, selection.r ?? 0);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fill();
+    ctx.setLineDash([5 * stroke, 3 * stroke]);
+    ctx.lineWidth = stroke;
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    let badgeText: string;
+    if (!selectionCrop) {
+      badgeText = "fora da imagem";
+    } else if (selectionMatchesExistingCut && !editingComponentId) {
+      badgeText = "área já recortada";
+    } else {
+      badgeText = `${Math.round(selectionCrop.w)} × ${Math.round(selectionCrop.h)}${
+        selectionCrop.r ? ` · r ${Math.round(selectionCrop.r)}` : ""
+      }`;
+    }
+    drawSizeBadge(ctx, badgeText, selection.x + sw, selection.y + sh, toolZoom);
+
+    if (selectionLocked) {
+      const handleRadius = HANDLE_DOT_SIZE / 2 / safeZoom;
+      const radiusRadius = RADIUS_DOT_SIZE / 2 / safeZoom;
+      for (const handle of RESIZE_HANDLES) {
+        const center = resizeHandleCenter(handle, selection);
+        drawCircleHandle(
+          ctx,
+          center.x,
+          center.y,
+          handleRadius,
+          "#FFFFFF",
+          "#0A0A0B",
+          1.5 * stroke,
+        );
+      }
+      for (const handle of RADIUS_HANDLES) {
+        const center = radiusHandleCenter(handle, selection, toolZoom);
+        drawCircleHandle(
+          ctx,
+          center.x,
+          center.y,
+          radiusRadius,
+          "#4C8DFF",
+          "#0A0A0B",
+          stroke,
+        );
+      }
+    }
+  }
+
+  if (drawingPath && drawingPath.points.length > 1) {
+    ctx.strokeStyle = "#4C8DFF";
+    ctx.lineWidth = 1.5 * stroke;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(drawingPath.points[0].x, drawingPath.points[0].y);
+    for (let i = 1; i < drawingPath.points.length; i++) {
+      ctx.lineTo(drawingPath.points[i].x, drawingPath.points[i].y);
+    }
+    ctx.stroke();
+  }
 }
 
