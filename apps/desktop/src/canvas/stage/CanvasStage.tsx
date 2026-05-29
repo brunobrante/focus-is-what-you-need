@@ -233,27 +233,39 @@ export function CanvasStage({
   const stageHeight = canvasSize.height;
   const projectedStageWidth = stageWidth * renderScale;
   const projectedStageHeight = stageHeight * renderScale;
-  const stageSpaceStyle: CSSProperties = scaledDomProjection
-    ? {
-        width: projectedStageWidth,
-        height: projectedStageHeight,
-        left: viewportTransform.offsetX,
-        top: viewportTransform.offsetY,
-        transform: "none",
-        transformOrigin: "0 0",
-        backfaceVisibility: "visible",
-        imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
-        "--zoom": displayZoom,
-      } as CSSProperties
-    : {
-        width: stageWidth,
-        height: stageHeight,
-        transform: viewportTransform.cssTransform,
-        transformOrigin: "0 0",
-        backfaceVisibility: "hidden",
-        imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
-        "--zoom": displayZoom,
-      } as CSSProperties;
+  const stageSpaceStyle = useMemo<CSSProperties>(
+    () =>
+      scaledDomProjection
+        ? ({
+            width: projectedStageWidth,
+            height: projectedStageHeight,
+            left: viewportTransform.offsetX,
+            top: viewportTransform.offsetY,
+            transform: "none",
+            transformOrigin: "0 0",
+            backfaceVisibility: "visible",
+            imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
+            "--zoom": displayZoom,
+          } as CSSProperties)
+        : ({
+            width: stageWidth,
+            height: stageHeight,
+            transform: viewportTransform.cssTransform,
+            transformOrigin: "0 0",
+            backfaceVisibility: "hidden",
+            imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
+            "--zoom": displayZoom,
+          } as CSSProperties),
+    [
+      scaledDomProjection,
+      projectedStageWidth,
+      projectedStageHeight,
+      stageWidth,
+      stageHeight,
+      viewportTransform,
+      displayZoom,
+    ],
+  );
 
   return (
     <div

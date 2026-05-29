@@ -195,7 +195,7 @@ export function useCanvasPointerEvents({
       const next = insertElement(state.document, node);
       interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, beforeDocument: state.document, lastDocument: next, moved: false };
       setInteractionActive(true);
-      dispatch({ type: "setDocumentTransient", document: next });
+      dispatch({ type: "setDocumentTransient", document: next, changedIds: [node.id] });
       viewport.setPointerCapture(event.pointerId);
       return;
     }

@@ -20,7 +20,7 @@ import {
   roundPixel,
   snapAngle,
 } from "@/canvas/engine/geometry";
-import { snapRect } from "@/canvas/engine/snapping";
+import { buildSnapCandidates, snapRectWithCandidates } from "@/canvas/engine/snapping";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
 import type {
@@ -55,13 +55,16 @@ export function computeDragMoveFromWorldDelta(
     x: interaction.startBox.x + deltaX,
     y: interaction.startBox.y + deltaY,
   };
-  const snapped = snapRect(
-    nextBox,
-    interaction.beforeDocument,
-    interaction.transformIds,
-    interaction.parentBounds,
-    interaction.commonParentId,
-  );
+  // Snap targets are static for the whole drag; build them once and reuse.
+  const candidates =
+    interaction.snapCandidates ??
+    (interaction.snapCandidates = buildSnapCandidates(
+      interaction.beforeDocument,
+      interaction.transformIds,
+      interaction.parentBounds,
+      interaction.commonParentId,
+    ));
+  const snapped = snapRectWithCandidates(nextBox, candidates, interaction.parentBounds);
   nextBox = clampRectToBounds(snapped.rect, interaction.parentBounds);
   return {
     delta: {
@@ -150,10 +153,16 @@ export function commitDragMove(
     if (!source || !sourceRect) continue;
     const node = mutateElementShallow(next, id);
     if (!node) continue;
-    // Use interaction.parentBounds so draft mode (DRAFT_BOUNDS) is respected
-    const parentBounds = source.parentId
-      ? getParentBounds(interaction.beforeDocument, id)
-      : interaction.parentBounds;
+    // Use interaction.parentBounds so draft mode (DRAFT_BOUNDS) is respected.
+    // Per-id parent bounds depend only on beforeDocument (constant for the drag),
+    // so cache them to avoid an ancestor walk per element per frame.
+    let parentBounds: Rect;
+    if (source.parentId) {
+      const cache = (interaction.parentBoundsById ??= {});
+      parentBounds = cache[id] ?? (cache[id] = getParentBounds(interaction.beforeDocument, id));
+    } else {
+      parentBounds = interaction.parentBounds;
+    }
     const clampedRect = clampRotatedRectToBounds(
       { ...sourceRect, x: sourceRect.x + delta.x, y: sourceRect.y + delta.y },
       source.rotation,

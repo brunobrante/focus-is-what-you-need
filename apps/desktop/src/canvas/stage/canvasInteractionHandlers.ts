@@ -79,7 +79,7 @@ export function handleDrawMove(
   if (!next.rootIds.includes(interaction.elementId)) next.rootIds.push(interaction.elementId);
   interaction.lastDocument = next;
   latestDocumentRef.current = next;
-  dispatch({ type: "setDocumentTransient", document: next });
+  dispatch({ type: "setDocumentTransient", document: next, changedIds: [interaction.elementId] });
 }
 
 export function handleMarqueeMove(
@@ -157,7 +157,9 @@ export function handleCanvasResizeMove(
   const result = resizeCanvasDocument(interaction, event);
   interaction.lastDocument = result.document;
   latestDocumentRef.current = result.document;
-  dispatch({ type: "setDocumentTransient", document: result.document });
+  // Canvas resize only mutates canvas dimensions, not any element — empty
+  // changedIds keeps the scene render set empty so no element re-renders.
+  dispatch({ type: "setDocumentTransient", document: result.document, changedIds: [] });
   dispatch({ type: "setViewport", zoom: result.viewport.zoom, offsetX: result.viewport.offsetX, offsetY: result.viewport.offsetY });
 }
 
@@ -171,7 +173,9 @@ export function handleCanvasRotateMove(
   const next = rotateCanvasDocument(interaction, point, event);
   interaction.lastDocument = next;
   latestDocumentRef.current = next;
-  dispatch({ type: "setDocumentTransient", document: next });
+  // Canvas rotation only mutates canvas.rotation (applied at the stage transform),
+  // not any element — empty changedIds avoids re-rendering the whole scene.
+  dispatch({ type: "setDocumentTransient", document: next, changedIds: [] });
 }
 
 export function handleTransformMove(

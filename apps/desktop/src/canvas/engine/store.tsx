@@ -257,7 +257,12 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     ) {
       return state;
     }
-    const selectedIds = sanitizeSelection(action.document, state.selectedIds);
+    // Preserve the prior array reference when the sanitized selection is
+    // unchanged — `sanitizeSelection` always returns a fresh array, and a new
+    // reference each ~60Hz transient frame defeats referential-equality memo
+    // in every selection-keyed consumer.
+    const sanitized = sanitizeSelection(action.document, state.selectedIds);
+    const selectedIds = idsEqual(state.selectedIds, sanitized) ? state.selectedIds : sanitized;
     return {
       ...state,
       document: action.document,
@@ -387,6 +392,12 @@ export function EditorProvider({
   }, [hoverStore, persistStorage, storageKey]);
 
   useEffect(() => {
+    // Transient (in-flight drag/resize/draw) frames push a new document ref ~60Hz,
+    // but the persisted/published result only matters once the interaction settles.
+    // Skipping them avoids per-frame timer churn and onDocumentChange calls; the
+    // following commit (transientChangedIds === null) delivers the final document.
+    if (state.transientChangedIds != null) return;
+
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -407,7 +418,7 @@ export function EditorProvider({
       cancelled = true;
       if (timeout) clearTimeout(timeout);
     };
-  }, [onDocumentChange, persistStorage, state.document, storageKey]);
+  }, [onDocumentChange, persistStorage, state.document, state.transientChangedIds, storageKey]);
 
   const value = useMemo(() => ({ state, dispatch, hoverStore }), [hoverStore, state]);
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;

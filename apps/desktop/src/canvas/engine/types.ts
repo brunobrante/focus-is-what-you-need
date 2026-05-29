@@ -149,6 +149,14 @@ export type ViewportClientRect = {
   height: number;
 };
 
+// ─── Snapping ─────────────────────────────────────────────────────────────────
+
+export type SnapCandidate = { value: number; from: number; to: number };
+export type SnapCandidateSet = {
+  vertical: SnapCandidate[];
+  horizontal: SnapCandidate[];
+};
+
 // ─── Interaction types ────────────────────────────────────────────────────────
 
 export type BaseInteraction = {
@@ -172,6 +180,11 @@ export type DragInteraction = BaseInteraction & {
   currentDelta: Point;
   startScreenPoint: Point;
   startWorldToScreenMatrix: ViewportMatrix;
+  // Lazily-populated per-drag caches. Sibling snap targets and parent bounds are
+  // constant for the lifetime of a drag (only the dragged box moves), so they are
+  // computed once on the first move frame and reused, instead of every ~60Hz frame.
+  snapCandidates?: SnapCandidateSet;
+  parentBoundsById?: Record<string, Rect>;
 };
 
 export type ResizeInteraction = BaseInteraction & {

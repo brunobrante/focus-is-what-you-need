@@ -69,11 +69,14 @@ export function useViewportControls({
     if (viewportChanged(next, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
       dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
     }
+    // `state.document` is intentionally omitted: this effect only reads the canvas
+    // size (already tracked via canvas.width/height) and the viewport fields below.
+    // Keeping the full document ref here re-ran the effect every ~60Hz transient
+    // frame just to early-return on the subjectKey guard.
   }, [
     dispatch,
     draftMode,
     state.canvasStageActive,
-    state.document,
     state.document.canvas.height,
     state.document.canvas.width,
     state.offsetX,

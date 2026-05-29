@@ -22,6 +22,7 @@ import type { CanvasDocument } from "@/canvas/engine/types";
 import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
 import {
   countNodes,
+  documentTreeShapeEqual,
   initiallyOpen,
   structureKey,
   treeFromCanvasDocument,
@@ -102,7 +103,10 @@ export function Tree({
   projectTree,
   parentNode,
 }: Props) {
-  const bridgeDocument = useEditorBridge((value) => value?.state.document ?? null);
+  const bridgeDocument = useEditorBridge(
+    (value) => value?.state.document ?? null,
+    documentTreeShapeEqual,
+  );
   const document = documentProp !== undefined ? documentProp : bridgeDocument;
   const tree = useMemo(() => {
     if (document) return treeFromCanvasDocument(document, componentName || screenName || "Canvas");

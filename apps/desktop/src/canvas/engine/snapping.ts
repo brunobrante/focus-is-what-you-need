@@ -1,4 +1,4 @@
-import type { CanvasDocument, Rect, SnapGuide } from "./types";
+import type { CanvasDocument, Rect, SnapCandidate, SnapCandidateSet, SnapGuide } from "./types";
 import {
   getAbsoluteRect,
   getDescendantIds,
@@ -11,11 +11,7 @@ import {
 
 const SNAP_DISTANCE = 6;
 
-type Candidate = {
-  value: number;
-  from: number;
-  to: number;
-};
+type Candidate = SnapCandidate;
 
 function buildIgnoreSet(document: CanvasDocument, ids: string[]): Set<string> {
   const ignore = new Set(ids);
@@ -50,20 +46,26 @@ function findBestSnap(
   return best ? { delta: best.delta, guide: best.guide } : null;
 }
 
-export function snapRect(
-  rect: Rect,
+/**
+ * Builds the snap target set (window/parent bounds + sibling edges/centers) for a
+ * drag. These targets depend only on the *static* part of the interaction —
+ * `document`, the ignored (moving) ids, the bounds, and the parent — so for a
+ * continuous drag this can be computed once and reused across frames via
+ * {@link snapRectWithCandidates}, instead of rebuilt every ~60Hz move.
+ */
+export function buildSnapCandidates(
   document: CanvasDocument,
   ignoreIds: string[],
   bounds: Rect,
   parentId: string | null | undefined
-): { rect: Rect; guides: SnapGuide[] } {
+): SnapCandidateSet {
   const ignore = buildIgnoreSet(document, ignoreIds);
-  const verticalCandidates: Candidate[] = [
+  const vertical: Candidate[] = [
     { value: bounds.x, from: bounds.y, to: rectBottom(bounds) },
     { value: rectCenterX(bounds), from: bounds.y, to: rectBottom(bounds) },
     { value: rectRight(bounds), from: bounds.y, to: rectBottom(bounds) }
   ];
-  const horizontalCandidates: Candidate[] = [
+  const horizontal: Candidate[] = [
     { value: bounds.y, from: bounds.x, to: rectRight(bounds) },
     { value: rectCenterY(bounds), from: bounds.x, to: rectRight(bounds) },
     { value: rectBottom(bounds), from: bounds.x, to: rectRight(bounds) }
@@ -88,17 +90,42 @@ export function snapRect(
     if (!candidateRect) {
       continue;
     }
-    verticalCandidates.push(
+    vertical.push(
       { value: candidateRect.x, from: candidateRect.y, to: rectBottom(candidateRect) },
       { value: rectCenterX(candidateRect), from: candidateRect.y, to: rectBottom(candidateRect) },
       { value: rectRight(candidateRect), from: candidateRect.y, to: rectBottom(candidateRect) }
     );
-    horizontalCandidates.push(
+    horizontal.push(
       { value: candidateRect.y, from: candidateRect.x, to: rectRight(candidateRect) },
       { value: rectCenterY(candidateRect), from: candidateRect.x, to: rectRight(candidateRect) },
       { value: rectBottom(candidateRect), from: candidateRect.x, to: rectRight(candidateRect) }
     );
   }
+
+  return { vertical, horizontal };
+}
+
+export function snapRect(
+  rect: Rect,
+  document: CanvasDocument,
+  ignoreIds: string[],
+  bounds: Rect,
+  parentId: string | null | undefined
+): { rect: Rect; guides: SnapGuide[] } {
+  return snapRectWithCandidates(
+    rect,
+    buildSnapCandidates(document, ignoreIds, bounds, parentId),
+    bounds
+  );
+}
+
+export function snapRectWithCandidates(
+  rect: Rect,
+  candidates: SnapCandidateSet,
+  bounds: Rect
+): { rect: Rect; guides: SnapGuide[] } {
+  const verticalCandidates = candidates.vertical;
+  const horizontalCandidates = candidates.horizontal;
 
   const verticalSnap = findBestSnap(
     [

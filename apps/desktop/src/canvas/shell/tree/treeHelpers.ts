@@ -1,5 +1,51 @@
-import type { ElementNode, ElementType } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
 import type { Node, NodeType } from "./treeTypes";
+
+function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
+/**
+ * Equality over the *tree-relevant* shape of a document — root order plus each
+ * element's id, type, name, visibility, lock state, and child order. Deliberately
+ * ignores geometry (x/y/w/h/rotation), styles, and text content, none of which the
+ * layers tree renders.
+ *
+ * Used as the `isEqual` for the Tree's bridge subscription so the panel keeps a
+ * stable document reference (and skips rebuilding the tree + re-rendering every row)
+ * across the ~60Hz transient document updates produced by a drag/resize/rotate.
+ */
+export function documentTreeShapeEqual(
+  a: CanvasDocument | null,
+  b: CanvasDocument | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (!stringArraysEqual(a.rootIds, b.rootIds)) return false;
+
+  const aIds = Object.keys(a.elements);
+  if (aIds.length !== Object.keys(b.elements).length) return false;
+  for (const id of aIds) {
+    const ea = a.elements[id];
+    const eb = b.elements[id];
+    if (!eb) return false;
+    if (
+      ea.name !== eb.name ||
+      ea.type !== eb.type ||
+      ea.visible !== eb.visible ||
+      ea.locked !== eb.locked ||
+      !stringArraysEqual(ea.children, eb.children)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export function initiallyOpen(node: Node, depth = 0, set: Set<string> = new Set()): Set<string> {
   if (depth <= 1 && (node.type === "frame" || node.type === "component")) {
