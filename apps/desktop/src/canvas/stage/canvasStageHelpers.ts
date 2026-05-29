@@ -38,6 +38,23 @@ function addElementAncestors(
   }
 }
 
+/**
+ * Build the render set from an explicit list of changed ids (reported by a hot
+ * interaction path) plus their ancestors — the same contract
+ * {@link getAffectedElementRenderIds} produces from a deep diff. Ancestors are
+ * required so the change propagates down through memoized parents; descendants are
+ * intentionally excluded (they move with their parent via nested layout and don't
+ * re-render).
+ */
+export function expandRenderIds(
+  document: CanvasDocument,
+  changedIds: readonly string[],
+): ReadonlySet<string> {
+  const affectedIds = new Set<string>(changedIds);
+  for (const id of changedIds) addElementAncestors(document, id, affectedIds);
+  return affectedIds;
+}
+
 export function getAffectedElementRenderIds(
   previousDocument: CanvasDocument | null,
   nextDocument: CanvasDocument,

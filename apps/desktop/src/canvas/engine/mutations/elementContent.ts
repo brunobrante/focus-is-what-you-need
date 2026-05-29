@@ -1,4 +1,5 @@
 import type { CanvasDocument } from "../types";
+import { mutateElementShallow, shallowCloneDocument } from "./coreUtils";
 
 export function cloneDocument(document: CanvasDocument): CanvasDocument {
   if (typeof structuredClone === "function") return structuredClone(document);
@@ -8,6 +9,25 @@ export function cloneDocument(document: CanvasDocument): CanvasDocument {
 export function updateElementText(document: CanvasDocument, id: string, content: string): CanvasDocument {
   const next = cloneDocument(document);
   const node = next.elements[id];
+  if (!node) return document;
+  node.content = content;
+  return next;
+}
+
+/**
+ * Hot-path variant of {@link updateElementText} for per-keystroke text edits.
+ * `content` is a scalar on the node, so a shallow document clone plus a shallow
+ * clone of just the edited node is sufficient — O(1) per keystroke instead of a
+ * full `structuredClone` of the whole scene. Commit still uses the deep
+ * `updateElementText` (see useTextEditingSession.commitTextEditing).
+ */
+export function updateElementTextShallow(
+  document: CanvasDocument,
+  id: string,
+  content: string,
+): CanvasDocument {
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node) return document;
   node.content = content;
   return next;

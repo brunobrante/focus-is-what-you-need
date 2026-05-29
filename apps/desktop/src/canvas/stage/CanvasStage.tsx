@@ -23,6 +23,7 @@ import { useViewportControls } from "./hooks/useViewportControls";
 import { useCanvasPointerEvents } from "./hooks/useCanvasPointerEvents";
 import { buildViewportTransform } from "./canvasCoordinates";
 import {
+  expandRenderIds,
   getAffectedElementRenderIds,
   isCanvasAlignmentDebugEnabled,
 } from "./canvasStageHelpers";
@@ -197,8 +198,11 @@ export function CanvasStage({
   });
 
   const affectedElementIds = useMemo(
-    () => getAffectedElementRenderIds(previousRenderDocumentRef.current, state.document),
-    [state.document],
+    () =>
+      state.transientChangedIds
+        ? expandRenderIds(state.document, state.transientChangedIds)
+        : getAffectedElementRenderIds(previousRenderDocumentRef.current, state.document),
+    [state.document, state.transientChangedIds],
   );
 
   const isDrawTool = state.tool !== "select";

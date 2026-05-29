@@ -51,7 +51,7 @@ function isWrapOpportunity(char: string): boolean {
   return char === " " || char === "\t";
 }
 
-export function getTextLayout(node: ElementNode): TextLayout {
+function computeTextLayout(node: ElementNode): TextLayout {
   const text = node.content ?? "";
   const fontSize = node.styles.fontSize ?? 16;
   const lineHeight = fontSize * 1.12;
@@ -133,6 +133,37 @@ export function getTextLayout(node: ElementNode): TextLayout {
     contentWidth,
     lines,
   };
+}
+
+let layoutCache: { key: string; layout: TextLayout } | null = null;
+
+function layoutKey(node: ElementNode): string {
+  const s = node.styles;
+  return [
+    node.content ?? "",
+    node.width,
+    `${s.fontWeight ?? "400"} ${s.fontSize ?? 16} ${s.fontFamily ?? ""}`,
+    s.textAlign ?? "left",
+    s.padding ?? 0,
+    s.borderWidth ?? 0,
+  ].join("|");
+}
+
+/**
+ * `computeTextLayout` is O(n²) in `measureText` calls per line, and the caret /
+ * selection / hit-test helpers all call it. During editing it is repeatedly asked
+ * for the same node, so a single-slot keyed cache removes nearly all the cost: the
+ * O(n²) work then runs once per real text/size/font change instead of every frame.
+ *
+ * The key must include every field `computeTextLayout` reads — extend it if a new
+ * layout-affecting style is added.
+ */
+export function getTextLayout(node: ElementNode): TextLayout {
+  const key = layoutKey(node);
+  if (layoutCache && layoutCache.key === key) return layoutCache.layout;
+  const layout = computeTextLayout(node);
+  layoutCache = { key, layout };
+  return layout;
 }
 
 function getLineForCaret(layout: TextLayout, index: number): TextLayoutLine {

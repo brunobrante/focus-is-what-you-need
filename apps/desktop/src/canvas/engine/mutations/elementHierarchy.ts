@@ -32,22 +32,30 @@ function clampNodeToParentBounds(document: CanvasDocument, id: string): void {
   node.y = roundPixel(clamped.y - parentBounds.y);
 }
 
-export function constrainElement(document: CanvasDocument, id: string): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
-  if (!node) return document;
-  const parentSize = getParentSize(next, id);
+// Mutates `document.elements[id]` in place. The caller is responsible for owning
+// `document` (e.g. via a single top-level `cloneDocument`) so this never leaks into
+// a shared document.
+function constrainElementInPlace(document: CanvasDocument, id: string): void {
+  const node = document.elements[id];
+  if (!node) return;
+  const parentSize = getParentSize(document, id);
   node.rotation = roundAngle(normalizeAngle(node.rotation ?? 0));
   node.width = Math.min(Math.max(node.width, MIN_ELEMENT_SIZE), parentSize.width);
   node.height = Math.min(Math.max(node.height, MIN_ELEMENT_SIZE), parentSize.height);
   node.x = roundPixel(Math.max(0, Math.min(node.x, parentSize.width - node.width)));
   node.y = roundPixel(Math.max(0, Math.min(node.y, parentSize.height - node.height)));
-  clampNodeToParentBounds(next, id);
+  clampNodeToParentBounds(document, id);
+}
+
+export function constrainElement(document: CanvasDocument, id: string): CanvasDocument {
+  if (!document.elements[id]) return document;
+  const next = cloneDocument(document);
+  constrainElementInPlace(next, id);
   return next;
 }
 
 export function constrainAll(document: CanvasDocument): CanvasDocument {
-  let next = cloneDocument(document);
+  const next = cloneDocument(document);
   if (!next.shellBackground || (next.shellBackground === "#e9edf3" && !next.shellPattern)) {
     next.shellBackground = DEFAULT_SHELL_BACKGROUND;
   }
@@ -55,8 +63,11 @@ export function constrainAll(document: CanvasDocument): CanvasDocument {
   for (const node of Object.values(next.elements)) {
     if ((node.type as string) === "container") node.type = "rect";
   }
+  // Clone once, then clamp every node in place. Parents are only clamped within
+  // their own parent (never resized), so clamping children after parents matches
+  // the previous per-call behavior.
   for (const id of Object.keys(next.elements)) {
-    next = constrainElement(next, id);
+    constrainElementInPlace(next, id);
   }
   return next;
 }
@@ -67,7 +78,8 @@ export function insertElement(document: CanvasDocument, node: ElementNode): Canv
   next.elements[node.id] = node;
   if (parentId) next.elements[parentId].children.push(node.id);
   else next.rootIds.push(node.id);
-  return constrainElement(next, node.id);
+  constrainElementInPlace(next, node.id);
+  return next;
 }
 
 export function reparentElements(
@@ -163,8 +175,12 @@ export function duplicateElements(
   const cloneTree = (sourceId: string, parentId: string | null, isTopLevel: boolean): string => {
     const source = document.elements[sourceId];
     const newId = createId(source.type);
+    // `styles` is the only nested mutable object a node owns; `children` is
+    // rebuilt by the recursion below. So this spread is a complete deep copy of a
+    // node — no per-node document clone needed.
     const clone: ElementNode = {
-      ...cloneDocument({ canvas: document.canvas, rootIds: [], elements: { [sourceId]: source } }).elements[sourceId],
+      ...source,
+      styles: { ...source.styles },
       id: newId, parentId, children: [],
       name: isTopLevel ? `${source.name} copy` : source.name,
       x: source.x + (isTopLevel ? 24 : 0),
@@ -185,7 +201,6 @@ export function duplicateElements(
     const list = source.parentId ? next.elements[source.parentId].children : next.rootIds;
     const sourceIndex = list.indexOf(sourceId);
     list.splice(sourceIndex >= 0 ? sourceIndex + 1 : list.length, 0, newId);
-    constrainElement(next, newId);
   }
 
   return { document: next, selectedIds };

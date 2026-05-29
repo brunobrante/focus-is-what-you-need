@@ -140,7 +140,12 @@ export function handleDragMove(
   interaction.lastGuides = move.guides;
   interaction.lastDocument = nextDocument;
   latestDocumentRef.current = nextDocument;
-  dispatch({ type: "setDocumentTransient", document: nextDocument, guides: move.guides });
+  dispatch({
+    type: "setDocumentTransient",
+    document: nextDocument,
+    guides: move.guides,
+    changedIds: interaction.transformIds,
+  });
 }
 
 export function handleCanvasResizeMove(
@@ -185,7 +190,14 @@ export function handleTransformMove(
   interaction.lastDocument = result.document;
   if ("lastGuides" in interaction) interaction.lastGuides = result.guides;
   latestDocumentRef.current = result.document;
-  dispatch({ type: "setDocumentTransient", document: result.document, guides: result.guides });
+  const changedIds =
+    interaction.type === "radius" ? [interaction.elementId] : interaction.transformIds;
+  dispatch({
+    type: "setDocumentTransient",
+    document: result.document,
+    guides: result.guides,
+    changedIds,
+  });
 }
 
 // === FINISH HELPERS ===

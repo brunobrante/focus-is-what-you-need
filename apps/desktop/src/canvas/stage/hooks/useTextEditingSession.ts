@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
-import { updateElementText } from "@/canvas/engine/actions";
+import { updateElementText, updateElementTextShallow } from "@/canvas/engine/actions";
 import type { CanvasDocument, EditorState, Point } from "@/canvas/engine/types";
 import type { Size } from "@/canvas/engine/viewport";
 import { buildViewportTransform } from "../canvasCoordinates";
@@ -70,7 +70,7 @@ export function useTextEditingSession({
       if (!current) return current;
       const start = Math.max(0, Math.min(selectionStart, value.length));
       const end = Math.max(0, Math.min(selectionEnd, value.length));
-      const nextDocument = updateElementText(latestDocumentRef.current, current.nodeId, value);
+      const nextDocument = updateElementTextShallow(latestDocumentRef.current, current.nodeId, value);
       latestDocumentRef.current = nextDocument;
       dispatch({ type: "setDocumentTransient", document: nextDocument });
       return {

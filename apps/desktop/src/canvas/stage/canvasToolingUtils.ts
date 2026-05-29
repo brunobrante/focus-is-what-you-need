@@ -46,7 +46,13 @@ export function findElementsInMarquee(document: CanvasDocument, marquee: Rect): 
       if (!node || node.visible === false) continue;
       const aabb = getElementAABB(document, id);
       if (aabb && rectsIntersect(marquee, aabb)) {
+        // Selecting a node implies its whole subtree moves with it, so we stop
+        // here: never return a parent together with its descendants, and skip
+        // descending into matched subtrees. A child that overflows a parent that
+        // did NOT match is still reachable, because we only recurse when the
+        // parent itself didn't intersect.
         result.push(id);
+        continue;
       }
       if (node.children.length > 0) walk(node.children);
     }

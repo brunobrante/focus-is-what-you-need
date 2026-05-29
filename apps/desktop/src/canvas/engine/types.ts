@@ -114,6 +114,11 @@ export type EditorState = {
   exportOpen: boolean;
   past: CanvasDocument[];
   future: CanvasDocument[];
+  // Set only by the transient action that carried it (drag/resize/rotate/radius
+  // frames report exactly which ids they touched). When present, the stage uses
+  // it instead of the per-frame deep diff; otherwise it falls back to the diff.
+  // Cleared on the next non-transient action.
+  transientChangedIds?: readonly string[] | null;
 };
 
 // ─── Text editing types ───────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ export type EditorAction =
   | { type: "setGuides"; guides: SnapGuide[] }
   | { type: "setExportOpen"; exportOpen: boolean }
   | { type: "hydrateDocument"; document: CanvasDocument }
-  | { type: "setDocumentTransient"; document: CanvasDocument; guides?: SnapGuide[] }
+  | { type: "setDocumentTransient"; document: CanvasDocument; guides?: SnapGuide[]; changedIds?: readonly string[] }
   | {
       type: "commitDocument";
       document: CanvasDocument;
@@ -142,7 +142,8 @@ function createInitialState(
     guides: [],
     exportOpen: false,
     past: [],
-    future: []
+    future: [],
+    transientChangedIds: null,
   };
 }
 
@@ -263,6 +264,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       selectedIds,
       isolatedParentId: sanitizeIsolatedParent(action.document, state.isolatedParentId, selectedIds),
       guides: action.guides ?? state.guides,
+      transientChangedIds: action.changedIds ?? null,
     };
   },
   commitDocument(state, action) {
@@ -331,7 +333,14 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
 
 function reducer(state: EditorState, action: EditorAction): EditorState {
   const handler = handlers[action.type] as Handler<EditorAction> | undefined;
-  return handler ? handler(state, action) : state;
+  const next = handler ? handler(state, action) : state;
+  // `transientChangedIds` is valid only for the `setDocumentTransient` that set it.
+  // Any other action (including a discrete commit/undo) must drop it so the stage
+  // falls back to the full diff and can never miss a re-render.
+  if (action.type !== "setDocumentTransient" && next !== state && next.transientChangedIds != null) {
+    return { ...next, transientChangedIds: null };
+  }
+  return next;
 }
 
 export function EditorProvider({
