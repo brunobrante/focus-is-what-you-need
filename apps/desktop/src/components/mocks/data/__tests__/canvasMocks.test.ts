@@ -10,7 +10,7 @@ import {
 import {
   canvasDocumentFromHtmlGraphJSON,
   htmlGraphJSONFromCanvasDocument,
-} from "@/lib/editor/htmlSceneAdapter";
+} from "@/canvas/engine/htmlSceneAdapter";
 import { htmlCanvasDocumentFromJSON, getHtmlCanvasChildren } from "@/lib/canvas/htmlScene";
 
 test("canvas mock dataset exposes seeded screen scenes per project type", async () => {

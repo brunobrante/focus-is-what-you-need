@@ -1,5 +1,5 @@
 import type { ComponentVariant, ProjectType, ScreenVariant } from "@/lib/data/types";
-import { getInitialZoomForSubjectSize, type Size } from "@/lib/editor/viewport";
+import { getInitialZoomForSubjectSize, type Size } from "@/canvas/engine/viewport";
 import { useScene, useThumbnail } from "@/lib/storage/hooks";
 import { graphJSONHasSnapshotContent } from "@/lib/storage/sceneSnapshots";
 import type { SceneOwnerType } from "@/lib/storage/schema";

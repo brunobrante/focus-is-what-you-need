@@ -5,7 +5,7 @@ import { NewProject } from "@/routes/NewProject";
 import { Gallery } from "@/routes/Gallery";
 import { Components as ComponentsRoute } from "@/routes/Components";
 import { ComponentDetail } from "@/routes/ComponentDetail";
-import { CanvasPage } from "@/routes/Canvas";
+import { CanvasPage } from "@/canvas/Canvas";
 import { References } from "@/routes/References";
 import { Tools } from "@/routes/Tools";
 import { ensureLocalProjectsLoaded, startLocalFigxAutosave } from "@/lib/storage/localProjects";

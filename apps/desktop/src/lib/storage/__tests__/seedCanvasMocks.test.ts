@@ -4,7 +4,7 @@ import {
   getCanvasMockBundleForScreen,
   getCanvasMockDataset,
 } from "@/components/mocks/data/canvasMocks";
-import { canvasDocumentFromHtmlGraphJSON } from "@/lib/editor/htmlSceneAdapter";
+import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { createDefaultDesignSystem } from "@/lib/storage/defaults";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, getTable, setTable, store } from "@/lib/storage/store";
