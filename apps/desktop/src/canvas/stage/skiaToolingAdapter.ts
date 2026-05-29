@@ -218,8 +218,20 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.disposeSurface();
     this.paintPool?.dispose();
     this.paintPool = null;
+    // Remove listeners before losing the context so handleContextLost does not
+    // fire re-entrantly during the loseContext() call below.
     this.canvas?.removeEventListener("webglcontextlost", this.handleContextLost);
     this.canvas?.removeEventListener("webglcontextrestored", this.handleContextRestored);
+    // Proactively free the WebGL context slot so the browser can reallocate it
+    // immediately rather than waiting for GC after the canvas leaves the DOM.
+    if (this.canvas) {
+      try {
+        const gl = this.canvas.getContext("webgl2");
+        gl?.getExtension("WEBGL_lose_context")?.loseContext();
+      } catch {
+        // Ignore — context may already be lost or WebGL unavailable.
+      }
+    }
     detachCanvas(this.canvas);
     this.canvas = null;
     this.canvasKit = null;
@@ -261,6 +273,27 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
   private createSurface(): Surface | null {
     if (!this.canvasKit || !this.canvas) return null;
+
+    // Pre-request the WebGL context with optimal flags. The browser returns the
+    // same context object on repeated getContext calls for a given canvas, so
+    // CanvasKit's MakeWebGLCanvasSurface will inherit these attributes.
+    // - depth:false    — Skia does not need a depth buffer
+    // - stencil:true   — Skia uses stencil for clipping
+    // - desynchronized:true — lower-latency present path where supported
+    // - powerPreference — prefer discrete GPU on multi-GPU machines
+    // - preserveDrawingBuffer omitted (defaults to false) — avoids extra copy
+    try {
+      this.canvas.getContext("webgl2", {
+        alpha: true,
+        antialias: false,
+        depth: false,
+        stencil: true,
+        desynchronized: true,
+        powerPreference: "high-performance",
+      });
+    } catch {
+      // Ignore — MakeWebGLCanvasSurface will still attempt its own getContext.
+    }
 
     try {
       const surface = this.canvasKit.MakeWebGLCanvasSurface(this.canvas, undefined, {
