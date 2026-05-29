@@ -7,7 +7,7 @@ import { Components as ComponentsRoute } from "@/routes/Components";
 import { ComponentDetail } from "@/routes/ComponentDetail";
 import { CanvasPage } from "@/canvas/Canvas";
 import { References } from "@/routes/References";
-import { Tools } from "@/routes/Tools";
+import { Generate } from "@/generate/Generate";
 import { ensureLocalProjectsLoaded, startLocalFigxAutosave } from "@/lib/storage/localProjects";
 
 export default function App() {
@@ -33,8 +33,8 @@ export default function App() {
       <Route path="/project/:projectId/c/:componentId" element={<ComponentDetail />} />
       <Route path="/canvas" element={<CanvasPage />} />
       <Route path="/references" element={<References />} />
-      <Route path="/generate" element={<Tools />} />
-      <Route path="/tools" element={<Tools />} />
+      <Route path="/generate" element={<Generate />} />
+      <Route path="/tools" element={<Generate />} />
       <Route path="*" element={<Landing />} />
     </Routes>
   );
