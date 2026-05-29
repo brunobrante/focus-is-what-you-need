@@ -18,7 +18,7 @@ import { getInitialZoomForSubjectSize, MAX_ZOOM, MIN_ZOOM } from "./viewport";
 
 const STORAGE_KEY = CURRENT_CANVAS_STORAGE_KEY;
 
-type EditorAction =
+export type EditorAction =
   | { type: "setTool"; tool: Tool }
   | { type: "setZoom"; zoom: number }
   | { type: "setViewport"; zoom?: number; offsetX?: number; offsetY?: number }
@@ -146,256 +146,192 @@ function createInitialState(
   };
 }
 
-function reducer(state: EditorState, action: EditorAction): EditorState {
-  switch (action.type) {
-    case "setTool": {
-      const isolatedParentId = action.tool === "select" ? state.isolatedParentId : null;
-      if (
-        state.tool === action.tool &&
-        state.isolatedParentId === isolatedParentId &&
-        state.editingTextId === null
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        tool: action.tool,
-        isolatedParentId,
-        editingTextId: null
-      };
-    }
-    case "setZoom": {
-      const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom));
-      if (state.zoom === zoom) return state;
-      return {
-        ...state,
-        zoom
-      };
-    }
-    case "setViewport": {
-      const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom ?? state.zoom));
-      const offsetX = action.offsetX ?? state.offsetX;
-      const offsetY = action.offsetY ?? state.offsetY;
-      if (state.zoom === zoom && state.offsetX === offsetX && state.offsetY === offsetY) {
-        return state;
-      }
-      return {
-        ...state,
-        zoom,
-        offsetX,
-        offsetY
-      };
-    }
-    case "setSelected":
-      {
-        const selectedIds = sanitizeSelection(state.document, action.selectedIds);
-        const isolatedParentId = sanitizeIsolatedParent(
-          state.document,
-          state.isolatedParentId,
-          selectedIds,
-        );
-        const canvasStageActive = selectedIds.length > 0 ? false : state.canvasStageActive;
-        if (
-          idsEqual(state.selectedIds, selectedIds) &&
-          state.isolatedParentId === isolatedParentId &&
-          state.canvasStageActive === canvasStageActive &&
-          state.editingTextId === null
-        ) {
-          return state;
-        }
-        return {
-          ...state,
-          selectedIds,
-          isolatedParentId,
-          canvasStageActive,
-          editingTextId: selectedIds.includes(state.editingTextId ?? "") ? state.editingTextId : null,
-        };
-      }
-    case "setIsolatedParent": {
-      const isolatedParentId =
-        action.isolatedParentId && state.document.elements[action.isolatedParentId]?.children.length
-          ? action.isolatedParentId
-          : null;
-      const selectedIds = isolatedParentId ? [isolatedParentId] : state.selectedIds;
-      if (
-        idsEqual(state.selectedIds, selectedIds) &&
-        state.isolatedParentId === isolatedParentId &&
-        !state.canvasStageActive &&
-        state.editingTextId === null
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        selectedIds,
-        isolatedParentId,
-        canvasStageActive: false,
-        editingTextId: null
-      };
-    }
-    case "setEditingText":
-      if (state.editingTextId === action.editingTextId) return state;
-      return {
-        ...state,
-        editingTextId: action.editingTextId
-      };
-    case "setCanvasStageActive": {
-      const selectedIds = action.active ? [] : state.selectedIds;
-      const isolatedParentId = action.active ? null : state.isolatedParentId;
-      if (
-        state.canvasStageActive === action.active &&
-        idsEqual(state.selectedIds, selectedIds) &&
-        state.isolatedParentId === isolatedParentId &&
-        state.editingTextId === null
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        canvasStageActive: action.active,
-        selectedIds,
-        isolatedParentId,
-        editingTextId: null
-      };
-    }
-    case "setGuides":
-      if (guidesEqual(state.guides, action.guides)) return state;
-      return {
-        ...state,
-        guides: action.guides
-      };
-    case "setExportOpen":
-      if (state.exportOpen === action.exportOpen) return state;
-      return {
-        ...state,
-        exportOpen: action.exportOpen
-      };
-    case "hydrateDocument":
-      return {
-        ...state,
-        document: constrainAll(action.document),
-        selectedIds: [],
-        isolatedParentId: null,
-        editingTextId: null,
-        canvasStageActive: false,
-        zoom: getInitialZoomForSubjectSize(action.document.canvas),
-        offsetX: 0,
-        offsetY: 0,
-        guides: [],
-        past: [],
-        future: [],
-      };
-    case "setDocumentTransient":
-      if (
-        state.document === action.document &&
-        (action.guides === undefined || guidesEqual(state.guides, action.guides))
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        document: action.document,
-        selectedIds: sanitizeSelection(action.document, state.selectedIds),
-        isolatedParentId: sanitizeIsolatedParent(
-          action.document,
-          state.isolatedParentId,
-          sanitizeSelection(action.document, state.selectedIds),
-        ),
-        guides: action.guides ?? state.guides
-      };
-    case "commitDocument": {
-      const beforeDocument = action.beforeDocument ?? state.document;
-      const selectedIds = sanitizeSelection(action.document, action.selectedIds ?? state.selectedIds);
-      const isolatedParentId = sanitizeIsolatedParent(
-        action.document,
-        state.isolatedParentId,
-        selectedIds,
-      );
+type Handler<A extends EditorAction> = (state: EditorState, action: A) => EditorState;
 
-      if (documentsEqual(beforeDocument, action.document)) {
-        return {
-          ...state,
-          document: action.document,
-          selectedIds,
-          isolatedParentId,
-          guides: []
-        };
-      }
-
-      return {
-        ...state,
-        document: action.document,
-        selectedIds,
-        isolatedParentId,
-        editingTextId: null,
-        guides: [],
-        past: limitHistory([...state.past, beforeDocument]),
-        future: []
-      };
-    }
-    case "undo": {
-      const previous = state.past[state.past.length - 1];
-      if (!previous) {
-        return state;
-      }
-      return {
-        ...state,
-        document: previous,
-        selectedIds: sanitizeSelection(previous, state.selectedIds),
-        isolatedParentId: sanitizeIsolatedParent(
-          previous,
-          state.isolatedParentId,
-          sanitizeSelection(previous, state.selectedIds),
-        ),
-        editingTextId: null,
-        guides: [],
-        past: state.past.slice(0, -1),
-        future: [state.document, ...state.future]
-      };
-    }
-    case "redo": {
-      const next = state.future[0];
-      if (!next) {
-        return state;
-      }
-      return {
-        ...state,
-        document: next,
-        selectedIds: sanitizeSelection(next, state.selectedIds),
-        isolatedParentId: sanitizeIsolatedParent(
-          next,
-          state.isolatedParentId,
-          sanitizeSelection(next, state.selectedIds),
-        ),
-        editingTextId: null,
-        guides: [],
-        past: limitHistory([...state.past, state.document]),
-        future: state.future.slice(1)
-      };
-    }
-    case "cancelTextEditing": {
-      const selectedIds = sanitizeSelection(action.document, state.selectedIds);
-      if (state.document === action.document && state.editingTextId === null) return state;
-      return {
-        ...state,
-        document: action.document,
-        selectedIds,
-        isolatedParentId: sanitizeIsolatedParent(
-          action.document,
-          state.isolatedParentId,
-          selectedIds,
-        ),
-        editingTextId: null,
-      };
-    }
-    case "reset":
-      return {
-        ...createInitialState(STORAGE_KEY),
-        document: createDefaultDocument()
-      };
-    default:
+const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { type: K }>> } = {
+  setTool(state, action) {
+    const isolatedParentId = action.tool === "select" ? state.isolatedParentId : null;
+    if (
+      state.tool === action.tool &&
+      state.isolatedParentId === isolatedParentId &&
+      state.editingTextId === null
+    ) {
       return state;
-  }
+    }
+    return { ...state, tool: action.tool, isolatedParentId, editingTextId: null };
+  },
+  setZoom(state, action) {
+    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom));
+    if (state.zoom === zoom) return state;
+    return { ...state, zoom };
+  },
+  setViewport(state, action) {
+    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom ?? state.zoom));
+    const offsetX = action.offsetX ?? state.offsetX;
+    const offsetY = action.offsetY ?? state.offsetY;
+    if (state.zoom === zoom && state.offsetX === offsetX && state.offsetY === offsetY) return state;
+    return { ...state, zoom, offsetX, offsetY };
+  },
+  setSelected(state, action) {
+    const selectedIds = sanitizeSelection(state.document, action.selectedIds);
+    const isolatedParentId = sanitizeIsolatedParent(state.document, state.isolatedParentId, selectedIds);
+    const canvasStageActive = selectedIds.length > 0 ? false : state.canvasStageActive;
+    if (
+      idsEqual(state.selectedIds, selectedIds) &&
+      state.isolatedParentId === isolatedParentId &&
+      state.canvasStageActive === canvasStageActive &&
+      state.editingTextId === null
+    ) {
+      return state;
+    }
+    return {
+      ...state,
+      selectedIds,
+      isolatedParentId,
+      canvasStageActive,
+      editingTextId: selectedIds.includes(state.editingTextId ?? "") ? state.editingTextId : null,
+    };
+  },
+  setIsolatedParent(state, action) {
+    const isolatedParentId =
+      action.isolatedParentId && state.document.elements[action.isolatedParentId]?.children.length
+        ? action.isolatedParentId
+        : null;
+    const selectedIds = isolatedParentId ? [isolatedParentId] : state.selectedIds;
+    if (
+      idsEqual(state.selectedIds, selectedIds) &&
+      state.isolatedParentId === isolatedParentId &&
+      !state.canvasStageActive &&
+      state.editingTextId === null
+    ) {
+      return state;
+    }
+    return { ...state, selectedIds, isolatedParentId, canvasStageActive: false, editingTextId: null };
+  },
+  setEditingText(state, action) {
+    if (state.editingTextId === action.editingTextId) return state;
+    return { ...state, editingTextId: action.editingTextId };
+  },
+  setCanvasStageActive(state, action) {
+    const selectedIds = action.active ? [] : state.selectedIds;
+    const isolatedParentId = action.active ? null : state.isolatedParentId;
+    if (
+      state.canvasStageActive === action.active &&
+      idsEqual(state.selectedIds, selectedIds) &&
+      state.isolatedParentId === isolatedParentId &&
+      state.editingTextId === null
+    ) {
+      return state;
+    }
+    return { ...state, canvasStageActive: action.active, selectedIds, isolatedParentId, editingTextId: null };
+  },
+  setGuides(state, action) {
+    if (guidesEqual(state.guides, action.guides)) return state;
+    return { ...state, guides: action.guides };
+  },
+  setExportOpen(state, action) {
+    if (state.exportOpen === action.exportOpen) return state;
+    return { ...state, exportOpen: action.exportOpen };
+  },
+  hydrateDocument(state, action) {
+    return {
+      ...state,
+      document: constrainAll(action.document),
+      selectedIds: [],
+      isolatedParentId: null,
+      editingTextId: null,
+      canvasStageActive: false,
+      zoom: getInitialZoomForSubjectSize(action.document.canvas),
+      offsetX: 0,
+      offsetY: 0,
+      guides: [],
+      past: [],
+      future: [],
+    };
+  },
+  setDocumentTransient(state, action) {
+    if (
+      state.document === action.document &&
+      (action.guides === undefined || guidesEqual(state.guides, action.guides))
+    ) {
+      return state;
+    }
+    const selectedIds = sanitizeSelection(action.document, state.selectedIds);
+    return {
+      ...state,
+      document: action.document,
+      selectedIds,
+      isolatedParentId: sanitizeIsolatedParent(action.document, state.isolatedParentId, selectedIds),
+      guides: action.guides ?? state.guides,
+    };
+  },
+  commitDocument(state, action) {
+    const beforeDocument = action.beforeDocument ?? state.document;
+    const selectedIds = sanitizeSelection(action.document, action.selectedIds ?? state.selectedIds);
+    const isolatedParentId = sanitizeIsolatedParent(action.document, state.isolatedParentId, selectedIds);
+    if (documentsEqual(beforeDocument, action.document)) {
+      return { ...state, document: action.document, selectedIds, isolatedParentId, guides: [] };
+    }
+    return {
+      ...state,
+      document: action.document,
+      selectedIds,
+      isolatedParentId,
+      editingTextId: null,
+      guides: [],
+      past: limitHistory([...state.past, beforeDocument]),
+      future: [],
+    };
+  },
+  undo(state) {
+    const previous = state.past[state.past.length - 1];
+    if (!previous) return state;
+    const selectedIds = sanitizeSelection(previous, state.selectedIds);
+    return {
+      ...state,
+      document: previous,
+      selectedIds,
+      isolatedParentId: sanitizeIsolatedParent(previous, state.isolatedParentId, selectedIds),
+      editingTextId: null,
+      guides: [],
+      past: state.past.slice(0, -1),
+      future: [state.document, ...state.future],
+    };
+  },
+  redo(state) {
+    const next = state.future[0];
+    if (!next) return state;
+    const selectedIds = sanitizeSelection(next, state.selectedIds);
+    return {
+      ...state,
+      document: next,
+      selectedIds,
+      isolatedParentId: sanitizeIsolatedParent(next, state.isolatedParentId, selectedIds),
+      editingTextId: null,
+      guides: [],
+      past: limitHistory([...state.past, state.document]),
+      future: state.future.slice(1),
+    };
+  },
+  cancelTextEditing(state, action) {
+    const selectedIds = sanitizeSelection(action.document, state.selectedIds);
+    if (state.document === action.document && state.editingTextId === null) return state;
+    return {
+      ...state,
+      document: action.document,
+      selectedIds,
+      isolatedParentId: sanitizeIsolatedParent(action.document, state.isolatedParentId, selectedIds),
+      editingTextId: null,
+    };
+  },
+  reset(_state) {
+    return { ...createInitialState(STORAGE_KEY), document: createDefaultDocument() };
+  },
+};
+
+function reducer(state: EditorState, action: EditorAction): EditorState {
+  const handler = handlers[action.type] as Handler<EditorAction> | undefined;
+  return handler ? handler(state, action) : state;
 }
 
 export function EditorProvider({
