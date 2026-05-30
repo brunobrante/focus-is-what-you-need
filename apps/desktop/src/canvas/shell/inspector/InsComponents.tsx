@@ -334,37 +334,34 @@ export function InsMultiSelect({
 export function InsSwitch({
   checked,
   onChange,
-  label,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
-  label: string;
 }) {
   return (
     <button
       type="button"
-      aria-pressed={checked}
+      role="switch"
+      aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={[
-        "flex h-7 min-w-0 flex-1 cursor-pointer items-center justify-between rounded-md border px-2 transition-colors duration-[100ms]",
-        checked
-          ? "border-[#0D99FF]/50 bg-[#0D99FF]/15 text-[#F2F2F2]"
-          : "border-[#2C2C2C] bg-[#1E1E1E] text-[#9A9A9A]",
-      ].join(" ")}
+      className="relative shrink-0 cursor-pointer rounded-full border-0 p-0 transition-colors duration-[150ms]"
+      style={{
+        width: 28,
+        height: 16,
+        background: checked ? "#0D99FF" : "#383838",
+      }}
     >
-      <span className="truncate text-[11.5px] font-medium">{label}</span>
       <span
         aria-hidden
-        className={[
-          "relative h-4 w-7 shrink-0 rounded-full transition-colors duration-[100ms]",
-          checked ? "bg-[#0D99FF]" : "bg-[#383838]",
-        ].join(" ")}
-      >
-        <span
-          className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-[100ms]"
-          style={{ transform: checked ? "translateX(13px)" : "translateX(2px)" }}
-        />
-      </span>
+        className="absolute rounded-full bg-white transition-transform duration-[150ms]"
+        style={{
+          width: 12,
+          height: 12,
+          top: 2,
+          left: 0,
+          transform: checked ? "translateX(14px)" : "translateX(2px)",
+        }}
+      />
     </button>
   );
 }

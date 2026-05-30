@@ -1,9 +1,8 @@
 import { useState } from "react";
 import type { ShellGridType } from "@/canvas/engine/types";
-import { InsColor, InsMultiSelect, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
+import { InsColor, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
 
 type ShellControlVisibility = "show" | "hidden" | "hover";
-type ShellWindowOption = "draft" | "reference";
 
 const SHELL_VISIBILITY_OPTIONS: Array<{ value: ShellControlVisibility; label: string }> = [
   { value: "show", label: "Show" },
@@ -22,7 +21,8 @@ export function ShellTab({ background, shellGrid, onUpdateBackground, onUpdateGr
   const [deviceButtonVisibility, setDeviceButtonVisibility] = useState<ShellControlVisibility>("show");
   const [zoomVisibility, setZoomVisibility] = useState<ShellControlVisibility>("show");
   const [expandVisibility, setExpandVisibility] = useState<ShellControlVisibility>("hover");
-  const [enabledWindows, setEnabledWindows] = useState<ShellWindowOption[]>(["draft"]);
+  const [draftEnabled, setDraftEnabled] = useState(true);
+  const [referenceEnabled, setReferenceEnabled] = useState(false);
 
   return (
     <>
@@ -34,15 +34,11 @@ export function ShellTab({ background, shellGrid, onUpdateBackground, onUpdateGr
       </InsSection>
 
       <InsSection title="Feats">
-        <InsRow label="Janelas">
-          <InsMultiSelect
-            value={enabledWindows}
-            onChange={(value) => setEnabledWindows(value as ShellWindowOption[])}
-            options={[
-              { value: "draft", label: "Draft" },
-              { value: "reference", label: "Referência" },
-            ]}
-          />
+        <InsRow label="Draft">
+          <InsSwitch checked={draftEnabled} onChange={setDraftEnabled} />
+        </InsRow>
+        <InsRow label="Referência">
+          <InsSwitch checked={referenceEnabled} onChange={setReferenceEnabled} />
         </InsRow>
       </InsSection>
 
@@ -75,7 +71,6 @@ export function ShellTab({ background, shellGrid, onUpdateBackground, onUpdateGr
           <InsSwitch
             checked={shellGrid.enabled}
             onChange={(enabled) => onUpdateGrid({ enabled })}
-            label="Grid"
           />
         </InsRow>
         <InsRow label="Tipo">
