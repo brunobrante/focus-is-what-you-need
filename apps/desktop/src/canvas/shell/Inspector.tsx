@@ -70,7 +70,7 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
     commitDocument(updateElementStyles(document, node.id, styles));
   };
 
-  const headerTitle = canvasStageActive ? "Canvas" : node ? node.name : "Inspector";
+  const headerTitle = canvasStageActive ? "Frame" : node ? node.name : "Inspector";
   const headerMeta = canvasStageActive
     ? `${document?.canvas.width ?? 0}×${document?.canvas.height ?? 0}px`
     : node
