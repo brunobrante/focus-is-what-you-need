@@ -92,7 +92,7 @@ pub fn open_and_migrate(path: &Path) -> Result<Connection, String> {
 
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
-enum Mutation {
+pub enum Mutation {
     UpsertScene {
         owner_type: String,
         owner_id: String,
