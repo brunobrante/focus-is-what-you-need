@@ -330,6 +330,7 @@ export function CanvasStage({
         <CanvasGridOverlay
           enabled={state.document.shellGrid?.enabled ?? false}
           type={state.document.shellGrid?.type ?? "dots"}
+          background={state.document.shellBackground ?? "#000000"}
           displayZoom={displayZoom}
           offsetX={viewportTransform.offsetX}
           offsetY={viewportTransform.offsetY}
