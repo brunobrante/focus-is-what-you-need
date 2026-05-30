@@ -164,6 +164,8 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
         ) : activeTab === "canvas" ? (
           <CanvasTab
             canvas={document.canvas}
+            active={canvasStageActive}
+            onToggleActive={(active) => (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active })}
             onUpdate={commitCanvas}
           />
         ) : activeTab === "shell" ? (

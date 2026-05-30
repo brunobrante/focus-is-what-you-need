@@ -1,14 +1,15 @@
-import { useState } from "react";
 import type { CanvasProperties } from "@/canvas/engine/types";
 import { clamp, InsColor, InsInput, InsRow, InsSection, updateNumber } from "./InsComponents";
 
 type CanvasTabProps = {
   canvas: CanvasProperties;
+  active: boolean;
+  onToggleActive: (active: boolean) => void;
   onUpdate: (props: Partial<CanvasProperties>) => void;
 };
 
-export function CanvasTab({ canvas, onUpdate }: CanvasTabProps) {
-  const [editing, setEditing] = useState(false);
+export function CanvasTab({ canvas, active, onToggleActive, onUpdate }: CanvasTabProps) {
+  const editing = active;
 
   return (
     <>
@@ -52,7 +53,7 @@ export function CanvasTab({ canvas, onUpdate }: CanvasTabProps) {
       <div className="border-t border-[#2C2C2C] px-3.5 py-3">
         <button
           type="button"
-          onClick={() => setEditing((v) => !v)}
+          onClick={() => onToggleActive(!editing)}
           className="w-full cursor-pointer rounded-lg border px-3 py-2 text-[12px] font-medium transition-colors duration-[100ms]"
           style={{
             background: editing ? "rgba(13,153,255,0.12)" : "#1E1E1E",
