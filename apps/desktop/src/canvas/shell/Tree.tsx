@@ -192,11 +192,17 @@ export function Tree({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerTriggerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!pickerOpen) return;
     const handler = (e: PointerEvent) => {
-      if (!pickerRef.current?.contains(e.target as Node)) setPickerOpen(false);
+      if (
+        !pickerRef.current?.contains(e.target as Node) &&
+        !pickerTriggerRef.current?.contains(e.target as Node)
+      ) {
+        setPickerOpen(false);
+      }
     };
     window.addEventListener("pointerdown", handler, true);
     return () => window.removeEventListener("pointerdown", handler, true);
@@ -266,20 +272,22 @@ export function Tree({
 
       {activeTab === "layers" ? (
         <>
-          <CurrentSceneTreeRow
-            active={canvasActive}
-            label={headerName}
-            width={document?.canvas.width}
-            height={document?.canvas.height}
-            isScreen={isScreen}
-            projectType={projectType ?? "mobile"}
-            pickerOpen={pickerOpen}
-            onOpenPicker={(rect) => {
-              setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
-              setPickerOpen((v) => !v);
-            }}
-            onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
-          />
+          <div ref={pickerTriggerRef}>
+            <CurrentSceneTreeRow
+              active={canvasActive}
+              label={headerName}
+              width={document?.canvas.width}
+              height={document?.canvas.height}
+              isScreen={isScreen}
+              projectType={projectType ?? "mobile"}
+              pickerOpen={pickerOpen}
+              onOpenPicker={(rect) => {
+                setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+                setPickerOpen((v) => !v);
+              }}
+              onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
+            />
+          </div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
