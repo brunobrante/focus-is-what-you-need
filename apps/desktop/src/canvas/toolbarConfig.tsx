@@ -67,13 +67,12 @@ const ICONS: Record<CanvasToolId, ReactNode> = {
   line: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
       <line x1="5" y1="19" x2="19" y2="5" />
-      <path d="M14 5h5v5" />
     </svg>
   ),
   arrow: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="5" y1="12" x2="19" y2="12" />
-      <polyline points="13 6 19 12 13 18" />
+      <line x1="5" y1="19" x2="19" y2="5" />
+      <path d="M14 5h5v5" />
     </svg>
   ),
   polygon: (
@@ -88,9 +87,7 @@ const ICONS: Record<CanvasToolId, ReactNode> = {
   ),
   pen: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 20c2-1 4-2 6-5s4-8 7-11" />
-      <path d="M17 4l3 3" />
-      <circle cx="4" cy="20" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
     </svg>
   ),
   text: (
