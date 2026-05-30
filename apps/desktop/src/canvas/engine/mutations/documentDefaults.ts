@@ -1,7 +1,7 @@
 import type { CanvasDocument, CanvasProperties, ShellGridType } from "../types";
 import { cloneDocument } from "./coreUtils";
 
-export const DEFAULT_SHELL_BACKGROUND = "#000000";
+export const DEFAULT_SHELL_BACKGROUND = "#171717";
 export const DEFAULT_SHELL_GRID: { enabled: boolean; type: ShellGridType } = { enabled: false, type: "dots" };
 
 export function createBlankDocument(width: number, height: number): CanvasDocument {
