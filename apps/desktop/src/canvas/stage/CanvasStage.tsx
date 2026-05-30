@@ -209,7 +209,7 @@ export function CanvasStage({
   const shellClassName = `canvas-shell${isDrawTool ? " is-draw-tool" : ""}`;
   const shellStyle = useMemo(
     () => getShellPatternStyle(state.document),
-    [state.document.shellBackground, state.document.shellPattern],
+    [state.document.shellBackground],
   );
   const canvasSize = useMemo(
     () => getCanvasSize(state.document),

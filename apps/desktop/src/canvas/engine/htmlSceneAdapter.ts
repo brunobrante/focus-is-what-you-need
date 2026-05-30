@@ -11,7 +11,7 @@ import {
   type HtmlCanvasStyle,
   type HtmlCanvasTag,
 } from "@/lib/canvas/htmlScene";
-import { DEFAULT_SHELL_BACKGROUND, DEFAULT_SHELL_PATTERN } from "./actions";
+import { DEFAULT_SHELL_BACKGROUND } from "./actions";
 import type {
   CanvasDocument,
   ElementNode,
@@ -108,7 +108,6 @@ export function canvasDocumentFromHtmlDocument(
           : undefined,
     },
     shellBackground: DEFAULT_SHELL_BACKGROUND,
-    shellPattern: DEFAULT_SHELL_PATTERN,
     rootIds,
     elements,
   };

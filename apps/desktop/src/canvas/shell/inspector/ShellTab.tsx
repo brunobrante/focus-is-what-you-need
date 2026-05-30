@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { ShellPattern } from "@/canvas/engine/types";
 import { InsColor, InsMultiSelect, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
 
 type ShellControlVisibility = "show" | "hidden" | "hover";
@@ -13,12 +12,10 @@ const SHELL_VISIBILITY_OPTIONS: Array<{ value: ShellControlVisibility; label: st
 
 type ShellTabProps = {
   background: string;
-  pattern: ShellPattern;
   onUpdateBackground: (background: string) => void;
-  onUpdatePattern: (pattern: ShellPattern) => void;
 };
 
-export function ShellTab({ background, pattern, onUpdateBackground, onUpdatePattern }: ShellTabProps) {
+export function ShellTab({ background, onUpdateBackground }: ShellTabProps) {
   const [deviceButtonVisibility, setDeviceButtonVisibility] = useState<ShellControlVisibility>("show");
   const [zoomVisibility, setZoomVisibility] = useState<ShellControlVisibility>("show");
   const [expandVisibility, setExpandVisibility] = useState<ShellControlVisibility>("hover");
@@ -32,16 +29,7 @@ export function ShellTab({ background, pattern, onUpdateBackground, onUpdatePatt
         <InsRow label="BG">
           <InsColor value={background} onChange={onUpdateBackground} />
         </InsRow>
-        <InsRow label="Padrão">
-          <InsToggle
-            value={pattern}
-            onChange={(value) => onUpdatePattern(value as ShellPattern)}
-            options={[
-              { value: "dots", label: "Pontilhado" },
-              { value: "grid", label: "Quadrados" },
-            ]}
-          />
-        </InsRow>
+
       </InsSection>
 
       <InsSection title="Feats">

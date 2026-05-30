@@ -2,8 +2,6 @@ export type ElementType = "rect" | "ellipse" | "text" | "image";
 
 export type Tool = "select" | "rect" | "ellipse" | "text" | "image" | "wrapper";
 
-export type ShellPattern = "dots" | "grid";
-
 export type ElementStyles = {
   background?: string;
   color?: string;
@@ -57,7 +55,6 @@ export type CanvasProperties = {
 export type CanvasDocument = {
   canvas: CanvasProperties;
   shellBackground?: string;
-  shellPattern?: ShellPattern;
   rootIds: string[];
   elements: Record<string, ElementNode>;
 };

@@ -1,14 +1,12 @@
-import type { CanvasDocument, CanvasProperties, ShellPattern } from "../types";
+import type { CanvasDocument, CanvasProperties } from "../types";
 import { cloneDocument } from "./coreUtils";
 
 export const DEFAULT_SHELL_BACKGROUND = "#000000";
-export const DEFAULT_SHELL_PATTERN: ShellPattern = "dots";
 
 export function createBlankDocument(width: number, height: number): CanvasDocument {
   return {
     canvas: { width, height, background: "#f8fafc" },
     shellBackground: DEFAULT_SHELL_BACKGROUND,
-    shellPattern: DEFAULT_SHELL_PATTERN,
     rootIds: [],
     elements: {},
   };
@@ -20,7 +18,6 @@ export function createDraftDocument(_width?: number, _height?: number): CanvasDo
   return {
     canvas: { width: DRAFT_CANVAS_SIZE, height: DRAFT_CANVAS_SIZE, background: "" },
     shellBackground: DEFAULT_SHELL_BACKGROUND,
-    shellPattern: DEFAULT_SHELL_PATTERN,
     rootIds: [],
     elements: {},
   };
@@ -29,12 +26,6 @@ export function createDraftDocument(_width?: number, _height?: number): CanvasDo
 export function updateShellBackground(document: CanvasDocument, background: string): CanvasDocument {
   const next = cloneDocument(document);
   next.shellBackground = background;
-  return next;
-}
-
-export function updateShellPattern(document: CanvasDocument, pattern: ShellPattern): CanvasDocument {
-  const next = cloneDocument(document);
-  next.shellPattern = pattern;
   return next;
 }
 
@@ -51,7 +42,6 @@ export function createDefaultDocument(): CanvasDocument {
   return {
     canvas: { width: 960, height: 640, background: "#f8fafc" },
     shellBackground: DEFAULT_SHELL_BACKGROUND,
-    shellPattern: DEFAULT_SHELL_PATTERN,
     rootIds: ["hero-card", "side-panel", "label-pill"],
     elements: {
       "hero-card": {

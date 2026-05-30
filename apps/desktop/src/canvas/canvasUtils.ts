@@ -270,7 +270,6 @@ export function canvasDocumentForNode(document: CanvasDocument, nodeId: string):
       padding: source.styles.padding,
     },
     shellBackground: document.shellBackground,
-    shellPattern: document.shellPattern,
     rootIds: [...source.children],
     elements,
   };

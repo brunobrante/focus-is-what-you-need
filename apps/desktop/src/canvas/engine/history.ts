@@ -70,7 +70,6 @@ function canvasPropertiesEqual(a: CanvasProperties, b: CanvasProperties): boolea
 export function documentsEqual(a: CanvasDocument, b: CanvasDocument): boolean {
   if (a === b) return true;
   if (a.shellBackground !== b.shellBackground) return false;
-  if (a.shellPattern !== b.shellPattern) return false;
   if (!canvasPropertiesEqual(a.canvas, b.canvas)) return false;
   if (!arrayValuesEqual(a.rootIds, b.rootIds)) return false;
 

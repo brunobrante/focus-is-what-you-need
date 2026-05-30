@@ -11,7 +11,6 @@ import {
   updateElementStyles,
   updateElementText,
   updateShellBackground,
-  updateShellPattern,
 } from "@/canvas/engine/actions";
 import type { CanvasDocument, CanvasProperties, ElementStyles } from "@/canvas/engine/types";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
@@ -171,9 +170,7 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
         ) : activeTab === "shell" ? (
           <ShellTab
             background={document.shellBackground ?? "#000000"}
-            pattern={document.shellPattern ?? "dots"}
             onUpdateBackground={(background) => commitDocument(updateShellBackground(document, background))}
-            onUpdatePattern={(pattern) => commitDocument(updateShellPattern(document, pattern))}
           />
         ) : selectedCount > 1 ? (
           <EmptyState title={`${selectedCount} elementos selecionados`} body="Use o canvas para mover o grupo ou selecione uma camada para editar propriedades." />

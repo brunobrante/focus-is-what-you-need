@@ -17,7 +17,7 @@ import {
   roundPixel,
 } from "../geometry";
 import { cloneDocument, createId } from "./coreUtils";
-import { DEFAULT_SHELL_BACKGROUND, DEFAULT_SHELL_PATTERN } from "./documentDefaults";
+import { DEFAULT_SHELL_BACKGROUND } from "./documentDefaults";
 
 function clampNodeToParentBounds(document: CanvasDocument, id: string): void {
   const node = document.elements[id];
@@ -56,10 +56,9 @@ export function constrainElement(document: CanvasDocument, id: string): CanvasDo
 
 export function constrainAll(document: CanvasDocument): CanvasDocument {
   const next = cloneDocument(document);
-  if (!next.shellBackground || (next.shellBackground === "#e9edf3" && !next.shellPattern)) {
+  if (!next.shellBackground || next.shellBackground === "#e9edf3") {
     next.shellBackground = DEFAULT_SHELL_BACKGROUND;
   }
-  next.shellPattern = next.shellPattern ?? DEFAULT_SHELL_PATTERN;
   for (const node of Object.values(next.elements)) {
     if ((node.type as string) === "container") node.type = "rect";
   }
