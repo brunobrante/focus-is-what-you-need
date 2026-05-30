@@ -281,17 +281,6 @@ export function CanvasStage({
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
     >
-      {viewportSize.width > 0 && viewportSize.height > 0 && (
-        <CanvasGridOverlay
-          enabled={state.document.shellGrid?.enabled ?? false}
-          type={state.document.shellGrid?.type ?? "dots"}
-          displayZoom={displayZoom}
-          offsetX={viewportTransform.offsetX}
-          offsetY={viewportTransform.offsetY}
-          width={viewportSize.width}
-          height={viewportSize.height}
-        />
-      )}
       <div
         ref={stageRef}
         className={`stage-space${draftMode ? " stage-space--draft" : ""}`}
@@ -336,6 +325,18 @@ export function CanvasStage({
           </div>
         )}
       </div>
+
+      {viewportSize.width > 0 && viewportSize.height > 0 && (
+        <CanvasGridOverlay
+          enabled={state.document.shellGrid?.enabled ?? false}
+          type={state.document.shellGrid?.type ?? "dots"}
+          displayZoom={displayZoom}
+          offsetX={viewportTransform.offsetX}
+          offsetY={viewportTransform.offsetY}
+          width={viewportSize.width}
+          height={viewportSize.height}
+        />
+      )}
 
       <CanvasToolingLayer
         ref={toolingRef}

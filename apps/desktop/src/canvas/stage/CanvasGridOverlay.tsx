@@ -81,7 +81,7 @@ export function CanvasGridOverlay({ enabled, type, displayZoom, offsetX, offsetY
         width,
         height,
         pointerEvents: "none",
-        zIndex: 2,
+        zIndex: 5,
       }}
     />
   );
