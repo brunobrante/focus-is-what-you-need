@@ -132,7 +132,7 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
       <div className="flex shrink-0 border-b border-[#2C2C2C] px-2">
         {([
           { id: "element", label: "Element" },
-          { id: "canvas", label: "Pai" },
+          { id: "canvas", label: "Frame" },
           { id: "shell", label: "Shell" },
         ] as const).map((tab) => {
           const isActive = activeTab === tab.id;
