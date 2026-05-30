@@ -85,7 +85,33 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
     >
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] pl-3.5 pr-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-[2px] bg-[#F2F2F2]" />
+          <span className="grid shrink-0 place-items-center text-[#9A9A9A]" style={{ width: 16, height: 16 }}>
+            {canvasStageActive ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            ) : node?.type === "text" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 6h14" /><path d="M12 6v13" /><path d="M9 19h6" />
+              </svg>
+            ) : node?.type === "image" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" />
+              </svg>
+            ) : node?.type === "ellipse" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <ellipse cx="12" cy="12" rx="9" ry="6" />
+              </svg>
+            ) : node ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            )}
+          </span>
           <span className="min-w-0">
             <span className="block truncate text-[12.5px] font-medium">{headerTitle}</span>
             <span className="block truncate text-[10.5px] text-[#6B6B6B]">{headerMeta}</span>
@@ -98,7 +124,7 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
           className="grid h-6 w-6 cursor-pointer place-items-center rounded-md border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M15 6l-6 6 6 6" />
+            <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       </div>
