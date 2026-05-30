@@ -1,11 +1,11 @@
 import { newId, now } from "@/lib/storage/ids";
 import type { ScreenVersionRow } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.screenVersions;
 
 export async function listScreenVersions(): Promise<ScreenVersionRow[]> {
-  return getTable<ScreenVersionRow>(KEY);
+  return listTable<ScreenVersionRow>(KEY);
 }
 
 export async function listVersionsByScreen(
@@ -42,14 +42,14 @@ export async function createScreenVersion(input: {
     label: input.label.trim(),
     createdAt: now(),
   };
-  await setTable<ScreenVersionRow>(KEY, [created, ...rows]);
+  await replaceTable<ScreenVersionRow>(KEY, [created, ...rows]);
   notify(KEY);
   return created;
 }
 
 export async function deleteScreenVersion(id: string): Promise<void> {
   const rows = await listScreenVersions();
-  await setTable<ScreenVersionRow>(
+  await replaceTable<ScreenVersionRow>(
     KEY,
     rows.filter((r) => r.id !== id),
   );
@@ -58,7 +58,7 @@ export async function deleteScreenVersion(id: string): Promise<void> {
 
 export async function deleteVersionsByScreen(screenId: string): Promise<void> {
   const rows = await listScreenVersions();
-  await setTable<ScreenVersionRow>(
+  await replaceTable<ScreenVersionRow>(
     KEY,
     rows.filter((r) => r.screenId !== screenId),
   );
@@ -68,6 +68,6 @@ export async function deleteVersionsByScreen(screenId: string): Promise<void> {
 export async function bulkInsertScreenVersions(
   rows: ScreenVersionRow[],
 ): Promise<void> {
-  await setTable<ScreenVersionRow>(KEY, rows);
+  await replaceTable<ScreenVersionRow>(KEY, rows);
   notify(KEY);
 }

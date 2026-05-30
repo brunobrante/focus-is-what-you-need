@@ -4,12 +4,12 @@ import type {
   HistoryTargetType,
   Patch,
 } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.history;
 
 export async function listHistory(): Promise<HistoryEntryRow[]> {
-  return getTable<HistoryEntryRow>(KEY);
+  return listTable<HistoryEntryRow>(KEY);
 }
 
 export async function listHistoryByTarget(
@@ -56,14 +56,14 @@ export async function recordHistoryEntry(input: {
     snapshot: input.snapshot ?? null,
     diff: input.diff ?? [],
   };
-  await setTable<HistoryEntryRow>(KEY, [created, ...rows]);
+  await replaceTable<HistoryEntryRow>(KEY, [created, ...rows]);
   notify(KEY);
   return created;
 }
 
 export async function deleteHistoryByTarget(targetId: string): Promise<void> {
   const rows = await listHistory();
-  await setTable<HistoryEntryRow>(
+  await replaceTable<HistoryEntryRow>(
     KEY,
     rows.filter((r) => r.targetId !== targetId),
   );
@@ -73,6 +73,6 @@ export async function deleteHistoryByTarget(targetId: string): Promise<void> {
 export async function bulkInsertHistory(
   rows: HistoryEntryRow[],
 ): Promise<void> {
-  await setTable<HistoryEntryRow>(KEY, rows);
+  await replaceTable<HistoryEntryRow>(KEY, rows);
   notify(KEY);
 }

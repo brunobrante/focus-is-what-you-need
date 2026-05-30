@@ -8,7 +8,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Dispatch, ReactNode } from "react";
-import { store as persistenceStore } from "@/lib/storage/store";
 import type { CanvasDocument, EditorState, SnapGuide, Tool } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
@@ -376,19 +375,20 @@ export function EditorProvider({
     hydratedRef.current = !persistStorage;
     if (!persistStorage) return;
 
-    let cancelled = false;
-    void persistenceStore.get<CanvasDocument>(storageKey).then((stored) => {
-      if (cancelled) return;
-      hydratedRef.current = true;
-      if (stored && isCanvasDocument(stored)) {
+    // The current-canvas draft is a UI-session cache, not database state: read
+    // it synchronously from localStorage (no IPC), matching createInitialState.
+    hydratedRef.current = true;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as unknown;
+      if (isCanvasDocument(parsed)) {
         hoverStore.set(null);
-        dispatch({ type: "hydrateDocument", document: stored });
+        dispatch({ type: "hydrateDocument", document: parsed });
       }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      /* ignore malformed draft */
+    }
   }, [hoverStore, persistStorage, storageKey]);
 
   useEffect(() => {
@@ -403,14 +403,19 @@ export function EditorProvider({
 
     if (persistStorage && hydratedRef.current) {
       timeout = setTimeout(() => {
-        void persistenceStore.set(storageKey, state.document).then(() => {
-          if (cancelled) return;
-          window.dispatchEvent(
-            new CustomEvent(CANVAS_DOCUMENT_SAVED_EVENT, {
-              detail: { storageKey, document: state.document },
-            }),
-          );
-        });
+        if (cancelled) return;
+        // Session-draft cache → localStorage (synchronous, no IPC). The
+        // database scene is saved separately through the queue, on commit.
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(state.document));
+        } catch {
+          /* quota — non-fatal */
+        }
+        window.dispatchEvent(
+          new CustomEvent(CANVAS_DOCUMENT_SAVED_EVENT, {
+            detail: { storageKey, document: state.document },
+          }),
+        );
       }, 250);
     }
     onDocumentChange?.(state.document);

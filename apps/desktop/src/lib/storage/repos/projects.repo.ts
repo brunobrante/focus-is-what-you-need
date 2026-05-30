@@ -14,12 +14,12 @@ import type {
   VariantRow,
 } from "@/lib/storage/schema";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.projects;
 
 export async function listProjects(): Promise<ProjectRow[]> {
-  const rows = await getTable<ProjectRow>(KEY);
+  const rows = await listTable<ProjectRow>(KEY);
   return rows.map(normalizeProjectRow);
 }
 
@@ -58,7 +58,7 @@ export async function createProject(input: {
     updatedAt: t,
   });
   const rows = await listProjects();
-  await setTable<ProjectRow>(KEY, [row, ...rows]);
+  await replaceTable<ProjectRow>(KEY, [row, ...rows]);
   notify(KEY);
   return row;
 }
@@ -83,7 +83,7 @@ export async function updateProject(
   });
   const updatedRows = [...rows];
   updatedRows[idx] = next;
-  await setTable<ProjectRow>(KEY, updatedRows);
+  await replaceTable<ProjectRow>(KEY, updatedRows);
   notify(KEY);
   return next;
 }
@@ -93,9 +93,9 @@ export async function deleteProject(projectId: string): Promise<void> {
   const project = projects.find((p) => p.id === projectId);
   if (!project) return;
 
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
   const screenIds = new Set(
     screens.filter((s) => s.projectId === projectId).map((s) => s.id),
   );
@@ -115,25 +115,25 @@ export async function deleteProject(projectId: string): Promise<void> {
     variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
   );
 
-  await setTable<ProjectRow>(
+  await replaceTable<ProjectRow>(
     KEY,
     projects.filter((p) => p.id !== projectId),
   );
-  await setTable<ScreenRow>(
+  await replaceTable<ScreenRow>(
     TABLES.screens,
     screens.filter((s) => !screenIds.has(s.id)),
   );
-  await setTable<ComponentRow>(
+  await replaceTable<ComponentRow>(
     TABLES.components,
     components.filter((c) => !componentIds.has(c.id)),
   );
-  await setTable<VariantRow>(
+  await replaceTable<VariantRow>(
     TABLES.variants,
     variants.filter((v) => !variantIds.has(v.id)),
   );
 
-  const references = await getTable<ReferenceRow>(TABLES.references);
-  await setTable<ReferenceRow>(
+  const references = await listTable<ReferenceRow>(TABLES.references);
+  await replaceTable<ReferenceRow>(
     TABLES.references,
     references
       .map((reference) => normalizeReferenceRow(reference))
@@ -150,8 +150,8 @@ export async function deleteProject(projectId: string): Promise<void> {
       .filter((reference) => reference.projectIds.length > 0),
   );
 
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  await setTable<SceneRow>(
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  await replaceTable<SceneRow>(
     TABLES.scenes,
     scenes.filter(
       (s) =>
@@ -160,8 +160,8 @@ export async function deleteProject(projectId: string): Promise<void> {
     ),
   );
 
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  await setTable<ThumbnailRow>(
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  await replaceTable<ThumbnailRow>(
     TABLES.thumbnails,
     thumbnails.filter(
       (t) =>
@@ -184,6 +184,6 @@ export async function deleteProject(projectId: string): Promise<void> {
 }
 
 export async function bulkInsertProjects(rows: ProjectRow[]): Promise<void> {
-  await setTable<ProjectRow>(KEY, rows.map(normalizeProjectRow));
+  await replaceTable<ProjectRow>(KEY, rows.map(normalizeProjectRow));
   notify(KEY);
 }

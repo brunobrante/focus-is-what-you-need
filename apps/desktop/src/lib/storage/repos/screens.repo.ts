@@ -12,12 +12,12 @@ import type {
   ThumbnailRow,
   VariantRow,
 } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.screens;
 
 export async function listScreens(): Promise<ScreenRow[]> {
-  return getTable<ScreenRow>(KEY);
+  return listTable<ScreenRow>(KEY);
 }
 
 export async function listScreensByProject(projectId: string): Promise<ScreenRow[]> {
@@ -45,7 +45,7 @@ export async function findScreenByTitle(
 }
 
 export async function bulkInsertScreens(rows: ScreenRow[]): Promise<void> {
-  await setTable<ScreenRow>(KEY, rows);
+  await replaceTable<ScreenRow>(KEY, rows);
   notify(KEY);
 }
 
@@ -68,7 +68,7 @@ export async function createScreen(input: {
     createdAt: t,
     updatedAt: t,
   };
-  await setTable<ScreenRow>(KEY, [...rows, created]);
+  await replaceTable<ScreenRow>(KEY, [...rows, created]);
   notify(KEY);
   return created;
 }
@@ -89,7 +89,7 @@ export async function updateScreen(
   };
   const nextRows = [...rows];
   nextRows[idx] = next;
-  await setTable<ScreenRow>(KEY, nextRows);
+  await replaceTable<ScreenRow>(KEY, nextRows);
   notify(KEY);
   return next;
 }
@@ -99,8 +99,8 @@ export async function deleteScreen(screenId: string): Promise<void> {
   const screen = screens.find((r) => r.id === screenId);
   if (!screen) return;
 
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
   const topLevelIds = components
     .filter((c) => c.screenId === screenId && c.parentVariantId === null)
     .map((c) => c.id);
@@ -114,21 +114,21 @@ export async function deleteScreen(screenId: string): Promise<void> {
     variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
   );
 
-  await setTable<ScreenRow>(
+  await replaceTable<ScreenRow>(
     KEY,
     screens.filter((r) => r.id !== screenId),
   );
-  await setTable<ComponentRow>(
+  await replaceTable<ComponentRow>(
     TABLES.components,
     components.filter((c) => !componentIds.has(c.id)),
   );
-  await setTable<VariantRow>(
+  await replaceTable<VariantRow>(
     TABLES.variants,
     variants.filter((v) => !variantIds.has(v.id)),
   );
 
-  const references = await getTable<ReferenceRow>(TABLES.references);
-  await setTable<ReferenceRow>(
+  const references = await listTable<ReferenceRow>(TABLES.references);
+  await replaceTable<ReferenceRow>(
     TABLES.references,
     references
       .map((reference) => normalizeReferenceRow(reference))
@@ -147,8 +147,8 @@ export async function deleteScreen(screenId: string): Promise<void> {
       .filter((reference) => reference.projectIds.length > 0),
   );
 
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  await setTable<SceneRow>(
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  await replaceTable<SceneRow>(
     TABLES.scenes,
     scenes.filter(
       (s) =>
@@ -157,8 +157,8 @@ export async function deleteScreen(screenId: string): Promise<void> {
     ),
   );
 
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  await setTable<ThumbnailRow>(
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  await replaceTable<ThumbnailRow>(
     TABLES.thumbnails,
     thumbnails.filter(
       (t) =>

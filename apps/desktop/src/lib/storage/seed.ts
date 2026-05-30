@@ -55,11 +55,11 @@ import {
   type VariantRow,
   type WorkspaceRow,
 } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable, store } from "@/lib/storage/store";
+import { TABLES, getMeta, listTable, notify, replaceTable, setMeta } from "@/lib/storage/store";
 
 async function readMeta(): Promise<Meta> {
   return (
-    (await store.get<Meta>(TABLES.meta)) ?? {
+    (await getMeta<Meta>()) ?? {
       schemaVersion: SCHEMA_VERSION,
       seededAt: null,
     }
@@ -67,7 +67,7 @@ async function readMeta(): Promise<Meta> {
 }
 
 async function writeMeta(meta: Meta): Promise<void> {
-  await store.set<Meta>(TABLES.meta, meta);
+  setMeta<Meta>(meta);
 }
 
 export async function ensureSeededAndMigrated(): Promise<void> {
@@ -263,17 +263,17 @@ async function firstBootSeedV5(): Promise<void> {
   // Single batch of writes — store has no transaction, but each table's row
   // set is replaced atomically and the meta gate on top short-circuits a
   // re-run if any of these fail.
-  await setTable<ProjectRow>(TABLES.projects, projects);
-  await setTable<ScreenRow>(TABLES.screens, screens);
-  await setTable<ComponentRow>(TABLES.components, components);
-  await setTable<VariantRow>(TABLES.variants, variants);
-  await setTable<ReferenceRow>(TABLES.references, references);
-  await setTable<SceneRow>(TABLES.scenes, scenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await setTable<WorkspaceRow>(TABLES.workspaces, [workspace]);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, placements);
-  await setTable<never>(TABLES.history, []);
+  await replaceTable<ProjectRow>(TABLES.projects, projects);
+  await replaceTable<ScreenRow>(TABLES.screens, screens);
+  await replaceTable<ComponentRow>(TABLES.components, components);
+  await replaceTable<VariantRow>(TABLES.variants, variants);
+  await replaceTable<ReferenceRow>(TABLES.references, references);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace]);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
+  await replaceTable<never>(TABLES.history, []);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -289,18 +289,18 @@ async function firstBootSeedV5(): Promise<void> {
 
 async function ensureFactoryMocksPresent(): Promise<void> {
   const t = now();
-  let projects = await getTable<ProjectRow>(TABLES.projects);
-  let screens = await getTable<ScreenRow>(TABLES.screens);
-  let components = (await getTable<ComponentRow>(TABLES.components)).map(
+  let projects = await listTable<ProjectRow>(TABLES.projects);
+  let screens = await listTable<ScreenRow>(TABLES.screens);
+  let components = (await listTable<ComponentRow>(TABLES.components)).map(
     normalizeComponentRow,
   );
-  let variants = await getTable<VariantRow>(TABLES.variants);
-  let references = await getTable<ReferenceRow>(TABLES.references);
-  let scenes = await getTable<SceneRow>(TABLES.scenes);
-  let thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  let workspaces = await getTable<WorkspaceRow>(TABLES.workspaces);
-  let screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  let placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  let variants = await listTable<VariantRow>(TABLES.variants);
+  let references = await listTable<ReferenceRow>(TABLES.references);
+  let scenes = await listTable<SceneRow>(TABLES.scenes);
+  let thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  let workspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
+  let screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  let placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   const seedKeys = new Set(
     PROJECTS.map((project) => projectKey(project.name, project.type)),
@@ -437,16 +437,16 @@ async function ensureFactoryMocksPresent(): Promise<void> {
     (reference) => !SEEDED_MOCK_REFERENCE_IDS.has(reference.id),
   );
 
-  await setTable<ProjectRow>(TABLES.projects, projects);
-  await setTable<ScreenRow>(TABLES.screens, screens);
-  await setTable<ComponentRow>(TABLES.components, components);
-  await setTable<VariantRow>(TABLES.variants, variants);
-  await setTable<ReferenceRow>(TABLES.references, references);
-  await setTable<SceneRow>(TABLES.scenes, scenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await setTable<WorkspaceRow>(TABLES.workspaces, workspaces);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, placements);
+  await replaceTable<ProjectRow>(TABLES.projects, projects);
+  await replaceTable<ScreenRow>(TABLES.screens, screens);
+  await replaceTable<ComponentRow>(TABLES.components, components);
+  await replaceTable<VariantRow>(TABLES.variants, variants);
+  await replaceTable<ReferenceRow>(TABLES.references, references);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, workspaces);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -554,13 +554,13 @@ function seedComponentTree(input: {
 
 async function migrateV6toV7NewTables(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const components = await getTable<ComponentRow>(TABLES.components);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const components = await listTable<ComponentRow>(TABLES.components);
 
   // Skip if already seeded (idempotent guard)
-  const existingWorkspaces = await getTable<WorkspaceRow>(TABLES.workspaces);
-  const existingVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
+  const existingWorkspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
+  const existingVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
 
   const workspace: WorkspaceRow =
     existingWorkspaces[0] ?? {
@@ -584,7 +584,7 @@ async function migrateV6toV7NewTables(): Promise<void> {
   const allVersions = [...existingVersions, ...newVersions];
 
   // Component placements from top-level screen components not yet placed
-  const existingPlacements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  const existingPlacements = await listTable<ComponentPlacementRow>(TABLES.placements);
   const placedComponentIds = new Set(existingPlacements.map((p) => p.componentId));
   const screenVersionByScreenId = new Map(allVersions.map((sv) => [sv.screenId, sv]));
 
@@ -605,17 +605,17 @@ async function migrateV6toV7NewTables(): Promise<void> {
     });
   }
 
-  await setTable<WorkspaceRow>(TABLES.workspaces, [workspace]);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, allVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, [
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace]);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, allVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, [
     ...existingPlacements,
     ...newPlacements,
   ]);
 
   // Ensure history table exists (empty for existing stores)
-  const existingHistory = await getTable<never>(TABLES.history);
+  const existingHistory = await listTable<never>(TABLES.history);
   if (existingHistory.length === 0) {
-    await setTable<never>(TABLES.history, []);
+    await replaceTable<never>(TABLES.history, []);
   }
 
   notify(TABLES.workspaces);
@@ -625,18 +625,18 @@ async function migrateV6toV7NewTables(): Promise<void> {
 
 async function migrateV7toV8DataIntegrity(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
 
-  let components = (await getTable<ComponentRow>(TABLES.components)).map(
+  let components = (await listTable<ComponentRow>(TABLES.components)).map(
     normalizeComponentRow,
   );
-  let variants = await getTable<VariantRow>(TABLES.variants);
-  let scenes = await getTable<SceneRow>(TABLES.scenes);
-  let thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  let screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  let placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  let variants = await listTable<VariantRow>(TABLES.variants);
+  let scenes = await listTable<SceneRow>(TABLES.scenes);
+  let thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  let screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  let placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   for (const screen of screens) {
     const projectType = projectTypeById.get(screen.projectId);
@@ -714,12 +714,12 @@ async function migrateV7toV8DataIntegrity(): Promise<void> {
     ];
   }
 
-  await setTable<ComponentRow>(TABLES.components, components);
-  await setTable<VariantRow>(TABLES.variants, variants);
-  await setTable<SceneRow>(TABLES.scenes, scenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, placements);
+  await replaceTable<ComponentRow>(TABLES.components, components);
+  await replaceTable<VariantRow>(TABLES.variants, variants);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
 
   notify(TABLES.components);
   notify(TABLES.variants);
@@ -731,18 +731,18 @@ async function migrateV7toV8DataIntegrity(): Promise<void> {
 
 async function migrateV8toV9CanvasSubjectRoots(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  let screens = await getTable<ScreenRow>(TABLES.screens);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  let screens = await listTable<ScreenRow>(TABLES.screens);
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
 
-  let components = (await getTable<ComponentRow>(TABLES.components)).map(
+  let components = (await listTable<ComponentRow>(TABLES.components)).map(
     normalizeComponentRow,
   );
-  let variants = await getTable<VariantRow>(TABLES.variants);
-  let scenes = await getTable<SceneRow>(TABLES.scenes);
-  let thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  let screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  let placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  let variants = await listTable<VariantRow>(TABLES.variants);
+  let scenes = await listTable<SceneRow>(TABLES.scenes);
+  let thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  let screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  let placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   const emptyUnsupportedScreenIds = new Set(
     screens
@@ -816,13 +816,13 @@ async function migrateV8toV9CanvasSubjectRoots(): Promise<void> {
     );
   }
 
-  await setTable<ScreenRow>(TABLES.screens, screens);
-  await setTable<ComponentRow>(TABLES.components, components);
-  await setTable<VariantRow>(TABLES.variants, variants);
-  await setTable<SceneRow>(TABLES.scenes, scenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, placements);
+  await replaceTable<ScreenRow>(TABLES.screens, screens);
+  await replaceTable<ComponentRow>(TABLES.components, components);
+  await replaceTable<VariantRow>(TABLES.variants, variants);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
 
   notify(TABLES.screens);
   notify(TABLES.components);
@@ -959,17 +959,17 @@ function upsertRawSceneData(
 
 async function migrateV9toV10DistinctMockHierarchy(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  let screens = await getTable<ScreenRow>(TABLES.screens);
-  let references = await getTable<ReferenceRow>(TABLES.references);
-  let components = (await getTable<ComponentRow>(TABLES.components)).map(
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  let screens = await listTable<ScreenRow>(TABLES.screens);
+  let references = await listTable<ReferenceRow>(TABLES.references);
+  let components = (await listTable<ComponentRow>(TABLES.components)).map(
     normalizeComponentRow,
   );
-  let variants = await getTable<VariantRow>(TABLES.variants);
-  let scenes = await getTable<SceneRow>(TABLES.scenes);
-  let thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  let screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  let placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  let variants = await listTable<VariantRow>(TABLES.variants);
+  let scenes = await listTable<SceneRow>(TABLES.scenes);
+  let thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  let screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  let placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   const projectTypeById = new Map(projects.map((project) => [project.id, project.type]));
   const emptyUnsupportedScreenIds = new Set(
@@ -1119,14 +1119,14 @@ async function migrateV9toV10DistinctMockHierarchy(): Promise<void> {
     ];
   }
 
-  await setTable<ScreenRow>(TABLES.screens, screens);
-  await setTable<ReferenceRow>(TABLES.references, references);
-  await setTable<ComponentRow>(TABLES.components, components);
-  await setTable<VariantRow>(TABLES.variants, variants);
-  await setTable<SceneRow>(TABLES.scenes, scenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, placements);
+  await replaceTable<ScreenRow>(TABLES.screens, screens);
+  await replaceTable<ReferenceRow>(TABLES.references, references);
+  await replaceTable<ComponentRow>(TABLES.components, components);
+  await replaceTable<VariantRow>(TABLES.variants, variants);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
 
   notify(TABLES.screens);
   notify(TABLES.references);
@@ -1144,17 +1144,17 @@ async function migrateV10toV11ConnectedSnapshots(): Promise<void> {
 
 async function migrateV11toV12AlignmentDebugScreen(): Promise<void> {
   const t = now();
-  let projects = await getTable<ProjectRow>(TABLES.projects);
-  let workspaces = await getTable<WorkspaceRow>(TABLES.workspaces);
-  let screens = await getTable<ScreenRow>(TABLES.screens);
-  let components = (await getTable<ComponentRow>(TABLES.components)).map(
+  let projects = await listTable<ProjectRow>(TABLES.projects);
+  let workspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
+  let screens = await listTable<ScreenRow>(TABLES.screens);
+  let components = (await listTable<ComponentRow>(TABLES.components)).map(
     normalizeComponentRow,
   );
-  let variants = await getTable<VariantRow>(TABLES.variants);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  let screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  let placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  let variants = await listTable<VariantRow>(TABLES.variants);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  let screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  let placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   const projectSeed = PROJECTS.find((project) =>
     isAlignmentDebugProject(project.name),
@@ -1284,15 +1284,15 @@ async function migrateV11toV12AlignmentDebugScreen(): Promise<void> {
     ];
   }
 
-  await setTable<ProjectRow>(TABLES.projects, projects);
-  await setTable<WorkspaceRow>(TABLES.workspaces, workspaces);
-  await setTable<ScreenRow>(TABLES.screens, screens);
-  await setTable<ComponentRow>(TABLES.components, components);
-  await setTable<VariantRow>(TABLES.variants, variants);
-  await setTable<SceneRow>(TABLES.scenes, scenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, placements);
+  await replaceTable<ProjectRow>(TABLES.projects, projects);
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, workspaces);
+  await replaceTable<ScreenRow>(TABLES.screens, screens);
+  await replaceTable<ComponentRow>(TABLES.components, components);
+  await replaceTable<VariantRow>(TABLES.variants, variants);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
 
   notify(TABLES.projects);
   notify(TABLES.workspaces);
@@ -1313,12 +1313,12 @@ const SEEDED_MOCK_REFERENCE_IDS = new Set([
 ]);
 
 async function migrateV12toV13StripMockReferences(): Promise<void> {
-  const references = await getTable<ReferenceRow>(TABLES.references);
+  const references = await listTable<ReferenceRow>(TABLES.references);
   const nextReferences = references.filter(
     (reference) => !SEEDED_MOCK_REFERENCE_IDS.has(reference.id),
   );
   if (nextReferences.length === references.length) return; // nothing to strip
-  await setTable<ReferenceRow>(TABLES.references, nextReferences);
+  await replaceTable<ReferenceRow>(TABLES.references, nextReferences);
   notify(TABLES.references);
 }
 
@@ -1326,7 +1326,7 @@ async function migrateV13toV14ProjectSources(): Promise<void> {
   const seedProjectKeys = new Set(
     PROJECTS.map((project) => `${project.name.toLowerCase()}::${project.type}`),
   );
-  const projects = await getTable<ProjectRow>(TABLES.projects);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
   const nextProjects = projects.map((project) => {
     if (project.source) return normalizeProjectRow(project);
     const seedKey = `${project.name.toLowerCase()}::${project.type}`;
@@ -1335,7 +1335,7 @@ async function migrateV13toV14ProjectSources(): Promise<void> {
       source: seedProjectKeys.has(seedKey) ? "mock" : "local",
     });
   });
-  await setTable<ProjectRow>(TABLES.projects, nextProjects);
+  await replaceTable<ProjectRow>(TABLES.projects, nextProjects);
   notify(TABLES.projects);
 }
 
@@ -1573,11 +1573,11 @@ async function migrateV2toV3CanvasMocks(): Promise<void> {
 
 async function migrateV3toV4CanvasMocks(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
 
   const nextScenes = [...scenes];
@@ -1654,9 +1654,9 @@ async function migrateV3toV4CanvasMocks(): Promise<void> {
     seedKey: null,
   }));
 
-  await setTable<SceneRow>(TABLES.scenes, nextScenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
-  await setTable<VariantRow>(TABLES.variants, normalizedVariants);
+  await replaceTable<SceneRow>(TABLES.scenes, nextScenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
+  await replaceTable<VariantRow>(TABLES.variants, normalizedVariants);
 
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
@@ -1665,13 +1665,13 @@ async function migrateV3toV4CanvasMocks(): Promise<void> {
 
 async function migrateV4toV5MockHierarchy(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const references = await getTable<ReferenceRow>(TABLES.references);
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const references = await listTable<ReferenceRow>(TABLES.references);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
 
   let nextReferences = [...references];
@@ -1763,11 +1763,11 @@ async function migrateV4toV5MockHierarchy(): Promise<void> {
     });
   }
 
-  await setTable<ReferenceRow>(TABLES.references, nextReferences);
-  await setTable<ComponentRow>(TABLES.components, nextComponents);
-  await setTable<VariantRow>(TABLES.variants, nextVariants);
-  await setTable<SceneRow>(TABLES.scenes, nextScenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
+  await replaceTable<ReferenceRow>(TABLES.references, nextReferences);
+  await replaceTable<ComponentRow>(TABLES.components, nextComponents);
+  await replaceTable<VariantRow>(TABLES.variants, nextVariants);
+  await replaceTable<SceneRow>(TABLES.scenes, nextScenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
 
   notify(TABLES.references);
   notify(TABLES.components);
@@ -1778,12 +1778,12 @@ async function migrateV4toV5MockHierarchy(): Promise<void> {
 
 async function migrateV5toV6HtmlCanvasMocks(): Promise<void> {
   const t = now();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
 
   const nextScenes = [...scenes];
@@ -1807,8 +1807,8 @@ async function migrateV5toV6HtmlCanvasMocks(): Promise<void> {
     });
   }
 
-  await setTable<SceneRow>(TABLES.scenes, nextScenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
+  await replaceTable<SceneRow>(TABLES.scenes, nextScenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
 }
@@ -1930,10 +1930,10 @@ function isReplaceableMockScene(graphJSON: string): boolean {
 }
 
 async function migrateV1toV2(): Promise<void> {
-  const oldComponents = await getTable<V1ComponentRow>(TABLES.components);
-  const oldScenes = await getTable<V1SceneRow>(TABLES.scenes);
-  const oldThumbnails = await getTable<V1ThumbnailRow>(TABLES.thumbnails);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
+  const oldComponents = await listTable<V1ComponentRow>(TABLES.components);
+  const oldScenes = await listTable<V1SceneRow>(TABLES.scenes);
+  const oldThumbnails = await listTable<V1ThumbnailRow>(TABLES.thumbnails);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
 
   // First-screen lookup per project for orphan ("global") components.
   const firstScreenByProject = new Map<string, string>();
@@ -2049,10 +2049,10 @@ async function migrateV1toV2(): Promise<void> {
     .filter((x): x is ThumbnailRow => x !== null);
 
   // All transformations done — commit.
-  await setTable<ComponentRow>(TABLES.components, newComponents);
-  await setTable<VariantRow>(TABLES.variants, newVariants);
-  await setTable<SceneRow>(TABLES.scenes, newScenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, newThumbnails);
+  await replaceTable<ComponentRow>(TABLES.components, newComponents);
+  await replaceTable<VariantRow>(TABLES.variants, newVariants);
+  await replaceTable<SceneRow>(TABLES.scenes, newScenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, newThumbnails);
 
   notify(TABLES.components);
   notify(TABLES.variants);

@@ -1,5 +1,4 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -7,6 +6,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
+
+mod db;
 
 const APP_FOLDER_NAME: &str = "focus-is-what-you-need";
 const DEFAULT_WORKSPACE_NAME: &str = "workspace";
@@ -61,29 +62,6 @@ fn sqlite_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join(SQLITE_FILE_NAME))
-}
-
-fn open_kv_connection(app: &tauri::AppHandle) -> Result<Connection, String> {
-    let path = sqlite_path(app)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    let conn = Connection::open(path).map_err(|e| e.to_string())?;
-    conn.pragma_update(None, "journal_mode", "WAL")
-        .map_err(|e| e.to_string())?;
-    conn.pragma_update(None, "synchronous", "NORMAL")
-        .map_err(|e| e.to_string())?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS kv_store (
-            key TEXT PRIMARY KEY NOT NULL,
-            value TEXT NOT NULL,
-            updated_at INTEGER NOT NULL
-        )",
-        [],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(conn)
 }
 
 fn default_config() -> WorkspaceConfig {
@@ -271,41 +249,6 @@ fn ensure_workspace_folders(app: tauri::AppHandle) -> Result<String, String> {
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
     Ok(app_root(&cfg).to_string_lossy().into_owned())
-}
-
-#[tauri::command]
-async fn kv_get(app: tauri::AppHandle, key: String) -> Result<Option<String>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let conn = open_kv_connection(&app)?;
-        conn.query_row(
-            "SELECT value FROM kv_store WHERE key = ?1",
-            params![key],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn kv_set(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let conn = open_kv_connection(&app)?;
-        conn.execute(
-            "INSERT INTO kv_store (key, value, updated_at)
-             VALUES (?1, ?2, ?3)
-             ON CONFLICT(key) DO UPDATE SET
-               value = excluded.value,
-               updated_at = excluded.updated_at",
-            params![key, value, now_ms() as i64],
-        )
-        .map(|_| ())
-        .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -887,6 +830,10 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // Open the single pooled SQLite connection and run migrations once.
+            let path = sqlite_path(app.handle())?;
+            let conn = db::open_and_migrate(&path)?;
+            app.manage(db::Db::new(conn));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -894,8 +841,14 @@ pub fn run() {
             set_workspace_folder,
             pick_folder_dialog,
             ensure_workspace_folders,
-            kv_get,
-            kv_set,
+            db::kv_get,
+            db::kv_set,
+            db::db_apply,
+            db::db_get_scene,
+            db::db_load_scene_nodes,
+            db::db_get_thumbnail,
+            db::db_get_record,
+            db::db_list_records,
             write_reference_file,
             read_reference_file,
             delete_reference_file,

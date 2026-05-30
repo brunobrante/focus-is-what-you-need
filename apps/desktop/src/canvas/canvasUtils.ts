@@ -236,12 +236,7 @@ export function componentStructureKey(document: CanvasDocument): string {
     const node = document.elements[nodeId];
     if (!node) return;
     if (node.children.length > 0) {
-      parts.push([
-        node.id, node.name,
-        Math.round(node.x), Math.round(node.y),
-        Math.round(node.width), Math.round(node.height),
-        node.children.join(","),
-      ].join(":"));
+      parts.push([node.id, node.name, node.children.join(",")].join(":"));
     }
     for (const childId of node.children) walk(childId);
   };

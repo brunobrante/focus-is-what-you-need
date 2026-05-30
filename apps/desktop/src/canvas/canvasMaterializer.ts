@@ -22,7 +22,9 @@ export async function upsertComponentSceneIfChanged(
 ): Promise<void> {
   const existingScene = await readSceneByOwner("variant", component.activeVariantId);
   if (existingScene?.graphJSON === graphJSON) return;
-  await saveScene({ ownerType: "variant", ownerId: component.activeVariantId, graphJSON }, { propagate: false });
+  // Fire-and-forget into the save queue; ancestor propagation runs lazily at
+  // idle inside the persistence adapter (no synchronous depth walk).
+  saveScene({ ownerType: "variant", ownerId: component.activeVariantId, graphJSON });
 }
 
 export async function createOrFindComponent(input: {
@@ -53,11 +55,11 @@ export async function createOrFindComponent(input: {
       kind: "Custom",
       sourceNodeId: input.sourceNodeId,
     });
-    await saveScene({
+    saveScene({
       ownerType: "variant",
       ownerId: result.component.activeVariantId,
       graphJSON: input.graphJSON,
-    }, { propagate: false });
+    });
     return result.component;
   } catch {
     const duplicateByName = await findComponentByName(input.parent, input.name);

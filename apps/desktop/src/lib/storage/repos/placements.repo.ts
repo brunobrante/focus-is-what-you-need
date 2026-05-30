@@ -1,11 +1,11 @@
 import { newId, now } from "@/lib/storage/ids";
 import type { ComponentPlacementRow, NodeOverride } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.placements;
 
 export async function listPlacements(): Promise<ComponentPlacementRow[]> {
-  return getTable<ComponentPlacementRow>(KEY);
+  return listTable<ComponentPlacementRow>(KEY);
 }
 
 export async function listPlacementsByScreenVersion(
@@ -56,7 +56,7 @@ export async function createPlacement(input: {
     order,
     overrides: input.overrides ?? {},
   };
-  await setTable<ComponentPlacementRow>(KEY, [created, ...rows]);
+  await replaceTable<ComponentPlacementRow>(KEY, [created, ...rows]);
   notify(KEY);
   return created;
 }
@@ -71,14 +71,14 @@ export async function updatePlacementOverrides(
   const next: ComponentPlacementRow = { ...rows[idx]!, overrides };
   const nextRows = [...rows];
   nextRows[idx] = next;
-  await setTable<ComponentPlacementRow>(KEY, nextRows);
+  await replaceTable<ComponentPlacementRow>(KEY, nextRows);
   notify(KEY);
   return next;
 }
 
 export async function deletePlacement(id: string): Promise<void> {
   const rows = await listPlacements();
-  await setTable<ComponentPlacementRow>(
+  await replaceTable<ComponentPlacementRow>(
     KEY,
     rows.filter((r) => r.id !== id),
   );
@@ -89,7 +89,7 @@ export async function deletePlacementsByScreenVersion(
   screenVersionId: string,
 ): Promise<void> {
   const rows = await listPlacements();
-  await setTable<ComponentPlacementRow>(
+  await replaceTable<ComponentPlacementRow>(
     KEY,
     rows.filter((r) => r.screenVersionId !== screenVersionId),
   );
@@ -100,7 +100,7 @@ export async function deletePlacementsByComponent(
   componentId: string,
 ): Promise<void> {
   const rows = await listPlacements();
-  await setTable<ComponentPlacementRow>(
+  await replaceTable<ComponentPlacementRow>(
     KEY,
     rows.filter((r) => r.componentId !== componentId),
   );
@@ -110,6 +110,6 @@ export async function deletePlacementsByComponent(
 export async function bulkInsertPlacements(
   rows: ComponentPlacementRow[],
 ): Promise<void> {
-  await setTable<ComponentPlacementRow>(KEY, rows);
+  await replaceTable<ComponentPlacementRow>(KEY, rows);
   notify(KEY);
 }

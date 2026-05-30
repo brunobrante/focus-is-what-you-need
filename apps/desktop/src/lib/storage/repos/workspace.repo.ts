@@ -1,11 +1,11 @@
 import { newId, now } from "@/lib/storage/ids";
 import type { WorkspaceRow } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.workspaces;
 
 export async function listWorkspaces(): Promise<WorkspaceRow[]> {
-  return getTable<WorkspaceRow>(KEY);
+  return listTable<WorkspaceRow>(KEY);
 }
 
 export async function getWorkspace(id: string): Promise<WorkspaceRow | null> {
@@ -31,7 +31,7 @@ export async function createWorkspace(input: {
     createdAt: t,
     updatedAt: t,
   };
-  await setTable<WorkspaceRow>(KEY, [created, ...rows]);
+  await replaceTable<WorkspaceRow>(KEY, [created, ...rows]);
   notify(KEY);
   return created;
 }
@@ -50,7 +50,7 @@ export async function updateWorkspace(
   };
   const nextRows = [...rows];
   nextRows[idx] = next;
-  await setTable<WorkspaceRow>(KEY, nextRows);
+  await replaceTable<WorkspaceRow>(KEY, nextRows);
   notify(KEY);
   return next;
 }
@@ -83,6 +83,6 @@ export async function removeProjectFromWorkspace(
 }
 
 export async function bulkInsertWorkspaces(rows: WorkspaceRow[]): Promise<void> {
-  await setTable<WorkspaceRow>(KEY, rows);
+  await replaceTable<WorkspaceRow>(KEY, rows);
   notify(KEY);
 }

@@ -1,12 +1,12 @@
 import { normalizeReferenceRow } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import type { OwnerType, ReferenceAttachment, ReferenceRow } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.references;
 
 export async function listReferences(): Promise<ReferenceRow[]> {
-  const rows = await getTable<ReferenceRow>(KEY);
+  const rows = await listTable<ReferenceRow>(KEY);
   return rows.map(normalizeReferenceRow);
 }
 
@@ -83,7 +83,7 @@ export async function createOrAttachReference(input: {
     });
     const nextRows = [...rows];
     nextRows[idx] = updated;
-    await setTable<ReferenceRow>(KEY, nextRows);
+    await replaceTable<ReferenceRow>(KEY, nextRows);
     notify(KEY);
     return updated;
   }
@@ -105,7 +105,7 @@ export async function createOrAttachReference(input: {
     attachments: [nextAttachment],
     createdAt: now(),
   });
-  await setTable<ReferenceRow>(KEY, [created, ...rows]);
+  await replaceTable<ReferenceRow>(KEY, [created, ...rows]);
   notify(KEY);
   return created;
 }
@@ -128,7 +128,7 @@ export async function updateReference(
   });
   const nextRows = [...rows];
   nextRows[idx] = updated;
-  await setTable<ReferenceRow>(KEY, nextRows);
+  await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
   return updated;
 }
@@ -148,11 +148,11 @@ export async function removeReferenceFromProject(referenceId: string, projectId:
       });
     })
     .filter((reference) => reference.projectIds.length > 0);
-  await setTable<ReferenceRow>(KEY, nextRows);
+  await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
 }
 
 export async function bulkInsertReferences(rows: ReferenceRow[]): Promise<void> {
-  await setTable<ReferenceRow>(KEY, rows.map(normalizeReferenceRow));
+  await replaceTable<ReferenceRow>(KEY, rows.map(normalizeReferenceRow));
   notify(KEY);
 }

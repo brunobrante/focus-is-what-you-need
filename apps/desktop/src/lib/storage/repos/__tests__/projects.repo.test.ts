@@ -2,7 +2,8 @@ import { beforeEach, expect, test } from "bun:test";
 
 import { createProject, deleteProject, findProjectByName } from "@/lib/storage/repos/projects.repo";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
-import { TABLES, getTable, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
+import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type {
   ComponentRow,
   ProjectRow,
@@ -24,6 +25,8 @@ class MemoryStorage {
 }
 
 beforeEach(() => {
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
 });
 
@@ -43,8 +46,8 @@ test("deleteProject removes project-owned screens, components, variants, and ref
     createdAt: 1,
     updatedAt: 1,
   };
-  await setTable<ProjectRow>(TABLES.projects, [project]);
-  await setTable<ScreenRow>(TABLES.screens, [
+  await replaceTable<ProjectRow>(TABLES.projects, [project]);
+  await replaceTable<ScreenRow>(TABLES.screens, [
     {
       id: "screen-1",
       projectId: project.id,
@@ -55,7 +58,7 @@ test("deleteProject removes project-owned screens, components, variants, and ref
       updatedAt: 1,
     },
   ]);
-  await setTable<ComponentRow>(TABLES.components, [
+  await replaceTable<ComponentRow>(TABLES.components, [
     {
       id: "component-1",
       projectId: project.id,
@@ -69,7 +72,7 @@ test("deleteProject removes project-owned screens, components, variants, and ref
       updatedAt: 1,
     },
   ]);
-  await setTable<VariantRow>(TABLES.variants, [
+  await replaceTable<VariantRow>(TABLES.variants, [
     {
       id: "variant-1",
       componentId: "component-1",
@@ -80,7 +83,7 @@ test("deleteProject removes project-owned screens, components, variants, and ref
       updatedAt: 1,
     },
   ]);
-  await setTable<ReferenceRow>(TABLES.references, [
+  await replaceTable<ReferenceRow>(TABLES.references, [
     {
       id: "reference-1",
       projectId: project.id,
@@ -98,9 +101,9 @@ test("deleteProject removes project-owned screens, components, variants, and ref
 
   await deleteProject(project.id);
 
-  expect(await getTable<ProjectRow>(TABLES.projects)).toEqual([]);
-  expect(await getTable<ScreenRow>(TABLES.screens)).toEqual([]);
-  expect(await getTable<ComponentRow>(TABLES.components)).toEqual([]);
-  expect(await getTable<VariantRow>(TABLES.variants)).toEqual([]);
-  expect(await getTable<ReferenceRow>(TABLES.references)).toEqual([]);
+  expect(await listTable<ProjectRow>(TABLES.projects)).toEqual([]);
+  expect(await listTable<ScreenRow>(TABLES.screens)).toEqual([]);
+  expect(await listTable<ComponentRow>(TABLES.components)).toEqual([]);
+  expect(await listTable<VariantRow>(TABLES.variants)).toEqual([]);
+  expect(await listTable<ReferenceRow>(TABLES.references)).toEqual([]);
 });

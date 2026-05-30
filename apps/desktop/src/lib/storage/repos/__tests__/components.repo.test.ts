@@ -12,7 +12,8 @@ import {
   serializeHtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
-import { TABLES, setTable } from "@/lib/storage/store";
+import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
+import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
 class MemoryStorage {
@@ -32,11 +33,15 @@ class MemoryStorage {
 }
 
 beforeEach(async () => {
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
-  await setTable<ComponentRow>(TABLES.components, []);
-  await setTable<SceneRow>(TABLES.scenes, []);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, []);
-  await setTable<VariantRow>(TABLES.variants, []);
+  await replaceTable<ComponentRow>(TABLES.components, []);
+  await replaceTable<SceneRow>(TABLES.scenes, []);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
+  await replaceTable<VariantRow>(TABLES.variants, []);
 });
 
 test("createComponent creates a component with a default variant under a screen", async () => {
@@ -117,7 +122,7 @@ test("deleteComponentTree removes a component, descendants, and their variants",
   screenDocument.nodes = screenDocument.nodes.map((node) =>
     node.id === "node-panel" ? { ...node, name: "Header" } : node,
   );
-  await setTable<SceneRow>(TABLES.scenes, [
+  await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-screen",
       ownerType: "screen",

@@ -8,7 +8,8 @@ import {
 import { getCanvasMockBundleForScreen } from "@/components/mocks/data/canvasMocks";
 import { flushThumbnailJobs } from "@/application/thumbnails/thumbnailQueue";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
-import { TABLES, getTable, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
+import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
 class MemoryStorage {
@@ -24,12 +25,16 @@ class MemoryStorage {
 }
 
 beforeEach(async () => {
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
   await flushThumbnailJobs();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
-  await setTable<ComponentRow>(TABLES.components, []);
-  await setTable<SceneRow>(TABLES.scenes, []);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, []);
-  await setTable<VariantRow>(TABLES.variants, []);
+  await replaceTable<ComponentRow>(TABLES.components, []);
+  await replaceTable<SceneRow>(TABLES.scenes, []);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
+  await replaceTable<VariantRow>(TABLES.variants, []);
 });
 
 test("upsertScene keeps the derived snapshot thumbnail in sync", async () => {
@@ -48,7 +53,7 @@ test("upsertScene keeps the derived snapshot thumbnail in sync", async () => {
   });
   await flushThumbnailJobs();
 
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   expect(thumbnails).toHaveLength(1);
   expect(thumbnails[0]).toMatchObject({
     ownerType: "variant",
@@ -66,7 +71,7 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   expect(bundle).not.toBeNull();
   const header = bundle!.components.find((component) => component.name === "Header")!;
 
-  await setTable<VariantRow>(TABLES.variants, [
+  await replaceTable<VariantRow>(TABLES.variants, [
     {
       id: "variant-header",
       componentId: "component-header",
@@ -77,7 +82,7 @@ test("upsertScene propagates connected component snapshots to parent screen", as
       updatedAt: 1,
     },
   ]);
-  await setTable<ComponentRow>(TABLES.components, [
+  await replaceTable<ComponentRow>(TABLES.components, [
     {
       id: "component-header",
       projectId: "project-1",
@@ -94,7 +99,7 @@ test("upsertScene propagates connected component snapshots to parent screen", as
       updatedAt: 1,
     },
   ]);
-  await setTable<SceneRow>(TABLES.scenes, [
+  await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-home",
       ownerType: "screen",
@@ -126,13 +131,13 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   });
   await flushThumbnailJobs();
 
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
   const screenScene = scenes.find(
     (scene) => scene.ownerType === "screen" && scene.ownerId === "screen-home",
   );
   expect(screenScene?.graphJSON).toContain("Resumo conectado");
 
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const screenThumbnail = thumbnails.find(
     (thumbnail) => thumbnail.ownerType === "screen" && thumbnail.ownerId === "screen-home",
   );
@@ -149,7 +154,7 @@ test("upsertScene propagates connected nested component snapshots through every 
   const header = bundle!.components.find((component) => component.name === "Header")!;
   const logo = header.children.find((component) => component.name === "Logo Design")!;
 
-  await setTable<VariantRow>(TABLES.variants, [
+  await replaceTable<VariantRow>(TABLES.variants, [
     {
       id: "variant-header",
       componentId: "component-header",
@@ -169,7 +174,7 @@ test("upsertScene propagates connected nested component snapshots through every 
       updatedAt: 1,
     },
   ]);
-  await setTable<ComponentRow>(TABLES.components, [
+  await replaceTable<ComponentRow>(TABLES.components, [
     {
       id: "component-header",
       projectId: "project-1",
@@ -201,7 +206,7 @@ test("upsertScene propagates connected nested component snapshots through every 
       updatedAt: 1,
     },
   ]);
-  await setTable<SceneRow>(TABLES.scenes, [
+  await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-home",
       ownerType: "screen",
@@ -241,7 +246,7 @@ test("upsertScene propagates connected nested component snapshots through every 
   });
   await flushThumbnailJobs();
 
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
   const headerScene = scenes.find(
     (scene) => scene.ownerType === "variant" && scene.ownerId === "variant-header",
   );
@@ -253,7 +258,7 @@ test("upsertScene propagates connected nested component snapshots through every 
   expect(screenScene?.graphJSON).toContain("ZX");
   expect(screenScene?.sceneVersion).toBe(2);
 
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const headerThumbnail = thumbnails.find(
     (thumbnail) => thumbnail.ownerType === "variant" && thumbnail.ownerId === "variant-header",
   );
@@ -265,7 +270,7 @@ test("upsertScene propagates connected nested component snapshots through every 
 });
 
 test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () => {
-  await setTable<VariantRow>(TABLES.variants, [
+  await replaceTable<VariantRow>(TABLES.variants, [
     {
       id: "variant-green",
       componentId: "component-green",
@@ -276,7 +281,7 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
       updatedAt: 1,
     },
   ]);
-  await setTable<ComponentRow>(TABLES.components, [
+  await replaceTable<ComponentRow>(TABLES.components, [
     {
       id: "component-green",
       projectId: "project-1",
@@ -295,7 +300,7 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
     },
   ]);
 
-  await setTable<SceneRow>(TABLES.scenes, [
+  await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-screen",
       ownerType: "screen",
@@ -320,7 +325,7 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
     graphJSON: duplicateRectangleComponentGraph("#0066FF"),
   });
 
-  const screenScene = (await getTable<SceneRow>(TABLES.scenes)).find(
+  const screenScene = (await listTable<SceneRow>(TABLES.scenes)).find(
     (scene) => scene.ownerType === "screen" && scene.ownerId === "screen-1",
   );
   const screenDocument = htmlCanvasDocumentFromJSON(screenScene!.graphJSON)!;

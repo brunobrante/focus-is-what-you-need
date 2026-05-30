@@ -9,12 +9,12 @@ import { notifyInvalidation, ownerInvalidationKey } from "@/application/persiste
 import { scheduleThumbnailRefresh } from "@/application/thumbnails/thumbnailQueue";
 import { newId, now } from "@/lib/storage/ids";
 import type { ComponentRow, SceneOwnerType, SceneRow, VariantRow } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, putRecord } from "@/lib/storage/store";
 
 const KEY = TABLES.scenes;
 
 export async function listScenes(): Promise<SceneRow[]> {
-  return getTable<SceneRow>(KEY);
+  return listTable<SceneRow>(KEY);
 }
 
 export async function getSceneByOwner(
@@ -34,49 +34,39 @@ export async function upsertScene(input: {
 }, options: {
   propagate?: boolean;
 } = {}): Promise<SceneRow> {
-  const rows = await listScenes();
-  const existing = rows.find(
-    (r) => r.ownerType === input.ownerType && r.ownerId === input.ownerId,
-  );
+  const existing = await getSceneByOwner(input.ownerType, input.ownerId);
   const t = now();
-  if (existing) {
-    const updated: SceneRow = {
-      ...existing,
-      graphJSON: input.graphJSON,
-      sceneVersion: existing.sceneVersion + 1,
-      updatedAt: t,
-    };
-    const next = rows.map((r) => (r.id === existing.id ? updated : r));
-    await setTable<SceneRow>(KEY, next);
-    scheduleDerivedThumbnail(input);
-    if (options.propagate !== false) {
-      await propagateVariantSceneToParents(input, t);
-    }
-    notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
-    notify(KEY);
-    return updated;
-  }
-  const created: SceneRow = {
-    id: newId(),
+  // One record per scene: writing it persists a single row (per-row delta on the
+  // save queue), never the whole scenes table.
+  const row: SceneRow = existing
+    ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: t }
+    : {
+        id: newId(),
+        ownerType: input.ownerType,
+        ownerId: input.ownerId,
+        graphJSON: input.graphJSON,
+        sceneVersion: 1,
+        updatedAt: t,
+      };
+  putRecord<SceneRow>(KEY, row);
+  // Snapshot propagation (CLAUDE.md): regenerate this node's thumbnail from the
+  // scene graph; propagation below regenerates ancestor thumbnails too.
+  scheduleThumbnailRefresh({
     ownerType: input.ownerType,
     ownerId: input.ownerId,
     graphJSON: input.graphJSON,
-    sceneVersion: 1,
-    updatedAt: t,
-  };
-  await setTable<SceneRow>(KEY, [created, ...rows]);
-  scheduleDerivedThumbnail(input);
+  });
   if (options.propagate !== false) {
     await propagateVariantSceneToParents(input, t);
   }
   notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
   notify(KEY);
-  return created;
+  return row;
 }
 
 export async function syncConnectedSceneSnapshots(): Promise<void> {
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const components = await getTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const components = await listTable<ComponentRow>(TABLES.components);
   const dependencyIndex = createSceneDependencyIndex({ components, variants });
   const t = now();
 
@@ -104,7 +94,7 @@ export async function syncConnectedSceneSnapshots(): Promise<void> {
 export async function removeComponentSubtreeFromParentScene(
   componentId: string,
 ): Promise<void> {
-  const components = await getTable<ComponentRow>(TABLES.components);
+  const components = await listTable<ComponentRow>(TABLES.components);
   const component = components.find((row) => row.id === componentId);
   if (!component) return;
 
@@ -132,16 +122,18 @@ export async function removeComponentSubtreeFromParentScene(
   });
 }
 
-function scheduleDerivedThumbnail(input: {
+/**
+ * Lazy ancestor propagation, off the save critical path. The queue calls this
+ * at idle after a scene row is written with `{ propagate: false }`, so a deep
+ * edit no longer multiplies the save cost by tree depth synchronously.
+ */
+export async function propagateSceneToParents(input: {
   ownerType: SceneOwnerType;
   ownerId: string;
   graphJSON: string;
-}): void {
-  scheduleThumbnailRefresh({
-    ownerType: input.ownerType,
-    ownerId: input.ownerId,
-    graphJSON: input.graphJSON,
-  });
+}): Promise<void> {
+  await propagateVariantSceneToParents(input, now());
+  notify(KEY);
 }
 
 async function propagateVariantSceneToParents(
@@ -160,8 +152,8 @@ async function propagateVariantSceneToParents(
   const visited = new Set<string>();
 
   const dependencyIndex = preloadedIndex ?? createSceneDependencyIndex({
-    variants: await getTable<VariantRow>(TABLES.variants),
-    components: await getTable<ComponentRow>(TABLES.components),
+    variants: await listTable<VariantRow>(TABLES.variants),
+    components: await listTable<ComponentRow>(TABLES.components),
   });
 
   for (let depth = 0; currentVariantId && depth < 64; depth += 1) {
@@ -203,38 +195,23 @@ async function upsertSceneRowWithoutPropagation(input: {
   graphJSON: string;
   t: number;
 }): Promise<void> {
-  const rows = await listScenes();
-  const existing = rows.find(
-    (row) => row.ownerType === input.ownerType && row.ownerId === input.ownerId,
-  );
-  if (!existing) {
-    await setTable<SceneRow>(KEY, [
-      {
+  const existing = await getSceneByOwner(input.ownerType, input.ownerId);
+  const row: SceneRow = existing
+    ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: input.t }
+    : {
         id: newId(),
         ownerType: input.ownerType,
         ownerId: input.ownerId,
         graphJSON: input.graphJSON,
         sceneVersion: 1,
         updatedAt: input.t,
-      },
-      ...rows,
-    ]);
-  } else {
-    await setTable<SceneRow>(
-      KEY,
-      rows.map((row) =>
-        row.id === existing.id
-          ? {
-              ...existing,
-              graphJSON: input.graphJSON,
-              sceneVersion: existing.sceneVersion + 1,
-              updatedAt: input.t,
-            }
-          : row,
-      ),
-    );
-  }
-  scheduleDerivedThumbnail(input);
+      };
+  putRecord<SceneRow>(KEY, row);
+  scheduleThumbnailRefresh({
+    ownerType: input.ownerType,
+    ownerId: input.ownerId,
+    graphJSON: input.graphJSON,
+  });
   notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
 }
 

@@ -81,19 +81,14 @@ export function useHtmlCanvasDocument(
     if (serialized === lastSavedRef.current) return;
 
     const timeout = window.setTimeout(() => {
-      void saveScene({
+      // Fire-and-forget into the save queue. Persistence failure becomes queue
+      // state (retry/backoff) — it must never surface as a document error.
+      saveScene({
         ownerType: target.kind,
         ownerId: target.row.id,
         graphJSON: serialized,
-      })
-        .then(() => {
-          lastSavedRef.current = serialized;
-        })
-        .catch((err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          setStatus("error");
-          setError(message);
-        });
+      });
+      lastSavedRef.current = serialized;
     }, 350);
 
     return () => window.clearTimeout(timeout);

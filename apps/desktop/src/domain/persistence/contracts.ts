@@ -99,3 +99,6 @@ export interface DependencyIndexRepository {
 export interface UnitOfWork {
   transaction<T>(run: () => Promise<T>): Promise<T>;
 }
+
+export type { PersistencePort } from "./persistencePort";
+export type { Mutation, ApplyAck } from "./mutations";

@@ -1,12 +1,12 @@
 import type { ComponentVariant } from "@/lib/data/types";
 import { newId, now } from "@/lib/storage/ids";
 import type { VariantRow } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.variants;
 
 export async function listVariants(): Promise<VariantRow[]> {
-  return getTable<VariantRow>(KEY);
+  return listTable<VariantRow>(KEY);
 }
 
 export async function listVariantsByComponent(
@@ -61,7 +61,7 @@ export async function createVariant(input: {
     createdAt: t,
     updatedAt: t,
   };
-  await setTable<VariantRow>(KEY, [created, ...rows]);
+  await replaceTable<VariantRow>(KEY, [created, ...rows]);
   notify(KEY);
   return created;
 }

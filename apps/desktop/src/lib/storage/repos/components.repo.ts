@@ -9,7 +9,7 @@ import type {
   ThumbnailRow,
   VariantRow,
 } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.components;
 const VARIANTS_KEY = TABLES.variants;
@@ -20,7 +20,7 @@ export type ComponentParent =
   | { kind: "variant"; variantId: string };
 
 export async function listComponents(): Promise<ComponentRow[]> {
-  const rows = await getTable<ComponentRow>(KEY);
+  const rows = await listTable<ComponentRow>(KEY);
   return rows.map(normalizeComponentRow);
 }
 
@@ -129,8 +129,8 @@ export async function createComponent(input: {
 
   const t = now();
 
-  const components = await getTable<ComponentRow>(KEY);
-  const variants = await getTable<VariantRow>(VARIANTS_KEY);
+  const components = await listTable<ComponentRow>(KEY);
+  const variants = await listTable<VariantRow>(VARIANTS_KEY);
 
   const siblings = components.filter((c) => {
     if (input.parent.kind === "project") {
@@ -188,8 +188,8 @@ export async function createComponent(input: {
     updatedAt: t,
   });
 
-  await setTable<VariantRow>(VARIANTS_KEY, [defaultVariant, ...variants]);
-  await setTable<ComponentRow>(KEY, [component, ...components]);
+  await replaceTable<VariantRow>(VARIANTS_KEY, [defaultVariant, ...variants]);
+  await replaceTable<ComponentRow>(KEY, [component, ...components]);
   notify(VARIANTS_KEY);
   notify(KEY);
 
@@ -200,7 +200,7 @@ export async function updateComponent(
   componentId: string,
   patch: Partial<Pick<ComponentRow, "assignedScreenIds" | "category" | "description" | "kind" | "name" | "screenId" | "sourceNodeId">>,
 ): Promise<ComponentRow | null> {
-  const components = await getTable<ComponentRow>(KEY);
+  const components = await listTable<ComponentRow>(KEY);
   const idx = components.findIndex((component) => component.id === componentId);
   if (idx < 0) return null;
 
@@ -215,14 +215,14 @@ export async function updateComponent(
   });
   const nextComponents = [...components];
   nextComponents[idx] = next;
-  await setTable<ComponentRow>(KEY, nextComponents);
+  await replaceTable<ComponentRow>(KEY, nextComponents);
   notify(KEY);
   return next;
 }
 
 export async function deleteComponentTree(componentId: string): Promise<void> {
-  const components = await getTable<ComponentRow>(KEY);
-  const variants = await getTable<VariantRow>(VARIANTS_KEY);
+  const components = await listTable<ComponentRow>(KEY);
+  const variants = await listTable<VariantRow>(VARIANTS_KEY);
   const componentIds = collectComponentTreeIds(componentId, components, variants);
   if (componentIds.size === 0) return;
 
@@ -232,17 +232,17 @@ export async function deleteComponentTree(componentId: string): Promise<void> {
     variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
   );
 
-  await setTable<ComponentRow>(
+  await replaceTable<ComponentRow>(
     KEY,
     components.filter((c) => !componentIds.has(c.id)),
   );
-  await setTable<VariantRow>(
+  await replaceTable<VariantRow>(
     VARIANTS_KEY,
     variants.filter((v) => !variantIds.has(v.id)),
   );
 
-  const references = await getTable<ReferenceRow>(TABLES.references);
-  await setTable<ReferenceRow>(
+  const references = await listTable<ReferenceRow>(TABLES.references);
+  await replaceTable<ReferenceRow>(
     TABLES.references,
     references
       .map((reference) => normalizeReferenceRow(reference))
@@ -259,14 +259,14 @@ export async function deleteComponentTree(componentId: string): Promise<void> {
       .filter((reference) => reference.projectIds.length > 0),
   );
 
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  await setTable<SceneRow>(
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  await replaceTable<SceneRow>(
     TABLES.scenes,
     scenes.filter((s) => !(s.ownerType === "variant" && variantIds.has(s.ownerId))),
   );
 
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  await setTable<ThumbnailRow>(
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  await replaceTable<ThumbnailRow>(
     TABLES.thumbnails,
     thumbnails.filter(
       (t) => !(t.ownerType === "variant" && variantIds.has(t.ownerId)),
@@ -309,6 +309,6 @@ export function collectComponentTreeIds(
 }
 
 export async function bulkInsertComponents(rows: ComponentRow[]): Promise<void> {
-  await setTable<ComponentRow>(KEY, rows.map(normalizeComponentRow));
+  await replaceTable<ComponentRow>(KEY, rows.map(normalizeComponentRow));
   notify(KEY);
 }

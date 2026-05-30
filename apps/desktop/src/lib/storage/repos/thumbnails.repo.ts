@@ -1,12 +1,12 @@
 import { newId, now } from "@/lib/storage/ids";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
 import type { SceneOwnerType, ThumbnailRow } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, putRecord, removeRecords } from "@/lib/storage/store";
 
 const KEY = TABLES.thumbnails;
 
 export async function listThumbnails(): Promise<ThumbnailRow[]> {
-  return getTable<ThumbnailRow>(KEY);
+  return listTable<ThumbnailRow>(KEY);
 }
 
 export async function getThumbnailByOwner(
@@ -24,46 +24,31 @@ export async function upsertThumbnail(input: {
   ownerId: string;
   dataUrl: string;
 }): Promise<ThumbnailRow> {
-  const rows = await listThumbnails();
-  const existing = rows.find(
-    (r) => r.ownerType === input.ownerType && r.ownerId === input.ownerId,
-  );
+  const existing = await getThumbnailByOwner(input.ownerType, input.ownerId);
   const t = now();
-  if (existing) {
-    const updated: ThumbnailRow = {
-      ...existing,
-      dataUrl: input.dataUrl,
-      capturedAt: t,
-    };
-    const next = rows.map((r) => (r.id === existing.id ? updated : r));
-    await setTable<ThumbnailRow>(KEY, next);
-    notifyInvalidation(ownerInvalidationKey("thumbnail", input.ownerType, input.ownerId));
-    notify(KEY);
-    return updated;
-  }
-  const created: ThumbnailRow = {
-    id: newId(),
-    ownerType: input.ownerType,
-    ownerId: input.ownerId,
-    dataUrl: input.dataUrl,
-    capturedAt: t,
-  };
-  await setTable<ThumbnailRow>(KEY, [created, ...rows]);
+  // One record per thumbnail — written as a single per-row delta.
+  const row: ThumbnailRow = existing
+    ? { ...existing, dataUrl: input.dataUrl, capturedAt: t }
+    : {
+        id: newId(),
+        ownerType: input.ownerType,
+        ownerId: input.ownerId,
+        dataUrl: input.dataUrl,
+        capturedAt: t,
+      };
+  putRecord<ThumbnailRow>(KEY, row);
   notifyInvalidation(ownerInvalidationKey("thumbnail", input.ownerType, input.ownerId));
   notify(KEY);
-  return created;
+  return row;
 }
 
 export async function deleteThumbnailByOwner(
   ownerType: SceneOwnerType,
   ownerId: string,
 ): Promise<void> {
-  const rows = await listThumbnails();
-  const nextRows = rows.filter(
-    (row) => !(row.ownerType === ownerType && row.ownerId === ownerId),
-  );
-  if (nextRows.length === rows.length) return;
-  await setTable<ThumbnailRow>(KEY, nextRows);
+  const existing = await getThumbnailByOwner(ownerType, ownerId);
+  if (!existing) return;
+  removeRecords(KEY, [existing.id]);
   notifyInvalidation(ownerInvalidationKey("thumbnail", ownerType, ownerId));
   notify(KEY);
 }

@@ -7,15 +7,13 @@ export type SaveSceneInput = {
   graphJSON: string;
 };
 
-export type SaveSceneOptions = {
-  propagate?: boolean;
-};
-
-export async function saveScene(
-  input: SaveSceneInput,
-  options: SaveSceneOptions = {},
-): Promise<SceneRow> {
-  return upsertScene(input, options);
+/**
+ * Save a scene. The UI never waits for the database: `upsertScene` updates the
+ * record-store cache synchronously and enqueues a single per-row delta on the
+ * save queue; ancestor propagation runs off the critical path. Fire-and-forget.
+ */
+export function saveScene(input: SaveSceneInput): void {
+  void upsertScene(input);
 }
 
 export async function readSceneByOwner(

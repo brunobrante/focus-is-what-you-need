@@ -84,15 +84,14 @@ export function useDeferredPersistence({
       latestGraphJSONRef.current = graphJSON;
     }
 
-    return saveScene({ ownerType: pending.ownerType, ownerId: pending.ownerId, graphJSON }).then(() =>
-      materializeComponentsFromCanvasDocument({
-        currentComponent: pending.currentComponent,
-        document: pending.document,
-        projectComponents: pending.projectComponents,
-        projectId: pending.projectId,
-        screen: pending.screen,
-      }),
-    );
+    saveScene({ ownerType: pending.ownerType, ownerId: pending.ownerId, graphJSON });
+    return materializeComponentsFromCanvasDocument({
+      currentComponent: pending.currentComponent,
+      document: pending.document,
+      projectComponents: pending.projectComponents,
+      projectId: pending.projectId,
+      screen: pending.screen,
+    });
   }, []);
 
   const handleCurrentDocumentChange = useCallback(
@@ -147,7 +146,7 @@ export function useDeferredPersistence({
   useEffect(() => {
     if (!sceneOwner || !currentReady || !resolvedSceneGraphJSON) return;
     if (resolvedSceneGraphJSON === effectiveSceneGraphJSON) return;
-    void saveScene({
+    saveScene({
       ownerType: sceneOwner.ownerType,
       ownerId: sceneOwner.ownerId,
       graphJSON: resolvedSceneGraphJSON,

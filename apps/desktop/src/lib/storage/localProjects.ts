@@ -19,7 +19,7 @@ import {
   type VariantRow,
   type WorkspaceRow,
 } from "@/lib/storage/schema";
-import { TABLES, getTable, notify, setTable, subscribe } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable, subscribe } from "@/lib/storage/store";
 
 const FIGX_FORMAT_VERSION = 1;
 const AUTOSAVE_DELAY_MS = 650;
@@ -136,17 +136,17 @@ async function importLocalFigxProjects(): Promise<void> {
     archive.tables.screenVersions.forEach((row) => importedScreenVersionIds.add(row.id));
   }
 
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const references = await getTable<ReferenceRow>(TABLES.references);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  const workspaces = await getTable<WorkspaceRow>(TABLES.workspaces);
-  const screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  const placements = await getTable<ComponentPlacementRow>(TABLES.placements);
-  const history = await getTable<HistoryEntryRow>(TABLES.history);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const references = await listTable<ReferenceRow>(TABLES.references);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  const workspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
+  const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
+  const history = await listTable<HistoryEntryRow>(TABLES.history);
 
   const importedProjects = archives.map((archive) =>
     normalizeProjectRow({ ...archive.project, source: "local" }),
@@ -230,17 +230,17 @@ async function importLocalFigxProjects(): Promise<void> {
     nextProjects.map((project) => project.id),
   );
 
-  await setTable<ProjectRow>(TABLES.projects, nextProjects);
-  await setTable<ScreenRow>(TABLES.screens, nextScreens);
-  await setTable<ComponentRow>(TABLES.components, nextComponents);
-  await setTable<VariantRow>(TABLES.variants, nextVariants);
-  await setTable<ReferenceRow>(TABLES.references, nextReferences);
-  await setTable<SceneRow>(TABLES.scenes, nextScenes);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
-  await setTable<WorkspaceRow>(TABLES.workspaces, nextWorkspaces);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, nextScreenVersions);
-  await setTable<ComponentPlacementRow>(TABLES.placements, nextPlacements);
-  await setTable<HistoryEntryRow>(TABLES.history, nextHistory);
+  await replaceTable<ProjectRow>(TABLES.projects, nextProjects);
+  await replaceTable<ScreenRow>(TABLES.screens, nextScreens);
+  await replaceTable<ComponentRow>(TABLES.components, nextComponents);
+  await replaceTable<VariantRow>(TABLES.variants, nextVariants);
+  await replaceTable<ReferenceRow>(TABLES.references, nextReferences);
+  await replaceTable<SceneRow>(TABLES.scenes, nextScenes);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, nextWorkspaces);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, nextScreenVersions);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, nextPlacements);
+  await replaceTable<HistoryEntryRow>(TABLES.history, nextHistory);
 
   PERSISTED_TABLES.forEach((table) => notify(table));
   notify(TABLES.workspaces);
@@ -387,24 +387,24 @@ async function syncLocalFigxProjects(): Promise<void> {
 async function buildLocalProjectArchives(): Promise<
   Array<{ archive: FigxArchive; referenceIds: string[] }>
 > {
-  const projects = (await getTable<ProjectRow>(TABLES.projects))
+  const projects = (await listTable<ProjectRow>(TABLES.projects))
     .map(normalizeProjectRow)
     .filter(isLocalProject);
   if (projects.length === 0) return [];
 
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const components = (await getTable<ComponentRow>(TABLES.components)).map(
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const components = (await listTable<ComponentRow>(TABLES.components)).map(
     normalizeComponentRow,
   );
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const references = (await getTable<ReferenceRow>(TABLES.references)).map(
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const references = (await listTable<ReferenceRow>(TABLES.references)).map(
     normalizeReferenceRow,
   );
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  const screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  const placements = await getTable<ComponentPlacementRow>(TABLES.placements);
-  const history = await getTable<HistoryEntryRow>(TABLES.history);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
+  const history = await listTable<HistoryEntryRow>(TABLES.history);
 
   return projects.map((project) => {
     const projectScreens = screens.filter((screen) => screen.projectId === project.id);

@@ -7,7 +7,8 @@ import {
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { createDefaultDesignSystem } from "@/lib/storage/defaults";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
-import { TABLES, getTable, setTable, store } from "@/lib/storage/store";
+import { TABLES, listTable, replaceTable, resetRecordStoreCache, setMeta } from "@/lib/storage/store";
+import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type {
   ComponentPlacementRow,
   ComponentRow,
@@ -33,6 +34,8 @@ class MemoryStorage {
 }
 
 beforeEach(() => {
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
 });
 
@@ -40,12 +43,12 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
   await ensureSeededAndMigrated();
 
   const mocks = await getCanvasMockDataset();
-  const projects = await getTable<ProjectRow>(TABLES.projects);
-  const screens = await getTable<ScreenRow>(TABLES.screens);
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
 
   const mobileProject = projects.find((project) => project.type === "mobile");
   const desktopProject = projects.find((project) => project.type === "desktop");
@@ -166,7 +169,7 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
 });
 
 test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and placements", async () => {
-  await store.set<Meta>(TABLES.meta, { schemaVersion: 7, seededAt: 1 });
+  setMeta<Meta>({ schemaVersion: 7, seededAt: 1 });
   const project: ProjectRow = {
     id: "project-1",
     name: "App de delivery",
@@ -188,23 +191,23 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
     updatedAt: 1,
   };
 
-  await setTable<ProjectRow>(TABLES.projects, [project]);
-  await setTable<ScreenRow>(TABLES.screens, [screen]);
-  await setTable<ComponentRow>(TABLES.components, []);
-  await setTable<VariantRow>(TABLES.variants, []);
-  await setTable<SceneRow>(TABLES.scenes, []);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, []);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, []);
-  await setTable<ComponentPlacementRow>(TABLES.placements, []);
+  await replaceTable<ProjectRow>(TABLES.projects, [project]);
+  await replaceTable<ScreenRow>(TABLES.screens, [screen]);
+  await replaceTable<ComponentRow>(TABLES.components, []);
+  await replaceTable<VariantRow>(TABLES.variants, []);
+  await replaceTable<SceneRow>(TABLES.scenes, []);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, []);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, []);
 
   await ensureSeededAndMigrated();
 
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const variants = await getTable<VariantRow>(TABLES.variants);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await getTable<ThumbnailRow>(TABLES.thumbnails);
-  const screenVersions = await getTable<ScreenVersionRow>(TABLES.screenVersions);
-  const placements = await getTable<ComponentPlacementRow>(TABLES.placements);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
+  const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
+  const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
   const homeVersion = screenVersions.find((version) => version.screenId === screen.id);
   const homePlacements = placements.filter(
     (placement) => placement.screenVersionId === homeVersion?.id,
@@ -240,7 +243,7 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
 });
 
 test("v9 migration replaces stale full-screen component scenes with component-sized scenes", async () => {
-  await store.set<Meta>(TABLES.meta, { schemaVersion: 9, seededAt: 1 });
+  setMeta<Meta>({ schemaVersion: 9, seededAt: 1 });
 
   const project: ProjectRow = {
     id: "project-1",
@@ -288,11 +291,11 @@ test("v9 migration replaces stale full-screen component scenes with component-si
   };
   const staleBundle = await getCanvasMockBundleForScreen(screen, "mobile");
 
-  await setTable<ProjectRow>(TABLES.projects, [project]);
-  await setTable<ScreenRow>(TABLES.screens, [screen]);
-  await setTable<ComponentRow>(TABLES.components, [staleHeader]);
-  await setTable<VariantRow>(TABLES.variants, [staleVariant]);
-  await setTable<SceneRow>(TABLES.scenes, [
+  await replaceTable<ProjectRow>(TABLES.projects, [project]);
+  await replaceTable<ScreenRow>(TABLES.screens, [screen]);
+  await replaceTable<ComponentRow>(TABLES.components, [staleHeader]);
+  await replaceTable<VariantRow>(TABLES.variants, [staleVariant]);
+  await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-screen",
       ownerType: "screen",
@@ -310,14 +313,14 @@ test("v9 migration replaces stale full-screen component scenes with component-si
       updatedAt: 1,
     },
   ]);
-  await setTable<ThumbnailRow>(TABLES.thumbnails, []);
-  await setTable<ScreenVersionRow>(TABLES.screenVersions, []);
-  await setTable<ComponentPlacementRow>(TABLES.placements, []);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
+  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, []);
+  await replaceTable<ComponentPlacementRow>(TABLES.placements, []);
 
   await ensureSeededAndMigrated();
 
-  const components = await getTable<ComponentRow>(TABLES.components);
-  const scenes = await getTable<SceneRow>(TABLES.scenes);
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
   const header = components.find(
     (component) => component.screenId === screen.id && component.name === "Header",
   );
