@@ -330,7 +330,14 @@ export function CanvasStage({
         <CanvasGridOverlay
           enabled={state.document.shellGrid?.enabled ?? false}
           type={state.document.shellGrid?.type ?? "dots"}
-          background={state.document.shellBackground ?? "#000000"}
+          shellBackground={state.document.shellBackground ?? "#000000"}
+          canvasBackground={state.document.canvas.background || "#ffffff"}
+          canvasRect={{
+            x: viewportTransform.offsetX,
+            y: viewportTransform.offsetY,
+            width: projectedStageWidth,
+            height: projectedStageHeight,
+          }}
           displayZoom={displayZoom}
           offsetX={viewportTransform.offsetX}
           offsetY={viewportTransform.offsetY}
