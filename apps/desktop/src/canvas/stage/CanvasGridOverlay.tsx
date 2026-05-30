@@ -44,19 +44,29 @@ function perceivedLuminance(hex: string): number {
 
 /**
  * Derive grid fill + stroke colours for a given background.
- * Light background → black lines; dark → white lines.
- * Alpha scales inversely to natural contrast so near-grey gets more opacity.
+ *
+ * Light background → black lines (inherently high contrast at low opacity).
+ * Dark background  → white lines (needs more opacity to register visually).
+ *
+ * Asymmetric base alphas compensate for perceptual asymmetry — our eyes
+ * detect dark marks on light more easily than light marks on dark.
+ * Near-grey backgrounds (lowest natural contrast) get an additional boost.
  */
-function gridColors(
-  bg: string,
-  fadeOpacity: number,
-): { fill: string; stroke: string } {
+function gridColors(bg: string, fadeOpacity: number): { fill: string; stroke: string } {
   const lum = perceivedLuminance(bg);
   const isLight = lum > 0.5;
-  const contrast = Math.abs(lum - 0.5) * 2; // 0 (grey) → 1 (black/white)
-  const alphaScale = 0.18 + (1 - contrast) * 0.22; // 0.18 → 0.40
-  const dotAlpha = +(alphaScale * fadeOpacity).toFixed(3);
-  const lineAlpha = +((alphaScale * 0.65) * fadeOpacity).toFixed(3);
+
+  // Distance from mid-grey: 0 = pure grey, 1 = pure black / white
+  const contrast = Math.abs(lum - 0.5) * 2;
+  // Mid-grey has lowest natural contrast with either colour → boost opacity
+  const greyBoost = (1 - contrast) * 0.10;
+
+  const baseLine = isLight ? 0.15 : 0.24;
+  const baseDot  = isLight ? 0.24 : 0.34;
+
+  const lineAlpha = +((baseLine + greyBoost) * fadeOpacity).toFixed(3);
+  const dotAlpha  = +((baseDot  + greyBoost) * fadeOpacity).toFixed(3);
+
   const ch = isLight ? "0,0,0" : "255,255,255";
   return { fill: `rgba(${ch},${dotAlpha})`, stroke: `rgba(${ch},${lineAlpha})` };
 }
