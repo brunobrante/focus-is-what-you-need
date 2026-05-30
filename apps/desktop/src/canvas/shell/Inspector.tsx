@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import {
   renameElement,
@@ -48,11 +48,6 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
     if (canvasStageActive) setActiveTab("canvas");
     else if (node) setActiveTab("element");
   }, [node?.id, canvasStageActive]);
-
-  const parentName = useMemo(() => {
-    if (!document || !node?.parentId) return "Canvas";
-    return document.elements[node.parentId]?.name ?? "Canvas";
-  }, [document, node?.parentId]);
 
   if (!open) return null;
 
@@ -161,7 +156,6 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
         ) : (
           <ElementTab
             node={node}
-            parentName={parentName}
             document={document}
             onUpdateName={(name) => commitDocument(renameElement(document, node.id, name))}
             onUpdateText={(text) => commitDocument(updateElementText(document, node.id, text))}

@@ -15,7 +15,6 @@ import {
 
 type ElementTabProps = {
   node: ElementNode;
-  parentName: string;
   document: CanvasDocument;
   onUpdateName: (name: string) => void;
   onUpdateText: (text: string) => void;
@@ -51,7 +50,6 @@ function weightForLabel(value: string): string {
 
 export function ElementTab({
   node,
-  parentName,
   document,
   onUpdateName,
   onUpdateText,
@@ -68,35 +66,6 @@ export function ElementTab({
 
   return (
     <>
-      <InsSection title="Hierarquia">
-        <InsRow label="Nome">
-          <InsInput value={node.name} onChange={onUpdateName} />
-        </InsRow>
-        <Readout label="Tipo" value={elementTypeLabel(node.type)} />
-        <Readout label="Pai" value={parentName} />
-        <Readout label="Filhos" value={String(node.children.length)} />
-        <InsRow label="Lock">
-          <InsToggle
-            value={node.locked ? "locked" : "free"}
-            onChange={(value) => onToggleLocked(value === "locked")}
-            options={[
-              { value: "free", label: "Livre" },
-              { value: "locked", label: "Travado" },
-            ]}
-          />
-        </InsRow>
-        <InsRow label="Visible">
-          <InsToggle
-            value={node.visible === false ? "hidden" : "visible"}
-            onChange={(value) => onToggleVisible(value === "visible")}
-            options={[
-              { value: "visible", label: "On" },
-              { value: "hidden", label: "Off" },
-            ]}
-          />
-        </InsRow>
-      </InsSection>
-
       {node.type === "text" ? (
         <InsSection title="Conteúdo">
           <InsTextarea value={node.content ?? ""} onChange={onUpdateText} />
