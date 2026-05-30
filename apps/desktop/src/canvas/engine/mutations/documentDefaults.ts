@@ -1,7 +1,8 @@
-import type { CanvasDocument, CanvasProperties } from "../types";
+import type { CanvasDocument, CanvasProperties, ShellGridType } from "../types";
 import { cloneDocument } from "./coreUtils";
 
 export const DEFAULT_SHELL_BACKGROUND = "#000000";
+export const DEFAULT_SHELL_GRID: { enabled: boolean; type: ShellGridType } = { enabled: false, type: "dots" };
 
 export function createBlankDocument(width: number, height: number): CanvasDocument {
   return {
@@ -26,6 +27,15 @@ export function createDraftDocument(_width?: number, _height?: number): CanvasDo
 export function updateShellBackground(document: CanvasDocument, background: string): CanvasDocument {
   const next = cloneDocument(document);
   next.shellBackground = background;
+  return next;
+}
+
+export function updateShellGrid(
+  document: CanvasDocument,
+  grid: Partial<{ enabled: boolean; type: ShellGridType }>,
+): CanvasDocument {
+  const next = cloneDocument(document);
+  next.shellGrid = { ...DEFAULT_SHELL_GRID, ...next.shellGrid, ...grid };
   return next;
 }
 

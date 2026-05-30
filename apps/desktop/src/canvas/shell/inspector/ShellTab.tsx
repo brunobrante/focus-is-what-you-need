@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ShellGridType } from "@/canvas/engine/types";
 import { InsColor, InsMultiSelect, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
 
 type ShellControlVisibility = "show" | "hidden" | "hover";
@@ -12,15 +13,15 @@ const SHELL_VISIBILITY_OPTIONS: Array<{ value: ShellControlVisibility; label: st
 
 type ShellTabProps = {
   background: string;
+  shellGrid: { enabled: boolean; type: ShellGridType };
   onUpdateBackground: (background: string) => void;
+  onUpdateGrid: (grid: Partial<{ enabled: boolean; type: ShellGridType }>) => void;
 };
 
-export function ShellTab({ background, onUpdateBackground }: ShellTabProps) {
+export function ShellTab({ background, shellGrid, onUpdateBackground, onUpdateGrid }: ShellTabProps) {
   const [deviceButtonVisibility, setDeviceButtonVisibility] = useState<ShellControlVisibility>("show");
   const [zoomVisibility, setZoomVisibility] = useState<ShellControlVisibility>("show");
   const [expandVisibility, setExpandVisibility] = useState<ShellControlVisibility>("hover");
-  const [showDots, setShowDots] = useState(true);
-  const [showSquares, setShowSquares] = useState(false);
   const [enabledWindows, setEnabledWindows] = useState<ShellWindowOption[]>(["draft"]);
 
   return (
@@ -70,11 +71,22 @@ export function ShellTab({ background, onUpdateBackground }: ShellTabProps) {
       </InsSection>
 
       <InsSection title="Grade">
-        <InsRow label="Dots">
-          <InsSwitch checked={showDots} onChange={setShowDots} label="Pontilhado" />
+        <InsRow label="Ativar">
+          <InsSwitch
+            checked={shellGrid.enabled}
+            onChange={(enabled) => onUpdateGrid({ enabled })}
+            label="Grid"
+          />
         </InsRow>
-        <InsRow label="Squares">
-          <InsSwitch checked={showSquares} onChange={setShowSquares} label="Quadrados" />
+        <InsRow label="Tipo">
+          <InsToggle
+            value={shellGrid.type}
+            onChange={(value) => onUpdateGrid({ type: value as ShellGridType })}
+            options={[
+              { value: "dots", label: "Dots" },
+              { value: "squares", label: "Squares" },
+            ]}
+          />
         </InsRow>
       </InsSection>
     </>

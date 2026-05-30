@@ -11,6 +11,7 @@ import { CanvasToolingLayer } from "./CanvasToolingLayer";
 import type { CanvasToolingRef } from "./CanvasToolingLayer";
 import type { Interaction } from "./canvasInteractionTypes";
 import { getShellPatternStyle, getStageBoxShadow, TOOLBAR_TOOL_MAP } from "./canvasShellStyle";
+import { CanvasGridOverlay } from "./CanvasGridOverlay";
 import { getCanvasSize } from "./canvasCoordinates";
 import type { CanvasAlignmentLogInput } from "./canvasAlignmentLog";
 import { RenderedScene } from "./RenderedScene";
@@ -280,6 +281,17 @@ export function CanvasStage({
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
     >
+      {viewportSize.width > 0 && viewportSize.height > 0 && (
+        <CanvasGridOverlay
+          enabled={state.document.shellGrid?.enabled ?? false}
+          type={state.document.shellGrid?.type ?? "dots"}
+          displayZoom={displayZoom}
+          offsetX={viewportTransform.offsetX}
+          offsetY={viewportTransform.offsetY}
+          width={viewportSize.width}
+          height={viewportSize.height}
+        />
+      )}
       <div
         ref={stageRef}
         className={`stage-space${draftMode ? " stage-space--draft" : ""}`}
