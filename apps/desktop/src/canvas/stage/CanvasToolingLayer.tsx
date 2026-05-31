@@ -2,6 +2,7 @@ import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useM
 import type { CSSProperties } from "react";
 import { filterTopLevelIds, getCommonParentId, getSelectionBox, unionRects } from "@/canvas/engine/geometry";
 import { useHoveredId } from "@/canvas/engine/store";
+import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/canvas/engine/types";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasHitTesting";
 import { hitTestTooling } from "./canvasHitTesting";
@@ -272,7 +273,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       const radiusEligible = Boolean(
         radiusElement &&
           !radiusElement.locked &&
-          (radiusElement.type === "rect" || radiusElement.type === "image"),
+          getElementDefinition(radiusElement.type).capabilities.radius,
       );
       const radiusElementHovered = Boolean(
         radiusElement && hoveredId === radiusElement.id,

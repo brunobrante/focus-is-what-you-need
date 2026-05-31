@@ -21,6 +21,7 @@ import {
   snapAngle,
 } from "@/canvas/engine/geometry";
 import { buildSnapCandidates, snapRectWithCandidates } from "@/canvas/engine/snapping";
+import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
 import type {
@@ -191,17 +192,18 @@ function resizeSingleElement(
     ? getParentSize(interaction.beforeDocument, id)
     : { width: parentBounds.width, height: parentBounds.height };
   const handle = interaction.handle;
+  const lockAspect = getElementDefinition(source.type).capabilities.lockAspectRatio;
   let nextRect: Rect;
   if (source.rotation !== 0) {
     nextRect = resizeRotatedRectFromHandle(startRect, handle, currentPoint, source.rotation, {
       altKey: event.altKey,
-      shiftKey: event.shiftKey,
+      shiftKey: event.shiftKey || lockAspect,
     });
     nextRect = clampRotatedRectToBounds(nextRect, source.rotation, parentBounds);
   } else {
     nextRect = resizeBoxFromHandle(startRect, interaction.startPoint, currentPoint, handle, {
       altKey: event.altKey,
-      shiftKey: event.shiftKey,
+      shiftKey: event.shiftKey || lockAspect,
     });
     nextRect = clampRectToBounds(nextRect, parentBounds);
   }

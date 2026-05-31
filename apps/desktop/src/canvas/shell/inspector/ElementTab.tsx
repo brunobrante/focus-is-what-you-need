@@ -1,3 +1,4 @@
+import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementStyles, ElementType } from "@/canvas/engine/types";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import {
@@ -141,7 +142,7 @@ export function ElementTab({
         <InsRow label="Opacity">
           <InsInput value={String(opacity)} onChange={(value) => updateNumber(value, (next) => onUpdateStyle({ opacity: clamp(next, 0, 100) / 100 }))} suffix="%" />
         </InsRow>
-        {node.type !== "ellipse" && (
+        {getElementDefinition(node.type).capabilities.radius && (
           <InsRow label="Radius">
             <InsInput value={String(node.styles.borderRadius ?? 0)} onChange={(value) => updateNumber(value, (borderRadius) => onUpdateStyle({ borderRadius }))} suffix="px" />
           </InsRow>

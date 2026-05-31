@@ -1,5 +1,6 @@
 import type React from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { getToolElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { createElementForTool, reparentElements, shallowCloneDocument } from "@/canvas/engine/actions";
 import { getDescendantIds, roundPixel } from "@/canvas/engine/geometry";
 import type { CanvasDocument, EditorState, Point, Rect } from "@/canvas/engine/types";
@@ -67,7 +68,8 @@ export function handleDrawMove(
   const x = Math.min(interaction.startPoint.x, point.x);
   const y = Math.min(interaction.startPoint.y, point.y);
   const w = Math.abs(point.x - interaction.startPoint.x);
-  const h = event.shiftKey ? w : Math.abs(point.y - interaction.startPoint.y);
+  const lockAspect = getToolElementDefinition(interaction.tool)?.capabilities.lockAspectRatio ?? false;
+  const h = (event.shiftKey || lockAspect) ? w : Math.abs(point.y - interaction.startPoint.y);
   const next = shallowCloneDocument(interaction.beforeDocument);
   const node = createElementForTool(interaction.tool, 0, 0, interaction.beforeDocument.canvas);
   node.id = interaction.elementId;
