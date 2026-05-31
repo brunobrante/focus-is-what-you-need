@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 
 import type { SplitMode } from "@/canvas/Canvas";
@@ -492,6 +492,13 @@ function SurfaceCanvasControls({
       onMouseEnter={() => setLocalHovered(true)}
       onMouseLeave={() => setLocalHovered(false)}
     >
+      {menuOpen && (
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 9 }}
+          onPointerDown={() => setMenuOpen(false)}
+        />
+      )}
       {isComponent && shellDeviceVisibility !== "hidden" && (
         <div className="relative flex items-center gap-0.5" style={deviceStyle}>
           <DeviceSwitch
@@ -511,7 +518,6 @@ function SurfaceCanvasControls({
                 onChangeScreenOverlayAlignment(a);
                 setMenuOpen(false);
               }}
-              onClose={() => setMenuOpen(false)}
             />
           )}
         </div>
@@ -605,29 +611,14 @@ function ScreenOverlayMenuToggle({
 function ScreenAlignmentMenu({
   alignment,
   onChange,
-  onClose,
 }: {
   alignment: ScreenOverlayAlignment;
   onChange: (a: ScreenOverlayAlignment) => void;
-  onClose: () => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
-
   return (
     <div
-      ref={ref}
       className="absolute bottom-[calc(100%+6px)] left-0 flex gap-1 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-1"
-      style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset" }}
+      style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset", zIndex: 10 }}
     >
       <AlignmentOption
         active={alignment === "center"}
