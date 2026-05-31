@@ -500,16 +500,13 @@ function SurfaceCanvasControls({
         />
       )}
       {isComponent && shellDeviceVisibility !== "hidden" && (
-        <div className="relative flex items-center gap-0.5" style={deviceStyle}>
-          <DeviceSwitch
-            enabled={screenOverlayEnabled}
+        <div className="relative" style={deviceStyle}>
+          <DeviceButton
+            overlayEnabled={screenOverlayEnabled}
+            menuOpen={menuOpen}
             projectType={projectType}
-            onToggle={onToggleScreenOverlay}
-          />
-          <ScreenOverlayMenuToggle
-            open={menuOpen}
-            enabled={screenOverlayEnabled}
-            onToggle={() => setMenuOpen((v) => !v)}
+            onToggleOverlay={onToggleScreenOverlay}
+            onToggleMenu={() => setMenuOpen((v) => !v)}
           />
           {menuOpen && (
             <ScreenAlignmentMenu
@@ -531,80 +528,76 @@ function SurfaceCanvasControls({
   );
 }
 
-function DeviceSwitch({
-  enabled,
+function DeviceButton({
+  overlayEnabled,
+  menuOpen,
   projectType,
-  onToggle,
+  onToggleOverlay,
+  onToggleMenu,
 }: {
-  enabled: boolean;
+  overlayEnabled: boolean;
+  menuOpen: boolean;
   projectType: ProjectType;
-  onToggle: () => void;
+  onToggleOverlay: () => void;
+  onToggleMenu: () => void;
 }) {
   const isMobile = projectType === "mobile";
-  const label = `${enabled ? "Desativar" : "Ativar"} modo ${isMobile ? "mobile" : "desktop"}`;
   const Icon = isMobile ? Smartphone : Monitor;
+  const active = overlayEnabled || menuOpen;
 
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={enabled}
-      title={label}
-      onClick={onToggle}
+    <div
       className={[
-        "grid h-[34px] w-[34px] place-items-center rounded-lg border transition-colors duration-[100ms]",
-        enabled
+        "flex items-center overflow-hidden rounded-lg border transition-colors duration-[100ms]",
+        active
           ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
-          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#CFCFCF] hover:bg-[#2A2A2A]",
+          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#CFCFCF]",
       ].join(" ")}
-      style={{
-        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)",
-      }}
+      style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)" }}
     >
-      <Icon size={16} strokeWidth={1.8} />
-    </button>
-  );
-}
-
-function ScreenOverlayMenuToggle({
-  open,
-  enabled,
-  onToggle,
-}: {
-  open: boolean;
-  enabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label="Opções de posição da tela"
-      aria-expanded={open}
-      onClick={onToggle}
-      className={[
-        "grid h-[34px] w-[22px] place-items-center rounded-lg border transition-colors duration-[100ms]",
-        open || enabled
-          ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
-          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#666] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
-      ].join(" ")}
-      style={{
-        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)",
-      }}
-    >
-      <svg
-        width="10"
-        height="10"
-        viewBox="0 0 10 10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms" }}
+      <button
+        type="button"
+        aria-label={`${overlayEnabled ? "Desativar" : "Ativar"} simulador de tela`}
+        aria-pressed={overlayEnabled}
+        onClick={onToggleOverlay}
+        className={[
+          "grid h-[34px] w-[34px] shrink-0 place-items-center transition-colors duration-[100ms]",
+          active ? "" : "hover:bg-[#2A2A2A]",
+        ].join(" ")}
       >
-        <path d="M2 6.5l3-3 3 3" />
-      </svg>
-    </button>
+        <Icon size={16} strokeWidth={1.8} />
+      </button>
+
+      <span
+        className="block h-[18px] w-px shrink-0"
+        style={{ background: active ? "rgba(13,153,255,0.25)" : "#2C2C2C" }}
+      />
+
+      <button
+        type="button"
+        aria-label="Opções de posição da tela"
+        aria-expanded={menuOpen}
+        onClick={onToggleMenu}
+        className={[
+          "grid h-[34px] w-[18px] shrink-0 place-items-center transition-colors duration-[100ms]",
+          active ? "hover:bg-[#0D99FF]/20" : "text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
+        ].join(" ")}
+      >
+        <svg
+          width="8"
+          height="8"
+          viewBox="0 0 10 10"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }}
+        >
+          <path d="M2 6.5l3-3 3 3" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
