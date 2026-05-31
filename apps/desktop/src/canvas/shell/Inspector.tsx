@@ -26,9 +26,11 @@ type InspectorProps = {
   onClose: () => void;
   editor?: EditorBridgeValue | null;
   shellDeviceVisibility: ShellControlVisibility;
+  shellBackVisibility: ShellControlVisibility;
   shellZoomVisibility: ShellControlVisibility;
   shellExpandVisibility: ShellControlVisibility;
   onShellDeviceVisibilityChange: (v: ShellControlVisibility) => void;
+  onShellBackVisibilityChange: (v: ShellControlVisibility) => void;
   onShellZoomVisibilityChange: (v: ShellControlVisibility) => void;
   onShellExpandVisibilityChange: (v: ShellControlVisibility) => void;
   /** Incrementing this counter forces the Shell tab to become active. */
@@ -42,9 +44,11 @@ export function Inspector({
   onClose,
   editor: editorProp,
   shellDeviceVisibility,
+  shellBackVisibility,
   shellZoomVisibility,
   shellExpandVisibility,
   onShellDeviceVisibilityChange,
+  onShellBackVisibilityChange,
   onShellZoomVisibilityChange,
   onShellExpandVisibilityChange,
   openShellTabSignal,
@@ -208,9 +212,11 @@ export function Inspector({
             onUpdateBackground={(background) => commitDocument(updateShellBackground(document, background))}
             onUpdateGrid={(grid) => commitDocument(updateShellGrid(document, grid))}
             deviceVisibility={shellDeviceVisibility}
+            backVisibility={shellBackVisibility}
             zoomVisibility={shellZoomVisibility}
             expandVisibility={shellExpandVisibility}
             onDeviceVisibilityChange={onShellDeviceVisibilityChange}
+            onBackVisibilityChange={onShellBackVisibilityChange}
             onZoomVisibilityChange={onShellZoomVisibilityChange}
             onExpandVisibilityChange={onShellExpandVisibilityChange}
           />

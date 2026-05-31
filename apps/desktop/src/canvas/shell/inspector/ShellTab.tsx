@@ -32,9 +32,11 @@ type ShellTabProps = {
   onUpdateBackground: (background: string) => void;
   onUpdateGrid: (grid: Partial<{ enabled: boolean; type: ShellGridType }>) => void;
   deviceVisibility: ShellControlVisibility;
+  backVisibility: ShellControlVisibility;
   zoomVisibility: ShellControlVisibility;
   expandVisibility: ShellControlVisibility;
   onDeviceVisibilityChange: (v: ShellControlVisibility) => void;
+  onBackVisibilityChange: (v: ShellControlVisibility) => void;
   onZoomVisibilityChange: (v: ShellControlVisibility) => void;
   onExpandVisibilityChange: (v: ShellControlVisibility) => void;
 };
@@ -45,9 +47,11 @@ export function ShellTab({
   onUpdateBackground,
   onUpdateGrid,
   deviceVisibility,
+  backVisibility,
   zoomVisibility,
   expandVisibility,
   onDeviceVisibilityChange,
+  onBackVisibilityChange,
   onZoomVisibilityChange,
   onExpandVisibilityChange,
 }: ShellTabProps) {
@@ -84,6 +88,13 @@ export function ShellTab({
           <InsToggle
             value={deviceVisibility}
             onChange={(value) => onDeviceVisibilityChange(value as ShellControlVisibility)}
+            options={SHELL_VISIBILITY_OPTIONS}
+          />
+        </InsRow>
+        <InsRow label="Back">
+          <InsToggle
+            value={backVisibility}
+            onChange={(value) => onBackVisibilityChange(value as ShellControlVisibility)}
             options={SHELL_VISIBILITY_OPTIONS}
           />
         </InsRow>

@@ -83,6 +83,7 @@ function CanvasPageContent() {
   const [split, setSplit] = useState<"none" | "vertical" | "horizontal">("none");
   const [canvasExpanded, setCanvasExpanded] = useState(false);
   const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
+  const [shellBackVisibility, setShellBackVisibility] = useState<ShellControlVisibility>("show");
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
   const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
   const [shellTabSignal, setShellTabSignal] = useState(0);
@@ -277,6 +278,7 @@ function CanvasPageContent() {
         isComponent={!!component}
         componentOriginPosition={componentOriginPosition}
         shellDeviceVisibility={shellDeviceVisibility}
+        shellBackVisibility={shellBackVisibility}
         shellZoomVisibility={shellZoomVisibility}
         shellExpandVisibility={shellExpandVisibility}
         onCurrentDocumentChange={handleCurrentDocumentChange}
@@ -373,9 +375,11 @@ function CanvasPageContent() {
           open={inspectorOpen}
           onClose={() => setInspectorOpen(false)}
           shellDeviceVisibility={shellDeviceVisibility}
+          shellBackVisibility={shellBackVisibility}
           shellZoomVisibility={shellZoomVisibility}
           shellExpandVisibility={shellExpandVisibility}
           onShellDeviceVisibilityChange={setShellDeviceVisibility}
+          onShellBackVisibilityChange={setShellBackVisibility}
           onShellZoomVisibilityChange={setShellZoomVisibility}
           onShellExpandVisibilityChange={setShellExpandVisibility}
           openShellTabSignal={shellTabSignal}

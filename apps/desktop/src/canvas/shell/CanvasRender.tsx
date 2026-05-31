@@ -57,6 +57,7 @@ export function CanvasRender({
   isComponent = false,
   componentOriginPosition = null,
   shellDeviceVisibility = "show",
+  shellBackVisibility = "show",
   shellZoomVisibility = "show",
   shellExpandVisibility = "hover",
   onCurrentDocumentChange,
@@ -78,6 +79,7 @@ export function CanvasRender({
   isComponent?: boolean;
   componentOriginPosition?: { x: number; y: number } | null;
   shellDeviceVisibility?: ShellControlVisibility;
+  shellBackVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
   shellExpandVisibility?: ShellControlVisibility;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
@@ -132,6 +134,7 @@ export function CanvasRender({
             isComponent={isComponent}
             componentOriginPosition={componentOriginPosition}
             shellDeviceVisibility={shellDeviceVisibility}
+            shellBackVisibility={shellBackVisibility}
             shellZoomVisibility={shellZoomVisibility}
             onBackToParent={onBackToParent}
           />
@@ -170,6 +173,7 @@ export function CanvasRender({
             isComponent={isComponent}
             componentOriginPosition={componentOriginPosition}
             shellDeviceVisibility={shellDeviceVisibility}
+            shellBackVisibility={shellBackVisibility}
             shellZoomVisibility={shellZoomVisibility}
             onBackToParent={onBackToParent}
           />
@@ -221,6 +225,7 @@ export function CanvasRender({
               isComponent={isComponent}
               componentOriginPosition={componentOriginPosition}
               shellDeviceVisibility={shellDeviceVisibility}
+              shellBackVisibility={shellBackVisibility}
               shellZoomVisibility={shellZoomVisibility}
               onBackToParent={onBackToParent}
             />
@@ -303,6 +308,7 @@ function CanvasSurface({
   isComponent = false,
   componentOriginPosition = null,
   shellDeviceVisibility = "show",
+  shellBackVisibility = "show",
   shellZoomVisibility = "show",
   onBackToParent,
 }: {
@@ -324,6 +330,7 @@ function CanvasSurface({
   isComponent?: boolean;
   componentOriginPosition?: { x: number; y: number } | null;
   shellDeviceVisibility?: ShellControlVisibility;
+  shellBackVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
   onBackToParent?: () => void;
 }) {
@@ -371,8 +378,12 @@ function CanvasSurface({
             viewportSubjectKey={viewportSubjectKey}
             screenOverlay={screenOverlay}
           />
-          {!draftMode && parentTarget ? (
-            <CanvasParentBackButton parentTarget={parentTarget} onBack={onBackToParent} />
+          {!draftMode && parentTarget && shellBackVisibility !== "hidden" ? (
+            <CanvasParentBackButton
+              parentTarget={parentTarget}
+              visibility={shellBackVisibility}
+              onBack={onBackToParent}
+            />
           ) : null}
           {!expanded ? (
             <SurfaceCanvasControls
@@ -398,11 +409,15 @@ function CanvasSurface({
 
 function CanvasParentBackButton({
   parentTarget,
+  visibility,
   onBack,
 }: {
   parentTarget: CanvasParentTarget;
+  visibility: ShellControlVisibility;
   onBack?: () => void;
 }) {
+  const [localHovered, setLocalHovered] = useState(false);
+
   return (
     <button
       type="button"
@@ -412,8 +427,11 @@ function CanvasParentBackButton({
       }}
       className="group absolute left-3 top-3 z-[10] flex max-w-[180px] items-center gap-2 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A]/95 px-2 py-1.5 text-left text-[#9A9A9A] transition-colors duration-[100ms] hover:bg-[#242424] hover:text-[#F2F2F2]"
       style={{
+        ...shellVisibilityStyle(visibility, localHovered),
         boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 18px rgba(0,0,0,0.42)",
       }}
+      onMouseEnter={() => setLocalHovered(true)}
+      onMouseLeave={() => setLocalHovered(false)}
     >
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-[#6B6B6B] transition-colors duration-[100ms] group-hover:text-[#CFCFCF]">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
