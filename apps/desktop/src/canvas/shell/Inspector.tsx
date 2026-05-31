@@ -17,18 +17,34 @@ import {
 import type { CanvasDocument, CanvasProperties, ElementStyles } from "@/canvas/engine/types";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { CanvasTab } from "./inspector/CanvasTab";
-import { ShellTab } from "./inspector/ShellTab";
+import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
 import { EmptyState } from "./inspector/InsComponents";
 
 type InspectorProps = {
   open: boolean;
   onClose: () => void;
   editor?: EditorBridgeValue | null;
+  shellDeviceVisibility: ShellControlVisibility;
+  shellZoomVisibility: ShellControlVisibility;
+  shellExpandVisibility: ShellControlVisibility;
+  onShellDeviceVisibilityChange: (v: ShellControlVisibility) => void;
+  onShellZoomVisibilityChange: (v: ShellControlVisibility) => void;
+  onShellExpandVisibilityChange: (v: ShellControlVisibility) => void;
 };
 
 type InspectorTab = "element" | "canvas" | "shell";
 
-export function Inspector({ open, onClose, editor: editorProp }: InspectorProps) {
+export function Inspector({
+  open,
+  onClose,
+  editor: editorProp,
+  shellDeviceVisibility,
+  shellZoomVisibility,
+  shellExpandVisibility,
+  onShellDeviceVisibilityChange,
+  onShellZoomVisibilityChange,
+  onShellExpandVisibilityChange,
+}: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
 
   const bridgeDocument = useEditorBridge((v) => v?.state.document ?? null);
@@ -175,6 +191,12 @@ export function Inspector({ open, onClose, editor: editorProp }: InspectorProps)
             shellGrid={document.shellGrid ?? DEFAULT_SHELL_GRID}
             onUpdateBackground={(background) => commitDocument(updateShellBackground(document, background))}
             onUpdateGrid={(grid) => commitDocument(updateShellGrid(document, grid))}
+            deviceVisibility={shellDeviceVisibility}
+            zoomVisibility={shellZoomVisibility}
+            expandVisibility={shellExpandVisibility}
+            onDeviceVisibilityChange={onShellDeviceVisibilityChange}
+            onZoomVisibilityChange={onShellZoomVisibilityChange}
+            onExpandVisibilityChange={onShellExpandVisibilityChange}
           />
         ) : selectedCount > 1 ? (
           <EmptyState title={`${selectedCount} elementos selecionados`} body="Use o canvas para mover o grupo ou selecione uma camada para editar propriedades." />

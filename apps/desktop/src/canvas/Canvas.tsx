@@ -6,6 +6,7 @@ import { Tree, TreeToggle, type ProjectTreeNode } from "@/canvas/shell/Tree";
 import { FloatingToggle } from "@/canvas/shell/GalleryPanel";
 import { SearchPalette, SearchToggle } from "@/canvas/shell/SearchPalette";
 import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
+import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { moveElementBefore, setElementLocked, setElementVisible, wrapElements } from "@/canvas/engine/actions";
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
@@ -81,6 +82,9 @@ function CanvasPageContent() {
   const [treeTab, setTreeTab] = useState<"layers" | "drafts">("layers");
   const [split, setSplit] = useState<"none" | "vertical" | "horizontal">("none");
   const [canvasExpanded, setCanvasExpanded] = useState(false);
+  const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
+  const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
+  const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
@@ -271,6 +275,9 @@ function CanvasPageContent() {
         parentTarget={parentProjectNode}
         isComponent={!!component}
         componentOriginPosition={componentOriginPosition}
+        shellDeviceVisibility={shellDeviceVisibility}
+        shellZoomVisibility={shellZoomVisibility}
+        shellExpandVisibility={shellExpandVisibility}
         onCurrentDocumentChange={handleCurrentDocumentChange}
         onActiveCanvasChange={(canvas) => changeCanvasTab(canvas === "right" ? "drafts" : "current")}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}
@@ -361,7 +368,16 @@ function CanvasPageContent() {
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 
       <div className="pointer-events-none fixed bottom-3 right-3 top-3 z-[6] flex items-stretch gap-3">
-        <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
+        <Inspector
+          open={inspectorOpen}
+          onClose={() => setInspectorOpen(false)}
+          shellDeviceVisibility={shellDeviceVisibility}
+          shellZoomVisibility={shellZoomVisibility}
+          shellExpandVisibility={shellExpandVisibility}
+          onShellDeviceVisibilityChange={setShellDeviceVisibility}
+          onShellZoomVisibilityChange={setShellZoomVisibility}
+          onShellExpandVisibilityChange={setShellExpandVisibility}
+        />
       </div>
 
       <div className="fixed bottom-6 right-3 z-[11] flex items-center gap-2">

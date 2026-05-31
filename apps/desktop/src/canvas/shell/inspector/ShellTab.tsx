@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ShellGridType } from "@/canvas/engine/types";
 import { InsColor, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
 
-type ShellControlVisibility = "show" | "hidden" | "hover";
+export type ShellControlVisibility = "show" | "hidden" | "hover";
 
 const SHELL_VISIBILITY_OPTIONS: Array<{ value: ShellControlVisibility; label: string }> = [
   { value: "show", label: "Show" },
@@ -15,12 +15,26 @@ type ShellTabProps = {
   shellGrid: { enabled: boolean; type: ShellGridType };
   onUpdateBackground: (background: string) => void;
   onUpdateGrid: (grid: Partial<{ enabled: boolean; type: ShellGridType }>) => void;
+  deviceVisibility: ShellControlVisibility;
+  zoomVisibility: ShellControlVisibility;
+  expandVisibility: ShellControlVisibility;
+  onDeviceVisibilityChange: (v: ShellControlVisibility) => void;
+  onZoomVisibilityChange: (v: ShellControlVisibility) => void;
+  onExpandVisibilityChange: (v: ShellControlVisibility) => void;
 };
 
-export function ShellTab({ background, shellGrid, onUpdateBackground, onUpdateGrid }: ShellTabProps) {
-  const [deviceButtonVisibility, setDeviceButtonVisibility] = useState<ShellControlVisibility>("show");
-  const [zoomVisibility, setZoomVisibility] = useState<ShellControlVisibility>("show");
-  const [expandVisibility, setExpandVisibility] = useState<ShellControlVisibility>("hover");
+export function ShellTab({
+  background,
+  shellGrid,
+  onUpdateBackground,
+  onUpdateGrid,
+  deviceVisibility,
+  zoomVisibility,
+  expandVisibility,
+  onDeviceVisibilityChange,
+  onZoomVisibilityChange,
+  onExpandVisibilityChange,
+}: ShellTabProps) {
   const [draftEnabled, setDraftEnabled] = useState(true);
   const [referenceEnabled, setReferenceEnabled] = useState(false);
 
@@ -45,22 +59,22 @@ export function ShellTab({ background, shellGrid, onUpdateBackground, onUpdateGr
       <InsSection title="Controles">
         <InsRow label="Device">
           <InsToggle
-            value={deviceButtonVisibility}
-            onChange={(value) => setDeviceButtonVisibility(value as ShellControlVisibility)}
+            value={deviceVisibility}
+            onChange={(value) => onDeviceVisibilityChange(value as ShellControlVisibility)}
             options={SHELL_VISIBILITY_OPTIONS}
           />
         </InsRow>
         <InsRow label="Zoom">
           <InsToggle
             value={zoomVisibility}
-            onChange={(value) => setZoomVisibility(value as ShellControlVisibility)}
+            onChange={(value) => onZoomVisibilityChange(value as ShellControlVisibility)}
             options={SHELL_VISIBILITY_OPTIONS}
           />
         </InsRow>
         <InsRow label="Expand">
           <InsToggle
             value={expandVisibility}
-            onChange={(value) => setExpandVisibility(value as ShellControlVisibility)}
+            onChange={(value) => onExpandVisibilityChange(value as ShellControlVisibility)}
             options={SHELL_VISIBILITY_OPTIONS}
           />
         </InsRow>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 
 import type { SplitMode } from "@/canvas/Canvas";
@@ -10,7 +10,14 @@ import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "@/canvas/engine/viewport";
 import { canvasSizeForProjectType } from "@/canvas/canvasUtils";
+import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasStage } from "../stage/CanvasStage";
+
+function shellVisibilityStyle(v: ShellControlVisibility, hovered: boolean): CSSProperties {
+  if (v === "hidden") return { opacity: 0, pointerEvents: "none" };
+  if (v === "hover") return { opacity: hovered ? 1 : 0, pointerEvents: hovered ? "auto" : "none", transition: "opacity 150ms" };
+  return {};
+}
 
 export type ScreenOverlayAlignment = "center" | "origin";
 
@@ -49,6 +56,9 @@ export function CanvasRender({
   parentTarget,
   isComponent = false,
   componentOriginPosition = null,
+  shellDeviceVisibility = "show",
+  shellZoomVisibility = "show",
+  shellExpandVisibility = "hover",
   onCurrentDocumentChange,
   onActiveCanvasChange,
   onToggleExpand,
@@ -67,6 +77,9 @@ export function CanvasRender({
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
   componentOriginPosition?: { x: number; y: number } | null;
+  shellDeviceVisibility?: ShellControlVisibility;
+  shellZoomVisibility?: ShellControlVisibility;
+  shellExpandVisibility?: ShellControlVisibility;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
   onActiveCanvasChange?: (canvas: "left" | "right") => void;
   onToggleExpand?: () => void;
@@ -121,6 +134,9 @@ export function CanvasRender({
             parentTarget={parentTarget}
             isComponent={isComponent}
             componentOriginPosition={componentOriginPosition}
+            shellDeviceVisibility={shellDeviceVisibility}
+            shellZoomVisibility={shellZoomVisibility}
+            hovered={hovered}
             onBackToParent={onBackToParent}
           />
           <CanvasSurface
@@ -157,6 +173,9 @@ export function CanvasRender({
             parentTarget={parentTarget}
             isComponent={isComponent}
             componentOriginPosition={componentOriginPosition}
+            shellDeviceVisibility={shellDeviceVisibility}
+            shellZoomVisibility={shellZoomVisibility}
+            hovered={hovered}
             onBackToParent={onBackToParent}
           />
           <CanvasSurface
@@ -206,13 +225,16 @@ export function CanvasRender({
               parentTarget={parentTarget}
               isComponent={isComponent}
               componentOriginPosition={componentOriginPosition}
+              shellDeviceVisibility={shellDeviceVisibility}
+              shellZoomVisibility={shellZoomVisibility}
+              hovered={hovered}
               onBackToParent={onBackToParent}
             />
           )}
         </div>
       )}
 
-      {!expanded && (
+      {!expanded && shellExpandVisibility !== "hidden" && (
         <button
           type="button"
           onClick={onToggleExpand}
@@ -221,8 +243,7 @@ export function CanvasRender({
           style={{
             top: btnTop,
             right: btnRight,
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? "auto" : "none",
+            ...shellVisibilityStyle(shellExpandVisibility, hovered),
             boxShadow: "0 2px 8px rgba(0,0,0,0.45)",
             zIndex: 10,
           }}
@@ -263,6 +284,9 @@ function CanvasSurface({
   parentTarget,
   isComponent = false,
   componentOriginPosition = null,
+  shellDeviceVisibility = "show",
+  shellZoomVisibility = "show",
+  hovered = false,
   onBackToParent,
 }: {
   active: boolean;
@@ -282,6 +306,9 @@ function CanvasSurface({
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
   componentOriginPosition?: { x: number; y: number } | null;
+  shellDeviceVisibility?: ShellControlVisibility;
+  shellZoomVisibility?: ShellControlVisibility;
+  hovered?: boolean;
   onBackToParent?: () => void;
 }) {
   const viewportSubjectKey = storageKey;
@@ -337,6 +364,9 @@ function CanvasSurface({
               isComponent={isComponent}
               screenOverlayEnabled={screenOverlayEnabled}
               screenOverlayAlignment={screenOverlayAlignment}
+              shellDeviceVisibility={shellDeviceVisibility}
+              shellZoomVisibility={shellZoomVisibility}
+              hovered={hovered}
               onToggleScreenOverlay={() => setScreenOverlayEnabled((v) => !v)}
               onChangeScreenOverlayAlignment={setScreenOverlayAlignment}
             />
@@ -415,6 +445,9 @@ function SurfaceCanvasControls({
   isComponent,
   screenOverlayEnabled,
   screenOverlayAlignment,
+  shellDeviceVisibility,
+  shellZoomVisibility,
+  hovered,
   onToggleScreenOverlay,
   onChangeScreenOverlayAlignment,
 }: {
@@ -422,6 +455,9 @@ function SurfaceCanvasControls({
   isComponent: boolean;
   screenOverlayEnabled: boolean;
   screenOverlayAlignment: ScreenOverlayAlignment;
+  shellDeviceVisibility: ShellControlVisibility;
+  shellZoomVisibility: ShellControlVisibility;
+  hovered: boolean;
   onToggleScreenOverlay: () => void;
   onChangeScreenOverlayAlignment: (a: ScreenOverlayAlignment) => void;
 }) {
@@ -433,10 +469,13 @@ function SurfaceCanvasControls({
     dispatch({ type: "setZoom", zoom });
   };
 
+  const deviceStyle = shellVisibilityStyle(shellDeviceVisibility, hovered);
+  const zoomStyle = shellVisibilityStyle(shellZoomVisibility, hovered);
+
   return (
     <div className="absolute bottom-3 left-3 z-[10] flex items-center gap-2">
-      {isComponent && (
-        <div className="relative flex items-center gap-0.5">
+      {isComponent && shellDeviceVisibility !== "hidden" && (
+        <div className="relative flex items-center gap-0.5" style={deviceStyle}>
           <DeviceSwitch
             enabled={screenOverlayEnabled}
             projectType={projectType}
@@ -459,7 +498,11 @@ function SurfaceCanvasControls({
           )}
         </div>
       )}
-      <ZoomControl zoom={state.zoom} setZoom={setZoom} />
+      {shellZoomVisibility !== "hidden" && (
+        <div style={zoomStyle}>
+          <ZoomControl zoom={state.zoom} setZoom={setZoom} />
+        </div>
+      )}
     </div>
   );
 }
