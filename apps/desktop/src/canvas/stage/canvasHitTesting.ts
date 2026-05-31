@@ -91,38 +91,34 @@ export type ToolingGeometry = {
   cursorRotation: number;
 };
 
-// ─── Moon / half-circle rotation cursor ──────────────────────────────────────
+// ─── Figma-style rotation cursor (curved arrow, two arrowheads) ───────────────
 
-/**
- * Base angle (degrees) for each corner.
- * The moon opens AWAY from the element — i.e. diagonally outward.
- * Base SVG opens toward the top (12 o'clock):
- *   NW → top-left  = 315°
- *   NE → top-right =  45°
- *   SE → bot-right = 135°
- *   SW → bot-left  = 225°
- */
+// Base angle per corner: the exported SVG is naturally oriented for NW (arrows
+// at upper-left and lower-right). Each subsequent corner needs +90° clockwise.
 const CORNER_BASE_ANGLE: Record<"nw" | "ne" | "se" | "sw", number> = {
-  nw: 315,
-  ne: 45,
-  se: 135,
-  sw: 225,
+  nw: 270,
+  ne: 0,
+  se: 90,
+  sw: 180,
 };
+
+const ROTATE_CURSOR_WHITE_PATH =
+  "M22.4393 19.4393L21.9002 19.9784C21.2216 14.8442 17.1558 10.7784 12.0216 10.0998L12.5607 9.56066C13.1464 8.97487 13.1464 8.02513 12.5607 7.43934C11.9749 6.85355 11.0251 6.85355 10.4393 7.43934L7.43934 10.4393C6.85355 11.0251 6.85355 11.9749 7.43934 12.5607L10.4393 15.5607C11.0251 16.1464 11.9749 16.1464 12.5607 15.5607C13.1464 14.9749 13.1464 14.0251 12.5607 13.4393L12.3157 13.1944C15.5527 13.8987 18.1013 16.4473 18.8056 19.6843L18.5607 19.4393C17.9749 18.8536 17.0251 18.8536 16.4393 19.4393C15.8536 20.0251 15.8536 20.9749 16.4393 21.5607L19.4393 24.5607C20.0251 25.1464 20.9749 25.1464 21.5607 24.5607L24.5607 21.5607C25.1464 20.9749 25.1464 20.0251 24.5607 19.4393C23.9749 18.8536 23.0251 18.8536 22.4393 19.4393Z";
+
+const ROTATE_CURSOR_BLACK_PATH =
+  "M11.8536 8.14645C12.0488 8.34171 12.0488 8.65829 11.8536 8.85355L9.70711 11H10.5C16.299 11 21 15.701 21 21.5V22.2929L23.1464 20.1464C23.3417 19.9512 23.6583 19.9512 23.8536 20.1464C24.0488 20.3417 24.0488 20.6583 23.8536 20.8536L20.8536 23.8536C20.6583 24.0488 20.3417 24.0488 20.1464 23.8536L17.1464 20.8536C16.9512 20.6583 16.9512 20.3417 17.1464 20.1464C17.3417 19.9512 17.6583 19.9512 17.8536 20.1464L20 22.2929V21.5C20 16.2533 15.7467 12 10.5 12H9.70711L11.8536 14.1464C12.0488 14.3417 12.0488 14.6583 11.8536 14.8536C11.6583 15.0488 11.3417 15.0488 11.1464 14.8536L8.14645 11.8536C7.95118 11.6583 7.95118 11.3417 8.14645 11.1464L11.1464 8.14645C11.3417 7.95118 11.6583 7.95118 11.8536 8.14645Z";
 
 const moonCursorCache = new Map<string, string>();
 
 function buildMoonSvg(angleDeg: number): string {
-  const size = 20;
+  const size = 32;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 6;
-  // Semicircle opening toward top: from left end → arc through top → right end
-  const d = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
   return (
-    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>` +
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}' fill='none'>` +
     `<g transform='rotate(${angleDeg} ${cx} ${cy})'>` +
-    `<path d='${d}' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round'/>` +
-    `<path d='${d}' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/>` +
+    `<path d='${ROTATE_CURSOR_WHITE_PATH}' fill='white'/>` +
+    `<path d='${ROTATE_CURSOR_BLACK_PATH}' fill='black'/>` +
     `</g></svg>`
   );
 }
@@ -137,7 +133,7 @@ function getRotateCursorForCorner(
   if (!cached) {
     const svg = buildMoonSvg(Math.round(angle));
     const encoded = encodeURIComponent(svg);
-    cached = `url("data:image/svg+xml,${encoded}") 10 10, crosshair`;
+    cached = `url("data:image/svg+xml,${encoded}") 16 16, crosshair`;
     moonCursorCache.set(key, cached);
   }
   return cached;
