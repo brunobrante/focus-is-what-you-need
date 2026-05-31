@@ -36,7 +36,7 @@ export function createElementForTool(
     line: { type: "line", name: "Line", width: sd(120, 20, 400), height: 2, styles: { background: "#182033", opacity: 1 } },
     arrow: { type: "arrow", name: "Arrow", width: sd(120, 20, 400), height: sd(40, 16, 80), styles: { background: "#182033", opacity: 1 } },
     polygon: { type: "polygon", name: "Polygon", width: sd(120, 16, 400), height: sd(120, 16, 400), styles: { background: "#dbeafe", opacity: 1 } },
-    star: { type: "star", name: "Star", width: sd(120, 16, 400), height: sd(120, 16, 400), styles: { background: "#dbeafe", borderRadius: 40, opacity: 1 } },
+    star: { type: "star", name: "Star", width: sd(120, 16, 400), height: sd(120, 16, 400), styles: { background: "#dbeafe", borderRadius: 22.49, opacity: 1 } },
   };
   const node = { ...base, ...defaults[tool] } as ElementNode;
   node.x = roundPixel(x - node.width / 2);
