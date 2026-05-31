@@ -1,4 +1,26 @@
-# AGENTS.md
+# CLAUDE.md
+
+## Language Rule
+
+All code must be written in English, regardless of the language used in the prompt
+or conversation.
+
+This applies to everything inside a file:
+
+- variable names, function names, class names, type names
+- file names and folder names
+- comments and JSDoc
+- string literals that are not user-facing UI copy
+- SQL column names, table names, Rust struct fields and enum variants
+- git branch names and commit messages
+
+The conversation language (Portuguese or any other) does not change this rule.
+If a prompt is written in Portuguese, the code and file content produced in
+response must still be entirely in English.
+
+The only exception is user-visible UI copy (button labels, error messages shown
+to the user, placeholder text) — those follow whatever language the product uses
+for its interface.
 
 ## Runtime And Tooling
 
@@ -196,28 +218,38 @@ It is shown on its own, while its contained children are available nearby for co
 
 ## Canvas Editing And Storage
 
-Every screen and every component that can be opened in the canvas must have exactly one editable scene for its current subject.
+### Frames and screens
 
-The canvas subject is not the whole original tree by default.
-It is the thing the user opened:
+Every component has a **frame** — the base element that defines its bounds and acts as the canvas boundary when that component is being edited. The frame is the root of the component's editable scene.
 
-- opening a screen edits the screen scene
-- opening `Header` edits the `Header` variant scene
-- opening `Logo Design` edits the `Logo Design` variant scene
+A **screen** is a special frame: the top-level root of the hierarchy. Screens have fixed defaults (device dimensions, type) that cannot be edited from within the canvas. In every other respect a screen behaves identically to a component frame.
 
-Inside that canvas scene, the first rendered subject element is the locked centered root for that subject.
-For a full mobile screen, this may be the screen body at `390x844`.
-For a component, this must be the component root itself, for example the `Header` background at `342x72`, not the original phone body.
+### Editing model
 
-This means the locked root is relative to the opened subject, not relative to the original full screen tree.
-If the user opens a component, the canvas must not secretly render the full screen and then select a nested node.
-It must render the component as its own scene, using its own bounds.
+A frame is only editable when its component is explicitly opened in the canvas. When opened:
+
+- the frame becomes the canvas boundary — elements can only be placed inside it, not outside
+- the frame itself is locked in position and cannot be moved or resized
+- closing the component returns to the parent context
+
+This is by design: a component already occupies a fixed position in its parent screen or parent component, so its frame boundary is fixed. You never edit a component by going to the full screen and clicking inside it from there. You open the specific component, and only that component's frame becomes editable.
+
+Every screen and every component opened in the canvas must have exactly one editable scene tied to its frame:
+
+- opening a screen edits the screen's frame scene
+- opening `Header` edits the `Header` frame scene
+- opening `Logo Design` edits the `Logo Design` frame scene
+
+For a full mobile screen the frame is the screen body at `390x844`.
+For a component such as `Header`, the frame is the component root at `342x72` — not the original phone body.
+
+If the user opens a component, the canvas must not secretly render the full screen and then select a nested node. It must render the component's own frame as the canvas root, using the frame's own bounds.
 
 ### Canvas zoom behavior
 
 The canvas is not an infinite workspace.
-There is no infinite horizontal or vertical panning area around the subject.
-The editable area is the subject that was opened: the screen or the component variant scene.
+There is no infinite horizontal or vertical panning area around the frame.
+The editable area is the frame of what was opened: the screen or the component.
 
 Zoom must respect that model:
 
@@ -356,7 +388,7 @@ These examples express the intent better than abstract rules alone.
 
 ### List
 
-- `Listagem` screen
+- `List` screen
 - `Header`
 - `Search Bar`
 - `Filter Chips`
@@ -365,7 +397,7 @@ These examples express the intent better than abstract rules alone.
 
 ### Detail
 
-- `Detalhe` screen
+- `Detail` screen
 - `Header`
 - `Product Gallery`
 - `Product Summary`
@@ -374,7 +406,7 @@ These examples express the intent better than abstract rules alone.
 
 ### Checkout / Mobile App Cart Flow
 
-- `Formulário` or checkout-like screen
+- `Checkout` screen
 - `Header`
 - `Shipping Form`
 - `Payment Methods`
@@ -411,40 +443,151 @@ If a reader or user can say:
 
 then the product is aligned with the intended idea.
 
-## Reusable Prompt For Future Chats
+## Builder
 
-Use the block below when you want to explain this project to another model or another collaborator:
+The Builder (`/generate`, `/tools` routes) is a standalone reference tool for UI/UX work. It is entirely separate from the canvas editor and the screen-first hierarchy — it has its own storage model, its own engine, and its output does not directly feed the component tree.
 
-```md
-This project is a screen-first component explorer built from mocked data.
+### Purpose
 
-The source of truth is the screen, not a flat component library. Each mocked screen must be decomposed into a meaningful parent-child tree. A screen is the root node, its direct sections are child components, and those components can contain smaller children. Every node must preserve its father/parent relationship.
+The problem the Builder solves: given a static UI screenshot or design image, extract meaningful component cuts from it. The user imports an image, draws crop regions over it to define component boundaries, and the resulting crops are grouped into a **stack**. A stack is a named collection of image cuts that, taken together, reconstruct the original reference image.
 
-The interaction model is:
-- opening a screen shows the full screen snapshot with all of its children already visible inside it
-- clicking a component inside that screen shows only that component's own snapshot
-- the selected component's children are shown adjacent to it so the user can keep drilling down
+The long-term goal is to accumulate enough labeled image-to-component data to train a model capable of transforming a static UI image into HTML/CSS automatically.
 
-Snapshot sizing is critical:
-- the snapshot must use the real bounds of the node itself
-- a mobile screen should keep its exact device size, for example `390x844`
-- a header, cart bar, card, or form block should keep its own intrinsic width and height
-- do not force components into a generic `4:3` preview or crop them arbitrarily
+### Current functionality
 
-Canvas and preview zoom should make small components legible without changing their real bounds:
-- the canvas is not infinite and cannot pan endlessly
-- the minimum user zoom is `1x`, and zoom-out below `100%` is not allowed
-- the maximum user zoom is `25x` (`2500%`)
-- full screens open at `1x` user zoom — one document pixel maps to one CSS pixel
-- the canvas projection is independent of the browser window size: resizing the window only changes the visible clipping area, never the zoom or offset; if the document is larger than the window, it overflows and the user pans to see the rest
-- components open with an initial zoom calculated from the component's own width and height
-- component snapshots may be visually scaled in previews using the same size-based zoom logic, while still preserving the snapshot's intrinsic dimensions
+- **Import**: user uploads a static image (video planned, not yet implemented)
+- **Cut**: user defines crop regions over the image to mark component boundaries
+- **Stack**: all cuts from a reference image form a stack — one stack per image
+- **View modes**: Builder (active cropping and editing) and Stack (viewing all collected cuts)
 
-Mock content should be realistic enough to communicate the structure: header text, logo image blocks, search controls, product names, prices, filters, summary text, form fields, payment methods, cart totals, and CTA labels.
+### Roadmap items — do not treat as bugs
 
-The same mocked hierarchy should drive the seed data, previews, navigation, and stored component tree. Do not create one fake hierarchy for previews and a different one for the actual mock data.
+These are intentionally not implemented yet:
 
-Every editable component should have one canonical current variant scene. Editing that component updates that scene, then all connected parent snapshots are regenerated from the changed subtree.
+- Video import
+- Background-remove tool
+- Other image processing tools to improve cut quality
+- Connecting stacks to the References section of the main project
 
-The main goal is visual decomposition with preserved ancestry: start from the whole screen, click into a child, see that child alone at the correct size, inspect its children, and always keep the link back to the original screen.
+### Constraints for this area
+
+- Builder storage is separate from the canvas `records` / `scenes` / `variants` system — do not connect them
+- A Builder cut is an image crop, not a canvas scene node — do not treat it as one
+- The Builder does not use an infinite canvas — it operates on a fixed reference image
+
+## Save Architecture
+
+The save system was rewritten from scratch. The old model stored every "table"
+(scenes, components, variants, …) as a single giant JSON blob in a KV row. Every
+edit read the whole blob, mutated one field in memory, then re-serialised and
+re-wrote the entire blob over IPC. This caused hundreds of MB of IPC per editing
+session and blocked the main thread.
+
+The new model is delta-based, queue-backed, and follows clean architecture with a
+single port that all adapters implement.
+
+### The mental model in one diagram
+
 ```
+user drags/edits a node
+        │
+        ▼
+engine reducer (synchronous, in-memory)   ← UI always reads this, never waits
+        │ commits the interaction
+        ▼
+recordStore.putRecord(table, row)          ← updates in-memory cache
+        │ fire-and-forget, no await
+        ▼
+SaveQueue.enqueue(mutation)                ← coalesces by (op, table, id)
+        │ 60fps drag of one node = one pending entry
+        │ microtask + requestIdleCallback
+        ▼
+SaveQueue.flush() → port.applyBatch([...mutations])   ← 1 IPC / 1 IDBTransaction
+        │
+        ├─ desktop  → invoke("db_apply") → Rust → 1 SQLite transaction
+        └─ web      → 1 IDBTransaction over the "records" object store
+```
+
+The UI never awaits the database. Ancestor propagation and thumbnail regeneration
+run off the critical path, at idle, after the row is already written.
+
+### File map
+
+#### Domain — zero I/O, no framework imports
+
+| File | What it contains |
+| --- | --- |
+| `src/domain/persistence/mutations.ts` | `Mutation` union type (`upsertRecord` / `deleteRecords`), `ApplyAck`, and `mutationKey()` — the coalescing key function. A 60fps drag of one node → one key → one pending entry. |
+| `src/domain/persistence/persistencePort.ts` | `PersistencePort` interface: `applyBatch(mutations)`, `getRecord(table, id)`, `listRecords(table)`. This is the only boundary all adapters must satisfy. |
+
+#### Application — use cases, depend only on the port
+
+| File | What it contains |
+| --- | --- |
+| `src/application/persistence/saveQueue.ts` | `SaveQueue` class. Coalesces mutations in a `Map<key, Mutation>` (last-write-wins per key). Drains via `queueMicrotask` + `requestIdleCallback`. Retry with exponential backoff (6 attempts, max 30s). Crash-durable: writes the pending batch to an `OutboxStore` before each flush; replays on boot if the previous session crashed mid-write. `getSaveQueue()` in `createPersistence.ts` is the singleton entry point. |
+| `src/application/scenes/saveScene.ts` | `saveScene()` is now `void` (fire-and-forget). It calls `upsertScene` which writes to the record-store cache and enqueues. The caller never awaits the database. |
+
+#### Infrastructure — adapters (the only pieces that know about SQLite / IndexedDB)
+
+| File | What it contains |
+| --- | --- |
+| `src/infrastructure/persistence/createPersistence.ts` | Factory + singletons. `createPersistencePort()` picks the adapter from `detectPersistenceRuntime()`. `getSaveQueue()` creates the singleton `SaveQueue` with outbox and replays any crash-leftover batch on first call. `resetPersistenceSingletons()` is the test seam. |
+| `src/infrastructure/persistence/sqlitePersistence.ts` | Desktop adapter. Translates `Mutation[]` to snake_case wire format and calls `invoke("db_apply")`. One IPC call = one SQLite transaction in Rust. Reads use `invoke("db_get_record")` / `invoke("db_list_records")` on the pooled connection. |
+| `src/infrastructure/persistence/indexedDbPersistence.ts` | Web adapter. Stores one `{ table, id, json }` row per record, keyed by `[table, id]`, in a single `records` object store. `applyBatch` applies all mutations inside one `IDBTransaction` (atomic). Reads use `IDBKeyRange.bound` to query by table without scanning everything. |
+| `src/infrastructure/persistence/memoryPersistence.ts` | In-memory adapter (`Map<table, Map<id, json>>`). Backs the `"memory"` runtime (Bun tests). Reference implementation the other adapters must match. |
+| `src/infrastructure/persistence/outbox.ts` | Two outbox implementations: `createLocalStorageOutbox()` (synchronous, IPC-free, crash-durable — used in web + desktop) and `createMemoryOutbox()` (tests). The outbox key is `__save_outbox_v1` in `localStorage`. |
+
+#### Record store — in-memory cache that connects repos to the queue
+
+| File | What it contains |
+| --- | --- |
+| `src/lib/storage/recordStore.ts` | The in-process source of truth for every persisted row. `listTable` / `getRecordById` hydrate from the port once, then serve from cache — read-after-write within a session is always synchronous. `putRecord` updates the cache and enqueues a per-row delta in one call with no await. `replaceTable` diffs the incoming array against the cache and enqueues only the rows that actually changed — so repos that compute a full next-array still persist O(changed), never O(table). |
+| `src/lib/storage/store.ts` | Thin re-export facade. The old `getTable` / `setTable` blob API is gone. This file now just re-exports `listTable`, `putRecord`, `removeRecords`, `replaceTable`, `notify`, `subscribe` from `recordStore.ts`. Repos import from here unchanged. |
+
+#### Rust backend — `src-tauri/src/db.rs`
+
+A single `Connection` lives in `tauri::State<Db>` (wrapped in `Arc<Mutex<>>`).
+`open_and_migrate` runs once at setup, creates all tables, and sets WAL + NORMAL
+sync. The old `open_kv_connection` (open + `CREATE TABLE` on every single
+`kv_get`/`kv_set` call) is gone.
+
+| Command | What it does |
+| --- | --- |
+| `db_apply(batch)` | Applies an entire coalesced batch in **one** `BEGIN…COMMIT` transaction. Handles `upsert_record`, `delete_records`, `upsert_scene`, `upsert_node`, `delete_node`, `delete_scene_nodes`, `upsert_thumbnail`, `delete_thumbnail`. Scene upserts use `WHERE excluded.scene_version > scenes.scene_version` (optimistic guard). Returns `ApplyAck { applied, scene_versions }`. |
+| `db_get_record(table, id)` | Single-row read from the `records` table. |
+| `db_list_records(table)` | All JSON strings for one table from `records`. |
+| `db_get_scene(owner_type, owner_id)` | Reads from the typed `scenes` table. |
+| `db_load_scene_nodes(owner_type, owner_id)` | All nodes for a scene from `nodes`, ordered by `order_index`. |
+| `db_get_thumbnail(owner_type, owner_id)` | Reads from the typed `thumbnails` table. |
+| `kv_get` / `kv_set` | Still exist for the legacy blob KV path, but now use the **same pooled connection** (no more per-call open + CREATE TABLE). |
+
+SQLite schema created in `open_and_migrate`: `kv_store`, `scenes`, `thumbnails`,
+`nodes` (with `idx_nodes_owner` index), and `records` (with `idx_records_tbl`
+index).
+
+#### Ancestor propagation
+
+The old `propagateVariantSceneToParents` ran synchronously inside `upsertScene`,
+multiplying the write cost by the depth of the component tree. Now:
+
+- `upsertScene` calls `putRecord` (synchronous cache + enqueue) and schedules
+  thumbnail regeneration via `scheduleThumbnailRefresh`.
+- `propagateSceneToParents` in `scenes.repo.ts` is exported as a standalone
+  function, called **off the critical path** (at idle, after the row is persisted).
+- Moving a node in a deeply nested component no longer blocks the interaction.
+
+### Rules for models working in this codebase
+
+- **Never call `getTable` or `setTable`.** Those symbols no longer exist. Use
+  `listTable`, `putRecord`, `removeRecords`, `replaceTable` from
+  `src/lib/storage/store.ts` (or directly from `recordStore.ts`).
+- **Never `await saveScene`.** It is `void`. The UI must not block on it.
+- **Never write to the persistence port directly.** All writes go through
+  `getSaveQueue().enqueue(mutation)` or through `putRecord` (which calls enqueue
+  internally). Direct `port.applyBatch` calls bypass the outbox and the coalescing.
+- **Never open a SQLite connection in Rust.** The only connection is the one in
+  `tauri::State<Db>`, injected by Tauri. All Rust commands receive it via
+  `state: State<'_, Db>`.
+- **Do not add a new blob key to `kv_store`.** New data goes in the `records`
+  table via `putRecord`, keyed by `(table, id)`.
+
