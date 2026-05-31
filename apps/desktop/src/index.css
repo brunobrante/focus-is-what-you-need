@@ -249,10 +249,6 @@
   min-height: 0;
   overflow: hidden;
   cursor: default;
-  background-image:
-    linear-gradient(rgb(0 0 0 / 20%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(0 0 0 / 20%) 1px, transparent 1px);
-  background-size: 24px 24px;
 }
 
 .canvas-stage {
