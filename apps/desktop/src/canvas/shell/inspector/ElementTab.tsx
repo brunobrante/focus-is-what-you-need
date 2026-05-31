@@ -58,6 +58,11 @@ export function ElementTab({
   const rect = getAbsoluteRect(document, node.id);
   const parentSize = getParentSize(document, node.id);
   const opacity = Math.round((node.styles.opacity ?? 1) * 100);
+  const def = getElementDefinition(node.type).capabilities;
+  const c = def.constraints;
+  const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? w);
+  const clampH = (h: number) => clamp(h, c.height.min, c.height.max ?? h);
+  const clampR = (r: number) => c.radius ? clamp(r, c.radius.min, c.radius.max ?? r) : r;
 
   return (
     <>
@@ -83,13 +88,15 @@ export function ElementTab({
 
       <InsSection title="Tamanho">
         <InsRow label="W">
-          <InsInput value={String(node.width)} onChange={(value) => updateNumber(value, (width) => onUpdateGeometry({ width }))} suffix="px" />
+          <InsInput value={String(node.width)} onChange={(value) => updateNumber(value, (w) => onUpdateGeometry({ width: clampW(w) }))} suffix="px" />
         </InsRow>
         <InsRow label="H">
-          <InsInput value={String(node.height)} onChange={(value) => updateNumber(value, (height) => onUpdateGeometry({ height }))} suffix="px" />
+          <InsInput value={String(node.height)} onChange={(value) => updateNumber(value, (h) => onUpdateGeometry({ height: clampH(h) }))} suffix="px" />
         </InsRow>
-        <Readout label="Max W" value={String(Math.round(parentSize.width))} />
-        <Readout label="Max H" value={String(Math.round(parentSize.height))} />
+        <Readout label="Min W" value={String(c.width.min)} />
+        {c.width.max !== undefined && <Readout label="Max W" value={String(c.width.max)} />}
+        <Readout label="Min H" value={String(c.height.min)} />
+        {c.height.max !== undefined && <Readout label="Max H" value={String(c.height.max)} />}
       </InsSection>
 
       <InsSection title="Layout" defaultOpen={false}>
@@ -136,9 +143,13 @@ export function ElementTab({
         <InsRow label="Opacity">
           <InsInput value={String(opacity)} onChange={(value) => updateNumber(value, (next) => onUpdateStyle({ opacity: clamp(next, 0, 100) / 100 }))} suffix="%" />
         </InsRow>
-        {getElementDefinition(node.type).capabilities.radius && (
+        {def.radius && (
           <InsRow label="Radius">
-            <InsInput value={String(node.styles.borderRadius ?? 0)} onChange={(value) => updateNumber(value, (borderRadius) => onUpdateStyle({ borderRadius }))} suffix="px" />
+            <InsInput
+              value={String(node.styles.borderRadius ?? 0)}
+              onChange={(value) => updateNumber(value, (r) => onUpdateStyle({ borderRadius: clampR(r) }))}
+              suffix={def.radiusRole === "ratio" ? "%" : "px"}
+            />
           </InsRow>
         )}
         <InsRow label="Border">

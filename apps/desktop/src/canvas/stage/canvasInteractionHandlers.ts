@@ -2,7 +2,7 @@ import type React from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { getToolElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { createElementForTool, reparentElements, shallowCloneDocument } from "@/canvas/engine/actions";
-import { getDescendantIds, roundPixel } from "@/canvas/engine/geometry";
+import { clamp, getDescendantIds, roundPixel } from "@/canvas/engine/geometry";
 import type { CanvasDocument, EditorState, Point, Rect } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import { clampViewportState } from "@/canvas/engine/viewport";
@@ -75,18 +75,22 @@ export function handleDrawMove(
   const next = shallowCloneDocument(interaction.beforeDocument);
   node.id = interaction.elementId;
 
+  const c = def?.capabilities.constraints;
+  const minW = c?.width.min ?? 1;
+  const minH = c?.height.min ?? 1;
+  const maxH = c?.height.max;
+
   if (isHorizontal) {
     const dx = point.x - interaction.startPoint.x;
     const dy = point.y - interaction.startPoint.y;
     const len = Math.hypot(dx, dy);
     const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
-    const h = node.height;
-    // Center the element on the midpoint of the drag; start endpoint stays at startPoint
+    const h = node.height; // already at default, which respects constraints
     const cx = (interaction.startPoint.x + point.x) / 2;
     const cy = (interaction.startPoint.y + point.y) / 2;
     node.x = roundPixel(cx - len / 2);
     node.y = roundPixel(cy - h / 2);
-    node.width = roundPixel(Math.max(len, 1));
+    node.width = roundPixel(Math.max(len, minW));
     node.height = h;
     node.rotation = angleDeg;
   } else {
@@ -96,8 +100,8 @@ export function handleDrawMove(
       : Math.abs(point.y - interaction.startPoint.y);
     node.x = roundPixel(Math.min(interaction.startPoint.x, point.x));
     node.y = roundPixel(Math.min(interaction.startPoint.y, point.y));
-    node.width = roundPixel(Math.max(rawW, 1));
-    node.height = roundPixel(Math.max(rawH, 1));
+    node.width = roundPixel(Math.max(rawW, minW));
+    node.height = roundPixel(clamp(Math.max(rawH, minH), minH, maxH ?? rawH));
   }
   next.elements[interaction.elementId] = node;
   if (!next.rootIds.includes(interaction.elementId)) next.rootIds.push(interaction.elementId);

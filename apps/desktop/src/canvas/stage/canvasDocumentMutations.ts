@@ -192,7 +192,12 @@ function resizeSingleElement(
     ? getParentSize(interaction.beforeDocument, id)
     : { width: parentBounds.width, height: parentBounds.height };
   const handle = interaction.handle;
-  const lockAspect = getElementDefinition(source.type).capabilities.lockAspectRatio;
+  const def = getElementDefinition(source.type).capabilities;
+  const lockAspect = def.lockAspectRatio;
+  const minW = def.constraints.width.min;
+  const maxW = Math.min(parentSize.width, def.constraints.width.max ?? parentSize.width);
+  const minH = def.constraints.height.min;
+  const maxH = Math.min(parentSize.height, def.constraints.height.max ?? parentSize.height);
   let nextRect: Rect;
   if (source.rotation !== 0) {
     nextRect = resizeRotatedRectFromHandle(startRect, handle, currentPoint, source.rotation, {
@@ -207,8 +212,8 @@ function resizeSingleElement(
     });
     nextRect = clampRectToBounds(nextRect, parentBounds);
   }
-  const width = roundPixel(clamp(nextRect.width, MIN_ELEMENT_SIZE, parentSize.width));
-  const height = roundPixel(clamp(nextRect.height, MIN_ELEMENT_SIZE, parentSize.height));
+  const width = roundPixel(clamp(nextRect.width, minW, maxW));
+  const height = roundPixel(clamp(nextRect.height, minH, maxH));
   let absX: number;
   let absY: number;
   if (source.rotation !== 0 || event.altKey) {
@@ -277,8 +282,9 @@ export function resizeDocument(
       width: Math.max(sourceRect.width * scaleX, MIN_ELEMENT_SIZE),
       height: Math.max(sourceRect.height * scaleY, MIN_ELEMENT_SIZE),
     };
-    node.width = roundPixel(Math.min(absoluteRect.width, parentSize.width));
-    node.height = roundPixel(Math.min(absoluteRect.height, parentSize.height));
+    const nc = getElementDefinition(node.type).capabilities.constraints;
+    node.width = roundPixel(clamp(absoluteRect.width, nc.width.min, Math.min(parentSize.width, nc.width.max ?? parentSize.width)));
+    node.height = roundPixel(clamp(absoluteRect.height, nc.height.min, Math.min(parentSize.height, nc.height.max ?? parentSize.height)));
     if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
       node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
     }

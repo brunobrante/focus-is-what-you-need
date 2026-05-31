@@ -35,10 +35,13 @@ export function updateElementGeometry(document: CanvasDocument, id: string, patc
   const node = next.elements[id];
   if (!node) return document;
   const parentSize = getParentSize(next, id);
-  const width = Math.min(Math.max(patch.width ?? node.width, MIN_ELEMENT_SIZE), parentSize.width);
-  const height = Math.min(Math.max(patch.height ?? node.height, MIN_ELEMENT_SIZE), parentSize.height);
-  node.width = roundPixel(width);
-  node.height = roundPixel(height);
+  const c = getElementDefinition(node.type).capabilities.constraints;
+  const minW = c.width.min;
+  const maxW = Math.min(parentSize.width, c.width.max ?? parentSize.width);
+  const minH = c.height.min;
+  const maxH = Math.min(parentSize.height, c.height.max ?? parentSize.height);
+  node.width = roundPixel(clamp(patch.width ?? node.width, minW, maxW));
+  node.height = roundPixel(clamp(patch.height ?? node.height, minH, maxH));
   node.x = roundPixel(clamp(patch.x ?? node.x, 0, parentSize.width - node.width));
   node.y = roundPixel(clamp(patch.y ?? node.y, 0, parentSize.height - node.height));
   clampNodeToParentBounds(next, id);
@@ -63,8 +66,14 @@ export function updateElementStyles(
   const node = next.elements[id];
   if (!node) return document;
   node.styles = { ...node.styles, ...styles };
-  if (styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
-    node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(styles.borderRadius, node.width, node.height));
+  const def = getElementDefinition(node.type).capabilities;
+  if (styles.borderRadius !== undefined) {
+    if (def.radiusRole === "corner") {
+      node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(styles.borderRadius, node.width, node.height));
+    } else if (def.radiusRole === "ratio" && def.constraints.radius) {
+      const { min, max } = def.constraints.radius;
+      node.styles.borderRadius = roundPixel(clamp(styles.borderRadius, min, max ?? styles.borderRadius));
+    }
   }
   return next;
 }
