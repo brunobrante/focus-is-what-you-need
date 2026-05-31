@@ -42,10 +42,10 @@ export function ProjectPreviewModal({
   if (!project) return null;
 
   return (
-    <Modal open={open} onClose={onClose} size="wide" ariaLabel="Preview do app">
+    <Modal open={open} onClose={onClose} size="wide" ariaLabel="App preview">
       <ModalHeader
-        title="Preview do app"
-        subtitle="Visualize as telas principais do projeto em sequência, com foco na composição final."
+        title="App preview"
+        subtitle="Visualize the project's main screens in sequence, focusing on final composition."
         onClose={onClose}
       />
       <ModalBody className="!p-0">
@@ -57,7 +57,7 @@ export function ProjectPreviewModal({
               </div>
               <div className="text-[20px] font-semibold tracking-[-0.25px] text-[var(--text)]">{project.name}</div>
               <div className="mt-2 text-[13px] leading-[1.55] text-[var(--text-muted)]">
-                {project.description?.trim() || "Prévia focada na experiência visual do app e na transição entre telas-chave."}
+                {project.description?.trim() || "Preview focused on the visual experience of the app and the transition between key screens."}
               </div>
             </div>
 
@@ -100,9 +100,9 @@ export function ProjectPreviewModal({
           <section className="flex min-h-0 flex-col bg-[linear-gradient(180deg,rgba(11,13,17,0.78),rgba(11,13,17,0.96))]">
             <div className="flex items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.07)] px-6 py-4">
               <div>
-                <div className="text-[15px] font-semibold text-[var(--text)]">{currentScreen?.title ?? "Sem tela"}</div>
+                <div className="text-[15px] font-semibold text-[var(--text)]">{currentScreen?.title ?? "No screen"}</div>
                 <div className="mt-1 text-[12px] text-[var(--text-muted)]">
-                  {screens.length > 0 ? `${currentIndex + 1} de ${screens.length}` : "Nenhuma tela disponível"}
+                  {screens.length > 0 ? `${currentIndex + 1} de ${screens.length}` : "No screens available"}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -144,7 +144,7 @@ export function ProjectPreviewModal({
                 </DeviceStage>
               ) : (
                 <div className="rounded-[18px] border border-dashed border-[rgba(255,255,255,0.1)] px-8 py-10 text-[13px] text-[var(--text-muted)]">
-                  Nenhuma tela disponível para preview.
+                  No screens available para preview.
                 </div>
               )}
             </div>

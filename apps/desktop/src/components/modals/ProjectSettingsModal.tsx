@@ -72,10 +72,10 @@ export function ProjectSettingsModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Configurações do projeto">
+    <Modal open={open} onClose={onClose} ariaLabel="Project settings">
       <ModalHeader
-        title="Configurações do projeto"
-        subtitle="Edite os detalhes principais e defina o comportamento de preview."
+        title="Project settings"
+        subtitle="Edit main details and set preview behavior."
         onClose={onClose}
       />
       <ModalBody className="!p-0">
@@ -116,7 +116,7 @@ export function ProjectSettingsModal({
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-                  placeholder="Nome do projeto"
+                  placeholder="Project name"
                 />
               </Field>
 
@@ -126,7 +126,7 @@ export function ProjectSettingsModal({
                   onChange={(event) => setDescription(event.target.value)}
                   rows={3}
                   className="min-h-[96px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 py-3 text-[14px] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-                  placeholder="Descreva rapidamente o foco deste projeto."
+                  placeholder="Briefly describe this project focus."
                 />
               </Field>
 
@@ -137,13 +137,13 @@ export function ProjectSettingsModal({
                   onClear={() => setThumbnailDataUrl(null)}
                   onFile={onFile}
                 />
-                <Field label="Tela de preview">
+                <Field label="Preview screen">
                   <select
                     value={previewScreenId}
                     onChange={(event) => setPreviewScreenId(event.target.value)}
                     className="h-11 cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors focus:border-[var(--text)]"
                   >
-                    <option value="">Primeira tela do projeto</option>
+                    <option value="">First screen of the project</option>
                     {screens.map((screen) => (
                       <option key={screen.id} value={screen.id}>
                         {screen.title}
@@ -156,10 +156,10 @@ export function ProjectSettingsModal({
           ) : (
             <div className="grid gap-5">
               <div className="grid gap-3 md:grid-cols-2">
-                <ReadonlyCard label="Tipo" value={project.type} />
-                <ReadonlyCard label="Projeto ID" value={project.id} />
-                <ReadonlyCard label="Telas" value={`${screens.length}`} />
-                <ReadonlyCard label="Última atualização" value={new Date(project.updatedAt).toLocaleString("pt-BR")} />
+                <ReadonlyCard label="Type" value={project.type} />
+                <ReadonlyCard label="Project ID" value={project.id} />
+                <ReadonlyCard label="Screens" value={`${screens.length}`} />
+                <ReadonlyCard label="Last updated" value={new Date(project.updatedAt).toLocaleString("en-US")} />
               </div>
 
               <Field label="Default preview screen">
@@ -178,7 +178,7 @@ export function ProjectSettingsModal({
               </Field>
 
               <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-4 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-                O preview do projeto usa a tela padrão definida acima. Se nenhuma tela for escolhida, o projeto abre pela primeira tela disponível.
+                Project preview uses the default screen above. If no screen is selected, the project opens with the first available screen.
               </div>
             </div>
           )}
@@ -188,7 +188,7 @@ export function ProjectSettingsModal({
               Cancelar
             </button>
             <button type="button" onClick={() => void save()} disabled={!name.trim() || saving} className="btn btn-primary">
-              {saving ? "Salvando…" : "Salvar alterações"}
+              {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         </div>
@@ -274,7 +274,7 @@ function ThumbnailField({
               </span>
               <div className="text-[13px] font-medium text-[var(--text)]">Adicionar thumbnail</div>
               <div className="text-[12px] leading-[1.5] text-[var(--text-muted)]">
-                Faça upload de uma imagem para representar o projeto na listagem e nas configurações.
+                Upload an image to represent the project in the listing and settings.
               </div>
             </div>
           </div>

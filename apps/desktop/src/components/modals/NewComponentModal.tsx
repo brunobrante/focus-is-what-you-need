@@ -61,11 +61,11 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
       if (submitting) return;
       const trimmed = name.trim();
       if (!trimmed) {
-        setError("Informe um nome.");
+        setError("Please enter a name.");
         return;
       }
       if (!projectId || !parent) {
-        setError("Contexto inválido.");
+        setError("Invalid context.");
         return;
       }
       setSubmitting(true);
@@ -73,7 +73,7 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
       try {
         const existing = await findComponentByName(parent, trimmed);
         if (existing) {
-          setError("Já existe um componente com esse nome aqui.");
+          setError("A component with that name already exists here.");
           setSubmitting(false);
           return;
         }
@@ -87,19 +87,19 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
         setOpen(false);
         onCreated?.(result);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Falha ao criar.");
+        setError(err instanceof Error ? err.message : "Failed to create.");
         setSubmitting(false);
       }
     };
 
     return (
-      <Modal open={open} onClose={close} ariaLabel="Novo componente">
+      <Modal open={open} onClose={close} ariaLabel="New component">
         <ModalHeader
-          title="Novo componente"
+          title="New component"
           subtitle={
             parent?.kind === "project"
-              ? "Crie um componente do projeto e, se quiser, vincule-o a telas específicas."
-              : "Dê um nome ao componente. Ele entra na hierarquia atual com uma variante padrão."
+              ? "Create a project component and optionally link it to specific screens."
+              : "Give a name to the component. It enters the current hierarchy with a default variant."
           }
           onClose={close}
         />
@@ -143,12 +143,12 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
 
             <div className="grid gap-2">
               <div className="text-[12px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                Vincular a telas
+                Link to screens
               </div>
               <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3">
                 {screens.length === 0 ? (
                   <div className="text-[13px] text-[var(--text-muted)]">
-                    Nenhuma tela disponível neste projeto.
+                    No screens available in this project.
                   </div>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -206,7 +206,7 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
                 )}
               </div>
               <div className="text-[12px] text-[var(--text-faint)]">
-                Se nenhuma tela for marcada, o componente fica disponível apenas no escopo do projeto.
+                If no screen is selected, the component is available only within project scope.
               </div>
             </div>
 
@@ -224,7 +224,7 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
               disabled={submitting}
               className="btn btn-primary"
             >
-              {submitting ? "Criando…" : "Criar componente"}
+              {submitting ? "Creating…" : "Create component"}
             </button>
           </div>
         </ModalBody>

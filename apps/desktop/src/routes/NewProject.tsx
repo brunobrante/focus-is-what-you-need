@@ -65,29 +65,29 @@ export function NewProject() {
     step === 1
       ? type
         ? `formato: ${PROJECT_TYPE_LABEL[type]}`
-        : "selecione um formato"
+        : "select a format"
       : step === 2
         ? name.trim()
-          ? "configure os detalhes finais"
+          ? "configure final details"
           : "informe um nome"
         : thumbnailDataUrl
           ? "thumbnail pronta"
-          : "você pode pular esta etapa";
+          : "you can skip this step";
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
       <header className="px-6 pt-[18px]">
         <div className="mb-3.5 flex items-center justify-between text-[12px] tracking-[0.3px] text-[var(--text-muted)]">
           <div>
-            <span className="font-medium text-[var(--text)]">Novo projeto</span>
+            <span className="font-medium text-[var(--text)]">New project</span>
             <span>
               {" "}
-              · etapa {step} de {TOTAL_STEPS}
+              · step {step} of {TOTAL_STEPS}
             </span>
           </div>
           <Link
             to="/"
-            aria-label="Fechar"
+            aria-label="Close"
             className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-lg border border-[var(--border)] bg-transparent text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
             <svg
@@ -157,11 +157,11 @@ export function NewProject() {
               onClick={() => void finalizeProject(null)}
               disabled={creating}
             >
-              Salvar e pular
+              Save and skip
             </button>
           ) : null}
           <button type="button" className="btn btn-primary" onClick={() => void next()} disabled={!canNext}>
-            <span>{creating ? "Criando…" : step === TOTAL_STEPS ? "Criar projeto" : "Avançar"}</span>
+            <span>{creating ? "Creating…" : step === TOTAL_STEPS ? "Create project" : "Next"}</span>
             <svg
               width="14"
               height="14"
@@ -195,9 +195,9 @@ function StepType({
   ];
   return (
     <section className="w-full max-w-[760px]">
-      <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Para qual formato?</h1>
+      <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Which format?</h1>
       <p className="m-0 mb-8 text-[14px] leading-[1.5] text-[var(--text-muted)]">
-        Escolha o tipo de projeto. Você poderá ajustar dimensões depois no canvas.
+        Choose the project type. You can adjust dimensions later in the canvas.
       </p>
       <div className="grid grid-cols-3 gap-3.5" role="radiogroup">
         {cards.map((c) => (
@@ -229,7 +229,7 @@ function StepAdvanced({
     <section className="w-full max-w-[760px]">
       <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Advanced Settings</h1>
       <p className="m-0 mb-8 text-[14px] leading-[1.5] text-[var(--text-muted)]">
-        Adicione uma thumbnail para identificar o projeto com mais rapidez na galeria.
+        Add a thumbnail to identify the project more quickly in the gallery.
       </p>
 
       <label
@@ -273,11 +273,11 @@ function StepAdvanced({
               <div className="space-y-2">
                 <div className="text-[16px] font-semibold text-[var(--text)]">Project thumbnail</div>
                 <div className="text-[13px] leading-[1.6] text-[var(--text-muted)]">
-                  Use uma arte, capa ou frame representativo. Você pode deixar essa etapa para depois usando “Salvar e pular”.
+                  Use a representative artwork, cover or frame. You can skip this step and come back later using “Save and skip”.
                 </div>
               </div>
               <span className="inline-flex h-9 items-center rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[12.5px] font-medium text-[var(--text)]">
-                Selecionar imagem
+                Select image
               </span>
             </div>
           </div>
@@ -408,17 +408,17 @@ function StepName({
       </div>
       <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Como vai se chamar?</h1>
       <p className="m-0 mb-8 text-[14px] leading-[1.5] text-[var(--text-muted)]">
-        Dê um nome ao seu projeto. Você pode renomear a qualquer momento.
+        Give a name to your project. You can rename it anytime.
       </p>
       <div className="flex max-w-[460px] flex-col gap-2">
         <label htmlFor="project-name" className="text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-          Nome do projeto
+          Project name
         </label>
         <input
           id="project-name"
           ref={inputRef}
           type="text"
-          placeholder="Ex: Aplicativo de finanças"
+          placeholder="Ex: Finance App"
           autoComplete="off"
           value={name}
           onChange={(e) => onChange(e.target.value)}
@@ -428,7 +428,7 @@ function StepName({
           className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors duration-[100ms] placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
         />
         <span className="mt-1 text-[12px] text-[var(--text-faint)]">
-          Recomendado: algo curto e memorável.
+          Recommended: something short and memorable.
         </span>
       </div>
     </section>

@@ -242,7 +242,7 @@ export function References() {
                   References
                 </h1>
                 <p className="m-0 text-[13px] text-[var(--text-muted)]">
-                  Imagens e vídeos salvos localmente. Arraste ou selecione para adicionar.
+                  Images and videos saved locally. Drag or select to add.
                 </p>
               </div>
               <SmallButton type="button" primary onClick={() => setImportOpen(true)}>
@@ -506,9 +506,9 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
         <Upload size={18} />
       </span>
       <div>
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">Nenhuma referência ainda</p>
+        <p className="m-0 text-[13px] font-medium text-[var(--text)]">No references yet</p>
         <p className="m-0 mt-1 text-[12px] text-[var(--text-faint)]">
-          Clique para fazer upload de imagens ou vídeos
+          Click to upload images or videos
         </p>
       </div>
     </button>
@@ -567,11 +567,11 @@ function Inspector({
     <div className="flex h-full w-[320px] flex-col overflow-hidden bg-[var(--bg-elev)]">
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-3 py-2.5">
         <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-muted)]">
-          Informações
+          Info
         </span>
         <button
           type="button"
-          aria-label="Fechar"
+          aria-label="Close"
           onClick={onClose}
           className="grid h-6 w-6 cursor-pointer place-items-center rounded-[6px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
@@ -595,7 +595,7 @@ function Inspector({
           {display.name}
         </div>
 
-        <Section title="Descrição">
+        <Section title="Description">
           <textarea
             value={descDraft}
             onChange={(e) => setDescDraft(e.target.value)}
@@ -606,7 +606,7 @@ function Inspector({
                 e.currentTarget.blur();
               }
             }}
-            placeholder="Adicione uma descrição…"
+            placeholder="Add a description..."
             rows={3}
             className="w-full resize-none rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-[12px] leading-[1.5] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
           />
@@ -653,20 +653,20 @@ function Inspector({
           />
         </Section>
 
-        <Section title="Detalhes">
+        <Section title="Details">
           <DetailList
             items={[
               ["Formato", display.type],
-              ["Tipo", display.mediaKind === "video" ? "Vídeo" : "Imagem"],
+              ["Type", display.mediaKind === "video" ? "Video" : "Image"],
               ...(display.w && display.h
-                ? [["Dimensões", `${display.w} × ${display.h}`] as [string, string]]
+                ? [["Dimensions", `${display.w} × ${display.h}`] as [string, string]]
                 : []),
-              ["Tamanho", formatSize(display.size || 0)],
+              ["Size", formatSize(display.size || 0)],
               ...(display.stack?.enabled
-                ? [["Stack", `${display.stack.itemCount} ${display.stack.itemCount === 1 ? "componente" : "componentes"}`] as [string, string]]
+                ? [["Stack", `${display.stack.itemCount} ${display.stack.itemCount === 1 ? "component" : "components"}`] as [string, string]]
                 : []),
               ...(display.duration !== undefined
-                ? [["Duração", formatDuration(display.duration)] as [string, string]]
+                ? [["Duration", formatDuration(display.duration)] as [string, string]]
                 : []),
             ]}
           />
@@ -685,7 +685,7 @@ function Inspector({
       <div className="flex shrink-0 gap-1.5 border-t border-[var(--border)] px-3 py-2.5">
         <InspectorAction
           icon={<ExternalLink size={12} />}
-          label="Abrir"
+          label="Open"
           onClick={() => onOpenLightbox(display)}
         />
         {display.mediaKind === "image" ? (
@@ -697,7 +697,7 @@ function Inspector({
         ) : null}
         <InspectorAction
           icon={<Trash2 size={12} />}
-          label="Remover"
+          label="Remove"
           danger
           onClick={() => onDelete(display.id)}
         />
@@ -818,7 +818,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
         type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Buscar por nome ou tag…"
+        placeholder="Search by name or tag..."
         className="h-[34px] w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] py-0 pl-8 pr-8 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
       />
       {value ? (
@@ -1024,7 +1024,7 @@ function ImportModal({
     <div
       role="dialog"
       aria-modal
-      aria-label="Adicionar referência"
+      aria-label="Add reference"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -1038,12 +1038,12 @@ function ImportModal({
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-[18px] py-3.5">
           <h3 className="m-0 text-[14px] font-semibold text-[var(--text)]">
             {isStaged
-              ? `${staged.length} ${staged.length === 1 ? "arquivo selecionado" : "arquivos selecionados"}`
-              : "Adicionar referência"}
+              ? `${staged.length} ${staged.length === 1 ? "file selected" : "files selected"}`
+              : "Add reference"}
           </h3>
           <button
             type="button"
-            aria-label="Fechar"
+            aria-label="Close"
             onClick={onClose}
             className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
@@ -1159,12 +1159,12 @@ function ImportModal({
                 </span>
                 <div>
                   <h4 className="m-0 text-[13.5px] font-semibold text-[var(--text)]">
-                    {processing ? "Processando…" : "Arraste arquivos aqui"}
+                    {processing ? "Processing…" : "Drag files here"}
                   </h4>
                   <p className="m-0 mt-1 max-w-[340px] text-[12px] text-[var(--text-muted)]">
                     Imagens: PNG, JPG, GIF, WebP, SVG
                     <br />
-                    Vídeos: MP4, MOV, WebM, AVI, MKV (máx. 150 MB)
+                    Videos: MP4, MOV, WebM, AVI, MKV (max. 150 MB)
                   </p>
                 </div>
                 <div className="flex gap-3 text-[11.5px] text-[var(--text-muted)]">
@@ -1173,7 +1173,7 @@ function ImportModal({
                   </span>
                   <span className="opacity-40">·</span>
                   <span className="flex items-center gap-1.5">
-                    <Film size={12} className="opacity-60" /> Vídeos
+                    <Film size={12} className="opacity-60" /> Videos
                   </span>
                 </div>
               </label>
@@ -1182,8 +1182,8 @@ function ImportModal({
                 <div className="rounded-[8px] border border-[rgba(255,100,100,0.25)] bg-[rgba(255,80,80,0.08)] px-3 py-2.5">
                   <p className="m-0 text-[12px] font-medium text-[#ff8a8a]">
                     {rejectedFiles.length === 1
-                      ? "1 vídeo ignorado — excede 150 MB:"
-                      : `${rejectedFiles.length} vídeos ignorados — excedem 150 MB:`}
+                      ? "1 video ignored — exceeds 150 MB:"
+                      : `${rejectedFiles.length} videos ignored — exceed 150 MB:`}
                   </p>
                   <ul className="m-0 mt-1 list-none p-0">
                     {rejectedFiles.map((name) => (
@@ -1202,15 +1202,15 @@ function ImportModal({
               </span>
               <div>
                 <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">
-                  Importação .figx
+                  .figx import
                 </p>
                 <p className="m-0 mt-2 max-w-[340px] text-[12px] leading-[1.55] text-[var(--text-muted)]">
-                  Arquivos <code className="text-[11px] text-[var(--text)]">.figx</code> são
-                  referências nativas da plataforma — importam múltiplos itens em uma só operação
-                  diretamente dos seus projetos.
+                  <code className="text-[11px] text-[var(--text)]">.figx</code> files are
+                  native platform references — they import multiple items in a single operation
+                  directly from your projects.
                 </p>
                 <p className="m-0 mt-3 text-[11.5px] text-[var(--text-faint)]">
-                  Disponível em breve.
+                  Coming soon.
                 </p>
               </div>
             </div>
@@ -1229,7 +1229,7 @@ function ImportModal({
                 disabled={staged.length === 0}
                 onClick={handleConfirm}
               >
-                Adicionar {staged.length} {staged.length === 1 ? "item" : "itens"}
+                Add {staged.length} {staged.length === 1 ? "item" : "items"}
               </SmallButton>
             </>
           ) : (
@@ -1300,7 +1300,7 @@ function DuplicateFileAlert({
           </h3>
           <button
             type="button"
-            aria-label="Fechar"
+            aria-label="Close"
             onClick={onClose}
             className="grid h-8 w-8 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
@@ -1326,7 +1326,7 @@ function DuplicateFileAlert({
         <div className="flex shrink-0 flex-wrap items-center gap-5 border-t border-[var(--border)] px-5 py-4">
           <DuplicateChoice
             checked={decision === "existing"}
-            label="Usar arquivo existente"
+            label="Use existing file"
             onChange={() => onDecisionChange("existing")}
           />
           <DuplicateChoice
@@ -1538,7 +1538,7 @@ function TagEditor({
         onBlur={() => {
           if (draft) commit();
         }}
-        placeholder={tags.length === 0 ? "Adicionar tag…" : "+ tag"}
+        placeholder={tags.length === 0 ? "Add tag…" : "+ tag"}
         className="min-w-[70px] flex-1 border-0 bg-transparent py-0 text-[10.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
       />
     </div>
@@ -1586,7 +1586,7 @@ function StagedItemRow({
           </div>
           <button
             type="button"
-            aria-label="Remover"
+            aria-label="Remove"
             onClick={onRemove}
             className="grid h-[22px] w-[22px] shrink-0 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-[var(--text-faint)] transition-colors hover:bg-[rgba(255,80,80,0.15)] hover:text-[#ff8a8a]"
           >
@@ -1596,7 +1596,7 @@ function StagedItemRow({
         <textarea
           value={item.desc}
           onChange={(e) => onDescChange(e.target.value)}
-          placeholder="Descrição (opcional)…"
+          placeholder="Description (opcional)…"
           rows={2}
           className="w-full resize-none rounded-[6px] border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-[11.5px] leading-[1.5] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
         />
@@ -1644,7 +1644,7 @@ function Lightbox({
     >
       <button
         type="button"
-        aria-label="Fechar"
+        aria-label="Close"
         onClick={onClose}
         className="absolute right-4 top-4 grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[rgba(20,20,20,0.85)] text-[var(--text)] hover:bg-white hover:text-black"
       >
@@ -1879,7 +1879,7 @@ function formatDuration(seconds: number): string {
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("pt-BR", {
+    return new Date(iso).toLocaleString("en-US", {
       day: "2-digit",
       month: "short",
       year: "numeric",

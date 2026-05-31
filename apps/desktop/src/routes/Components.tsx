@@ -68,15 +68,15 @@ export function Components() {
   const { data: references } = useReferences("screen", screen?.id ?? null);
   const type: ProjectType = project?.type ?? "desktop";
   const canUseFactoryMocks = project?.source === "mock";
-  const projectName = project?.name ?? "Projeto";
-  const screenName = screen?.title ?? "Tela";
+  const projectName = project?.name ?? "Project";
+  const screenName = screen?.title ?? "Screen";
   const tpl = templateForScreenName(screenName);
   const tplLabel: Record<ReturnType<typeof templateForScreenName>, string> = {
     hero: "Hero",
-    list: "Listagem",
-    detail: "Detalhe",
-    form: "Formulário",
-    profile: "Perfil",
+    list: "List",
+    detail: "Detail",
+    form: "Form",
+    profile: "Profile",
   };
 
   const [sideTab, setSideTab] = useState<SideTab>("components");
@@ -159,7 +159,7 @@ export function Components() {
       title: `v${n} · nova`,
       tpl: tpls[n % tpls.length],
       updated: "agora",
-      author: "Você",
+      author: "You",
       initials: "VC",
     };
     setVersions((prev) => [newV, ...prev]);
@@ -181,7 +181,7 @@ export function Components() {
           </Link>
           <span className="text-[var(--text-faint)]">/</span>
           <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-            Projetos
+            Projects
           </Link>
           <span className="text-[var(--text-faint)]">/</span>
           <Link
@@ -202,7 +202,7 @@ export function Components() {
               <rect x="3" y="4" width="18" height="14" rx="2" />
               <path d="M3 9h18" />
             </svg>
-            Abrir canvas
+            Open canvas
           </Link>
         </div>
       </header>
@@ -212,7 +212,7 @@ export function Components() {
         <div>
           <EditableTitle
             value={screen?.title ?? screenName}
-            label="Editar nome da tela"
+            label="Edit screen name"
             onSave={(title) => {
               if (!screen || title === screen.title) return;
               void (async () => {
@@ -228,13 +228,13 @@ export function Components() {
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
             <span>{tplLabel[tpl]}</span>
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-            <span>atualizada há 1 hora</span>
+            <span>updated 1 hour ago</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Ver histórico"
+            aria-label="View history"
             onClick={() => historyRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
@@ -243,10 +243,10 @@ export function Components() {
               <polyline points="3 4 3 10 9 10" />
               <path d="M12 7v5l3 2" />
             </svg>
-            Histórico
+            History
           </button>
           <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-            {components.length} componentes
+            {components.length} component{components.length === 1 ? "" : "s"}
           </span>
         </div>
       </div>
@@ -258,13 +258,13 @@ export function Components() {
           canvasHref={canvasHref}
           prev={prevScreen ? {
             name: prevScreen.title,
-            details: [`${components.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            details: [`${components.length} component${components.length === 1 ? "" : "s"}`, PROJECT_TYPE_DIMS[type]],
             href: buildScreenHref(prevScreen.id),
             screenId: prevScreen.id,
           } : undefined}
           next={nextScreen ? {
             name: nextScreen.title,
-            details: [`${components.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            details: [`${components.length} component${components.length === 1 ? "" : "s"}`, PROJECT_TYPE_DIMS[type]],
             href: buildScreenHref(nextScreen.id),
             screenId: nextScreen.id,
           } : undefined}
@@ -291,15 +291,15 @@ export function Components() {
                 {sideTab === "components"
                   ? "Sub Components"
                   : sideTab === "versions"
-                    ? "Versões da tela"
-                    : "Referências"}
+                    ? "Screen Versions"
+                    : "References"}
               </h2>
               <p className="m-0 text-[12px] text-[var(--text-muted)]">
                 {sideTab === "components"
-                  ? "Tudo que está nessa tela. Clique para abrir."
+                  ? "Everything on this screen. Click to open."
                   : sideTab === "versions"
-                    ? "Histórico de versões dessa tela."
-                    : "Inspirações e materiais de apoio para essa tela."}
+                    ? "History of versions for this screen."
+                    : "Inspirations and support materials for this screen."}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ export function Components() {
               {sideTab === "versions" ? (
                 <button
                   type="button"
-                  aria-label="Comparar versões"
+                  aria-label="Compare versions"
                   onClick={() => compareRef.current?.open()}
                   className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
                 >
@@ -327,8 +327,8 @@ export function Components() {
           <div role="tablist" className="flex shrink-0 gap-0.5 border-b border-[var(--border)] px-3.5">
             {([
               { id: "components", label: "Sub Components", count: components.length },
-              { id: "versions", label: "Versões", count: versions.length },
-              { id: "references", label: "Referências", count: references.length },
+              { id: "versions", label: "Versions", count: versions.length },
+              { id: "references", label: "References", count: references.length },
             ] as Array<{ id: SideTab; label: string; count: number }>).map((t) => {
               const active = sideTab === t.id;
               return (
@@ -381,14 +381,14 @@ export function Components() {
                 ))}
                 {filteredComponents.length === 0 && (
                   <SideEmptyState
-                    title="Nenhum sub component encontrado"
-                    description="Os componentes derivados desta tela aparecerão aqui quando forem criados."
-                    actionLabel="Novo componente"
+                    title="No sub component found"
+                    description="Components derived from this screen will appear here when created."
+                    actionLabel="New component"
                     onAction={components.length === 0 ? openNewComponent : undefined}
                   />
                 )}
                 {filteredComponents.length > 0 ? (
-                  <AddCard label="Novo componente" onClick={openNewComponent} />
+                  <AddCard label="New component" onClick={openNewComponent} />
                 ) : null}
               </>
             )}
@@ -406,10 +406,10 @@ export function Components() {
                 ))}
                 {filteredVersions.length === 0 && (
                   <div className="col-span-full px-3 py-14 text-center text-[13px] text-[var(--text-faint)]">
-                    Nenhuma versão encontrada.
+                    No versions found.
                   </div>
                 )}
-                <AddCard label="Nova versão" onClick={addVersion} />
+                <AddCard label="New version" onClick={addVersion} />
               </>
             )}
             {sideTab === "references" && (
@@ -426,8 +426,8 @@ export function Components() {
 
       <HistoryModal
         ref={historyRef}
-        title="Histórico da tela"
-        subtitle={`Alterações feitas em "${screenName}" ao longo do tempo.`}
+        title="Screen history"
+        subtitle={`Changes made to "${screenName}" over time.`}
         commits={DEFAULT_HISTORY}
       />
       <CompareVersionsModal
@@ -474,10 +474,10 @@ export function Components() {
       />
       <ConfirmActionModal
         open={Boolean(pendingComponentDelete)}
-        title="Excluir componente"
+        title="Delete component"
         message={
           pendingComponentDelete
-            ? `O componente "${pendingComponentDelete.name}" será removido junto com subcomponentes e variantes.`
+            ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
             : ""
         }
         onClose={() => setPendingComponentDelete(null)}
@@ -574,7 +574,7 @@ function SideSearch({ query, onChange }: { query: string; onChange: (v: string) 
       </svg>
       <input
         type="search"
-        placeholder="Buscar..."
+        placeholder="Search..."
         value={query}
         onChange={(e) => onChange(e.target.value)}
         className="h-[30px] w-full rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-[30px] pr-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
@@ -593,7 +593,7 @@ function SideKindFilter({
   return (
     <div className="relative inline-flex items-center">
       <select
-        aria-label="Filtrar por tipo"
+        aria-label="Filter by type"
         value={value}
         onChange={(e) => onChange(e.target.value as CmpKindFilter)}
         className="h-[30px] cursor-pointer rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-2.5 pr-[26px] text-[12px] text-[var(--text)] outline-none focus:border-[var(--text-muted)]"
@@ -649,10 +649,10 @@ function ComponentSideCard({
         ) : null}
         <CardMenu
           buttons={[
-            { key: "open", label: "Abrir componente", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
+            { key: "open", label: "Open component", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
             {
               key: "canvas",
-              label: "Abrir no canvas",
+              label: "Open in canvas",
               icon: CardMenuIcons.Canvas,
               onClick: () => {
                 if (variant) onOpenCanvas(variant.id);
@@ -665,7 +665,7 @@ function ComponentSideCard({
               menuItems: [
                 {
                   key: "delete",
-                  label: "Excluir componente",
+                  label: "Delete component",
                   icon: CardMenuIcons.Trash,
                   destructive: true,
                   onClick: () => onRequestDelete(component),
@@ -715,7 +715,7 @@ function VersionSideCard({
         <button
           type="button"
           onClick={onSelect}
-          aria-label={`Selecionar versão ${version.title}`}
+          aria-label={`Select version ${version.title}`}
           className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
         />
         <div className="h-full w-full overflow-hidden">
@@ -723,9 +723,9 @@ function VersionSideCard({
         </div>
         <CardMenu
           buttons={[
-            { key: "select", label: "Selecionar versão", icon: CardMenuIcons.Check, onClick: onSelect },
-            { key: "duplicate", label: "Duplicar", icon: CardMenuIcons.Duplicate },
-            { key: "more", label: "Mais", icon: CardMenuIcons.More },
+            { key: "select", label: "Select version", icon: CardMenuIcons.Check, onClick: onSelect },
+            { key: "duplicate", label: "Duplicate", icon: CardMenuIcons.Duplicate },
+            { key: "more", label: "More", icon: CardMenuIcons.More },
           ]}
         />
       </div>
@@ -775,7 +775,7 @@ function PreviewMockImage({
   if (!allowMock) {
     return (
       <div className="grid h-full w-full place-items-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text-faint)]">
-        Tela vazia
+        Empty screen
       </div>
     );
   }
@@ -784,7 +784,7 @@ function PreviewMockImage({
   if (!mock) {
     return (
       <div className="grid h-full w-full place-items-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text-faint)]">
-        Tela vazia
+        Empty screen
       </div>
     );
   }

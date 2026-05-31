@@ -42,17 +42,17 @@ export function ConfirmActionModal({
 export function confirmationDialogCopy(action: PendingConfirmation, components: SavedComponent[]) {
   if (action.type === "reset") {
     return {
-      title: "Resetar ferramenta",
+      title: "Reset tool",
       description:
-        "Isso remove os recortes atuais e volta para a raiz da imagem original. A árvore será recriada apenas com o componente root.",
-      confirmLabel: "Resetar",
+        "This removes current crops and returns to the original image root. The tree will be recreated with only the root component.",
+      confirmLabel: "Reset",
     };
   }
 
   const component = components.find((entry) => entry.id === action.componentId);
   return {
-    title: "Tornar primário",
-    description: `Isso vai usar ${component?.name ?? "este componente"} como componente primário e remover pais e irmãos que não fazem mais parte desse escopo.`,
-    confirmLabel: "Tornar primário",
+    title: "Make primary",
+    description: `This will use ${component?.name ?? "this component"} as the primary component and remove parents and siblings no longer in scope.`,
+    confirmLabel: "Make primary",
   };
 }

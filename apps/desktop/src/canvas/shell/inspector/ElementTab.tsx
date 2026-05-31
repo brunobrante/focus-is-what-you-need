@@ -67,12 +67,12 @@ export function ElementTab({
   return (
     <>
       {node.type === "text" ? (
-        <InsSection title="Conteúdo">
+        <InsSection title="Content">
           <InsTextarea value={node.content ?? ""} onChange={onUpdateText} />
         </InsSection>
       ) : null}
 
-      <InsSection title="Posição">
+      <InsSection title="Position">
         <Readout label="Abs X" value={String(Math.round(rect?.x ?? 0))} />
         <Readout label="Abs Y" value={String(Math.round(rect?.y ?? 0))} />
         <InsRow label="X">
@@ -81,7 +81,7 @@ export function ElementTab({
         <InsRow label="Y">
           <InsInput value={String(node.y)} onChange={(value) => updateNumber(value, (y) => onUpdateGeometry({ y }))} suffix="px" />
         </InsRow>
-        <InsRow label="Rotação">
+        <InsRow label="Rotation">
           <InsInput value={String(Math.round(node.rotation))} onChange={(value) => updateNumber(value, onUpdateRotation)} suffix="°" />
         </InsRow>
       </InsSection>
@@ -134,7 +134,7 @@ export function ElementTab({
         </InsRow>
       </InsSection>
 
-      <InsSection title="Aparência">
+      <InsSection title="Appearance">
         <InsRow label="Fill">
           <InsColor value={node.styles.background ?? "#FFFFFF"} onChange={(background) => onUpdateStyle({ background })} />
         </InsRow>
@@ -173,7 +173,7 @@ export function ElementTab({
       ) : null}
 
       {node.type === "image" ? (
-        <InsSection title="Imagem" defaultOpen={false}>
+        <InsSection title="Image" defaultOpen={false}>
           <InsRow label="URL">
             <InsInput value={node.src ?? ""} onChange={onUpdateImageSource} placeholder="https://..." />
           </InsRow>

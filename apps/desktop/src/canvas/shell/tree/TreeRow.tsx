@@ -131,8 +131,8 @@ export function TreeRow({
               e.stopPropagation();
               onOpenNodeCanvas?.(node.id);
             }}
-            aria-label="Abrir componente no canvas"
-            title="Abrir componente no canvas"
+            aria-label="Open component in canvas"
+            title="Open component in canvas"
             className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#7A7A7A] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
             style={{ opacity: 0.72 }}
           >

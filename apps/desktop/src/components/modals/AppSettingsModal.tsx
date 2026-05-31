@@ -22,14 +22,14 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: "Canvas",
     entries: [
-      { action: "Desfazer", keys: ["⌘", "Z"] },
-      { action: "Refazer", keys: ["⌘", "⇧", "Z"] },
-      { action: "Salvar", keys: ["⌘", "S"] },
-      { action: "Selecionar tudo", keys: ["⌘", "A"] },
-      { action: "Copiar", keys: ["⌘", "C"] },
-      { action: "Colar", keys: ["⌘", "V"] },
-      { action: "Duplicar", keys: ["⌘", "D"] },
-      { action: "Apagar seleção", keys: ["⌫"] },
+      { action: "Undo", keys: ["⌘", "Z"] },
+      { action: "Redo", keys: ["⌘", "⇧", "Z"] },
+      { action: "Save", keys: ["⌘", "S"] },
+      { action: "Select all", keys: ["⌘", "A"] },
+      { action: "Copy", keys: ["⌘", "C"] },
+      { action: "Paste", keys: ["⌘", "V"] },
+      { action: "Duplicate", keys: ["⌘", "D"] },
+      { action: "Clear selection", keys: ["⌫"] },
     ],
   },
   {
@@ -38,25 +38,25 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { action: "Aumentar zoom", keys: ["⌘", "+"] },
       { action: "Reduzir zoom", keys: ["⌘", "-"] },
       { action: "Zoom 100%", keys: ["⌘", "0"] },
-      { action: "Ajustar à tela", keys: ["⌘", "⇧", "H"] },
+      { action: "Fit to screen", keys: ["⌘", "⇧", "H"] },
     ],
   },
   {
-    label: "Navegação",
+    label: "Navigation",
     entries: [
-      { action: "Abrir busca", keys: ["⌘", "K"] },
-      { action: "Nova tela", keys: ["⌘", "N"] },
-      { action: "Abrir canvas", keys: ["⌘", "E"] },
+      { action: "Open search", keys: ["⌘", "K"] },
+      { action: "New screen", keys: ["⌘", "N"] },
+      { action: "Open canvas", keys: ["⌘", "E"] },
       { action: "Voltar", keys: ["⌘", "["] },
-      { action: "Avançar", keys: ["⌘", "]"] },
+      { action: "Next", keys: ["⌘", "]"] },
     ],
   },
   {
     label: "Ferramentas",
     entries: [
-      { action: "Ferramenta Seleção", keys: ["V"] },
-      { action: "Ferramenta Mão", keys: ["H"] },
-      { action: "Ferramenta Retângulo", keys: ["R"] },
+      { action: "Selection Tool", keys: ["V"] },
+      { action: "Hand Tool", keys: ["H"] },
+      { action: "Rectangle Tool", keys: ["R"] },
       { action: "Ferramenta Texto", keys: ["T"] },
     ],
   },
@@ -105,10 +105,10 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
     : "";
 
   return (
-    <Modal open={open} onClose={onClose} size="wide" ariaLabel="Configurações">
+    <Modal open={open} onClose={onClose} size="wide" ariaLabel="Settings">
       <ModalHeader
-        title="Configurações"
-        subtitle="Gerencie atalhos de teclado e o local de salvamento dos projetos."
+        title="Settings"
+        subtitle="Manage keyboard shortcuts and project save location."
         onClose={onClose}
       />
       <ModalBody className="!p-0 flex flex-col">
@@ -116,8 +116,8 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
           <div className="flex gap-1 pt-3">
             {(
               [
-                { id: "shortcuts", label: "Atalhos de teclado" },
-                { id: "storage", label: "Local de salvamento" },
+                { id: "shortcuts", label: "Keyboard shortcuts" },
+                { id: "storage", label: "Save location" },
               ] as { id: AppSettingsTab; label: string }[]
             ).map((item) => {
               const active = tab === item.id;
@@ -169,7 +169,7 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
             disabled={saving || !folderPath}
             className="btn btn-primary"
           >
-            {saving ? "Salvando…" : "Salvar alterações"}
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </ModalBody>
@@ -189,7 +189,7 @@ function ShortcutsTab({
   return (
     <div className="px-[22px] py-5 grid gap-6">
       <p className="text-[12.5px] leading-[1.6] text-[var(--text-muted)] m-0">
-        Clique em um atalho para reatribuí-lo. Pressione a nova combinação de teclas e confirme.
+        Click a shortcut to reassign it. Press the new key combination and confirm.
       </p>
 
       {SHORTCUT_GROUPS.map((group) => (
@@ -239,8 +239,8 @@ function ShortcutsTab({
       ))}
 
       <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-4 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-        Os atalhos são salvos localmente e valem para toda a workspace.
-        Atalhos conflitantes com o sistema operacional podem não funcionar.
+        Shortcuts are saved locally and apply to the entire workspace.
+        Shortcuts that conflict with the operating system may not work.
       </div>
     </div>
   );
@@ -286,11 +286,11 @@ function StorageTab({
       <div className="grid gap-5">
         <div>
           <div className="mb-1.5 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
-            Pasta base dos projetos
+            Projects base folder
           </div>
           <p className="mt-0 mb-3 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-            Pasta raiz onde referências globais, workspaces e projetos avulsos serão armazenados.
-            A estrutura criada é <code className="rounded-[4px] bg-[var(--surface)] px-1 font-mono text-[11px] text-[var(--text)]">&lt;pasta&gt;/references, &lt;pasta&gt;/workspaces/{workspaceName}, &lt;pasta&gt;/projects</code>.
+            Root folder where global references, workspaces, and standalone projects will be stored.
+            The created structure is <code className="rounded-[4px] bg-[var(--surface)] px-1 font-mono text-[11px] text-[var(--text)]">&lt;folder&gt;/references, &lt;folder&gt;/workspaces/{workspaceName}, &lt;folder&gt;/projects</code>.
           </p>
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center gap-2 h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5">
@@ -308,7 +308,7 @@ function StorageTab({
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               <span className="flex-1 text-[13.5px] font-medium text-[var(--text)] truncate">
-                {folderPath || "Carregando…"}
+                {folderPath || "Loading…"}
               </span>
             </div>
             <button
@@ -323,7 +323,7 @@ function StorageTab({
 
         <div className="grid gap-3">
           <div className="mb-0 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
-            Detalhes do armazenamento
+            Storage details
           </div>
           <div className="grid grid-cols-2 gap-3">
             <InfoCard
@@ -332,7 +332,7 @@ function StorageTab({
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
               }
-              label="Pasta de referências"
+              label="References folder"
               value={referencesPath || "—"}
               mono
             />
@@ -355,7 +355,7 @@ function StorageTab({
                 </svg>
               }
               label="Auto-save"
-              value="Automático"
+              value="Automatic"
             />
             <InfoCard
               icon={
@@ -370,11 +370,11 @@ function StorageTab({
         </div>
 
         <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-4 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-          Os projetos são salvos como arquivos{" "}
+          Projects are saved as files{" "}
           <code className="rounded-[4px] bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[11.5px] text-[var(--text)]">
             .figx
           </code>{" "}
-          dentro do workspace local. Projetos mockados continuam internos e não são gravados nessa pasta.
+          within the local workspace. Mocked projects remain internal and are not saved to this folder.
         </div>
       </div>
     </div>

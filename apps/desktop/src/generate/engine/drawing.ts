@@ -307,9 +307,9 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
 
     let badgeText: string;
     if (!selectionCrop) {
-      badgeText = "fora da imagem";
+      badgeText = "outside image";
     } else if (selectionMatchesExistingCut && !editingComponentId) {
-      badgeText = "área já recortada";
+      badgeText = "area already cropped";
     } else {
       badgeText = `${Math.round(selectionCrop.w)} × ${Math.round(selectionCrop.h)}${
         selectionCrop.r ? ` · r ${Math.round(selectionCrop.r)}` : ""

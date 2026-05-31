@@ -24,10 +24,10 @@ export function SideReferencesTab({
         </span>
         <div>
           <p className="m-0 text-[13px] font-medium text-[var(--text)]">
-            {query.trim() ? "Nenhuma referência encontrada" : "Nenhuma referência ainda"}
+            {query.trim() ? "No reference found" : "No references yet"}
           </p>
           <p className="m-0 mt-1 text-[12px] text-[var(--text-faint)]">
-            Adicione imagens ou vídeos de referência
+            Add reference images or videos
           </p>
         </div>
         <button
@@ -38,7 +38,7 @@ export function SideReferencesTab({
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Adicionar referência
+          Add reference
         </button>
       </div>
     );
@@ -61,7 +61,7 @@ export function SideReferencesTab({
         {references.map((r, i) => (
           <RefSidePin key={r.id} reference={r} onClick={() => onOpen(i)} />
         ))}
-        <AddCard label="Nova referência" onClick={onAdd} compact />
+        <AddCard label="New reference" onClick={onAdd} compact />
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ export function ToolsLoadingShell() {
     <ToolsShellContainer>
       <div className="flex flex-col items-center gap-3 text-[var(--text-muted)]">
         <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-[var(--text)]" />
-        <span className="text-[13px]">Carregando referência…</span>
+        <span className="text-[13px]">Loading reference…</span>
       </div>
     </ToolsShellContainer>
   );
@@ -48,14 +48,14 @@ export function ToolsNotFoundShell() {
     <ToolsShellContainer>
       <div className="flex flex-col items-center gap-2.5 text-[var(--text-muted)]">
         <ImageIcon size={24} strokeWidth={1.6} />
-        <h2 className="m-0 text-[16px] text-[var(--text)]">Referência não encontrada</h2>
+        <h2 className="m-0 text-[16px] text-[var(--text)]">Reference not found</h2>
         <p className="m-0 text-[13px]">
           Volte para{" "}
           <Link
             className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline"
             to="/references"
           >
-            Referências
+            References
           </Link>
           .
         </p>
@@ -135,18 +135,18 @@ export function ToolsEmptyShell({ onUpload }: { onUpload: (next: ToolReference) 
           </span>
           <div>
             <p className="m-0 text-[15px] font-semibold text-[var(--text)]">
-              {uploading ? "Processando…" : "Arraste uma imagem aqui"}
+              {uploading ? "Processing…" : "Drag an image here"}
             </p>
             <p className="m-0 mt-1.5 text-[12.5px] text-[var(--text-muted)]">
-              Clique para selecionar do disco. PNG, JPG, GIF, WebP ou SVG.
+              Click to select from disk. PNG, JPG, GIF, WebP or SVG.
             </p>
             <p className="m-0 mt-2 text-[11.5px] text-[var(--text-faint)]">
-              Ou abra uma referência salva em{" "}
+              Or open a saved reference in{" "}
               <Link
                 to="/references"
                 className="border-b border-[var(--border-strong)] text-[var(--text-muted)] no-underline hover:text-[var(--text)]"
               >
-                Referências
+                References
               </Link>
               .
             </p>

@@ -67,9 +67,9 @@ const ELEMENTS_BY_VARIANT: Partial<Record<ComponentVariant, Element[]>> = {
   ],
   chero: [
     { id: "title", title: "Title", kind: "Atom", variant: "etext-l" },
-    { id: "sub", title: "Subtítulo", kind: "Atom", variant: "etext-m" },
-    { id: "cta", title: "Botão CTA", kind: "Atom", variant: "ebtn-p" },
-    { id: "media", title: "Mídia", kind: "Pattern", variant: "emedia" },
+    { id: "sub", title: "Subtitle", kind: "Atom", variant: "etext-m" },
+    { id: "cta", title: "CTA Button", kind: "Atom", variant: "ebtn-p" },
+    { id: "media", title: "Media", kind: "Pattern", variant: "emedia" },
   ],
   cbtn: [
     { id: "primary", title: "Primary", kind: "Variant", variant: "ebtn-p" },
@@ -103,8 +103,8 @@ const ELEMENTS_BY_VARIANT: Partial<Record<ComponentVariant, Element[]>> = {
     { id: "overlay", title: "Backdrop", kind: "Layout", variant: "ebackdrop" },
   ],
   cfooter: [
-    { id: "col", title: "Coluna", kind: "Pattern", variant: "ecol" },
-    { id: "title", title: "Título coluna", kind: "Atom", variant: "etext-s" },
+    { id: "col", title: "Column", kind: "Pattern", variant: "ecol" },
+    { id: "title", title: "Column title", kind: "Atom", variant: "etext-s" },
     { id: "link", title: "Link", kind: "Atom", variant: "elink" },
     { id: "social", title: "Social icons", kind: "Pattern", variant: "esocial" },
   ],
@@ -127,9 +127,9 @@ export function Component() {
   const { data: scopedComponents } = useScreenChildren(project?.id, screen?.id);
   const { data: componentById } = useComponent(componentId);
   const type: ProjectType = project?.type ?? "desktop";
-  const projectName = project?.name ?? "Projeto";
-  const screenName = screen?.title ?? "Tela";
-  const componentName = componentById?.name ?? "Componente";
+  const projectName = project?.name ?? "Project";
+  const screenName = screen?.title ?? "Screen";
+  const componentName = componentById?.name ?? "Component";
 
   const meta: ComponentRow | null = useMemo(() => {
     const exact = scopedComponents.find((c) => c.id === componentId);
@@ -204,14 +204,14 @@ export function Component() {
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]" data-type={type}>
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
         <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-          <Link to={screenHref} aria-label="Voltar" className="text-[var(--text-muted)] hover:text-[var(--text)]">
+          <Link to={screenHref} aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 6l-6 6 6 6" />
             </svg>
           </Link>
           <span className="text-[var(--text-faint)]">/</span>
           <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-            Projetos
+            Projects
           </Link>
           <span className="text-[var(--text-faint)]">/</span>
           <Link to={`/project/${encodeURIComponent(projectId)}`} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
@@ -233,13 +233,13 @@ export function Component() {
               <rect x="3" y="4" width="18" height="14" rx="2" />
               <path d="M3 9h18" />
             </svg>
-            Editar no canvas
+            Edit in canvas
           </Link>
           <button type="button" onClick={() => addElement()} className="btn btn-primary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Nova variação
+            New variant
           </button>
         </div>
       </header>
@@ -250,17 +250,17 @@ export function Component() {
           <div className="flex items-center gap-2.5 text-[12.5px] text-[var(--text-muted)]">
             <span>{kindLabel(meta?.kind ?? "Atom")}</span>
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-            <span>{meta?.screenId == null ? "Global" : "Tela"}</span>
+            <span>{meta?.screenId == null ? "Global" : "Screen"}</span>
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-            <span>usado em 1 tela</span>
+            <span>used in 1 screen</span>
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-            <span>atualizado há 1 hora</span>
+            <span>updated 1 hour ago</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Ver histórico"
+            aria-label="View history"
             onClick={() => historyRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
@@ -269,11 +269,11 @@ export function Component() {
               <polyline points="3 4 3 10 9 10" />
               <path d="M12 7v5l3 2" />
             </svg>
-            Histórico
+            History
           </button>
           <button
             type="button"
-            aria-label="Comparar versões"
+            aria-label="Compare versions"
             onClick={() => compareRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
@@ -285,7 +285,7 @@ export function Component() {
           </button>
           <button
             type="button"
-            aria-label="Ver referências"
+            aria-label="View references"
             onClick={() => referencesRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
@@ -293,7 +293,7 @@ export function Component() {
               <circle cx="12" cy="12" r="9" />
               <path d="M9 12h6M12 9v6" />
             </svg>
-            Referências
+            References
           </button>
           <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
             {elements.length} {elements.length === 1 ? "elemento" : "elementos"}
@@ -309,12 +309,12 @@ export function Component() {
           canvasHref={canvasHref}
           prev={prevComponent ? {
             name: prevComponent.name,
-            details: [`${componentsInScope.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            details: [`${componentsInScope.length} component${componentsInScope.length === 1 ? "" : "s"}`, PROJECT_TYPE_DIMS[type]],
             href: buildComponentHref(prevComponent.id),
           } : undefined}
           next={nextComponent ? {
             name: nextComponent.name,
-            details: [`${componentsInScope.length} componentes`, PROJECT_TYPE_DIMS[type]],
+            details: [`${componentsInScope.length} component${componentsInScope.length === 1 ? "" : "s"}`, PROJECT_TYPE_DIMS[type]],
             href: buildComponentHref(nextComponent.id),
           } : undefined}
         >
@@ -331,7 +331,7 @@ export function Component() {
                   </svg>
                 </span>
                 <span className="text-[13px] font-medium text-[var(--text-muted)]">
-                  Componente vazio
+                  Empty component
                 </span>
               </div>
             </div>
@@ -343,7 +343,7 @@ export function Component() {
             <div>
               <h2 className="m-0 mb-1 text-[14px] font-semibold tracking-[0.1px]">Elementos</h2>
               <p className="m-0 text-[12px] text-[var(--text-muted)]">
-                Subcomponentes e variações deste componente.
+                Subcomponents and variations of this component.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -366,7 +366,7 @@ export function Component() {
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar..."
+                  placeholder="Search..."
                   className="h-[30px] w-full rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-[30px] pr-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
                 />
               </div>
@@ -377,7 +377,7 @@ export function Component() {
                   className="h-[30px] cursor-pointer rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-2.5 pr-[26px] text-[12px] text-[var(--text)] outline-none focus:border-[var(--text-muted)]"
                   style={{ appearance: "none", WebkitAppearance: "none" as never }}
                 >
-                  <option value="all">Todos</option>
+                  <option value="all">All</option>
                   {elementKinds.map((k) => (
                     <option key={k} value={k}>
                       {k}
@@ -398,7 +398,7 @@ export function Component() {
           >
             {filtered.length === 0 && elements.length === 0 ? (
               <div className="col-span-full px-3 py-14 text-center text-[13px] text-[var(--text-faint)]">
-                Nenhum elemento encontrado.
+                No elements found.
               </div>
             ) : (
               filtered.map((e, i) => (
@@ -414,25 +414,25 @@ export function Component() {
                 />
               ))
             )}
-            <AddCard label="Novo elemento" onClick={() => addElement()} />
+            <AddCard label="New element" onClick={() => addElement()} />
           </div>
         </aside>
       </div>
 
       <HistoryModal
         ref={historyRef}
-        title={`Histórico de ${componentName}`}
-        subtitle={`Alterações no componente "${componentName}".`}
+        title={`History of ${componentName}`}
+        subtitle={`Changes to component "${componentName}".`}
         commits={DEFAULT_HISTORY}
       />
       <CompareVersionsModal ref={compareRef} versions={versions} type={type} />
       <ReferencesModal ref={referencesRef} references={[]} />
       <ConfirmActionModal
         open={Boolean(pendingElementDelete)}
-        title="Excluir elemento"
+        title="Delete element"
         message={
           pendingElementDelete
-            ? `O elemento "${pendingElementDelete.title}" será removido.`
+            ? `The element "${pendingElementDelete.title}" will be removed.`
             : ""
         }
         onClose={() => setPendingElementDelete(null)}
@@ -467,7 +467,7 @@ function ElementCard({
           <ElementMock variant={element.variant} />
           <CardMenu
             buttons={[
-              { key: "canvas", label: "Editar no canvas", icon: CardMenuIcons.Canvas, onClick: onOpenCanvas },
+              { key: "canvas", label: "Edit in canvas", icon: CardMenuIcons.Canvas, onClick: onOpenCanvas },
               {
                 key: "more",
                 label: "Mais",
@@ -475,7 +475,7 @@ function ElementCard({
                 menuItems: [
                   {
                     key: "delete",
-                    label: "Excluir elemento",
+                    label: "Delete element",
                     icon: CardMenuIcons.Trash,
                     destructive: true,
                     onClick: () => onRequestDelete(element),
@@ -498,8 +498,8 @@ function ElementCard({
       </button>
       <button
         type="button"
-        aria-label="Adicionar elemento aqui"
-        title="Adicionar elemento aqui"
+        aria-label="Add element here"
+        title="Add element here"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();

@@ -4,25 +4,25 @@ type Kind = "component" | "page" | "frame" | "action";
 type Item = { id: string; kind: Kind; name: string; subtitle: string };
 
 const ITEMS: Item[] = [
-  { id: "c-header", kind: "component", name: "Header", subtitle: "Componente · global" },
-  { id: "c-buttons", kind: "component", name: "Buttons", subtitle: "Componente · primary, secondary, ghost" },
-  { id: "c-hero", kind: "component", name: "Hero", subtitle: "Componente · landing" },
-  { id: "c-card", kind: "component", name: "Card", subtitle: "Componente · variações A/B" },
-  { id: "c-modal", kind: "component", name: "Modal", subtitle: "Componente · confirm, alert" },
-  { id: "c-input", kind: "component", name: "Input", subtitle: "Componente · text, search" },
-  { id: "p-landing", kind: "page", name: "Landing", subtitle: "Página · home" },
-  { id: "p-gallery", kind: "page", name: "Gallery", subtitle: "Página · projetos" },
-  { id: "p-checkout", kind: "page", name: "Checkout", subtitle: "Página · fluxo de compra" },
+  { id: "c-header", kind: "component", name: "Header", subtitle: "Component · global" },
+  { id: "c-buttons", kind: "component", name: "Buttons", subtitle: "Component · primary, secondary, ghost" },
+  { id: "c-hero", kind: "component", name: "Hero", subtitle: "Component · landing" },
+  { id: "c-card", kind: "component", name: "Card", subtitle: "Component · variations A/B" },
+  { id: "c-modal", kind: "component", name: "Modal", subtitle: "Component · confirm, alert" },
+  { id: "c-input", kind: "component", name: "Input", subtitle: "Component · text, search" },
+  { id: "p-landing", kind: "page", name: "Landing", subtitle: "Page · home" },
+  { id: "p-gallery", kind: "page", name: "Gallery", subtitle: "Page · projects" },
+  { id: "p-checkout", kind: "page", name: "Checkout", subtitle: "Page · checkout flow" },
   { id: "f-mobile-home", kind: "frame", name: "Mobile · Home", subtitle: "Frame · 9:16" },
   { id: "f-tablet-grid", kind: "frame", name: "Tablet · Grid", subtitle: "Frame · 4:3" },
-  { id: "a-new-component", kind: "action", name: "Novo componente", subtitle: "Ação · criar" },
-  { id: "a-new-page", kind: "action", name: "Nova página", subtitle: "Ação · criar" },
-  { id: "a-export", kind: "action", name: "Exportar projeto", subtitle: "Ação" },
+  { id: "a-new-component", kind: "action", name: "New component", subtitle: "Action · create" },
+  { id: "a-new-page", kind: "action", name: "New page", subtitle: "Action · create" },
+  { id: "a-export", kind: "action", name: "Export project", subtitle: "Action" },
 ];
 
 const KIND_META: Record<Kind, { label: string; color: string; icon: React.ReactNode }> = {
   component: {
-    label: "Componente",
+    label: "Component",
     color: "#D7C2FF",
     icon: (
       <svg
@@ -41,7 +41,7 @@ const KIND_META: Record<Kind, { label: string; color: string; icon: React.ReactN
     ),
   },
   page: {
-    label: "Página",
+    label: "Page",
     color: "#9DD0FF",
     icon: (
       <svg
@@ -79,7 +79,7 @@ const KIND_META: Record<Kind, { label: string; color: string; icon: React.ReactN
     ),
   },
   action: {
-    label: "Ação",
+    label: "Action",
     color: "#9AE6B4",
     icon: (
       <svg
@@ -192,7 +192,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
               setQuery(e.target.value);
               setActiveIdx(0);
             }}
-            placeholder="Buscar componentes, páginas, frames, ações…"
+            placeholder="Search components, pages, frames, actions…"
             className="h-7 flex-1 border-0 bg-transparent text-[14px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
           />
           <span className="rounded border border-[#2C2C2C] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-faint)]">
@@ -253,7 +253,7 @@ export function SearchToggle({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label="Buscar"
+      aria-label="Search"
       className="grid h-6 w-6 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[var(--text-muted)] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
     >
       <svg

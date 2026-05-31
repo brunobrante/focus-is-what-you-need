@@ -9,8 +9,8 @@ export type ScreenVersion = {
 };
 
 export const DEFAULT_SCREEN_VERSIONS: ScreenVersion[] = [
-  { id: "v3", title: "v3 · atual", device: "iPhone 15", tpl: "hero", updated: "agora", author: "Você", initials: "VC" },
-  { id: "v2", title: "v2 · ontem", device: "iPhone XR", tpl: "hero", updated: "ontem", author: "Você", initials: "VC" },
+  { id: "v3", title: "v3 · atual", device: "iPhone 15", tpl: "hero", updated: "agora", author: "You", initials: "VC" },
+  { id: "v2", title: "v2 · ontem", device: "iPhone XR", tpl: "hero", updated: "yesterday", author: "You", initials: "VC" },
   { id: "v1", title: "v1 · inicial", device: "iPhone SE", tpl: "detail", updated: "3 d", author: "Marina", initials: "MR" },
 ];
 
@@ -34,8 +34,8 @@ export type GitCommit = {
 export const DEFAULT_HISTORY: GitCommit[] = [
   {
     hash: "a1f4c2e",
-    msg: "Ajuste de espaçamento e tipografia no hero",
-    author: "Você",
+    msg: "Adjusted spacing and typography in hero",
+    author: "You",
     initials: "VC",
     when: "agora",
     current: true,
@@ -46,10 +46,10 @@ export const DEFAULT_HISTORY: GitCommit[] = [
   },
   {
     hash: "7b29d80",
-    msg: "Adiciona seção de cards e CTA secundário",
-    author: "Você",
+    msg: "Added cards section and secondary CTA",
+    author: "You",
     initials: "VC",
-    when: "há 2 h",
+    when: "2 hours ago",
     changes: [
       { op: "A", file: "cards-grid.tsx", add: 48 },
       { op: "M", file: "hero.tsx", add: 8, rem: 1 },
@@ -57,10 +57,10 @@ export const DEFAULT_HISTORY: GitCommit[] = [
   },
   {
     hash: "3e0a112",
-    msg: "Refatora header para componente reutilizável",
+    msg: "Refactor header into reusable component",
     author: "Marina",
     initials: "MR",
-    when: "ontem",
+    when: "yesterday",
     changes: [
       { op: "R", file: "header-old.tsx", rem: 64 },
       { op: "A", file: "header.tsx", add: 72 },
@@ -69,16 +69,16 @@ export const DEFAULT_HISTORY: GitCommit[] = [
   },
   {
     hash: "9c7e445",
-    msg: "Troca paleta para tema escuro",
-    author: "Você",
+    msg: "Switch palette to dark theme",
+    author: "You",
     initials: "VC",
     when: "3 d",
     changes: [{ op: "M", file: "tokens.css", add: 22, rem: 22 }],
   },
   {
     hash: "1d8b09a",
-    msg: "Versão inicial da tela",
-    author: "Você",
+    msg: "Initial screen version",
+    author: "You",
     initials: "VC",
     when: "5 d",
     changes: [

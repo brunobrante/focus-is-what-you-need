@@ -49,9 +49,9 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
   const r = references[idx];
 
   return (
-    <Modal open={open} onClose={close} size="image" ariaLabel="Visualizar referência">
+    <Modal open={open} onClose={close} size="image" ariaLabel="View reference">
       <ModalHeader
-        title={r?.title ?? "Referência"}
+        title={r?.title ?? "Reference"}
         subtitle={r?.source ?? ""}
         onClose={close}
         actions={
@@ -97,19 +97,19 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
                       <circle cx="9" cy="9" r="2" />
                       <path d="m21 15-5-5L5 21" />
                     </svg>
-                    <span className="text-[12px]">Sem pré-visualização</span>
+                    <span className="text-[12px]">No preview</span>
                   </div>
                 </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="text-[13px] text-[var(--text-faint)]">Sem referências para mostrar.</div>
+          <div className="text-[13px] text-[var(--text-faint)]">No references to show.</div>
         )}
         {total > 1 ? (
           <button
             type="button"
-            aria-label="Próxima"
+            aria-label="Next"
             onClick={next}
             className="absolute right-[18px] top-1/2 grid h-[38px] w-[38px] -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[rgba(20,20,20,0.85)] text-[var(--text)] backdrop-blur transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >

@@ -80,7 +80,7 @@ export function useCanvasEntities({
 
   const projectType: ProjectType = project?.type ?? queryProjectType;
   const projectId = project?.id ?? projectIdParam;
-  const projectName = project?.name ?? (legacyProjectName || "Projeto sem título");
+  const projectName = project?.name ?? (legacyProjectName || "Untitled Project");
   const canUseFactoryMocks = project?.source === "mock";
 
   const sceneOwner = useMemo<{ ownerType: SceneOwnerType; ownerId: string } | null>(() => {

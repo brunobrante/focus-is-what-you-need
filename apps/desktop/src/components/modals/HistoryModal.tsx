@@ -14,7 +14,7 @@ type Props = {
 };
 
 export const HistoryModal = forwardRef<HistoryModalHandle, Props>(function HistoryModal(
-  { title = "Histórico da tela", subtitle, commits },
+  { title = "Screen history", subtitle, commits },
   ref,
 ) {
   const [open, setOpen] = useState(false);

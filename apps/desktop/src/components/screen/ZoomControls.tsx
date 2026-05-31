@@ -30,8 +30,8 @@ export function ZoomControls({ index, onZoomIn, onZoomOut, onReset, onFullscreen
         type="button"
         disabled={!canReset}
         onClick={onReset}
-        aria-label="Resetar zoom"
-        title="Resetar para 100%"
+        aria-label="Reset zoom"
+        title="Reset to 100%"
         className={[
           "inline-flex h-8 min-w-[56px] cursor-pointer items-center justify-center border-0 bg-transparent px-2 text-center text-[11px] font-medium transition-colors",
           canReset
@@ -51,7 +51,7 @@ export function ZoomControls({ index, onZoomIn, onZoomOut, onReset, onFullscreen
       {onFullscreen ? (
         <>
           <span aria-hidden className="w-px self-stretch bg-[var(--border-strong)]" />
-          <ZoomBtn label="Tela cheia" onClick={onFullscreen}>
+          <ZoomBtn label="Fullscreen" onClick={onFullscreen}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M3 9V5a2 2 0 0 1 2-2h4M21 9V5a2 2 0 0 0-2-2h-4M3 15v4a2 2 0 0 0 2 2h4M21 15v4a2 2 0 0 1-2 2h-4" />
             </svg>

@@ -45,7 +45,7 @@ export function CardMenu({ buttons }: { buttons: CardMenuButton[] }) {
     <div
       ref={rootRef}
       role="toolbar"
-      aria-label="Ações"
+      aria-label="Actions"
       className="pointer-events-none absolute bottom-2 left-1/2 z-[2] flex -translate-x-1/2 translate-y-1.5 items-center gap-0 rounded-md border border-[var(--border-strong)] bg-[rgba(20,20,20,0.92)] p-1 opacity-0 backdrop-blur-md transition-[opacity,transform] duration-[120ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
     >
       {buttons.map((btn, i) => (
@@ -129,7 +129,7 @@ type MoreMenuItem = {
 
 export function CardMoreMenu({
   items,
-  label = "Mais opções",
+  label = "More options",
 }: {
   items: MoreMenuItem[];
   label?: string;

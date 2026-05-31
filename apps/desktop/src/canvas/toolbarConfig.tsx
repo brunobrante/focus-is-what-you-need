@@ -127,20 +127,20 @@ const ICONS: Record<CanvasToolId, ReactNode> = {
  * individual entries without re-constructing them.
  */
 export const TOOL_ENTRIES: Record<CanvasToolId, ToolEntry> = {
-  cursor:    { id: "cursor",    name: "Selecionar", icon: ICONS.cursor },
-  hand:      { id: "hand",      name: "Mão",        icon: ICONS.hand },
+  cursor:    { id: "cursor",    name: "Select",     icon: ICONS.cursor },
+  hand:      { id: "hand",      name: "Hand",       icon: ICONS.hand },
   wrapper:   { id: "wrapper",   name: "Wrapper",    icon: ICONS.wrapper },
-  rectangle: { id: "rectangle", name: "Retângulo",  icon: ICONS.rectangle },
-  ellipse:   { id: "ellipse",   name: "Elipse",     icon: ICONS.ellipse },
-  line:      { id: "line",      name: "Linha",      icon: ICONS.line },
-  arrow:     { id: "arrow",     name: "Seta",       icon: ICONS.arrow },
-  polygon:   { id: "polygon",   name: "Polígono",   icon: ICONS.polygon },
-  star:      { id: "star",      name: "Estrela",    icon: ICONS.star },
-  pen:       { id: "pen",       name: "Caneta",     icon: ICONS.pen },
-  text:      { id: "text",      name: "Texto",      icon: ICONS.text },
-  image:     { id: "image",     name: "Imagem",     icon: ICONS.image },
-  svg:       { id: "svg",       name: "Ícone SVG",  icon: ICONS.svg },
-  actions:   { id: "actions",   name: "Ações",      icon: ICONS.actions },
+  rectangle: { id: "rectangle", name: "Rectangle",  icon: ICONS.rectangle },
+  ellipse:   { id: "ellipse",   name: "Ellipse",    icon: ICONS.ellipse },
+  line:      { id: "line",      name: "Line",       icon: ICONS.line },
+  arrow:     { id: "arrow",     name: "Arrow",      icon: ICONS.arrow },
+  polygon:   { id: "polygon",   name: "Polygon",    icon: ICONS.polygon },
+  star:      { id: "star",      name: "Star",       icon: ICONS.star },
+  pen:       { id: "pen",       name: "Pen",        icon: ICONS.pen },
+  text:      { id: "text",      name: "Text",       icon: ICONS.text },
+  image:     { id: "image",     name: "Image",      icon: ICONS.image },
+  svg:       { id: "svg",       name: "SVG Icon",   icon: ICONS.svg },
+  actions:   { id: "actions",   name: "Actions",    icon: ICONS.actions },
 };
 
 // ── Default config ─────────────────────────────────────────────────────────────

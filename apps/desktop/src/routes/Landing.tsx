@@ -16,14 +16,14 @@ type Filter = "all" | ProjectType;
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60_000);
-  if (m < 1) return "agora";
-  if (m < 60) return `há ${m} min`;
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `há ${h} h`;
+  if (h < 24) return `${h} h ago`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `há ${d} ${d === 1 ? "dia" : "dias"}`;
+  if (d < 7) return `${d} ${d === 1 ? "day" : "days"} ago`;
   const w = Math.floor(d / 7);
-  return `há ${w} ${w === 1 ? "semana" : "semanas"}`;
+  return `${w} ${w === 1 ? "week" : "weeks"} ago`;
 }
 
 export function Landing() {
@@ -85,10 +85,10 @@ export function Landing() {
 
       <ConfirmActionModal
         open={Boolean(pendingDelete)}
-        title="Excluir projeto"
+        title="Delete project"
         message={
           pendingDelete
-            ? `O projeto "${pendingDelete.name}" será removido junto com suas telas, componentes e referências.`
+            ? `The project "${pendingDelete.name}" will be removed along with its screens, components, and references.`
             : ""
         }
         onClose={() => setPendingDelete(null)}
@@ -138,9 +138,9 @@ function ProjectsView({
     <div className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-14">
       <header className="mb-7 flex items-end justify-between gap-4">
         <div>
-          <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Seus projetos</h1>
+          <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Your projects</h1>
           <p className="m-0 text-[13.5px] text-[var(--text-muted)]">
-            {allProjects.length} {allProjects.length === 1 ? "projeto" : "projetos"} no workspace
+            {allProjects.length} {allProjects.length === 1 ? "project" : "projects"} in workspace
           </p>
         </div>
         <Link to="/new" className="btn btn-primary">
@@ -155,7 +155,7 @@ function ProjectsView({
           >
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Novo projeto
+          New project
         </Link>
       </header>
 
@@ -177,7 +177,7 @@ function ProjectsView({
           </svg>
           <input
             type="search"
-            placeholder="Buscar projetos..."
+            placeholder="Search projects..."
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] py-0 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
@@ -188,7 +188,7 @@ function ProjectsView({
           value={filter}
           onChange={onFilterChange}
           options={[
-            { value: "all", label: "Todos" },
+            { value: "all", label: "All" },
             { value: "desktop", label: "Desktop" },
             { value: "tablet", label: "Tablet" },
             { value: "mobile", label: "Mobile" },
@@ -227,7 +227,7 @@ function Segmented<T extends string>({
   return (
     <div
       role="tablist"
-      aria-label="Filtrar por tipo"
+      aria-label="Filter by type"
       className="inline-flex gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
     >
       {options.map((opt) => {
@@ -274,13 +274,13 @@ function ProjectCard({
           items={[
             {
               key: "edit",
-              label: "Editar projeto",
+              label: "Edit project",
               icon: CardMenuIcons.Open,
               onClick: () => onRequestEdit(project),
             },
             {
               key: "delete",
-              label: "Excluir projeto",
+              label: "Delete project",
               icon: CardMenuIcons.Trash,
               destructive: true,
               onClick: () => onRequestDelete(project),
@@ -295,9 +295,9 @@ function ProjectCard({
           </span>
         </div>
         <div className="text-[11.5px] text-[var(--text-muted)]">
-          {screensCount} {screensCount === 1 ? "tela" : "telas"}
+          {screensCount} {screensCount === 1 ? "screen" : "screens"}
           <span className="px-1.5 text-[var(--text-faint)]">·</span>
-          atualizado {relativeTime(project.updatedAt)}
+          updated {relativeTime(project.updatedAt)}
         </div>
       </div>
     </Link>
@@ -357,7 +357,7 @@ function AddProjectCard() {
   return (
     <Link
       to="/new"
-      aria-label="Criar projeto"
+      aria-label="Create project"
       className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
     >
       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)] transition-colors duration-[120ms] group-hover:border-[var(--text)] group-hover:text-[var(--text)]">
@@ -373,7 +373,7 @@ function AddProjectCard() {
           >
             <path d="M12 5v14M5 12h14" />
           </svg>
-          <span>Novo projeto</span>
+          <span>New project</span>
         </div>
       </div>
       <div className="flex flex-col gap-[3px] px-0.5">
@@ -410,9 +410,9 @@ function EmptyState() {
             <path d="M12 8v8M8 12h8" />
           </svg>
         </div>
-        <h1 className="mb-2 text-[22px] font-semibold tracking-[-0.2px]">Nenhum projeto ainda</h1>
+        <h1 className="mb-2 text-[22px] font-semibold tracking-[-0.2px]">No projects yet</h1>
         <p className="mb-7 text-[14px] leading-[1.5] text-[var(--text-muted)]">
-          Comece criando seu primeiro projeto. Você poderá escolher o formato e dar um nome a ele.
+          Start by creating your first project. You can choose the format and give it a name.
         </p>
         <Link to="/new" className="btn btn-primary">
           <svg
@@ -426,7 +426,7 @@ function EmptyState() {
           >
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Criar projeto
+          Create project
         </Link>
       </div>
     </div>

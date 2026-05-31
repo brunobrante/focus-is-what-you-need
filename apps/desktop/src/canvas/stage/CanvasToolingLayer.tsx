@@ -76,7 +76,7 @@ type ContextTool = { id: string; label: string; icon: React.ReactNode } | "divid
 const CONTEXT_TOOLS: ContextTool[] = [
   {
     id: "edit",
-    label: "Editar",
+    label: "Edit",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -86,7 +86,7 @@ const CONTEXT_TOOLS: ContextTool[] = [
   },
   {
     id: "duplicate",
-    label: "Duplicar",
+    label: "Duplicate",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -116,7 +116,7 @@ const CONTEXT_TOOLS: ContextTool[] = [
   },
   {
     id: "backward",
-    label: "Para trás",
+    label: "Backward",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="4" width="12" height="12" rx="1.5" />
@@ -127,7 +127,7 @@ const CONTEXT_TOOLS: ContextTool[] = [
   "divider",
   {
     id: "delete",
-    label: "Excluir",
+    label: "Delete",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6" />

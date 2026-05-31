@@ -38,8 +38,8 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
     const summary = useMemo(
       () =>
         selection.length === 1
-          ? "1 versão selecionada"
-          : `${selection.length} versões selecionadas`,
+          ? "1 version selected"
+          : `${selection.length} versions selected`,
       [selection],
     );
 
@@ -78,10 +78,10 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
     };
 
     return (
-      <Modal open={open} onClose={close} size="xl" ariaLabel="Comparar versões">
+      <Modal open={open} onClose={close} size="xl" ariaLabel="Compare versions">
         <ModalHeader
-          title="Comparar versões"
-          subtitle="Coloque versões dessa tela lado a lado."
+          title="Compare versions"
+          subtitle="Place versions of this screen side by side."
           onClose={close}
           actions={
             <button
@@ -93,7 +93,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
                 <rect x="3" y="4" width="18" height="14" rx="2" />
                 <path d="M3 9h18" />
               </svg>
-              Abrir no canvas
+              Open in canvas
             </button>
           }
         />
@@ -169,7 +169,7 @@ function Toolbar({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Painéis</span>
+        <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Panels</span>
         <input
           type="range"
           min={1}
@@ -319,7 +319,7 @@ function Panel({
         </select>
         <button
           type="button"
-          aria-label="Abrir no canvas"
+          aria-label="Open in canvas"
           onClick={onOpenCanvas}
           className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
@@ -330,7 +330,7 @@ function Panel({
         </button>
         <button
           type="button"
-          aria-label="Remover painel"
+          aria-label="Remove panel"
           onClick={onRemove}
           className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
@@ -350,7 +350,7 @@ function Panel({
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-[13px] text-[var(--text-faint)]">
-              Tela vazia
+              Empty screen
             </div>
           )}
         </div>

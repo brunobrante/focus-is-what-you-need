@@ -72,14 +72,14 @@ export function SidebarComponentsHeader({
           </span>
         </div>
         <p className="m-0 mt-0.5 max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--text-faint)]">
-          Primário: {primaryName}
+          Primary: {primaryName}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <button
           type="button"
-          aria-label="Abrir tudo"
-          title="Abrir toda a árvore"
+          aria-label="Expand all"
+          title="Expand entire tree"
           onClick={onExpandAll}
           disabled={scopedCount <= 1}
           className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border)] disabled:hover:bg-[var(--surface)] disabled:hover:text-[var(--text-muted)]"
@@ -88,8 +88,8 @@ export function SidebarComponentsHeader({
         </button>
         <button
           type="button"
-          aria-label="Fechar tudo"
-          title="Fechar toda a árvore"
+          aria-label="Collapse all"
+          title="Collapse entire tree"
           onClick={onCollapseAll}
           disabled={scopedCount <= 1}
           className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border)] disabled:hover:bg-[var(--surface)] disabled:hover:text-[var(--text-muted)]"
@@ -134,7 +134,7 @@ export function SidebarSaveButton({
         ) : (
           <Save size={14} strokeWidth={1.9} />
         )}
-        {saving ? "Salvando..." : saveStatus ?? "Salvar"}
+        {saving ? "Saving..." : saveStatus ?? "Save"}
       </button>
     </div>
   );
@@ -153,11 +153,11 @@ export function SidebarConfigPanel({
       <div className="flex flex-col gap-2">
         <div>
           <h4 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">
-            Cor do overlay de recortes
+            Crop overlay color
           </h4>
           <p className="m-0 mt-1 text-[10.5px] leading-[1.4] text-[var(--text-faint)]">
-            Cor base aplicada sobre áreas já recortadas. Opacidade {alphaPct}% e blend
-            (screen) são mantidos — cores mais claras aparecem mais.
+            Base color applied over already cropped areas. Opacity {alphaPct}% and blend
+            (screen) are preserved — lighter colors appear more.
           </p>
         </div>
 
@@ -187,7 +187,7 @@ export function SidebarConfigPanel({
               <button
                 key={preset}
                 type="button"
-                aria-label={`Selecionar cor ${preset}`}
+                aria-label={`Select color ${preset}`}
                 onClick={() => onChangeCropsOverlayColor(preset)}
                 className={[
                   "h-6 w-6 cursor-pointer rounded-full border transition-transform duration-[120ms] hover:scale-110",

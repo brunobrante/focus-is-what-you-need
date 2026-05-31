@@ -258,10 +258,10 @@ function previewEntry(
 
 function titleForTemplate(template: MockScreenTemplate): string {
   if (template === "home") return "Home";
-  if (template === "list") return "Listagem";
-  if (template === "detail") return "Detalhe";
+  if (template === "list") return "List";
+  if (template === "detail") return "Detail";
   if (template === "alignment-debug") return "Alignment Debug";
-  return "Formulario";
+  return "Form";
 }
 
 function keyFor(

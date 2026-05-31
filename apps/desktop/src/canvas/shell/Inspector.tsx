@@ -147,7 +147,7 @@ export function Inspector({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Fechar"
+          aria-label="Close"
           className="grid h-6 w-6 cursor-pointer place-items-center rounded-md border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -187,7 +187,7 @@ export function Inspector({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {!document ? (
-          <EmptyState title="Nenhum canvas ativo" body="Selecione Current ou Drafts para inspecionar." />
+          <EmptyState title="No active canvas" body="Select Current or Drafts to inspect." />
         ) : activeTab === "canvas" ? (
           <CanvasTab
             canvas={document.canvas}
@@ -209,9 +209,9 @@ export function Inspector({
             onExpandVisibilityChange={onShellExpandVisibilityChange}
           />
         ) : selectedCount > 1 ? (
-          <EmptyState title={`${selectedCount} elementos selecionados`} body="Use o canvas para mover o grupo ou selecione uma camada para editar propriedades." />
+          <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />
         ) : !node ? (
-          <EmptyState title="Nenhum elemento selecionado" body="Selecione um elemento na árvore ou no canvas." />
+          <EmptyState title="No element selected" body="Select an element in the tree or canvas." />
         ) : (
           <ElementTab
             node={node}

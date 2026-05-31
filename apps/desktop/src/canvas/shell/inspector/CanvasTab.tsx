@@ -25,11 +25,11 @@ export function CanvasTab({ canvas, active, onToggleActive, onUpdate }: CanvasTa
           <InsRow label="H">
             <InsInput value={String(canvas.height)} onChange={(value) => updateNumber(value, (height) => onUpdate({ height }))} suffix="px" />
           </InsRow>
-          <InsRow label="Rotação">
+          <InsRow label="Rotation">
             <InsInput value={String(Math.round(canvas.rotation ?? 0))} onChange={(value) => updateNumber(value, (rotation) => onUpdate({ rotation }))} suffix="°" />
           </InsRow>
         </InsSection>
-        <InsSection title="Aparência">
+        <InsSection title="Appearance">
           <InsRow label="Fill">
             <InsColor value={canvas.background || "#F8FAFC"} onChange={(background) => onUpdate({ background })} />
           </InsRow>
@@ -61,7 +61,7 @@ export function CanvasTab({ canvas, active, onToggleActive, onUpdate }: CanvasTa
             color: editing ? "#7CC7FF" : "#CFCFCF",
           }}
         >
-          {editing ? "Salvar" : "Editar"}
+          {editing ? "Save" : "Edit"}
         </button>
       </div>
     </>

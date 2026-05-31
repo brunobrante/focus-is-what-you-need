@@ -150,7 +150,7 @@ export function PreviewShell({
           </button>
           <button
             type="button"
-            aria-label="Abrir lista de dispositivos"
+            aria-label="Open device list"
             aria-haspopup="menu"
             aria-expanded={deviceMenuOpen}
             onClick={(event) => openDeviceMenu(event.currentTarget.getBoundingClientRect())}
@@ -237,7 +237,7 @@ export function PreviewShell({
               <rect x="3" y="4" width="18" height="14" rx="2" />
               <path d="M3 9h18" />
             </svg>
-            Abrir no canvas
+            Open in canvas
           </Link>
         ) : null}
       </div>
@@ -247,7 +247,7 @@ export function PreviewShell({
         <div className={["group absolute left-4 top-1/2 z-[4] -translate-y-1/2", overlayClass].join(" ")}>
           <Link
             to={prev.href ?? "#"}
-            aria-label="Tela anterior"
+            aria-label="Previous screen"
             className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] no-underline transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -263,7 +263,7 @@ export function PreviewShell({
         <div className={["group absolute right-4 top-1/2 z-[4] -translate-y-1/2", overlayClass].join(" ")}>
           <Link
             to={next.href ?? "#"}
-            aria-label="Próxima tela"
+            aria-label="Next screen"
             className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] no-underline transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

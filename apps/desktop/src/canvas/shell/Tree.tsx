@@ -260,7 +260,7 @@ export function Tree({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fechar painel"
+            aria-label="Close panel"
             className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -374,7 +374,7 @@ export function Tree({
             ))
           ) : (
             <div className="px-4 py-6 text-[12px] text-[#6B6B6B]">
-              Sem itens do projeto.
+              No project items.
             </div>
           )}
         </div>
@@ -390,7 +390,7 @@ export function TreeToggle({ open, onClick }: { open: boolean; onClick: () => vo
     <button
       type="button"
       onClick={onClick}
-      aria-label="Abrir camadas"
+      aria-label="Open layers"
       className="fixed bottom-6 left-3 z-[11] inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-lg border border-[#2C2C2C] bg-[#1E1E1E] px-3 text-[13px] font-medium text-[#CFCFCF] transition-colors hover:bg-[#2A2A2A] hover:text-[var(--text)]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)" }}
     >

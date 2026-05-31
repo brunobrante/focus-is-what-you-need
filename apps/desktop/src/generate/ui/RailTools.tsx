@@ -123,8 +123,8 @@ export function CropsOverlayToggle({
     <button
       type="button"
       data-selection-action
-      aria-label={active ? "Esconder áreas recortadas" : "Mostrar áreas recortadas"}
-      title={active ? "Esconder áreas recortadas" : "Mostrar áreas recortadas"}
+      aria-label={active ? "Hide cropped areas" : "Show cropped areas"}
+      title={active ? "Hide cropped areas" : "Show cropped areas"}
       onClick={onToggle}
       className={[
         "absolute right-3 top-3 z-30 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-medium backdrop-blur-[8px] transition-colors duration-[120ms]",
@@ -134,7 +134,7 @@ export function CropsOverlayToggle({
       ].join(" ")}
     >
       <Eye size={13} strokeWidth={1.8} />
-      <span>Recortes</span>
+      <span>Crops</span>
     </button>
   );
 }

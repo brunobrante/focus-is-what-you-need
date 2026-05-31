@@ -125,7 +125,7 @@ function EmptyPreviewPlaceholder({ kind }: { kind: SnapshotProps["kind"] }) {
           </svg>
         </span>
         <span className="text-[13px] font-medium text-[var(--text-muted)]">
-          {kind === "screen" ? "Tela vazia" : "Componente vazio"}
+          {kind === "screen" ? "Empty screen" : "Empty component"}
         </span>
       </div>
     </div>
@@ -141,7 +141,7 @@ function EmptyCardPlaceholder({
 }) {
   return (
     <div
-      aria-label={kind === "screen" ? "Tela vazia" : "Componente vazio"}
+      aria-label={kind === "screen" ? "Empty screen" : "Empty component"}
       data-empty-card={`${type}-${kind}`}
       className="grid h-full w-full place-items-center overflow-hidden rounded-md text-[var(--text-faint)]"
       style={{

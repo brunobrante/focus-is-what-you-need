@@ -137,7 +137,7 @@ export function ComponentDetail() {
       title: `v${n} · nova`,
       tpl: tpls[n % tpls.length],
       updated: "agora",
-      author: "Você",
+      author: "You",
       initials: "VC",
     };
     setVersions((prev) => [newV, ...prev]);
@@ -148,7 +148,7 @@ export function ComponentDetail() {
   if (!component) {
     return (
       <div className="grid min-h-screen place-items-center bg-[var(--bg)] text-[13px] text-[var(--text-muted)]">
-        Componente não encontrado.
+        Component not found.
       </div>
     );
   }
@@ -170,7 +170,7 @@ export function ComponentDetail() {
               <rect x="3" y="4" width="18" height="14" rx="2" />
               <path d="M3 9h18" />
             </svg>
-            Editar no canvas
+            Edit in canvas
           </Link>
         </div>
       </header>
@@ -179,7 +179,7 @@ export function ComponentDetail() {
         <div>
           <EditableTitle
             value={component.name}
-            label="Editar nome do componente"
+            label="Edit component name"
             onSave={(name) => {
               void updateComponent(component.id, { name });
             }}
@@ -189,13 +189,13 @@ export function ComponentDetail() {
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
             <span>{variants.length} {variants.length === 1 ? "variante" : "variantes"}</span>
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-            <span>{children.length} {children.length === 1 ? "componente filho" : "componentes filhos"}</span>
+            <span>{children.length} {children.length === 1 ? "child component" : "child components"}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Ver histórico"
+            aria-label="View history"
             onClick={() => historyRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
@@ -204,7 +204,7 @@ export function ComponentDetail() {
               <polyline points="3 4 3 10 9 10" />
               <path d="M12 7v5l3 2" />
             </svg>
-            Histórico
+            History
           </button>
           <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
             {children.length} filhos
@@ -242,19 +242,19 @@ export function ComponentDetail() {
                 {sideTab === "components"
                   ? "Sub Components"
                   : sideTab === "info"
-                    ? "Informações"
+                    ? "Information"
                   : sideTab === "versions"
-                    ? "Versões do componente"
-                    : "Referências"}
+                    ? "Component Versions"
+                    : "References"}
               </h2>
               <p className="m-0 text-[12px] text-[var(--text-muted)]">
                 {sideTab === "components"
-                  ? "Tudo que está dentro desta variante. Clique para abrir."
+                  ? "Everything inside this variant. Click to open."
                   : sideTab === "info"
-                    ? "Descrição e metadados editáveis deste componente."
+                    ? "Editable description and metadata for this component."
                   : sideTab === "versions"
-                    ? "Histórico de versões deste componente."
-                    : "Inspirações e materiais de apoio para este componente."}
+                    ? "History of versions for this component."
+                    : "Inspirations and support materials for this component."}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -265,7 +265,7 @@ export function ComponentDetail() {
               {sideTab === "versions" ? (
                 <button
                   type="button"
-                  aria-label="Comparar versões"
+                  aria-label="Compare versions"
                   onClick={() => compareRef.current?.open()}
                   className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
                 >
@@ -281,9 +281,9 @@ export function ComponentDetail() {
           <div role="tablist" className="flex shrink-0 gap-0.5 border-b border-[var(--border)] px-3.5">
             {([
               { id: "components", label: "Sub Components", count: children.length },
-              { id: "info", label: "Informações", count: 0 },
-              { id: "versions", label: "Versões", count: versions.length },
-              { id: "references", label: "Referências", count: references.length ?? 0 },
+              { id: "info", label: "Information", count: 0 },
+              { id: "versions", label: "Versions", count: versions.length },
+              { id: "references", label: "References", count: references.length ?? 0 },
             ] as Array<{ id: SideTab; label: string; count: number }>).map((t) => {
               const active = sideTab === t.id;
               return (
@@ -337,14 +337,14 @@ export function ComponentDetail() {
                 ))}
                 {filteredChildren.length === 0 && (
                   <SideEmptyState
-                    title="Nenhum sub component encontrado"
-                    description="Os filhos deste componente aparecerão aqui quando forem criados."
-                    actionLabel="Novo componente"
+                    title="No sub component found"
+                    description="Children of this component will appear here when created."
+                    actionLabel="New component"
                     onAction={children.length === 0 ? openNewChild : undefined}
                   />
                 )}
                 {filteredChildren.length > 0 ? (
-                  <AddCard label="Novo componente" onClick={openNewChild} />
+                  <AddCard label="New component" onClick={openNewChild} />
                 ) : null}
               </>
             )}
@@ -365,10 +365,10 @@ export function ComponentDetail() {
                 ))}
                 {filteredVersions.length === 0 && (
                   <div className="col-span-full px-3 py-14 text-center text-[13px] text-[var(--text-faint)]">
-                    Nenhuma versão encontrada.
+                    No versions found.
                   </div>
                 )}
-                <AddCard label="Nova versão" onClick={addVersion} />
+                <AddCard label="New version" onClick={addVersion} />
               </>
             )}
             {sideTab === "references" && (
@@ -385,8 +385,8 @@ export function ComponentDetail() {
 
       <HistoryModal
         ref={historyRef}
-        title="Histórico do componente"
-        subtitle={`Alterações feitas em "${component.name}" ao longo do tempo.`}
+        title="Component history"
+        subtitle={`Changes made to "${component.name}" over time.`}
         commits={DEFAULT_HISTORY}
       />
       <CompareVersionsModal
@@ -422,10 +422,10 @@ export function ComponentDetail() {
       />
       <ConfirmActionModal
         open={Boolean(pendingChildDelete)}
-        title="Excluir componente"
+        title="Delete component"
         message={
           pendingChildDelete
-            ? `O componente "${pendingChildDelete.name}" será removido junto com subcomponentes e variantes.`
+            ? `The component "${pendingChildDelete.name}" will be removed along with subcomponents and variants.`
             : ""
         }
         onClose={() => setPendingChildDelete(null)}
@@ -469,7 +469,7 @@ function SideSearch({ query, onChange }: { query: string; onChange: (v: string) 
       </svg>
       <input
         type="search"
-        placeholder="Buscar..."
+        placeholder="Search..."
         value={query}
         onChange={(e) => onChange(e.target.value)}
         className="h-[30px] w-full rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-[30px] pr-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
@@ -552,7 +552,7 @@ function SideKindFilter({
   return (
     <div className="relative inline-flex items-center">
       <select
-        aria-label="Filtrar por tipo"
+        aria-label="Filter by type"
         value={value}
         onChange={(e) => onChange(e.target.value as CmpKindFilter)}
         className="h-[30px] cursor-pointer rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-2.5 pr-[26px] text-[12px] text-[var(--text)] outline-none focus:border-[var(--text-muted)]"
@@ -597,7 +597,7 @@ function VersionSideCard({
         <button
           type="button"
           onClick={onSelect}
-          aria-label={`Selecionar versão ${version.title}`}
+          aria-label={`Select version ${version.title}`}
           className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
         />
         <div className="h-full w-full overflow-hidden">
@@ -605,9 +605,9 @@ function VersionSideCard({
         </div>
         <CardMenu
           buttons={[
-            { key: "select", label: "Selecionar versão", icon: CardMenuIcons.Check, onClick: onSelect },
-            { key: "duplicate", label: "Duplicar", icon: CardMenuIcons.Duplicate },
-            { key: "more", label: "Mais", icon: CardMenuIcons.More },
+            { key: "select", label: "Select version", icon: CardMenuIcons.Check, onClick: onSelect },
+            { key: "duplicate", label: "Duplicate", icon: CardMenuIcons.Duplicate },
+            { key: "more", label: "More", icon: CardMenuIcons.More },
           ]}
         />
       </div>
@@ -655,7 +655,7 @@ function VersionPreviewImage({
   if (!allowMock) {
     return (
       <div className="grid h-full w-full place-items-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text-faint)]">
-        Componente vazio
+        Empty component
       </div>
     );
   }
@@ -664,7 +664,7 @@ function VersionPreviewImage({
   if (!mock) {
     return (
       <div className="grid h-full w-full place-items-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text-faint)]">
-        Componente vazio
+        Empty component
       </div>
     );
   }
@@ -696,12 +696,12 @@ function ComponentInfoPanel({ component }: { component: ComponentRow }) {
   return (
     <div className="col-span-full flex flex-col gap-5">
       <label className="flex flex-col gap-1.5">
-        <span className="text-[11px] text-[var(--text-faint)]">Descrição</span>
+        <span className="text-[11px] text-[var(--text-faint)]">Description</span>
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           onBlur={() => save({ description: description.trim() || null })}
-          placeholder="Descreva o papel deste componente..."
+          placeholder="Describe this component role..."
           className="min-h-[96px] resize-none rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] leading-[1.5] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
         />
       </label>
@@ -718,7 +718,7 @@ function ComponentInfoPanel({ component }: { component: ComponentRow }) {
             }}
             className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--border-strong)]"
           >
-            <option value="">Sem tipo</option>
+            <option value="">No type</option>
             <option value="Layout">Layout</option>
             <option value="Atom">Atom</option>
             <option value="Section">Section</option>
@@ -744,8 +744,8 @@ function ComponentInfoPanel({ component }: { component: ComponentRow }) {
           <span className="min-w-0 truncate font-mono text-[10.5px] text-[var(--text-muted)]">{component.id}</span>
         </div>
         <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
-          <span className="text-[11.5px] text-[var(--text-faint)]">Variantes</span>
-          <span className="text-[11.5px] text-[var(--text-muted)]">Gerenciadas na tab Versões</span>
+          <span className="text-[11.5px] text-[var(--text-faint)]">Variants</span>
+          <span className="text-[11.5px] text-[var(--text-muted)]">Managed in the Versions tab</span>
         </div>
       </div>
     </div>
@@ -821,7 +821,7 @@ function Breadcrumb({
 }) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-      <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">Projetos</Link>
+      <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">Projects</Link>
       <span className="text-[var(--text-faint)]">/</span>
       <Link to={`/project/${encodeURIComponent(projectId)}`} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
         {projectName}
@@ -918,10 +918,10 @@ function ChildCard({
         ) : null}
         <CardMenu
           buttons={[
-            { key: "open", label: "Abrir componente", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
+            { key: "open", label: "Open component", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
             {
               key: "canvas",
-              label: "Abrir no canvas",
+              label: "Open in canvas",
               icon: CardMenuIcons.Canvas,
               onClick: () => {
                 if (variant) onOpenCanvas(variant.id);
@@ -934,7 +934,7 @@ function ChildCard({
               menuItems: [
                 {
                   key: "delete",
-                  label: "Excluir componente",
+                  label: "Delete component",
                   icon: CardMenuIcons.Trash,
                   destructive: true,
                   onClick: () => onRequestDelete(component),

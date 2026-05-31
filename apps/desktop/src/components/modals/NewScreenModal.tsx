@@ -54,11 +54,11 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
       if (submitting) return;
       const title = name.trim();
       if (!title) {
-        setError("Informe um nome.");
+        setError("Please enter a name.");
         return;
       }
       if (!projectId) {
-        setError("Projeto não encontrado.");
+        setError("Project not found.");
         return;
       }
       setSubmitting(true);
@@ -66,7 +66,7 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
       try {
         const existing = await findScreenByTitle(projectId, title);
         if (existing) {
-          setError("Já existe uma tela com esse nome.");
+          setError("A screen with that name already exists.");
           setSubmitting(false);
           return;
         }
@@ -74,16 +74,16 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
         setOpen(false);
         onCreated?.(screen);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Falha ao criar.");
+        setError(err instanceof Error ? err.message : "Failed to create.");
         setSubmitting(false);
       }
     };
 
     return (
-      <Modal open={open} onClose={close} ariaLabel="Nova tela">
+      <Modal open={open} onClose={close} ariaLabel="New screen">
         <ModalHeader
-          title="Nova tela"
-          subtitle="Dê um nome e escolha um template visual para a nova tela."
+          title="New screen"
+          subtitle="Give a name and choose a visual template for the new screen."
           onClose={close}
         />
         <ModalBody>
@@ -121,7 +121,7 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
                     Templates
                   </div>
                   <div className="mt-1 text-[12.5px] text-[var(--text-muted)]">
-                    Todos usam o mesmo fluxo por enquanto. A seleção já prepara o visual para templates futuros.
+                    All use the same flow for now. The selection already prepares the visual for future templates.
                   </div>
                 </div>
               </div>
@@ -160,7 +160,7 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
                         <div>
                           <div className="text-[14px] font-semibold text-[var(--text)]">{template.label}</div>
                           <div className="mt-1 text-[12px] text-[var(--text-faint)]">
-                            {template.variant === "blank" ? "Layout vazio para começar do zero" : "Estrutura inicial pronta para edição"}
+                            {template.variant === "blank" ? "Blank layout to start from scratch" : "Initial structure ready for editing"}
                           </div>
                         </div>
                         <span
@@ -202,7 +202,7 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
               disabled={submitting}
               className="btn btn-primary"
             >
-              {submitting ? "Criando…" : "Criar tela"}
+              {submitting ? "Creating…" : "Create screen"}
             </button>
           </div>
         </ModalBody>

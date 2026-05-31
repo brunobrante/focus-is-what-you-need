@@ -506,7 +506,7 @@ export function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEdito
     try {
       writeSavedComponents(componentKey, components);
       if (!referenceId || item.id !== referenceId) {
-        setStackSaveStatus("Estado local salvo");
+        setStackSaveStatus("Local state saved");
         return;
       }
 
@@ -518,12 +518,12 @@ export function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEdito
       });
       setStackSaveStatus(
         data
-          ? `${data.components.length - 1} ${data.components.length - 1 === 1 ? "componente salvo" : "componentes salvos"}`
-          : "Stack removido",
+          ? `${data.components.length - 1} ${data.components.length - 1 === 1 ? "component saved" : "components saved"}`
+          : "Stack removed",
       );
     } catch (err) {
       console.error("[tools] stack save failed:", err);
-      setStackSaveStatus("Falha ao salvar stack");
+      setStackSaveStatus("Failed to save stack");
     } finally {
       setSavingStack(false);
     }
@@ -1264,7 +1264,7 @@ export function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEdito
                 name={headerSubject.name || "—"}
                 width={headerSubject.w}
                 height={headerSubject.h}
-                type={activeSubject.kind === "stack" && !selectedComponent ? "Tudo junto" : headerSubject.type || "—"}
+                type={activeSubject.kind === "stack" && !selectedComponent ? "Full stack" : headerSubject.type || "—"}
                 thumbnailUrl={activeSubject.kind === "component" ? activeSubject.url : selectedComponent?.dataUrl ?? activeSubject.url}
                 canPromote={Boolean(selectedComponent && selectedComponent.id !== primaryScopeId)}
                 onPromote={() => {
@@ -1282,9 +1282,9 @@ export function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEdito
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
                   <ImageIcon size={24} strokeWidth={1.6} />
-                  <h2 className="m-0 text-[16px] text-[var(--text)]">Imagem não encontrada</h2>
+                  <h2 className="m-0 text-[16px] text-[var(--text)]">Image not found</h2>
                   <p className="m-0 text-[13px]">
-                    Volte para <Link className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline" to="/references">Referências</Link>.
+                    Volte para <Link className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline" to="/references">References</Link>.
                   </p>
                 </div>
               ) : (
@@ -1375,31 +1375,31 @@ export function ToolsEditor({ item, referenceId, onUploadedLocally }: ToolsEdito
                     className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
                   >
                     <Check size={11} strokeWidth={2.2} />
-                    Salvar componente
+                    Save component
                   </button>
                 </div>
               ) : null}
 
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
                 {!canCrop ? (
-                  <span>Abra um componente da árvore para recortar. Original e tudo junto são apenas visualização.</span>
+                  <span>Open a component from the tree to crop. Original and full stack are view-only.</span>
                 ) : editingComponentId ? (
                   <span>
-                    Editando recorte existente. Ajuste a caixa e <Key>Enter</Key> salva · <Key>Esc</Key> cancela
+                    Editing existing crop. Adjust the box and <Key>Enter</Key> saves · <Key>Esc</Key> cancels
                   </span>
                 ) : currentTool === "crop" ? (
                   <span>
-                    Clique e arraste sobre o assunto aberto. Áreas filhas já recortadas aparecem como aviso. <Key>Enter</Key> salva ·{" "}
-                    <Key>Esc</Key> cancela
+                    Click and drag over the open subject. Child areas already cropped appear as a warning. <Key>Enter</Key> saves ·{" "}
+                    <Key>Esc</Key> cancels
                   </span>
                 ) : currentTool === "draw" ? (
                   <span>
-                    Desenhe livremente sobre a imagem. A área desenhada vira o recorte. <Key>Enter</Key> salva ·{" "}
-                    <Key>Esc</Key> cancela
+                    Draw freely over the image. The drawn area becomes the crop. <Key>Enter</Key> saves ·{" "}
+                    <Key>Esc</Key> cancels
                   </span>
                 ) : (
                   <span>
-                    Selecione um componente para recortar dentro dele, ou use <Key>C</Key> para recortar ou <Key>D</Key> para desenhar.
+                    Select a component to crop inside it, or use <Key>C</Key> to crop or <Key>D</Key> to draw.
                   </span>
                 )}
               </div>

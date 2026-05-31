@@ -5,46 +5,46 @@ export { PROJECT_TYPE_LABEL, PROJECT_TYPE_DIMS } from "./types";
 export const PROJECTS: Project[] = [
   {
     id: "p1",
-    name: "App de delivery",
+    name: "Delivery App",
     type: "mobile",
     screens: 12,
-    updated: "há 2 horas",
+    updated: "2 hours ago",
   },
   {
     id: "p2",
-    name: "Dashboard interno",
+    name: "Internal Dashboard",
     type: "desktop",
     screens: 8,
-    updated: "ontem",
+    updated: "yesterday",
   },
   {
     id: "p3",
-    name: "Editor de notas",
+    name: "Notes Editor",
     type: "tablet",
     screens: 5,
-    updated: "há 3 dias",
+    updated: "3 days ago",
   },
   {
     id: "p4",
-    name: "Landing campanha verão",
+    name: "Summer Campaign Landing",
     type: "desktop",
     screens: 3,
-    updated: "há 1 semana",
+    updated: "1 week ago",
   },
   {
     id: "p5",
     name: "Alignment Debug",
     type: "mobile",
     screens: 1,
-    updated: "agora",
+    updated: "now",
   },
 ];
 
 export const DEFAULT_SCREENS: Screen[] = [
   { id: "home", title: "Home", variant: "hero" },
-  { id: "list", title: "Listagem", variant: "list" },
-  { id: "detail", title: "Detalhe", variant: "detail" },
-  { id: "form", title: "Formulário", variant: "form" },
+  { id: "list", title: "List", variant: "list" },
+  { id: "detail", title: "Detail", variant: "detail" },
+  { id: "form", title: "Form", variant: "form" },
 ];
 
 export const ALIGNMENT_DEBUG_SCREENS: Screen[] = [
@@ -64,7 +64,7 @@ export const PROJECT_COMPONENTS: ProjectComponent[] = [
     kind: "Layout",
     variant: "cheader",
     scope: "global",
-    screens: ["Home", "Listagem", "Detalhe", "Formulário", "Perfil"],
+    screens: ["Home", "List", "Detail", "Form", "Profile"],
   },
   {
     id: "footer",
@@ -72,7 +72,7 @@ export const PROJECT_COMPONENTS: ProjectComponent[] = [
     kind: "Layout",
     variant: "cfooter",
     scope: "global",
-    screens: ["Home", "Listagem", "Detalhe", "Formulário", "Perfil"],
+    screens: ["Home", "List", "Detail", "Form", "Profile"],
   },
   {
     id: "buttons",
@@ -80,7 +80,7 @@ export const PROJECT_COMPONENTS: ProjectComponent[] = [
     kind: "Atom",
     variant: "cbtn",
     scope: "global",
-    screens: ["Home", "Formulário", "Detalhe"],
+    screens: ["Home", "Form", "Detail"],
   },
   {
     id: "input",
@@ -88,7 +88,7 @@ export const PROJECT_COMPONENTS: ProjectComponent[] = [
     kind: "Atom",
     variant: "cinput",
     scope: "global",
-    screens: ["Formulário", "Perfil"],
+    screens: ["Form", "Profile"],
   },
   {
     id: "hero",
@@ -104,7 +104,7 @@ export const PROJECT_COMPONENTS: ProjectComponent[] = [
     kind: "Pattern",
     variant: "ccards",
     scope: "screen",
-    screens: ["Listagem"],
+    screens: ["List"],
   },
   {
     id: "sidebar",
@@ -112,7 +112,7 @@ export const PROJECT_COMPONENTS: ProjectComponent[] = [
     kind: "Layout",
     variant: "csidebar",
     scope: "screen",
-    screens: ["Detalhe"],
+    screens: ["Detail"],
   },
   {
     id: "modal",
@@ -133,7 +133,7 @@ export const SCREEN_COMPONENTS: ProjectComponent[] = [
   { id: "sidebar", title: "Sidebar", kind: "Layout", variant: "csidebar", scope: "screen", screens: [] },
   {
     id: "modal",
-    title: "Modal de login",
+    title: "Login Modal",
     kind: "Overlay",
     variant: "cmodal",
     scope: "screen",
@@ -156,7 +156,7 @@ export function isAlignmentDebugProject(name: string | undefined): boolean {
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
   return (
-    (normalized.includes("alignment") || normalized.includes("alinhamento")) &&
+    normalized.includes("alignment") &&
     normalized.includes("debug")
   );
 }
@@ -170,9 +170,9 @@ export function templateForScreenName(name: string): "hero" | "list" | "detail" 
   const s = name.toLowerCase();
   if (s.includes("hero") || s.includes("home")) return "hero";
   if (s.includes("list")) return "list";
-  if (s.includes("detal")) return "detail";
+  if (s.includes("detail")) return "detail";
   if (s.includes("form")) return "form";
-  if (s.includes("perfil") || s.includes("profile")) return "profile";
+  if (s.includes("profile")) return "profile";
   return "hero";
 }
 

@@ -218,7 +218,7 @@ export function propsForTool(tool: CanvasInsertToolId): Record<string, unknown> 
 }
 
 export function textForTool(tool: CanvasInsertToolId): string | null {
-  if (tool === "text") return "Novo texto";
-  if (tool === "actions") return "Ação";
+  if (tool === "text") return "New text";
+  if (tool === "actions") return "Action";
   return null;
 }

@@ -267,7 +267,7 @@ function ExpandButton({
     <button
       type="button"
       onClick={onClick}
-      aria-label="Expandir canvas"
+      aria-label="Expand canvas"
       className="absolute grid h-7 w-7 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888] transition-opacity duration-150 hover:text-[#CFCFCF]"
       style={{
         top: btnTop,
@@ -557,7 +557,7 @@ function DeviceButton({
     >
       <button
         type="button"
-        aria-label={`${overlayEnabled ? "Desativar" : "Ativar"} simulador de tela`}
+        aria-label={`${overlayEnabled ? "Disable" : "Enable"} screen simulator`}
         aria-pressed={overlayEnabled}
         onClick={onToggleOverlay}
         className={[
@@ -575,7 +575,7 @@ function DeviceButton({
 
       <button
         type="button"
-        aria-label="Opções de posição da tela"
+        aria-label="Screen position options"
         aria-expanded={menuOpen}
         onClick={onToggleMenu}
         className={[
@@ -708,8 +708,8 @@ export function ZoomControl({
         type="button"
         disabled={!canReset}
         onClick={() => setZoom(1)}
-        aria-label="Resetar zoom"
-        title="Resetar para 100%"
+        aria-label="Reset zoom"
+        title="Reset to 100%"
         className={[
           "inline-flex h-[26px] min-w-[52px] items-center justify-center rounded-md border-0 bg-transparent px-2 text-[11.5px] font-medium tracking-[0.2px]",
           canReset ? "cursor-pointer text-[#CFCFCF] hover:bg-[#2A2A2A]" : "cursor-default text-[#7A7A7A]",
@@ -737,7 +737,7 @@ export function ZoomControl({
   return (
     <div
       role="group"
-      aria-label="Controle de zoom"
+      aria-label="Zoom control"
       className="inline-flex items-center gap-0.5 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-[3px]"
       style={{
         boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)",

@@ -15,13 +15,13 @@ type Draft = {
 const MOCK_DRAFTS: Draft[] = [
   { id: "d-01", name: "Hero · v3", kind: "frame", tone: "#2A2440", w: 16, h: 10, updated: "agora" },
   { id: "d-02", name: "Onboarding flow", kind: "frame", tone: "#1F2E2A", w: 16, h: 10, updated: "12 min" },
-  { id: "d-03", name: "Card · variação A", kind: "image", tone: "#3A2A22", w: 4, h: 5, updated: "1 h" },
-  { id: "d-04", name: "Card · variação B", kind: "image", tone: "#22303A", w: 4, h: 5, updated: "1 h" },
-  { id: "d-05", name: "Wireframe — checkout", kind: "frame", tone: "#2C2C2C", w: 16, h: 10, updated: "ontem" },
-  { id: "d-06", name: "Botão · estados", kind: "image", tone: "#2E2842", w: 5, h: 3, updated: "ontem" },
+  { id: "d-03", name: "Card · Variation A", kind: "image", tone: "#3A2A22", w: 4, h: 5, updated: "1 h" },
+  { id: "d-04", name: "Card · Variation B", kind: "image", tone: "#22303A", w: 4, h: 5, updated: "1 h" },
+  { id: "d-05", name: "Wireframe — checkout", kind: "frame", tone: "#2C2C2C", w: 16, h: 10, updated: "yesterday" },
+  { id: "d-06", name: "Button · States", kind: "image", tone: "#2E2842", w: 5, h: 3, updated: "yesterday" },
   { id: "d-07", name: "Empty state", kind: "image", tone: "#262626", w: 4, h: 5, updated: "2 d" },
   { id: "d-08", name: "Mobile · home", kind: "frame", tone: "#1E2A38", w: 9, h: 16, updated: "3 d" },
-  { id: "d-09", name: "Tipografia exploração", kind: "image", tone: "#1E1E1E", w: 16, h: 9, updated: "4 d" },
+  { id: "d-09", name: "Typography Exploration", kind: "image", tone: "#1E1E1E", w: 16, h: 9, updated: "4 d" },
   { id: "d-10", name: "Modal · confirm", kind: "frame", tone: "#332026", w: 4, h: 3, updated: "5 d" },
 ];
 
@@ -68,7 +68,7 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fechar galeria"
+            aria-label="Close gallery"
             className="grid h-[22px] w-[22px] cursor-pointer place-items-center rounded-[5px] border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -102,7 +102,7 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar"
+                placeholder="Search"
                 className="flex-1 border-0 bg-transparent text-[12px] text-[#F2F2F2] outline-none placeholder:text-[#6B6B6B]"
               />
             </div>
@@ -112,9 +112,9 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
           <div className="flex gap-1 px-2.5 pb-2.5">
             {(
               [
-                { id: "all", label: "Todos" },
+                { id: "all", label: "All" },
                 { id: "frame", label: "Frames" },
-                { id: "image", label: "Imagens" },
+                { id: "image", label: "Images" },
               ] as Array<{ id: Filter; label: string }>
             ).map((f) => {
               const isActive = filter === f.id;
@@ -144,7 +144,7 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
                 className="px-2 py-8 text-center text-[11.5px] text-[#6B6B6B]"
                 style={{ letterSpacing: "0.2px" }}
               >
-                Nenhum item.
+                No items.
               </div>
             ) : (
               <div
@@ -227,7 +227,7 @@ function GalleryDetail({ draft, onBack }: { draft: Draft; onBack: () => void }) 
         <button
           type="button"
           onClick={onBack}
-          aria-label="Voltar"
+          aria-label="Back"
           className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md border border-[#2C2C2C] bg-transparent text-[#CFCFCF]"
         >
           <svg
@@ -260,8 +260,8 @@ function GalleryDetail({ draft, onBack }: { draft: Draft; onBack: () => void }) 
 
         {/* Metadata box */}
         <div className="flex flex-col gap-1.5 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] px-3 py-2.5 text-[11.5px] text-[#CFCFCF]">
-          <Meta label="Tipo" value={draft.kind === "frame" ? "Frame" : "Imagem"} />
-          <Meta label="Proporção" value={`${draft.w} : ${draft.h}`} />
+          <Meta label="Type" value={draft.kind === "frame" ? "Frame" : "Image"} />
+          <Meta label="Ratio" value={`${draft.w} : ${draft.h}`} />
           <Meta label="Atualizado" value={draft.updated} />
           <Meta label="ID" value={draft.id} mono />
         </div>
@@ -384,7 +384,7 @@ export function GalleryToggle({ open, onClick }: { open: boolean; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      aria-label="Abrir galeria"
+      aria-label="Open gallery"
       className="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-lg border border-[#2C2C2C] bg-[#1E1E1E] px-3 text-[13px] font-medium text-[#CFCFCF] transition-colors hover:bg-[#2A2A2A] hover:text-[var(--text)]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)" }}
     >

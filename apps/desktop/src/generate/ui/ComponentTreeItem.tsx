@@ -77,7 +77,7 @@ export function ComponentTreeItem({
         {hasChildren ? (
           <button
             type="button"
-            aria-label={expanded ? "Fechar filhos" : "Abrir filhos"}
+            aria-label={expanded ? "Close children" : "Open children"}
             onClick={(event) => {
               event.stopPropagation();
               onToggle(component.id);
@@ -102,7 +102,7 @@ export function ComponentTreeItem({
         </span>
         <div className="flex shrink-0">
           <IconButton
-            aria-label="Editar recorte"
+            aria-label="Edit crop"
             disabled={!canEdit}
             className={[
               !canEdit ? "cursor-not-allowed opacity-35 hover:bg-transparent hover:text-[var(--text-muted)]" : "",
@@ -116,7 +116,7 @@ export function ComponentTreeItem({
             <SquarePen size={13} strokeWidth={1.8} />
           </IconButton>
           <IconButton
-            aria-label="Remover"
+            aria-label="Remove"
             danger
             disabled={isProtected}
             className={isProtected ? "cursor-not-allowed opacity-35 hover:bg-transparent hover:text-[var(--text-muted)]" : ""}

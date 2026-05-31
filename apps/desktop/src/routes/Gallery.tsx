@@ -172,7 +172,7 @@ export function Gallery() {
             type="button"
             onClick={() => setProjectSettingsOpen(true)}
             className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-            aria-label="Configurações do projeto"
+            aria-label="Project settings"
           >
             <svg
               width="14"
@@ -273,10 +273,10 @@ export function Gallery() {
       />
       <ConfirmActionModal
         open={Boolean(pendingScreenDelete)}
-        title="Excluir tela"
+        title="Delete screen"
         message={
           pendingScreenDelete
-            ? `A tela "${pendingScreenDelete.title}" será removida junto com seus componentes.`
+            ? `Screen "${pendingScreenDelete.title}" will be removed along with its components.`
             : ""
         }
         onClose={() => setPendingScreenDelete(null)}
@@ -288,10 +288,10 @@ export function Gallery() {
       />
       <ConfirmActionModal
         open={Boolean(pendingComponentDelete)}
-        title="Excluir componente"
+        title="Delete component"
         message={
           pendingComponentDelete
-            ? `O componente "${pendingComponentDelete.name}" será removido junto com subcomponentes e variantes.`
+            ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
             : ""
         }
         onClose={() => setPendingComponentDelete(null)}
@@ -308,7 +308,7 @@ export function Gallery() {
 function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-      <Link to="/" aria-label="Voltar" className="text-[var(--text-muted)] hover:text-[var(--text)]">
+      <Link to="/" aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
         <svg
           width="14"
           height="14"
@@ -324,7 +324,7 @@ function Crumbs({ projectName, type }: { projectName: string; type: ProjectType 
       </Link>
       <span className="text-[var(--text-faint)]">/</span>
       <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-        Projetos
+        Projects
       </Link>
       <span className="text-[var(--text-faint)]">/</span>
       <span className="text-[13px] font-medium text-[var(--text)]">{projectName}</span>
@@ -349,9 +349,9 @@ function Tabs({
   referencesCount: number;
 }) {
   const tabs: Array<{ id: Tab; label: string; count?: number }> = [
-    { id: "screens", label: "Telas", count: screensCount },
-    { id: "components", label: "Componentes", count: componentsCount },
-    { id: "references", label: "Referências", count: referencesCount },
+    { id: "screens", label: "Screens", count: screensCount },
+    { id: "components", label: "Components", count: componentsCount },
+    { id: "references", label: "References", count: referencesCount },
     { id: "system", label: "System" },
   ];
   return (
@@ -419,11 +419,11 @@ function ScreensTab({
     <>
       <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
         <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Telas</h1>
+          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Screens</h1>
           <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Clique em uma tela para abrir os componentes.{" "}
+            Click a screen to open its components.{" "}
             <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-              {screens.length} {screens.length === 1 ? "tela" : "telas"}
+              {screens.length} {screens.length === 1 ? "screen" : "screens"}
             </span>
           </p>
         </div>
@@ -436,7 +436,7 @@ function ScreensTab({
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Nova section
+            New section
           </button>
           <button type="button" onClick={onNewScreen} className="btn btn-primary h-9 px-3.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -513,14 +513,14 @@ function ScreensGrid({
           </div>
           <h2 className="m-0 text-[20px] font-semibold tracking-[-0.2px] text-[var(--text)]">Empty Screen</h2>
           <p className="mt-2 text-[13px] leading-[1.6] text-[var(--text-muted)]">
-            Comece criando a primeira tela do projeto. As novas telas permanecem dentro desta área para manter o fluxo de navegação por tab.
+            Start by creating the first screen of the project. New screens stay inside this area to keep the tab navigation flow.
           </p>
           <div className="mt-6">
             <button type="button" onClick={onNewScreen} className="btn btn-primary">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Criar primeira tela
+              Create first screen
             </button>
           </div>
         </div>
@@ -705,7 +705,7 @@ function SectionedGrid<T>({
                   <span className="flex-1" />
                   <button
                     type="button"
-                    aria-label="Excluir section"
+                    aria-label="Delete section"
                     onClick={() => {
                       if (!group.id) return;
                       setPendingSectionDelete({ id: group.id, name: group.name ?? "Section" });
@@ -742,7 +742,7 @@ function SectionedGrid<T>({
                   })}
                   {!isUncategorized && groupItems.length === 0 ? (
                     <div className="col-span-full grid min-h-[58px] place-items-center text-[12.5px] text-[var(--text-faint)]">
-                      Arraste cards para esta section
+                      Drag cards to this section
                     </div>
                   ) : null}
                   {isUncategorized ? renderAddCard?.() : null}
@@ -777,11 +777,11 @@ function SectionedGrid<T>({
       <Modal
         open={sectionModalOpen}
         onClose={() => setSectionModalOpen(false)}
-        ariaLabel="Nova section"
+        ariaLabel="New section"
       >
         <ModalHeader
-          title="Nova section"
-          subtitle="Crie uma categoria visual para organizar os cards."
+          title="New section"
+          subtitle="Create a visual category to organize cards."
           onClose={() => setSectionModalOpen(false)}
         />
         <ModalBody>
@@ -812,17 +812,17 @@ function SectionedGrid<T>({
               disabled={!sectionName.trim()}
               className="btn btn-primary"
             >
-              Criar section
+              Create section
             </button>
           </div>
         </ModalBody>
       </Modal>
       <ConfirmActionModal
         open={Boolean(pendingSectionDelete)}
-        title="Excluir section"
+        title="Delete section"
         message={
           pendingSectionDelete
-            ? `A section "${pendingSectionDelete.name}" será removida. Os itens voltam para a área sem section.`
+            ? `Section "${pendingSectionDelete.name}" will be removed. Items will return to the unsectioned area.`
             : ""
         }
         onClose={() => setPendingSectionDelete(null)}
@@ -842,11 +842,11 @@ function SectionedGrid<T>({
       <Modal
         open={Boolean(assigningItem)}
         onClose={() => setAssigningItemId(null)}
-        ariaLabel="Adicionar à section"
+        ariaLabel="Add to section"
       >
         <ModalHeader
-          title="Adicionar à section"
-          subtitle="Escolha onde este card deve aparecer visualmente."
+          title="Add to section"
+          subtitle="Choose where this card should appear visually."
           onClose={() => setAssigningItemId(null)}
         />
         <ModalBody>
@@ -864,7 +864,7 @@ function SectionedGrid<T>({
                 onChange={(e) => setAssignSectionId(e.target.value)}
                 className="h-11 cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors duration-[100ms] focus:border-[var(--text)]"
               >
-                <option value="">Sem section</option>
+                <option value="">No section</option>
                 {sections.map((section) => (
                   <option key={section.id} value={section.id}>
                     {section.name}
@@ -983,12 +983,12 @@ function ScreenCard({
               menuItems: [
                 {
                   key: "section",
-                  label: "Adicionar à section",
+                  label: "Add to section",
                   onClick: onRequestAssignSection,
                 },
                 {
                   key: "delete",
-                  label: "Excluir tela",
+                  label: "Delete screen",
                   icon: SharedCardMenuIcons.Trash,
                   destructive: true,
                   onClick: () => onRequestDelete(screen),
@@ -1034,7 +1034,7 @@ function AddScreenCard({ type, onClick }: { type: ProjectType; onClick: () => vo
               <path d="M12 5v14M5 12h14" />
             </svg>
           </span>
-          <span>Nova tela</span>
+          <span>New screen</span>
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 px-0.5">
@@ -1099,7 +1099,7 @@ function CardMenu({
     <div
       ref={rootRef}
       role="toolbar"
-      aria-label="Ações"
+      aria-label="Actions"
       className="pointer-events-none absolute bottom-2 left-1/2 z-[2] inline-flex -translate-x-1/2 translate-y-1.5 items-center gap-0.5 rounded-[10px] border border-[var(--border-strong)] bg-[#161616] p-1 opacity-0 shadow-[var(--shadow-pop)] transition-[opacity,transform] duration-[140ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
     >
       {actions.map((a, i) => (
@@ -1182,7 +1182,7 @@ function ViewToggle({
   return (
     <div
       role="tablist"
-      aria-label="Visualização"
+      aria-label="Preview"
       className="inline-flex gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-[3px]"
     >
       <button
@@ -1201,7 +1201,7 @@ function ViewToggle({
       </button>
       <button
         type="button"
-        aria-label="Lista"
+        aria-label="List"
         onClick={() => setView("list")}
         className={[
           "grid h-[26px] w-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent",
@@ -1323,16 +1323,16 @@ function ComponentsTab({
       : `${filtered.length} de ${components.length}`;
   const noun =
     (filter === "all" ? components.length : filtered.length) === 1
-      ? "componente"
-      : "componentes";
+      ? "component"
+      : "components";
 
   return (
     <>
       <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
         <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Componentes</h1>
+          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Components</h1>
           <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Todos os componentes do projeto.{" "}
+            All project components.{" "}
             <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
               {labelTotal} {noun}
             </span>
@@ -1347,7 +1347,7 @@ function ComponentsTab({
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Nova section
+            New section
           </button>
           <button
             type="button"
@@ -1375,12 +1375,12 @@ function ComponentsTab({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por nome ou categoria…"
+              placeholder="Search by name or category..."
               className="h-11 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-0 pl-9 pr-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
             />
           </label>
           <FilterSelectBase
-            ariaLabel="Filtrar por tipo"
+            ariaLabel="Filter by type"
             value={filter}
             onChange={(value) => onFilterChange(value as CmpKindFilter)}
             options={[
@@ -1393,7 +1393,7 @@ function ComponentsTab({
             ]}
           />
           <FilterSelectBase
-            ariaLabel="Filtrar por tela"
+            ariaLabel="Filter by screen"
             value={screenFilter}
             onChange={setScreenFilter}
             options={[
@@ -1402,17 +1402,17 @@ function ComponentsTab({
             ]}
           />
           <FilterSelectBase
-            ariaLabel="Filtrar por section"
+            ariaLabel="Filter by section"
             value={sectionFilter}
             onChange={setSectionFilter}
             options={[
               { value: "all", label: "All Sections" },
-              { value: "unassigned", label: "Sem section" },
+              { value: "unassigned", label: "No section" },
               ...sections.map((section) => ({ value: section.id, label: section.name })),
             ]}
           />
           <FilterSelectBase
-            ariaLabel="Filtrar por categoria"
+            ariaLabel="Filter by category"
             value={categoryFilter}
             onChange={setCategoryFilter}
             options={[
@@ -1537,7 +1537,7 @@ function ComponentCard({
         ) : null}
         <CardMenu
           actions={[
-            { id: "edit", label: "Editar", icon: <IconEdit />, onClick: () => navigate(canvasHref) },
+            { id: "edit", label: "Edit", icon: <IconEdit />, onClick: () => navigate(canvasHref) },
             { id: "inspect", label: "Inspecionar", icon: <IconSearch />, onClick: () => navigate(href) },
             {
               id: "more",
@@ -1546,18 +1546,18 @@ function ComponentCard({
               menuItems: [
                 {
                   key: "section",
-                  label: "Adicionar à section",
+                  label: "Add to section",
                   onClick: onRequestAssignSection,
                 },
                 {
                   key: "screens",
-                  label: "Vincular telas",
+                  label: "Link screens",
                   icon: <IconScreen />,
                   onClick: onRequestAssignScreens,
                 },
                 {
                   key: "delete",
-                  label: "Excluir componente",
+                  label: "Delete component",
                   icon: SharedCardMenuIcons.Trash,
                   destructive: true,
                   onClick: () => onRequestDelete(component),
@@ -1602,10 +1602,10 @@ function ComponentScreensModal({
 
   return (
     <>
-      <Modal open={Boolean(component)} onClose={onClose} ariaLabel="Vincular telas ao componente">
+      <Modal open={Boolean(component)} onClose={onClose} ariaLabel="Link screens to component">
         <ModalHeader
-          title="Vincular telas"
-          subtitle={component ? `Escolha em quais telas "${component.name}" deve aparecer no projeto.` : undefined}
+          title="Link screens"
+          subtitle={component ? `Choose which screens "${component.name}" should appear in.` : undefined}
           onClose={onClose}
         />
         <ModalBody>
@@ -1662,20 +1662,20 @@ function ComponentScreensModal({
               }}
               className="btn btn-primary"
             >
-              Salvar telas
+              Save screens
             </button>
           </div>
         </ModalBody>
       </Modal>
       <ConfirmActionModal
         open={Boolean(pendingPrimaryUnlink)}
-        title="Deseja realmente desvincular?"
+        title="Unlink screen?"
         message={
           pendingPrimaryUnlink
-            ? `A tela "${pendingPrimaryUnlink.title}" deixará de ser a origem deste componente.`
+            ? `Screen "${pendingPrimaryUnlink.title}" will no longer be the origin of this component.`
             : ""
         }
-        confirmLabel="Desvincular"
+        confirmLabel="Unlink"
         onClose={() => setPendingPrimaryUnlink(null)}
         onConfirm={() => {
           if (!pendingPrimaryUnlink) return;
@@ -1973,11 +1973,11 @@ function ReferencesTab({
     <>
       <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
         <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Referências</h1>
+          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">References</h1>
           <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Cards visuais conectados ao projeto, telas ou componentes.{" "}
+            Visual cards connected to the project, screens or components.{" "}
             <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-              {references.length} {references.length === 1 ? "referência" : "referências"}
+              {references.length} {references.length === 1 ? "reference" : "references"}
             </span>
           </p>
         </div>
@@ -2003,12 +2003,12 @@ function ReferencesTab({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por título, fonte, link ou descrição…"
+              placeholder="Search by title, source, link or description..."
               className="h-11 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-0 pl-9 pr-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
             />
           </label>
           <FilterSelectBase
-            ariaLabel="Filtrar por origem"
+            ariaLabel="Filter by source"
             value={originFilter}
             onChange={setOriginFilter}
             options={[
@@ -2018,7 +2018,7 @@ function ReferencesTab({
             ]}
           />
           <FilterSelectBase
-            ariaLabel="Filtrar por tipo"
+            ariaLabel="Filter by type"
             value={kindFilter}
             onChange={setKindFilter}
             options={[
@@ -2031,7 +2031,7 @@ function ReferencesTab({
             ]}
           />
           <FilterSelectBase
-            ariaLabel="Filtrar por alvo"
+            ariaLabel="Filter by target"
             value={targetFilter}
             onChange={setTargetFilter}
             options={targetOptions}
@@ -2041,9 +2041,9 @@ function ReferencesTab({
         {filtered.length === 0 ? (
           <div className="grid min-h-[320px] place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-6 py-10 text-center">
             <div className="max-w-[340px]">
-              <div className="mb-3 text-[16px] font-semibold text-[var(--text)]">Nenhuma referência encontrada</div>
+              <div className="mb-3 text-[16px] font-semibold text-[var(--text)]">No reference found</div>
               <div className="text-[13px] leading-[1.6] text-[var(--text-muted)]">
-                Ajuste os filtros ou adicione novas referências ao projeto usando busca, upload ou URL externa.
+                Adjust the filters or add new references to the project via search, upload or external URL.
               </div>
             </div>
           </div>
@@ -2173,11 +2173,11 @@ function ReferenceProjectCard({
           </div>
         )}
         <CardMoreMenu
-          label="Mais ações da referência"
+          label="More reference actions"
           items={[
             {
               key: "delete",
-              label: "Excluir referência",
+              label: "Delete reference",
               icon: SharedCardMenuIcons.Trash,
               destructive: true,
               onClick: onRemove,
@@ -2231,11 +2231,11 @@ function ReferenceProjectRow({
   return (
     <div className="group relative grid gap-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3 transition-colors hover:border-[var(--border-strong)] md:grid-cols-[180px_1fr_auto]">
       <CardMoreMenu
-        label="Mais ações da referência"
+        label="More reference actions"
         items={[
           {
             key: "delete",
-            label: "Excluir referência",
+            label: "Delete reference",
             icon: SharedCardMenuIcons.Trash,
             destructive: true,
             onClick: onRemove,
@@ -2271,7 +2271,7 @@ function ReferenceProjectRow({
         </div>
         <div className="mt-1 text-[12px] text-[var(--text-muted)]">{reference.source}</div>
         <div className="mt-3 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-          {reference.description || "Referência visual conectada ao projeto."}
+          {reference.description || "a visual reference connected to the project."}
         </div>
       </div>
       <div className="flex flex-col items-end justify-between gap-3">
@@ -2358,22 +2358,22 @@ function SystemTab({ project }: { project: ProjectRow }) {
         <div>
           <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">System</h1>
           <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Tokens e assets reais do projeto, com entrada dedicada para cores, fontes, ícones e imagens.
+            Real project tokens and assets, with dedicated fields for colors, fonts, icons and images.
           </p>
         </div>
       </div>
       <main className="flex flex-1 flex-col gap-9 px-7 pb-10">
-        <SysBlock title="Cores" actionLabel="Nova cor" onAction={() => setModal({ kind: "color" })}>
+        <SysBlock title="Cores" actionLabel="New color" onAction={() => setModal({ kind: "color" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))" }}>
             {project.designSystem.colors.map((color) => (
               <div key={color.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
                 <CardMoreMenu
-                  label="Mais ações da cor"
+                  label="More color actions"
                   items={[
-                    { key: "edit", label: "Editar cor", icon: <IconEdit />, onClick: () => setModal({ kind: "color", assetId: color.id }) },
+                    { key: "edit", label: "Edit color", icon: <IconEdit />, onClick: () => setModal({ kind: "color", assetId: color.id }) },
                     {
                       key: "delete",
-                      label: "Excluir cor",
+                      label: "Delete color",
                       icon: SharedCardMenuIcons.Trash,
                       destructive: true,
                       onClick: () => deleteSystemAsset("color", color.id),
@@ -2392,17 +2392,17 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Fontes" actionLabel="Adicionar fonte" onAction={() => setModal({ kind: "font" })}>
+        <SysBlock title="Fontes" actionLabel="Add font" onAction={() => setModal({ kind: "font" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
             {project.designSystem.fonts.map((font) => (
               <div key={font.id} className="group relative flex min-h-[168px] flex-col gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-[18px] pb-3.5 pt-[18px] transition-colors hover:border-[var(--border-strong)]">
                 <CardMoreMenu
-                  label="Mais ações da fonte"
+                  label="More font actions"
                   items={[
-                    { key: "edit", label: "Editar fonte", icon: <IconEdit />, onClick: () => setModal({ kind: "font", assetId: font.id }) },
+                    { key: "edit", label: "Edit font", icon: <IconEdit />, onClick: () => setModal({ kind: "font", assetId: font.id }) },
                     {
                       key: "delete",
-                      label: "Excluir fonte",
+                      label: "Delete font",
                       icon: SharedCardMenuIcons.Trash,
                       destructive: true,
                       onClick: () => deleteSystemAsset("font", font.id),
@@ -2423,17 +2423,17 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Ícones" actionLabel="Adicionar ícone" onAction={() => setModal({ kind: "icon" })}>
+        <SysBlock title="Icons" actionLabel="Add icon" onAction={() => setModal({ kind: "icon" })}>
           <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}>
             {project.designSystem.icons.map((icon) => (
               <div key={icon.id} className="group relative grid aspect-square gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]">
                 <CardMoreMenu
-                  label="Mais ações do ícone"
+                  label="More icon actions"
                   items={[
-                    { key: "edit", label: "Editar ícone", icon: <IconEdit />, onClick: () => setModal({ kind: "icon", assetId: icon.id }) },
+                    { key: "edit", label: "Edit icon", icon: <IconEdit />, onClick: () => setModal({ kind: "icon", assetId: icon.id }) },
                     {
                       key: "delete",
-                      label: "Excluir ícone",
+                      label: "Delete icon",
                       icon: SharedCardMenuIcons.Trash,
                       destructive: true,
                       onClick: () => deleteSystemAsset("icon", icon.id),
@@ -2449,17 +2449,17 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Imagens" actionLabel="Adicionar imagem" onAction={() => setModal({ kind: "image" })}>
+        <SysBlock title="Images" actionLabel="Add image" onAction={() => setModal({ kind: "image" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
             {project.designSystem.images.map((image) => (
               <div key={image.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
                 <CardMoreMenu
-                  label="Mais ações da imagem"
+                  label="More image actions"
                   items={[
-                    { key: "edit", label: "Editar imagem", icon: <IconEdit />, onClick: () => setModal({ kind: "image", assetId: image.id }) },
+                    { key: "edit", label: "Edit image", icon: <IconEdit />, onClick: () => setModal({ kind: "image", assetId: image.id }) },
                     {
                       key: "delete",
-                      label: "Excluir imagem",
+                      label: "Delete image",
                       icon: SharedCardMenuIcons.Trash,
                       destructive: true,
                       onClick: () => deleteSystemAsset("image", image.id),
@@ -2569,8 +2569,8 @@ function ColorAssetModal({
   }, [color, open]);
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Nova cor">
-      <ModalHeader title={color ? "Editar cor" : "Nova cor"} subtitle="Defina um nome e selecione a cor diretamente na paleta." onClose={onClose} />
+    <Modal open={open} onClose={onClose} ariaLabel="New color">
+      <ModalHeader title={color ? "Edit color" : "New color"} subtitle="Set a name and pick the color directly in the palette." onClose={onClose} />
       <ModalBody>
         <div className="grid gap-4">
           <FieldLine label="Nome">
@@ -2615,8 +2615,8 @@ function FontAssetModal({
   }, [font, open]);
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Nova fonte">
-      <ModalHeader title={font ? "Editar fonte" : "Adicionar fonte"} subtitle="Registre a família tipográfica e o papel dela dentro do projeto." onClose={onClose} />
+    <Modal open={open} onClose={onClose} ariaLabel="New font">
+      <ModalHeader title={font ? "Edit font" : "Add font"} subtitle="Register the typeface family and its role within the project." onClose={onClose} />
       <ModalBody>
         <div className="grid gap-4">
           <FieldLine label="Nome"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
@@ -2633,8 +2633,8 @@ function FontAssetModal({
             Hierarchy matters
           </div>
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
-            <button type="button" onClick={() => onSave({ id: font?.id ?? `font-${Date.now()}`, name: name.trim() || "Custom font", family: family.trim() || "inherit", role, preview: font?.preview ?? "Hierarchy matters" })} className="btn btn-primary">Salvar fonte</button>
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="button" onClick={() => onSave({ id: font?.id ?? `font-${Date.now()}`, name: name.trim() || "Custom font", family: family.trim() || "inherit", role, preview: font?.preview ?? "Hierarchy matters" })} className="btn btn-primary">Save font</button>
           </div>
         </div>
       </ModalBody>
@@ -2665,12 +2665,12 @@ function IconAssetModal({
   }, [icon, open]);
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Novo ícone">
-      <ModalHeader title={icon ? "Editar ícone" : "Adicionar ícone"} subtitle="Escolha um glyph e nomeie o asset para o design system do projeto." onClose={onClose} />
+    <Modal open={open} onClose={onClose} ariaLabel="New icon">
+      <ModalHeader title={icon ? "Edit icon" : "Add icon"} subtitle="Choose a glyph and name the asset for the project design system." onClose={onClose} />
       <ModalBody>
         <div className="grid gap-4">
-          <FieldLine label="Nome"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
-          <FieldLine label="Ícone">
+          <FieldLine label="Name"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
+          <FieldLine label="Icon">
             <div className="grid grid-cols-3 gap-3">
               {SYSTEM_GLYPHS.map((entry) => (
                 <button
@@ -2688,8 +2688,8 @@ function IconAssetModal({
             </div>
           </FieldLine>
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
-            <button type="button" onClick={() => onSave({ id: icon?.id ?? `icon-${Date.now()}`, name: name.trim() || "Custom icon", glyph, family: icon?.family ?? "system" })} className="btn btn-primary">Salvar ícone</button>
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="button" onClick={() => onSave({ id: icon?.id ?? `icon-${Date.now()}`, name: name.trim() || "Custom icon", glyph, family: icon?.family ?? "system" })} className="btn btn-primary">Save icon</button>
           </div>
         </div>
       </ModalBody>
@@ -2720,8 +2720,8 @@ function ImageAssetModal({
   }, [image, open]);
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Nova imagem">
-      <ModalHeader title={image ? "Editar imagem" : "Adicionar imagem"} subtitle="Envie uma imagem para adicionar ao design system do projeto." onClose={onClose} />
+    <Modal open={open} onClose={onClose} ariaLabel="New image">
+      <ModalHeader title={image ? "Edit image" : "Add image"} subtitle="Upload an image to add to the project design system." onClose={onClose} />
       <ModalBody>
         <div className="grid gap-4">
           <FieldLine label="Nome"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
@@ -2744,13 +2744,13 @@ function ImageAssetModal({
               <img src={previewUrl} alt="" className="max-h-[220px] rounded-[10px] object-contain" />
             ) : (
               <div className="max-w-[240px] text-[12px] leading-[1.6] text-[var(--text-muted)]">
-                Clique para selecionar uma imagem do projeto.
+                Click to select an image from your disk.
               </div>
             )}
           </label>
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
-            <button type="button" onClick={() => onSave({ id: image?.id ?? `image-${Date.now()}`, name: name.trim() || "Asset", previewUrl, format })} disabled={!previewUrl} className="btn btn-primary">Salvar imagem</button>
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button type="button" onClick={() => onSave({ id: image?.id ?? `image-${Date.now()}`, name: name.trim() || "Asset", previewUrl, format })} disabled={!previewUrl} className="btn btn-primary">Save image</button>
           </div>
         </div>
       </ModalBody>

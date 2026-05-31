@@ -133,7 +133,7 @@ export function FastEditModal(props: FastEditModalProps) {
           <span className="text-[13px] font-semibold tracking-[-0.1px] text-[var(--text)]">FastEdit</span>
           <span className="h-3 w-px shrink-0 rounded-full bg-[rgba(255,255,255,0.12)]" />
           <span className="truncate text-[11.5px] text-[var(--text-faint)]">
-            Edição rápida de cor, texto, borda e radius por camada.
+            Quick editing of color, text, border, and radius per layer.
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -149,7 +149,7 @@ export function FastEditModal(props: FastEditModalProps) {
           </Link>
           <button
             type="button"
-            aria-label="Fechar"
+            aria-label="Close"
             onClick={props.onClose}
             className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
           >
@@ -266,21 +266,21 @@ export function FastEditModal(props: FastEditModalProps) {
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-3 p-4">
                 <Section title="Texto">
-                  <Field label="Conteúdo">
+                  <Field label="Content">
                     <input
                       value={selectedDraft.text ?? selectedNode.text}
                       onChange={(event) => updateSelectedDraft({ text: event.target.value })}
                       className="h-9 w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
                     />
                   </Field>
-                  <Field label="Cor do texto">
+                  <Field label="Text color">
                     <ColorInput
                       value={selectedDraft.textColor ?? selectedNode.textColor}
                       onChange={(value) => updateSelectedDraft({ textColor: value })}
                     />
                   </Field>
                 </Section>
-                <Section title="Superfície">
+                <Section title="Surface">
                   <Field label="Fundo">
                     <ColorInput
                       value={selectedDraft.background ?? selectedNode.background}

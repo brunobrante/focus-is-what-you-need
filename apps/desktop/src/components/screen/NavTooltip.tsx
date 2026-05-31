@@ -45,7 +45,7 @@ export function NavTooltip({
       <div className="min-w-0 flex-1">
         <div className="truncate text-[12px] font-medium text-[var(--text)]">{name}</div>
         <div className="mt-1 space-y-[2px] text-[11px] leading-[1.35] text-[var(--text-faint)]">
-          {(details ?? ["Abrir para inspecionar o preview desta tela."]).map((line) => (
+          {(details ?? ["Click to inspect this screen preview."]).map((line) => (
             <div key={line} className="truncate">
               {line}
             </div>

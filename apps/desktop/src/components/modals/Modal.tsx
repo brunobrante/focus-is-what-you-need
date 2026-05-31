@@ -118,7 +118,7 @@ export function ModalHeader({
         {actions}
         <button
           type="button"
-          aria-label="Fechar"
+          aria-label="Close"
           onClick={onClose}
           className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
         >

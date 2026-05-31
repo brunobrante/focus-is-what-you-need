@@ -380,7 +380,7 @@ export function createDefaultHtmlCanvasDocument(input: {
     id: "node-action", parentId: panel.id, name: "Primary CTA", type: "frame", order: 0,
     bounds: { x: 24, y: 24, width: 148, height: 44 },
     props: { name: "Primary CTA", bg: "#0F2D2E", color: "#F4F6F1", rounded: 22, flex: "row", justify: "center", items: "center", weight: 700 },
-    text: "Editar",
+    text: "Edit",
   });
   return normalizeHtmlCanvasDocument({
     format: HTML_CANVAS_FORMAT, version: HTML_CANVAS_VERSION, rootId,

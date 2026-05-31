@@ -295,7 +295,7 @@ function CanvasPageContent() {
       >
         <Link
           to={backHref}
-          aria-label="Voltar"
+          aria-label="Back"
           onClick={() => { void flushPendingSave(); }}
           className="grid place-items-center text-[var(--text-muted)] hover:text-[var(--text)]"
         >

@@ -10,11 +10,11 @@ const SHAPE_RENDER_OPTIONS: Array<{ value: ShapeRenderMode; label: string }> = [
 ];
 
 const SHAPE_LIST: Array<{ id: string; label: string }> = [
-  { id: "rectangle", label: "Retângulo" },
+  { id: "rectangle", label: "Rectangle" },
   { id: "ellipse",   label: "Elipse" },
   { id: "line",      label: "Linha" },
   { id: "arrow",     label: "Seta" },
-  { id: "polygon",   label: "Polígono" },
+  { id: "polygon",   label: "Polygon" },
   { id: "star",      label: "Estrela" },
 ];
 
@@ -71,10 +71,10 @@ export function ShellTab({
         <InsRow label="Draft">
           <InsSwitch checked={draftEnabled} onChange={setDraftEnabled} />
         </InsRow>
-        <InsRow label="Referência">
+        <InsRow label="Reference">
           <InsSwitch checked={referenceEnabled} onChange={setReferenceEnabled} />
         </InsRow>
-        <InsRow label="Versões">
+        <InsRow label="Versions">
           <InsSwitch checked={versoesEnabled} onChange={setVersoesEnabled} />
         </InsRow>
       </InsSection>
@@ -118,13 +118,13 @@ export function ShellTab({
       </InsSection>
 
       <InsSection title="Grade">
-        <InsRow label="Ativar">
+        <InsRow label="Enable">
           <InsSwitch
             checked={shellGrid.enabled}
             onChange={(enabled) => onUpdateGrid({ enabled })}
           />
         </InsRow>
-        <InsRow label="Tipo">
+        <InsRow label="Type">
           <InsToggle
             value={shellGrid.type}
             onChange={(value) => onUpdateGrid({ type: value as ShellGridType })}

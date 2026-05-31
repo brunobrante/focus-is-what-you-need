@@ -8,6 +8,7 @@ export type MockScreenTemplate =
   | "home"
   | "list"
   | "detail"
+  | "form"
   | "formulario"
   | "alignment-debug";
 
@@ -106,6 +107,7 @@ export function buildMockScreenTree(
       return buildListTree(d);
     case "detail":
       return buildDetailTree(d);
+    case "form":
     case "formulario":
       return buildFormTree(d);
     case "alignment-debug":
@@ -119,9 +121,9 @@ export function templateForScreen(
   const title = normalize(screen.title);
   if (title.includes("home")) return "home";
   if (title.includes("list")) return "list";
-  if (title.includes("detal")) return "detail";
-  if (title.includes("form")) return "formulario";
-  if (title.includes("alignment") || title.includes("alinhamento")) {
+  if (title.includes("detail")) return "detail";
+  if (title.includes("form")) return "form";
+  if (title.includes("alignment")) {
     return "alignment-debug";
   }
   return null;
@@ -133,7 +135,7 @@ export function templateForVariant(
   if (variant === "hero") return "home";
   if (variant === "list") return "list";
   if (variant === "detail") return "detail";
-  if (variant === "form") return "formulario";
+  if (variant === "form") return "form";
   return null;
 }
 
@@ -213,11 +215,11 @@ function deviceFor(projectType: ProjectType): DeviceSpec {
 }
 
 function buildHomeTree(d: DeviceSpec): MockScreenTree {
-  const header = createHeader(d, "Dashboard Interno", "Resumo operacional");
+  const header = createHeader(d, "Internal Dashboard", "Operational Summary");
   const hero = createHeroBanner(d);
   const categories = createCategoryStrip(d);
   const featured = createFeaturedList(d);
-  const cart = createMobileCart(d, "3 alertas", "R$ 482k", "Revisar");
+  const cart = createMobileCart(d, "3 alerts", "$482k", "Review");
 
   return {
     title: "Home",
@@ -234,17 +236,17 @@ function buildHomeTree(d: DeviceSpec): MockScreenTree {
 }
 
 function buildListTree(d: DeviceSpec): MockScreenTree {
-  const header = createHeader(d, "Listagem", "Pedidos em operação");
+  const header = createHeader(d, "List", "Orders in progress");
   const search = createSearchBar(d);
   const filters = createFilterStrip(d);
   const results = createProductResults(d);
-  const cart = createMobileCart(d, "12 selecionados", "SLA 94%", "Exportar");
+  const cart = createMobileCart(d, "12 selected", "SLA 94%", "Export");
 
   return {
-    title: "Listagem",
+    title: "List",
     variant: "list",
     components: [header, search, filters, results, cart],
-    tree: screenFrame(d, "Listagem", [
+    tree: screenFrame(d, "List", [
       header.tree,
       search.tree,
       filters.tree,
@@ -255,17 +257,17 @@ function buildListTree(d: DeviceSpec): MockScreenTree {
 }
 
 function buildDetailTree(d: DeviceSpec): MockScreenTree {
-  const header = createHeader(d, "Detalhe", "Pedido #1842");
+  const header = createHeader(d, "Detail", "Order #1842");
   const gallery = createProductGallery(d);
   const summary = createProductSummary(d);
   const options = createOptionsList(d);
-  const cart = createMobileCart(d, "Risco medio", "4 acoes", "Aprovar", true);
+  const cart = createMobileCart(d, "Medium risk", "4 actions", "Approve", true);
 
   return {
-    title: "Detalhe",
+    title: "Detail",
     variant: "detail",
     components: [header, gallery, summary, options, cart],
-    tree: screenFrame(d, "Detalhe", [
+    tree: screenFrame(d, "Detail", [
       header.tree,
       gallery.tree,
       summary.tree,
@@ -276,16 +278,16 @@ function buildDetailTree(d: DeviceSpec): MockScreenTree {
 }
 
 function buildFormTree(d: DeviceSpec): MockScreenTree {
-  const header = createHeader(d, "Formulário", "Nova solicitação");
+  const header = createHeader(d, "Form", "New Request");
   const shipping = createShippingForm(d);
   const payment = createPaymentMethods(d);
-  const cart = createMobileCart(d, "Rascunho salvo", "5 campos", "Enviar", true);
+  const cart = createMobileCart(d, "Draft saved", "5 fields", "Submit", true);
 
   return {
-    title: "Formulário",
+    title: "Form",
     variant: "form",
     components: [header, shipping, payment, cart],
-    tree: screenFrame(d, "Formulário", [
+    tree: screenFrame(d, "Form", [
       header.tree,
       shipping.tree,
       payment.tree,
@@ -418,14 +420,14 @@ function createHeroBanner(d: DeviceSpec): MockComponentTree {
     d.heroH - 46,
     "#6D28D9",
     [
-      text("Receita hoje", copyW - 24, 18, 12, 800, "#DDD6FE"),
+      text("Revenue today", copyW - 24, 18, 12, 800, "#DDD6FE"),
       text("R$ 482.900", copyW - 24, 42, d.projectType === "mobile" ? 27 : 40, 950, WHITE),
-      text("Operacao 18% acima da meta ate agora.", copyW - 24, 42, 12, 700, "#EDE9FE"),
+      text("Operation 18% above target so far.", copyW - 24, 42, 12, 700, "#EDE9FE"),
     ],
     { rounded: 18, gap: 8, px: 12, py: 12 },
   );
 
-  const cta = buttonAtom("Primary CTA", "Abrir painel", d.projectType === "mobile" ? 116 : 150, 40, "#FDE047", INK);
+  const cta = buttonAtom("Primary CTA", "Open panel", d.projectType === "mobile" ? 116 : 150, 40, "#FDE047", INK);
   const art = simpleBlock(
     "Hero Illustration",
     "Atom",
@@ -463,8 +465,8 @@ function createHeroBanner(d: DeviceSpec): MockComponentTree {
 
 function createCategoryStrip(d: DeviceSpec): MockComponentTree {
   const labels = d.projectType === "mobile"
-    ? ["Receita", "Pedidos", "Risco"]
-    : ["Receita", "Pedidos", "Equipes", "Risco"];
+    ? ["Revenue", "Orders", "Risk"]
+    : ["Revenue", "Orders", "Teams", "Risk"];
   const chips = labels.map((label, index) =>
     chipAtom(
       `Category Chip - ${label}`,
@@ -493,7 +495,7 @@ function createCategoryStrip(d: DeviceSpec): MockComponentTree {
 function createFeaturedList(d: DeviceSpec): MockComponentTree {
   const title = textAtom("Section Heading", "Indicadores principais", d.contentW, 28, d.projectType === "mobile" ? 18 : 22, 900, INK);
   const cards = [
-    metricCard(d, "Metric Card - Receita", "Receita hoje", "R$ 482k", COLORS.cardA),
+    metricCard(d, "Metric Card - Revenue", "Revenue today", "$482k", COLORS.cardA),
     metricCard(d, "Metric Card - SLA", "SLA entrega", "94%", COLORS.cardB),
     ...(d.projectType === "mobile"
       ? []
@@ -523,14 +525,14 @@ function createSearchBar(d: DeviceSpec): MockComponentTree {
   ], { rounded: 999, justify: "center", items: "center", gap: 1 });
   const input = textAtom(
     "Search Placeholder",
-    "Buscar pedido, cliente ou status",
+    "Search order, customer or status",
     Math.max(150, d.contentW - 150),
     24,
     13,
     750,
     INK,
   );
-  const filter = buttonAtom("Filter Button", "Filtros", d.projectType === "mobile" ? 84 : 104, 40, "#111827", WHITE);
+  const filter = buttonAtom("Filter Button", "Filters", d.projectType === "mobile" ? 84 : 104, 40, "#111827", WHITE);
 
   return component(
     "Search Bar",
@@ -556,9 +558,9 @@ function createSearchBar(d: DeviceSpec): MockComponentTree {
 
 function createFilterStrip(d: DeviceSpec): MockComponentTree {
   const chips = [
-    chipAtom("Filter Chip - Atrasados", "Atrasados", d.projectType === "mobile" ? 104 : 132, d.chipH, "#FB7185", INK),
-    chipAtom("Filter Chip - Hoje", "Hoje", d.projectType === "mobile" ? 78 : 104, d.chipH, "#FDE047", INK),
-    chipAtom("Filter Chip - Alto valor", "Alto valor", d.projectType === "mobile" ? 116 : 136, d.chipH, "#22D3EE", INK),
+    chipAtom("Filter Chip - Late", "Late", d.projectType === "mobile" ? 104 : 132, d.chipH, "#FB7185", INK),
+    chipAtom("Filter Chip - Today", "Today", d.projectType === "mobile" ? 78 : 104, d.chipH, "#FDE047", INK),
+    chipAtom("Filter Chip - High value", "High value", d.projectType === "mobile" ? 116 : 136, d.chipH, "#22D3EE", INK),
   ];
 
   return component(
@@ -576,9 +578,9 @@ function createFilterStrip(d: DeviceSpec): MockComponentTree {
 
 function createProductResults(d: DeviceSpec): MockComponentTree {
   const rows = [
-    resultRow(d, "Result Row - Pedido 1842", "Pedido #1842", "ACME Corp · em separacao", "R$ 18k", COLORS.cardC),
-    resultRow(d, "Result Row - Pedido 1920", "Pedido #1920", "Blue Market · aguardando nota", "R$ 9k", COLORS.cardB),
-    resultRow(d, "Result Row - Pedido 2041", "Pedido #2041", "Nova Retail · pronto para envio", "R$ 31k", COLORS.cardD),
+    resultRow(d, "Result Row - Order 1842", "Order #1842", "ACME Corp · in separation", "$18k", COLORS.cardC),
+    resultRow(d, "Result Row - Order 1920", "Order #1920", "Blue Market · awaiting invoice", "$9k", COLORS.cardB),
+    resultRow(d, "Result Row - Order 2041", "Order #2041", "Nova Retail · ready for shipping", "$31k", COLORS.cardD),
   ];
 
   return component(
@@ -620,14 +622,14 @@ function createProductGallery(d: DeviceSpec): MockComponentTree {
 }
 
 function createProductSummary(d: DeviceSpec): MockComponentTree {
-  const title = textAtom("Product Title", "Pedido #1842 · ACME Corp", d.contentW, 30, d.projectType === "mobile" ? 21 : 29, 950, INK);
-  const status = chipAtom("Status Badge", "Separacao em andamento", d.projectType === "mobile" ? 190 : 250, 34, "#111827", WHITE);
+  const title = textAtom("Product Title", "Order #1842 · ACME Corp", d.contentW, 30, d.projectType === "mobile" ? 21 : 29, 950, INK);
+  const status = chipAtom("Status Badge", "Separation in progress", d.projectType === "mobile" ? 190 : 250, 34, "#111827", WHITE);
   const amount = simpleBlock("Price Copy", "Atom", d.projectType === "mobile" ? 110 : 136, 38, "#FDE047", [
     text("R$ 18k", d.projectType === "mobile" ? 92 : 118, 24, d.projectType === "mobile" ? 17 : 20, 950, INK),
   ], { rounded: 18, justify: "center", items: "center" });
   const note = textAtom(
     "Description Copy",
-    "Cliente premium, rota expressa e janela de entrega ate 16h.",
+    "Premium client, express route and delivery window until 4pm.",
     d.contentW,
     d.projectType === "mobile" ? 44 : 50,
     13,
@@ -664,11 +666,11 @@ function createOptionsList(d: DeviceSpec): MockComponentTree {
 }
 
 function createShippingForm(d: DeviceSpec): MockComponentTree {
-  const heading = textAtom("Form Heading", "Dados da solicitacao", d.contentW, 28, d.projectType === "mobile" ? 18 : 22, 900, INK);
+  const heading = textAtom("Form Heading", "Request details", d.contentW, 28, d.projectType === "mobile" ? 18 : 22, 900, INK);
   const fields = [
-    formField(d, "Field - Name", "Solicitante", "Marina Costa"),
-    formField(d, "Field - Address", "Centro de custo", "OPS-4421"),
-    formField(d, "Field - Notes", "Observacao", "Priorizar rota expressa"),
+    formField(d, "Field - Name", "Requester", "Marina Costa"),
+    formField(d, "Field - Address", "Cost center", "OPS-4421"),
+    formField(d, "Field - Notes", "Notes", "Prioritize express route"),
   ];
 
   return component(
@@ -688,11 +690,11 @@ function createShippingForm(d: DeviceSpec): MockComponentTree {
 }
 
 function createPaymentMethods(d: DeviceSpec): MockComponentTree {
-  const heading = textAtom("Payment Heading", "Metodo de aprovacao", d.contentW, 28, d.projectType === "mobile" ? 18 : 22, 900, INK);
+  const heading = textAtom("Payment Heading", "Approval method", d.contentW, 28, d.projectType === "mobile" ? 18 : 22, 900, INK);
   const methods = [
-    chipAtom("Payment Chip - Gestor", "Gestor", d.projectType === "mobile" ? 92 : 116, d.chipH, "#111827", WHITE),
-    chipAtom("Payment Chip - Financeiro", "Financeiro", d.projectType === "mobile" ? 118 : 148, d.chipH, "#FDE047", INK),
-    chipAtom("Payment Chip - Diretoria", "Diretoria", d.projectType === "mobile" ? 112 : 140, d.chipH, "#22D3EE", INK),
+    chipAtom("Payment Chip - Manager", "Manager", d.projectType === "mobile" ? 92 : 116, d.chipH, "#111827", WHITE),
+    chipAtom("Payment Chip - Finance", "Finance", d.projectType === "mobile" ? 118 : 148, d.chipH, "#FDE047", INK),
+    chipAtom("Payment Chip - Board", "Board", d.projectType === "mobile" ? 112 : 140, d.chipH, "#22D3EE", INK),
   ];
 
   return component(
@@ -830,7 +832,7 @@ function optionRow(
     text(label, Math.max(130, d.contentW - 150), 20, d.projectType === "mobile" ? 13 : 15, 850, INK),
     text(value, Math.max(130, d.contentW - 150), 18, 11, 800, MUTED),
   ], { rounded: 12, justify: "center", gap: 2, px: 8 });
-  const select = chipAtom(`${name} Select`, "Editar", d.projectType === "mobile" ? 76 : 92, d.projectType === "mobile" ? 32 : 36, "#111827", WHITE);
+  const select = chipAtom(`${name} Select`, "Edit", d.projectType === "mobile" ? 76 : 92, d.projectType === "mobile" ? 32 : 36, "#111827", WHITE);
 
   return component(
     name,

@@ -14,7 +14,7 @@ const SEED: Message[] = [
     id: "m1",
     role: "assistant",
     text:
-      "Oi! Posso ajudar a iterar nesse componente — sugerir variações, escrever copy, ou revisar a hierarquia. O que você quer fazer?",
+      Hi! I can help iterate on this component — suggest variations, write copy, or review the hierarchy. What would you like to do?,
     ts: "agora",
   },
 ];
@@ -69,7 +69,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
           role: "assistant",
           ts: "agora",
           text:
-            "Beleza — aqui vão três variações que dá pra explorar. Posso aplicar uma delas direto no canvas ou só listar diffs?",
+            Cool — here are three variations to explore. I can apply one directly to the canvas or just list the diffs?,
         },
       ]);
       setThinking(false);
@@ -136,8 +136,8 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
           </div>
           <div className="flex items-center gap-1">
             <IconBtn
-              ariaLabel="Nova conversa"
-              title="Nova conversa"
+              ariaLabel="New conversation"
+              title="New conversation"
               onClick={() => {
                 setMessages(SEED);
                 setDraft("");
@@ -158,7 +158,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
                 <path d="M21 4v5h-5" />
               </svg>
             </IconBtn>
-            <IconBtn ariaLabel="Fechar chat" onClick={onClose}>
+            <IconBtn ariaLabel="Close chat" onClick={onClose}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
@@ -202,7 +202,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
         {/* Quick suggestions */}
         {messages.length <= 1 && !thinking ? (
           <div className="flex shrink-0 flex-wrap gap-1.5 px-3.5 pb-2">
-            {["Sugerir 3 variações", "Revisar hierarquia", "Escrever copy do CTA"].map((s) => (
+            {["Suggest 3 variations", "Review hierarchy", "Write CTA copy"].map((s) => (
               <button
                 key={s}
                 type="button"
@@ -224,7 +224,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={`Pergunte ou peça uma alteração${componentName ? " em " + componentName : ""}…`}
+              placeholder={`Ask or request a change${componentName ? " em " + componentName : ""}…`}
               rows={1}
               className="min-h-[22px] w-full resize-none border-0 bg-transparent p-0 text-[13.5px] leading-[1.5] text-[#F2F2F2] outline-none"
               style={{ maxHeight: 160 }}
@@ -269,7 +269,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
                 type="button"
                 onClick={send}
                 disabled={!canSend}
-                aria-label="Enviar"
+                aria-label="Send"
                 className="grid h-6 w-7 place-items-center rounded-[5px] border-0 transition-colors duration-100"
                 style={{
                   background: canSend ? "#F2F2F2" : "#2A2A2A",
@@ -321,7 +321,7 @@ function ChatMessage({ msg }: { msg: Message }) {
             className="font-semibold"
             style={{ color: isUser ? "#CFCFCF" : "#D7C2FF" }}
           >
-            {isUser ? "Você" : "Assistente"}
+            {isUser ? "You" : "Assistant"}
           </span>
           <span className="text-[10.5px] text-[#6B6B6B]">{msg.ts}</span>
         </div>

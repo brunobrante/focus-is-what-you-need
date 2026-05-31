@@ -170,7 +170,7 @@ function DropdownToolButton({
 
       <button
         type="button"
-        aria-label="Mais opções"
+        aria-label="More options"
         onClick={() => setMenuOpen((o) => !o)}
         className={[
           "inline-flex h-9 w-3 cursor-pointer items-center justify-center rounded-md border-0 p-0 transition-colors duration-[90ms]",
@@ -223,7 +223,7 @@ function DropdownToolButton({
                     onMouseLeave={() => setHoveredBadgeId(null)}
                     onClick={(e) => { e.stopPropagation(); onBadgeClick?.(); }}
                     className="mr-1.5 shrink-0 cursor-pointer border-0 bg-transparent p-0"
-                    aria-label={`Modo de renderização: ${badge}`}
+                    aria-label={`Rendering mode: ${badge}`}
                   >
                     <span
                       className="rounded px-1 py-px font-mono text-[9px] font-semibold leading-none transition-all duration-[90ms]"
@@ -325,7 +325,7 @@ function CanvasExpandedControls({
       <button
         type="button"
         onClick={onCollapse}
-        aria-label="Sair da tela cheia"
+        aria-label="Exit fullscreen"
         className="grid h-9 w-9 place-items-center rounded-lg text-[#888] transition-colors duration-[90ms] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -350,7 +350,7 @@ function ToolbarDeviceButton({
 }) {
   const isMobile = projectType === "mobile";
   const Icon = isMobile ? Smartphone : Monitor;
-  const label = `${enabled ? "Desativar" : "Ativar"} modo ${isMobile ? "mobile" : "desktop"}`;
+  const label = `${enabled ? "Disable" : "Enable"} ${isMobile ? "mobile" : "desktop"} mode`;
 
   return (
     <button

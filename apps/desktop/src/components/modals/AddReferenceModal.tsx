@@ -228,7 +228,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
   const isEmpty = libraryItems.length === 0 && !loadingLibrary;
 
   return (
-    <Modal open={open} onClose={close} size="picker" ariaLabel="Adicionar referência">
+    <Modal open={open} onClose={close} size="picker" ariaLabel="Add reference">
       <ModalBody className="!p-0">
         <div className="flex h-full flex-col">
 
@@ -247,13 +247,13 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nome, tags ou fonte…"
+              placeholder="Search by name, tags or source..."
               className="flex-1 bg-transparent text-[14.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
             />
             <button
               type="button"
               onClick={close}
-              aria-label="Fechar"
+              aria-label="Close"
               className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -277,7 +277,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
                       : "border-transparent text-[var(--text-faint)] hover:text-[var(--text-muted)]",
                   ].join(" ")}
                 >
-                  {k === "all" ? "Todos" : k === "image" ? "Imagens" : "Vídeos"}
+                  {k === "all" ? "All" : k === "image" ? "Images" : "Videos"}
                 </button>
               ))}
               <span className="ml-auto text-[11px] tabular-nums text-[var(--text-faint)]">
@@ -318,18 +318,18 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
                 onChange={(v) => setAttachMode(v as AttachMode)}
               >
                 <option value="global">Projeto inteiro</option>
-                <option value="screen">Tela específica</option>
-                {components.length > 0 && <option value="component">Componente específico</option>}
+                <option value="screen">Specific screen</option>
+                {components.length > 0 && <option value="component">Specific component</option>}
               </FooterSelect>
               {attachMode === "screen" && (
                 <FooterSelect value={screenId} onChange={setScreenId}>
-                  <option value="">Selecionar tela…</option>
+                  <option value="">Select screen…</option>
                   {screens.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </FooterSelect>
               )}
               {attachMode === "component" && (
                 <FooterSelect value={componentId} onChange={setComponentId}>
-                  <option value="">Selecionar componente…</option>
+                  <option value="">Select component…</option>
                   {components.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </FooterSelect>
               )}
@@ -358,11 +358,11 @@ function EmptyLibrary() {
         </svg>
       </span>
       <div>
-        <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">Biblioteca vazia</p>
+        <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">Empty library</p>
         <p className="m-0 mt-1 max-w-[300px] text-[12.5px] leading-[1.55] text-[var(--text-muted)]">
-          Adicione imagens e vídeos na página{" "}
+          Add images and videos on the{" "}
           <span className="text-[var(--text)]">References</span>{" "}
-          para que apareçam aqui.
+          page so they appear here.
         </p>
       </div>
     </div>
@@ -385,7 +385,7 @@ function RecentGrid({
   if (items.length === 0) {
     return (
       <p className="py-10 text-center text-[12.5px] text-[var(--text-faint)]">
-        Nenhum item nesta categoria.
+        No items in this category.
       </p>
     );
   }
@@ -460,7 +460,7 @@ function GridCard({
         </div>
         <div className="absolute inset-0 grid place-items-center rounded-[10px] bg-[rgba(0,0,0,0.55)] opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black">
-            {linked ? "Reusar" : "Adicionar"}
+            {linked ? "Reuse" : "Add"}
           </span>
         </div>
         {linked && (
@@ -497,7 +497,7 @@ function SearchResults({
   if (items.length === 0) {
     return (
       <p className="py-10 text-center text-[12.5px] text-[var(--text-faint)]">
-        Nenhum item encontrado para essa busca.
+        No items found for this search.
       </p>
     );
   }
@@ -572,7 +572,7 @@ function SearchRow({
         )}
       </div>
       <span className="shrink-0 text-[12px] font-medium text-[var(--text-muted)]">
-        {linked ? "Reusar" : "Adicionar"}
+        {linked ? "Reuse" : "Add"}
       </span>
     </button>
   );

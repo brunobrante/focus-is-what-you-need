@@ -232,11 +232,11 @@ async function firstBootSeedV5(): Promise<void> {
     updatedAt: t,
   };
 
-  // Screen versions — one "Padrão" version per screen
+  // Screen versions — one "Default" version per screen
   const screenVersions: ScreenVersionRow[] = screens.map((screen) => ({
     id: newId(),
     screenId: screen.id,
-    label: "Padrão",
+    label: "Default",
     createdAt: t,
   }));
 
@@ -375,7 +375,7 @@ async function ensureFactoryMocksPresent(): Promise<void> {
     const newScreenVersions: ScreenVersionRow[] = newScreens.map((screen) => ({
       id: newId(),
       screenId: screen.id,
-      label: "Padrão",
+      label: "Default",
       createdAt: t,
     }));
     screenVersions = [...screenVersions, ...newScreenVersions];
@@ -571,14 +571,14 @@ async function migrateV6toV7NewTables(): Promise<void> {
       updatedAt: t,
     };
 
-  // One "Padrão" version per screen that doesn't already have one
+  // One "Default" version per screen that doesn't already have one
   const existingVersionScreenIds = new Set(existingVersions.map((v) => v.screenId));
   const newVersions: ScreenVersionRow[] = screens
     .filter((s) => !existingVersionScreenIds.has(s.id))
     .map((s) => ({
       id: newId(),
       screenId: s.id,
-      label: "Padrão",
+      label: "Default",
       createdAt: t,
     }));
   const allVersions = [...existingVersions, ...newVersions];
@@ -683,7 +683,7 @@ async function migrateV7toV8DataIntegrity(): Promise<void> {
     const version: ScreenVersionRow = {
       id: newId(),
       screenId: screen.id,
-      label: "Padrão",
+      label: "Default",
       createdAt: t,
     };
     screenVersions = [...screenVersions, version];
@@ -1080,7 +1080,7 @@ async function migrateV9toV10DistinctMockHierarchy(): Promise<void> {
     const version: ScreenVersionRow = {
       id: newId(),
       screenId: screen.id,
-      label: "Padrão",
+      label: "Default",
       createdAt: t,
     };
     screenVersions = [...screenVersions, version];
@@ -1248,7 +1248,7 @@ async function migrateV11toV12AlignmentDebugScreen(): Promise<void> {
     const version: ScreenVersionRow = {
       id: newId(),
       screenId: screen.id,
-      label: "Padrão",
+      label: "Default",
       createdAt: t,
     };
     screenVersions = [...screenVersions, version];
@@ -1925,7 +1925,10 @@ function isReplaceableMockScene(graphJSON: string): boolean {
     graphJSON.includes('"name":"Home"') ||
     graphJSON.includes('"name":"Listagem"') ||
     graphJSON.includes('"name":"Detalhe"') ||
-    graphJSON.includes('"name":"Formulario"')
+    graphJSON.includes('"name":"Formulario"') ||
+    graphJSON.includes('"name":"List"') ||
+    graphJSON.includes('"name":"Detail"') ||
+    graphJSON.includes('"name":"Form"')
   );
 }
 

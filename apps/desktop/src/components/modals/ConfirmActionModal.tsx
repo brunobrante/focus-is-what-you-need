@@ -13,7 +13,7 @@ export function ConfirmActionModal({
   open,
   title,
   message,
-  confirmLabel = "Excluir",
+  confirmLabel = "Delete",
   onClose,
   onConfirm,
 }: Props) {
