@@ -91,8 +91,57 @@ export type ToolingGeometry = {
   cursorRotation: number;
 };
 
-const ROTATION_CURSOR =
-  'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 16 16\'%3E%3Cpath fill=\'none\' stroke=\'%230d99ff\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M11 4.4A5 5 0 1 0 13 8M13 2.5V7h-4.5\'/%3E%3C/svg%3E") 8 8, grab';
+// ─── Moon / half-circle rotation cursor ──────────────────────────────────────
+
+/**
+ * Base angle (degrees) for each corner.
+ * The moon opens AWAY from the element — i.e. diagonally outward.
+ * Base SVG opens toward the top (12 o'clock):
+ *   NW → top-left  = 315°
+ *   NE → top-right =  45°
+ *   SE → bot-right = 135°
+ *   SW → bot-left  = 225°
+ */
+const CORNER_BASE_ANGLE: Record<"nw" | "ne" | "se" | "sw", number> = {
+  nw: 315,
+  ne: 45,
+  se: 135,
+  sw: 225,
+};
+
+const moonCursorCache = new Map<string, string>();
+
+function buildMoonSvg(angleDeg: number): string {
+  const size = 20;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 6;
+  // Semicircle opening toward top: from left end → arc through top → right end
+  const d = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
+  return (
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>` +
+    `<g transform='rotate(${angleDeg} ${cx} ${cy})'>` +
+    `<path d='${d}' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round'/>` +
+    `<path d='${d}' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/>` +
+    `</g></svg>`
+  );
+}
+
+function getRotateCursorForCorner(
+  corner: "nw" | "ne" | "se" | "sw",
+  canvasRotation: number,
+): string {
+  const angle = ((CORNER_BASE_ANGLE[corner] + canvasRotation) % 360 + 360) % 360;
+  const key = `${corner}-${Math.round(angle)}`;
+  let cached = moonCursorCache.get(key);
+  if (!cached) {
+    const svg = buildMoonSvg(Math.round(angle));
+    const encoded = encodeURIComponent(svg);
+    cached = `url("data:image/svg+xml,${encoded}") 10 10, crosshair`;
+    moonCursorCache.set(key, cached);
+  }
+  return cached;
+}
 
 const handleAngle: Record<ResizeHandle, number> = {
   n: 0,
@@ -216,35 +265,43 @@ function normalizedVector(from: Point, to: Point): Point {
   return { x: dx / length, y: dy / length };
 }
 
-function hitTestRotationZones(vx: number, vy: number, box: ToolingBox): boolean {
+function hitTestRotationZones(
+  vx: number,
+  vy: number,
+  box: ToolingBox,
+): "nw" | "ne" | "se" | "sw" | null {
   const half = ROTATION_SIZE / 2;
   const [nw, ne, se, sw] = box.corners;
   const ux = normalizedVector(nw, ne);
   const uy = normalizedVector(nw, sw);
-  const positions = [
+  const positions: Array<{ corner: "nw" | "ne" | "se" | "sw"; x: number; y: number }> = [
     {
+      corner: "nw",
       x: nw.x - ux.x * ROTATION_OFFSET - uy.x * ROTATION_OFFSET,
       y: nw.y - ux.y * ROTATION_OFFSET - uy.y * ROTATION_OFFSET,
     },
     {
+      corner: "ne",
       x: ne.x + ux.x * ROTATION_OFFSET - uy.x * ROTATION_OFFSET,
       y: ne.y + ux.y * ROTATION_OFFSET - uy.y * ROTATION_OFFSET,
     },
     {
+      corner: "se",
       x: se.x + ux.x * ROTATION_OFFSET + uy.x * ROTATION_OFFSET,
       y: se.y + ux.y * ROTATION_OFFSET + uy.y * ROTATION_OFFSET,
     },
     {
+      corner: "sw",
       x: sw.x - ux.x * ROTATION_OFFSET + uy.x * ROTATION_OFFSET,
       y: sw.y - ux.y * ROTATION_OFFSET + uy.y * ROTATION_OFFSET,
     },
   ];
   for (const p of positions) {
     if (vx >= p.x - half && vx <= p.x + half && vy >= p.y - half && vy <= p.y + half) {
-      return true;
+      return p.corner;
     }
   }
-  return false;
+  return null;
 }
 
 const radiusCorners: RadiusCorner[] = ["nw", "ne", "se", "sw"];
@@ -288,8 +345,12 @@ export function hitTestTooling(vx: number, vy: number, geometry: ToolingGeometry
   }
 
   if (geometry.selectionBox && geometry.canRotate) {
-    if (hitTestRotationZones(vx, vy, geometry.selectionBox)) {
-      return { type: "rotate", cursor: ROTATION_CURSOR };
+    const rotateCorner = hitTestRotationZones(vx, vy, geometry.selectionBox);
+    if (rotateCorner) {
+      return {
+        type: "rotate",
+        cursor: getRotateCursorForCorner(rotateCorner, geometry.cursorRotation),
+      };
     }
   }
 
