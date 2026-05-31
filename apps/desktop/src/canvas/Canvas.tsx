@@ -85,6 +85,7 @@ function CanvasPageContent() {
   const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
   const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
+  const [shellTabSignal, setShellTabSignal] = useState(0);
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
@@ -377,6 +378,7 @@ function CanvasPageContent() {
           onShellDeviceVisibilityChange={setShellDeviceVisibility}
           onShellZoomVisibilityChange={setShellZoomVisibility}
           onShellExpandVisibilityChange={setShellExpandVisibility}
+          openShellTabSignal={shellTabSignal}
         />
       </div>
 
@@ -402,6 +404,10 @@ function CanvasPageContent() {
           parentTarget={parentProjectNode}
           onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
           onCollapseCanvas={() => setCanvasExpanded(false)}
+          onBadgeClick={() => {
+            setInspectorOpen(true);
+            setShellTabSignal((s) => s + 1);
+          }}
         />
       </div>
 

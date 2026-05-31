@@ -2,6 +2,22 @@ import { useState } from "react";
 import type { ShellGridType } from "@/canvas/engine/types";
 import { InsColor, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
 
+type ShapeRenderMode = "svg" | "div";
+
+const SHAPE_RENDER_OPTIONS: Array<{ value: ShapeRenderMode; label: string }> = [
+  { value: "svg", label: "SVG" },
+  { value: "div", label: "DIV" },
+];
+
+const SHAPE_LIST: Array<{ id: string; label: string }> = [
+  { id: "rectangle", label: "Retângulo" },
+  { id: "ellipse",   label: "Elipse" },
+  { id: "line",      label: "Linha" },
+  { id: "arrow",     label: "Seta" },
+  { id: "polygon",   label: "Polígono" },
+  { id: "star",      label: "Estrela" },
+];
+
 export type ShellControlVisibility = "show" | "hidden" | "hover";
 
 const SHELL_VISIBILITY_OPTIONS: Array<{ value: ShellControlVisibility; label: string }> = [
@@ -37,6 +53,10 @@ export function ShellTab({
 }: ShellTabProps) {
   const [draftEnabled, setDraftEnabled] = useState(true);
   const [referenceEnabled, setReferenceEnabled] = useState(false);
+  const [versoesEnabled, setVersoesEnabled] = useState(false);
+  const [shapeRenderModes, setShapeRenderModes] = useState<Record<string, ShapeRenderMode>>(
+    Object.fromEntries(SHAPE_LIST.map((s) => [s.id, "svg" as ShapeRenderMode])),
+  );
 
   return (
     <>
@@ -53,6 +73,9 @@ export function ShellTab({
         </InsRow>
         <InsRow label="Referência">
           <InsSwitch checked={referenceEnabled} onChange={setReferenceEnabled} />
+        </InsRow>
+        <InsRow label="Versões">
+          <InsSwitch checked={versoesEnabled} onChange={setVersoesEnabled} />
         </InsRow>
       </InsSection>
 
@@ -78,6 +101,20 @@ export function ShellTab({
             options={SHELL_VISIBILITY_OPTIONS}
           />
         </InsRow>
+      </InsSection>
+
+      <InsSection title="Formas">
+        {SHAPE_LIST.map((shape) => (
+          <InsRow key={shape.id} label={shape.label}>
+            <InsToggle
+              value={shapeRenderModes[shape.id] ?? "svg"}
+              onChange={(value) =>
+                setShapeRenderModes((prev) => ({ ...prev, [shape.id]: value as ShapeRenderMode }))
+              }
+              options={SHAPE_RENDER_OPTIONS}
+            />
+          </InsRow>
+        ))}
       </InsSection>
 
       <InsSection title="Grade">

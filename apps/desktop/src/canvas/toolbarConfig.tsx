@@ -14,10 +14,13 @@ export type ToolEntry = {
  * A toolbar item is either:
  * - `button`   — a standalone icon button for a single tool
  * - `dropdown` — a combined button + chevron that exposes multiple tools
+ *
+ * `badge` on a dropdown shows a small render-mode indicator (e.g. "SVG" or "DIV")
+ * next to the button. Clicking it opens the matching settings panel.
  */
 export type ToolbarItemConfig =
   | { kind: "button"; tool: ToolEntry }
-  | { kind: "dropdown"; tools: ToolEntry[] };
+  | { kind: "dropdown"; tools: ToolEntry[]; badge?: string };
 
 /** A group is a horizontal cluster of items separated from other groups by a divider. */
 export type ToolbarGroupConfig = ToolbarItemConfig[];
@@ -161,7 +164,7 @@ export const DEFAULT_TOOLBAR_CONFIG: ToolbarConfig = {
     // ── Creation ────────────────────────────────────────────────────────────
     [
       { kind: "button",   tool: e("wrapper") },
-      { kind: "dropdown", tools: [e("rectangle"), e("ellipse"), e("line"), e("arrow"), e("polygon"), e("star")] },
+      { kind: "dropdown", tools: [e("rectangle"), e("ellipse"), e("line"), e("arrow"), e("polygon"), e("star")], badge: "SVG" },
       { kind: "button",   tool: e("pen") },
       { kind: "button",   tool: e("text") },
       { kind: "dropdown", tools: [e("image"), e("svg")] },

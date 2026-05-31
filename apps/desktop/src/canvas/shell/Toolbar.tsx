@@ -27,6 +27,7 @@ export function Toolbar({
   parentTarget,
   onBackToParent,
   config = DEFAULT_TOOLBAR_CONFIG,
+  onBadgeClick,
 }: {
   activeTool?: CanvasToolId;
   defaultTool?: CanvasToolId;
@@ -39,6 +40,7 @@ export function Toolbar({
   parentTarget?: ToolbarParentTarget | null;
   onBackToParent?: () => void;
   config?: ToolbarConfig;
+  onBadgeClick?: () => void;
 }) {
   const [uncontrolledActive, setUncontrolledActive] = useState<CanvasToolId>(defaultTool);
   const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
@@ -71,6 +73,8 @@ export function Toolbar({
                     tools={item.tools}
                     active={active}
                     onSelect={selectTool}
+                    badge={item.badge}
+                    onBadgeClick={item.badge ? onBadgeClick : undefined}
                   />
                 ) : (
                   <ToolButton
@@ -110,13 +114,18 @@ function DropdownToolButton({
   tools,
   active,
   onSelect,
+  badge,
+  onBadgeClick,
 }: {
   tools: ToolEntry[];
   active: CanvasToolId;
   onSelect: (id: CanvasToolId) => void;
+  badge?: string;
+  onBadgeClick?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hover, setHover] = useState(false);
+  const [hoveredBadgeId, setHoveredBadgeId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const isGroupActive = tools.some((t) => t.id === active);
@@ -182,29 +191,59 @@ function DropdownToolButton({
             minWidth: 140,
           }}
         >
-          {tools.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              onClick={() => {
-                onSelect(tool.id);
-                setMenuOpen(false);
-              }}
-              className={[
-                "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] font-medium transition-colors duration-[90ms]",
-                active === tool.id
-                  ? "bg-[#383838] text-white"
-                  : "text-[#CFCFCF] hover:bg-[#2A2A2A] hover:text-white",
-              ].join(" ")}
-            >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                {tool.icon}
-              </span>
-              {tool.name}
-            </button>
-          ))}
+          {tools.map((tool) => {
+            const isActive = active === tool.id;
+            const badgeLit = hoveredBadgeId === tool.id;
+            return (
+              <div
+                key={tool.id}
+                className={[
+                  "flex w-full items-center rounded-md transition-colors duration-[90ms]",
+                  isActive ? "bg-[#383838]" : "hover:bg-[#2A2A2A]",
+                ].join(" ")}
+              >
+                <button
+                  type="button"
+                  onClick={() => { onSelect(tool.id); setMenuOpen(false); }}
+                  className={[
+                    "flex flex-1 items-center gap-2.5 border-0 bg-transparent px-2 py-1.5 text-left text-[12px] font-medium",
+                    isActive ? "text-white" : "text-[#CFCFCF]",
+                  ].join(" ")}
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                    {tool.icon}
+                  </span>
+                  {tool.name}
+                </button>
+
+                {badge && (
+                  <button
+                    type="button"
+                    onMouseEnter={() => setHoveredBadgeId(tool.id)}
+                    onMouseLeave={() => setHoveredBadgeId(null)}
+                    onClick={(e) => { e.stopPropagation(); onBadgeClick?.(); }}
+                    className="mr-1.5 shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                    aria-label={`Modo de renderização: ${badge}`}
+                  >
+                    <span
+                      className="rounded px-1 py-px font-mono text-[9px] font-semibold leading-none transition-all duration-[90ms]"
+                      style={{
+                        letterSpacing: "0.5px",
+                        color: badgeLit ? "#CFCFCF" : "#555",
+                        background: badgeLit ? "#2A2A2A" : "transparent",
+                        border: `1px solid ${badgeLit ? "#3A3A3A" : "transparent"}`,
+                      }}
+                    >
+                      {badge}
+                    </span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
+
     </div>
   );
 }

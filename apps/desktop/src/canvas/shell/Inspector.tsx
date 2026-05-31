@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import {
   renameElement,
@@ -30,6 +30,8 @@ type InspectorProps = {
   onShellDeviceVisibilityChange: (v: ShellControlVisibility) => void;
   onShellZoomVisibilityChange: (v: ShellControlVisibility) => void;
   onShellExpandVisibilityChange: (v: ShellControlVisibility) => void;
+  /** Incrementing this counter forces the Shell tab to become active. */
+  openShellTabSignal?: number;
 };
 
 type InspectorTab = "element" | "canvas" | "shell";
@@ -44,8 +46,16 @@ export function Inspector({
   onShellDeviceVisibilityChange,
   onShellZoomVisibilityChange,
   onShellExpandVisibilityChange,
+  openShellTabSignal,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
+  const prevShellTabSignalRef = useRef(openShellTabSignal ?? 0);
+  useEffect(() => {
+    if (openShellTabSignal !== undefined && openShellTabSignal !== prevShellTabSignalRef.current) {
+      prevShellTabSignalRef.current = openShellTabSignal;
+      setActiveTab("shell");
+    }
+  }, [openShellTabSignal]);
 
   const bridgeDocument = useEditorBridge((v) => v?.state.document ?? null);
   const bridgeSelectedId = useEditorBridge((v) => v?.state.selectedIds[0] ?? null);
