@@ -70,26 +70,35 @@ export function handleDrawMove(
   const def = getToolElementDefinition(interaction.tool);
   const drawMode = def?.capabilities.drawMode ?? "free";
 
-  const rawW = Math.abs(point.x - interaction.startPoint.x);
   const isHorizontal = drawMode === "horizontal";
   const isProportional = drawMode === "proportional";
-  const rawH = isHorizontal
-    ? node.height
-    : event.shiftKey || isProportional
-      ? rawW
-      : Math.abs(point.y - interaction.startPoint.y);
-
-  const x = Math.min(interaction.startPoint.x, point.x);
-  const y = isHorizontal
-    ? interaction.startPoint.y - node.height / 2
-    : Math.min(interaction.startPoint.y, point.y);
-
   const next = shallowCloneDocument(interaction.beforeDocument);
   node.id = interaction.elementId;
-  node.x = roundPixel(x);
-  node.y = roundPixel(y);
-  node.width = roundPixel(Math.max(rawW, 1));
-  node.height = roundPixel(Math.max(rawH, 1));
+
+  if (isHorizontal) {
+    const dx = point.x - interaction.startPoint.x;
+    const dy = point.y - interaction.startPoint.y;
+    const len = Math.hypot(dx, dy);
+    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+    const h = node.height;
+    // Center the element on the midpoint of the drag; start endpoint stays at startPoint
+    const cx = (interaction.startPoint.x + point.x) / 2;
+    const cy = (interaction.startPoint.y + point.y) / 2;
+    node.x = roundPixel(cx - len / 2);
+    node.y = roundPixel(cy - h / 2);
+    node.width = roundPixel(Math.max(len, 1));
+    node.height = h;
+    node.rotation = angleDeg;
+  } else {
+    const rawW = Math.abs(point.x - interaction.startPoint.x);
+    const rawH = event.shiftKey || isProportional
+      ? rawW
+      : Math.abs(point.y - interaction.startPoint.y);
+    node.x = roundPixel(Math.min(interaction.startPoint.x, point.x));
+    node.y = roundPixel(Math.min(interaction.startPoint.y, point.y));
+    node.width = roundPixel(Math.max(rawW, 1));
+    node.height = roundPixel(Math.max(rawH, 1));
+  }
   next.elements[interaction.elementId] = node;
   if (!next.rootIds.includes(interaction.elementId)) next.rootIds.push(interaction.elementId);
   interaction.lastDocument = next;
