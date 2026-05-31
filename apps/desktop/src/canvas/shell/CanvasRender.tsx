@@ -222,7 +222,6 @@ export function CanvasRender({
               componentOriginPosition={componentOriginPosition}
               shellDeviceVisibility={shellDeviceVisibility}
               shellZoomVisibility={shellZoomVisibility}
-              hovered={hovered}
               onBackToParent={onBackToParent}
             />
           )}
