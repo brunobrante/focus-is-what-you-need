@@ -1,4 +1,5 @@
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
+import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import type { CanvasDocument, ElementNode, ElementStyles, ElementType } from "@/canvas/engine/types";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import {
@@ -26,13 +27,6 @@ type ElementTabProps = {
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
 };
-
-function elementTypeLabel(type: ElementType): string {
-  if (type === "text") return "Text";
-  if (type === "ellipse") return "Ellipse";
-  if (type === "image") return "Image";
-  return "Frame";
-}
 
 function labelForWeight(value: string | undefined): string {
   const numeric = Number(value ?? 400);
@@ -185,4 +179,4 @@ export function ElementTab({
 }
 
 // Re-exported for Inspector.tsx header label
-export { elementTypeLabel };
+export { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";

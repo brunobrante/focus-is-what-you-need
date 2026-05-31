@@ -236,7 +236,7 @@ function resizeSingleElement(
     if (node) {
       node.width = width;
       node.height = height;
-      if (node.styles.borderRadius !== undefined) {
+      if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
         node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, width, height));
       }
       node.x = roundPixel(absX - parentBounds.x);
@@ -279,7 +279,7 @@ export function resizeDocument(
     };
     node.width = roundPixel(Math.min(absoluteRect.width, parentSize.width));
     node.height = roundPixel(Math.min(absoluteRect.height, parentSize.height));
-    if (node.styles.borderRadius !== undefined) {
+    if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
       node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
     }
     const clampedRect = clampRotatedRectToBounds(

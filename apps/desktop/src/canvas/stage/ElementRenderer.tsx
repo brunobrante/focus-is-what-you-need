@@ -33,7 +33,7 @@ const ARROW_CLIP_PATH = "polygon(0% 30%, 65% 30%, 65% 0%, 100% 50%, 65% 100%, 65
 function computeClipPath(type: ElementType, borderRadius?: number): string | undefined {
   if (type === "arrow") return ARROW_CLIP_PATH;
   if (type === "polygon") return polygonClipPath(5);
-  if (type === "star") return starClipPath(borderRadius ?? 40);
+  if (type === "star") return starClipPath(borderRadius ?? 22.49);
   return undefined;
 }
 

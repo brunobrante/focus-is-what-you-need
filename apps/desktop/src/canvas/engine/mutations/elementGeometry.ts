@@ -1,3 +1,4 @@
+import { getElementDefinition } from "../elementDefinitions";
 import type { CanvasDocument, ElementStyles, Rect } from "../types";
 import {
   clamp,
@@ -62,7 +63,7 @@ export function updateElementStyles(
   const node = next.elements[id];
   if (!node) return document;
   node.styles = { ...node.styles, ...styles };
-  if (styles.borderRadius !== undefined) {
+  if (styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
     node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(styles.borderRadius, node.width, node.height));
   }
   return next;
