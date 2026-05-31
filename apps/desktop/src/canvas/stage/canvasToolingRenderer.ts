@@ -29,8 +29,8 @@ export const RADIUS_HANDLE_SIZE = 8;
 export const RADIUS_MIN_OFFSET = 12;
 export const RADIUS_MIN_ELEMENT_SCREEN = 24;
 
-export const ROTATION_OFFSET = 16;
-export const ROTATION_SIZE = 32;
+export const ROTATION_OFFSET = 8;
+export const ROTATION_SIZE = 14;
 
 export const EDGE_THICKNESS = 6;
 
