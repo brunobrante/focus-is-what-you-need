@@ -65,18 +65,31 @@ export function handleDrawMove(
 ): void {
   const distance = Math.hypot(point.x - interaction.startPoint.x, point.y - interaction.startPoint.y);
   interaction.moved = interaction.moved || distance > 2;
-  const x = Math.min(interaction.startPoint.x, point.x);
-  const y = Math.min(interaction.startPoint.y, point.y);
-  const w = Math.abs(point.x - interaction.startPoint.x);
-  const lockAspect = getToolElementDefinition(interaction.tool)?.capabilities.lockAspectRatio ?? false;
-  const h = (event.shiftKey || lockAspect) ? w : Math.abs(point.y - interaction.startPoint.y);
-  const next = shallowCloneDocument(interaction.beforeDocument);
+
   const node = createElementForTool(interaction.tool, 0, 0, interaction.beforeDocument.canvas);
+  const def = getToolElementDefinition(interaction.tool);
+  const drawMode = def?.capabilities.drawMode ?? "free";
+
+  const rawW = Math.abs(point.x - interaction.startPoint.x);
+  const isHorizontal = drawMode === "horizontal";
+  const isProportional = drawMode === "proportional";
+  const rawH = isHorizontal
+    ? node.height
+    : event.shiftKey || isProportional
+      ? rawW
+      : Math.abs(point.y - interaction.startPoint.y);
+
+  const x = Math.min(interaction.startPoint.x, point.x);
+  const y = isHorizontal
+    ? interaction.startPoint.y - node.height / 2
+    : Math.min(interaction.startPoint.y, point.y);
+
+  const next = shallowCloneDocument(interaction.beforeDocument);
   node.id = interaction.elementId;
   node.x = roundPixel(x);
   node.y = roundPixel(y);
-  node.width = roundPixel(Math.max(w, 1));
-  node.height = roundPixel(Math.max(h, 1));
+  node.width = roundPixel(Math.max(rawW, 1));
+  node.height = roundPixel(Math.max(rawH, 1));
   next.elements[interaction.elementId] = node;
   if (!next.rootIds.includes(interaction.elementId)) next.rootIds.push(interaction.elementId);
   interaction.lastDocument = next;

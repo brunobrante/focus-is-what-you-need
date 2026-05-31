@@ -404,6 +404,20 @@ function drawPolygonOutline(
   }
 }
 
+function resolveSkiaHandlePoints(box: ToolingBoxCommand): Point[] {
+  const [nw, ne, se, sw] = box.corners;
+  const allowed = box.allowedHandles;
+  if (!allowed) return [nw, ne, se, sw];
+  const positions: Record<string, Point> = {
+    nw, ne, se, sw,
+    n: { x: (nw.x + ne.x) / 2, y: (nw.y + ne.y) / 2 },
+    e: { x: (ne.x + se.x) / 2, y: (ne.y + se.y) / 2 },
+    s: { x: (se.x + sw.x) / 2, y: (se.y + sw.y) / 2 },
+    w: { x: (sw.x + nw.x) / 2, y: (sw.y + nw.y) / 2 },
+  };
+  return allowed.map((h) => positions[h]).filter(Boolean) as Point[];
+}
+
 function drawResizeHandles(
   ck: CanvasKit,
   canvas: Canvas,
@@ -414,10 +428,10 @@ function drawResizeHandles(
   const fillPaint = pool.getFill(HANDLE_FILL);
   const strokePaint = pool.getStroke(SELECTION_COLOR, 1);
 
-  for (const corner of box.corners) {
+  for (const pos of resolveSkiaHandlePoints(box)) {
     const handleRect = {
-      x: corner.x - half,
-      y: corner.y - half,
+      x: pos.x - half,
+      y: pos.y - half,
       width: HANDLE_SIZE,
       height: HANDLE_SIZE,
     };

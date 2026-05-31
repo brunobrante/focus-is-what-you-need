@@ -145,6 +145,7 @@ const EMPTY_GEOMETRY: ToolingGeometry = {
   canRotate: false,
   hasRadiusHandles: false,
   cursorRotation: 0,
+  allowedResizeHandles: null,
 };
 
 const TOOLING_RENDERER_KIND = "skia";
@@ -268,6 +269,13 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           : boxFromRects(transformViewportRects);
       const canResize = Boolean(selectionBox && canSelectionResize);
       const canRotate = Boolean(selectionBox && canSelectionRotate);
+      const singleElement = transformIds.length === 1 ? doc.elements[transformIds[0]] : null;
+      const allowedResizeHandles = singleElement
+        ? (() => {
+            const h = getElementDefinition(singleElement.type).capabilities.resizeHandles;
+            return h === "all" ? null : h;
+          })()
+        : null;
       const radiusElement =
         transformIds.length === 1 ? doc.elements[transformIds[0]] : null;
       const radiusEligible = Boolean(
@@ -353,6 +361,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             canRotate: true,
             hasRadiusHandles: false,
             cursorRotation: doc.canvas.rotation ?? 0,
+            allowedResizeHandles: null,
           }
         : {
             selectionBox: suppressHandles ? null : selectionBox,
@@ -361,6 +370,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             canRotate: suppressHandles ? false : canRotate,
             hasRadiusHandles: suppressHandles ? false : hasRadiusHandles,
             cursorRotation: selectionBox ? getToolingBoxRotation(selectionBox) : 0,
+            allowedResizeHandles: suppressHandles ? null : allowedResizeHandles,
           };
 
       return {
@@ -377,8 +387,8 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             ],
         resizeBox: props.canvasStageActive
           ? canvasBox
-          : !suppressHandles && canResize
-            ? selectionBox
+          : !suppressHandles && canResize && selectionBox
+            ? { ...selectionBox, allowedHandles: allowedResizeHandles }
             : null,
         radiusHandlePositions:
           !props.canvasStageActive && !suppressHandles && hasRadiusHandles

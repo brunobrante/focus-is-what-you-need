@@ -89,6 +89,8 @@ export type ToolingGeometry = {
   canRotate: boolean;
   hasRadiusHandles: boolean;
   cursorRotation: number;
+  /** When set, only these handles are hit-tested. null = all handles. */
+  allowedResizeHandles: readonly ResizeHandle[] | null;
 };
 
 // ─── Figma-style rotation cursor (curved arrow, two arrowheads) ───────────────
@@ -322,16 +324,23 @@ export function hitTestTooling(vx: number, vy: number, geometry: ToolingGeometry
   }
 
   if (geometry.selectionBox && geometry.canResize) {
-    const cornerHandle = hitTestCornerHandles(vx, vy, geometry.selectionBox);
-    if (cornerHandle) {
-      return {
-        type: "resize",
-        handle: cornerHandle,
-        cursor: getRotatedCursor(cornerHandle, geometry.cursorRotation),
-      };
+    const allowed = geometry.allowedResizeHandles;
+    const cornerHandles: readonly ResizeHandle[] = ["nw", "ne", "se", "sw"];
+    const allowsCorners = !allowed || allowed.some((h) => cornerHandles.includes(h));
+
+    if (allowsCorners) {
+      const cornerHandle = hitTestCornerHandles(vx, vy, geometry.selectionBox);
+      if (cornerHandle && (!allowed || allowed.includes(cornerHandle))) {
+        return {
+          type: "resize",
+          handle: cornerHandle,
+          cursor: getRotatedCursor(cornerHandle, geometry.cursorRotation),
+        };
+      }
     }
+
     const edgeHandle = hitTestEdgeHandles(vx, vy, geometry.selectionBox);
-    if (edgeHandle) {
+    if (edgeHandle && (!allowed || allowed.includes(edgeHandle))) {
       return {
         type: "resize",
         handle: edgeHandle,

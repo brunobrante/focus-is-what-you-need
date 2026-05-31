@@ -9,6 +9,7 @@ import {
   rectCenterX,
   rectCenterY,
 } from "@/canvas/engine/geometry";
+import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { EditorState, Point, ResizeHandle } from "@/canvas/engine/types";
 import { getCanvasDisplayScale } from "@/canvas/engine/viewport";
 import type { Size } from "@/canvas/engine/viewport";
@@ -182,7 +183,7 @@ export function startRadiusInteraction(
   if (transformIds.length !== 1) return;
   const elementId = transformIds[0];
   const element = state.document.elements[elementId];
-  if (!element || (element.type !== "rect" && element.type !== "image")) return;
+  if (!element || !getElementDefinition(element.type).capabilities.radius) return;
   interactionRef.current = {
     type: "radius",
     pointerId: event.pointerId,

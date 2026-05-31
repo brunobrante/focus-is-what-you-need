@@ -1,4 +1,4 @@
-import type { Point, Rect, SnapGuide } from "@/canvas/engine/types";
+import type { Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
 import type { ViewportTransform } from "@/canvas/engine/viewport";
 
 export type ToolingRendererKind = "skia";
@@ -13,6 +13,8 @@ export type ToolingOutlineCommand = {
 export type ToolingBoxCommand = {
   rect: Rect;
   corners: [Point, Point, Point, Point];
+  /** When set, only these handles are drawn/hit-tested. null / undefined = all 4 corners. */
+  allowedHandles?: readonly ResizeHandle[] | null;
 };
 
 export type ToolingDropTargetCommand = {

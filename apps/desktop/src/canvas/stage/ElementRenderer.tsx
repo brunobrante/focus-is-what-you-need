@@ -1,7 +1,41 @@
 import { memo } from "react";
 import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
-import type { CanvasDocument, ElementNode } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
+
+// ─── Clip-path helpers ────────────────────────────────────────────────────────
+
+function polygonClipPath(sides: number): string {
+  const verts: string[] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * 2 * Math.PI - Math.PI / 2;
+    verts.push(`${50 + 50 * Math.cos(angle)}% ${50 + 50 * Math.sin(angle)}%`);
+  }
+  return `polygon(${verts.join(", ")})`;
+}
+
+function starClipPath(innerRadiusPercent: number): string {
+  const points = 5;
+  const outer = 50;
+  const inner = Math.max(1, Math.min(49, innerRadiusPercent));
+  const step = Math.PI / points;
+  const verts: string[] = [];
+  for (let i = 0; i < 2 * points; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const angle = i * step - Math.PI / 2;
+    verts.push(`${50 + r * Math.cos(angle)}% ${50 + r * Math.sin(angle)}%`);
+  }
+  return `polygon(${verts.join(", ")})`;
+}
+
+const ARROW_CLIP_PATH = "polygon(0% 30%, 65% 30%, 65% 0%, 100% 50%, 65% 100%, 65% 70%, 0% 70%)";
+
+function computeClipPath(type: ElementType, borderRadius?: number): string | undefined {
+  if (type === "arrow") return ARROW_CLIP_PATH;
+  if (type === "polygon") return polygonClipPath(5);
+  if (type === "star") return starClipPath(borderRadius ?? 40);
+  return undefined;
+}
 
 function rotationTransform(rotation: number, width: number, height: number): string | undefined {
   if (!rotation) return undefined;
@@ -18,6 +52,7 @@ function nodeStyle(node: ElementNode, isEditing = false, renderScale = 1): CSSPr
   const hasSceneChildren = node.children.length > 0;
   const width = node.width * renderScale;
   const height = node.height * renderScale;
+  const clipPath = computeClipPath(node.type, styles.borderRadius);
   return {
     position: "absolute",
     left: node.x * renderScale,
@@ -33,10 +68,11 @@ function nodeStyle(node: ElementNode, isEditing = false, renderScale = 1): CSSPr
     fontSize: scaled(styles.fontSize, renderScale),
     fontWeight: styles.fontWeight,
     textAlign: styles.textAlign,
-    borderRadius: isEllipse ? "50%" : scaled(styles.borderRadius, renderScale),
-    borderWidth: scaled(styles.borderWidth, renderScale),
-    borderStyle: styles.borderWidth ? "solid" : undefined,
-    borderColor: styles.borderColor,
+    borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
+    borderWidth: clipPath ? undefined : scaled(styles.borderWidth, renderScale),
+    borderStyle: !clipPath && styles.borderWidth ? "solid" : undefined,
+    borderColor: clipPath ? undefined : styles.borderColor,
+    clipPath,
     opacity: 1,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
     justifyContent: hasSceneChildren ? undefined : styles.justifyContent,
@@ -60,6 +96,7 @@ function detachedNodeStyle(
   const hasSceneChildren = node.children.length > 0;
   const width = node.width * renderScale;
   const height = node.height * renderScale;
+  const clipPath = computeClipPath(node.type, styles.borderRadius);
 
   return {
     position: "absolute",
@@ -76,10 +113,11 @@ function detachedNodeStyle(
     fontSize: scaled(styles.fontSize, renderScale),
     fontWeight: styles.fontWeight,
     textAlign: styles.textAlign,
-    borderRadius: isEllipse ? "50%" : scaled(styles.borderRadius, renderScale),
-    borderWidth: scaled(styles.borderWidth, renderScale),
-    borderStyle: styles.borderWidth ? "solid" : undefined,
-    borderColor: styles.borderColor,
+    borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
+    borderWidth: clipPath ? undefined : scaled(styles.borderWidth, renderScale),
+    borderStyle: !clipPath && styles.borderWidth ? "solid" : undefined,
+    borderColor: clipPath ? undefined : styles.borderColor,
+    clipPath,
     opacity: styles.opacity,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
     justifyContent: hasSceneChildren ? undefined : styles.justifyContent,

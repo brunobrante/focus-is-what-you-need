@@ -15,6 +15,10 @@ export const TOOLBAR_TOOL_MAP: Record<string, Tool> = {
   ellipse: "ellipse",
   text: "text",
   image: "image",
+  line: "line",
+  arrow: "arrow",
+  polygon: "polygon",
+  star: "star",
 };
 
 const STAGE_BASE_SHADOW = "0 0 0 1px rgba(255, 255, 255, 0.06), 0 18px 46px rgba(0, 0, 0, 0.4)";

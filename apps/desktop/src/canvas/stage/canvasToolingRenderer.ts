@@ -325,14 +325,32 @@ export function drawGroupOutline(ctx: CanvasRenderingContext2D, rect: Rect, pixe
   drawOutlineRect(ctx, rect, SELECTION_COLOR, 1, pixelScale);
 }
 
+function edgeMidpoint(a: Point, b: Point): Point {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function resolveHandlePoints(box: ToolingBox): Point[] {
+  const [nw, ne, se, sw] = box.corners;
+  const allowed = box.allowedHandles;
+  if (!allowed) return [nw, ne, se, sw];
+  const positions: Record<string, Point> = {
+    nw, ne, se, sw,
+    n: edgeMidpoint(nw, ne),
+    e: edgeMidpoint(ne, se),
+    s: edgeMidpoint(se, sw),
+    w: edgeMidpoint(sw, nw),
+  };
+  return allowed.map((h) => positions[h]).filter(Boolean) as Point[];
+}
+
 export function drawResizeHandles(ctx: CanvasRenderingContext2D, box: ToolingBox): void {
   const half = HANDLE_SIZE / 2;
   ctx.fillStyle = HANDLE_FILL;
   ctx.strokeStyle = SELECTION_COLOR;
   ctx.lineWidth = 1;
-  for (const c of box.corners) {
+  for (const pos of resolveHandlePoints(box)) {
     ctx.beginPath();
-    ctx.roundRect(c.x - half, c.y - half, HANDLE_SIZE, HANDLE_SIZE, HANDLE_BORDER_RADIUS);
+    ctx.roundRect(pos.x - half, pos.y - half, HANDLE_SIZE, HANDLE_SIZE, HANDLE_BORDER_RADIUS);
     ctx.fill();
     ctx.stroke();
   }
