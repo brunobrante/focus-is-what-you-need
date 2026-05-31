@@ -22,6 +22,7 @@ import {
 } from "@/canvas/engine/geometry";
 import { buildSnapCandidates, snapRectWithCandidates } from "@/canvas/engine/snapping";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
+import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
 import type {
@@ -239,13 +240,16 @@ function resizeSingleElement(
         ? mutateElementWithStyles(next, id)
         : mutateElementShallow(next, id);
     if (node) {
-      node.width = width;
-      node.height = height;
+      const widthFit = source.type === "text" && source.sizing?.width === "fit";
+      const heightFit = source.type === "text" && source.sizing?.height === "fit";
+      node.width = widthFit ? source.width : width;
+      node.height = heightFit ? source.height : height;
       if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
-        node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, width, height));
+        node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
       }
-      node.x = roundPixel(absX - parentBounds.x);
-      node.y = roundPixel(absY - parentBounds.y);
+      node.x = widthFit ? source.x : roundPixel(absX - parentBounds.x);
+      node.y = heightFit ? source.y : roundPixel(absY - parentBounds.y);
+      applyTextFitSizingInPlace(next, id);
     }
   }
   return { document: next, guides: [] };
@@ -283,8 +287,14 @@ export function resizeDocument(
       height: Math.max(sourceRect.height * scaleY, MIN_ELEMENT_SIZE),
     };
     const nc = getElementDefinition(node.type).capabilities.constraints;
-    node.width = roundPixel(clamp(absoluteRect.width, nc.width.min, Math.min(parentSize.width, nc.width.max ?? parentSize.width)));
-    node.height = roundPixel(clamp(absoluteRect.height, nc.height.min, Math.min(parentSize.height, nc.height.max ?? parentSize.height)));
+    const widthFit = node.type === "text" && node.sizing?.width === "fit";
+    const heightFit = node.type === "text" && node.sizing?.height === "fit";
+    node.width = widthFit
+      ? sourceNode.width
+      : roundPixel(clamp(absoluteRect.width, nc.width.min, Math.min(parentSize.width, nc.width.max ?? parentSize.width)));
+    node.height = heightFit
+      ? sourceNode.height
+      : roundPixel(clamp(absoluteRect.height, nc.height.min, Math.min(parentSize.height, nc.height.max ?? parentSize.height)));
     if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
       node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
     }
@@ -293,8 +303,9 @@ export function resizeDocument(
       node.rotation,
       parentBounds,
     );
-    node.x = roundPixel(clampedRect.x - parentBounds.x);
-    node.y = roundPixel(clampedRect.y - parentBounds.y);
+    node.x = widthFit ? sourceNode.x : roundPixel(clampedRect.x - parentBounds.x);
+    node.y = heightFit ? sourceNode.y : roundPixel(clampedRect.y - parentBounds.y);
+    applyTextFitSizingInPlace(next, id);
   }
   return { document: next, guides: [] };
 }

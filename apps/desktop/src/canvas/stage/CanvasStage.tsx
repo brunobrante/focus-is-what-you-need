@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
 import { useEditor, useHoverStore } from "@/canvas/engine/store";
@@ -137,6 +137,10 @@ export function CanvasStage({
     viewportSize,
     viewportInitializedSubjectRef,
   });
+
+  const commitContextToolbarDocument = useCallback((document: CanvasDocument, selectedIds?: string[]) => {
+    dispatch({ type: "commitDocument", document, selectedIds });
+  }, [dispatch]);
 
   const canvasAlignmentDebugEnabled = useMemo(isCanvasAlignmentDebugEnabled, []);
 
@@ -399,6 +403,7 @@ export function CanvasStage({
         interactionType={interactionActive ? (interactionRef.current?.type ?? null) : null}
         marqueeRect={marqueeRect}
         dropTargetId={dropTargetId}
+        onCommitDocument={commitContextToolbarDocument}
       />
 
       <TextEditingTextarea

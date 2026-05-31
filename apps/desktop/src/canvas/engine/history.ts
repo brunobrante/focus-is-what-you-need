@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasProperties, ElementNode, ElementStyles } from "./types";
+import type { CanvasDocument, CanvasProperties, ElementNode, ElementSizing, ElementStyles } from "./types";
 
 function arrayValuesEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a === b) return true;
@@ -31,6 +31,10 @@ function elementStylesEqual(a: ElementStyles, b: ElementStyles): boolean {
   );
 }
 
+function elementSizingEqual(a: ElementSizing | undefined, b: ElementSizing | undefined): boolean {
+  return (a?.width ?? "fixed") === (b?.width ?? "fixed") && (a?.height ?? "fixed") === (b?.height ?? "fixed");
+}
+
 export function elementNodesEqual(a: ElementNode | undefined, b: ElementNode | undefined): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -49,6 +53,7 @@ export function elementNodesEqual(a: ElementNode | undefined, b: ElementNode | u
     a.src === b.src &&
     a.locked === b.locked &&
     a.visible === b.visible &&
+    elementSizingEqual(a.sizing, b.sizing) &&
     elementStylesEqual(a.styles, b.styles)
   );
 }

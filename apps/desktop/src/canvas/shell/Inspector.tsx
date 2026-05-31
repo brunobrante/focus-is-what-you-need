@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import {
   renameElement,
+  setTextElementSizing,
   setElementLocked,
   setElementVisible,
   updateCanvasProperties,
@@ -14,7 +15,7 @@ import {
   updateShellGrid,
   DEFAULT_SHELL_GRID,
 } from "@/canvas/engine/actions";
-import type { CanvasDocument, CanvasProperties, ElementStyles } from "@/canvas/engine/types";
+import type { CanvasDocument, CanvasProperties, ElementSizing, ElementStyles } from "@/canvas/engine/types";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { CanvasTab } from "./inspector/CanvasTab";
 import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
@@ -95,6 +96,11 @@ export function Inspector({
   const commitStyle = (styles: Partial<ElementStyles>) => {
     if (!document || !node) return;
     commitDocument(updateElementStyles(document, node.id, styles));
+  };
+
+  const commitSizing = (sizing: ElementSizing) => {
+    if (!document || !node) return;
+    commitDocument(setTextElementSizing(document, node.id, sizing));
   };
 
   const headerTitle = canvasStageActive ? "Frame" : node ? node.name : "Inspector";
@@ -222,6 +228,7 @@ export function Inspector({
             onUpdateGeometry={(patch) => commitDocument(updateElementGeometry(document, node.id, patch))}
             onUpdateRotation={(rotation) => commitDocument(updateElementRotation(document, node.id, rotation))}
             onUpdateStyle={commitStyle}
+            onUpdateSizing={commitSizing}
             onToggleLocked={(locked) => commitDocument(setElementLocked(document, node.id, locked))}
             onToggleVisible={(visible) => {
               const ids = (editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [];

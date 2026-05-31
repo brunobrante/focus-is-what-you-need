@@ -1,6 +1,6 @@
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
-import type { CanvasDocument, ElementNode, ElementStyles, ElementType } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import {
   clamp,
@@ -24,6 +24,7 @@ type ElementTabProps = {
   onUpdateGeometry: (patch: Partial<{ x: number; y: number; width: number; height: number }>) => void;
   onUpdateRotation: (rotation: number) => void;
   onUpdateStyle: (style: Partial<ElementStyles>) => void;
+  onUpdateSizing: (sizing: ElementSizing) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
 };
@@ -52,6 +53,7 @@ export function ElementTab({
   onUpdateGeometry,
   onUpdateRotation,
   onUpdateStyle,
+  onUpdateSizing,
   onToggleLocked,
   onToggleVisible,
 }: ElementTabProps) {
@@ -63,6 +65,8 @@ export function ElementTab({
   const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? w);
   const clampH = (h: number) => clamp(h, c.height.min, c.height.max ?? h);
   const clampR = (r: number) => c.radius ? clamp(r, c.radius.min, c.radius.max ?? r) : r;
+  const widthFit = node.type === "text" && node.sizing?.width === "fit";
+  const heightFit = node.type === "text" && node.sizing?.height === "fit";
 
   return (
     <>
@@ -87,12 +91,44 @@ export function ElementTab({
       </InsSection>
 
       <InsSection title="Tamanho">
-        <InsRow label="W">
-          <InsInput value={String(node.width)} onChange={(value) => updateNumber(value, (w) => onUpdateGeometry({ width: clampW(w) }))} suffix="px" />
-        </InsRow>
-        <InsRow label="H">
-          <InsInput value={String(node.height)} onChange={(value) => updateNumber(value, (h) => onUpdateGeometry({ height: clampH(h) }))} suffix="px" />
-        </InsRow>
+        {node.type === "text" ? (
+          <>
+            <InsRow label="W mode">
+              <InsToggle
+                value={widthFit ? "fit" : "fixed"}
+                onChange={(width) => onUpdateSizing({ width: width as ElementSizing["width"] })}
+                options={[
+                  { value: "fixed", label: "Fixed" },
+                  { value: "fit", label: "Fit" },
+                ]}
+              />
+            </InsRow>
+            <InsRow label="H mode">
+              <InsToggle
+                value={heightFit ? "fit" : "fixed"}
+                onChange={(height) => onUpdateSizing({ height: height as ElementSizing["height"] })}
+                options={[
+                  { value: "fixed", label: "Fixed" },
+                  { value: "fit", label: "Fit" },
+                ]}
+              />
+            </InsRow>
+          </>
+        ) : null}
+        {widthFit ? (
+          <Readout label="W" value={`${node.width} px fit`} />
+        ) : (
+          <InsRow label="W">
+            <InsInput value={String(node.width)} onChange={(value) => updateNumber(value, (w) => onUpdateGeometry({ width: clampW(w) }))} suffix="px" />
+          </InsRow>
+        )}
+        {heightFit ? (
+          <Readout label="H" value={`${node.height} px fit`} />
+        ) : (
+          <InsRow label="H">
+            <InsInput value={String(node.height)} onChange={(value) => updateNumber(value, (h) => onUpdateGeometry({ height: clampH(h) }))} suffix="px" />
+          </InsRow>
+        )}
         <Readout label="Min W" value={String(c.width.min)} />
         {c.width.max !== undefined && <Readout label="Max W" value={String(c.width.max)} />}
         <Readout label="Min H" value={String(c.height.min)} />

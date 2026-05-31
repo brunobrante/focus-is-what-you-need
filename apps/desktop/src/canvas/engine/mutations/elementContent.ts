@@ -1,5 +1,6 @@
 import type { CanvasDocument } from "../types";
 import { mutateElementShallow, shallowCloneDocument } from "./coreUtils";
+import { applyTextFitSizingInPlace } from "./elementGeometry";
 
 export function cloneDocument(document: CanvasDocument): CanvasDocument {
   if (typeof structuredClone === "function") return structuredClone(document);
@@ -11,6 +12,7 @@ export function updateElementText(document: CanvasDocument, id: string, content:
   const node = next.elements[id];
   if (!node) return document;
   node.content = content;
+  applyTextFitSizingInPlace(next, id);
   return next;
 }
 
@@ -30,6 +32,7 @@ export function updateElementTextShallow(
   const node = mutateElementShallow(next, id);
   if (!node) return document;
   node.content = content;
+  applyTextFitSizingInPlace(next, id);
   return next;
 }
 

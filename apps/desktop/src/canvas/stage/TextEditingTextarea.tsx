@@ -101,7 +101,11 @@ export function TextEditingTextarea({
     latestTextEditRef.current = textEdit;
     const textarea = textareaRef.current;
     if (!textarea) return;
-    if (!textEdit) { textarea.value = ""; return; }
+    if (!textEdit) {
+      textarea.value = "";
+      if (globalThis.document?.activeElement === textarea) textarea.blur();
+      return;
+    }
     if (textarea.value !== textEdit.value) textarea.value = textEdit.value;
     textarea.focus({ preventScroll: true });
     textarea.setSelectionRange(textEdit.selectionStart, textEdit.selectionEnd);
@@ -191,12 +195,13 @@ export function TextEditingTextarea({
         event.preventDefault();
       }}
       onKeyDown={(event) => {
-        event.stopPropagation();
         const current = latestTextEditRef.current;
+        if (!current) return;
+        event.stopPropagation();
 
         if (event.key === "Escape") { event.preventDefault(); onCancel(); return; }
         if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onCommit(); return; }
-        if (!current || composingRef.current) return;
+        if (composingRef.current) return;
 
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
           event.preventDefault();

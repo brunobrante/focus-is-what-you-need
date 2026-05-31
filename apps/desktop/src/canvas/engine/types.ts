@@ -24,6 +24,13 @@ export type ElementStyles = {
   objectFit?: "fill" | "contain" | "cover" | "none" | "scale-down";
 };
 
+export type ElementSizingMode = "fixed" | "fit";
+
+export type ElementSizing = {
+  width?: ElementSizingMode;
+  height?: ElementSizingMode;
+};
+
 export type ElementNode = {
   id: string;
   type: ElementType;
@@ -36,6 +43,7 @@ export type ElementNode = {
   height: number;
   rotation: number;
   styles: ElementStyles;
+  sizing?: ElementSizing;
   content?: string;
   src?: string;
   locked?: boolean;
