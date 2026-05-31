@@ -13,9 +13,9 @@ import { canvasSizeForProjectType } from "@/canvas/canvasUtils";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasStage } from "../stage/CanvasStage";
 
-function shellVisibilityStyle(v: ShellControlVisibility, hovered: boolean): CSSProperties {
+function shellVisibilityStyle(v: ShellControlVisibility, localHovered: boolean): CSSProperties {
   if (v === "hidden") return { opacity: 0, pointerEvents: "none" };
-  if (v === "hover") return { opacity: hovered ? 1 : 0, pointerEvents: hovered ? "auto" : "none", transition: "opacity 150ms" };
+  if (v === "hover") return { opacity: localHovered ? 1 : 0, transition: "opacity 150ms" };
   return {};
 }
 
@@ -85,7 +85,6 @@ export function CanvasRender({
   onToggleExpand?: () => void;
   onBackToParent?: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
   const activeCanvas = split !== "none" && activeTab === "drafts" ? "right" : "left";
 
   const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + TREE_WIDTH + GAP      : PANEL_MARGIN);
@@ -111,8 +110,6 @@ export function CanvasRender({
         left, right, top, bottom,
         transition: "left 220ms cubic-bezier(.2,.8,.2,1), right 220ms cubic-bezier(.2,.8,.2,1), top 220ms cubic-bezier(.2,.8,.2,1), bottom 220ms cubic-bezier(.2,.8,.2,1)",
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {split === "vertical" ? (
         <div className="absolute inset-0 flex gap-2">
@@ -136,7 +133,6 @@ export function CanvasRender({
             componentOriginPosition={componentOriginPosition}
             shellDeviceVisibility={shellDeviceVisibility}
             shellZoomVisibility={shellZoomVisibility}
-            hovered={hovered}
             onBackToParent={onBackToParent}
           />
           <CanvasSurface
@@ -175,7 +171,6 @@ export function CanvasRender({
             componentOriginPosition={componentOriginPosition}
             shellDeviceVisibility={shellDeviceVisibility}
             shellZoomVisibility={shellZoomVisibility}
-            hovered={hovered}
             onBackToParent={onBackToParent}
           />
           <CanvasSurface
@@ -235,21 +230,12 @@ export function CanvasRender({
       )}
 
       {!expanded && shellExpandVisibility !== "hidden" && (
-        <button
-          type="button"
+        <ExpandButton
+          shellExpandVisibility={shellExpandVisibility}
+          btnTop={btnTop}
+          btnRight={btnRight}
           onClick={onToggleExpand}
-          aria-label="Expandir canvas"
-          className="absolute grid h-7 w-7 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888] transition-opacity duration-150 hover:text-[#CFCFCF]"
-          style={{
-            top: btnTop,
-            right: btnRight,
-            ...shellVisibilityStyle(shellExpandVisibility, hovered),
-            boxShadow: "0 2px 8px rgba(0,0,0,0.45)",
-            zIndex: 10,
-          }}
-        >
-          <ExpandIcon />
-        </button>
+        />
       )}
     </div>
   );
@@ -263,6 +249,39 @@ function ExpandIcon() {
       <line x1="21" y1="3" x2="14" y2="10" />
       <line x1="3" y1="21" x2="10" y2="14" />
     </svg>
+  );
+}
+
+function ExpandButton({
+  shellExpandVisibility,
+  btnTop,
+  btnRight,
+  onClick,
+}: {
+  shellExpandVisibility: ShellControlVisibility;
+  btnTop: number;
+  btnRight: number;
+  onClick?: () => void;
+}) {
+  const [localHovered, setLocalHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Expandir canvas"
+      className="absolute grid h-7 w-7 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888] transition-opacity duration-150 hover:text-[#CFCFCF]"
+      style={{
+        top: btnTop,
+        right: btnRight,
+        ...shellVisibilityStyle(shellExpandVisibility, localHovered),
+        boxShadow: "0 2px 8px rgba(0,0,0,0.45)",
+        zIndex: 10,
+      }}
+      onMouseEnter={() => setLocalHovered(true)}
+      onMouseLeave={() => setLocalHovered(false)}
+    >
+      <ExpandIcon />
+    </button>
   );
 }
 
@@ -286,7 +305,6 @@ function CanvasSurface({
   componentOriginPosition = null,
   shellDeviceVisibility = "show",
   shellZoomVisibility = "show",
-  hovered = false,
   onBackToParent,
 }: {
   active: boolean;
@@ -308,7 +326,6 @@ function CanvasSurface({
   componentOriginPosition?: { x: number; y: number } | null;
   shellDeviceVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
-  hovered?: boolean;
   onBackToParent?: () => void;
 }) {
   const viewportSubjectKey = storageKey;
@@ -366,7 +383,6 @@ function CanvasSurface({
               screenOverlayAlignment={screenOverlayAlignment}
               shellDeviceVisibility={shellDeviceVisibility}
               shellZoomVisibility={shellZoomVisibility}
-              hovered={hovered}
               onToggleScreenOverlay={() => setScreenOverlayEnabled((v) => !v)}
               onChangeScreenOverlayAlignment={setScreenOverlayAlignment}
             />
@@ -447,7 +463,6 @@ function SurfaceCanvasControls({
   screenOverlayAlignment,
   shellDeviceVisibility,
   shellZoomVisibility,
-  hovered,
   onToggleScreenOverlay,
   onChangeScreenOverlayAlignment,
 }: {
@@ -457,23 +472,27 @@ function SurfaceCanvasControls({
   screenOverlayAlignment: ScreenOverlayAlignment;
   shellDeviceVisibility: ShellControlVisibility;
   shellZoomVisibility: ShellControlVisibility;
-  hovered: boolean;
   onToggleScreenOverlay: () => void;
   onChangeScreenOverlayAlignment: (a: ScreenOverlayAlignment) => void;
 }) {
   const { state, dispatch } = useEditor();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [localHovered, setLocalHovered] = useState(false);
 
   const setZoom: ZoomSetter = (next) => {
     const zoom = typeof next === "function" ? next(state.zoom) : next;
     dispatch({ type: "setZoom", zoom });
   };
 
-  const deviceStyle = shellVisibilityStyle(shellDeviceVisibility, hovered);
-  const zoomStyle = shellVisibilityStyle(shellZoomVisibility, hovered);
+  const deviceStyle = shellVisibilityStyle(shellDeviceVisibility, localHovered);
+  const zoomStyle = shellVisibilityStyle(shellZoomVisibility, localHovered);
 
   return (
-    <div className="absolute bottom-3 left-3 z-[10] flex items-center gap-2">
+    <div
+      className="absolute bottom-3 left-3 z-[10] flex items-center gap-2"
+      onMouseEnter={() => setLocalHovered(true)}
+      onMouseLeave={() => setLocalHovered(false)}
+    >
       {isComponent && shellDeviceVisibility !== "hidden" && (
         <div className="relative flex items-center gap-0.5" style={deviceStyle}>
           <DeviceSwitch
