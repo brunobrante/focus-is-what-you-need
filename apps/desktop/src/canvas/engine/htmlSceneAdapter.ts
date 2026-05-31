@@ -544,3 +544,35 @@ function normalizeName(value: string): string {
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
 }
+
+/**
+ * Returns the absolute position of a node within the scene graph, accounting
+ * for all ancestor offsets up to (but not including) the root node.
+ * Used to find where a component sits inside its parent screen scene.
+ */
+export function getNodeAbsoluteBoundsInGraph(
+  graphJSON: string | null | undefined,
+  nodeId: string | null | undefined,
+): { x: number; y: number; width: number; height: number } | null {
+  if (!graphJSON || !nodeId) return null;
+  const doc = htmlCanvasDocumentFromJSON(graphJSON);
+  if (!doc) return null;
+
+  const nodeMap = new Map(doc.nodes.map((n) => [n.id, n]));
+  const target = nodeMap.get(nodeId);
+  if (!target) return null;
+
+  let x = target.bounds.x;
+  let y = target.bounds.y;
+  let current: typeof target = target;
+
+  while (current.parentId && current.parentId !== doc.rootId) {
+    const parent = nodeMap.get(current.parentId);
+    if (!parent) break;
+    x += parent.bounds.x;
+    y += parent.bounds.y;
+    current = parent;
+  }
+
+  return { x, y, width: target.bounds.width, height: target.bounds.height };
+}

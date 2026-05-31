@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 
 import type { SplitMode } from "@/canvas/Canvas";
@@ -9,7 +9,18 @@ import { createDraftDocument } from "@/canvas/engine/actions";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "@/canvas/engine/viewport";
+import { canvasSizeForProjectType } from "@/canvas/canvasUtils";
 import { CanvasStage } from "../stage/CanvasStage";
+
+export type ScreenOverlayAlignment = "center" | "origin";
+
+export type ScreenOverlay = {
+  width: number;
+  height: number;
+  borderRadius: number;
+  alignment: ScreenOverlayAlignment;
+  originPosition: { x: number; y: number } | null;
+};
 
 const GAP = 8;
 const TREE_WIDTH = 300;
@@ -36,6 +47,8 @@ export function CanvasRender({
   currentReady = true,
   projectType = "desktop",
   parentTarget,
+  isComponent = false,
+  componentOriginPosition = null,
   onCurrentDocumentChange,
   onActiveCanvasChange,
   onToggleExpand,
@@ -52,6 +65,8 @@ export function CanvasRender({
   currentReady?: boolean;
   projectType?: ProjectType;
   parentTarget?: CanvasParentTarget | null;
+  isComponent?: boolean;
+  componentOriginPosition?: { x: number; y: number } | null;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
   onActiveCanvasChange?: (canvas: "left" | "right") => void;
   onToggleExpand?: () => void;
@@ -104,6 +119,8 @@ export function CanvasRender({
             activeTool={activeTool}
             projectType={projectType}
             parentTarget={parentTarget}
+            isComponent={isComponent}
+            componentOriginPosition={componentOriginPosition}
             onBackToParent={onBackToParent}
           />
           <CanvasSurface
@@ -138,6 +155,8 @@ export function CanvasRender({
             activeTool={activeTool}
             projectType={projectType}
             parentTarget={parentTarget}
+            isComponent={isComponent}
+            componentOriginPosition={componentOriginPosition}
             onBackToParent={onBackToParent}
           />
           <CanvasSurface
@@ -185,6 +204,8 @@ export function CanvasRender({
               activeTool={activeTool}
               projectType={projectType}
               parentTarget={parentTarget}
+              isComponent={isComponent}
+              componentOriginPosition={componentOriginPosition}
               onBackToParent={onBackToParent}
             />
           )}
@@ -240,6 +261,8 @@ function CanvasSurface({
   publishBridge,
   projectType,
   parentTarget,
+  isComponent = false,
+  componentOriginPosition = null,
   onBackToParent,
 }: {
   active: boolean;
@@ -257,9 +280,26 @@ function CanvasSurface({
   publishBridge: boolean;
   projectType: ProjectType;
   parentTarget?: CanvasParentTarget | null;
+  isComponent?: boolean;
+  componentOriginPosition?: { x: number; y: number } | null;
   onBackToParent?: () => void;
 }) {
   const viewportSubjectKey = storageKey;
+  const [screenOverlayEnabled, setScreenOverlayEnabled] = useState(false);
+  const [screenOverlayAlignment, setScreenOverlayAlignment] = useState<ScreenOverlayAlignment>("center");
+
+  useEffect(() => {
+    setScreenOverlayEnabled(false);
+  }, [storageKey]);
+
+  const screenOverlay: ScreenOverlay | null = screenOverlayEnabled
+    ? {
+        ...canvasSizeForProjectType(projectType),
+        borderRadius: projectType === "desktop" ? 0 : 32,
+        alignment: screenOverlayAlignment,
+        originPosition: componentOriginPosition ?? null,
+      }
+    : null;
 
   return (
     <div
@@ -286,11 +326,21 @@ function CanvasSurface({
             draftMode={draftMode}
             activeTool={activeTool}
             viewportSubjectKey={viewportSubjectKey}
+            screenOverlay={screenOverlay}
           />
           {!draftMode && parentTarget ? (
             <CanvasParentBackButton parentTarget={parentTarget} onBack={onBackToParent} />
           ) : null}
-          {!expanded ? <SurfaceCanvasControls projectType={projectType} /> : null}
+          {!expanded ? (
+            <SurfaceCanvasControls
+              projectType={projectType}
+              isComponent={isComponent}
+              screenOverlayEnabled={screenOverlayEnabled}
+              screenOverlayAlignment={screenOverlayAlignment}
+              onToggleScreenOverlay={() => setScreenOverlayEnabled((v) => !v)}
+              onChangeScreenOverlayAlignment={setScreenOverlayAlignment}
+            />
+          ) : null}
         </EditorProvider>
       ) : (
         <div className="grid h-full w-full place-items-center text-[12px] text-[#777]">
@@ -360,9 +410,23 @@ function ParentComponentIcon() {
   );
 }
 
-function SurfaceCanvasControls({ projectType }: { projectType: ProjectType }) {
+function SurfaceCanvasControls({
+  projectType,
+  isComponent,
+  screenOverlayEnabled,
+  screenOverlayAlignment,
+  onToggleScreenOverlay,
+  onChangeScreenOverlayAlignment,
+}: {
+  projectType: ProjectType;
+  isComponent: boolean;
+  screenOverlayEnabled: boolean;
+  screenOverlayAlignment: ScreenOverlayAlignment;
+  onToggleScreenOverlay: () => void;
+  onChangeScreenOverlayAlignment: (a: ScreenOverlayAlignment) => void;
+}) {
   const { state, dispatch } = useEditor();
-  const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const setZoom: ZoomSetter = (next) => {
     const zoom = typeof next === "function" ? next(state.zoom) : next;
@@ -371,11 +435,30 @@ function SurfaceCanvasControls({ projectType }: { projectType: ProjectType }) {
 
   return (
     <div className="absolute bottom-3 left-3 z-[10] flex items-center gap-2">
-      <DeviceSwitch
-        enabled={deviceOverlayEnabled}
-        projectType={projectType}
-        onToggle={() => setDeviceOverlayEnabled((value) => !value)}
-      />
+      {isComponent && (
+        <div className="relative flex items-center gap-0.5">
+          <DeviceSwitch
+            enabled={screenOverlayEnabled}
+            projectType={projectType}
+            onToggle={onToggleScreenOverlay}
+          />
+          <ScreenOverlayMenuToggle
+            open={menuOpen}
+            enabled={screenOverlayEnabled}
+            onToggle={() => setMenuOpen((v) => !v)}
+          />
+          {menuOpen && (
+            <ScreenAlignmentMenu
+              alignment={screenOverlayAlignment}
+              onChange={(a) => {
+                onChangeScreenOverlayAlignment(a);
+                setMenuOpen(false);
+              }}
+              onClose={() => setMenuOpen(false)}
+            />
+          )}
+        </div>
+      )}
       <ZoomControl zoom={state.zoom} setZoom={setZoom} />
     </div>
   );
@@ -413,6 +496,146 @@ function DeviceSwitch({
     >
       <Icon size={16} strokeWidth={1.8} />
     </button>
+  );
+}
+
+function ScreenOverlayMenuToggle({
+  open,
+  enabled,
+  onToggle,
+}: {
+  open: boolean;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Opções de posição da tela"
+      aria-expanded={open}
+      onClick={onToggle}
+      className={[
+        "grid h-[34px] w-[22px] place-items-center rounded-lg border transition-colors duration-[100ms]",
+        open || enabled
+          ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
+          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#666] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
+      ].join(" ")}
+      style={{
+        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)",
+      }}
+    >
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 10 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms" }}
+      >
+        <path d="M2 6.5l3-3 3 3" />
+      </svg>
+    </button>
+  );
+}
+
+function ScreenAlignmentMenu({
+  alignment,
+  onChange,
+  onClose,
+}: {
+  alignment: ScreenOverlayAlignment;
+  onChange: (a: ScreenOverlayAlignment) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute bottom-[calc(100%+6px)] left-0 flex gap-1 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-1"
+      style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset" }}
+    >
+      <AlignmentOption
+        active={alignment === "center"}
+        label="Centralizado"
+        onClick={() => onChange("center")}
+        icon={<CenterAlignIcon />}
+      />
+      <AlignmentOption
+        active={alignment === "origin"}
+        label="Local original"
+        onClick={() => onChange("origin")}
+        icon={<OriginAlignIcon />}
+      />
+    </div>
+  );
+}
+
+function AlignmentOption({
+  active,
+  label,
+  onClick,
+  icon,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        onClick={onClick}
+        className={[
+          "grid h-[34px] w-[34px] place-items-center rounded-md border transition-colors duration-[100ms]",
+          active
+            ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
+            : "border-transparent text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
+        ].join(" ")}
+      >
+        {icon}
+      </button>
+      <div
+        className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-[#333] bg-[#1E1E1E] px-2 py-1 text-[10px] font-medium leading-none text-[#CFCFCF] opacity-0 transition-opacity duration-100 group-hover:opacity-100"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function CenterAlignIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="1" y="1" width="16" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="5.5" y="5.5" width="7" height="7" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function OriginAlignIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="1" y="1" width="16" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="2.5" y="2.5" width="13" height="4" rx="0.8" fill="currentColor" />
+    </svg>
   );
 }
 

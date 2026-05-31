@@ -8,9 +8,10 @@ import { SearchPalette, SearchToggle } from "@/canvas/shell/SearchPalette";
 import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { moveElementBefore, setElementLocked, setElementVisible, wrapElements } from "@/canvas/engine/actions";
-import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
+import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasToolId } from "@/canvas/tools";
 import { CanvasTabs } from "./CanvasTabs";
+import { useScene } from "@/lib/storage/hooks";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
 import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
@@ -90,6 +91,22 @@ function CanvasPageContent() {
   });
   const editorCanvasActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
   const getEditor = useEditorBridgeReader();
+
+  const parentSceneOwner = useMemo(() => {
+    if (!component) return null;
+    if (component.parentVariantId) return { ownerType: "variant" as const, ownerId: component.parentVariantId };
+    if (component.screenId) return { ownerType: "screen" as const, ownerId: component.screenId };
+    return null;
+  }, [component?.parentVariantId, component?.screenId]);
+
+  const { data: parentScene } = useScene(parentSceneOwner?.ownerType ?? null, parentSceneOwner?.ownerId ?? null);
+
+  const componentOriginPosition = useMemo(() => {
+    if (!component?.sourceNodeId) return null;
+    const bounds = getNodeAbsoluteBoundsInGraph(parentScene?.graphJSON, component.sourceNodeId);
+    if (!bounds) return null;
+    return { x: bounds.x, y: bounds.y };
+  }, [component?.sourceNodeId, parentScene?.graphJSON]);
 
   const currentOwnerKey = sceneOwner
     ? `${sceneOwner.ownerType}:${sceneOwner.ownerId}`
@@ -252,6 +269,8 @@ function CanvasPageContent() {
         currentReady={currentReady}
         projectType={projectType}
         parentTarget={parentProjectNode}
+        isComponent={!!component}
+        componentOriginPosition={componentOriginPosition}
         onCurrentDocumentChange={handleCurrentDocumentChange}
         onActiveCanvasChange={(canvas) => changeCanvasTab(canvas === "right" ? "drafts" : "current")}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}

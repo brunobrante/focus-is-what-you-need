@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
 import { useEditor, useHoverStore } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import {
@@ -34,10 +35,12 @@ export function CanvasStage({
   draftMode = false,
   activeTool,
   viewportSubjectKey,
+  screenOverlay,
 }: {
   draftMode?: boolean;
   activeTool?: string;
   viewportSubjectKey?: string;
+  screenOverlay?: ScreenOverlay | null;
 }) {
   const { state, dispatch } = useEditor();
   const hoverStore = useHoverStore();
@@ -58,12 +61,38 @@ export function CanvasStage({
   const previousRenderDocumentRef = useRef<CanvasDocument | null>(null);
   const viewportInitializedSubjectRef = useRef<string | null>(null);
   const commandModeRef = useRef(false);
+  const originPanRef = useRef<{ x: number; y: number } | null>(null);
   const [interactionActive, setInteractionActive] = useState(false);
 
   useEffect(() => {
     latestStateRef.current = state;
     latestDocumentRef.current = state.document;
   }, [state]);
+
+  useEffect(() => {
+    const alignment = screenOverlay?.alignment;
+    const origin = screenOverlay?.originPosition;
+
+    if (alignment === "origin" && origin) {
+      const { offsetX, offsetY } = latestStateRef.current;
+      originPanRef.current = { x: origin.x, y: origin.y };
+      dispatch({
+        type: "setViewport",
+        offsetX: offsetX + origin.x * displayZoom,
+        offsetY: offsetY + origin.y * displayZoom,
+      });
+    } else if (originPanRef.current) {
+      const { x, y } = originPanRef.current;
+      const { offsetX, offsetY } = latestStateRef.current;
+      originPanRef.current = null;
+      dispatch({
+        type: "setViewport",
+        offsetX: offsetX - x * displayZoom,
+        offsetY: offsetY - y * displayZoom,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screenOverlay?.alignment]);
 
   useLayoutEffect(() => {
     previousRenderDocumentRef.current = state.document;
@@ -286,6 +315,18 @@ export function CanvasStage({
         className={`stage-space${draftMode ? " stage-space--draft" : ""}`}
         style={stageSpaceStyle}
       >
+        {!draftMode && screenOverlay ? (
+          <ScreenBoundsOverlay
+            screenWidth={screenOverlay.width}
+            screenHeight={screenOverlay.height}
+            borderRadius={screenOverlay.borderRadius}
+            alignment={screenOverlay.alignment}
+            originPosition={screenOverlay.originPosition}
+            canvasWidth={stageWidth}
+            canvasHeight={stageHeight}
+            renderScale={renderScale}
+          />
+        ) : null}
         {draftMode ? (
           <RenderedScene
             draftMode
@@ -379,5 +420,49 @@ export function CanvasStage({
 
       {contextMenu && <CanvasContextMenu menu={contextMenu} onClose={closeContextMenu} />}
     </div>
+  );
+}
+
+function ScreenBoundsOverlay({
+  screenWidth,
+  screenHeight,
+  borderRadius,
+  alignment,
+  originPosition,
+  canvasWidth,
+  canvasHeight,
+  renderScale,
+}: {
+  screenWidth: number;
+  screenHeight: number;
+  borderRadius: number;
+  alignment: "center" | "origin";
+  originPosition: { x: number; y: number } | null;
+  canvasWidth: number;
+  canvasHeight: number;
+  renderScale: number;
+}) {
+  const left = alignment === "center"
+    ? ((canvasWidth - screenWidth) / 2) * renderScale
+    : -(originPosition?.x ?? 0) * renderScale;
+  const top = alignment === "center"
+    ? ((canvasHeight - screenHeight) / 2) * renderScale
+    : -(originPosition?.y ?? 0) * renderScale;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left,
+        top,
+        width: screenWidth * renderScale,
+        height: screenHeight * renderScale,
+        borderRadius: borderRadius * renderScale,
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        pointerEvents: "none",
+        boxSizing: "border-box",
+      }}
+    />
   );
 }
