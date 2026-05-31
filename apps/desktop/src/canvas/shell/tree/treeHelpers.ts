@@ -104,7 +104,12 @@ export function visibleNodeIds(root: Node, openSet: Set<string>): string[] {
 export function nodeTypeFromElement(type: ElementType, hasChildren: boolean): NodeType {
   if (type === "text") return "text";
   if (type === "image") return "image";
-  return hasChildren ? "component" : "frame";
+  if (type === "ellipse") return "ellipse";
+  if (type === "line") return "line";
+  if (type === "arrow") return "arrow";
+  if (type === "polygon") return "polygon";
+  if (type === "star") return "star";
+  return hasChildren ? "component" : "rect";
 }
 
 export function treeFromCanvasDocument(

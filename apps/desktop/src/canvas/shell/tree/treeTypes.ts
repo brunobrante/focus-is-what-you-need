@@ -1,4 +1,4 @@
-export type NodeType = "frame" | "component" | "text" | "image" | "ellipse" | "line" | "pen";
+export type NodeType = "frame" | "component" | "rect" | "text" | "image" | "ellipse" | "line" | "arrow" | "polygon" | "star" | "pen";
 
 export type Node = {
   id: string;

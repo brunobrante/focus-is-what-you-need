@@ -31,6 +31,12 @@ export function TypeIcon({ type, hasChildren }: { type: NodeType; hasChildren?: 
           <rect x="3" y="3" width="18" height="18" rx="2" />
         </svg>
       );
+    case "rect":
+      return (
+        <svg {...common}>
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+        </svg>
+      );
     case "text":
       return (
         <svg {...common}>
@@ -50,7 +56,7 @@ export function TypeIcon({ type, hasChildren }: { type: NodeType; hasChildren?: 
     case "ellipse":
       return (
         <svg {...common}>
-          <ellipse cx="12" cy="12" rx="9" ry="6" />
+          <circle cx="12" cy="12" r="9" />
         </svg>
       );
     case "line":
@@ -58,6 +64,24 @@ export function TypeIcon({ type, hasChildren }: { type: NodeType; hasChildren?: 
         <svg {...common}>
           <line x1="5" y1="19" x2="19" y2="5" />
           <path d="M14 5h5v5" />
+        </svg>
+      );
+    case "arrow":
+      return (
+        <svg {...common}>
+          <path d="M3 12H21M14 5L21 12L14 19" />
+        </svg>
+      );
+    case "polygon":
+      return (
+        <svg {...common}>
+          <polygon points="12 3 21 8.5 17.5 21 6.5 21 3 8.5" />
+        </svg>
+      );
+    case "star":
+      return (
+        <svg {...common}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       );
     case "pen":
