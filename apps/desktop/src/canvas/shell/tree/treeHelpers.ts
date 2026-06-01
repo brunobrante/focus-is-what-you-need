@@ -64,6 +64,25 @@ export function findNode(node: Node, id: string): Node | null {
   return null;
 }
 
+export function ancestorIdsForNodeIds(root: Node, nodeIds: readonly string[]): Set<string> {
+  const targets = new Set(nodeIds);
+  const ancestors = new Set<string>();
+
+  const walk = (node: Node): boolean => {
+    let containsTarget = targets.has(node.id);
+    for (const child of node.children ?? []) {
+      if (walk(child)) {
+        containsTarget = true;
+        if (node.id !== root.id) ancestors.add(node.id);
+      }
+    }
+    return containsTarget;
+  };
+
+  walk(root);
+  return ancestors;
+}
+
 export function nodeTypeLabel(node: Node): string {
   switch (node.type) {
     case "text":    return "text";

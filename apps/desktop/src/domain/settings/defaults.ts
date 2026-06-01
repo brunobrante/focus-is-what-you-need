@@ -165,6 +165,9 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
     shell: {
       background: "#171717",
       grid: { enabled: false, type: "dots" },
+      tree: {
+        autoRevealSelection: true,
+      },
     },
   },
 };

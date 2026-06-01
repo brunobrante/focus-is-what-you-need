@@ -32,6 +32,15 @@ import {
 
 export type { SplitMode } from "./canvasUtils";
 
+function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
 export function CanvasPage() {
   return (
     <EditorBridgeProvider>
@@ -94,11 +103,10 @@ function CanvasPageContent() {
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
-  const selectedNodeId = useEditorBridge((v) => {
-    if (!v) return null;
-    if (v.state.canvasStageActive) return null;
-    return v.state.selectedIds[0] ?? null;
-  });
+  const selectedNodeIds = useEditorBridge((v) => {
+    if (!v || v.state.canvasStageActive) return [];
+    return v.state.selectedIds;
+  }, stringArraysEqual);
   const editorCanvasActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
   const getEditor = useEditorBridgeReader();
 
@@ -346,7 +354,8 @@ function CanvasPageContent() {
         onClose={() => setTreeOpen(false)}
         componentName={componentName || undefined}
         screenName={screenTitle || undefined}
-        selectedNodeId={selectedNodeId}
+        selectedNodeIds={selectedNodeIds}
+        autoRevealSelection={settings.canvas.shell.tree.autoRevealSelection}
         canvasActive={editorCanvasActive}
         onSelectNode={(nodeId) => { getEditor()?.dispatch({ type: "setSelected", selectedIds: [nodeId] }); }}
         onReorderNode={(activeNodeId, overNodeId) => {

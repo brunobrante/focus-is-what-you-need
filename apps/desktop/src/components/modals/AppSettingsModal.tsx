@@ -22,7 +22,7 @@ import {
   pickFolderDialog,
 } from "@/lib/tauri/workspace";
 
-type AppSettingsTab = "shortcuts" | "storage";
+type AppSettingsTab = "canvas" | "shortcuts" | "storage";
 
 type RecordingCommand = {
   id: CanvasCommandId;
@@ -80,7 +80,7 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
     <Modal open={open} onClose={onClose} size="wide" ariaLabel="Settings">
       <ModalHeader
         title="Settings"
-        subtitle="Manage keyboard shortcuts and project save location."
+        subtitle="Manage canvas behavior, keyboard shortcuts, and project save location."
         onClose={onClose}
       />
       <ModalBody className="!p-0 flex flex-col">
@@ -88,6 +88,7 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
           <div className="flex gap-1 pt-3">
             {(
               [
+                { id: "canvas", label: "Canvas" },
                 { id: "shortcuts", label: "Keyboard shortcuts" },
                 { id: "storage", label: "Save location" },
               ] as { id: AppSettingsTab; label: string }[]
@@ -116,7 +117,9 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {tab === "shortcuts" ? (
+          {tab === "canvas" ? (
+            <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
+          ) : tab === "shortcuts" ? (
             <ShortcutsTab
               settings={settingsDraft}
               recordingCommand={recordingCommand}
@@ -149,6 +152,43 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
         </div>
       </ModalBody>
     </Modal>
+  );
+}
+
+function CanvasTab({
+  settings,
+  onSettingsChange,
+}: {
+  settings: GlobalSettings;
+  onSettingsChange: (settings: GlobalSettings) => void;
+}) {
+  const autoRevealSelection = settings.canvas.shell.tree.autoRevealSelection;
+
+  return (
+    <div className="px-[22px] py-5 grid gap-6">
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+          Layers tree
+        </div>
+        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
+          <div className="flex items-center justify-between gap-5 px-4 py-3">
+            <div>
+              <div className="text-[13px] text-[var(--text)]">Reveal selected layers</div>
+              <p className="m-0 mt-1 max-w-[520px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                Expand parent rows and scroll the tree to the selected canvas element.
+              </p>
+            </div>
+            <Switch
+              checked={autoRevealSelection}
+              ariaLabel="Reveal selected layers"
+              onChange={(checked) =>
+                onSettingsChange(updateTreeAutoRevealSelection(settings, checked))
+              }
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -253,6 +293,25 @@ function ShortcutsTab({
   );
 }
 
+function updateTreeAutoRevealSelection(
+  settings: GlobalSettings,
+  autoRevealSelection: boolean,
+): GlobalSettings {
+  return {
+    ...settings,
+    canvas: {
+      ...settings.canvas,
+      shell: {
+        ...settings.canvas.shell,
+        tree: {
+          ...settings.canvas.shell.tree,
+          autoRevealSelection,
+        },
+      },
+    },
+  };
+}
+
 function updateKeyCommand(
   settings: GlobalSettings,
   commandId: CanvasKeyCommandId,
@@ -316,6 +375,41 @@ function KeyBadge({ children }: { children: React.ReactNode }) {
     <span className="inline-flex min-w-[26px] items-center justify-center rounded-[6px] border border-[var(--border-strong)] bg-[var(--surface)] px-1.5 py-0.5 text-[12px] font-medium text-[var(--text-muted)] shadow-[0_1px_0_rgba(0,0,0,0.4)]">
       {children}
     </span>
+  );
+}
+
+function Switch({
+  checked,
+  ariaLabel,
+  onChange,
+}: {
+  checked: boolean;
+  ariaLabel: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex shrink-0 cursor-pointer items-center">
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        aria-label={ariaLabel}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span
+        className={[
+          "relative h-6 w-11 rounded-full border transition-colors",
+          checked
+            ? "border-[#5b6cff] bg-[#5b6cff]"
+            : "border-[var(--border-strong)] bg-[var(--surface)]",
+        ].join(" ")}
+      >
+        <span
+          className="absolute top-1/2 h-[18px] w-[18px] rounded-full bg-white transition-transform"
+          style={{ transform: `translate(${checked ? 21 : 3}px, -50%)` }}
+        />
+      </span>
+    </label>
   );
 }
 

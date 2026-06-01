@@ -31,8 +31,10 @@ import type { CanvasDocument } from "@/canvas/engine/types";
 
 import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
 import {
+  ancestorIdsForNodeIds,
   countNodes,
   documentTreeShapeEqual,
+  findNode,
   initiallyOpen,
   structureKey,
   treeFromCanvasDocument,
@@ -57,6 +59,23 @@ type TreeContextMenuItem =
 
 const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 const modLabel = isMac ? "⌘" : "Ctrl+";
+
+function escapeCssAttributeValue(value: string): string {
+  const css = globalThis.CSS as { escape?: (input: string) => string } | undefined;
+  if (css?.escape) return css.escape(value);
+  return value.replace(/["\\\u0000-\u001F\u007F]/g, (character) => {
+    if (character === "\"") return "\\\"";
+    if (character === "\\") return "\\\\";
+    return `\\${character.charCodeAt(0).toString(16)} `;
+  });
+}
+
+function scrollTreeNodeIntoView(container: HTMLDivElement | null, nodeId: string): void {
+  const row = container?.querySelector<HTMLElement>(
+    `[data-tree-node-id="${escapeCssAttributeValue(nodeId)}"]`,
+  );
+  row?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
 
 function isCanvasDocument(value: unknown): value is CanvasDocument {
   const maybe = value as CanvasDocument;
@@ -88,6 +107,8 @@ type Props = {
   screenName?: string;
   document?: CanvasDocument | null;
   selectedNodeId?: string | null;
+  selectedNodeIds?: readonly string[];
+  autoRevealSelection?: boolean;
   canvasActive?: boolean;
   onSelectNode?: (nodeId: string) => void;
   onReorderNode?: (activeNodeId: string, overNodeId: string) => void;
@@ -111,6 +132,8 @@ export function Tree({
   screenName,
   document: documentProp,
   selectedNodeId,
+  selectedNodeIds,
+  autoRevealSelection = true,
   canvasActive = false,
   onSelectNode,
   onReorderNode,
@@ -163,11 +186,24 @@ export function Tree({
   const totalCount = useMemo(() => countNodes(tree.root), [tree]);
   const draftsCount = useMemo(() => countNodes(draftsTree.root), [draftsTree]);
   const pickerTree = projectTree ?? [];
-  const selectedId = selectedNodeId ?? localSelectedId;
+  const selectedIds =
+    selectedNodeIds ??
+    (selectedNodeId != null
+      ? [selectedNodeId]
+      : localSelectedId
+        ? [localSelectedId]
+        : []);
+  const selectedIdsKey = JSON.stringify(selectedIds);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIdsKey]);
+  const draftsSelectedIds = useMemo(
+    () => new Set(draftsSelectedId ? [draftsSelectedId] : []),
+    [draftsSelectedId],
+  );
   const visibleLayerIds = useMemo(
     () => visibleNodeIds(tree.root, openSet),
     [openSet, tree.root],
   );
+  const layerTreeRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
@@ -178,6 +214,40 @@ export function Tree({
   useEffect(() => {
     setOpenSet(initiallyOpen(tree.root));
   }, [tree.root.id, treeStructureKey]);
+
+  useEffect(() => {
+    if (!autoRevealSelection || activeTab !== "layers" || selectedIds.length === 0) return;
+
+    const revealTargetId = selectedIds.find((id) => findNode(tree.root, id));
+    if (!revealTargetId) return;
+
+    const ancestorIds = ancestorIdsForNodeIds(tree.root, selectedIds);
+    if (ancestorIds.size > 0) {
+      setOpenSet((current) => {
+        const next = new Set(current);
+        let changed = false;
+        for (const id of ancestorIds) {
+          if (!next.has(id)) {
+            next.add(id);
+            changed = true;
+          }
+        }
+        return changed ? next : current;
+      });
+    }
+
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        scrollTreeNodeIntoView(layerTreeRef.current, revealTargetId);
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [activeTab, autoRevealSelection, selectedIdsKey, tree.root, treeStructureKey]);
 
   useEffect(() => {
     setDraftsOpenSet(initiallyOpen(draftsTree.root));
@@ -322,7 +392,7 @@ export function Tree({
               items={visibleLayerIds}
               strategy={verticalListSortingStrategy}
             >
-              <div role="tree" className="flex-1 overflow-y-auto pb-3 pt-1">
+              <div ref={layerTreeRef} role="tree" className="flex-1 overflow-y-auto pb-3 pt-1">
                 {(tree.root.children || []).map((c) => (
                   <TreeRow
                     key={c.id}
@@ -330,7 +400,7 @@ export function Tree({
                     depth={0}
                     openSet={openSet}
                     setOpenSet={setOpenSet}
-                    selectedId={selectedId}
+                    selectedIds={selectedIdSet}
                     setSelectedId={selectLayer}
                     sortable={Boolean(onReorderNode)}
                     onToggleVisible={onToggleVisible}
@@ -338,7 +408,6 @@ export function Tree({
                     canOpenNodeCanvas={canOpenNodeCanvas}
                     onOpenNodeCanvas={onOpenNodeCanvas}
                     onContextMenuNode={(nodeId, x, y) => {
-                      selectLayer(nodeId);
                       setContextMenu({ x, y, targetId: nodeId });
                     }}
                   />
@@ -357,10 +426,9 @@ export function Tree({
                 depth={0}
                 openSet={draftsOpenSet}
                 setOpenSet={setDraftsOpenSet}
-                selectedId={draftsSelectedId}
+                selectedIds={draftsSelectedIds}
                 setSelectedId={setDraftsSelectedId}
                 onContextMenuNode={(nodeId, x, y) => {
-                  setDraftsSelectedId(nodeId);
                   setContextMenu({ x, y, targetId: nodeId });
                 }}
               />

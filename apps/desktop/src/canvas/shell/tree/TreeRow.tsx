@@ -8,7 +8,7 @@ export function TreeRow({
   depth,
   openSet,
   setOpenSet,
-  selectedId,
+  selectedIds,
   setSelectedId,
   sortable = false,
   onToggleVisible,
@@ -21,7 +21,7 @@ export function TreeRow({
   depth: number;
   openSet: Set<string>;
   setOpenSet: (s: Set<string>) => void;
-  selectedId: string | null;
+  selectedIds: ReadonlySet<string>;
   setSelectedId: (id: string | null) => void;
   sortable?: boolean;
   onToggleVisible?: (nodeId: string, visible: boolean) => void;
@@ -40,7 +40,7 @@ export function TreeRow({
   } = useSortable({ id: node.id, disabled: !sortable });
   const hasChildren = (node.children || []).length > 0;
   const isOpen = openSet.has(node.id);
-  const isSelected = selectedId === node.id;
+  const isSelected = selectedIds.has(node.id);
   const visible = node.visible !== false;
   const locked = node.locked === true;
   const canOpenCanvas = Boolean(onOpenNodeCanvas && (canOpenNodeCanvas?.(node.id) ?? false));
@@ -51,6 +51,7 @@ export function TreeRow({
     <>
       <div
         ref={setNodeRef}
+        data-tree-node-id={node.id}
         {...(sortable ? attributes : {})}
         {...(sortable ? listeners : {})}
         role="treeitem"
@@ -63,7 +64,7 @@ export function TreeRow({
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setSelectedId(node.id);
+          if (!isSelected) setSelectedId(node.id);
           onContextMenuNode?.(node.id, e.clientX, e.clientY);
         }}
         onMouseEnter={(e) => {
@@ -210,7 +211,7 @@ export function TreeRow({
               depth={depth + 1}
               openSet={openSet}
               setOpenSet={setOpenSet}
-              selectedId={selectedId}
+              selectedIds={selectedIds}
               setSelectedId={setSelectedId}
               sortable={sortable}
               onToggleVisible={onToggleVisible}

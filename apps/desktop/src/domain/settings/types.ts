@@ -108,6 +108,9 @@ export type CanvasViewportSettings = {
 export type CanvasShellSettings = {
   background: string;
   grid: { enabled: boolean; type: ShellGridType };
+  tree: {
+    autoRevealSelection: boolean;
+  };
 };
 
 export type CanvasSettings = {
