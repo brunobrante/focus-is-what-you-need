@@ -161,10 +161,22 @@ function DropdownToolButton({
   const [menuOpen, setMenuOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const [hoveredBadgeId, setHoveredBadgeId] = useState<string | null>(null);
+  const [selectedToolId, setSelectedToolId] = useState<CanvasToolId | null>(tools[0]?.id ?? null);
   const ref = useRef<HTMLDivElement>(null);
 
   const isGroupActive = tools.some((t) => t.id === active);
-  const current = isGroupActive ? tools.find((t) => t.id === active)! : tools[0];
+  const current =
+    tools.find((t) => t.id === (isGroupActive ? active : selectedToolId)) ??
+    tools[0];
+
+  useEffect(() => {
+    if (isGroupActive) setSelectedToolId(active);
+  }, [active, isGroupActive]);
+
+  useEffect(() => {
+    if (selectedToolId && tools.some((tool) => tool.id === selectedToolId)) return;
+    setSelectedToolId(tools[0]?.id ?? null);
+  }, [selectedToolId, tools]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -185,7 +197,10 @@ function DropdownToolButton({
         type="button"
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        onClick={() => onSelect(current.id)}
+        onClick={() => {
+          setSelectedToolId(current.id);
+          onSelect(current.id);
+        }}
         aria-label={current.name}
         className={[
           "relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border-0 p-0 transition-colors duration-[90ms]",
@@ -226,22 +241,26 @@ function DropdownToolButton({
           }}
         >
           {tools.map((tool) => {
-            const isActive = active === tool.id;
+            const isSelected = current.id === tool.id;
             const badgeLit = hoveredBadgeId === tool.id;
             return (
               <div
                 key={tool.id}
                 className={[
                   "flex w-full items-center rounded-md transition-colors duration-[90ms]",
-                  isActive ? "bg-[#383838]" : "hover:bg-[#2A2A2A]",
+                  isSelected ? "bg-[#383838]" : "hover:bg-[#2A2A2A]",
                 ].join(" ")}
               >
                 <button
                   type="button"
-                  onClick={() => { onSelect(tool.id); setMenuOpen(false); }}
+                  onClick={() => {
+                    setSelectedToolId(tool.id);
+                    onSelect(tool.id);
+                    setMenuOpen(false);
+                  }}
                   className={[
                     "flex flex-1 items-center gap-2.5 border-0 bg-transparent px-2 py-1.5 text-left text-[12px] font-medium",
-                    isActive ? "text-white" : "text-[#CFCFCF]",
+                    isSelected ? "text-white" : "text-[#CFCFCF]",
                   ].join(" ")}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center">
