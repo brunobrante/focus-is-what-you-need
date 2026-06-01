@@ -41,6 +41,9 @@ export function CanvasStage({
   screenOverlay,
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
+  onOpenSelectedComponentShortcut,
+  onBackToParentShortcut,
+  onToggleScreenOverlayShortcut,
 }: {
   draftMode?: boolean;
   activeTool?: string;
@@ -48,6 +51,9 @@ export function CanvasStage({
   screenOverlay?: ScreenOverlay | null;
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+  onOpenSelectedComponentShortcut?: () => boolean | void;
+  onBackToParentShortcut?: () => boolean | void;
+  onToggleScreenOverlayShortcut?: () => boolean | void;
 }) {
   const { state, dispatch } = useEditor();
   const hoverStore = useHoverStore();
@@ -137,6 +143,9 @@ export function CanvasStage({
     setInteractionActive,
     settings,
     onCanvasToolShortcut,
+    onOpenSelectedComponentShortcut,
+    onBackToParentShortcut,
+    onToggleScreenOverlayShortcut,
   });
 
   const { onWheel } = useViewportControls({

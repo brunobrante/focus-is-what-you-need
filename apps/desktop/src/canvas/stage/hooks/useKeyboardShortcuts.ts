@@ -22,6 +22,9 @@ type Params = {
   setInteractionActive: (active: boolean) => void;
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+  onOpenSelectedComponentShortcut?: () => boolean | void;
+  onBackToParentShortcut?: () => boolean | void;
+  onToggleScreenOverlayShortcut?: () => boolean | void;
 };
 
 export function useKeyboardShortcuts({
@@ -32,6 +35,9 @@ export function useKeyboardShortcuts({
   setInteractionActive,
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
+  onOpenSelectedComponentShortcut,
+  onBackToParentShortcut,
+  onToggleScreenOverlayShortcut,
 }: Params): { spacePressedRef: MutableRefObject<boolean> } {
   const spacePressedRef = useRef(false);
 
@@ -97,6 +103,29 @@ export function useKeyboardShortcuts({
         dispatch({ type: "commitDocument", document: deleteElements(currentState.document, currentState.selectedIds), selectedIds: [] });
         return;
       }
+      if (matchesKeyCommand(event, settings, "canvas.component.openSelection")) {
+        const handled =
+          currentState.selectedIds.length === 1 &&
+          onOpenSelectedComponentShortcut?.() === true;
+        if (handled) {
+          event.preventDefault();
+          return;
+        }
+      }
+      if (matchesKeyCommand(event, settings, "canvas.component.backToParent")) {
+        const handled = onBackToParentShortcut?.() === true;
+        if (handled) {
+          event.preventDefault();
+          return;
+        }
+      }
+      if (matchesKeyCommand(event, settings, "canvas.overlay.toggleScreen")) {
+        const handled = onToggleScreenOverlayShortcut?.() === true;
+        if (handled) {
+          event.preventDefault();
+          return;
+        }
+      }
 
       for (const [commandId, tool] of toolCommands) {
         if (matchesKeyCommand(event, settings, commandId)) {
@@ -127,7 +156,18 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", onKeyUp);
       spacePressedRef.current = false;
     };
-  }, [dispatch, interactionRef, latestStateRef, onCanvasToolShortcut, setInteractionActive, settings, viewportRef]);
+  }, [
+    dispatch,
+    interactionRef,
+    latestStateRef,
+    onBackToParentShortcut,
+    onCanvasToolShortcut,
+    onOpenSelectedComponentShortcut,
+    onToggleScreenOverlayShortcut,
+    setInteractionActive,
+    settings,
+    viewportRef,
+  ]);
 
   return { spacePressedRef };
 }

@@ -22,6 +22,9 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
     { key: "Backspace" },
   ],
   "canvas.selection.cancel": [{ key: "Escape" }],
+  "canvas.component.openSelection": [{ key: "1" }],
+  "canvas.component.backToParent": [{ key: "2" }],
+  "canvas.overlay.toggleScreen": [{ key: "3" }],
   "canvas.viewport.zoomIn": [
     { mod: true, key: "=" },
     { mod: true, key: "+" },

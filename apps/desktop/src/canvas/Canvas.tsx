@@ -250,6 +250,14 @@ function CanvasPageContent() {
     [getEditor],
   );
 
+  const openSelectedComponentInCanvas = useCallback((): boolean => {
+    const editor = getEditor();
+    const selectedId = editor?.state.selectedIds.length === 1 ? editor.state.selectedIds[0] : null;
+    if (!selectedId || editor?.sourceId !== "current" || !canOpenCanvasNode(selectedId)) return false;
+    openCanvasForNode(selectedId);
+    return true;
+  }, [canOpenCanvasNode, getEditor, openCanvasForNode]);
+
   useEffect(() => {
     if (!editorTool) return;
     if (editorTool === "select") {
@@ -306,6 +314,7 @@ function CanvasPageContent() {
         onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
         settings={settings}
         onCanvasToolShortcut={handleToolChange}
+        onOpenSelectedComponentShortcut={openSelectedComponentInCanvas}
       />
 
       <div className="fixed left-1/2 top-3 z-[5] -translate-x-1/2">

@@ -69,6 +69,7 @@ export function CanvasRender({
   onBackToParent,
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
+  onOpenSelectedComponentShortcut,
 }: {
   treeOpen: boolean;
   inspectorOpen: boolean;
@@ -93,6 +94,7 @@ export function CanvasRender({
   onBackToParent?: () => void;
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+  onOpenSelectedComponentShortcut?: () => boolean | void;
 }) {
   const activeCanvas = split !== "none" && activeTab === "drafts" ? "right" : "left";
 
@@ -146,6 +148,7 @@ export function CanvasRender({
             onBackToParent={onBackToParent}
             settings={settings}
             onCanvasToolShortcut={onCanvasToolShortcut}
+            onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
           />
           <CanvasSurface
             active={activeCanvas === "right"}
@@ -161,6 +164,7 @@ export function CanvasRender({
             projectType={projectType}
             settings={settings}
             onCanvasToolShortcut={onCanvasToolShortcut}
+            onOpenSelectedComponentShortcut={undefined}
           />
         </div>
       ) : split === "horizontal" ? (
@@ -189,6 +193,7 @@ export function CanvasRender({
             onBackToParent={onBackToParent}
             settings={settings}
             onCanvasToolShortcut={onCanvasToolShortcut}
+            onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
           />
           <CanvasSurface
             active={activeCanvas === "right"}
@@ -204,6 +209,7 @@ export function CanvasRender({
             projectType={projectType}
             settings={settings}
             onCanvasToolShortcut={onCanvasToolShortcut}
+            onOpenSelectedComponentShortcut={undefined}
           />
         </div>
       ) : (
@@ -222,6 +228,7 @@ export function CanvasRender({
               projectType={projectType}
               settings={settings}
               onCanvasToolShortcut={onCanvasToolShortcut}
+              onOpenSelectedComponentShortcut={undefined}
             />
           ) : (
             <CanvasSurface
@@ -247,6 +254,7 @@ export function CanvasRender({
               onBackToParent={onBackToParent}
               settings={settings}
               onCanvasToolShortcut={onCanvasToolShortcut}
+              onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
             />
           )}
         </div>
@@ -332,6 +340,7 @@ function CanvasSurface({
   onBackToParent,
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
+  onOpenSelectedComponentShortcut,
 }: {
   active: boolean;
   showActiveBorder: boolean;
@@ -356,6 +365,7 @@ function CanvasSurface({
   onBackToParent?: () => void;
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+  onOpenSelectedComponentShortcut?: () => boolean | void;
 }) {
   const viewportSubjectKey = storageKey;
   const [screenOverlayEnabled, setScreenOverlayEnabled] = useState(false);
@@ -373,6 +383,22 @@ function CanvasSurface({
         originPosition: componentOriginPosition ?? null,
       }
     : null;
+  const shortcutEnabled = active && !draftMode;
+  const openSelectedComponentShortcut = shortcutEnabled ? onOpenSelectedComponentShortcut : undefined;
+  const backToParentShortcut =
+    shortcutEnabled && parentTarget && onBackToParent
+      ? () => {
+          onBackToParent();
+          return true;
+        }
+      : undefined;
+  const toggleScreenOverlayShortcut =
+    shortcutEnabled && isComponent
+      ? () => {
+          setScreenOverlayEnabled((enabled) => !enabled);
+          return true;
+        }
+      : undefined;
 
   return (
     <div
@@ -402,6 +428,9 @@ function CanvasSurface({
             screenOverlay={screenOverlay}
             settings={settings}
             onCanvasToolShortcut={onCanvasToolShortcut}
+            onOpenSelectedComponentShortcut={openSelectedComponentShortcut}
+            onBackToParentShortcut={backToParentShortcut}
+            onToggleScreenOverlayShortcut={toggleScreenOverlayShortcut}
           />
           {!draftMode && parentTarget && shellBackVisibility !== "hidden" ? (
             <CanvasParentBackButton

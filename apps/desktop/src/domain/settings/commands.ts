@@ -59,6 +59,9 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.selection.duplicate", label: "Duplicate", group: "Canvas", type: "key" },
       { id: "canvas.selection.delete", label: "Delete selection", group: "Canvas", type: "key" },
       { id: "canvas.selection.cancel", label: "Cancel or select tool", group: "Canvas", type: "key" },
+      { id: "canvas.component.openSelection", label: "Open selected component", group: "Canvas", type: "key" },
+      { id: "canvas.component.backToParent", label: "Back to parent component", group: "Canvas", type: "key" },
+      { id: "canvas.overlay.toggleScreen", label: "Toggle screen overlay", group: "Canvas", type: "key" },
     ],
   },
   {
