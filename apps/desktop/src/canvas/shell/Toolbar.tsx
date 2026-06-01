@@ -117,10 +117,7 @@ export function Toolbar({
         })}
       </div>
       {actionsMenuOpen && (
-        <div
-          className="absolute bottom-[calc(100%+5px)] left-1/2 z-50 h-[220px] w-[380px] -translate-x-1/2 rounded-[10px] border border-[#2C2C2C] bg-[#1E1E1E] p-2"
-          style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3)" }}
-        />
+        <ActionsPanel />
       )}
 
       {canvasExpanded && (
@@ -366,6 +363,130 @@ function ActionsMenuButton({
           <ToolTooltip tool={tool} />
         )}
       </button>
+    </div>
+  );
+}
+
+function ActionsPanel() {
+  const [activeTab, setActiveTab] = useState<"all" | "assets" | "plugins">("all");
+  const [searchValue, setSearchValue] = useState("");
+  const [aiMode, setAiMode] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const tabs = [
+    { id: "all" as const, label: "All" },
+    { id: "assets" as const, label: "Assets" },
+    { id: "plugins" as const, label: "Plugins & widgets" },
+  ];
+  const items = [
+    { title: "Make an image" },
+    { title: "Send Coupon to Figma Make" },
+    { title: "Replace content" },
+    { title: "Translate to..." },
+    { title: "Rewrite this..." },
+    { title: "Rename layers" },
+    { title: "Find more like Coupon" },
+    { title: "First Draft" },
+  ];
+
+  return (
+    <div
+      className="absolute bottom-[calc(100%+8px)] left-1/2 z-50 flex h-[286px] w-[404px] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-[#3A3A3A] bg-[#2B2B2B] p-2 pb-[2px]"
+      style={{ boxShadow: "0 18px 40px rgba(0,0,0,0.58), 0 1px 0 rgba(255,255,255,0.03) inset" }}
+    >
+      {!aiMode ? (
+        <>
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-[#424242] bg-[#363636] px-2.5">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8E8E8E" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Search"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#E5E5E5] outline-none placeholder:text-[#A4A4A4]"
+            />
+            <button
+              type="button"
+              aria-label="Open AI chat"
+              onClick={() => setAiMode(true)}
+              className="relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#D8D8D8] transition-colors duration-100 hover:bg-[#3B3B3B]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20l7.5-7.5" />
+                <path d="M9 3l1 2.5L12.5 6 10 7l-1 2.5L8 7 5.5 6 8 5.5 9 3z" />
+                <path d="M16 8l.6 1.4L18 10l-1.4.6L16 12l-.6-1.4L14 10l1.4-.6L16 8z" />
+                <path d="M19 14l.5 1.1L20.6 16l-1.1.5L19 17.6l-.5-1.1L17.4 16l1.1-.5L19 14z" />
+              </svg>
+              <span className="absolute -right-1 -top-1 rounded-full bg-[#0D99FF] px-1 text-[8px] font-semibold leading-[14px] text-white shadow-[0_0_0_1px_#2B2B2B]">
+                IA
+              </span>
+            </button>
+          </div>
+
+          <div className="mt-2 flex items-center gap-1">
+            {tabs.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={[
+                    "h-7 rounded-md px-2.5 text-[11px] font-medium transition-colors duration-100",
+                    active ? "bg-[#444] text-[#F2F2F2]" : "text-[#BDBDBD] hover:bg-[#343434] hover:text-[#E8E8E8]",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="mb-1 px-2 text-[10px] font-medium tracking-[0.2px] text-[#8B8B8B]">Suggestions</div>
+            <div className="min-h-0 max-h-[150px] flex-1 overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-width:thin] [scrollbar-color:#4A4A4A_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#4A4A4A]">
+              <div className="space-y-0.5 pb-1">
+                {items.map((item) => (
+                  <button
+                    key={item.title}
+                    type="button"
+                    className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left transition-colors duration-100 hover:bg-[#343434]"
+                  >
+                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#DFDFDF]">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="M12 5v14" />
+                      </svg>
+                    </span>
+                    <span className="truncate text-[12px] text-[#EFEFEF]">{item.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="mb-1.5 flex items-center justify-between px-1">
+            <span className="text-[10px] font-medium tracking-[0.2px] text-[#8B8B8B]">AI Chat</span>
+            <button
+              type="button"
+              onClick={() => setAiMode(false)}
+              className="rounded px-1.5 py-0.5 text-[10px] text-[#BDBDBD] transition-colors duration-100 hover:bg-[#343434] hover:text-[#F2F2F2]"
+            >
+              Back
+            </button>
+          </div>
+          <textarea
+            value={aiPrompt}
+            onChange={(event) => setAiPrompt(event.target.value)}
+            placeholder="Ask AI to generate or edit..."
+            className="min-h-0 flex-1 resize-none rounded-lg border border-[#424242] bg-[#363636] px-3 py-2 text-[12px] text-[#E5E5E5] outline-none placeholder:text-[#A4A4A4]"
+          />
+        </div>
+      )}
     </div>
   );
 }

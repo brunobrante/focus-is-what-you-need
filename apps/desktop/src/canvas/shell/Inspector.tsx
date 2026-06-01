@@ -37,7 +37,7 @@ type InspectorProps = {
   openShellTabSignal?: number;
 };
 
-type InspectorTab = "element" | "canvas" | "shell";
+type InspectorTab = "element" | "canvas" | "shell" | "todo";
 
 export function Inspector({
   open,
@@ -54,6 +54,14 @@ export function Inspector({
   openShellTabSignal,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
+  const [checklistInput, setChecklistInput] = useState("");
+  const [checklistItems, setChecklistItems] = useState<Array<{ id: string; label: string; checked: boolean }>>([
+    { id: "todo-1", label: "Review hero banner spacing", checked: false },
+    { id: "todo-2", label: "Adjust footer contrast tokens", checked: true },
+    { id: "todo-3", label: "Polish toolbar icon alignment", checked: false },
+    { id: "todo-4", label: "Validate mobile inspector width", checked: false },
+    { id: "todo-5", label: "Sync shell tab labels", checked: true },
+  ]);
   const prevShellTabSignalRef = useRef(openShellTabSignal ?? 0);
   useEffect(() => {
     if (openShellTabSignal !== undefined && openShellTabSignal !== prevShellTabSignalRef.current) {
@@ -105,6 +113,26 @@ export function Inspector({
   const commitSizing = (sizing: ElementSizing) => {
     if (!document || !node) return;
     commitDocument(setTextElementSizing(document, node.id, sizing));
+  };
+
+  const addChecklistItem = () => {
+    const nextLabel = checklistInput.trim();
+    if (!nextLabel) return;
+    setChecklistItems((current) => [
+      ...current,
+      { id: `todo-${Date.now()}`, label: nextLabel, checked: false },
+    ]);
+    setChecklistInput("");
+  };
+
+  const toggleChecklistItem = (id: string) => {
+    setChecklistItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item)),
+    );
+  };
+
+  const removeChecklistItem = (id: string) => {
+    setChecklistItems((current) => current.filter((item) => item.id !== id));
   };
 
   const headerTitle = canvasStageActive ? "Frame" : node ? node.name : "Inspector";
@@ -171,6 +199,7 @@ export function Inspector({
           { id: "element", label: "Element" },
           { id: "canvas", label: "Frame" },
           { id: "shell", label: "Shell" },
+          { id: "todo", label: "Checklist" },
         ] as const).map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -179,7 +208,7 @@ export function Inspector({
               type="button"
               onClick={() => {
                 setActiveTab(tab.id);
-                if (tab.id === "element" && canvasStageActive) {
+                if ((tab.id === "element" || tab.id === "todo") && canvasStageActive) {
                   (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active: false });
                 }
               }}
@@ -220,6 +249,69 @@ export function Inspector({
             onZoomVisibilityChange={onShellZoomVisibilityChange}
             onExpandVisibilityChange={onShellExpandVisibilityChange}
           />
+        ) : activeTab === "todo" ? (
+          <div className="p-3">
+            <div className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.3px] text-[#9A9A9A]">
+              Checklist
+            </div>
+            <div className="mb-2.5 flex items-center gap-1.5">
+              <input
+                type="text"
+                value={checklistInput}
+                onChange={(event) => setChecklistInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addChecklistItem();
+                  }
+                }}
+                placeholder="Adicionar item no checklist..."
+                className="h-8 min-w-0 flex-1 rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2 text-[12px] text-[#D8D8D8] outline-none placeholder:text-[#7A7A7A]"
+              />
+              <button
+                type="button"
+                onClick={addChecklistItem}
+                className="h-8 shrink-0 rounded-md border border-[#2C2C2C] bg-[#0D99FF]/20 px-2 text-[11px] font-medium text-[#9DD4FF] transition-colors duration-100 hover:bg-[#0D99FF]/30"
+              >
+                Salvar
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {checklistItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="group flex items-center gap-2 rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2.5 py-2 text-[12px] text-[#D8D8D8] transition-colors duration-100 hover:bg-[#242424]"
+                >
+                  <input
+                    id={item.id}
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={() => toggleChecklistItem(item.id)}
+                    className="h-3.5 w-3.5 rounded border-[#4A4A4A] bg-transparent accent-[#0D99FF]"
+                  />
+                  <span className={`min-w-0 flex-1 truncate ${item.checked ? "line-through text-[#8A8A8A]" : ""}`}>
+                    {item.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeChecklistItem(item.id)}
+                    className="grid h-5 w-5 shrink-0 place-items-center rounded text-[#8A8A8A] opacity-0 transition-all duration-100 hover:bg-[#2F2F2F] hover:text-[#E4A1A1] group-hover:opacity-100"
+                    aria-label="Apagar item"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="mt-2.5 h-8 w-full rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2 text-[11px] font-medium text-[#D8D8D8] transition-colors duration-100 hover:bg-[#2A2A2A]"
+            >
+              IA Resolver
+            </button>
+          </div>
         ) : selectedCount > 1 ? (
           <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />
         ) : !node ? (

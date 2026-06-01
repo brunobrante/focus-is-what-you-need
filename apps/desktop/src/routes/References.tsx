@@ -240,77 +240,79 @@ export function References() {
       <TopBar />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <main className="flex flex-1 min-w-0 flex-col overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1400px] px-7 pb-20 pt-8">
-            <header className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <h1 className="m-0 mb-1.5 text-[22px] font-semibold tracking-[-0.3px] text-[var(--text)]">
-                  References
-                </h1>
-                <p className="m-0 text-[13px] text-[var(--text-muted)]">
-                  Images and videos saved locally. Drag or select to add.
-                </p>
+        <main className="flex flex-1 min-w-0 min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-[1400px] px-7 pb-20 pt-8">
+              <header className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="m-0 mb-1.5 text-[22px] font-semibold tracking-[-0.3px] text-[var(--text)]">
+                    References
+                  </h1>
+                  <p className="m-0 text-[13px] text-[var(--text-muted)]">
+                    Images and videos saved locally. Drag or select to add.
+                  </p>
+                </div>
+                <SmallButton type="button" primary onClick={() => setImportOpen(true)}>
+                  <Upload size={14} />
+                  Upload
+                </SmallButton>
+              </header>
+
+              <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
+                <SearchInput value={query} onChange={setQuery} />
+                <SelectControl
+                  value={filterKind}
+                  onChange={(v) => {
+                    const next = v as FilterKind;
+                    setFilterKind(next);
+                    setFilterType((current) => {
+                      const opts = typeOptionsForKind(next);
+                      return opts.some((o) => o.value === current) ? current : "all";
+                    });
+                  }}
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "image", label: "Images" },
+                    { value: "video", label: "Videos" },
+                    { value: "figx", label: "Canvas" },
+                  ]}
+                />
+                <SelectControl
+                  value={filterType}
+                  onChange={(v) => setFilterType(v as FilterType)}
+                  options={typeOptions}
+                />
+                <SelectControl
+                  value={filterSort}
+                  onChange={(v) => setFilterSort(v as FilterSort)}
+                  options={[
+                    { value: "recent", label: "Mais recentes" },
+                    { value: "old", label: "Mais antigos" },
+                    { value: "name", label: "Nome (A–Z)" },
+                    { value: "size", label: "Maior tamanho" },
+                  ]}
+                />
+                <span className="ml-auto text-[12px] tabular-nums text-[var(--text-muted)]">
+                  {loading ? "…" : `${visible.length} ${visible.length === 1 ? "item" : "itens"}`}
+                </span>
               </div>
-              <SmallButton type="button" primary onClick={() => setImportOpen(true)}>
-                <Upload size={14} />
-                Upload
-              </SmallButton>
-            </header>
 
-            <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
-              <SearchInput value={query} onChange={setQuery} />
-              <SelectControl
-                value={filterKind}
-                onChange={(v) => {
-                  const next = v as FilterKind;
-                  setFilterKind(next);
-                  setFilterType((current) => {
-                    const opts = typeOptionsForKind(next);
-                    return opts.some((o) => o.value === current) ? current : "all";
-                  });
-                }}
-                options={[
-                  { value: "all", label: "All" },
-                  { value: "image", label: "Images" },
-                  { value: "video", label: "Videos" },
-                  { value: "figx", label: "Canvas" },
-                ]}
-              />
-              <SelectControl
-                value={filterType}
-                onChange={(v) => setFilterType(v as FilterType)}
-                options={typeOptions}
-              />
-              <SelectControl
-                value={filterSort}
-                onChange={(v) => setFilterSort(v as FilterSort)}
-                options={[
-                  { value: "recent", label: "Mais recentes" },
-                  { value: "old", label: "Mais antigos" },
-                  { value: "name", label: "Nome (A–Z)" },
-                  { value: "size", label: "Maior tamanho" },
-                ]}
-              />
-              <span className="ml-auto text-[12px] tabular-nums text-[var(--text-muted)]">
-                {loading ? "…" : `${visible.length} ${visible.length === 1 ? "item" : "itens"}`}
-              </span>
+              {loading ? (
+                <LoadingState />
+              ) : visible.length === 0 ? (
+                <EmptyState onUpload={() => setImportOpen(true)} />
+              ) : (
+                <MasonryGrid
+                  items={visible}
+                  selectedId={selectedId}
+                  onSelect={(id) => setSelectedId(id)}
+                  onOpenLightbox={(item) => setLightboxItem(item)}
+                />
+              )}
             </div>
-
-            {loading ? (
-              <LoadingState />
-            ) : visible.length === 0 ? (
-              <EmptyState onUpload={() => setImportOpen(true)} />
-            ) : (
-              <MasonryGrid
-                items={visible}
-                selectedId={selectedId}
-                onSelect={(id) => setSelectedId(id)}
-                onOpenLightbox={(item) => setLightboxItem(item)}
-              />
-            )}
           </div>
 
-          <footer className="border-t border-[var(--border)] py-4 text-center text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
+          <footer className="mt-auto border-t border-[var(--border)] py-4 text-center text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
             v0.1 · design preview
           </footer>
         </main>

@@ -32,7 +32,6 @@ import type { CanvasDocument } from "@/canvas/engine/types";
 import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
 import {
   ancestorIdsForNodeIds,
-  countNodes,
   documentTreeShapeEqual,
   findNode,
   initiallyOpen,
@@ -183,8 +182,6 @@ export function Tree({
   );
   const [draftsSelectedId, setDraftsSelectedId] = useState<string | null>(null);
 
-  const totalCount = useMemo(() => countNodes(tree.root), [tree]);
-  const draftsCount = useMemo(() => countNodes(draftsTree.root), [draftsTree]);
   const pickerTree = projectTree ?? [];
   const selectedIds =
     selectedNodeIds ??
@@ -346,17 +343,11 @@ export function Tree({
           })}
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className="text-[11px] text-[#6B6B6B]"
-            style={{ fontFeatureSettings: '"tnum"' }}
-          >
-            {activeTab === "layers" ? totalCount : draftsCount}
-          </span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close panel"
-            className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
+            className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -502,8 +493,10 @@ export function TreeToggle({ open, onClick }: { open: boolean; onClick: () => vo
       className="fixed bottom-6 left-3 z-[11] inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-lg border border-[#2C2C2C] bg-[#1E1E1E] px-3 text-[13px] font-medium text-[#CFCFCF] transition-colors hover:bg-[#2A2A2A] hover:text-[var(--text)]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)" }}
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 5h18M3 12h12M3 19h18" />
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3l9 5-9 5-9-5 9-5z" />
+        <path d="M3 12l9 5 9-5" />
+        <path d="M3 16l9 5 9-5" />
       </svg>
       Camadas
     </button>

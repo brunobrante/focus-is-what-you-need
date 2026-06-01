@@ -269,7 +269,7 @@ export function InsToggle({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-md border border-[#2C2C2C] bg-[#1E1E1E] p-0.5">
+    <div className="flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-full border border-[#2C2C2C] bg-[#1E1E1E] p-0.5">
       {options.map((o) => {
         const isActive = value === o.value;
         return (
@@ -277,7 +277,7 @@ export function InsToggle({
             key={o.value}
             type="button"
             onClick={() => onChange(o.value)}
-            className="h-[22px] min-w-0 flex-1 cursor-pointer truncate rounded border-0 text-[11px]"
+            className="h-[22px] min-w-0 flex-1 cursor-pointer truncate rounded-full border-0 text-[11px]"
             style={{
               letterSpacing: "0.2px",
               background: isActive ? "#383838" : "transparent",
@@ -302,7 +302,7 @@ export function InsMultiSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-md border border-[#2C2C2C] bg-[#1E1E1E] p-0.5">
+    <div className="flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-full border border-[#2C2C2C] bg-[#1E1E1E] p-0.5">
       {options.map((option) => {
         const isActive = value.includes(option.value);
         return (
@@ -316,7 +316,7 @@ export function InsMultiSelect({
                 : [...value, option.value];
               onChange(next);
             }}
-            className="h-[22px] min-w-0 flex-1 cursor-pointer truncate rounded border-0 text-[11px]"
+            className="h-[22px] min-w-0 flex-1 cursor-pointer truncate rounded-full border-0 text-[11px]"
             style={{
               letterSpacing: "0.2px",
               background: isActive ? "rgba(13,153,255,0.18)" : "transparent",

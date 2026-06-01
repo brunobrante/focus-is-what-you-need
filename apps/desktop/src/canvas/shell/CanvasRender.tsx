@@ -479,28 +479,28 @@ function CanvasParentBackButton({
         event.stopPropagation();
         onBack?.();
       }}
-      className="group absolute left-3 top-3 z-[10] flex max-w-[180px] items-center gap-2 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A]/95 px-2 py-1.5 text-left text-[#9A9A9A] transition-colors duration-[100ms] hover:bg-[#242424] hover:text-[#F2F2F2]"
+      className="group absolute left-3 top-3 z-[10] flex max-w-[192px] items-center gap-2.5 rounded-lg border border-[#2A2A2A] bg-[#171717]/95 px-3 py-2 text-left text-[#8E8E8E] transition-colors duration-[100ms] hover:bg-[#202020] hover:text-[#F2F2F2]"
       style={{
         ...shellVisibilityStyle(visibility, localHovered),
-        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 18px rgba(0,0,0,0.42)",
+        boxShadow: "0 1px 0 rgba(255,255,255,0.03) inset, 0 5px 14px rgba(0,0,0,0.36)",
       }}
       onMouseEnter={() => setLocalHovered(true)}
       onMouseLeave={() => setLocalHovered(false)}
     >
-      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-[#6B6B6B] transition-colors duration-[100ms] group-hover:text-[#CFCFCF]">
+      <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded text-[#6A6A6A] transition-colors duration-[100ms] group-hover:text-[#BCBCBC]">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M15 6l-6 6 6 6" />
         </svg>
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[9.5px] font-medium uppercase leading-none text-[#5A5A5A] transition-colors duration-[100ms] group-hover:text-[#777]">
+        <span className="text-[8px] font-medium uppercase tracking-[0.08em] leading-none text-[#5E5E5E] transition-colors duration-[100ms] group-hover:text-[#767676]">
           Voltar para
         </span>
-        <span className="truncate text-[11.5px] font-medium leading-none text-[#CFCFCF]">
+        <span className="truncate text-[12px] font-semibold leading-[1.1] text-[#DEDEDE]">
           {parentTarget.name}
         </span>
       </span>
-      <span className="ml-1 shrink-0 text-[#5A5A5A] transition-colors duration-[100ms] group-hover:text-[#888]">
+      <span className="ml-1 shrink-0 text-[#5B5B5B] transition-colors duration-[100ms] group-hover:text-[#808080]">
         {parentTarget.kind === "screen" ? <ParentScreenIcon /> : <ParentComponentIcon />}
       </span>
     </button>
@@ -509,7 +509,7 @@ function CanvasParentBackButton({
 
 function ParentScreenIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="3" width="20" height="14" rx="2" />
       <path d="M8 21h8M12 17v4" />
     </svg>
@@ -518,7 +518,7 @@ function ParentScreenIcon() {
 
 function ParentComponentIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="7" height="7" rx="1" />
       <rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -615,7 +615,7 @@ function DeviceButton({
 }) {
   const isMobile = projectType === "mobile";
   const Icon = isMobile ? Smartphone : Monitor;
-  const active = overlayEnabled || menuOpen;
+  const active = overlayEnabled;
 
   return (
     <div
@@ -652,7 +652,11 @@ function DeviceButton({
         onClick={onToggleMenu}
         className={[
           "grid h-[34px] w-[18px] shrink-0 place-items-center transition-colors duration-[100ms]",
-          active ? "hover:bg-[#0D99FF]/20" : "text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
+          active
+            ? "hover:bg-[#0D99FF]/20"
+            : menuOpen
+              ? "bg-[#2A2A2A] text-[#CFCFCF]"
+              : "text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
         ].join(" ")}
       >
         <svg

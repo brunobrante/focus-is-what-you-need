@@ -421,7 +421,9 @@ function CanvasPageContent() {
         {!inspectorOpen && (
           <FloatingToggle onClick={() => setInspectorOpen(true)} aria="Inspector">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M3 12h18M3 18h12" />
+              <rect x="3" y="4" width="18" height="16" rx="2.4" />
+              <path d="M14 4v16" />
+              <path d="M7 9h3M7 15h4" />
             </svg>
             Inspector
           </FloatingToggle>
