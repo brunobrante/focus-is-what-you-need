@@ -500,6 +500,10 @@ function CanvasParentBackButton({
           {parentTarget.name}
         </span>
       </span>
+      <span
+        aria-hidden
+        className="ml-1 h-4 w-px shrink-0 bg-[#323232] transition-colors duration-[100ms] group-hover:bg-[#4A4A4A]"
+      />
       <span className="ml-1 shrink-0 text-[#5B5B5B] transition-colors duration-[100ms] group-hover:text-[#808080]">
         {parentTarget.kind === "screen" ? <ParentScreenIcon /> : <ParentComponentIcon />}
       </span>
