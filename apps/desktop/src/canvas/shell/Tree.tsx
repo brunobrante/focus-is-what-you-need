@@ -14,8 +14,18 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { constrainAll } from "@/canvas/engine/actions";
-import { useEditorBridge } from "@/canvas/engine/bridge";
+import {
+  bringToFront,
+  constrainAll,
+  deleteElements,
+  duplicateElements,
+  reorderElement,
+  sendToBack,
+  setElementLocked,
+  setElementVisible,
+} from "@/canvas/engine/actions";
+import { copyElements, hasClipboard, pasteElements } from "@/canvas/engine/clipboard";
+import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { CANVAS_DOCUMENT_SAVED_EVENT, DRAFTS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import type { CanvasDocument } from "@/canvas/engine/types";
 
@@ -34,6 +44,19 @@ import { PickerNode } from "./tree/PickerNode";
 import { TreeRow } from "./tree/TreeRow";
 
 export type { ProjectTreeNode };
+
+type TreeContextMenuState = {
+  x: number;
+  y: number;
+  targetId: string | null;
+} | null;
+
+type TreeContextMenuItem =
+  | { type: "action"; label: string; shortcut?: string; disabled?: boolean; action: () => void }
+  | { type: "separator" };
+
+const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
+const modLabel = isMac ? "⌘" : "Ctrl+";
 
 function isCanvasDocument(value: unknown): value is CanvasDocument {
   const maybe = value as CanvasDocument;
@@ -191,8 +214,10 @@ export function Tree({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<TreeContextMenuState>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const pickerTriggerRef = useRef<HTMLDivElement>(null);
+  const readEditor = useEditorBridgeReader();
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -312,6 +337,10 @@ export function Tree({
                     onToggleLocked={onToggleLocked}
                     canOpenNodeCanvas={canOpenNodeCanvas}
                     onOpenNodeCanvas={onOpenNodeCanvas}
+                    onContextMenuNode={(nodeId, x, y) => {
+                      selectLayer(nodeId);
+                      setContextMenu({ x, y, targetId: nodeId });
+                    }}
                   />
                 ))}
               </div>
@@ -330,6 +359,10 @@ export function Tree({
                 setOpenSet={setDraftsOpenSet}
                 selectedId={draftsSelectedId}
                 setSelectedId={setDraftsSelectedId}
+                onContextMenuNode={(nodeId, x, y) => {
+                  setDraftsSelectedId(nodeId);
+                  setContextMenu({ x, y, targetId: nodeId });
+                }}
               />
             ))
           ) : (
@@ -380,6 +413,13 @@ export function Tree({
         </div>
       </div>
     )}
+    {contextMenu ? (
+      <TreeContextMenu
+        menu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        getEditor={readEditor}
+      />
+    ) : null}
     </>
   );
 }
@@ -399,5 +439,108 @@ export function TreeToggle({ open, onClick }: { open: boolean; onClick: () => vo
       </svg>
       Camadas
     </button>
+  );
+}
+
+function TreeContextMenu({
+  menu,
+  onClose,
+  getEditor,
+}: {
+  menu: NonNullable<TreeContextMenuState>;
+  onClose: () => void;
+  getEditor: ReturnType<typeof useEditorBridgeReader>;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const editor = getEditor();
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) onClose();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    const element = menuRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let adjustedX = menu.x;
+    let adjustedY = menu.y;
+    if (rect.right > vw - 8) adjustedX = vw - rect.width - 8;
+    if (rect.bottom > vh - 8) adjustedY = vh - rect.height - 8;
+    if (adjustedX !== menu.x || adjustedY !== menu.y) {
+      element.style.left = `${adjustedX}px`;
+      element.style.top = `${adjustedY}px`;
+    }
+  }, [menu.x, menu.y]);
+
+  if (!editor) return null;
+  const { state, dispatch } = editor;
+  const selectedIds = state.selectedIds;
+  const hasSelection = selectedIds.length > 0;
+  const singleId = selectedIds.length === 1 ? selectedIds[0] : null;
+  const singleNode = singleId ? state.document.elements[singleId] : null;
+
+  const commit = (document: CanvasDocument, ids?: string[]) => {
+    dispatch({ type: "commitDocument", document, selectedIds: ids ?? state.selectedIds });
+    onClose();
+  };
+
+  const items: TreeContextMenuItem[] = [
+    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: () => { copyElements(state.document, selectedIds); onClose(); } },
+    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !hasClipboard(), action: () => { const result = pasteElements(state.document); if (result) commit(result.document, result.selectedIds); else onClose(); } },
+    { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: () => { const result = duplicateElements(state.document, selectedIds); commit(result.document, result.selectedIds); } },
+    { type: "separator" },
+    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: () => { if (singleId) commit(bringToFront(state.document, singleId)); } },
+    { type: "action", label: "Bring Forward", disabled: !singleNode, action: () => { if (singleId) commit(reorderElement(state.document, singleId, "forward")); } },
+    { type: "action", label: "Send Backward", disabled: !singleNode, action: () => { if (singleId) commit(reorderElement(state.document, singleId, "backward")); } },
+    { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: () => { if (singleId) commit(sendToBack(state.document, singleId)); } },
+    { type: "separator" },
+    ...(singleNode ? [
+      { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commit(setElementLocked(state.document, singleId!, !singleNode.locked)) },
+      { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commit(setElementVisible(state.document, singleId!, singleNode.visible === false)) },
+      { type: "separator" as const },
+    ] : []),
+    { type: "action", label: "Delete", shortcut: "Del", disabled: !hasSelection, action: () => commit(deleteElements(state.document, selectedIds), []) },
+  ];
+
+  return (
+    <div
+      ref={menuRef}
+      className="context-menu"
+      style={{ left: menu.x, top: menu.y }}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      {items.map((item, index) =>
+        item.type === "separator" ? (
+          <div key={`sep-${index}`} className="context-menu-separator" />
+        ) : (
+          <button
+            key={`${item.label}-${index}`}
+            className="context-menu-item"
+            disabled={item.disabled}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              item.action();
+            }}
+          >
+            <span className="context-menu-label">{item.label}</span>
+            {item.shortcut ? <span className="context-menu-shortcut">{item.shortcut}</span> : null}
+          </button>
+        ),
+      )}
+    </div>
   );
 }

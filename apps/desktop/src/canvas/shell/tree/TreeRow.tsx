@@ -15,6 +15,7 @@ export function TreeRow({
   onToggleLocked,
   canOpenNodeCanvas,
   onOpenNodeCanvas,
+  onContextMenuNode,
 }: {
   node: Node;
   depth: number;
@@ -27,6 +28,7 @@ export function TreeRow({
   onToggleLocked?: (nodeId: string, locked: boolean) => void;
   canOpenNodeCanvas?: (nodeId: string) => boolean;
   onOpenNodeCanvas?: (nodeId: string) => void;
+  onContextMenuNode?: (nodeId: string, x: number, y: number) => void;
 }) {
   const {
     attributes,
@@ -57,6 +59,12 @@ export function TreeRow({
         onClick={(e) => {
           e.stopPropagation();
           setSelectedId(node.id);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedId(node.id);
+          onContextMenuNode?.(node.id, e.clientX, e.clientY);
         }}
         onMouseEnter={(e) => {
           if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.035)";
@@ -209,6 +217,7 @@ export function TreeRow({
               onToggleLocked={onToggleLocked}
               canOpenNodeCanvas={canOpenNodeCanvas}
               onOpenNodeCanvas={onOpenNodeCanvas}
+              onContextMenuNode={onContextMenuNode}
             />
           ))
         : null}
