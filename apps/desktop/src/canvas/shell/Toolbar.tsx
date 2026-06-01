@@ -173,12 +173,12 @@ function DropdownToolButton({
         aria-label="More options"
         onClick={() => setMenuOpen((o) => !o)}
         className={[
-          "inline-flex h-9 w-3 cursor-pointer items-center justify-center rounded-md border-0 p-0 transition-colors duration-[90ms]",
-          menuOpen ? "text-white" : "text-[#555] hover:text-[#CFCFCF]",
+          "-ml-1 inline-flex h-8 w-4 cursor-pointer items-center justify-center rounded-md border-0 p-0 transition-colors duration-[90ms]",
+          menuOpen ? "bg-[#2A2A2A] text-white" : "text-[#666] hover:bg-[#2A2A2A] hover:text-[#DADADA]",
         ].join(" ")}
       >
-        <svg width="5" height="4" viewBox="0 0 5 4" fill="currentColor">
-          <path d="M0 0.5L2.5 3.5L5 0.5H0Z" />
+        <svg width="6" height="4" viewBox="0 0 6 4" fill="currentColor">
+          <path d="M0.5 0.5L3 3.5L5.5 0.5H0.5Z" />
         </svg>
       </button>
 
