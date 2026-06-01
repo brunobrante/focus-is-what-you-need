@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Monitor, Smartphone } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Monitor, RotateCcw, Smartphone } from "lucide-react";
 
 import type { SplitMode } from "@/canvas/Canvas";
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
@@ -711,9 +711,41 @@ export function ZoomControl({
   setZoom: ZoomSetter;
   bare?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [draftPercent, setDraftPercent] = useState(() => String(Math.round(zoom * 100)));
   const canIn    = zoom < MAX_ZOOM - 1e-6;
   const canOut   = zoom > MIN_ZOOM + 1e-6;
   const canReset = Math.abs(zoom - 1) > 1e-6;
+  const clampedPercentMin = Math.round(MIN_ZOOM * 100);
+  const clampedPercentMax = Math.round(MAX_ZOOM * 100);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (menuOpen) return;
+    setDraftPercent(String(Math.round(zoom * 100)));
+  }, [menuOpen, zoom]);
+
+  const commitDraftPercent = () => {
+    const raw = Number.parseFloat(draftPercent.replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(raw)) {
+      setDraftPercent(String(Math.round(zoom * 100)));
+      return;
+    }
+    const nextPercent = Math.max(clampedPercentMin, Math.min(clampedPercentMax, Math.round(raw)));
+    setZoom(+(nextPercent / 100).toFixed(4));
+    setDraftPercent(String(nextPercent));
+  };
 
   const buttons = (
     <>
@@ -722,20 +754,74 @@ export function ZoomControl({
           <path d="M5 12h14" />
         </svg>
       </ZoomBtn>
-      <button
-        type="button"
-        disabled={!canReset}
-        onClick={() => setZoom(1)}
-        aria-label="Reset zoom"
-        title="Reset to 100%"
-        className={[
-          "inline-flex h-[26px] min-w-[52px] items-center justify-center rounded-md border-0 bg-transparent px-2 text-[11.5px] font-medium tracking-[0.2px]",
-          canReset ? "cursor-pointer text-[#CFCFCF] hover:bg-[#2A2A2A]" : "cursor-default text-[#7A7A7A]",
-        ].join(" ")}
-        style={{ fontFeatureSettings: '"tnum"' }}
-      >
-        {Math.round(zoom * 100)}%
-      </button>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((value) => !value)}
+          aria-label="Zoom options"
+          aria-expanded={menuOpen}
+          className={[
+            "inline-flex h-[26px] min-w-[52px] items-center justify-center rounded-md border-0 px-2 text-[11.5px] font-medium tracking-[0.2px] transition-colors duration-[100ms]",
+            menuOpen
+              ? "bg-[#2A2A2A] text-[#F2F2F2]"
+              : canReset
+                ? "cursor-pointer bg-transparent text-[#CFCFCF] hover:bg-[#2A2A2A]"
+                : "cursor-pointer bg-transparent text-[#7A7A7A] hover:bg-[#2A2A2A] hover:text-[#A0A0A0]",
+          ].join(" ")}
+          style={{ fontFeatureSettings: '"tnum"' }}
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute bottom-[calc(100%+6px)] left-1/2 z-20 -translate-x-1/2 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-1.5"
+            style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset" }}
+          >
+            <div className="flex items-center gap-1">
+              <label className="relative block">
+                <input
+                  aria-label="Zoom percent"
+                  value={draftPercent}
+                  onChange={(event) => setDraftPercent(event.target.value)}
+                  onBlur={commitDraftPercent}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      commitDraftPercent();
+                      setMenuOpen(false);
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setDraftPercent(String(Math.round(zoom * 100)));
+                      setMenuOpen(false);
+                    }
+                  }}
+                  inputMode="numeric"
+                  className="h-[26px] w-[70px] rounded-md border border-[#343434] bg-[#141414] px-2 pr-5 text-[11.5px] text-[#E2E2E2] outline-none shadow-none transition-colors focus:border-[#0D99FF]/70"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8A8A8A]">%</span>
+              </label>
+              <button
+                type="button"
+                aria-label="Reset zoom"
+                disabled={!canReset}
+                onClick={() => {
+                  setZoom(1);
+                  setDraftPercent("100");
+                }}
+                className={[
+                  "grid h-[26px] w-[26px] place-items-center rounded-md border text-[11px] font-medium shadow-none transition-colors duration-[100ms]",
+                  canReset
+                    ? "cursor-pointer border-[#3A3A3A] bg-[#202020] text-[#D2D2D2] hover:bg-[#2A2A2A]"
+                    : "cursor-not-allowed border-[#2F2F2F] bg-[#191919] text-[#6C6C6C]",
+                ].join(" ")}
+              >
+                <RotateCcw size={13} strokeWidth={1.8} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
       <ZoomBtn active={canIn} ariaLabel="Aumentar zoom" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(4)))}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
@@ -746,7 +832,7 @@ export function ZoomControl({
 
   if (bare) {
     return (
-      <div role="group" aria-label="Controle de zoom" className="inline-flex items-center gap-0.5" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+      <div ref={containerRef} role="group" aria-label="Controle de zoom" className="inline-flex items-center gap-0.5" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
         {buttons}
       </div>
     );
@@ -754,6 +840,7 @@ export function ZoomControl({
 
   return (
     <div
+      ref={containerRef}
       role="group"
       aria-label="Zoom control"
       className="inline-flex items-center gap-0.5 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-[3px]"
