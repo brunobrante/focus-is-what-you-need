@@ -3,6 +3,9 @@ import type { CSSProperties } from "react";
 import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
 import { useEditor, useHoverStore } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
+import type { CanvasToolId } from "@/canvas/tools";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import type { GlobalSettings } from "@/domain/settings/types";
 import {
   getCanvasDisplayScale,
   shouldUseScaledDomProjection,
@@ -36,11 +39,15 @@ export function CanvasStage({
   activeTool,
   viewportSubjectKey,
   screenOverlay,
+  settings = DEFAULT_GLOBAL_SETTINGS,
+  onCanvasToolShortcut,
 }: {
   draftMode?: boolean;
   activeTool?: string;
   viewportSubjectKey?: string;
   screenOverlay?: ScreenOverlay | null;
+  settings?: GlobalSettings;
+  onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
 }) {
   const { state, dispatch } = useEditor();
   const hoverStore = useHoverStore();
@@ -49,7 +56,11 @@ export function CanvasStage({
     if (!activeTool) return;
     const mapped = TOOLBAR_TOOL_MAP[activeTool];
     if (mapped && mapped !== state.tool) dispatch({ type: "setTool", tool: mapped });
-  }, [activeTool, dispatch, state.tool]);
+    // Only toolbar/tool-prop changes should drive the editor tool. If this also
+    // reacts to state.tool changes, Escape can switch the editor to select while
+    // the previous toolbar tool is still in props, causing a select/tool loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, dispatch]);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -124,6 +135,8 @@ export function CanvasStage({
     interactionRef,
     latestStateRef,
     setInteractionActive,
+    settings,
+    onCanvasToolShortcut,
   });
 
   const { onWheel } = useViewportControls({
@@ -136,6 +149,7 @@ export function CanvasStage({
     viewportSubjectKey,
     viewportSize,
     viewportInitializedSubjectRef,
+    settings,
   });
 
   const commitContextToolbarDocument = useCallback((document: CanvasDocument, selectedIds?: string[]) => {
@@ -229,6 +243,7 @@ export function CanvasStage({
     enterTextEditing,
     syncTextSelection,
     scheduleCanvasAlignmentLog,
+    settings,
   });
 
   const affectedElementIds = useMemo(
@@ -404,6 +419,7 @@ export function CanvasStage({
         marqueeRect={marqueeRect}
         dropTarget={dropTarget}
         onCommitDocument={commitContextToolbarDocument}
+        settings={settings}
       />
 
       <TextEditingTextarea

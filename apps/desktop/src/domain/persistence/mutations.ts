@@ -1,7 +1,7 @@
 /**
  * A persistence command. Every entity in the app — projects, screens,
  * components, variants, scenes, thumbnails, placements, references, history,
- * meta — is stored as one record keyed by `(table, id)`. There is no
+ * settings, meta — is stored as one record keyed by `(table, id)`. There is no
  * table-blob: creating one record never rewrites a whole table.
  *
  * The queue coalesces these by `mutationKey` before a single batched

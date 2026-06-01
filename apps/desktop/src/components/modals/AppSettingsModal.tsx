@@ -1,5 +1,21 @@
 import { useEffect, useState } from "react";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
+import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import {
+  captureKeyBinding,
+  captureModifierBinding,
+  formatKeyBinding,
+  formatModifierBinding,
+} from "@/domain/settings/resolve";
+import type {
+  CanvasCommandId,
+  CanvasKeyCommandId,
+  CanvasModifierCommandId,
+  GlobalSettings,
+} from "@/domain/settings/types";
+import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import {
   getWorkspaceConfig,
   setWorkspaceFolder,
@@ -8,59 +24,10 @@ import {
 
 type AppSettingsTab = "shortcuts" | "storage";
 
-type ShortcutEntry = {
-  action: string;
-  keys: string[];
-};
-
-type ShortcutGroup = {
-  label: string;
-  entries: ShortcutEntry[];
-};
-
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
-  {
-    label: "Canvas",
-    entries: [
-      { action: "Undo", keys: ["⌘", "Z"] },
-      { action: "Redo", keys: ["⌘", "⇧", "Z"] },
-      { action: "Save", keys: ["⌘", "S"] },
-      { action: "Select all", keys: ["⌘", "A"] },
-      { action: "Copy", keys: ["⌘", "C"] },
-      { action: "Paste", keys: ["⌘", "V"] },
-      { action: "Duplicate", keys: ["⌘", "D"] },
-      { action: "Clear selection", keys: ["⌫"] },
-    ],
-  },
-  {
-    label: "Zoom",
-    entries: [
-      { action: "Aumentar zoom", keys: ["⌘", "+"] },
-      { action: "Reduzir zoom", keys: ["⌘", "-"] },
-      { action: "Zoom 100%", keys: ["⌘", "0"] },
-      { action: "Fit to screen", keys: ["⌘", "⇧", "H"] },
-    ],
-  },
-  {
-    label: "Navigation",
-    entries: [
-      { action: "Open search", keys: ["⌘", "K"] },
-      { action: "New screen", keys: ["⌘", "N"] },
-      { action: "Open canvas", keys: ["⌘", "E"] },
-      { action: "Voltar", keys: ["⌘", "["] },
-      { action: "Next", keys: ["⌘", "]"] },
-    ],
-  },
-  {
-    label: "Ferramentas",
-    entries: [
-      { action: "Selection Tool", keys: ["V"] },
-      { action: "Hand Tool", keys: ["H"] },
-      { action: "Rectangle Tool", keys: ["R"] },
-      { action: "Ferramenta Texto", keys: ["T"] },
-    ],
-  },
-];
+type RecordingCommand = {
+  id: CanvasCommandId;
+  type: "key" | "modifier";
+} | null;
 
 type AppSettingsModalProps = {
   open: boolean;
@@ -69,21 +36,25 @@ type AppSettingsModalProps = {
 
 export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
   const [tab, setTab] = useState<AppSettingsTab>("shortcuts");
-  const [recordingAction, setRecordingAction] = useState<string | null>(null);
+  const [recordingCommand, setRecordingCommand] = useState<RecordingCommand>(null);
   const [folderPath, setFolderPath] = useState("");
   const [workspaceName, setWorkspaceName] = useState("workspace");
   const [saving, setSaving] = useState(false);
+  const { settings: persistedSettings } = useGlobalSettings();
+  const [settingsDraft, setSettingsDraft] = useState<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
 
   // Load real config whenever the modal opens
   useEffect(() => {
     if (!open) return;
+    setSettingsDraft(persistedSettings);
+    setRecordingCommand(null);
     getWorkspaceConfig()
       .then((cfg) => {
         setFolderPath(cfg.base_folder);
         setWorkspaceName(cfg.workspace_name);
       })
       .catch(() => {});
-  }, [open]);
+  }, [open, persistedSettings]);
 
   async function handlePickFolder() {
     const picked = await pickFolderDialog().catch(() => null);
@@ -94,6 +65,7 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
     setSaving(true);
     try {
       await setWorkspaceFolder(folderPath);
+      putGlobalSettings(settingsDraft);
       onClose();
     } finally {
       setSaving(false);
@@ -146,14 +118,17 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
         <div className="flex-1 overflow-y-auto">
           {tab === "shortcuts" ? (
             <ShortcutsTab
-              recordingAction={recordingAction}
-              onStartRecording={setRecordingAction}
-              onStopRecording={() => setRecordingAction(null)}
+              settings={settingsDraft}
+              recordingCommand={recordingCommand}
+              onStartRecording={setRecordingCommand}
+              onStopRecording={() => setRecordingCommand(null)}
+              onSettingsChange={setSettingsDraft}
             />
           ) : (
             <StorageTab
               folderPath={folderPath}
               referencesPath={referencesPath}
+              workspaceName={workspaceName}
               onPickFolder={() => void handlePickFolder()}
             />
           )}
@@ -178,32 +153,64 @@ export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
 }
 
 function ShortcutsTab({
-  recordingAction,
+  settings,
+  recordingCommand,
   onStartRecording,
   onStopRecording,
+  onSettingsChange,
 }: {
-  recordingAction: string | null;
-  onStartRecording: (action: string) => void;
+  settings: GlobalSettings;
+  recordingCommand: RecordingCommand;
+  onStartRecording: (command: Exclude<RecordingCommand, null>) => void;
   onStopRecording: () => void;
+  onSettingsChange: (settings: GlobalSettings) => void;
 }) {
+  useEffect(() => {
+    if (!recordingCommand) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (recordingCommand.type === "key") {
+        const binding = captureKeyBinding(event);
+        if (!binding) return;
+        onSettingsChange(updateKeyCommand(settings, recordingCommand.id as CanvasKeyCommandId, binding));
+        onStopRecording();
+        return;
+      }
+
+      const binding = captureModifierBinding(event);
+      if (!binding) return;
+      onSettingsChange(updateModifierCommand(settings, recordingCommand.id as CanvasModifierCommandId, binding));
+      onStopRecording();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [onSettingsChange, onStopRecording, recordingCommand, settings]);
+
   return (
     <div className="px-[22px] py-5 grid gap-6">
       <p className="text-[12.5px] leading-[1.6] text-[var(--text-muted)] m-0">
         Click a shortcut to reassign it. Press the new key combination and confirm.
       </p>
 
-      {SHORTCUT_GROUPS.map((group) => (
+      {CANVAS_COMMAND_GROUPS.map((group) => (
         <div key={group.label}>
           <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
             {group.label}
           </div>
           <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
-            {group.entries.map((entry, index) => {
-              const isRecording = recordingAction === entry.action;
-              const isLast = index === group.entries.length - 1;
+            {group.commands.map((entry, index) => {
+              const isRecording = recordingCommand?.id === entry.id;
+              const isLast = index === group.commands.length - 1;
+              const labels =
+                entry.type === "key"
+                  ? settings.canvas.inputBindings.keyCommands[entry.id].map(formatKeyBinding)
+                  : [formatModifierBinding(settings.canvas.inputBindings.modifierCommands[entry.id])];
               return (
                 <div
-                  key={entry.action}
+                  key={entry.id}
                   className={[
                     "flex items-center justify-between px-4 py-3",
                     !isLast ? "border-b border-[var(--border)]" : "",
@@ -211,18 +218,18 @@ function ShortcutsTab({
                     "transition-colors",
                   ].join(" ")}
                 >
-                  <span className="text-[13px] text-[var(--text)]">{entry.action}</span>
+                  <span className="text-[13px] text-[var(--text)]">{entry.label}</span>
                   <div className="flex items-center gap-2">
                     {isRecording ? (
                       <RecordingPill onCancel={onStopRecording} />
                     ) : (
                       <button
                         type="button"
-                        onClick={() => onStartRecording(entry.action)}
+                        onClick={() => onStartRecording({ id: entry.id, type: entry.type })}
                         className="flex items-center gap-1 cursor-pointer group"
-                        aria-label={`Reatribuir atalho: ${entry.action}`}
+                        aria-label={`Reassign shortcut: ${entry.label}`}
                       >
-                        {entry.keys.map((key, i) => (
+                        {labels.map((key, i) => (
                           <KeyBadge key={i}>{key}</KeyBadge>
                         ))}
                         <span className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[var(--text-faint)]">
@@ -244,6 +251,46 @@ function ShortcutsTab({
       </div>
     </div>
   );
+}
+
+function updateKeyCommand(
+  settings: GlobalSettings,
+  commandId: CanvasKeyCommandId,
+  binding: GlobalSettings["canvas"]["inputBindings"]["keyCommands"][CanvasKeyCommandId][number],
+): GlobalSettings {
+  return {
+    ...settings,
+    canvas: {
+      ...settings.canvas,
+      inputBindings: {
+        ...settings.canvas.inputBindings,
+        keyCommands: {
+          ...settings.canvas.inputBindings.keyCommands,
+          [commandId]: [binding],
+        },
+      },
+    },
+  };
+}
+
+function updateModifierCommand(
+  settings: GlobalSettings,
+  commandId: CanvasModifierCommandId,
+  binding: GlobalSettings["canvas"]["inputBindings"]["modifierCommands"][CanvasModifierCommandId],
+): GlobalSettings {
+  return {
+    ...settings,
+    canvas: {
+      ...settings.canvas,
+      inputBindings: {
+        ...settings.canvas.inputBindings,
+        modifierCommands: {
+          ...settings.canvas.inputBindings.modifierCommands,
+          [commandId]: binding,
+        },
+      },
+    },
+  };
 }
 
 function RecordingPill({ onCancel }: { onCancel: () => void }) {
@@ -275,10 +322,12 @@ function KeyBadge({ children }: { children: React.ReactNode }) {
 function StorageTab({
   folderPath,
   referencesPath,
+  workspaceName,
   onPickFolder,
 }: {
   folderPath: string;
   referencesPath: string;
+  workspaceName: string;
   onPickFolder: () => void;
 }) {
   return (

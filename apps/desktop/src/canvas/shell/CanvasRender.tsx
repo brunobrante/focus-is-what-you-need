@@ -12,6 +12,9 @@ import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "@/canvas/engine/viewport";
 import { canvasSizeForProjectType } from "@/canvas/canvasUtils";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasStage } from "../stage/CanvasStage";
+import type { CanvasToolId } from "@/canvas/tools";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import type { GlobalSettings } from "@/domain/settings/types";
 
 function shellVisibilityStyle(v: ShellControlVisibility, localHovered: boolean): CSSProperties {
   if (v === "hidden") return { opacity: 0, pointerEvents: "none" };
@@ -64,6 +67,8 @@ export function CanvasRender({
   onActiveCanvasChange,
   onToggleExpand,
   onBackToParent,
+  settings = DEFAULT_GLOBAL_SETTINGS,
+  onCanvasToolShortcut,
 }: {
   treeOpen: boolean;
   inspectorOpen: boolean;
@@ -86,6 +91,8 @@ export function CanvasRender({
   onActiveCanvasChange?: (canvas: "left" | "right") => void;
   onToggleExpand?: () => void;
   onBackToParent?: () => void;
+  settings?: GlobalSettings;
+  onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
 }) {
   const activeCanvas = split !== "none" && activeTab === "drafts" ? "right" : "left";
 
@@ -137,6 +144,8 @@ export function CanvasRender({
             shellBackVisibility={shellBackVisibility}
             shellZoomVisibility={shellZoomVisibility}
             onBackToParent={onBackToParent}
+            settings={settings}
+            onCanvasToolShortcut={onCanvasToolShortcut}
           />
           <CanvasSurface
             active={activeCanvas === "right"}
@@ -150,6 +159,8 @@ export function CanvasRender({
             fallbackDocument={draftsFallbackDoc}
             activeTool={activeTool}
             projectType={projectType}
+            settings={settings}
+            onCanvasToolShortcut={onCanvasToolShortcut}
           />
         </div>
       ) : split === "horizontal" ? (
@@ -176,6 +187,8 @@ export function CanvasRender({
             shellBackVisibility={shellBackVisibility}
             shellZoomVisibility={shellZoomVisibility}
             onBackToParent={onBackToParent}
+            settings={settings}
+            onCanvasToolShortcut={onCanvasToolShortcut}
           />
           <CanvasSurface
             active={activeCanvas === "right"}
@@ -189,6 +202,8 @@ export function CanvasRender({
             fallbackDocument={draftsFallbackDoc}
             activeTool={activeTool}
             projectType={projectType}
+            settings={settings}
+            onCanvasToolShortcut={onCanvasToolShortcut}
           />
         </div>
       ) : (
@@ -205,6 +220,8 @@ export function CanvasRender({
               fallbackDocument={draftsFallbackDoc}
               activeTool={activeTool}
               projectType={projectType}
+              settings={settings}
+              onCanvasToolShortcut={onCanvasToolShortcut}
             />
           ) : (
             <CanvasSurface
@@ -228,6 +245,8 @@ export function CanvasRender({
               shellBackVisibility={shellBackVisibility}
               shellZoomVisibility={shellZoomVisibility}
               onBackToParent={onBackToParent}
+              settings={settings}
+              onCanvasToolShortcut={onCanvasToolShortcut}
             />
           )}
         </div>
@@ -311,6 +330,8 @@ function CanvasSurface({
   shellBackVisibility = "show",
   shellZoomVisibility = "show",
   onBackToParent,
+  settings = DEFAULT_GLOBAL_SETTINGS,
+  onCanvasToolShortcut,
 }: {
   active: boolean;
   showActiveBorder: boolean;
@@ -333,6 +354,8 @@ function CanvasSurface({
   shellBackVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
   onBackToParent?: () => void;
+  settings?: GlobalSettings;
+  onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
 }) {
   const viewportSubjectKey = storageKey;
   const [screenOverlayEnabled, setScreenOverlayEnabled] = useState(false);
@@ -377,6 +400,8 @@ function CanvasSurface({
             activeTool={activeTool}
             viewportSubjectKey={viewportSubjectKey}
             screenOverlay={screenOverlay}
+            settings={settings}
+            onCanvasToolShortcut={onCanvasToolShortcut}
           />
           {!draftMode && parentTarget && shellBackVisibility !== "hidden" ? (
             <CanvasParentBackButton

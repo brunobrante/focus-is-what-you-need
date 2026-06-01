@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect } from "react";
 import type { MutableRefObject, WheelEvent as ReactWheelEvent } from "react";
 import type { EditorState } from "@/canvas/engine/types";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import type { GlobalSettings } from "@/domain/settings/types";
 import { clamp } from "@/canvas/engine/geometry";
 import {
   MAX_ZOOM,
@@ -28,6 +30,7 @@ type Params = {
   viewportSubjectKey?: string;
   viewportSize: Size;
   viewportInitializedSubjectRef: MutableRefObject<string | null>;
+  settings?: GlobalSettings;
 };
 
 export function useViewportControls({
@@ -40,6 +43,7 @@ export function useViewportControls({
   viewportSubjectKey,
   viewportSize,
   viewportInitializedSubjectRef,
+  settings = DEFAULT_GLOBAL_SETTINGS,
 }: Params) {
   useEffect(() => {
     const el = viewportRef.current;
@@ -96,7 +100,11 @@ export function useViewportControls({
     let nextViewport;
 
     if (event.ctrlKey || event.metaKey) {
-      const nextZoom = clamp(state.zoom * Math.exp(-event.deltaY * 0.002), MIN_ZOOM, MAX_ZOOM);
+      const nextZoom = clamp(
+        state.zoom * Math.exp(-event.deltaY * settings.canvas.viewport.wheelZoomSensitivity),
+        MIN_ZOOM,
+        MAX_ZOOM,
+      );
       const displayScale = getCanvasDisplayScale(containerSize, canvasSize);
       const currentDisplayZoom = state.zoom * displayScale;
       const nextDisplayZoom = nextZoom * displayScale;

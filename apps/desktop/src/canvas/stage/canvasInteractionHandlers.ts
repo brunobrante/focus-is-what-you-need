@@ -7,6 +7,9 @@ import type { CanvasDocument, EditorState, Point, Rect } from "@/canvas/engine/t
 import type { EditorAction } from "@/canvas/engine/store";
 import { clampViewportState } from "@/canvas/engine/viewport";
 import type { Size } from "@/canvas/engine/viewport";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { isModifierCommandActive } from "@/domain/settings/resolve";
+import type { GlobalSettings } from "@/domain/settings/types";
 import {
   commitDragMove,
   computeDragMoveCommandFromScreenDelta,
@@ -99,13 +102,15 @@ export function handleDrawMove(
   point: Point,
   dispatch: Dispatch,
   latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): void {
   const distance = Math.hypot(point.x - interaction.startPoint.x, point.y - interaction.startPoint.y);
   interaction.moved = interaction.moved || distance > 2;
 
-  const node = createElementForTool(interaction.tool, 0, 0, interaction.beforeDocument.canvas);
+  const node = createElementForTool(interaction.tool, 0, 0, interaction.beforeDocument.canvas, settings);
   const def = getToolElementDefinition(interaction.tool);
   const drawMode = def?.capabilities.drawMode ?? "free";
+  const constrainAspect = isModifierCommandActive(event, settings, "canvas.transform.constrainAspect");
 
   const isHorizontal = drawMode === "horizontal";
   const isProportional = drawMode === "proportional";
@@ -132,7 +137,7 @@ export function handleDrawMove(
     node.rotation = angleDeg;
   } else {
     const rawW = Math.abs(point.x - interaction.startPoint.x);
-    const rawH = event.shiftKey || isProportional
+    const rawH = constrainAspect || isProportional
       ? rawW
       : Math.abs(point.y - interaction.startPoint.y);
     node.x = roundPixel(Math.min(interaction.startPoint.x, point.x));
@@ -177,6 +182,7 @@ export function handleDragMove(
   updateDropTarget: (target: CanvasDropTarget | null) => void,
   dispatch: Dispatch,
   latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): void {
   const screenDelta = {
     x: event.clientX - interaction.startScreenPoint.x,
@@ -187,7 +193,7 @@ export function handleDragMove(
   let move;
   let nextDocument: CanvasDocument;
   let changedIds = interaction.transformIds;
-  if (event.metaKey) {
+  if (isModifierCommandActive(event, settings, "canvas.drag.reparent")) {
     commandModeRef.current = true;
     const canvasBounds: Rect = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
     move = computeDragMoveCommandFromScreenDelta(interaction, screenDelta, canvasBounds);
@@ -234,8 +240,9 @@ export function handleCanvasResizeMove(
   event: ReactPointerEvent,
   dispatch: Dispatch,
   latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): void {
-  const result = resizeCanvasDocument(interaction, event);
+  const result = resizeCanvasDocument(interaction, event, settings);
   interaction.lastDocument = result.document;
   latestDocumentRef.current = result.document;
   // Canvas resize only mutates canvas dimensions, not any element — empty
@@ -250,8 +257,9 @@ export function handleCanvasRotateMove(
   event: ReactPointerEvent,
   dispatch: Dispatch,
   latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): void {
-  const next = rotateCanvasDocument(interaction, point, event);
+  const next = rotateCanvasDocument(interaction, point, event, settings);
   interaction.lastDocument = next;
   latestDocumentRef.current = next;
   // Canvas rotation only mutates canvas.rotation (applied at the stage transform),
@@ -265,13 +273,14 @@ export function handleTransformMove(
   event: ReactPointerEvent,
   dispatch: Dispatch,
   latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): void {
   const result =
     interaction.type === "resize"
-      ? resizeDocument(interaction, point, event)
+      ? resizeDocument(interaction, point, event, settings)
       : interaction.type === "radius"
         ? radiusDocument(interaction, point)
-        : rotateDocument(interaction, point, event);
+        : rotateDocument(interaction, point, event, settings);
   interaction.lastDocument = result.document;
   if ("lastGuides" in interaction) interaction.lastGuides = result.guides;
   latestDocumentRef.current = result.document;
@@ -287,7 +296,11 @@ export function handleTransformMove(
 
 // === FINISH HELPERS ===
 
-export function finishDrawInteraction(interaction: DrawInteraction, dispatch: Dispatch): void {
+export function finishDrawInteraction(
+  interaction: DrawInteraction,
+  dispatch: Dispatch,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
+): void {
   if (interaction.moved) {
     dispatch({
       type: "commitDocument",
@@ -302,6 +315,7 @@ export function finishDrawInteraction(interaction: DrawInteraction, dispatch: Di
       interaction.startPoint.x,
       interaction.startPoint.y,
       interaction.beforeDocument.canvas,
+      settings,
     );
     node.id = interaction.elementId;
     next.elements[node.id] = node;

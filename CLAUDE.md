@@ -576,6 +576,59 @@ multiplying the write cost by the depth of the component tree. Now:
   function, called **off the critical path** (at idle, after the row is persisted).
 - Moving a node in a deeply nested component no longer blocks the interaction.
 
+## Global Settings Architecture
+
+Settings are stored as ordinary `records` rows, not in `kv_store` and not inside
+projects, scenes, or variants. The current global settings row is:
+
+- `table`: `settings`
+- `id`: `global`
+- `json`: a `SettingsRow` containing `schemaVersion`, `scope`, and `overrides`
+
+The SQLite layer does not need a dedicated settings table. The existing
+`records(tbl, id, json)` table persists settings through the same record-store
+cache and `SaveQueue` used by the rest of the app.
+
+### File map
+
+| File | What it contains |
+| --- | --- |
+| `src/domain/settings/types.ts` | Pure settings types: global settings, canvas settings, key commands, modifier commands, toolbar layout, element defaults, and persisted `SettingsRow`. |
+| `src/domain/settings/defaults.ts` | The complete default settings tree. Defaults are the source of truth for missing persisted fields. |
+| `src/domain/settings/commands.ts` | The canvas command registry. Every shortcut or held modifier should map to a named command id such as `canvas.drag.reparent` or `canvas.tool.rectangle`. |
+| `src/domain/settings/resolve.ts` | Default-plus-override resolution, keybinding matching, modifier matching, shortcut formatting, and recording helpers. |
+| `src/lib/storage/repos/settings.repo.ts` | Storage repo for global settings. It reads/writes `TABLES.settings` through `getRecordById` and `putRecord`. |
+| `src/application/settings/useGlobalSettings.ts` | React hook that loads global settings and subscribes to the `settings` table. |
+
+### Canvas settings model
+
+Canvas settings are split by ownership:
+
+- `canvas.tools`: toolbar layout and default active tool.
+- `canvas.toolDefaults`: tool-level defaults such as shape render modes.
+- `canvas.elementDefaults`: default names, sizes, styles, and content for newly created elements.
+- `canvas.inputBindings.keyCommands`: discrete keyboard commands such as undo, paste, zoom, and tool selection.
+- `canvas.inputBindings.modifierCommands`: held modifiers such as reparent while dragging, context toolbar, resize from center, constrain aspect, and rotation snapping.
+- `canvas.viewport`: canvas interaction values such as zoom step and wheel zoom sensitivity.
+- `canvas.shell`: shell-level defaults such as background and grid.
+
+Do not check `event.metaKey`, `event.altKey`, or `event.shiftKey` directly for
+canvas behavior that should be configurable. Use the helpers in
+`src/domain/settings/resolve.ts`:
+
+- `matchesKeyCommand(event, settings, commandId)` for discrete shortcuts.
+- `isModifierCommandActive(event, settings, commandId)` for held modifiers.
+
+Toolbar config must stay serializable. Persist only tool ids, groups, dropdowns,
+and badges. The React icon registry lives in `src/canvas/toolbarConfig.tsx`,
+which turns the serializable layout plus current keybindings into renderable
+toolbar entries.
+
+Future project-specific settings should use the same table with ids such as
+`project:<projectId>` and resolve in this order:
+
+`defaults -> global overrides -> project overrides`
+
 ### Rules for models working in this codebase
 
 - **Never call `getTable` or `setTable`.** Those symbols no longer exist. Use
@@ -590,4 +643,3 @@ multiplying the write cost by the depth of the component tree. Now:
   `state: State<'_, Db>`.
 - **Do not add a new blob key to `kv_store`.** New data goes in the `records`
   table via `putRecord`, keyed by `(table, id)`.
-

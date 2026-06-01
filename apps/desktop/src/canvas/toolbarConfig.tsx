@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 import type { CanvasToolId } from "./tools";
+import { CANVAS_TOOL_COMMANDS } from "@/domain/settings/commands";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { getPrimaryKeyBindingLabel } from "@/domain/settings/resolve";
+import type { GlobalSettings, ToolbarLayoutItem } from "@/domain/settings/types";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -8,6 +12,7 @@ export type ToolEntry = {
   id: CanvasToolId;
   name: string;
   icon: ReactNode;
+  shortcut?: string | null;
 };
 
 /**
@@ -146,7 +151,36 @@ export const TOOL_ENTRIES: Record<CanvasToolId, ToolEntry> = {
 // ── Default config ─────────────────────────────────────────────────────────────
 
 /** Shorthand — grab an entry by id. */
-const e = (id: CanvasToolId): ToolEntry => TOOL_ENTRIES[id];
+const e = (id: CanvasToolId, settings: GlobalSettings): ToolEntry => ({
+  ...TOOL_ENTRIES[id],
+  shortcut: getPrimaryKeyBindingLabel(settings, CANVAS_TOOL_COMMANDS[id]),
+});
+
+function createToolbarItemConfig(
+  item: ToolbarLayoutItem,
+  settings: GlobalSettings,
+): ToolbarItemConfig | null {
+  if (item.kind === "button") {
+    return { kind: "button", tool: e(item.tool, settings) };
+  }
+  const tools = item.tools.map((tool) => e(tool, settings));
+  if (tools.length === 0) return null;
+  return { kind: "dropdown", tools, badge: item.badge };
+}
+
+export function createToolbarConfig(
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
+): ToolbarConfig {
+  return {
+    groups: settings.canvas.tools.toolbar.groups
+      .map((group) =>
+        group
+          .map((item) => createToolbarItemConfig(item, settings))
+          .filter((item): item is ToolbarItemConfig => item !== null),
+      )
+      .filter((group) => group.length > 0),
+  };
+}
 
 /**
  * Default toolbar layout shipped with the canvas editor.
@@ -156,22 +190,5 @@ const e = (id: CanvasToolId): ToolEntry => TOOL_ENTRIES[id];
  * Group 3 — Actions:      [actions]
  */
 export const DEFAULT_TOOLBAR_CONFIG: ToolbarConfig = {
-  groups: [
-    // ── Navigation ──────────────────────────────────────────────────────────
-    [
-      { kind: "dropdown", tools: [e("cursor"), e("hand")] },
-    ],
-    // ── Creation ────────────────────────────────────────────────────────────
-    [
-      { kind: "button",   tool: e("wrapper") },
-      { kind: "dropdown", tools: [e("rectangle"), e("ellipse"), e("line"), e("arrow"), e("polygon"), e("star")], badge: "SVG" },
-      { kind: "button",   tool: e("pen") },
-      { kind: "button",   tool: e("text") },
-      { kind: "dropdown", tools: [e("image"), e("svg")] },
-    ],
-    // ── Actions ─────────────────────────────────────────────────────────────
-    [
-      { kind: "button", tool: e("actions") },
-    ],
-  ],
+  groups: createToolbarConfig(DEFAULT_GLOBAL_SETTINGS).groups,
 };

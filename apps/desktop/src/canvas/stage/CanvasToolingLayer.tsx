@@ -13,6 +13,9 @@ import { filterTopLevelIds, getCommonParentId, getSelectionBox, unionRects } fro
 import { useHoveredId } from "@/canvas/engine/store";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementStyles, Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { isModifierCommandActive } from "@/domain/settings/resolve";
+import type { GlobalSettings } from "@/domain/settings/types";
 import type { CanvasDropTarget } from "./canvasStageTypes";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasHitTesting";
 import { hitTestTooling } from "./canvasHitTesting";
@@ -56,6 +59,7 @@ export type CanvasToolingLayerProps = {
   marqueeRect: Rect | null;
   dropTarget: CanvasDropTarget | null;
   onCommitDocument: (document: CanvasDocument, selectedIds?: string[]) => void;
+  settings?: GlobalSettings;
 };
 
 function computeTransformIds(doc: CanvasDocument, selectedIds: string[]): string[] {
@@ -217,18 +221,21 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
     const t = props.viewportTransform;
     const hoveredId = useHoveredId();
 
-    const [altKeyDown, setAltKeyDown] = useState(false);
+    const settings = props.settings ?? DEFAULT_GLOBAL_SETTINGS;
+    const [contextToolbarModifierDown, setContextToolbarModifierDown] = useState(false);
     useEffect(() => {
-      const hasAltModifier = (event: KeyboardEvent) =>
-        event.key === "Alt" || event.getModifierState("Alt") || event.altKey;
       const onKeyDown = (event: KeyboardEvent) => {
-        if (hasAltModifier(event)) setAltKeyDown(true);
+        if (isModifierCommandActive(event, settings, "canvas.selection.contextToolbar")) {
+          setContextToolbarModifierDown(true);
+        }
       };
       const onKeyUp = (event: KeyboardEvent) => {
-        if (event.key === "Alt" || !event.getModifierState("Alt")) setAltKeyDown(false);
+        if (!isModifierCommandActive(event, settings, "canvas.selection.contextToolbar")) {
+          setContextToolbarModifierDown(false);
+        }
       };
       const onBlur = () => {
-        setAltKeyDown(false);
+        setContextToolbarModifierDown(false);
         setOpenPanel(null);
       };
       window.addEventListener("keydown", onKeyDown);
@@ -239,7 +246,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         window.removeEventListener("keyup", onKeyUp);
         window.removeEventListener("blur", onBlur);
       };
-    }, []);
+    }, [settings]);
 
     const selectedIdsKey = props.selectedIds.join("|");
     useEffect(() => {
@@ -250,7 +257,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
 
     useEffect(() => {
       if (!props.editingTextId) return;
-      setAltKeyDown(false);
+      setContextToolbarModifierDown(false);
       setOpenPanel(null);
       setRenamingElementId(null);
       setRenameDraft("");
@@ -529,7 +536,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       [selectedFontFamily],
     );
     const isRenamingSelection = renamingElementId !== null && renamingElementId === selectedId;
-    const toolbarActive = altKeyDown || openPanel !== null || isRenamingSelection;
+    const toolbarActive = contextToolbarModifierDown || openPanel !== null || isRenamingSelection;
 
     const contextTools = useMemo<ContextTool[]>(() => {
       const tools: ContextTool[] = [];
@@ -839,7 +846,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
 
         {contextualToolbar ? (
           <div
-            key={isRenamingSelection ? "rename" : String(altKeyDown)} // remount on toggle to replay animation
+            key={isRenamingSelection ? "rename" : String(contextToolbarModifierDown)} // remount on toggle to replay animation
             ref={toolbarRef}
             className={`context-toolbar${isRenamingSelection ? " context-toolbar--rename" : ""}`}
             style={{

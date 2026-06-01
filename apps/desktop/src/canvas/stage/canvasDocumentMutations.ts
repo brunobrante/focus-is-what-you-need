@@ -25,6 +25,9 @@ import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
 import type { CanvasDocument, Point, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { isModifierCommandActive } from "@/domain/settings/resolve";
+import type { GlobalSettings } from "@/domain/settings/types";
 import type {
   CanvasResizeInteraction,
   CanvasRotateInteraction,
@@ -182,6 +185,7 @@ function resizeSingleElement(
   interaction: ResizeInteraction,
   currentPoint: Point,
   event: ReactPointerEvent,
+  settings: GlobalSettings,
 ): { document: CanvasDocument; guides: SnapGuide[] } {
   const id = interaction.transformIds[0];
   const source = interaction.beforeDocument.elements[id];
@@ -197,6 +201,9 @@ function resizeSingleElement(
   const handle = interaction.handle;
   const def = getElementDefinition(source.type).capabilities;
   const lockAspect = def.lockAspectRatio;
+  const fromCenter = isModifierCommandActive(event, settings, "canvas.resize.fromCenter");
+  const constrainAspect =
+    isModifierCommandActive(event, settings, "canvas.transform.constrainAspect") || lockAspect;
   const minW = def.constraints.width.min;
   const maxW = Math.min(parentSize.width, def.constraints.width.max ?? parentSize.width);
   const minH = def.constraints.height.min;
@@ -204,14 +211,14 @@ function resizeSingleElement(
   let nextRect: Rect;
   if (source.rotation !== 0) {
     nextRect = resizeRotatedRectFromHandle(startRect, handle, currentPoint, source.rotation, {
-      altKey: event.altKey,
-      shiftKey: event.shiftKey || lockAspect,
+      altKey: fromCenter,
+      shiftKey: constrainAspect,
     });
     nextRect = clampRotatedRectToBounds(nextRect, source.rotation, parentBounds);
   } else {
     nextRect = resizeBoxFromHandle(startRect, interaction.startPoint, currentPoint, handle, {
-      altKey: event.altKey,
-      shiftKey: event.shiftKey || lockAspect,
+      altKey: fromCenter,
+      shiftKey: constrainAspect,
     });
     nextRect = clampRectToBounds(nextRect, parentBounds);
   }
@@ -219,7 +226,7 @@ function resizeSingleElement(
   const height = roundPixel(clamp(nextRect.height, minH, maxH));
   let absX: number;
   let absY: number;
-  if (source.rotation !== 0 || event.altKey) {
+  if (source.rotation !== 0 || fromCenter) {
     absX = nextRect.x;
     absY = nextRect.y;
   } else {
@@ -261,11 +268,14 @@ export function resizeDocument(
   interaction: ResizeInteraction,
   currentPoint: Point,
   event: ReactPointerEvent,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): { document: CanvasDocument; guides: SnapGuide[] } {
-  if (interaction.transformIds.length === 1) return resizeSingleElement(interaction, currentPoint, event);
+  if (interaction.transformIds.length === 1) return resizeSingleElement(interaction, currentPoint, event, settings);
+  const fromCenter = isModifierCommandActive(event, settings, "canvas.resize.fromCenter");
+  const constrainAspect = isModifierCommandActive(event, settings, "canvas.transform.constrainAspect");
   let nextBox = resizeBoxFromHandle(interaction.startBox, interaction.startPoint, currentPoint, interaction.handle, {
-    altKey: event.altKey,
-    shiftKey: event.shiftKey,
+    altKey: fromCenter,
+    shiftKey: constrainAspect,
   });
   nextBox = clampRectToBounds(nextBox, interaction.parentBounds);
   const scaleX = nextBox.width / Math.max(interaction.startBox.width, 1);
@@ -316,6 +326,7 @@ export function rotateDocument(
   interaction: RotateInteraction,
   currentPoint: Point,
   event: ReactPointerEvent,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): { document: CanvasDocument; guides: SnapGuide[] } {
   const currentAngle = angleBetweenPoints(interaction.center, currentPoint);
   const delta = angleDelta(interaction.startAngle, currentAngle);
@@ -324,7 +335,11 @@ export function rotateDocument(
     const node = mutateElementShallow(next, id);
     if (!node) continue;
     const rawRotation = (interaction.startRotations[id] ?? 0) + delta;
-    node.rotation = roundAngle(normalizeAngle(snapAngle(rawRotation, event.shiftKey)));
+    node.rotation = roundAngle(
+      normalizeAngle(
+        snapAngle(rawRotation, isModifierCommandActive(event, settings, "canvas.rotate.snap")),
+      ),
+    );
     const absoluteRect = getAbsoluteRect(next, id);
     if (absoluteRect) {
       const parentBounds = getParentBounds(next, id);
@@ -367,6 +382,7 @@ export function radiusDocument(
 export function resizeCanvasDocument(
   interaction: CanvasResizeInteraction,
   event: ReactPointerEvent,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): { document: CanvasDocument; viewport: ViewportState } {
   const handle = interaction.handle;
   const rotation = interaction.beforeDocument.canvas.rotation ?? 0;
@@ -382,7 +398,7 @@ export function resizeCanvasDocument(
   if (handle.includes("w")) newWidth = interaction.startWidth - delta.x;
   if (handle.includes("s")) newHeight = interaction.startHeight + delta.y;
   if (handle.includes("n")) newHeight = interaction.startHeight - delta.y;
-  if (event.shiftKey && handle.length === 2) {
+  if (isModifierCommandActive(event, settings, "canvas.transform.constrainAspect") && handle.length === 2) {
     const aspect = interaction.startWidth / Math.max(interaction.startHeight, 1);
     if (Math.abs(delta.x) > Math.abs(delta.y)) newHeight = newWidth / aspect;
     else newWidth = newHeight * aspect;
@@ -412,11 +428,16 @@ export function rotateCanvasDocument(
   interaction: CanvasRotateInteraction,
   currentPoint: Point,
   event: ReactPointerEvent,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): CanvasDocument {
   const currentAngle = angleBetweenPoints(interaction.center, currentPoint);
   const delta = angleDelta(interaction.startAngle, currentAngle);
   const rawRotation = interaction.startRotation + delta;
-  const newRotation = roundAngle(normalizeAngle(snapAngle(rawRotation, event.shiftKey)));
+  const newRotation = roundAngle(
+    normalizeAngle(
+      snapAngle(rawRotation, isModifierCommandActive(event, settings, "canvas.rotate.snap")),
+    ),
+  );
   const next = shallowCloneDocument(interaction.beforeDocument);
   next.canvas.rotation = newRotation;
   return next;

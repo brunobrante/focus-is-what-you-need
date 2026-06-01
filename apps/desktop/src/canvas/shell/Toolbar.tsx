@@ -42,16 +42,33 @@ export function Toolbar({
   config?: ToolbarConfig;
   onBadgeClick?: () => void;
 }) {
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const [uncontrolledActive, setUncontrolledActive] = useState<CanvasToolId>(defaultTool);
   const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const active = activeTool ?? uncontrolledActive;
   const selectTool = (tool: CanvasToolId) => {
     setUncontrolledActive(tool);
     onToolChange?.(tool);
   };
 
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
+        setActionsMenuOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [actionsMenuOpen]);
+
+  useEffect(() => {
+    if (active === "actions") setActionsMenuOpen(true);
+  }, [active]);
+
   return (
-    <div className="relative inline-flex">
+    <div ref={toolbarRef} className="relative inline-flex">
       <div
         data-screen-label="Toolbar"
         className="inline-flex items-center gap-0.5 rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-1.5"
@@ -73,22 +90,38 @@ export function Toolbar({
                     tools={item.tools}
                     active={active}
                     onSelect={selectTool}
+                    onOpenMenu={() => setActionsMenuOpen(false)}
                     badge={item.badge}
                     onBadgeClick={item.badge ? onBadgeClick : undefined}
                   />
                 ) : (
-                  <ToolButton
-                    key={item.tool.id}
-                    tool={item.tool}
-                    active={active === item.tool.id}
-                    onClick={() => selectTool(item.tool.id)}
-                  />
+                  item.tool.id === "actions" ? (
+                    <ActionsMenuButton
+                      key={item.tool.id}
+                      tool={item.tool}
+                      menuOpen={actionsMenuOpen}
+                      onToggle={() => setActionsMenuOpen((value) => !value)}
+                    />
+                  ) : (
+                    <ToolButton
+                      key={item.tool.id}
+                      tool={item.tool}
+                      active={active === item.tool.id}
+                      onClick={() => selectTool(item.tool.id)}
+                    />
+                  )
                 )
               )}
             </Fragment>
           );
         })}
       </div>
+      {actionsMenuOpen && (
+        <div
+          className="absolute bottom-[calc(100%+5px)] left-1/2 z-50 h-[220px] w-[380px] -translate-x-1/2 rounded-[10px] border border-[#2C2C2C] bg-[#1E1E1E] p-2"
+          style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3)" }}
+        />
+      )}
 
       {canvasExpanded && (
         <div className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
@@ -114,12 +147,14 @@ function DropdownToolButton({
   tools,
   active,
   onSelect,
+  onOpenMenu,
   badge,
   onBadgeClick,
 }: {
   tools: ToolEntry[];
   active: CanvasToolId;
   onSelect: (id: CanvasToolId) => void;
+  onOpenMenu?: () => void;
   badge?: string;
   onBadgeClick?: () => void;
 }) {
@@ -159,19 +194,18 @@ function DropdownToolButton({
       >
         {current.icon}
         {hover && !isGroupActive && (
-          <span
-            className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-md border border-[#2A2A2A] bg-[#0E0E0E] px-2 py-1.5 text-[11px] font-medium leading-none tracking-[0.1px] text-[#F5F5F5]"
-            style={{ bottom: "calc(100% + 10px)", whiteSpace: "nowrap" }}
-          >
-            {current.name}
-          </span>
+          <ToolTooltip tool={current} />
         )}
       </button>
 
       <button
         type="button"
         aria-label="More options"
-        onClick={() => setMenuOpen((o) => !o)}
+        onClick={() => {
+          const next = !menuOpen;
+          setMenuOpen(next);
+          if (next) onOpenMenu?.();
+        }}
         className={[
           "-ml-1 inline-flex h-8 w-4 cursor-pointer items-center justify-center rounded-md border-0 p-0 transition-colors duration-[90ms]",
           menuOpen ? "bg-[#2A2A2A] text-white" : "text-[#666] hover:bg-[#2A2A2A] hover:text-[#DADADA]",
@@ -213,7 +247,12 @@ function DropdownToolButton({
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                     {tool.icon}
                   </span>
-                  {tool.name}
+                  <span className="flex-1">{tool.name}</span>
+                  {tool.shortcut ? (
+                    <span className="ml-4 rounded border border-[#343434] bg-[#171717] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[#8E8E8E]">
+                      {tool.shortcut}
+                    </span>
+                  ) : null}
                 </button>
 
                 {badge && (
@@ -272,14 +311,59 @@ function ToolButton({
     >
       {tool.icon}
       {hover && !active && (
-        <span
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-md border border-[#2A2A2A] bg-[#0E0E0E] px-2 py-1.5 text-[11px] font-medium leading-none tracking-[0.1px] text-[#F5F5F5]"
-          style={{ bottom: "calc(100% + 10px)", whiteSpace: "nowrap" }}
-        >
-          {tool.name}
-        </span>
+        <ToolTooltip tool={tool} />
       )}
     </button>
+  );
+}
+
+function ActionsMenuButton({
+  tool,
+  menuOpen,
+  onToggle,
+}: {
+  tool: ToolEntry;
+  menuOpen: boolean;
+  onToggle: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        aria-label={tool.name}
+        aria-expanded={menuOpen}
+        className={[
+          "relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border-0 p-0 transition-colors duration-[90ms]",
+          menuOpen ? "bg-[#383838] text-white" : hover ? "bg-[#2A2A2A] text-[#CFCFCF]" : "bg-transparent text-[#CFCFCF]",
+        ].join(" ")}
+      >
+        {tool.icon}
+        {hover && !menuOpen && (
+          <ToolTooltip tool={tool} />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function ToolTooltip({ tool }: { tool: ToolEntry }) {
+  return (
+    <span
+      className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-[#2A2A2A] bg-[#0E0E0E] px-2 py-1.5 text-[11px] font-medium leading-none tracking-[0.1px] text-[#F5F5F5]"
+      style={{ bottom: "calc(100% + 10px)", whiteSpace: "nowrap" }}
+    >
+      {tool.name}
+      {tool.shortcut ? (
+        <span className="rounded border border-[#343434] bg-[#171717] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[#8E8E8E]">
+          {tool.shortcut}
+        </span>
+      ) : null}
+    </span>
   );
 }
 

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { DEFAULT_SHELL_BACKGROUND } from "@/canvas/engine/actions";
 import type { CanvasDocument, Tool } from "@/canvas/engine/types";
+import type { CanvasToolId } from "@/canvas/tools";
 
 export function getShellPatternStyle(document: CanvasDocument): CSSProperties {
   return {
@@ -16,6 +17,20 @@ export const TOOLBAR_TOOL_MAP: Record<string, Tool> = {
   text: "text",
   image: "image",
   svg: "icon",
+  line: "line",
+  arrow: "arrow",
+  polygon: "polygon",
+  star: "star",
+};
+
+export const EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP: Partial<Record<Tool, CanvasToolId>> = {
+  select: "cursor",
+  wrapper: "wrapper",
+  rect: "rectangle",
+  ellipse: "ellipse",
+  text: "text",
+  image: "image",
+  icon: "svg",
   line: "line",
   arrow: "arrow",
   polygon: "polygon",

@@ -11,6 +11,9 @@ import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/
 import { moveElementBefore, setElementLocked, setElementVisible, wrapElements } from "@/canvas/engine/actions";
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasToolId } from "@/canvas/tools";
+import { createToolbarConfig } from "@/canvas/toolbarConfig";
+import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
+import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import { CanvasTabs } from "./CanvasTabs";
 import { useScene } from "@/lib/storage/hooks";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
@@ -87,6 +90,7 @@ function CanvasPageContent() {
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
   const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
   const [shellTabSignal, setShellTabSignal] = useState(0);
+  const { settings } = useGlobalSettings();
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
@@ -222,23 +226,30 @@ function CanvasPageContent() {
     flushPendingSave,
   });
 
+  const toolbarConfig = useMemo(() => createToolbarConfig(settings), [settings]);
+
   const handleToolChange = useCallback(
-    (tool: CanvasToolId) => {
+    (tool: CanvasToolId): boolean => {
       const editor = getEditor();
       if (tool === "wrapper" && editor && editor.state.selectedIds.length > 0) {
         const { document: next, wrapperId } = wrapElements(editor.state.document, editor.state.selectedIds);
         editor.dispatch({ type: "commitDocument", document: next, selectedIds: wrapperId ? [wrapperId] : [] });
-        return;
+        return true;
       }
       setActiveTool(tool);
+      return tool === "actions";
     },
     [getEditor],
   );
 
   useEffect(() => {
+    if (!editorTool) return;
     if (editorTool === "select") {
       setActiveTool((prev) => (prev === "cursor" || prev === "hand") ? prev : "cursor");
+      return;
     }
+    const mapped = EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP[editorTool];
+    if (mapped) setActiveTool(mapped);
   }, [editorTool]);
 
   const setActiveZoom: ZoomSetter = (next) => {
@@ -285,6 +296,8 @@ function CanvasPageContent() {
         onActiveCanvasChange={(canvas) => changeCanvasTab(canvas === "right" ? "drafts" : "current")}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}
         onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
+        settings={settings}
+        onCanvasToolShortcut={handleToolChange}
       />
 
       <div className="fixed left-1/2 top-3 z-[5] -translate-x-1/2">
@@ -408,6 +421,7 @@ function CanvasPageContent() {
           parentTarget={parentProjectNode}
           onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
           onCollapseCanvas={() => setCanvasExpanded(false)}
+          config={toolbarConfig}
           onBadgeClick={() => {
             setInspectorOpen(true);
             setShellTabSignal((s) => s + 1);

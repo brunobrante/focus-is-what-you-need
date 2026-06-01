@@ -9,6 +9,8 @@ import { buildViewportTransform } from "../canvasCoordinates";
 import { viewportPointToCanvas } from "@/canvas/engine/viewport";
 import type { Size } from "@/canvas/engine/viewport";
 import { createElementForTool, insertElement } from "@/canvas/engine/actions";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import type { GlobalSettings } from "@/domain/settings/types";
 import type { CanvasToolingRef } from "../CanvasToolingLayer";
 import { findChildAtPoint, retargetForIsolatedParent } from "../canvasHitTesting";
 import { clearNativeTextSelection } from "../canvasStageHelpers";
@@ -65,6 +67,7 @@ type Params = {
   enterTextEditing: (nodeId: string, clientPoint?: Point, selectAll?: boolean) => void;
   syncTextSelection: (start: number, end: number, anchor?: number) => void;
   scheduleCanvasAlignmentLog: (input: CanvasAlignmentLogInput) => void;
+  settings?: GlobalSettings;
 };
 
 export type CanvasPointerEventsResult = {
@@ -98,6 +101,7 @@ export function useCanvasPointerEvents({
   enterTextEditing,
   syncTextSelection,
   scheduleCanvasAlignmentLog,
+  settings = DEFAULT_GLOBAL_SETTINGS,
 }: Params): CanvasPointerEventsResult {
   const dropTargetRef = useRef<CanvasDropTarget | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
@@ -187,7 +191,7 @@ export function useCanvasPointerEvents({
 
     if (state.tool !== "select") {
       event.preventDefault();
-      const node = createElementForTool(state.tool, point.x, point.y, state.document.canvas);
+      const node = createElementForTool(state.tool, point.x, point.y, state.document.canvas, settings);
       node.x = roundPixel(point.x);
       node.y = roundPixel(point.y);
       node.width = 0;
@@ -281,16 +285,16 @@ export function useCanvasPointerEvents({
     const point = getCanvasPoint(event);
     if (!point) return;
 
-    if (interaction.type === "draw") { handleDrawMove(interaction, event, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "draw") { handleDrawMove(interaction, event, point, dispatch, latestDocumentRef, settings); return; }
     if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
-    if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
 
     // canvas-resize, canvas-rotate, resize, rotate, radius: shared distance threshold
     interaction.moved = interaction.moved || Math.hypot(point.x - interaction.startPoint.x, point.y - interaction.startPoint.y) > 0.5;
 
-    if (interaction.type === "canvas-resize") { handleCanvasResizeMove(interaction, event, dispatch, latestDocumentRef); return; }
-    if (interaction.type === "canvas-rotate") { handleCanvasRotateMove(interaction, point, event, dispatch, latestDocumentRef); return; }
-    handleTransformMove(interaction, point, event, dispatch, latestDocumentRef);
+    if (interaction.type === "canvas-resize") { handleCanvasResizeMove(interaction, event, dispatch, latestDocumentRef, settings); return; }
+    if (interaction.type === "canvas-rotate") { handleCanvasRotateMove(interaction, point, event, dispatch, latestDocumentRef, settings); return; }
+    handleTransformMove(interaction, point, event, dispatch, latestDocumentRef, settings);
   };
 
   const finishInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -313,7 +317,7 @@ export function useCanvasPointerEvents({
       return;
     }
     if (interaction.type === "marquee") { setMarqueeRect(null); return; }
-    if (interaction.type === "draw") { finishDrawInteraction(interaction, dispatch); return; }
+    if (interaction.type === "draw") { finishDrawInteraction(interaction, dispatch, settings); return; }
 
     const wasCommandMode = commandModeRef.current;
     const capturedDropTarget = dropTargetRef.current;

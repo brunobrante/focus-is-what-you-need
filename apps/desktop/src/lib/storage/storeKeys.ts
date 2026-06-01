@@ -7,6 +7,7 @@ export const TABLES = {
   references: "references",
   scenes: "scenes",
   thumbnails: "thumbnails",
+  settings: "settings",
   workspaces: "workspaces",
   screenVersions: "screen_versions",
   placements: "placements",
