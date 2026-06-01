@@ -2177,7 +2177,7 @@ function ReferenceProjectCard({
           items={[
             {
               key: "delete",
-              label: "Delete reference",
+              label: "Remove from project",
               icon: SharedCardMenuIcons.Trash,
               destructive: true,
               onClick: onRemove,
@@ -2235,7 +2235,7 @@ function ReferenceProjectRow({
         items={[
           {
             key: "delete",
-            label: "Delete reference",
+            label: "Remove from project",
             icon: SharedCardMenuIcons.Trash,
             destructive: true,
             onClick: onRemove,

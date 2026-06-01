@@ -38,7 +38,10 @@ import {
   useScreens,
 } from "@/lib/storage/hooks";
 import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
-import { createOrAttachReference } from "@/lib/storage/repos/references.repo";
+import {
+  createOrAttachReference,
+  removeReferenceFromOwner,
+} from "@/lib/storage/repos/references.repo";
 import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import {
@@ -164,6 +167,11 @@ export function Components() {
     };
     setVersions((prev) => [newV, ...prev]);
     setActiveVersionId(newV.id);
+  };
+
+  const removeLinkedReference = (referenceId: string) => {
+    if (!screen) return;
+    void removeReferenceFromOwner(referenceId, "screen", screen.id);
   };
 
   return (
@@ -418,6 +426,7 @@ export function Components() {
                 query={query}
                 onAdd={() => addRefModalRef.current?.open()}
                 onOpen={(i) => referencesRef.current?.open(i)}
+                onRemove={(reference) => removeLinkedReference(reference.id)}
               />
             )}
           </div>
@@ -443,7 +452,11 @@ export function Components() {
           }
         }}
       />
-      <ReferencesModal ref={referencesRef} references={filteredReferences} />
+      <ReferencesModal
+        ref={referencesRef}
+        references={filteredReferences}
+        onRemove={(reference) => removeLinkedReference(reference.id)}
+      />
       <AddReferenceModal
         ref={addRefModalRef}
         projectId={project?.id ?? null}

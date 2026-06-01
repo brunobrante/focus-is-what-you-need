@@ -152,6 +152,47 @@ export async function removeReferenceFromProject(referenceId: string, projectId:
   notify(KEY);
 }
 
+function attachmentMatchesOwner(
+  attachment: ReferenceAttachment,
+  ownerType: OwnerType,
+  ownerId: string,
+): boolean {
+  if (ownerType === "project") {
+    return (
+      attachment.projectId === ownerId &&
+      attachment.screenId === null &&
+      attachment.componentId === null
+    );
+  }
+  if (ownerType === "screen") {
+    return attachment.screenId === ownerId;
+  }
+  return attachment.componentId === ownerId;
+}
+
+export async function removeReferenceFromOwner(
+  referenceId: string,
+  ownerType: OwnerType,
+  ownerId: string,
+): Promise<void> {
+  const rows = await listReferences();
+  const nextRows = rows
+    .map((reference) => {
+      if (reference.id !== referenceId) return reference;
+      const attachments = reference.attachments.filter(
+        (attachment) => !attachmentMatchesOwner(attachment, ownerType, ownerId),
+      );
+      return normalizeReferenceRow({
+        ...reference,
+        attachments,
+        projectIds: Array.from(new Set(attachments.map((attachment) => attachment.projectId))),
+      });
+    })
+    .filter((reference) => reference.projectIds.length > 0);
+  await replaceTable<ReferenceRow>(KEY, nextRows);
+  notify(KEY);
+}
+
 export async function bulkInsertReferences(rows: ReferenceRow[]): Promise<void> {
   await replaceTable<ReferenceRow>(KEY, rows.map(normalizeReferenceRow));
   notify(KEY);

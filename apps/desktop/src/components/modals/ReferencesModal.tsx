@@ -7,6 +7,7 @@ export interface ReferencesModalHandle {
 }
 
 type RefDisplayItem = {
+  id: string;
   title: string;
   source: string;
   thumbnailUrl?: string | null;
@@ -14,10 +15,11 @@ type RefDisplayItem = {
 
 type Props = {
   references: RefDisplayItem[];
+  onRemove?: (reference: RefDisplayItem) => void;
 };
 
 export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function ReferencesModal(
-  { references },
+  { references, onRemove },
   ref,
 ) {
   const [open, setOpen] = useState(false);
@@ -35,6 +37,16 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
   const total = references.length;
   const next = () => setIdx((i) => (total === 0 ? 0 : (i + 1) % total));
   const prev = () => setIdx((i) => (total === 0 ? 0 : (i - 1 + total) % total));
+  const removeCurrent = () => {
+    const current = references[idx];
+    if (!current || !onRemove) return;
+    onRemove(current);
+    if (total <= 1) {
+      close();
+      return;
+    }
+    setIdx((i) => Math.min(i, total - 2));
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -55,9 +67,26 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
         subtitle={r?.source ?? ""}
         onClose={close}
         actions={
-          <span className="text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
-            {total === 0 ? "0 / 0" : `${idx + 1} / ${total}`}
-          </span>
+          <>
+            {r && onRemove ? (
+              <button
+                type="button"
+                onClick={removeCurrent}
+                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v5M14 11v5" />
+                </svg>
+                Remove from project
+              </button>
+            ) : null}
+            <span className="text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
+              {total === 0 ? "0 / 0" : `${idx + 1} / ${total}`}
+            </span>
+          </>
         }
       />
       <div

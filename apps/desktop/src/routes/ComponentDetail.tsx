@@ -24,7 +24,10 @@ import {
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
 import { deleteComponentTree, getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
-import { createOrAttachReference } from "@/lib/storage/repos/references.repo";
+import {
+  createOrAttachReference,
+  removeReferenceFromOwner,
+} from "@/lib/storage/repos/references.repo";
 import { getVariant } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
@@ -142,6 +145,11 @@ export function ComponentDetail() {
     };
     setVersions((prev) => [newV, ...prev]);
     setActiveVersionId(newV.id);
+  };
+
+  const removeLinkedReference = (referenceId: string) => {
+    if (!component) return;
+    void removeReferenceFromOwner(referenceId, "component", component.id);
   };
 
 
@@ -377,6 +385,7 @@ export function ComponentDetail() {
                 query={query}
                 onAdd={() => addRefModalRef.current?.open()}
                 onOpen={(i) => referencesRef.current?.open(i)}
+                onRemove={(reference) => removeLinkedReference(reference.id)}
               />
             )}
           </div>
@@ -402,7 +411,11 @@ export function ComponentDetail() {
           }
         }}
       />
-      <ReferencesModal ref={referencesRef} references={filteredReferences} />
+      <ReferencesModal
+        ref={referencesRef}
+        references={filteredReferences}
+        onRemove={(reference) => removeLinkedReference(reference.id)}
+      />
       <FastEditModal
         mode="component"
         open={fastEditOpen}
