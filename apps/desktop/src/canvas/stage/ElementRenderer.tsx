@@ -307,6 +307,21 @@ function ElementRendererImpl({
     );
   }
 
+  if (node.type === "icon") {
+    return (
+      <div
+        data-element-id={node.id}
+        data-node-type={node.type}
+        className={elementClassName(node, "element icon-element", false, isolatedParentId, canvasDocument.elements)}
+        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, false, renderScale)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3.5l2.64 5.35 5.91.86-4.27 4.16 1.01 5.88L12 16.98l-5.29 2.77 1.01-5.88-4.27-4.16 5.91-.86L12 3.5z" />
+        </svg>
+      </div>
+    );
+  }
+
   return (
     <div
       data-element-id={node.id}

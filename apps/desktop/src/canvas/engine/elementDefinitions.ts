@@ -69,6 +69,13 @@ const DEFINITIONS: Record<ElementType, ElementDefinition> = {
       constraints: { width: { min: 8 }, height: { min: 8 }, radius: { min: 0 } },
     },
   },
+  icon: {
+    type: "icon",
+    capabilities: {
+      radius: false, radiusRole: "none", lockAspectRatio: true, resizeHandles: "all", drawMode: "proportional",
+      constraints: { width: { min: 8 }, height: { min: 8 } },
+    },
+  },
   line: {
     type: "line",
     capabilities: {
@@ -105,6 +112,7 @@ const TOOL_TO_ELEMENT_TYPE: Partial<Record<Exclude<Tool, "select">, ElementType>
   ellipse: "ellipse",
   text: "text",
   image: "image",
+  icon: "icon",
   line: "line",
   arrow: "arrow",
   polygon: "polygon",

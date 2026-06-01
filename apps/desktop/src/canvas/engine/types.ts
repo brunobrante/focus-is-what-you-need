@@ -1,6 +1,6 @@
-export type ElementType = "rect" | "ellipse" | "text" | "image" | "line" | "arrow" | "polygon" | "star";
+export type ElementType = "rect" | "ellipse" | "text" | "image" | "icon" | "line" | "arrow" | "polygon" | "star";
 
-export type Tool = "select" | "rect" | "ellipse" | "text" | "image" | "wrapper" | "line" | "arrow" | "polygon" | "star";
+export type Tool = "select" | "rect" | "ellipse" | "text" | "image" | "icon" | "wrapper" | "line" | "arrow" | "polygon" | "star";
 
 export type ShellGridType = "dots" | "squares";
 

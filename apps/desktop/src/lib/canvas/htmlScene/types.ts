@@ -7,6 +7,7 @@ export type HtmlCanvasNodeKind =
   | "text"
   | "shape"
   | "image"
+  | "icon"
   | "component";
 
 export type HtmlCanvasTag =
@@ -20,6 +21,7 @@ export type HtmlCanvasTag =
   | "button"
   | "a"
   | "img"
+  | "icon"
   | "span"
   | "p"
   | "h1"

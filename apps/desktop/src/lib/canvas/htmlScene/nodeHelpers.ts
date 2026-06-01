@@ -18,13 +18,14 @@ import {
 export function isCanvasTag(value: string): value is HtmlCanvasTag {
   return [
     "div", "section", "header", "footer", "main", "article", "nav",
-    "button", "a", "img", "span", "p", "h1", "h2",
+    "button", "a", "img", "icon", "span", "p", "h1", "h2",
   ].includes(value);
 }
 
 export function kindFromType(type: string): HtmlCanvasNodeKind {
   if (type === "text") return "text";
   if (type === "image") return "image";
+  if (type === "icon") return "icon";
   if (type === "rectangle" || type === "ellipse" || type === "line") return "shape";
   if (type === "group" || type === "section") return "group";
   if (type === "component" || type === "instance") return "component";
@@ -45,6 +46,7 @@ export function tagFromKind(kind: HtmlCanvasNodeKind, name: string): HtmlCanvasT
   if (normalized.includes("footer") || normalized.includes("cart")) return "footer";
   if (normalized.includes("nav")) return "nav";
   if (kind === "image") return "img";
+  if (kind === "icon") return "icon";
   if (kind === "text") return normalized.includes("title") ? "h2" : "p";
   if (kind === "component" && (normalized.includes("button") || normalized.includes("cta"))) return "button";
   if (kind === "frame") return "section";
@@ -187,6 +189,7 @@ function defaultSizeForTool(tool: CanvasInsertToolId): { width: number; height: 
   if (tool === "line") return { width: 180, height: 0 };
   if (tool === "pen") return { width: 180, height: 72 };
   if (tool === "text") return { width: 220, height: 34 };
+  if (tool === "svg") return { width: 140, height: 140 };
   return { width: 148, height: 44 };
 }
 
@@ -197,6 +200,7 @@ export function nameForTool(tool: CanvasInsertToolId): string {
   if (tool === "line") return "Line";
   if (tool === "pen") return "Pen Path";
   if (tool === "text") return "Text";
+  if (tool === "svg") return "Icon";
   return "Action Button";
 }
 
@@ -204,6 +208,7 @@ export function typeForTool(tool: CanvasInsertToolId): string {
   if (tool === "wrapper") return "frame";
   if (tool === "text") return "text";
   if (tool === "actions") return "component";
+  if (tool === "svg") return "icon";
   return tool === "ellipse" ? "ellipse" : tool === "line" || tool === "pen" ? "line" : "rectangle";
 }
 
@@ -214,6 +219,7 @@ export function propsForTool(tool: CanvasInsertToolId): Record<string, unknown> 
   if (tool === "line") return { name: nameForTool(tool), bg: "#0F2D2E", stroke: "#0F2D2E", strokeWidth: 2 };
   if (tool === "pen") return { name: nameForTool(tool), bg: "#7C5CFF", stroke: "#7C5CFF", strokeWidth: 3 };
   if (tool === "text") return { name: nameForTool(tool), color: "#17211D", size: 24, weight: 700 };
+  if (tool === "svg") return { name: nameForTool(tool), bg: "#eef2f7" };
   return { name: nameForTool(tool), bg: "#0F2D2E", color: "#F4F6F1", rounded: 22, flex: "row", justify: "center", items: "center", weight: 700 };
 }
 

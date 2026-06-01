@@ -36,6 +36,23 @@ function renderSvgNode(
       : ` stroke="${escapeAttr(node.style.borderColor)}" stroke-width="${node.style.borderWidth}"`;
   const opacity = node.style.opacity < 1 ? ` opacity="${node.style.opacity}"` : "";
 
+  if (node.kind === "icon") {
+    const cx = x + node.bounds.width / 2;
+    const cy = y + node.bounds.height / 2;
+    const outerRadius = Math.min(node.bounds.width, node.bounds.height) * 0.28;
+    const points: string[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      const angle = -Math.PI / 2 + i * (Math.PI / 5);
+      const radius = i % 2 === 0 ? outerRadius : outerRadius * 0.48;
+      points.push(`${cx + Math.cos(angle) * radius},${cy + Math.sin(angle) * radius}`);
+    }
+    return [
+      `<rect x="${x}" y="${y}" width="${node.bounds.width}" height="${node.bounds.height}" rx="${node.style.borderRadius}" fill="${fill}"${stroke}${opacity}/>`,
+      `<polygon points="${points.join(" ")}" fill="${escapeAttr(node.style.color)}"${opacity}/>`,
+      children,
+    ].join("");
+  }
+
   if (node.kind === "text") {
     const text = escapeXml(node.text ?? node.name);
     return [

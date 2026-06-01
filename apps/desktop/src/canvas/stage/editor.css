@@ -166,6 +166,19 @@
     linear-gradient(45deg, transparent 49%, rgba(255, 255, 255, 0.08) 50%, transparent 51%);
 }
 
+.icon-element {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: #8896a8;
+}
+
+.icon-element svg {
+  width: 58%;
+  height: 58%;
+  fill: currentColor;
+}
+
 .editing-outline {
   box-shadow: none;
   border: none;

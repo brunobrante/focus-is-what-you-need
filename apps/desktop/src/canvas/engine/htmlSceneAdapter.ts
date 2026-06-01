@@ -379,6 +379,7 @@ function htmlParentIdForCanvasElement(
 function elementTypeFromHtmlNode(node: HtmlCanvasNode): ElementType {
   if (node.kind === "text" || ["p", "h1", "h2", "span"].includes(node.tag)) return "text";
   if (node.kind === "image" || node.tag === "img") return "image";
+  if (node.kind === "icon" || node.tag === "icon") return "icon";
   return "rect";
 }
 
@@ -446,6 +447,7 @@ function styleFromElement(
 function htmlKindFromElement(element: ElementNode): HtmlCanvasNodeKind {
   if (element.type === "text") return "text";
   if (element.type === "image") return "image";
+  if (element.type === "icon") return "icon";
   return element.children.length > 0 ? "component" : "shape";
 }
 
@@ -458,6 +460,7 @@ function htmlTagFromElement(
   if (normalized.includes("footer") || normalized.includes("cart")) return "footer";
   if (normalized.includes("nav")) return "nav";
   if (kind === "image") return "img";
+  if (kind === "icon") return "icon";
   if (kind === "text") return normalized.includes("title") ? "h2" : "p";
   if (normalized.includes("button") || normalized.includes("cta")) return "button";
   return element.parentId ? "div" : "section";

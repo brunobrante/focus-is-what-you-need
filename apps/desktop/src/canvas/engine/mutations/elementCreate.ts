@@ -33,6 +33,7 @@ export function createElementForTool(
     rect: { type: "rect", name: "Rectangle", width: sd(168, 20, 500), height: sd(104, 12, 350), styles: { background: "#dbeafe", opacity: 1 } },
     text: { type: "text", name: "Text", width: sd(190, 60, 500), height: sd(48, 18, 120), styles: { color: "#182033", fontSize: sd(24, 8, 72), fontWeight: "700", opacity: 1 }, content: "Text layer" },
     image: { type: "image", name: "Image Placeholder", width: sd(220, 30, 500), height: sd(140, 20, 350), styles: { background: "#eef2f7", opacity: 1 } },
+    icon: { type: "icon", name: "Icon", width: sd(140, 20, 350), height: sd(140, 20, 350), styles: { background: "#eef2f7", opacity: 1 } },
     line: { type: "line", name: "Line", width: sd(120, 20, 400), height: 2, styles: { background: "#182033", opacity: 1 } },
     arrow: { type: "arrow", name: "Arrow", width: sd(120, 20, 400), height: sd(40, 16, 80), styles: { background: "#182033", opacity: 1 } },
     polygon: { type: "polygon", name: "Polygon", width: sd(120, 16, 400), height: sd(120, 16, 400), styles: { background: "#dbeafe", opacity: 1 } },
@@ -48,6 +49,7 @@ export function elementTypeLabel(type: ElementType): string {
   if (type === "rect") return "Rectangle";
   if (type === "ellipse") return "Ellipse";
   if (type === "image") return "Image";
+  if (type === "icon") return "Icon";
   if (type === "line") return "Line";
   if (type === "arrow") return "Arrow";
   if (type === "polygon") return "Polygon";

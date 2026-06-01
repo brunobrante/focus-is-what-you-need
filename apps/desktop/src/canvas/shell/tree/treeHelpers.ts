@@ -68,6 +68,7 @@ export function nodeTypeLabel(node: Node): string {
   switch (node.type) {
     case "text":    return "text";
     case "image":   return "img";
+    case "icon":    return "icon";
     case "ellipse": return "elipse";
     case "line":    return "line";
     case "pen":     return "pen";
@@ -104,6 +105,7 @@ export function visibleNodeIds(root: Node, openSet: Set<string>): string[] {
 export function nodeTypeFromElement(type: ElementType, hasChildren: boolean): NodeType {
   if (type === "text") return "text";
   if (type === "image") return "image";
+  if (type === "icon") return "icon";
   if (type === "ellipse") return "ellipse";
   if (type === "line") return "line";
   if (type === "arrow") return "arrow";

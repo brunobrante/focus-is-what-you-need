@@ -15,6 +15,7 @@ export const TOOLBAR_TOOL_MAP: Record<string, Tool> = {
   ellipse: "ellipse",
   text: "text",
   image: "image",
+  svg: "icon",
   line: "line",
   arrow: "arrow",
   polygon: "polygon",

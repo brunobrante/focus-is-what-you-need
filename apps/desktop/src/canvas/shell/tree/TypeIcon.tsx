@@ -53,6 +53,12 @@ export function TypeIcon({ type, hasChildren }: { type: NodeType; hasChildren?: 
           <path d="M21 15l-5-5L5 21" />
         </svg>
       );
+    case "icon":
+      return (
+        <svg {...common}>
+          <path d="M12 3.5l2.64 5.35 5.91.86-4.27 4.16 1.01 5.88L12 16.98l-5.29 2.77 1.01-5.88-4.27-4.16 5.91-.86L12 3.5z" />
+        </svg>
+      );
     case "ellipse":
       return (
         <svg {...common}>
