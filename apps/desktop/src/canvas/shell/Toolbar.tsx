@@ -377,16 +377,41 @@ function ActionsPanel() {
     { id: "assets" as const, label: "Assets" },
     { id: "plugins" as const, label: "Plugins & widgets" },
   ];
-  const items = [
-    { title: "Make an image" },
-    { title: "Send Coupon to Figma Make" },
-    { title: "Replace content" },
-    { title: "Translate to..." },
-    { title: "Rewrite this..." },
-    { title: "Rename layers" },
-    { title: "Find more like Coupon" },
-    { title: "First Draft" },
-  ];
+  const itemsByTab: Record<"all" | "assets" | "plugins", Array<{ title: string }>> = {
+    all: [
+      { title: "Make an image" },
+      { title: "Replace content" },
+      { title: "Translate to..." },
+      { title: "Rewrite this..." },
+      { title: "Rename layers" },
+      { title: "Find more like Coupon" },
+      { title: "First Draft" },
+    ],
+    assets: [
+      { title: "Image library" },
+      { title: "Icon library" },
+      { title: "Color styles" },
+      { title: "Text styles" },
+      { title: "Local uploads" },
+      { title: "Shared components" },
+    ],
+    plugins: [
+      { title: "Figma Make" },
+      { title: "Auto layout helper" },
+      { title: "Accessibility checker" },
+      { title: "Content generator" },
+      { title: "Localization helper" },
+    ],
+  };
+  const visibleItems = itemsByTab[activeTab].filter((item) =>
+    item.title.toLowerCase().includes(searchValue.trim().toLowerCase()),
+  );
+  const sectionTitle =
+    activeTab === "assets"
+      ? "Assets"
+      : activeTab === "plugins"
+        ? "Plugins & widgets"
+        : "Suggestions";
 
   return (
     <div
@@ -445,10 +470,10 @@ function ActionsPanel() {
           </div>
 
           <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="mb-1 px-2 text-[10px] font-medium tracking-[0.2px] text-[#8B8B8B]">Suggestions</div>
+            <div className="mb-1 px-2 text-[10px] font-medium tracking-[0.2px] text-[#8B8B8B]">{sectionTitle}</div>
             <div className="min-h-0 max-h-[150px] flex-1 overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-width:thin] [scrollbar-color:#4A4A4A_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#4A4A4A]">
               <div className="space-y-0.5 pb-1">
-                {items.map((item) => (
+                {visibleItems.map((item) => (
                   <button
                     key={item.title}
                     type="button"
@@ -463,6 +488,9 @@ function ActionsPanel() {
                     <span className="truncate text-[12px] text-[#EFEFEF]">{item.title}</span>
                   </button>
                 ))}
+                {visibleItems.length === 0 ? (
+                  <div className="px-2 py-2 text-[11px] text-[#7C7C7C]">No items found.</div>
+                ) : null}
               </div>
             </div>
           </div>
