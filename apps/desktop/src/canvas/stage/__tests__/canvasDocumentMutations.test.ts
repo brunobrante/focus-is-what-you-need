@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CanvasDocument } from "@/canvas/engine/types";
-import { fitTextElementToContent, setTextElementSizing, updateElementStyles, updateElementText } from "@/canvas/engine/actions";
+import { fitTextElementToContent, reparentElements, setTextElementSizing, updateElementStyles, updateElementText } from "@/canvas/engine/actions";
 import { createViewportTransform } from "@/canvas/engine/viewport";
 import type { DragInteraction, RadiusInteraction, ResizeInteraction } from "../canvasInteractionTypes";
 import {
@@ -74,6 +74,71 @@ test("drag movement converts screen pixels through the shared world matrix once"
   expect(move.delta).toEqual({ x: 2, y: -1 });
   expect(next.elements.node.x).toBe(102);
   expect(next.elements.node.y).toBe(79);
+});
+
+test("command drag can leave the current parent before detaching", () => {
+  const document = createDocument();
+  document.rootIds = ["parent"];
+  document.elements = {
+    parent: {
+      id: "parent",
+      type: "rect",
+      parentId: null,
+      children: ["child"],
+      name: "Parent",
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      styles: {},
+    },
+    child: {
+      id: "child",
+      type: "rect",
+      parentId: "parent",
+      children: [],
+      name: "Child",
+      x: 10,
+      y: 10,
+      width: 20,
+      height: 20,
+      rotation: 0,
+      styles: {},
+    },
+  };
+  const interaction: DragInteraction = {
+    type: "drag",
+    pointerId: 1,
+    startPoint: { x: 60, y: 60 },
+    beforeDocument: document,
+    selectedIds: ["child"],
+    transformIds: ["child"],
+    startBox: { x: 60, y: 60, width: 20, height: 20 },
+    commonParentId: "parent",
+    parentBounds: { x: 50, y: 50, width: 100, height: 100 },
+    moved: true,
+    lastDocument: document,
+    lastGuides: [],
+    clickedId: "child",
+    wasAlreadySelected: true,
+    currentDelta: { x: 150, y: 0 },
+    startScreenPoint: { x: 0, y: 0 },
+    startWorldToScreenMatrix: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+  };
+
+  const normalMove = commitDragMove(interaction, interaction.currentDelta);
+  const commandMove = commitDragMove(interaction, interaction.currentDelta, {
+    clampBounds: { x: 0, y: 0, width: 500, height: 500 },
+  });
+  const detached = reparentElements(commandMove, ["child"], null);
+
+  expect(normalMove.elements.child.x).toBe(80);
+  expect(commandMove.elements.child.x).toBe(160);
+  expect(detached.elements.child.parentId).toBeNull();
+  expect(detached.elements.child.x).toBe(210);
+  expect(detached.rootIds).toContain("child");
+  expect(detached.elements.parent.children).toEqual([]);
 });
 
 test("radius drag stays clamped after the pointer passes the maximum corner radius", () => {

@@ -27,7 +27,9 @@ const HANDLE_FILL = "#ffffff";
 const HANDLE_BORDER_RADIUS = 2;
 const GUIDE_COLOR = "#ff2ca8";
 const MARQUEE_FILL = "rgba(13, 153, 255, 0.08)";
-const DROP_FILL = "rgba(13, 153, 255, 0.07)";
+const DROP_INSERT_FILL = "rgba(13, 153, 255, 0.07)";
+const DROP_DETACH_COLOR = "#ff453a";
+const DROP_DETACH_FILL = "rgba(255, 69, 58, 0.08)";
 
 type ParsedColor = {
   r: number;
@@ -483,12 +485,14 @@ function drawDropTarget(
   pool: PaintPool,
   command: ToolingDropTargetCommand,
 ): void {
+  const color = command.intent === "detach" ? DROP_DETACH_COLOR : SELECTION_COLOR;
+  const fill = command.intent === "detach" ? DROP_DETACH_FILL : DROP_INSERT_FILL;
   const radius = Math.min(
     command.borderRadius * command.displayZoom,
     maxBorderRadiusForSize(command.rect.width, command.rect.height),
   );
-  drawRoundRectWithPaint(ck, canvas, command.rect, radius, pool.getFill(DROP_FILL));
-  drawDashedRect(ck, canvas, pool, command.rect, SELECTION_COLOR, 4, 4);
+  drawRoundRectWithPaint(ck, canvas, command.rect, radius, pool.getFill(fill));
+  drawDashedRect(ck, canvas, pool, command.rect, color, 4, 4);
 }
 
 function drawDashedRect(

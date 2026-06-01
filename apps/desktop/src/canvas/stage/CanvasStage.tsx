@@ -203,7 +203,7 @@ export function CanvasStage({
   const {
     marqueeRect,
     contextMenu,
-    dropTargetId,
+    dropTarget,
     closeContextMenu,
     onPointerDown,
     onPointerMove,
@@ -402,7 +402,7 @@ export function CanvasStage({
         suppressHover={interactionActive}
         interactionType={interactionActive ? (interactionRef.current?.type ?? null) : null}
         marqueeRect={marqueeRect}
-        dropTargetId={dropTargetId}
+        dropTarget={dropTarget}
         onCommitDocument={commitContextToolbarDocument}
       />
 

@@ -1,5 +1,6 @@
 import type { Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
 import type { ViewportTransform } from "@/canvas/engine/viewport";
+import type { CanvasDropIntent } from "./canvasStageTypes";
 
 export type ToolingRendererKind = "skia";
 
@@ -21,6 +22,7 @@ export type ToolingDropTargetCommand = {
   rect: Rect;
   borderRadius: number;
   displayZoom: number;
+  intent: CanvasDropIntent;
 };
 
 export type ToolingRenderFrame = {

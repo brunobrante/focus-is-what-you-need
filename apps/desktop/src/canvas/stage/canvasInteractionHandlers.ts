@@ -32,8 +32,45 @@ import type {
   ResizeInteraction,
   RotateInteraction,
 } from "./canvasInteractionTypes";
+import type { CanvasDropTarget } from "./canvasStageTypes";
 
 type Dispatch = React.Dispatch<EditorAction>;
+
+function isSameParentDropTarget(
+  interaction: DragInteraction,
+  targetId: string | null,
+): boolean {
+  return targetId !== null && interaction.transformIds.every(
+    (id) => interaction.beforeDocument.elements[id]?.parentId === targetId,
+  );
+}
+
+function getSharedCurrentParentId(interaction: DragInteraction): string | null {
+  let sharedParentId: string | null | undefined;
+  for (const id of interaction.transformIds) {
+    const parentId = interaction.beforeDocument.elements[id]?.parentId ?? null;
+    if (!parentId) return null;
+    if (sharedParentId === undefined) {
+      sharedParentId = parentId;
+      continue;
+    }
+    if (sharedParentId !== parentId) return null;
+  }
+  return sharedParentId ?? null;
+}
+
+function getReparentChangedIds(
+  interaction: DragInteraction,
+  newParentId: string | null,
+): string[] {
+  const ids = new Set(interaction.transformIds);
+  for (const id of interaction.transformIds) {
+    const oldParentId = interaction.beforeDocument.elements[id]?.parentId ?? null;
+    if (oldParentId) ids.add(oldParentId);
+  }
+  if (newParentId) ids.add(newParentId);
+  return Array.from(ids);
+}
 
 // === MOVE HANDLERS ===
 
@@ -137,7 +174,7 @@ export function handleDragMove(
   point: Point,
   document: CanvasDocument,
   commandModeRef: React.MutableRefObject<boolean>,
-  updateDropTarget: (id: string | null) => void,
+  updateDropTarget: (target: CanvasDropTarget | null) => void,
   dispatch: Dispatch,
   latestDocumentRef: React.MutableRefObject<CanvasDocument>,
 ): void {
@@ -148,22 +185,38 @@ export function handleDragMove(
   interaction.moved = interaction.moved || Math.hypot(screenDelta.x, screenDelta.y) > 0.5;
 
   let move;
+  let nextDocument: CanvasDocument;
+  let changedIds = interaction.transformIds;
   if (event.metaKey) {
     commandModeRef.current = true;
     const canvasBounds: Rect = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
     move = computeDragMoveCommandFromScreenDelta(interaction, screenDelta, canvasBounds);
-    const committed = commitDragMove(interaction, move.delta);
+    const committed = commitDragMove(interaction, move.delta, { clampBounds: canvasBounds });
     const excludeIds = new Set<string>(interaction.transformIds);
     for (const id of interaction.transformIds) {
       for (const desc of getDescendantIds(interaction.beforeDocument, id)) excludeIds.add(desc);
     }
-    updateDropTarget(findDropTarget(committed, point, excludeIds));
+    const targetId = findDropTarget(committed, point, excludeIds);
+    const detachParentId = targetId === null ? getSharedCurrentParentId(interaction) : null;
+    updateDropTarget(
+      targetId
+        ? { targetId, intent: "insert" }
+        : detachParentId
+          ? { targetId: detachParentId, intent: "detach" }
+          : null,
+    );
+    const staysInSameParent = isSameParentDropTarget(interaction, targetId);
+    const reparentTargetId = staysInSameParent ? null : targetId;
+    nextDocument = staysInSameParent
+      ? commitDragMove(interaction, move.delta)
+      : reparentElements(committed, interaction.transformIds, reparentTargetId);
+    if (!staysInSameParent) changedIds = getReparentChangedIds(interaction, reparentTargetId);
   } else {
     if (commandModeRef.current) { commandModeRef.current = false; updateDropTarget(null); }
     move = computeDragMoveFromScreenDelta(interaction, screenDelta);
+    nextDocument = commitDragMove(interaction, move.delta);
   }
 
-  const nextDocument = commitDragMove(interaction, move.delta);
   interaction.currentDelta = move.delta;
   interaction.lastGuides = move.guides;
   interaction.lastDocument = nextDocument;
@@ -172,7 +225,7 @@ export function handleDragMove(
     type: "setDocumentTransient",
     document: nextDocument,
     guides: move.guides,
-    changedIds: interaction.transformIds,
+    changedIds,
   });
 }
 
@@ -266,16 +319,27 @@ export function finishDrawInteraction(interaction: DrawInteraction, dispatch: Di
 export function finishMovedInteraction(
   interaction: DragInteraction | ResizeInteraction | RotateInteraction | RadiusInteraction,
   wasCommandMode: boolean,
-  capturedDropTarget: string | null,
+  capturedDropTarget: CanvasDropTarget | null,
   dispatch: Dispatch,
   scheduleCanvasAlignmentLog: (input: CanvasAlignmentLogInput) => void,
   state: EditorState,
 ): void {
   let finalDoc: CanvasDocument;
   if (interaction.type === "drag") {
-    const committed = commitDragMove(interaction, interaction.currentDelta);
+    const targetId =
+      capturedDropTarget?.intent === "insert" ? capturedDropTarget.targetId : null;
+    const canvasBounds: Rect = {
+      x: 0,
+      y: 0,
+      width: interaction.beforeDocument.canvas.width,
+      height: interaction.beforeDocument.canvas.height,
+    };
+    const useCanvasBounds = wasCommandMode && !isSameParentDropTarget(interaction, targetId);
+    const committed = useCanvasBounds
+      ? commitDragMove(interaction, interaction.currentDelta, { clampBounds: canvasBounds })
+      : commitDragMove(interaction, interaction.currentDelta);
     finalDoc = wasCommandMode
-      ? reparentElements(committed, interaction.transformIds, capturedDropTarget)
+      ? reparentElements(committed, interaction.transformIds, targetId)
       : committed;
   } else {
     finalDoc = interaction.lastDocument;

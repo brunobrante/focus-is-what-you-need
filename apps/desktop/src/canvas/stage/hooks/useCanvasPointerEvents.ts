@@ -20,7 +20,7 @@ import {
   getTransformIds,
 } from "../canvasToolingUtils";
 import type { Interaction } from "../canvasInteractionTypes";
-import type { TextEditState, ViewportClientRect } from "../canvasStageTypes";
+import type { CanvasDropTarget, TextEditState, ViewportClientRect } from "../canvasStageTypes";
 import type { ContextMenuState } from "../CanvasContextMenu";
 import type { HoverStore } from "@/canvas/engine/hoverStore";
 import type { CanvasAlignmentLogInput } from "../canvasAlignmentLog";
@@ -70,7 +70,7 @@ type Params = {
 export type CanvasPointerEventsResult = {
   marqueeRect: Rect | null;
   contextMenu: ContextMenuState;
-  dropTargetId: string | null;
+  dropTarget: CanvasDropTarget | null;
   closeContextMenu: () => void;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -99,13 +99,13 @@ export function useCanvasPointerEvents({
   syncTextSelection,
   scheduleCanvasAlignmentLog,
 }: Params): CanvasPointerEventsResult {
-  const dropTargetIdRef = useRef<string | null>(null);
+  const dropTargetRef = useRef<CanvasDropTarget | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<CanvasDropTarget | null>(null);
 
   const closeContextMenu = () => setContextMenu(null);
-  const updateDropTarget = (id: string | null) => { dropTargetIdRef.current = id; setDropTargetId(id); };
+  const updateDropTarget = (target: CanvasDropTarget | null) => { dropTargetRef.current = target; setDropTarget(target); };
 
   const textInteraction = useCanvasTextInteraction({
     viewportRef, state, textEdit, enterTextEditing, syncTextSelection,
@@ -316,7 +316,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "draw") { finishDrawInteraction(interaction, dispatch); return; }
 
     const wasCommandMode = commandModeRef.current;
-    const capturedDropTarget = dropTargetIdRef.current;
+    const capturedDropTarget = dropTargetRef.current;
     commandModeRef.current = false;
     updateDropTarget(null);
 
@@ -337,7 +337,7 @@ export function useCanvasPointerEvents({
   return {
     marqueeRect,
     contextMenu,
-    dropTargetId,
+    dropTarget,
     closeContextMenu,
     onPointerDown,
     onPointerMove,

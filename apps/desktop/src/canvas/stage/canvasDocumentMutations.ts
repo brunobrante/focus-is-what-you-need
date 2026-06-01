@@ -147,6 +147,7 @@ export function computeDragMoveCommandFromScreenDelta(
 export function commitDragMove(
   interaction: DragInteraction,
   delta: Point,
+  options: { clampBounds?: Rect } = {},
 ): CanvasDocument {
   const next = shallowCloneDocument(interaction.beforeDocument);
   for (const id of interaction.transformIds) {
@@ -165,10 +166,11 @@ export function commitDragMove(
     } else {
       parentBounds = interaction.parentBounds;
     }
+    const clampBounds = options.clampBounds ?? parentBounds;
     const clampedRect = clampRotatedRectToBounds(
       { ...sourceRect, x: sourceRect.x + delta.x, y: sourceRect.y + delta.y },
       source.rotation,
-      parentBounds,
+      clampBounds,
     );
     node.x = roundPixel(clampedRect.x - parentBounds.x);
     node.y = roundPixel(clampedRect.y - parentBounds.y);

@@ -13,6 +13,7 @@ import { filterTopLevelIds, getCommonParentId, getSelectionBox, unionRects } fro
 import { useHoveredId } from "@/canvas/engine/store";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementStyles, Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
+import type { CanvasDropTarget } from "./canvasStageTypes";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasHitTesting";
 import { hitTestTooling } from "./canvasHitTesting";
 import {
@@ -53,7 +54,7 @@ export type CanvasToolingLayerProps = {
   suppressHover: boolean;
   interactionType: string | null;
   marqueeRect: Rect | null;
-  dropTargetId: string | null;
+  dropTarget: CanvasDropTarget | null;
   onCommitDocument: (document: CanvasDocument, selectedIds?: string[]) => void;
 };
 
@@ -399,15 +400,17 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         : null;
       const canvasBox = canvasRect ? rectToToolingBox(canvasRect) : null;
 
-      const dropTargetNode = props.dropTargetId ? doc.elements[props.dropTargetId] : null;
+      const dropTargetId = props.dropTarget?.targetId ?? null;
+      const dropTargetNode = dropTargetId ? doc.elements[dropTargetId] : null;
       const dropTargetRect =
-        dropTargetNode && props.dropTargetId ? resolveRect(props.dropTargetId) : null;
+        dropTargetNode && dropTargetId ? resolveRect(dropTargetId) : null;
       const dropTarget: ToolingDropTargetCommand | null =
-        dropTargetNode && dropTargetRect
+        dropTargetNode && dropTargetRect && props.dropTarget
           ? {
               rect: dropTargetRect,
               borderRadius: dropTargetNode.styles.borderRadius ?? 0,
               displayZoom: t.displayZoom,
+              intent: props.dropTarget.intent,
             }
           : null;
 
@@ -460,7 +463,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       doc,
       hoveredId,
       props.canvasStageActive,
-      props.dropTargetId,
+      props.dropTarget,
       props.editingTextId,
       props.interactionType,
       props.selectedIds,
