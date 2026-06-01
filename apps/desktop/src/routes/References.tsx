@@ -41,6 +41,12 @@ import { ensureWorkspaceFolders } from "@/lib/tauri/workspace";
 
 const MAX_VIDEO_BYTES = 150 * 1024 * 1024; // 150 MB (~5–10 min)
 
+const masonryItemStyle = {
+  breakInside: "avoid",
+  pageBreakInside: "avoid",
+  WebkitColumnBreakInside: "avoid",
+};
+
 /* ---------- Types ---------- */
 
 type MediaKind = "image" | "video" | "figx";
@@ -364,12 +370,18 @@ function MasonryGrid({
   return (
     <>
       <style>{`
-        .ref-pin-grid { column-count: 4; column-gap: 14px; }
-        @media (max-width: 1240px) { .ref-pin-grid { column-count: 3; } }
-        @media (max-width: 880px) { .ref-pin-grid { column-count: 2; } }
-        @media (max-width: 540px) { .ref-pin-grid { column-count: 1; } }
+        .reference-library-grid {
+          column-width: 224px;
+          column-gap: 14px;
+        }
+        @media (max-width: 720px) {
+          .reference-library-grid {
+            column-width: 168px;
+            column-gap: 10px;
+          }
+        }
       `}</style>
-      <div className="ref-pin-grid">
+      <div className="reference-library-grid">
         {items.map((item) => (
           <Pin
             key={item.id}
@@ -409,15 +421,15 @@ function Pin({
       type="button"
       onClick={onSelect}
       onDoubleClick={onDoubleClick}
-      className="group mb-[14px] block w-full break-inside-avoid cursor-zoom-in border-0 bg-transparent p-0 text-left text-inherit"
-      style={{ breakInside: "avoid" }}
+      className="group mb-[14px] inline-block w-full break-inside-avoid cursor-zoom-in border-0 bg-transparent p-0 text-left align-top text-inherit"
+      style={masonryItemStyle}
     >
       <div
         className={[
-          "relative overflow-hidden rounded-[10px] border bg-[var(--surface)] transition-[border-color] duration-150",
+          "relative overflow-hidden rounded-[10px] border bg-[var(--surface)] transition-[border-color,box-shadow] duration-150",
           selected
             ? "border-[var(--text)] shadow-[0_0_0_1px_var(--text)]"
-            : "border-[var(--border)] group-hover:border-[var(--border-strong)]",
+            : "border-[var(--border)] shadow-[0_1px_0_rgba(255,255,255,0.03),0_8px_22px_rgba(0,0,0,0.12)] group-hover:border-[var(--border-strong)] group-hover:shadow-[0_1px_0_rgba(255,255,255,0.03),0_12px_28px_rgba(0,0,0,0.18)]",
         ].join(" ")}
       >
         {item.mediaKind === "video" ? (

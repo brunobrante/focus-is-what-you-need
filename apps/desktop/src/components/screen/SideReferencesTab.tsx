@@ -1,5 +1,10 @@
 import type { ReferenceRow } from "@/lib/storage/schema";
-import { AddCard } from "./AddCard";
+
+const masonryItemStyle = {
+  breakInside: "avoid",
+  pageBreakInside: "avoid",
+  WebkitColumnBreakInside: "avoid",
+};
 
 export function SideReferencesTab({
   references,
@@ -47,23 +52,43 @@ export function SideReferencesTab({
   return (
     <div className="col-span-full flex flex-col gap-3">
       <style>{`
-        .ref-pin-grid {
-          column-width: 170px;
-          column-gap: 10px;
+        .side-reference-grid {
+          column-width: 164px;
+          column-gap: 12px;
         }
         @media (min-width: 1280px) {
-          .ref-pin-grid {
-            column-width: 190px;
+          .side-reference-grid {
+            column-width: 178px;
           }
         }
       `}</style>
-      <div className="ref-pin-grid">
+      <div className="side-reference-grid">
         {references.map((r, i) => (
           <RefSidePin key={r.id} reference={r} onClick={() => onOpen(i)} />
         ))}
-        <AddCard label="New reference" onClick={onAdd} compact />
+        <ReferenceAddPin onClick={onAdd} />
       </div>
     </div>
+  );
+}
+
+function ReferenceAddPin({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group mb-3 inline-block w-full cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
+      style={masonryItemStyle}
+    >
+      <div className="relative flex aspect-[4/3] min-h-[102px] flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--surface)_0%,var(--bg)_100%)] p-3 text-center text-[var(--text-muted)] shadow-[0_1px_0_rgba(255,255,255,0.03)] group-focus-visible:border-[var(--text)] group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-[rgba(255,255,255,0.12)]">
+        <span className="grid h-7 w-7 place-items-center rounded-full border border-current bg-[rgba(255,255,255,0.03)]">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </span>
+        <span className="text-[11px] font-medium leading-tight">New reference</span>
+      </div>
+    </button>
   );
 }
 
@@ -78,8 +103,8 @@ function RefSidePin({
     <button
       type="button"
       onClick={onClick}
-      className="group mb-2 block w-full cursor-zoom-in border-0 bg-transparent p-0 text-left"
-      style={{ breakInside: "avoid" }}
+      className="group mb-3 inline-block w-full cursor-zoom-in border-0 bg-transparent p-0 text-left align-top"
+      style={masonryItemStyle}
     >
       <div className="relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_1px_0_rgba(255,255,255,0.03),0_8px_20px_rgba(0,0,0,0.12)] transition-[border-color,transform,box-shadow] duration-150 group-hover:-translate-y-0.5 group-hover:border-[var(--border-strong)] group-hover:shadow-[0_1px_0_rgba(255,255,255,0.03),0_12px_26px_rgba(0,0,0,0.18)]">
         {reference.thumbnailUrl ? (

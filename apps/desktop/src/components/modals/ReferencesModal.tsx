@@ -80,13 +80,13 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
           </button>
         ) : null}
         {r ? (
-          <div className="block max-h-[calc(100vh-64px-76px)] max-w-full">
-            <div className="aspect-[600/450] w-[min(900px,calc(100vw-120px))] overflow-hidden rounded-md border border-[var(--border-strong)]">
+          <div className="flex h-full max-h-full max-w-full items-center justify-center px-16 py-6">
+            <div className="h-[min(480px,calc(100vh-180px))] w-[min(720px,calc(100vw-144px))] max-w-full overflow-hidden rounded-md border border-[var(--border-strong)] bg-[#0E0E0E]">
               {r.thumbnailUrl ? (
                 <img
                   src={r.thumbnailUrl}
                   alt=""
-                  className="block h-full w-full object-cover"
+                  className="block h-full w-full object-contain"
                   draggable={false}
                 />
               ) : (

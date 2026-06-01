@@ -61,7 +61,7 @@ export function Modal({ open, onClose, children, size = "default", ariaLabel }: 
       : size === "wide"
         ? "w-[min(1180px,calc(100vw-32px))] h-[min(860px,calc(100vh-40px))] max-w-none max-h-[calc(100vh-40px)]"
         : size === "image"
-          ? "w-[calc(100vw-64px)] max-w-none max-h-[calc(100vh-64px)] bg-[#0E0E0E]"
+          ? "w-[min(920px,calc(100vw-48px))] h-[min(680px,calc(100vh-48px))] max-w-[920px] max-h-[calc(100vh-48px)] bg-[#0E0E0E]"
           : size === "picker"
             ? "w-[min(600px,calc(100vw-32px))] max-h-[min(560px,calc(100vh-48px))]"
             : "w-full max-w-[760px] max-h-[80vh]";
