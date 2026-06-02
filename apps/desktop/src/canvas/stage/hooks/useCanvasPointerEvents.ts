@@ -272,7 +272,11 @@ export function useCanvasPointerEvents({
       if (viewport && toolingRef.current && !state.editingTextId) {
         const vpRect = getCurrentViewportRect();
         const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
-        if (hit.cursor) { viewport.style.cursor = hit.cursor; hoverStore.set(null); return; }
+        if (hit.cursor) {
+          viewport.style.cursor = hit.cursor;
+          if (hit.type !== "radius") hoverStore.set(null);
+          return;
+        }
         viewport.style.cursor = "";
       }
       hoverStore.set(getInteractiveElementId(event.target));

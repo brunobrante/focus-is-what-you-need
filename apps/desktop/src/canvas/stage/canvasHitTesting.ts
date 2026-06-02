@@ -303,9 +303,10 @@ function hitTestRotationZones(
 }
 
 const radiusCorners: RadiusCorner[] = ["nw", "ne", "se", "sw"];
+const RADIUS_HANDLE_HIT_SIZE = 16;
 
 function hitTestRadiusPositions(vx: number, vy: number, positions: Point[]): RadiusCorner | null {
-  const r = RADIUS_HANDLE_SIZE / 2;
+  const r = Math.max(RADIUS_HANDLE_SIZE, RADIUS_HANDLE_HIT_SIZE) / 2;
   for (let i = 0; i < positions.length; i++) {
     const p = positions[i];
     const dx = vx - p.x;

@@ -17,7 +17,22 @@ test("hit-tests the local handle at its rotated visual position", () => {
     canRotate: true,
     hasRadiusHandles: false,
     cursorRotation: 180,
+    allowedResizeHandles: null,
   });
 
   expect(hit).toMatchObject({ type: "resize", handle: "se" });
+});
+
+test("hit-tests radius handles with a larger target than the visual dot", () => {
+  const hit = hitTestTooling(107, 100, {
+    selectionBox: null,
+    radiusHandlePositions: [{ x: 100, y: 100 }],
+    canResize: false,
+    canRotate: false,
+    hasRadiusHandles: true,
+    cursorRotation: 0,
+    allowedResizeHandles: null,
+  });
+
+  expect(hit).toMatchObject({ type: "radius", corner: "nw" });
 });
