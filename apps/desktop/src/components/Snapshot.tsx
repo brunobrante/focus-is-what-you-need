@@ -1,3 +1,5 @@
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+
 import type { ComponentVariant, ProjectType, ScreenVariant } from "@/lib/data/types";
 import { getInitialZoomForSubjectSize, type Size } from "@/canvas/engine/viewport";
 import { useScene, useThumbnail } from "@/lib/storage/hooks";
@@ -34,16 +36,18 @@ export function Snapshot(props: SnapshotProps) {
 
   if (data && !sceneLoading && !sceneIsEmpty) {
     const display = props.display ?? "fit";
-    // "natural" mode: show at intrinsic/scaled size so small components appear
-    // legible in preview panels where the image floats at its own size.
     const componentSize =
-      props.kind === "component" && display === "natural"
+      props.kind === "component" && (display === "natural" || display === "card")
         ? intrinsicSvgSizeFromDataUrl(data.dataUrl)
         : null;
-    const componentScale =
-      componentSize
-        ? getInitialZoomForSubjectSize(componentSize)
-        : 1;
+
+    if (display === "card" && componentSize) {
+      return <CardSnapshotImage src={data.dataUrl} size={componentSize} />;
+    }
+
+    // "natural" mode: show at intrinsic/scaled size so small components appear
+    // legible in preview panels where the image floats at its own size.
+    const componentScale = componentSize ? getInitialZoomForSubjectSize(componentSize) : 1;
     const componentStyle =
       componentSize && componentScale > 1
         ? {
@@ -71,6 +75,69 @@ export function Snapshot(props: SnapshotProps) {
   ) : (
     <EmptyCardPlaceholder type={props.type} kind={props.kind} />
   );
+}
+
+function CardSnapshotImage({ src, size }: { src: string; size: Size }) {
+  const hostRef = useRef<HTMLSpanElement>(null);
+  const [hostSize, setHostSize] = useState<Size | null>(null);
+  const scale = hostSize ? resolveSnapshotCardScale(size, hostSize) : 1;
+  const imageStyle = useMemo<CSSProperties>(
+    () => ({
+      width: size.width * scale,
+      height: size.height * scale,
+    }),
+    [scale, size.height, size.width],
+  );
+
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    const updateHostSize = () => {
+      const next = {
+        width: host.clientWidth,
+        height: host.clientHeight,
+      };
+      setHostSize((current) =>
+        current && current.width === next.width && current.height === next.height
+          ? current
+          : next,
+      );
+    };
+
+    updateHostSize();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateHostSize);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <span ref={hostRef} className="grid h-full w-full place-items-center overflow-hidden">
+      <img
+        src={src}
+        alt=""
+        className="block object-contain"
+        style={imageStyle}
+        draggable={false}
+      />
+    </span>
+  );
+}
+
+export function resolveSnapshotCardScale(subjectSize: Size, hostSize: Size): number {
+  const subjectWidth = Math.max(1, subjectSize.width);
+  const subjectHeight = Math.max(1, subjectSize.height);
+  const hostWidth = Math.max(1, hostSize.width);
+  const hostHeight = Math.max(1, hostSize.height);
+  const legibilityScale = getInitialZoomForSubjectSize({
+    width: subjectWidth,
+    height: subjectHeight,
+  });
+  const fitScale = Math.min(hostWidth / subjectWidth, hostHeight / subjectHeight);
+
+  return Math.max(0.01, Math.min(legibilityScale, fitScale));
 }
 
 export function intrinsicSvgSizeFromDataUrl(dataUrl: string): Size | null {

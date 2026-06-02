@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { intrinsicSvgSizeFromDataUrl } from "@/components/Snapshot";
+import { intrinsicSvgSizeFromDataUrl, resolveSnapshotCardScale } from "@/components/Snapshot";
 
 test("reads intrinsic svg size from encoded snapshot data urls", () => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="60" height="52" viewBox="0 0 60 52"></svg>`;
@@ -14,4 +14,12 @@ test("falls back to viewBox when svg width and height are absent", () => {
   const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
   expect(intrinsicSvgSizeFromDataUrl(dataUrl)).toEqual({ width: 48, height: 32 });
+});
+
+test("scales small card snapshots by their own size without overflowing", () => {
+  expect(resolveSnapshotCardScale({ width: 60, height: 60 }, { width: 220, height: 170 })).toBeCloseTo(170 / 60);
+});
+
+test("fits wide card snapshots into the available card area", () => {
+  expect(resolveSnapshotCardScale({ width: 342, height: 72 }, { width: 197, height: 140 })).toBeCloseTo(197 / 342);
 });
