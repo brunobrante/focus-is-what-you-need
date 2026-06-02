@@ -25,6 +25,7 @@ import {
   DEFAULT_CANVAS_FEATURES,
   addCanvasWindowToSplit,
   buildProjectTree,
+  canvasSizeForProjectType,
   createBlankDocumentForProjectType,
   enabledCanvasWindowTypes,
   findTreeNodeById,
@@ -356,6 +357,9 @@ function CanvasPageContent() {
     });
   }, []);
   const splitActive = split !== "none";
+  const selectedSubjectSize = component
+    ? currentDocument.canvas
+    : canvasSizeForProjectType(projectType);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--bg)]">
@@ -477,6 +481,7 @@ function CanvasPageContent() {
         projectType={projectType}
         projectTree={projectTree}
         parentNode={parentProjectNode}
+        subjectSize={selectedSubjectSize}
       />
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 

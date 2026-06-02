@@ -26,7 +26,7 @@ import {
 import { copyElements, hasClipboard, pasteElements } from "@/canvas/engine/clipboard";
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import type { CanvasDocument } from "@/canvas/engine/types";
-import type { CanvasWindowType } from "@/canvas/canvasUtils";
+import { CANVAS_WINDOW_LABELS, type CanvasWindowType } from "@/canvas/canvasUtils";
 
 import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
 import {
@@ -99,6 +99,7 @@ type Props = {
   projectType?: DeviceType;
   projectTree?: ProjectTreeNode[];
   parentNode?: ProjectTreeNode | null;
+  subjectSize?: { width: number; height: number };
 };
 
 export function Tree({
@@ -119,9 +120,11 @@ export function Tree({
   canOpenNodeCanvas,
   onOpenNodeCanvas,
   onOpenProjectNode,
+  activeTab = "current",
   projectType,
   projectTree,
   parentNode,
+  subjectSize,
 }: Props) {
   const bridgeDocument = useEditorBridge(
     (value) => value?.state.document ?? null,
@@ -233,6 +236,9 @@ export function Tree({
 
   const headerName = componentName || screenName || "Frame";
   const isScreen = !componentName && !!screenName;
+  const focusedWindowLabel = activeTab === "current" ? null : CANVAS_WINDOW_LABELS[activeTab];
+  const rowWidth = subjectSize?.width ?? document?.canvas.width;
+  const rowHeight = subjectSize?.height ?? document?.canvas.height;
 
   return (
     <>
@@ -242,8 +248,15 @@ export function Tree({
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] bg-[#141414] pl-3.5 pr-2">
-        <div className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9A9A9A]">
-          Layers
+        <div className="flex min-w-0 flex-col">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9A9A9A]">
+            Layers
+          </span>
+          {focusedWindowLabel ? (
+            <span className="mt-0.5 truncate text-[9.5px] font-medium leading-none text-[#5F5F5F]">
+              {focusedWindowLabel}
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -264,8 +277,8 @@ export function Tree({
           <CurrentSceneTreeRow
             active={canvasActive}
             label={headerName}
-            width={document?.canvas.width}
-            height={document?.canvas.height}
+            width={rowWidth}
+            height={rowHeight}
             isScreen={isScreen}
             projectType={projectType ?? "mobile"}
             pickerOpen={pickerOpen}
