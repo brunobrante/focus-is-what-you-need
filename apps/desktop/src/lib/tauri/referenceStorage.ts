@@ -151,11 +151,10 @@ export async function readRefsMeta(): Promise<StoredRefMeta[]> {
     const raw = await invoke<string>("read_references_meta");
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    const metas = parsed.filter(
+    return parsed.filter(
       (x): x is StoredRefMeta =>
         Boolean(x && typeof x === "object" && "id" in x && "mediaKind" in x),
     );
-    return Promise.all(metas.map(refreshReferenceStackSummary));
   } catch {
     return [];
   }

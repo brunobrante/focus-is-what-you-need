@@ -101,7 +101,6 @@ type ReferenceItem = {
   groupId?: string | null;
   stack?: ReferenceStackSummary;
   url: string; // runtime only — Object URL created from the file blob
-  stackThumbnailUrl?: string | null; // runtime only — root/primary stack preview
 };
 
 type StagedItem = ReferenceItem & { desc: string };
@@ -136,6 +135,10 @@ type StackTreeNode = {
   children: StackTreeNode[];
   depth: number;
 };
+type SelectedSubject =
+  | { kind: "reference"; id: string }
+  | { kind: "group"; id: string }
+  | null;
 
 /* ---------- File-system storage ---------- */
 
@@ -147,19 +150,14 @@ async function loadLibrary(): Promise<ReferenceItem[]> {
     const ext = meta.ext || extFromName(meta.name);
     const blob = await loadReferenceFile(meta.id, ext).catch(() => null);
     if (!blob) continue;
-    const contentHash = meta.contentHash ?? (await hashBlob(blob).catch(() => undefined));
     const url = URL.createObjectURL(blob);
-    const stackThumbnailUrl =
-      meta.mediaKind === "image" && meta.stack?.enabled
-        ? await loadStackThumbnailUrl(meta.id)
-        : null;
-    items.push({ ...meta, contentHash, ext, url, stackThumbnailUrl });
+    items.push({ ...meta, ext, url });
   }
   return items;
 }
 
 function persistMeta(library: ReferenceItem[]): void {
-  const metas = library.map(({ url: _url, stackThumbnailUrl: _stackThumbnailUrl, ...rest }) => ({
+  const metas = library.map(({ url: _url, ...rest }) => ({
     ...rest,
     ext: rest.ext ?? extFromName(rest.name),
   }));
@@ -179,16 +177,19 @@ export function References() {
   const typeOptions = useMemo(() => typeOptionsForKind(filterKind), [filterKind]);
   const [filterSort, setFilterSort] = useState<FilterSort>("recent");
   const [importTargetGroupId, setImportTargetGroupId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<SelectedSubject>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [lightboxItem, setLightboxItem] = useState<ReferenceItem | null>(null);
   const [groupDialog, setGroupDialog] = useState<GroupDialogState>(null);
   const [deleteGroup, setDeleteGroup] = useState<ReferenceGroup | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus>(null);
+  const [stackThumbnailUrls, setStackThumbnailUrls] = useState<Record<string, string>>({});
 
   // Keep a ref to the current library so the unmount cleanup sees the latest value.
   const libraryRef = useRef<ReferenceItem[]>([]);
   libraryRef.current = library;
+  const stackThumbnailUrlsRef = useRef<Record<string, string>>({});
+  stackThumbnailUrlsRef.current = stackThumbnailUrls;
 
   useEffect(() => {
     Promise.all([loadLibrary(), readReferenceGroups()]).then(([items, storedGroups]) => {
@@ -200,6 +201,7 @@ export function References() {
     });
     return () => {
       for (const item of libraryRef.current) releaseReferenceItemUrls(item);
+      for (const url of Object.values(stackThumbnailUrlsRef.current)) URL.revokeObjectURL(url);
     };
   }, []);
 
@@ -214,11 +216,14 @@ export function References() {
     void writeReferenceGroups(groups);
   }, [groups, loading]);
 
-  // Clear selection if item was removed
   useEffect(() => {
-    if (!selectedId) return;
-    if (!library.some((item) => item.id === selectedId)) setSelectedId(null);
-  }, [library, selectedId]);
+    if (!selectedSubject) return;
+    if (selectedSubject.kind === "reference") {
+      if (!library.some((item) => item.id === selectedSubject.id)) setSelectedSubject(null);
+      return;
+    }
+    if (!groups.some((group) => group.id === selectedSubject.id)) setSelectedSubject(null);
+  }, [groups, library, selectedSubject]);
 
   const importTargetGroup = useMemo(
     () =>
@@ -248,6 +253,7 @@ export function References() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = library.filter((r) => {
+      if (r.groupId) return false;
       if (filterKind !== "all" && r.mediaKind !== filterKind) return false;
       if (filterType !== "all" && r.type !== filterType) return false;
       if (q) {
@@ -274,9 +280,93 @@ export function References() {
   }, [library, query, filterKind, filterType, filterSort]);
 
   const selected = useMemo(
-    () => (selectedId ? library.find((item) => item.id === selectedId) ?? null : null),
-    [library, selectedId],
+    () =>
+      selectedSubject?.kind === "reference"
+        ? library.find((item) => item.id === selectedSubject.id) ?? null
+        : null,
+    [library, selectedSubject],
   );
+
+  const selectedGroup = useMemo(
+    () =>
+      selectedSubject?.kind === "group"
+        ? groups.find((group) => group.id === selectedSubject.id) ?? null
+        : null,
+    [groups, selectedSubject],
+  );
+  const selectedGroupReferences = useMemo(() => {
+    if (!selectedGroup) return [];
+    const referencesById = new Map(library.map((item) => [item.id, item]));
+    return selectedGroup.referenceIds
+      .map((id) => referencesById.get(id))
+      .filter((item): item is ReferenceItem => item != null);
+  }, [library, selectedGroup]);
+  const looseGroupCandidates = useMemo(
+    () =>
+      library
+        .filter((item) => item.mediaKind === "image" && !item.groupId)
+        .sort((a, b) => {
+          const stackDelta = Number(Boolean(b.stack?.enabled)) - Number(Boolean(a.stack?.enabled));
+          if (stackDelta !== 0) return stackDelta;
+          return a.name.localeCompare(b.name);
+        }),
+    [library],
+  );
+
+  useEffect(() => {
+    if (loading) return;
+    const candidateIds = new Set<string>();
+    const referencesById = new Map(library.map((item) => [item.id, item]));
+
+    for (const item of library) {
+      if (!item.groupId) candidateIds.add(item.id);
+    }
+    for (const group of groups) {
+      const coverId = group.coverReferenceId ?? group.referenceIds[0] ?? null;
+      if (coverId) candidateIds.add(coverId);
+    }
+    if (selectedGroup) {
+      for (const id of selectedGroup.referenceIds) candidateIds.add(id);
+    }
+
+    const missing = Array.from(candidateIds).filter((id) => {
+      const item = referencesById.get(id);
+      return Boolean(
+        item?.mediaKind === "image" &&
+          item.stack?.enabled &&
+          !stackThumbnailUrls[id],
+      );
+    });
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    const run = () => {
+      void loadStackThumbnailBatch(missing).then((entries) => {
+        if (entries.length === 0) return;
+        if (cancelled) {
+          for (const [, url] of entries) URL.revokeObjectURL(url);
+          return;
+        }
+        setStackThumbnailUrls((current) => {
+          const next = { ...current };
+          for (const [id, url] of entries) {
+            if (next[id]) {
+              URL.revokeObjectURL(url);
+              continue;
+            }
+            next[id] = url;
+          }
+          return next;
+        });
+      });
+    };
+
+    const idleId = requestIdle(run);
+    return () => {
+      cancelled = true;
+      cancelIdle(idleId);
+    };
+  }, [groups, library, loading, selectedGroup, stackThumbnailUrls]);
 
   const addItems = useCallback((items: ReferenceItem[]) => {
     if (items.length === 0) return;
@@ -288,7 +378,11 @@ export function References() {
     if (targetGroupId) {
       setGroups((prev) => addReferencesToGroup(prev, targetGroupId, nextItems.map((item) => item.id)));
     }
-    setSelectedId(nextItems[0]?.id ?? null);
+    if (targetGroupId) {
+      setSelectedSubject({ kind: "group", id: targetGroupId });
+    } else if (nextItems[0]) {
+      setSelectedSubject({ kind: "reference", id: nextItems[0].id });
+    }
   }, [importTargetGroupId]);
 
   const removeItem = useCallback((id: string) => {
@@ -298,8 +392,17 @@ export function References() {
       return prev.filter((i) => i.id !== id);
     });
     setGroups((prev) => removeReferenceFromGroups(prev, id));
+    setStackThumbnailUrls((current) => {
+      const url = current[id];
+      if (!url) return current;
+      URL.revokeObjectURL(url);
+      const { [id]: _removed, ...next } = current;
+      return next;
+    });
     void removeReferenceFile(id);
-    setSelectedId((current) => (current === id ? null : current));
+    setSelectedSubject((current) =>
+      current?.kind === "reference" && current.id === id ? null : current,
+    );
   }, []);
 
   const updateDescription = useCallback((id: string, description: string) => {
@@ -491,16 +594,12 @@ export function References() {
                   allReferences={library}
                   groupNameById={groupNameById}
                   archiveStatus={archiveStatus}
-                  selectedId={selectedId}
-                  onSelect={(id) => setSelectedId(id)}
+                  stackThumbnailUrls={stackThumbnailUrls}
+                  selectedReferenceId={selectedSubject?.kind === "reference" ? selectedSubject.id : null}
+                  selectedGroupId={selectedSubject?.kind === "group" ? selectedSubject.id : null}
+                  onSelectReference={(id) => setSelectedSubject({ kind: "reference", id })}
+                  onSelectGroup={(id) => setSelectedSubject({ kind: "group", id })}
                   onOpenLightbox={(item) => setLightboxItem(item)}
-                  onUploadToGroup={(group) => {
-                    setImportTargetGroupId(group.id);
-                    setImportOpen(true);
-                  }}
-                  onEditGroup={(group) => setGroupDialog({ mode: "edit", group })}
-                  onDeleteGroup={setDeleteGroup}
-                  onSyncArchive={(group) => void syncGroupArchive(group)}
                 />
               )}
             </div>
@@ -515,21 +614,43 @@ export function References() {
           className={[
             "shrink-0 overflow-hidden border-l border-[var(--border)]",
             "transition-[width] duration-200",
-            selected ? "w-[320px]" : "w-0",
+            selected || selectedGroup ? "w-[320px]" : "w-0",
           ].join(" ")}
           style={{ transitionTimingFunction: "cubic-bezier(.2,.7,.2,1)" }}
         >
-          <Inspector
-            item={selected}
-            onClose={() => setSelectedId(null)}
-            onOpenLightbox={(item) => setLightboxItem(item)}
-            onDelete={(id) => removeItem(id)}
-            onDescriptionChange={updateDescription}
-            onTagsChange={updateTags}
-            onSourceUrlChange={updateSourceUrl}
-            groups={groups}
-            onGroupChange={updateReferenceGroup}
-          />
+          {selectedGroup ? (
+            <GroupInspector
+              group={selectedGroup}
+              references={selectedGroupReferences}
+              looseReferences={looseGroupCandidates}
+              archiveStatus={
+                archiveStatus?.groupId === selectedGroup.id ? archiveStatus : null
+              }
+              stackThumbnailUrls={stackThumbnailUrls}
+              onClose={() => setSelectedSubject(null)}
+              onOpenLightbox={(item) => setLightboxItem(item)}
+              onUpload={() => {
+                setImportTargetGroupId(selectedGroup.id);
+                setImportOpen(true);
+              }}
+              onEdit={() => setGroupDialog({ mode: "edit", group: selectedGroup })}
+              onDelete={() => setDeleteGroup(selectedGroup)}
+              onSyncArchive={() => void syncGroupArchive(selectedGroup)}
+              onGroupChange={updateReferenceGroup}
+            />
+          ) : (
+            <Inspector
+              item={selected}
+              onClose={() => setSelectedSubject(null)}
+              onOpenLightbox={(item) => setLightboxItem(item)}
+              onDelete={(id) => removeItem(id)}
+              onDescriptionChange={updateDescription}
+              onTagsChange={updateTags}
+              onSourceUrlChange={updateSourceUrl}
+              groups={groups}
+              onGroupChange={updateReferenceGroup}
+            />
+          )}
         </aside>
       </div>
 
@@ -546,8 +667,12 @@ export function References() {
           setImportTargetGroupId(null);
         }}
         onUseExisting={(item) => {
-          if (importTargetGroupId) updateReferenceGroup(item.id, importTargetGroupId);
-          setSelectedId(item.id);
+          if (importTargetGroupId) {
+            updateReferenceGroup(item.id, importTargetGroupId);
+            setSelectedSubject({ kind: "group", id: importTargetGroupId });
+          } else {
+            setSelectedSubject({ kind: "reference", id: item.id });
+          }
           setImportOpen(false);
           setImportTargetGroupId(null);
         }}
@@ -570,58 +695,6 @@ export function References() {
 }
 
 /* ---------- Groups ---------- */
-
-function GroupIconButton({
-  danger = false,
-  disabled = false,
-  label,
-  onClick,
-  children,
-}: {
-  danger?: boolean;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={[
-        "grid h-6 w-6 cursor-pointer place-items-center rounded-[6px] border border-transparent bg-transparent text-[var(--text-faint)] hover:border-[var(--border)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-        danger ? "hover:text-[#ff8a8a]" : "",
-        disabled ? "cursor-not-allowed opacity-35 hover:border-transparent hover:bg-transparent hover:text-[var(--text-faint)]" : "",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
-}
-
-function GroupIconLink({
-  label,
-  to,
-  children,
-}: {
-  label: string;
-  to: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      aria-label={label}
-      title={label}
-      to={to}
-      className="grid h-6 w-6 cursor-pointer place-items-center rounded-[6px] border border-transparent bg-transparent text-[var(--text-faint)] no-underline hover:border-[var(--border)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-    >
-      {children}
-    </Link>
-  );
-}
 
 function ReferenceGroupModal({
   state,
@@ -777,26 +850,24 @@ function CatalogGrid({
   allReferences,
   groupNameById,
   archiveStatus,
-  selectedId,
-  onSelect,
+  stackThumbnailUrls,
+  selectedReferenceId,
+  selectedGroupId,
+  onSelectReference,
+  onSelectGroup,
   onOpenLightbox,
-  onUploadToGroup,
-  onEditGroup,
-  onDeleteGroup,
-  onSyncArchive,
 }: {
   groups: ReferenceGroup[];
   references: ReferenceItem[];
   allReferences: ReferenceItem[];
   groupNameById: Map<string, string>;
   archiveStatus: ArchiveStatus;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  stackThumbnailUrls: Record<string, string>;
+  selectedReferenceId: string | null;
+  selectedGroupId: string | null;
+  onSelectReference: (id: string) => void;
+  onSelectGroup: (id: string) => void;
   onOpenLightbox: (item: ReferenceItem) => void;
-  onUploadToGroup: (group: ReferenceGroup) => void;
-  onEditGroup: (group: ReferenceGroup) => void;
-  onDeleteGroup: (group: ReferenceGroup) => void;
-  onSyncArchive: (group: ReferenceGroup) => void;
 }) {
   const referencesById = useMemo(
     () => new Map(allReferences.map((item) => [item.id, item])),
@@ -826,10 +897,9 @@ function CatalogGrid({
               .map((id) => referencesById.get(id))
               .filter((item): item is ReferenceItem => item != null)}
             archiveStatus={archiveStatus?.groupId === group.id ? archiveStatus : null}
-            onUpload={() => onUploadToGroup(group)}
-            onEdit={() => onEditGroup(group)}
-            onDelete={() => onDeleteGroup(group)}
-            onSync={() => onSyncArchive(group)}
+            stackThumbnailUrls={stackThumbnailUrls}
+            selected={group.id === selectedGroupId}
+            onSelect={() => onSelectGroup(group.id)}
           />
         ))}
 
@@ -838,13 +908,14 @@ function CatalogGrid({
             key={item.id}
             item={item}
             groupName={item.groupId ? groupNameById.get(item.groupId) ?? null : null}
-            selected={item.id === selectedId}
+            stackThumbnailUrl={stackThumbnailUrls[item.id]}
+            selected={item.id === selectedReferenceId}
             onSelect={() => {
-              if (item.id === selectedId) {
+              if (item.id === selectedReferenceId) {
                 onOpenLightbox(item);
                 return;
               }
-              onSelect(item.id);
+              onSelectReference(item.id);
             }}
             onDoubleClick={() => onOpenLightbox(item)}
           />
@@ -858,125 +929,119 @@ function GroupPin({
   group,
   references,
   archiveStatus,
-  onUpload,
-  onEdit,
-  onDelete,
-  onSync,
+  stackThumbnailUrls,
+  selected,
+  onSelect,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   archiveStatus: ArchiveStatus;
-  onUpload: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onSync: () => void;
+  stackThumbnailUrls: Record<string, string>;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const imageReferences = references.filter((item) => item.mediaKind === "image");
-  const firstImage = imageReferences[0] ?? null;
+  const firstImage =
+    (group.coverReferenceId
+      ? imageReferences.find((item) => item.id === group.coverReferenceId)
+      : null) ?? imageReferences[0] ?? null;
   const stackCount = references.filter((item) => item.stack?.enabled).length;
-  const previewItems = imageReferences.slice(0, 4);
-  const builderHref = firstImage
-    ? `/tools?id=${encodeURIComponent(firstImage.id)}&groupId=${encodeURIComponent(group.id)}`
+  const ratio = firstImage?.w && firstImage.h ? firstImage.w / firstImage.h : 16 / 9;
+  const padBottom = (100 / ratio).toFixed(2);
+  const thumbnailUrl = firstImage
+    ? referenceCardThumbnailUrl(firstImage, stackThumbnailUrls[firstImage.id])
     : null;
 
   return (
-    <div
-      className="group mb-[14px] inline-block w-full break-inside-avoid align-top"
+    <button
+      type="button"
+      onClick={onSelect}
+      className="group mb-[14px] inline-block w-full break-inside-avoid cursor-pointer border-0 bg-transparent p-0 text-left align-top text-inherit"
       style={masonryItemStyle}
     >
-      <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_1px_0_rgba(255,255,255,0.03),0_8px_22px_rgba(0,0,0,0.12)] transition-[border-color,box-shadow] duration-150 hover:border-[var(--border-strong)] hover:shadow-[0_1px_0_rgba(255,255,255,0.03),0_12px_28px_rgba(0,0,0,0.18)]">
-        <div className="relative grid aspect-[4/3] grid-cols-2 grid-rows-2 gap-px bg-[var(--border)]">
-          {previewItems.length > 0 ? (
-            previewItems.map((item) => (
-              <div
-                key={item.id}
-                className="bg-cover bg-center bg-[var(--bg)]"
-                style={{ backgroundImage: `url('${referenceCardThumbnailUrl(item)}')` }}
-              />
-            ))
+      <div className="relative pr-1.5 pt-1.5">
+        {references.length > 1 ? (
+          <>
+            <span className="pointer-events-none absolute inset-0 translate-x-1 translate-y-0 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] opacity-65" />
+            <span className="pointer-events-none absolute inset-0 translate-x-[3px] translate-y-[3px] rounded-[10px] border border-[var(--border)] bg-[var(--surface)] opacity-45" />
+          </>
+        ) : null}
+        <div
+          className={[
+            "relative overflow-hidden rounded-[10px] border bg-[var(--surface)] transition-[border-color,box-shadow] duration-150",
+            selected
+              ? "border-[var(--text)] shadow-[0_0_0_1px_var(--text)]"
+              : "border-[var(--border)] shadow-[0_1px_0_rgba(255,255,255,0.03),0_8px_22px_rgba(0,0,0,0.12)] group-hover:border-[var(--border-strong)] group-hover:shadow-[0_1px_0_rgba(255,255,255,0.03),0_12px_28px_rgba(0,0,0,0.18)]",
+          ].join(" ")}
+        >
+          {thumbnailUrl ? (
+            <div
+              className="block w-full bg-cover bg-center bg-[var(--surface)]"
+              style={{
+                paddingBottom: `${padBottom}%`,
+                backgroundImage: `url('${thumbnailUrl}')`,
+              }}
+            />
           ) : (
-            <div className="col-span-2 row-span-2 grid place-items-center bg-[var(--bg)] text-[var(--text-muted)]">
-              <Folder size={28} strokeWidth={1.5} />
+            <div
+              className="relative w-full bg-[var(--bg)] text-[var(--text-muted)]"
+              style={{ paddingBottom: `${padBottom}%` }}
+            >
+              <Folder
+                size={30}
+                strokeWidth={1.5}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
             </div>
           )}
           <span className="pointer-events-none absolute left-2 top-2 rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
             Stack group
           </span>
-        </div>
-
-        <div className="flex flex-col gap-2.5 p-3">
-          <div className="min-w-0">
-            <h3 className="m-0 truncate text-[13px] font-semibold text-[var(--text)]">
-              {group.name}
-            </h3>
-            <p className="m-0 mt-1 line-clamp-2 text-[11.5px] leading-[1.4] text-[var(--text-muted)]">
-              {group.description || "Project stack set"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 text-[10.5px] text-[var(--text-faint)]">
-            <span className="rounded-[5px] border border-[var(--border)] px-1.5 py-[3px]">
-              {references.length} {references.length === 1 ? "screen" : "screens"}
+          {archiveStatus ? (
+            <span className="pointer-events-none absolute right-2 top-2 max-w-[96px] truncate rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] text-white backdrop-blur">
+              {archiveStatus.label}
             </span>
-            <span className="rounded-[5px] border border-[var(--border)] px-1.5 py-[3px]">
-              {stackCount} {stackCount === 1 ? "stack" : "stacks"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1 border-t border-[var(--border)] pt-2">
-            {builderHref ? (
-              <GroupIconLink label="Open in Builder" to={builderHref}>
-                <Layers size={11} strokeWidth={1.8} />
-              </GroupIconLink>
-            ) : (
-              <GroupIconButton disabled label="Open in Builder" onClick={() => undefined}>
-                <Layers size={11} strokeWidth={1.8} />
-              </GroupIconButton>
-            )}
-            <GroupIconButton label="Add screens" onClick={onUpload}>
-              <Upload size={11} strokeWidth={1.8} />
-            </GroupIconButton>
-            <GroupIconButton
-              label={archiveStatus?.saving ? "Saving .figx" : "Save .figx"}
-              disabled={archiveStatus?.saving || references.length === 0}
-              onClick={onSync}
-            >
-              <Archive size={11} strokeWidth={1.8} />
-            </GroupIconButton>
-            <GroupIconButton label="Edit group" onClick={onEdit}>
-              <Edit3 size={11} strokeWidth={1.8} />
-            </GroupIconButton>
-            <GroupIconButton danger label="Delete group" onClick={onDelete}>
-              <Trash2 size={11} strokeWidth={1.8} />
-            </GroupIconButton>
-            {archiveStatus ? (
-              <span className="ml-auto max-w-[90px] truncate text-[10px] text-[var(--text-faint)]">
-                {archiveStatus.label}
+          ) : null}
+          <div
+            className={[
+              "pointer-events-none absolute inset-0 flex items-end p-3 transition-opacity duration-150",
+              selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+            ].join(" ")}
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 45%)" }}
+          >
+            <div className="flex w-full flex-col gap-0.5 text-[11.5px] leading-[1.35] text-white">
+              <span className="line-clamp-2 font-medium">{group.name}</span>
+              <span className="flex items-center gap-2 text-[10.5px] tabular-nums text-white/70">
+                <span>{references.length} {references.length === 1 ? "screen" : "screens"}</span>
+                <span>·</span>
+                <span>{stackCount} {stackCount === 1 ? "stack" : "stacks"}</span>
               </span>
-            ) : null}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
 function Pin({
   item,
   groupName,
+  stackThumbnailUrl,
   selected,
   onSelect,
   onDoubleClick,
 }: {
   item: ReferenceItem;
   groupName: string | null;
+  stackThumbnailUrl?: string;
   selected: boolean;
   onSelect: () => void;
   onDoubleClick: () => void;
 }) {
   const ratio = item.w && item.h ? item.w / item.h : 16 / 9;
   const padBottom = (100 / ratio).toFixed(2);
-  const thumbnailUrl = referenceCardThumbnailUrl(item);
+  const thumbnailUrl = referenceCardThumbnailUrl(item, stackThumbnailUrl);
 
   return (
     <button
@@ -1308,6 +1373,250 @@ function Inspector({
   );
 }
 
+function GroupInspector({
+  group,
+  references,
+  looseReferences,
+  archiveStatus,
+  stackThumbnailUrls,
+  onClose,
+  onOpenLightbox,
+  onUpload,
+  onEdit,
+  onDelete,
+  onSyncArchive,
+  onGroupChange,
+}: {
+  group: ReferenceGroup;
+  references: ReferenceItem[];
+  looseReferences: ReferenceItem[];
+  archiveStatus: ArchiveStatus;
+  stackThumbnailUrls: Record<string, string>;
+  onClose: () => void;
+  onOpenLightbox: (item: ReferenceItem) => void;
+  onUpload: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onSyncArchive: () => void;
+  onGroupChange: (id: string, groupId: string | null) => void;
+}) {
+  const [addReferenceId, setAddReferenceId] = useState("");
+
+  useEffect(() => {
+    setAddReferenceId("");
+  }, [group.id]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const imageReferences = references.filter((item) => item.mediaKind === "image");
+  const cover =
+    (group.coverReferenceId
+      ? imageReferences.find((item) => item.id === group.coverReferenceId)
+      : null) ?? imageReferences[0] ?? null;
+  const builderHref = cover
+    ? `/tools?id=${encodeURIComponent(cover.id)}&groupId=${encodeURIComponent(group.id)}`
+    : null;
+  const stackCount = references.filter((item) => item.stack?.enabled).length;
+
+  return (
+    <div className="flex h-full w-[320px] flex-col overflow-hidden bg-[var(--bg-elev)]">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-3 py-2.5">
+        <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-muted)]">
+          Stack group
+        </span>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="grid h-6 w-6 cursor-pointer place-items-center rounded-[6px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3.5">
+        <div
+          className="flex items-center justify-center overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--bg)]"
+          style={{ aspectRatio: "16/9" }}
+        >
+          {cover ? (
+            <img
+              src={referenceCardThumbnailUrl(cover, stackThumbnailUrls[cover.id])}
+              alt={group.name}
+              className="max-h-full max-w-full"
+              draggable={false}
+            />
+          ) : (
+            <Folder size={30} strokeWidth={1.5} className="text-[var(--text-muted)]" />
+          )}
+        </div>
+
+        <div>
+          <div className="break-words text-[13px] font-medium leading-[1.4] text-[var(--text)]">
+            {group.name}
+          </div>
+          {group.description ? (
+            <p className="m-0 mt-1.5 text-[12px] leading-[1.45] text-[var(--text-muted)]">
+              {group.description}
+            </p>
+          ) : null}
+        </div>
+
+        <Section title="Details">
+          <DetailList
+            items={[
+              ["Screens", String(references.length)],
+              ["Stacks", String(stackCount)],
+              ["Updated", formatDateTime(group.updatedAt)],
+              ["ID", group.id, true],
+            ]}
+          />
+        </Section>
+
+        <Section title="Add loose screen">
+          <select
+            value={addReferenceId}
+            disabled={looseReferences.length === 0}
+            onChange={(event) => {
+              const nextId = event.target.value;
+              setAddReferenceId("");
+              if (nextId) onGroupChange(nextId, group.id);
+            }}
+            className="h-[34px] w-full cursor-pointer rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] text-[var(--text)] outline-none hover:border-[var(--border-strong)] focus:border-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <option value="">
+              {looseReferences.length === 0 ? "No loose image references" : "Choose a screen..."}
+            </option>
+            {looseReferences.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.stack?.enabled ? "Stack - " : ""}
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </Section>
+
+        <Section title="Screens in group">
+          {references.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {references.map((item) => (
+                <GroupReferenceRow
+                  key={item.id}
+                  item={item}
+                  groupId={group.id}
+                  stackThumbnailUrl={stackThumbnailUrls[item.id]}
+                  onOpen={() => onOpenLightbox(item)}
+                  onRemove={() => onGroupChange(item.id, null)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-4 text-[11.5px] leading-[1.45] text-[var(--text-faint)]">
+              This group has no screens yet.
+            </div>
+          )}
+        </Section>
+
+        {archiveStatus ? (
+          <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
+            {archiveStatus.label}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid shrink-0 grid-cols-2 gap-1.5 border-t border-[var(--border)] px-3 py-2.5">
+        {builderHref ? (
+          <InspectorLinkAction
+            icon={<Layers size={12} />}
+            label="Builder"
+            to={builderHref}
+          />
+        ) : (
+          <InspectorAction
+            icon={<Layers size={12} />}
+            label="Builder"
+            disabled
+            onClick={() => undefined}
+          />
+        )}
+        <InspectorAction icon={<Upload size={12} />} label="Add" onClick={onUpload} />
+        <InspectorAction
+          icon={<Archive size={12} />}
+          label=".figx"
+          disabled={archiveStatus?.saving || references.length === 0}
+          onClick={onSyncArchive}
+        />
+        <InspectorAction icon={<Edit3 size={12} />} label="Edit" onClick={onEdit} />
+        <InspectorAction
+          icon={<Trash2 size={12} />}
+          label="Delete"
+          danger
+          onClick={onDelete}
+        />
+      </div>
+    </div>
+  );
+}
+
+function GroupReferenceRow({
+  item,
+  groupId,
+  stackThumbnailUrl,
+  onOpen,
+  onRemove,
+}: {
+  item: ReferenceItem;
+  groupId: string;
+  stackThumbnailUrl?: string;
+  onOpen: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex min-w-0 gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] p-1.5">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="h-12 w-12 shrink-0 cursor-zoom-in overflow-hidden rounded-[7px] border border-[var(--border)] bg-[var(--bg)] p-0"
+      >
+        <img
+          src={referenceCardThumbnailUrl(item, stackThumbnailUrl)}
+          alt={item.name}
+          draggable={false}
+          className="h-full w-full object-cover"
+        />
+      </button>
+      <div className="min-w-0 flex-1 py-0.5">
+        <div className="truncate text-[12px] font-medium text-[var(--text)]">{item.name}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] tabular-nums text-[var(--text-faint)]">
+          <span>{item.w} x {item.h}</span>
+          {item.stack?.enabled ? <span>Stack</span> : null}
+        </div>
+        <div className="mt-1 flex gap-1">
+          <Link
+            to={`/tools?id=${encodeURIComponent(item.id)}&groupId=${encodeURIComponent(groupId)}`}
+            className="rounded-[5px] border border-[var(--border)] px-1.5 py-[2px] text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-muted)] no-underline hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+          >
+            Builder
+          </Link>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="cursor-pointer rounded-[5px] border border-[var(--border)] bg-transparent px-1.5 py-[2px] text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-muted)] hover:border-[rgba(255,80,80,0.45)] hover:text-[#ff8a8a]"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- UI atoms ---------- */
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -1346,19 +1655,24 @@ function InspectorAction({
   label,
   onClick,
   danger,
+  disabled = false,
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={[
         "inline-flex h-[30px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[7px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] transition-colors",
-        danger
+        disabled
+          ? "cursor-not-allowed opacity-40 hover:border-[var(--border)] hover:bg-[var(--surface)]"
+          : danger
           ? "hover:border-[rgba(255,80,80,0.45)] hover:bg-[rgba(255,80,80,0.15)] hover:text-[#ff8a8a]"
           : "hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]",
       ].join(" ")}
@@ -2293,7 +2607,7 @@ function Lightbox({
   const stackImageUrl =
     selectedStackComponent && stackPreview
       ? stackPreview.urls[selectedStackComponent.id] ?? item.url
-      : item.stackThumbnailUrl ?? item.url;
+      : item.url;
   const stackTitle = selectedStackComponent?.name ?? "Stack";
 
   return (
@@ -2650,6 +2964,24 @@ function withGroupReferences(
 
 /* ---------- File helpers ---------- */
 
+async function loadStackThumbnailBatch(referenceIds: string[]): Promise<Array<[string, string]>> {
+  const entries: Array<[string, string]> = [];
+  const queue = [...referenceIds];
+  const workerCount = Math.min(4, queue.length);
+
+  async function worker() {
+    while (queue.length > 0) {
+      const referenceId = queue.shift();
+      if (!referenceId) continue;
+      const url = await loadStackThumbnailUrl(referenceId).catch(() => null);
+      if (url) entries.push([referenceId, url]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return entries;
+}
+
 async function loadStackThumbnailUrl(referenceId: string): Promise<string | null> {
   const data = await readReferenceStackData(referenceId);
   if (!data || data.components.length === 0) return null;
@@ -2677,14 +3009,13 @@ function pickFallbackStackThumbnailComponent(
   return candidates.sort((a, b) => b.box.w * b.box.h - a.box.w * a.box.h)[0] ?? null;
 }
 
-function referenceCardThumbnailUrl(item: ReferenceItem): string {
-  if (item.stack?.enabled && item.stackThumbnailUrl) return item.stackThumbnailUrl;
+function referenceCardThumbnailUrl(item: ReferenceItem, stackThumbnailUrl?: string | null): string {
+  if (item.stack?.enabled && stackThumbnailUrl) return stackThumbnailUrl;
   return item.url;
 }
 
 function releaseReferenceItemUrls(item: ReferenceItem): void {
   URL.revokeObjectURL(item.url);
-  if (item.stackThumbnailUrl) URL.revokeObjectURL(item.stackThumbnailUrl);
 }
 
 function isVideoFile(file: File): boolean {
@@ -2801,6 +3132,28 @@ function measureVideo(src: string): Promise<{ w: number; h: number; duration: nu
 }
 
 /* ---------- Utility helpers ---------- */
+
+function requestIdle(callback: () => void): number {
+  if (typeof window === "undefined") return 0;
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void) => number;
+  };
+  return idleWindow.requestIdleCallback
+    ? idleWindow.requestIdleCallback(callback)
+    : window.setTimeout(callback, 1);
+}
+
+function cancelIdle(id: number): void {
+  if (typeof window === "undefined") return;
+  const idleWindow = window as Window & {
+    cancelIdleCallback?: (id: number) => void;
+  };
+  if (idleWindow.cancelIdleCallback) {
+    idleWindow.cancelIdleCallback(id);
+  } else {
+    window.clearTimeout(id);
+  }
+}
 
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return `r-${crypto.randomUUID()}`;

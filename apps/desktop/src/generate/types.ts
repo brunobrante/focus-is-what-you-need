@@ -6,6 +6,7 @@ export type {
   CropBox,
   ToolReference,
   ToolReferenceGroupContext,
+  ToolReferenceGroupItem,
   SavedComponent,
   PendingConfirmation,
   ComponentTreeNode,

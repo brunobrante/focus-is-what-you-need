@@ -41,11 +41,14 @@ export function Generate() {
     setDiskReference(null);
     setGroupContext(null);
     setReferenceLoading(true);
-    void Promise.all([
-      readDiskReference(referenceId),
-      readToolReferenceGroupContext(referenceId, requestedGroupId),
-    ])
-      .then(([reference, context]) => {
+    void readDiskReference(referenceId)
+      .then(async (reference) => {
+        const context = reference
+          ? await readToolReferenceGroupContext(referenceId, requestedGroupId, reference)
+          : null;
+        return { reference, context };
+      })
+      .then(({ reference, context }) => {
         if (cancelled) return;
         setDiskReference(reference);
         setGroupContext(context);
@@ -100,6 +103,7 @@ export function Generate() {
 async function readToolReferenceGroupContext(
   referenceId: string,
   requestedGroupId: string | null,
+  activeReference: ToolReference,
 ): Promise<ToolReferenceGroupContext | null> {
   const [groups, metas] = await Promise.all([readReferenceGroups(), readRefsMeta()]);
   const meta = metas.find((entry) => entry.id === referenceId);
@@ -112,9 +116,22 @@ async function readToolReferenceGroupContext(
   const orderedIds = group.referenceIds.includes(referenceId)
     ? group.referenceIds
     : [referenceId, ...group.referenceIds];
-  const references = (
-    await Promise.all(orderedIds.map((id) => readDiskReference(id)))
-  ).filter((reference): reference is ToolReference => reference != null);
+  const metasById = new Map(metas.map((entry) => [entry.id, entry]));
+  const references = orderedIds
+    .map((id) => {
+      const entry = metasById.get(id);
+      if (!entry || entry.mediaKind !== "image") return null;
+      return {
+        id: entry.id,
+        name: entry.name,
+        type: entry.type,
+        w: Number(entry.w || 0),
+        h: Number(entry.h || 0),
+        ext: entry.ext,
+        url: entry.id === activeReference.id ? activeReference.url : undefined,
+      };
+    })
+    .filter((reference): reference is ToolReferenceGroupContext["references"][number] => reference != null);
 
   if (references.length === 0) return null;
   return {

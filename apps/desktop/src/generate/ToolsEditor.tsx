@@ -25,6 +25,10 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TopBar } from "@/components/layout/TopBar";
 import { readFileAsDataUrl } from "@/lib/utils";
+import {
+  extFromName,
+  loadReferenceFile,
+} from "@/lib/tauri/referenceStorage";
 
 import type {
   CropBox,
@@ -94,7 +98,7 @@ import {
   writeSavedComponents,
   readCropsOverlayColor,
 } from "./engine/storage";
-import { inferType, measureImage, shortComponentName, waitForImage } from "./engine/image";
+import { blobToDataUrl, inferType, measureImage, shortComponentName, waitForImage } from "./engine/image";
 
 import { ComponentTreeItem } from "./ui/ComponentTreeItem";
 import { ElementInfoCard } from "./ui/ElementInfoCard";
@@ -1545,14 +1549,7 @@ function ReferenceGroupNavigator({
                     : "border-transparent bg-transparent hover:border-[var(--border)] hover:bg-[rgba(255,255,255,0.02)]",
                 ].join(" ")}
               >
-                <span className="h-12 w-12 shrink-0 overflow-hidden rounded-[7px] border border-[var(--border)] bg-[var(--bg)]">
-                  <img
-                    src={reference.url}
-                    alt={reference.name}
-                    draggable={false}
-                    className="h-full w-full object-cover"
-                  />
-                </span>
+                <ReferenceGroupNavigatorThumbnail reference={reference} />
                 <span className="min-w-0 flex-1 py-0.5">
                   <span className="block truncate text-[12px] font-medium text-[var(--text)]">
                     {reference.name}
@@ -1573,4 +1570,50 @@ function ReferenceGroupNavigator({
       </div>
     </aside>
   );
+}
+
+function ReferenceGroupNavigatorThumbnail({
+  reference,
+}: {
+  reference: ToolReferenceGroupContext["references"][number];
+}) {
+  const [url, setUrl] = useState(reference.url ?? null);
+
+  useEffect(() => {
+    setUrl(reference.url ?? null);
+    if (reference.url) return;
+
+    let cancelled = false;
+    void loadReferenceNavigatorThumbnail(reference).then((loadedUrl) => {
+      if (!cancelled) setUrl(loadedUrl);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reference.ext, reference.id, reference.name, reference.url]);
+
+  return (
+    <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-[7px] border border-[var(--border)] bg-[var(--bg)] text-[var(--text-faint)]">
+      {url ? (
+        <img
+          src={url}
+          alt={reference.name}
+          draggable={false}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <ImageIcon size={16} strokeWidth={1.6} />
+      )}
+    </span>
+  );
+}
+
+async function loadReferenceNavigatorThumbnail(
+  reference: ToolReferenceGroupContext["references"][number],
+): Promise<string | null> {
+  const blob = await loadReferenceFile(reference.id, reference.ext || extFromName(reference.name)).catch(
+    () => null,
+  );
+  return blob ? blobToDataUrl(blob) : null;
 }

@@ -18,7 +18,17 @@ export type ToolReference = {
 export type ToolReferenceGroupContext = {
   id: string;
   name: string;
-  references: ToolReference[];
+  references: ToolReferenceGroupItem[];
+};
+
+export type ToolReferenceGroupItem = {
+  id: string;
+  name: string;
+  type: string;
+  w: number;
+  h: number;
+  ext?: string;
+  url?: string;
 };
 
 export type SavedComponent = {
