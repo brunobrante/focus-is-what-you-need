@@ -22,7 +22,6 @@ export function Toolbar({
   onToolChange,
   canvasExpanded,
   canvasControlsVisible,
-  canvasControlsCompact,
   onCanvasExpandedChange,
   zoom,
   onZoomChange,
@@ -38,7 +37,6 @@ export function Toolbar({
   onToolChange?: (tool: CanvasToolId) => void;
   canvasExpanded?: boolean;
   canvasControlsVisible?: boolean;
-  canvasControlsCompact?: boolean;
   onCanvasExpandedChange?: (expanded: boolean) => void;
   zoom?: number;
   onZoomChange?: ZoomSetter;
@@ -132,7 +130,6 @@ export function Toolbar({
         <div className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
           <CanvasExpandedControls
             expanded={Boolean(canvasExpanded)}
-            compact={Boolean(canvasControlsCompact)}
             zoom={zoom}
             onZoomChange={onZoomChange}
             zoomLimits={zoomLimits}
@@ -548,7 +545,6 @@ function ToolTooltip({ tool }: { tool: ToolEntry }) {
 
 function CanvasExpandedControls({
   expanded,
-  compact,
   zoom,
   onZoomChange,
   zoomLimits,
@@ -560,7 +556,6 @@ function CanvasExpandedControls({
   onToggleExpanded,
 }: {
   expanded: boolean;
-  compact: boolean;
   zoom?: number;
   onZoomChange?: ZoomSetter;
   zoomLimits?: ZoomLimits;
@@ -576,23 +571,19 @@ function CanvasExpandedControls({
       className="inline-flex items-center gap-1.5 rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-[3px]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35)" }}
     >
-      {!compact ? (
+      <ToolbarDeviceButton
+        enabled={deviceEnabled}
+        projectType={projectType}
+        onClick={onToggleDevice}
+      />
+      {parentTarget ? (
+        <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
+      ) : null}
+      <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
+      {zoom != null && onZoomChange ? (
         <>
-          <ToolbarDeviceButton
-            enabled={deviceEnabled}
-            projectType={projectType}
-            onClick={onToggleDevice}
-          />
-          {parentTarget ? (
-            <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
-          ) : null}
+          <ZoomControl zoom={zoom} setZoom={onZoomChange} limits={zoomLimits} bare />
           <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
-          {zoom != null && onZoomChange ? (
-            <>
-              <ZoomControl zoom={zoom} setZoom={onZoomChange} limits={zoomLimits} bare />
-              <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
-            </>
-          ) : null}
         </>
       ) : null}
       <button

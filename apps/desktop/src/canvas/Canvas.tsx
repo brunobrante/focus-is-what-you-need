@@ -515,7 +515,6 @@ function CanvasPageContent() {
           onToolChange={handleToolChange}
           canvasExpanded={canvasExpanded}
           canvasControlsVisible={canvasExpanded || splitActive}
-          canvasControlsCompact={splitActive}
           zoom={activeZoom}
           onZoomChange={setActiveZoom}
           zoomLimits={activeZoomLimits}
