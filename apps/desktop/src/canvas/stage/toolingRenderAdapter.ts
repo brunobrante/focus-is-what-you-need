@@ -25,6 +25,17 @@ export type ToolingDropTargetCommand = {
   intent: CanvasDropIntent;
 };
 
+export type ToolingParentDistanceCommand = {
+  parentRect: Rect;
+  childRect: Rect;
+  distances: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+};
+
 export type ToolingRenderFrame = {
   left: number;
   top: number;
@@ -37,6 +48,7 @@ export type ToolingRenderFrame = {
   viewportTransform: ViewportTransform;
   marqueeRect: Rect | null;
   dropTarget: ToolingDropTargetCommand | null;
+  parentDistances: ToolingParentDistanceCommand | null;
 };
 
 export type ToolingRendererAdapter = {

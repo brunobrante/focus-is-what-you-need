@@ -51,6 +51,7 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
 const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
   "canvas.drag.reparent": "mod",
   "canvas.selection.contextToolbar": "alt",
+  "canvas.overlay.parentDistances": "ctrl",
   "canvas.resize.fromCenter": "alt",
   "canvas.transform.constrainAspect": "shift",
   "canvas.rotate.snap": "shift",

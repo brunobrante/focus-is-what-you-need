@@ -12,6 +12,17 @@ import {
   unionRects,
 } from "./transforms";
 
+export type ParentDistanceMeasurements = {
+  parentRect: Rect;
+  childRect: Rect;
+  distances: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+};
+
 export function getAbsoluteRect(document: CanvasDocument, id: string): Rect | null {
   const node = document.elements[id];
   if (!node) return null;
@@ -34,6 +45,55 @@ export function getAbsoluteRect(document: CanvasDocument, id: string): Rect | nu
     y,
     width: snapToLayoutUnit(node.width),
     height: snapToLayoutUnit(node.height),
+  };
+}
+
+function getCanvasFrameRect(document: CanvasDocument): Rect {
+  return {
+    x: 0,
+    y: 0,
+    width: snapToLayoutUnit(document.canvas.width),
+    height: snapToLayoutUnit(document.canvas.height),
+  };
+}
+
+function getImmediateParentContentRect(document: CanvasDocument, id: string): Rect | null {
+  const node = document.elements[id];
+  if (!node) return null;
+  if (!node.parentId) return getCanvasFrameRect(document);
+
+  const parent = document.elements[node.parentId];
+  if (!parent) return null;
+
+  const parentRect = getAbsoluteRect(document, node.parentId);
+  if (!parentRect) return null;
+
+  const borderWidth = snapToLayoutUnit(parent.styles.borderWidth ?? 0);
+  return {
+    x: parentRect.x + borderWidth,
+    y: parentRect.y + borderWidth,
+    width: Math.max(0, parentRect.width - borderWidth * 2),
+    height: Math.max(0, parentRect.height - borderWidth * 2),
+  };
+}
+
+export function getParentDistanceMeasurements(
+  document: CanvasDocument,
+  selectedElementId: string,
+): ParentDistanceMeasurements | null {
+  const childRect = getAbsoluteRect(document, selectedElementId);
+  const parentRect = getImmediateParentContentRect(document, selectedElementId);
+  if (!childRect || !parentRect) return null;
+
+  return {
+    parentRect,
+    childRect,
+    distances: {
+      top: Math.max(0, childRect.y - parentRect.y),
+      right: Math.max(0, rectRight(parentRect) - rectRight(childRect)),
+      bottom: Math.max(0, rectBottom(parentRect) - rectBottom(childRect)),
+      left: Math.max(0, childRect.x - parentRect.x),
+    },
   };
 }
 

@@ -91,7 +91,7 @@ export function isModifierCommandActive(
   const binding = settings.canvas.inputBindings.modifierCommands[commandId];
   switch (binding) {
     case "mod":
-      return event.metaKey || event.ctrlKey;
+      return isMacLike() ? event.metaKey : event.ctrlKey;
     case "meta":
       return event.metaKey;
     case "ctrl":

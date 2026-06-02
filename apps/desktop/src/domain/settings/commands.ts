@@ -97,6 +97,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
     commands: [
       { id: "canvas.drag.reparent", label: "Insert into parent while dragging", group: "Modifiers", type: "modifier" },
       { id: "canvas.selection.contextToolbar", label: "Show context toolbar", group: "Modifiers", type: "modifier" },
+      { id: "canvas.overlay.parentDistances", label: "Show parent distances", group: "Modifiers", type: "modifier" },
       { id: "canvas.resize.fromCenter", label: "Resize from center", group: "Modifiers", type: "modifier" },
       { id: "canvas.transform.constrainAspect", label: "Constrain aspect while drawing or resizing", group: "Modifiers", type: "modifier" },
       { id: "canvas.rotate.snap", label: "Snap rotation", group: "Modifiers", type: "modifier" },

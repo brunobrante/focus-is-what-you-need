@@ -40,6 +40,7 @@ export type CanvasKeyCommandId =
 export type CanvasModifierCommandId =
   | "canvas.drag.reparent"
   | "canvas.selection.contextToolbar"
+  | "canvas.overlay.parentDistances"
   | "canvas.resize.fromCenter"
   | "canvas.transform.constrainAspect"
   | "canvas.rotate.snap";

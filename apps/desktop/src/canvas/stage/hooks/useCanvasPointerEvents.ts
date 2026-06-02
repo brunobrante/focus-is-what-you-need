@@ -359,6 +359,7 @@ export function useCanvasPointerEvents({
 
   const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (event.button !== 2) return;
     const targetId = getInteractiveElementId(event.target);
     if (targetId && !state.selectedIds.includes(targetId)) dispatch({ type: "setSelected", selectedIds: [targetId] });
     setContextMenu({ x: event.clientX, y: event.clientY, targetId: targetId ?? null });

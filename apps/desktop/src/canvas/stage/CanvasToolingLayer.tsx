@@ -9,7 +9,7 @@ import {
   setTextElementSizing,
   updateElementStyles,
 } from "@/canvas/engine/actions";
-import { filterTopLevelIds, getCommonParentId, getSelectionBox, unionRects } from "@/canvas/engine/geometry";
+import { filterTopLevelIds, getCommonParentId, getParentDistanceMeasurements, getSelectionBox, unionRects } from "@/canvas/engine/geometry";
 import { useHoveredId } from "@/canvas/engine/store";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementStyles, Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
@@ -38,6 +38,7 @@ import { createToolingRendererAdapter } from "./toolingRendererFactory";
 import type {
   ToolingDropTargetCommand,
   ToolingOutlineCommand,
+  ToolingParentDistanceCommand,
   ToolingRendererAdapter,
 } from "./toolingRenderAdapter";
 
@@ -196,6 +197,7 @@ type ToolingRenderData = {
   resizeBox: ToolingBox | null;
   radiusHandlePositions: Point[] | null;
   dropTarget: ToolingDropTargetCommand | null;
+  parentDistances: ToolingParentDistanceCommand | null;
   isDragging: boolean;
   isEditingText: boolean;
 };
@@ -223,19 +225,27 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
 
     const settings = props.settings ?? DEFAULT_GLOBAL_SETTINGS;
     const [contextToolbarModifierDown, setContextToolbarModifierDown] = useState(false);
+    const [parentDistanceModifierDown, setParentDistanceModifierDown] = useState(false);
     useEffect(() => {
       const onKeyDown = (event: KeyboardEvent) => {
         if (isModifierCommandActive(event, settings, "canvas.selection.contextToolbar")) {
           setContextToolbarModifierDown(true);
+        }
+        if (isModifierCommandActive(event, settings, "canvas.overlay.parentDistances")) {
+          setParentDistanceModifierDown(true);
         }
       };
       const onKeyUp = (event: KeyboardEvent) => {
         if (!isModifierCommandActive(event, settings, "canvas.selection.contextToolbar")) {
           setContextToolbarModifierDown(false);
         }
+        if (!isModifierCommandActive(event, settings, "canvas.overlay.parentDistances")) {
+          setParentDistanceModifierDown(false);
+        }
       };
       const onBlur = () => {
         setContextToolbarModifierDown(false);
+        setParentDistanceModifierDown(false);
         setOpenPanel(null);
       };
       window.addEventListener("keydown", onKeyDown);
@@ -258,6 +268,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
     useEffect(() => {
       if (!props.editingTextId) return;
       setContextToolbarModifierDown(false);
+      setParentDistanceModifierDown(false);
       setOpenPanel(null);
       setRenamingElementId(null);
       setRenameDraft("");
@@ -420,6 +431,13 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
               intent: props.dropTarget.intent,
             }
           : null;
+      const parentDistances =
+        !props.canvasStageActive &&
+        !isEditingText &&
+        parentDistanceModifierDown &&
+        transformIds.length === 1
+          ? getParentDistanceMeasurements(doc, transformIds[0])
+          : null;
 
       const hitGeometry = props.canvasStageActive
         ? {
@@ -463,6 +481,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             ? radiusHandlePositions
             : null,
         dropTarget,
+        parentDistances,
         isDragging,
         isEditingText,
       };
@@ -475,6 +494,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.interactionType,
       props.selectedIds,
       props.suppressHover,
+      parentDistanceModifierDown,
       t,
     ]);
 
@@ -805,6 +825,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         viewportTransform: t,
         marqueeRect: props.marqueeRect,
         dropTarget: renderData.dropTarget,
+        parentDistances: renderData.parentDistances,
       });
     }, [
       hostRect.left,

@@ -1,9 +1,12 @@
 import CanvasKitInit, {
   type Canvas,
   type CanvasKit,
+  type Font,
   type Paint,
   type Surface,
+  type Typeface,
 } from "canvaskit-wasm";
+import geistLatinFontUrl from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url";
 import canvasKitWasmUrl from "canvaskit-wasm/bin/canvaskit.wasm?url";
 import { maxBorderRadiusForSize } from "@/canvas/engine/geometry";
 import type { Point, Rect, SnapGuide } from "@/canvas/engine/types";
@@ -30,6 +33,14 @@ const MARQUEE_FILL = "rgba(13, 153, 255, 0.08)";
 const DROP_INSERT_FILL = "rgba(13, 153, 255, 0.07)";
 const DROP_DETACH_COLOR = "#ff453a";
 const DROP_DETACH_FILL = "rgba(255, 69, 58, 0.08)";
+const PARENT_DISTANCE_COLOR = "#ff7a00";
+const PARENT_DISTANCE_TEXT_COLOR = "#ffffff";
+const PARENT_DISTANCE_LABEL_HEIGHT = 18;
+const PARENT_DISTANCE_LABEL_RADIUS = 4;
+const PARENT_DISTANCE_LABEL_PADDING_X = 6;
+const PARENT_DISTANCE_LABEL_FONT_SIZE = 11;
+const PARENT_DISTANCE_LABEL_MARGIN = 4;
+const PARENT_DISTANCE_SHORT_LABEL_OFFSET = 8;
 
 type ParsedColor = {
   r: number;
@@ -52,7 +63,8 @@ function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
     a.guides === b.guides &&
     a.viewportTransform === b.viewportTransform &&
     a.marqueeRect === b.marqueeRect &&
-    a.dropTarget === b.dropTarget
+    a.dropTarget === b.dropTarget &&
+    a.parentDistances === b.parentDistances
   );
 }
 
@@ -99,6 +111,8 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
   private host: HTMLElement | null = null;
   private surface: Surface | null = null;
   private paintPool: PaintPool | null = null;
+  private parentDistanceTypeface: Typeface | null = null;
+  private ownsParentDistanceTypeface = false;
   private ready = false;
   private destroyed = false;
   private contextLost = false;
@@ -151,6 +165,13 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
     this.canvasKit = canvasKit;
     this.paintPool = new PaintPool(canvasKit);
+    const loadedTypeface = await loadToolingTypeface(canvasKit);
+    if (this.destroyed) {
+      if (loadedTypeface.owned) loadedTypeface.typeface?.delete();
+      return;
+    }
+    this.parentDistanceTypeface = loadedTypeface.typeface;
+    this.ownsParentDistanceTypeface = loadedTypeface.owned;
     this.ready = true;
     if (this.pendingFrame) this.render(this.pendingFrame);
   }
@@ -188,6 +209,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
         drawGuide(ck, canvas, pool, guide, frame.viewportTransform);
       }
 
+      if (frame.parentDistances) {
+        drawParentDistances(ck, canvas, pool, frame.parentDistances, frame, this.parentDistanceTypeface);
+      }
+
       if (frame.marqueeRect) {
         const rect = canvasRectToViewport(frame.marqueeRect, frame.viewportTransform);
         drawFilledRect(ck, canvas, pool, rect, MARQUEE_FILL);
@@ -220,6 +245,9 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.disposeSurface();
     this.paintPool?.dispose();
     this.paintPool = null;
+    if (this.ownsParentDistanceTypeface) this.parentDistanceTypeface?.delete();
+    this.parentDistanceTypeface = null;
+    this.ownsParentDistanceTypeface = false;
     // Remove listeners before losing the context so handleContextLost does not
     // fire re-entrantly during the loseContext() call below.
     this.canvas?.removeEventListener("webglcontextlost", this.handleContextLost);
@@ -333,6 +361,23 @@ function loadCanvasKit(): Promise<CanvasKit> {
     locateFile: (file) => (file.endsWith(".wasm") ? canvasKitWasmUrl : file),
   });
   return canvasKitPromise;
+}
+
+async function loadToolingTypeface(
+  ck: CanvasKit,
+): Promise<{ typeface: Typeface | null; owned: boolean }> {
+  try {
+    const response = await fetch(geistLatinFontUrl);
+    if (response.ok) {
+      const typeface = ck.Typeface.MakeTypefaceFromData(await response.arrayBuffer());
+      if (typeface) return { typeface, owned: true };
+    }
+  } catch {
+    // Fall back to CanvasKit's compiled default below. The adapter still renders,
+    // but bundled Geist is the primary tooling font.
+  }
+
+  return { typeface: ck.Typeface.GetDefault(), owned: false };
 }
 
 function getResolution(): number {
@@ -493,6 +538,194 @@ function drawDropTarget(
   );
   drawRoundRectWithPaint(ck, canvas, command.rect, radius, pool.getFill(fill));
   drawDashedRect(ck, canvas, pool, command.rect, color, 4, 4);
+}
+
+function drawParentDistances(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  command: ToolingRenderFrame["parentDistances"],
+  frame: ToolingRenderFrame,
+  typeface: Typeface | null,
+): void {
+  if (!command) return;
+
+  const parent = command.parentRect;
+  const child = command.childRect;
+  const childCenterX = child.x + child.width / 2;
+  const childCenterY = child.y + child.height / 2;
+  const parentRight = parent.x + parent.width;
+  const parentBottom = parent.y + parent.height;
+  const childRight = child.x + child.width;
+  const childBottom = child.y + child.height;
+  const stroke = pool.getStroke(PARENT_DISTANCE_COLOR, 1);
+  const fill = pool.getFill(PARENT_DISTANCE_COLOR);
+  const textPaint = pool.getFill(PARENT_DISTANCE_TEXT_COLOR);
+  const font = new ck.Font(typeface ?? ck.Typeface.GetDefault(), PARENT_DISTANCE_LABEL_FONT_SIZE);
+  font.setSubpixel(true);
+
+  try {
+    drawParentDistanceSegment(ck, canvas, {
+      from: { x: childCenterX, y: child.y },
+      to: { x: childCenterX, y: parent.y },
+      value: command.distances.top,
+      orientation: "vertical",
+      frame,
+      stroke,
+      fill,
+      textPaint,
+      font,
+    });
+    drawParentDistanceSegment(ck, canvas, {
+      from: { x: childRight, y: childCenterY },
+      to: { x: parentRight, y: childCenterY },
+      value: command.distances.right,
+      orientation: "horizontal",
+      frame,
+      stroke,
+      fill,
+      textPaint,
+      font,
+    });
+    drawParentDistanceSegment(ck, canvas, {
+      from: { x: childCenterX, y: childBottom },
+      to: { x: childCenterX, y: parentBottom },
+      value: command.distances.bottom,
+      orientation: "vertical",
+      frame,
+      stroke,
+      fill,
+      textPaint,
+      font,
+    });
+    drawParentDistanceSegment(ck, canvas, {
+      from: { x: child.x, y: childCenterY },
+      to: { x: parent.x, y: childCenterY },
+      value: command.distances.left,
+      orientation: "horizontal",
+      frame,
+      stroke,
+      fill,
+      textPaint,
+      font,
+    });
+  } finally {
+    font.delete();
+  }
+}
+
+function drawParentDistanceSegment(
+  ck: CanvasKit,
+  canvas: Canvas,
+  input: {
+    from: Point;
+    to: Point;
+    value: number;
+    orientation: "horizontal" | "vertical";
+    frame: ToolingRenderFrame;
+    stroke: Paint;
+    fill: Paint;
+    textPaint: Paint;
+    font: Font;
+  },
+): void {
+  const from = canvasPointToViewport(input.from, input.frame.viewportTransform);
+  const to = canvasPointToViewport(input.to, input.frame.viewportTransform);
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  if (length > 0.5) {
+    canvas.drawLine(from.x, from.y, to.x, to.y, input.stroke);
+  }
+
+  const anchor = {
+    x: (from.x + to.x) / 2,
+    y: (from.y + to.y) / 2,
+  };
+  drawParentDistanceLabel(ck, canvas, {
+    text: String(Math.round(input.value)),
+    anchor,
+    orientation: input.orientation,
+    lineLength: length,
+    overlayWidth: input.frame.width,
+    overlayHeight: input.frame.height,
+    fill: input.fill,
+    textPaint: input.textPaint,
+    font: input.font,
+  });
+}
+
+function drawParentDistanceLabel(
+  ck: CanvasKit,
+  canvas: Canvas,
+  input: {
+    text: string;
+    anchor: Point;
+    orientation: "horizontal" | "vertical";
+    lineLength: number;
+    overlayWidth: number;
+    overlayHeight: number;
+    fill: Paint;
+    textPaint: Paint;
+    font: Font;
+  },
+): void {
+  const textWidth = measureTextWidth(input.font, input.text);
+  const width = Math.ceil(textWidth + PARENT_DISTANCE_LABEL_PADDING_X * 2);
+  const height = PARENT_DISTANCE_LABEL_HEIGHT;
+  let left = input.anchor.x - width / 2;
+  let top = input.anchor.y - height / 2;
+
+  if (
+    input.orientation === "vertical" &&
+    input.lineLength < PARENT_DISTANCE_LABEL_HEIGHT + PARENT_DISTANCE_LABEL_MARGIN
+  ) {
+    left = input.anchor.x + PARENT_DISTANCE_SHORT_LABEL_OFFSET;
+  }
+  if (
+    input.orientation === "horizontal" &&
+    input.lineLength < width + PARENT_DISTANCE_LABEL_MARGIN
+  ) {
+    top = input.anchor.y - height - PARENT_DISTANCE_SHORT_LABEL_OFFSET;
+  }
+
+  left = clampOverlayCoordinate(
+    left,
+    PARENT_DISTANCE_LABEL_MARGIN,
+    input.overlayWidth - width - PARENT_DISTANCE_LABEL_MARGIN,
+  );
+  top = clampOverlayCoordinate(
+    top,
+    PARENT_DISTANCE_LABEL_MARGIN,
+    input.overlayHeight - height - PARENT_DISTANCE_LABEL_MARGIN,
+  );
+
+  drawRoundRectWithPaint(
+    ck,
+    canvas,
+    { x: left, y: top, width, height },
+    PARENT_DISTANCE_LABEL_RADIUS,
+    input.fill,
+  );
+
+  const metrics = input.font.getMetrics();
+  const baseline = top + (height - metrics.ascent - metrics.descent) / 2;
+  canvas.drawText(
+    input.text,
+    left + PARENT_DISTANCE_LABEL_PADDING_X,
+    baseline,
+    input.textPaint,
+    input.font,
+  );
+}
+
+function measureTextWidth(font: Font, text: string): number {
+  const glyphs = font.getGlyphIDs(text);
+  const widths = font.getGlyphWidths(glyphs);
+  return widths.reduce((sum, width) => sum + width, 0);
+}
+
+function clampOverlayCoordinate(value: number, min: number, max: number): number {
+  if (max < min) return Math.max(0, max);
+  return Math.min(Math.max(value, min), max);
 }
 
 function drawDashedRect(
