@@ -5,6 +5,7 @@ export type { ViewMode } from "./engine/types";
 export type {
   CropBox,
   ToolReference,
+  ToolReferenceGroupContext,
   SavedComponent,
   PendingConfirmation,
   ComponentTreeNode,

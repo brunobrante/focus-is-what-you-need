@@ -6,6 +6,8 @@ import {
 } from "@/lib/tauri/referenceStorage";
 import { inferType, blobToDataUrl } from "./image";
 
+export { readReferenceGroups, readRefsMeta } from "@/lib/tauri/referenceStorage";
+
 export const COMPONENT_STORAGE_PREFIX = "workspace.tools.components.";
 export const PRIMARY_COMPONENT_STORAGE_PREFIX = "workspace.tools.primary.";
 export const CROPS_OVERLAY_COLOR_STORAGE_KEY = "workspace.tools.cropsOverlayColor";

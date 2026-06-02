@@ -29,6 +29,20 @@ pub struct FigxProjectInput {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ReferenceGroupArchiveInput {
+    pub group_id: String,
+    pub group_name: String,
+    pub reference_ids: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ReferenceGroupArchiveResult {
+    pub file: String,
+    pub path: String,
+    pub updated_at: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct WorkspaceMetaProject {
     id: String,
     name: String,
@@ -103,6 +117,10 @@ fn references_dir(cfg: &WorkspaceConfig) -> PathBuf {
     app_root(cfg).join("references")
 }
 
+fn reference_groups_dir(cfg: &WorkspaceConfig) -> PathBuf {
+    app_root(cfg).join("reference-groups")
+}
+
 fn reference_dir(cfg: &WorkspaceConfig, id: &str) -> PathBuf {
     references_dir(cfg).join(id)
 }
@@ -140,6 +158,7 @@ fn now_ms() -> u64 {
 
 fn ensure_local_structure(cfg: &WorkspaceConfig) -> Result<(), String> {
     fs::create_dir_all(references_dir(cfg)).map_err(|e| e.to_string())?;
+    fs::create_dir_all(reference_groups_dir(cfg)).map_err(|e| e.to_string())?;
     fs::create_dir_all(workspace_dir(cfg)).map_err(|e| e.to_string())?;
     fs::create_dir_all(loose_projects_dir(cfg)).map_err(|e| e.to_string())?;
     if !workspace_meta_path(cfg).exists() {
@@ -404,6 +423,54 @@ fn write_references_meta(app: tauri::AppHandle, content: String) -> Result<(), S
 }
 
 #[tauri::command]
+fn read_reference_groups(app: tauri::AppHandle) -> Result<String, String> {
+    let cfg = read_config(&app);
+    let primary = references_dir(&cfg).join("groups.json");
+    let fallback = legacy_references_dir(&cfg).join("groups.json");
+    if primary.exists() {
+        fs::read_to_string(&primary).map_err(|e| e.to_string())
+    } else if fallback.exists() {
+        fs::read_to_string(&fallback).map_err(|e| e.to_string())
+    } else {
+        Ok("[]".into())
+    }
+}
+
+#[tauri::command]
+fn write_reference_groups(app: tauri::AppHandle, content: String) -> Result<(), String> {
+    let cfg = read_config(&app);
+    ensure_local_structure(&cfg)?;
+    fs::write(references_dir(&cfg).join("groups.json"), content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn sync_reference_group_archive(
+    app: tauri::AppHandle,
+    group: ReferenceGroupArchiveInput,
+) -> Result<ReferenceGroupArchiveResult, String> {
+    let cfg = read_config(&app);
+    ensure_local_structure(&cfg)?;
+    let safe_id = safe_path_segment(&group.group_id, "reference group id")?;
+    let name = if group.group_name.trim().is_empty() {
+        "reference-group"
+    } else {
+        group.group_name.trim()
+    };
+    let filename = figx_filename(&safe_id, name);
+    let dir = reference_groups_dir(&cfg);
+    remove_stale_project_files(&dir, &safe_id, &filename);
+    let path = dir.join(&filename);
+    let entries = reference_group_archive_entries(&cfg, &group, &safe_id)?;
+    write_zip_file(&path, &entries)?;
+    let updated_at = now_ms();
+    Ok(ReferenceGroupArchiveResult {
+        file: filename,
+        path: path.to_string_lossy().into_owned(),
+        updated_at,
+    })
+}
+
+#[tauri::command]
 fn read_local_figx_projects(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
@@ -585,6 +652,38 @@ fn project_archive_entries(
     }
 
     entries.extend(reference_archive_entries(cfg, &project.reference_ids)?);
+    Ok(entries)
+}
+
+fn reference_group_archive_entries(
+    cfg: &WorkspaceConfig,
+    group: &ReferenceGroupArchiveInput,
+    safe_group_id: &str,
+) -> Result<Vec<ZipEntry>, String> {
+    let saved_at = now_ms();
+    let manifest = json!({
+        "format": "figx",
+        "formatVersion": 1,
+        "app": APP_FOLDER_NAME,
+        "kind": "reference-group",
+        "groupId": safe_group_id,
+        "groupName": group.group_name,
+        "savedAt": saved_at,
+        "archiveEntry": "data/reference-group.json",
+    });
+    let group_data = json!({
+        "version": 1,
+        "id": safe_group_id,
+        "name": group.group_name,
+        "referenceIds": group.reference_ids,
+        "savedAt": saved_at,
+    });
+
+    let mut entries = vec![
+        json_entry("manifest.json", &manifest)?,
+        json_entry("data/reference-group.json", &group_data)?,
+    ];
+    entries.extend(reference_archive_entries(cfg, &group.reference_ids)?);
     Ok(entries)
 }
 
@@ -859,6 +958,9 @@ pub fn run() {
             delete_reference_stack,
             read_references_meta,
             write_references_meta,
+            read_reference_groups,
+            write_reference_groups,
+            sync_reference_group_archive,
             read_local_figx_projects,
             sync_figx_projects,
             delete_figx_project,

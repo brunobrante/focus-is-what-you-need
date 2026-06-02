@@ -4,6 +4,13 @@ import {
   type ReferenceStackData,
   type ReferenceStackSummary,
 } from "@/lib/references/stackTypes";
+import {
+  normalizeReferenceGroups,
+  referenceGroupArchiveFromResult,
+  type ReferenceGroup,
+  type ReferenceGroupArchive,
+  type ReferenceGroupArchiveResult,
+} from "@/lib/references/groupTypes";
 
 // Matches StoredMeta from References.tsx (Omit<ReferenceItem, "url">),
 // with ext required so we know which filename to look up on disk.
@@ -22,6 +29,7 @@ export type StoredRefMeta = {
   tags: string[];
   added: string;
   ext: string;
+  groupId?: string | null;
   stack?: ReferenceStackSummary;
 };
 
@@ -157,6 +165,35 @@ export async function writeRefsMeta(items: StoredRefMeta[]): Promise<void> {
   await invoke("write_references_meta", { content: JSON.stringify(items) });
 }
 
+export async function readReferenceGroups(): Promise<ReferenceGroup[]> {
+  try {
+    const raw = await invoke<string>("read_reference_groups");
+    const parsed: unknown = JSON.parse(raw);
+    return normalizeReferenceGroups(parsed);
+  } catch {
+    return [];
+  }
+}
+
+export async function writeReferenceGroups(groups: ReferenceGroup[]): Promise<void> {
+  await invoke("write_reference_groups", { content: JSON.stringify(groups, null, 2) });
+}
+
+export async function syncReferenceGroupArchive(input: {
+  id: string;
+  name: string;
+  referenceIds: string[];
+}): Promise<ReferenceGroupArchive> {
+  const result = await invoke<ReferenceGroupArchiveResult>("sync_reference_group_archive", {
+    group: {
+      group_id: input.id,
+      group_name: input.name,
+      reference_ids: input.referenceIds,
+    },
+  });
+  return referenceGroupArchiveFromResult(result);
+}
+
 export async function refreshReferenceStackSummary(meta: StoredRefMeta): Promise<StoredRefMeta> {
   const data = await readReferenceStackData(meta.id);
   const stack = stackSummaryFromData(data);
@@ -213,4 +250,4 @@ function normalizeReferenceStackData(value: unknown, fallbackReferenceId: string
   };
 }
 
-export type { ReferenceStackData, ReferenceStackSummary };
+export type { ReferenceStackData, ReferenceStackSummary, ReferenceGroup };

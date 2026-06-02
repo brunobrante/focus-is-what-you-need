@@ -15,6 +15,12 @@ export type ToolReference = {
   url: string;
 };
 
+export type ToolReferenceGroupContext = {
+  id: string;
+  name: string;
+  references: ToolReference[];
+};
+
 export type SavedComponent = {
   id: string;
   name: string;
