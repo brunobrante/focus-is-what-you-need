@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Monitor, RotateCcw, Smartphone } from "lucide-react";
 
-import type { SplitMode } from "@/canvas/Canvas";
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
 import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import { EditorProvider, useEditor } from "@/canvas/engine/store";
@@ -10,7 +9,15 @@ import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, getViewportZoomLimits } from "@/canvas/engine/viewport";
 import type { ZoomLimits } from "@/canvas/engine/viewport";
-import { canvasSizeForProjectType } from "@/canvas/canvasUtils";
+import {
+  CANVAS_WINDOW_LABELS,
+  canvasSizeForProjectType,
+  normalizeCanvasSplitWindows,
+  type CanvasFeatureWindowType,
+  type CanvasSplitWindows,
+  type CanvasWindowType,
+  type SplitMode,
+} from "@/canvas/canvasUtils";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasStage } from "../stage/CanvasStage";
 import type { CanvasToolId } from "@/canvas/tools";
@@ -50,7 +57,9 @@ export function CanvasRender({
   treeOpen,
   inspectorOpen,
   split,
-  activeTab,
+  activeTab = "current",
+  enabledTabs = ["current", "drafts"],
+  splitWindows = ["current", "drafts"],
   expanded,
   activeTool,
   currentDocument,
@@ -75,7 +84,9 @@ export function CanvasRender({
   treeOpen: boolean;
   inspectorOpen: boolean;
   split: SplitMode;
-  activeTab?: "current" | "drafts";
+  activeTab?: CanvasWindowType;
+  enabledTabs?: readonly CanvasWindowType[];
+  splitWindows?: readonly CanvasWindowType[];
   expanded: boolean;
   activeTool?: string;
   currentDocument?: CanvasDocument;
@@ -90,15 +101,13 @@ export function CanvasRender({
   shellZoomVisibility?: ShellControlVisibility;
   shellExpandVisibility?: ShellControlVisibility;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
-  onActiveCanvasChange?: (canvas: "left" | "right") => void;
+  onActiveCanvasChange?: (windowType: CanvasWindowType) => void;
   onToggleExpand?: () => void;
   onBackToParent?: () => void;
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
 }) {
-  const activeCanvas = split !== "none" && activeTab === "drafts" ? "right" : "left";
-
   const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + TREE_WIDTH + GAP      : PANEL_MARGIN);
   const right  = expanded ? 0 : (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP : PANEL_MARGIN);
   const top    = expanded ? 0 : HEADER_HEIGHT;
@@ -115,6 +124,94 @@ export function CanvasRender({
     return createDraftDocument(Math.max(400, w), Math.max(300, h));
   }, []);
 
+  const selectedTab = enabledTabs.includes(activeTab) ? activeTab : "current";
+  const normalizedSplitWindows: CanvasSplitWindows = normalizeCanvasSplitWindows(
+    splitWindows,
+    enabledTabs,
+  );
+  const splitEnabled = split !== "none" && normalizedSplitWindows.length > 1;
+  const renderedWindows = splitEnabled ? normalizedSplitWindows : [selectedTab];
+  const activeWindow = renderedWindows.includes(selectedTab) ? selectedTab : renderedWindows[0];
+  const surfaceDeviceVisibility = splitEnabled ? "hidden" : shellDeviceVisibility;
+  const surfaceZoomVisibility = splitEnabled ? "hidden" : shellZoomVisibility;
+
+  const renderCurrentSurface = (active: boolean, showActiveBorder: boolean) => (
+    <CanvasSurface
+      active={active}
+      showActiveBorder={showActiveBorder}
+      sourceId="current"
+      publishBridge={active}
+      expanded={expanded}
+      onClick={() => onActiveCanvasChange?.("current")}
+      storageKey={currentStorageKey}
+      draftMode={false}
+      fallbackDocument={currentDocument}
+      persistStorage={false}
+      ready={currentReady}
+      onDocumentChange={onCurrentDocumentChange}
+      activeTool={activeTool}
+      projectType={projectType}
+      parentTarget={parentTarget}
+      isComponent={isComponent}
+      componentOriginPosition={componentOriginPosition}
+      shellDeviceVisibility={surfaceDeviceVisibility}
+      shellBackVisibility={shellBackVisibility}
+      shellZoomVisibility={surfaceZoomVisibility}
+      onBackToParent={onBackToParent}
+      settings={settings}
+      onCanvasToolShortcut={onCanvasToolShortcut}
+      onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
+    />
+  );
+
+  const renderSecondarySurface = (
+    windowType: CanvasFeatureWindowType,
+    active: boolean,
+    showActiveBorder: boolean,
+  ) => {
+    if (windowType === "drafts") {
+      return (
+        <CanvasSurface
+          active={active}
+          showActiveBorder={showActiveBorder}
+          sourceId="drafts"
+          publishBridge={active}
+          expanded={expanded}
+          onClick={() => onActiveCanvasChange?.("drafts")}
+          storageKey={DRAFTS_CANVAS_STORAGE_KEY}
+          draftMode
+          fallbackDocument={draftsFallbackDoc}
+          activeTool={activeTool}
+          projectType={projectType}
+          shellDeviceVisibility={surfaceDeviceVisibility}
+          shellZoomVisibility={surfaceZoomVisibility}
+          settings={settings}
+          onCanvasToolShortcut={onCanvasToolShortcut}
+          onOpenSelectedComponentShortcut={undefined}
+        />
+      );
+    }
+
+    return (
+      <CanvasPlaceholderSurface
+        active={active}
+        showActiveBorder={showActiveBorder}
+        windowType={windowType}
+        onClick={() => onActiveCanvasChange?.(windowType)}
+      />
+    );
+  };
+
+  const renderWindowSurface = (
+    windowType: CanvasWindowType,
+    active: boolean,
+    showActiveBorder: boolean,
+  ) => {
+    if (windowType === "current") return renderCurrentSurface(active, showActiveBorder);
+    return renderSecondarySurface(windowType, active, showActiveBorder);
+  };
+  const useGridSplit = split === "grid" && renderedWindows.length >= 3;
+
   return (
     <div
       className="fixed z-[2]"
@@ -123,145 +220,34 @@ export function CanvasRender({
         transition: "left 220ms cubic-bezier(.2,.8,.2,1), right 220ms cubic-bezier(.2,.8,.2,1), top 220ms cubic-bezier(.2,.8,.2,1), bottom 220ms cubic-bezier(.2,.8,.2,1)",
       }}
     >
-      {split === "vertical" ? (
-        <div className="absolute inset-0 flex gap-2">
-          <CanvasSurface
-            active={activeCanvas === "left"}
-            showActiveBorder
-            sourceId="current"
-            publishBridge={activeCanvas === "left"}
-            expanded={expanded}
-            onClick={() => onActiveCanvasChange?.("left")}
-            storageKey={currentStorageKey}
-            draftMode={false}
-            fallbackDocument={currentDocument}
-            persistStorage={false}
-            ready={currentReady}
-            onDocumentChange={onCurrentDocumentChange}
-            activeTool={activeTool}
-            projectType={projectType}
-            parentTarget={parentTarget}
-            isComponent={isComponent}
-            componentOriginPosition={componentOriginPosition}
-            shellDeviceVisibility={shellDeviceVisibility}
-            shellBackVisibility={shellBackVisibility}
-            shellZoomVisibility={shellZoomVisibility}
-            onBackToParent={onBackToParent}
-            settings={settings}
-            onCanvasToolShortcut={onCanvasToolShortcut}
-            onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
-          />
-          <CanvasSurface
-            active={activeCanvas === "right"}
-            showActiveBorder
-            sourceId="drafts"
-            publishBridge={activeCanvas === "right"}
-            expanded={expanded}
-            onClick={() => onActiveCanvasChange?.("right")}
-            storageKey={DRAFTS_CANVAS_STORAGE_KEY}
-            draftMode
-            fallbackDocument={draftsFallbackDoc}
-            activeTool={activeTool}
-            projectType={projectType}
-            settings={settings}
-            onCanvasToolShortcut={onCanvasToolShortcut}
-            onOpenSelectedComponentShortcut={undefined}
-          />
-        </div>
-      ) : split === "horizontal" ? (
-        <div className="absolute inset-0 flex flex-col gap-2">
-          <CanvasSurface
-            active={activeCanvas === "left"}
-            showActiveBorder
-            sourceId="current"
-            publishBridge={activeCanvas === "left"}
-            expanded={expanded}
-            onClick={() => onActiveCanvasChange?.("left")}
-            storageKey={currentStorageKey}
-            draftMode={false}
-            fallbackDocument={currentDocument}
-            persistStorage={false}
-            ready={currentReady}
-            onDocumentChange={onCurrentDocumentChange}
-            activeTool={activeTool}
-            projectType={projectType}
-            parentTarget={parentTarget}
-            isComponent={isComponent}
-            componentOriginPosition={componentOriginPosition}
-            shellDeviceVisibility={shellDeviceVisibility}
-            shellBackVisibility={shellBackVisibility}
-            shellZoomVisibility={shellZoomVisibility}
-            onBackToParent={onBackToParent}
-            settings={settings}
-            onCanvasToolShortcut={onCanvasToolShortcut}
-            onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
-          />
-          <CanvasSurface
-            active={activeCanvas === "right"}
-            showActiveBorder
-            sourceId="drafts"
-            publishBridge={activeCanvas === "right"}
-            expanded={expanded}
-            onClick={() => onActiveCanvasChange?.("right")}
-            storageKey={DRAFTS_CANVAS_STORAGE_KEY}
-            draftMode
-            fallbackDocument={draftsFallbackDoc}
-            activeTool={activeTool}
-            projectType={projectType}
-            settings={settings}
-            onCanvasToolShortcut={onCanvasToolShortcut}
-            onOpenSelectedComponentShortcut={undefined}
-          />
+      {splitEnabled ? (
+        <div
+          className={
+            useGridSplit
+              ? "absolute inset-0 grid gap-2"
+              : split === "horizontal"
+                ? "absolute inset-0 flex flex-col gap-2"
+                : "absolute inset-0 flex gap-2"
+          }
+          style={useGridSplit ? { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" } : undefined}
+        >
+          {renderedWindows.map((windowType, index) => (
+            <div
+              key={windowType}
+              className="flex min-h-0 min-w-0 flex-1"
+              style={gridPaneStyle(index, renderedWindows.length)}
+            >
+              {renderWindowSurface(windowType, activeWindow === windowType, true)}
+            </div>
+          ))}
         </div>
       ) : (
         <div className="absolute inset-0 flex">
-          {activeTab === "drafts" ? (
-            <CanvasSurface
-              active
-              showActiveBorder={false}
-              sourceId="drafts"
-              publishBridge
-              expanded={expanded}
-              storageKey={DRAFTS_CANVAS_STORAGE_KEY}
-              draftMode
-              fallbackDocument={draftsFallbackDoc}
-              activeTool={activeTool}
-              projectType={projectType}
-              settings={settings}
-              onCanvasToolShortcut={onCanvasToolShortcut}
-              onOpenSelectedComponentShortcut={undefined}
-            />
-          ) : (
-            <CanvasSurface
-              active
-              showActiveBorder={false}
-              sourceId="current"
-              publishBridge
-              expanded={expanded}
-              storageKey={currentStorageKey}
-              draftMode={false}
-              fallbackDocument={currentDocument}
-              persistStorage={false}
-              ready={currentReady}
-              onDocumentChange={onCurrentDocumentChange}
-              activeTool={activeTool}
-              projectType={projectType}
-              parentTarget={parentTarget}
-              isComponent={isComponent}
-              componentOriginPosition={componentOriginPosition}
-              shellDeviceVisibility={shellDeviceVisibility}
-              shellBackVisibility={shellBackVisibility}
-              shellZoomVisibility={shellZoomVisibility}
-              onBackToParent={onBackToParent}
-              settings={settings}
-              onCanvasToolShortcut={onCanvasToolShortcut}
-              onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
-            />
-          )}
+          {renderWindowSurface(selectedTab, true, false)}
         </div>
       )}
 
-      {!expanded && shellExpandVisibility !== "hidden" && (
+      {!expanded && !splitEnabled && shellExpandVisibility !== "hidden" && (
         <ExpandButton
           shellExpandVisibility={shellExpandVisibility}
           btnTop={btnTop}
@@ -271,6 +257,11 @@ export function CanvasRender({
       )}
     </div>
   );
+}
+
+function gridPaneStyle(index: number, count: number): CSSProperties | undefined {
+  if (count === 3 && index === 2) return { gridColumn: "1 / span 2" };
+  return undefined;
 }
 
 function ExpandIcon() {
@@ -314,6 +305,55 @@ function ExpandButton({
     >
       <ExpandIcon />
     </button>
+  );
+}
+
+function CanvasPlaceholderSurface({
+  active,
+  showActiveBorder,
+  windowType,
+  onClick,
+}: {
+  active: boolean;
+  showActiveBorder: boolean;
+  windowType: CanvasFeatureWindowType;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative flex flex-1 cursor-default items-center justify-center overflow-hidden rounded-xl border text-left transition-all duration-150"
+      style={{
+        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
+        backgroundColor: "#141615",
+        boxShadow: active && showActiveBorder
+          ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
+          : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
+      }}
+    >
+      <span className="flex flex-col items-center gap-2">
+        <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
+          <PlaceholderWindowIcon />
+        </span>
+        <span className="text-[13px] font-semibold text-[#E6E6E6]">
+          {CANVAS_WINDOW_LABELS[windowType]}
+        </span>
+        <span className="rounded border border-[#2C2C2C] bg-[#1A1A1A] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#737373]">
+          No canvas yet
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function PlaceholderWindowIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M8 9h8" />
+      <path d="M8 14h5" />
+    </svg>
   );
 }
 
@@ -394,12 +434,15 @@ function CanvasSurface({
         }
       : undefined;
   const toggleScreenOverlayShortcut =
-    shortcutEnabled && isComponent
+    shortcutEnabled && isComponent && shellDeviceVisibility !== "hidden"
       ? () => {
           setScreenOverlayEnabled((enabled) => !enabled);
           return true;
         }
       : undefined;
+  const showSurfaceCanvasControls =
+    !expanded &&
+    (shellZoomVisibility !== "hidden" || (isComponent && shellDeviceVisibility !== "hidden"));
 
   return (
     <div
@@ -441,7 +484,7 @@ function CanvasSurface({
               onBack={onBackToParent}
             />
           ) : null}
-          {!expanded ? (
+          {showSurfaceCanvasControls ? (
             <SurfaceCanvasControls
               projectType={projectType}
               isComponent={isComponent}

@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  CANVAS_WINDOW_LABELS,
+  type CanvasWindowType,
+} from "@/canvas/canvasUtils";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import {
   renameElement,
@@ -81,7 +85,8 @@ export function Inspector({
   const selectedId = editorProp !== undefined ? (editorProp?.state.selectedIds[0] ?? null) : bridgeSelectedId;
   const selectedCount = editorProp !== undefined ? (editorProp?.state.selectedIds.length ?? 0) : bridgeSelectedCount;
   const canvasStageActive = editorProp !== undefined ? (editorProp?.state.canvasStageActive ?? false) : bridgeCanvasStageActive;
-  const sourceLabel = ((editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId) === "drafts") ? "Drafts" : "Current";
+  const sourceId = editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId;
+  const sourceLabel = CANVAS_WINDOW_LABELS[(sourceId as CanvasWindowType | null) ?? "current"] ?? "Current";
   const node = document && selectedId ? document.elements[selectedId] ?? null : null;
 
   useEffect(() => {
@@ -226,7 +231,7 @@ export function Inspector({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {!document ? (
-          <EmptyState title="No active canvas" body="Select Current or Drafts to inspect." />
+          <EmptyState title="No active canvas" body="Select a canvas window to inspect." />
         ) : activeTab === "canvas" ? (
           <CanvasTab
             canvas={document.canvas}

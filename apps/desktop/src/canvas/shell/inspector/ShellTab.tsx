@@ -55,9 +55,6 @@ export function ShellTab({
   onZoomVisibilityChange,
   onExpandVisibilityChange,
 }: ShellTabProps) {
-  const [draftEnabled, setDraftEnabled] = useState(true);
-  const [referenceEnabled, setReferenceEnabled] = useState(false);
-  const [versoesEnabled, setVersoesEnabled] = useState(false);
   const [shapeRenderModes, setShapeRenderModes] = useState<Record<string, ShapeRenderMode>>(
     Object.fromEntries(SHAPE_LIST.map((s) => [s.id, "svg" as ShapeRenderMode])),
   );
@@ -69,18 +66,6 @@ export function ShellTab({
           <InsColor value={background} onChange={onUpdateBackground} />
         </InsRow>
 
-      </InsSection>
-
-      <InsSection title="Feats">
-        <InsRow label="Draft">
-          <InsSwitch checked={draftEnabled} onChange={setDraftEnabled} />
-        </InsRow>
-        <InsRow label="Reference">
-          <InsSwitch checked={referenceEnabled} onChange={setReferenceEnabled} />
-        </InsRow>
-        <InsRow label="Versions">
-          <InsSwitch checked={versoesEnabled} onChange={setVersoesEnabled} />
-        </InsRow>
       </InsSection>
 
       <InsSection title="Controles">

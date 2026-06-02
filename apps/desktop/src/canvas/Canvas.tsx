@@ -22,13 +22,22 @@ import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
 import { useCanvasNavigation } from "./hooks/useCanvasNavigation";
 import {
+  DEFAULT_CANVAS_FEATURES,
+  addCanvasWindowToSplit,
   buildProjectTree,
   createBlankDocumentForProjectType,
+  enabledCanvasWindowTypes,
   findTreeNodeById,
   isFactoryMockGraphJSON,
   mockTargetKey,
+  normalizeCanvasSplitWindows,
   normalizeProjectType,
   shouldUseMockGraph,
+  type CanvasFeatureFlags,
+  type CanvasFeatureWindowType,
+  type CanvasSplitWindows,
+  type CanvasWindowType,
+  type SplitMode,
 } from "./canvasUtils";
 
 export type { SplitMode } from "./canvasUtils";
@@ -91,16 +100,28 @@ function CanvasPageContent() {
   const [treeOpen, setTreeOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
-  const [activeTab, setActiveTab] = useState<"current" | "drafts">("current");
-  const [treeTab, setTreeTab] = useState<"layers" | "drafts">("layers");
-  const [split, setSplit] = useState<"none" | "vertical" | "horizontal">("none");
+  const [activeTab, setActiveTab] = useState<CanvasWindowType>("current");
+  const [treeTab, setTreeTab] = useState<CanvasWindowType>("current");
+  const [split, setSplit] = useState<SplitMode>("none");
+  const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "drafts"]);
   const [canvasExpanded, setCanvasExpanded] = useState(false);
+  const [canvasFeatures, setCanvasFeatures] = useState<CanvasFeatureFlags>(() => ({
+    ...DEFAULT_CANVAS_FEATURES,
+  }));
   const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
   const [shellBackVisibility, setShellBackVisibility] = useState<ShellControlVisibility>("show");
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
   const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
   const [shellTabSignal, setShellTabSignal] = useState(0);
   const { settings } = useGlobalSettings();
+  const enabledCanvasTabs = useMemo(
+    () => enabledCanvasWindowTypes(canvasFeatures),
+    [canvasFeatures],
+  );
+  const normalizedSplitWindows = useMemo(
+    () => normalizeCanvasSplitWindows(splitWindows, enabledCanvasTabs),
+    [enabledCanvasTabs, splitWindows],
+  );
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
@@ -259,10 +280,10 @@ function CanvasPageContent() {
   const openSelectedComponentInCanvas = useCallback((): boolean => {
     const editor = getEditor();
     const selectedId = editor?.state.selectedIds.length === 1 ? editor.state.selectedIds[0] : null;
-    if (!selectedId || editor?.sourceId !== "current" || !canOpenCanvasNode(selectedId)) return false;
+    if (activeTab !== "current" || !selectedId || editor?.sourceId !== "current" || !canOpenCanvasNode(selectedId)) return false;
     openCanvasForNode(selectedId);
     return true;
-  }, [canOpenCanvasNode, getEditor, openCanvasForNode]);
+  }, [activeTab, canOpenCanvasNode, getEditor, openCanvasForNode]);
 
   useEffect(() => {
     if (!editorTool) return;
@@ -289,10 +310,52 @@ function CanvasPageContent() {
         ? `/project/${encodeURIComponent(projectId)}`
         : "/";
 
-  const changeCanvasTab = (tab: "current" | "drafts") => {
-    setActiveTab(tab);
-    setTreeTab(tab === "drafts" ? "drafts" : "layers");
-  };
+  useEffect(() => {
+    if (!enabledCanvasTabs.includes(activeTab)) setActiveTab("current");
+    if (!enabledCanvasTabs.includes(treeTab)) setTreeTab("current");
+    setSplitWindows((current) => normalizeCanvasSplitWindows(current, enabledCanvasTabs));
+    if (split !== "none" && (enabledCanvasTabs.length < 2 || normalizedSplitWindows.length < 2)) {
+      setSplit("none");
+    } else if (split === "grid" && normalizedSplitWindows.length < 3) {
+      setSplit("vertical");
+    }
+  }, [activeTab, enabledCanvasTabs, normalizedSplitWindows.length, split, treeTab]);
+
+  const changeCanvasTab = useCallback((tab: CanvasWindowType) => {
+    const nextTab = enabledCanvasTabs.includes(tab) ? tab : "current";
+    setActiveTab(nextTab);
+    setTreeTab(nextTab);
+    if (split !== "none" && enabledCanvasTabs.length >= 2) {
+      setSplitWindows((current) => addCanvasWindowToSplit(current, enabledCanvasTabs, nextTab));
+    }
+  }, [enabledCanvasTabs, split]);
+
+  const changeSplitMode = useCallback((mode: SplitMode) => {
+    if (mode !== "none" && enabledCanvasTabs.length < 2) {
+      setSplit("none");
+      return;
+    }
+    const nextMode =
+      mode === "grid" && normalizedSplitWindows.length < 3
+        ? "vertical"
+        : mode;
+    setSplit(nextMode);
+    if (mode !== "none") {
+      setSplitWindows((current) => normalizeCanvasSplitWindows(current, enabledCanvasTabs));
+    }
+  }, [enabledCanvasTabs, normalizedSplitWindows.length]);
+
+  const changeSplitWindows = useCallback((windows: readonly CanvasWindowType[]) => {
+    setSplitWindows(normalizeCanvasSplitWindows(windows, enabledCanvasTabs));
+  }, [enabledCanvasTabs]);
+
+  const updateCanvasFeature = useCallback((feature: CanvasFeatureWindowType, enabled: boolean) => {
+    setCanvasFeatures((current) => {
+      if (current[feature] === enabled) return current;
+      return { ...current, [feature]: enabled };
+    });
+  }, []);
+  const splitActive = split !== "none";
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--bg)]">
@@ -301,6 +364,8 @@ function CanvasPageContent() {
         inspectorOpen={inspectorOpen}
         split={split}
         activeTab={activeTab}
+        enabledTabs={enabledCanvasTabs}
+        splitWindows={normalizedSplitWindows}
         expanded={canvasExpanded}
         activeTool={activeTool}
         currentDocument={currentDocument}
@@ -315,7 +380,7 @@ function CanvasPageContent() {
         shellZoomVisibility={shellZoomVisibility}
         shellExpandVisibility={shellExpandVisibility}
         onCurrentDocumentChange={handleCurrentDocumentChange}
-        onActiveCanvasChange={(canvas) => changeCanvasTab(canvas === "right" ? "drafts" : "current")}
+        onActiveCanvasChange={changeCanvasTab}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}
         onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
         settings={settings}
@@ -324,7 +389,17 @@ function CanvasPageContent() {
       />
 
       <div className="fixed left-1/2 top-3 z-[5] -translate-x-1/2">
-        <CanvasTabs activeTab={activeTab} onTabChange={changeCanvasTab} split={split} onSplitChange={setSplit} />
+        <CanvasTabs
+          activeTab={activeTab}
+          enabledTabs={enabledCanvasTabs}
+          onTabChange={changeCanvasTab}
+          split={split}
+          splitWindows={normalizedSplitWindows}
+          canvasFeatures={canvasFeatures}
+          onSplitChange={changeSplitMode}
+          onSplitWindowsChange={changeSplitWindows}
+          onCanvasFeatureChange={updateCanvasFeature}
+        />
       </div>
 
       <div
@@ -397,10 +472,8 @@ function CanvasPageContent() {
         onOpenNodeCanvas={openCanvasForNode}
         onOpenProjectNode={openProjectNodeCanvas}
         activeTab={treeTab}
-        onTabChange={(tab) => {
-          setTreeTab(tab);
-          setActiveTab(tab === "drafts" ? "drafts" : "current");
-        }}
+        enabledTabs={enabledCanvasTabs}
+        onTabChange={changeCanvasTab}
         projectType={projectType}
         projectTree={projectTree}
         parentNode={parentProjectNode}
@@ -441,13 +514,15 @@ function CanvasPageContent() {
           activeTool={activeTool}
           onToolChange={handleToolChange}
           canvasExpanded={canvasExpanded}
+          canvasControlsVisible={canvasExpanded || splitActive}
+          canvasControlsCompact={splitActive}
           zoom={activeZoom}
           onZoomChange={setActiveZoom}
           zoomLimits={activeZoomLimits}
           projectType={projectType}
           parentTarget={parentProjectNode}
           onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
-          onCollapseCanvas={() => setCanvasExpanded(false)}
+          onCanvasExpandedChange={setCanvasExpanded}
           config={toolbarConfig}
           onBadgeClick={() => {
             setInspectorOpen(true);

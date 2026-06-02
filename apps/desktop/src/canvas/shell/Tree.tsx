@@ -16,7 +16,6 @@ import {
 
 import {
   bringToFront,
-  constrainAll,
   deleteElements,
   duplicateElements,
   reorderElement,
@@ -26,8 +25,8 @@ import {
 } from "@/canvas/engine/actions";
 import { copyElements, hasClipboard, pasteElements } from "@/canvas/engine/clipboard";
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
-import { CANVAS_DOCUMENT_SAVED_EVENT, DRAFTS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import type { CanvasDocument } from "@/canvas/engine/types";
+import type { CanvasWindowType } from "@/canvas/canvasUtils";
 
 import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
 import {
@@ -76,29 +75,6 @@ function scrollTreeNodeIntoView(container: HTMLDivElement | null, nodeId: string
   row?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
-function isCanvasDocument(value: unknown): value is CanvasDocument {
-  const maybe = value as CanvasDocument;
-  return Boolean(
-    maybe &&
-      maybe.canvas &&
-      typeof maybe.canvas.width === "number" &&
-      typeof maybe.canvas.height === "number" &&
-      maybe.elements &&
-      Array.isArray(maybe.rootIds),
-  );
-}
-
-function readStoredCanvasDocument(storageKey: string): CanvasDocument | null {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    return isCanvasDocument(parsed) ? constrainAll(parsed) : null;
-  } catch {
-    return null;
-  }
-}
-
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -117,8 +93,9 @@ type Props = {
   canOpenNodeCanvas?: (nodeId: string) => boolean;
   onOpenNodeCanvas?: (nodeId: string) => void;
   onOpenProjectNode?: (node: ProjectTreeNode) => void;
-  activeTab?: "layers" | "drafts";
-  onTabChange?: (tab: "layers" | "drafts") => void;
+  activeTab?: CanvasWindowType;
+  enabledTabs?: readonly CanvasWindowType[];
+  onTabChange?: (tab: CanvasWindowType) => void;
   projectType?: DeviceType;
   projectTree?: ProjectTreeNode[];
   parentNode?: ProjectTreeNode | null;
@@ -142,8 +119,6 @@ export function Tree({
   canOpenNodeCanvas,
   onOpenNodeCanvas,
   onOpenProjectNode,
-  activeTab: externalTab,
-  onTabChange: externalOnTabChange,
   projectType,
   projectTree,
   parentNode,
@@ -158,29 +133,9 @@ export function Tree({
     return treeFromCanvasDocument(null, componentName || screenName || "Canvas");
   }, [componentName, document, screenName]);
   const treeStructureKey = useMemo(() => structureKey(tree.root), [tree]);
-  const [draftDocument, setDraftDocument] = useState<CanvasDocument | null>(() =>
-    readStoredCanvasDocument(DRAFTS_CANVAS_STORAGE_KEY),
-  );
-  const draftsTree = useMemo(() => {
-    return treeFromCanvasDocument(draftDocument, "Drafts");
-  }, [draftDocument]);
-  const draftsStructureKey = useMemo(() => structureKey(draftsTree.root), [draftsTree]);
 
   const [openSet, setOpenSet] = useState<Set<string>>(() => initiallyOpen(tree.root));
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
-  const [internalTab, setInternalTab] = useState<"layers" | "drafts">("layers");
-  const activeTab = externalTab ?? internalTab;
-  const setActiveTab = (tab: "layers" | "drafts") => {
-    setInternalTab(tab);
-    if (tab === "drafts") {
-      setDraftDocument(readStoredCanvasDocument(DRAFTS_CANVAS_STORAGE_KEY));
-    }
-    externalOnTabChange?.(tab);
-  };
-  const [draftsOpenSet, setDraftsOpenSet] = useState<Set<string>>(() =>
-    initiallyOpen(draftsTree.root),
-  );
-  const [draftsSelectedId, setDraftsSelectedId] = useState<string | null>(null);
 
   const pickerTree = projectTree ?? [];
   const selectedIds =
@@ -192,10 +147,6 @@ export function Tree({
         : []);
   const selectedIdsKey = JSON.stringify(selectedIds);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIdsKey]);
-  const draftsSelectedIds = useMemo(
-    () => new Set(draftsSelectedId ? [draftsSelectedId] : []),
-    [draftsSelectedId],
-  );
   const visibleLayerIds = useMemo(
     () => visibleNodeIds(tree.root, openSet),
     [openSet, tree.root],
@@ -213,7 +164,7 @@ export function Tree({
   }, [tree.root.id, treeStructureKey]);
 
   useEffect(() => {
-    if (!autoRevealSelection || activeTab !== "layers" || selectedIds.length === 0) return;
+    if (!autoRevealSelection || selectedIds.length === 0) return;
 
     const revealTargetId = selectedIds.find((id) => findNode(tree.root, id));
     if (!revealTargetId) return;
@@ -244,29 +195,7 @@ export function Tree({
       window.cancelAnimationFrame(firstFrame);
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
     };
-  }, [activeTab, autoRevealSelection, selectedIdsKey, tree.root, treeStructureKey]);
-
-  useEffect(() => {
-    setDraftsOpenSet(initiallyOpen(draftsTree.root));
-  }, [draftsTree.root.id, draftsStructureKey]);
-
-  useEffect(() => {
-    const refreshDrafts = () => setDraftDocument(readStoredCanvasDocument(DRAFTS_CANVAS_STORAGE_KEY));
-    const onSaved = (event: Event) => {
-      const detail = (event as CustomEvent<{ storageKey?: string }>).detail;
-      if (detail?.storageKey === DRAFTS_CANVAS_STORAGE_KEY) refreshDrafts();
-    };
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === DRAFTS_CANVAS_STORAGE_KEY) refreshDrafts();
-    };
-
-    window.addEventListener(CANVAS_DOCUMENT_SAVED_EVENT, onSaved);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener(CANVAS_DOCUMENT_SAVED_EVENT, onSaved);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
+  }, [autoRevealSelection, selectedIdsKey, tree.root, treeStructureKey]);
 
   const selectLayer = (nodeId: string | null) => {
     setLocalSelectedId(nodeId);
@@ -312,35 +241,9 @@ export function Tree({
       className="pointer-events-auto fixed bottom-3 left-3 top-16 z-[6] flex w-[300px] flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
-      <div className="flex h-11 shrink-0 items-stretch justify-between border-b border-[#2C2C2C] bg-[#141414] pl-1.5 pr-2">
-        <div className="flex items-stretch gap-0.5">
-          {([
-            { id: "layers", label: "Camadas" },
-            { id: "drafts", label: "Drafts" },
-          ] as const).map((t) => {
-            const isActive = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setActiveTab(t.id)}
-                className="relative cursor-pointer border-0 bg-transparent px-2.5 font-semibold uppercase"
-                style={{
-                  color: isActive ? "#F2F2F2" : "#9A9A9A",
-                  fontSize: "11.5px",
-                  letterSpacing: "0.8px",
-                }}
-              >
-                {t.label}
-                {isActive ? (
-                  <span
-                    aria-hidden
-                    className="absolute -bottom-px left-2 right-2 h-0.5 rounded-[2px] bg-[#F2F2F2]"
-                  />
-                ) : null}
-              </button>
-            );
-          })}
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] bg-[#141414] pl-3.5 pr-2">
+        <div className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9A9A9A]">
+          Layers
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -356,81 +259,56 @@ export function Tree({
         </div>
       </div>
 
-      {activeTab === "layers" ? (
-        <>
-          <div ref={pickerTriggerRef}>
-            <CurrentSceneTreeRow
-              active={canvasActive}
-              label={headerName}
-              width={document?.canvas.width}
-              height={document?.canvas.height}
-              isScreen={isScreen}
-              projectType={projectType ?? "mobile"}
-              pickerOpen={pickerOpen}
-              onOpenPicker={(rect) => {
-                setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
-                setPickerOpen((v) => !v);
-              }}
-              onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
-            />
-          </div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={visibleLayerIds}
-              strategy={verticalListSortingStrategy}
-            >
-              <div ref={layerTreeRef} role="tree" className="flex-1 overflow-y-auto pb-3 pt-1">
-                {(tree.root.children || []).map((c) => (
-                  <TreeRow
-                    key={c.id}
-                    node={c}
-                    depth={0}
-                    openSet={openSet}
-                    setOpenSet={setOpenSet}
-                    selectedIds={selectedIdSet}
-                    setSelectedId={selectLayer}
-                    sortable={Boolean(onReorderNode)}
-                    onToggleVisible={onToggleVisible}
-                    onToggleLocked={onToggleLocked}
-                    canOpenNodeCanvas={canOpenNodeCanvas}
-                    onOpenNodeCanvas={onOpenNodeCanvas}
-                    onContextMenuNode={(nodeId, x, y) => {
-                      setContextMenu({ x, y, targetId: nodeId });
-                    }}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </>
-      ) : (
-        <div role="tree" className="flex-1 overflow-y-auto pb-3 pt-1.5">
-          {(draftsTree.root.children || []).length > 0 ? (
-            (draftsTree.root.children || []).map((c) => (
-              <TreeRow
-                key={c.id}
-                node={c}
-                depth={0}
-                openSet={draftsOpenSet}
-                setOpenSet={setDraftsOpenSet}
-                selectedIds={draftsSelectedIds}
-                setSelectedId={setDraftsSelectedId}
-                onContextMenuNode={(nodeId, x, y) => {
-                  setContextMenu({ x, y, targetId: nodeId });
-                }}
-              />
-            ))
-          ) : (
-            <div className="px-4 py-8 text-center text-[12px] leading-5 text-[#6B6B6B]">
-              Canvas livre, sem elementos.
-            </div>
-          )}
+      <>
+        <div ref={pickerTriggerRef}>
+          <CurrentSceneTreeRow
+            active={canvasActive}
+            label={headerName}
+            width={document?.canvas.width}
+            height={document?.canvas.height}
+            isScreen={isScreen}
+            projectType={projectType ?? "mobile"}
+            pickerOpen={pickerOpen}
+            onOpenPicker={(rect) => {
+              setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+              setPickerOpen((v) => !v);
+            }}
+            onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
+          />
         </div>
-      )}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={visibleLayerIds}
+            strategy={verticalListSortingStrategy}
+          >
+            <div ref={layerTreeRef} role="tree" className="flex-1 overflow-y-auto pb-3 pt-1">
+              {(tree.root.children || []).map((c) => (
+                <TreeRow
+                  key={c.id}
+                  node={c}
+                  depth={0}
+                  openSet={openSet}
+                  setOpenSet={setOpenSet}
+                  selectedIds={selectedIdSet}
+                  setSelectedId={selectLayer}
+                  sortable={Boolean(onReorderNode)}
+                  onToggleVisible={onToggleVisible}
+                  onToggleLocked={onToggleLocked}
+                  canOpenNodeCanvas={canOpenNodeCanvas}
+                  onOpenNodeCanvas={onOpenNodeCanvas}
+                  onContextMenuNode={(nodeId, x, y) => {
+                    setContextMenu({ x, y, targetId: nodeId });
+                  }}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </>
 
       <BackFooter
         parentNode={parentNode}

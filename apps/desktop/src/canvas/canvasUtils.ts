@@ -6,13 +6,96 @@ import type { MockComponentSeed } from "@/components/mocks/data/canvasMocks";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 import type { ProjectType } from "@/lib/data/types";
 
-export type SplitMode = "none" | "vertical" | "horizontal";
+export type SplitMode = "none" | "vertical" | "horizontal" | "grid";
+export type CanvasWindowType = "current" | "drafts" | "references" | "versions";
+export type CanvasFeatureWindowType = Exclude<CanvasWindowType, "current">;
+export type CanvasFeatureFlags = Record<CanvasFeatureWindowType, boolean>;
+export type CanvasSplitWindows = CanvasWindowType[];
+
+export const MAX_CANVAS_SPLIT_PANES = 4;
+
+export const CANVAS_WINDOW_ORDER: readonly CanvasWindowType[] = [
+  "current",
+  "versions",
+  "drafts",
+  "references",
+];
+
+export const CANVAS_FEATURE_WINDOW_ORDER: readonly CanvasFeatureWindowType[] = [
+  "versions",
+  "drafts",
+  "references",
+];
+
+export const CANVAS_WINDOW_LABELS: Record<CanvasWindowType, string> = {
+  current: "Current",
+  drafts: "Drafts",
+  references: "References",
+  versions: "Versions",
+};
+
+export const DEFAULT_CANVAS_FEATURES: CanvasFeatureFlags = {
+  drafts: true,
+  references: false,
+  versions: false,
+};
 
 export const LAYOUT_LABELS: Record<SplitMode, string> = {
   none: "Single canvas",
   vertical: "Split vertical",
   horizontal: "Split horizontal",
+  grid: "Split quadrants",
 };
+
+export function enabledCanvasWindowTypes(features: CanvasFeatureFlags): CanvasWindowType[] {
+  return CANVAS_WINDOW_ORDER.filter((windowType) => (
+    windowType === "current" || features[windowType]
+  ));
+}
+
+export function firstEnabledSecondaryWindow(
+  enabledWindowTypes: readonly CanvasWindowType[],
+): CanvasFeatureWindowType | null {
+  return CANVAS_FEATURE_WINDOW_ORDER.find((windowType) => enabledWindowTypes.includes(windowType)) ?? null;
+}
+
+export function normalizeCanvasSplitWindows(
+  windows: readonly CanvasWindowType[],
+  enabledWindowTypes: readonly CanvasWindowType[],
+): CanvasSplitWindows {
+  const normalized: CanvasSplitWindows = [];
+
+  for (const windowType of windows) {
+    if (
+      enabledWindowTypes.includes(windowType) &&
+      !normalized.includes(windowType)
+    ) {
+      normalized.push(windowType);
+    }
+  }
+
+  if (enabledWindowTypes.includes("current") && !normalized.includes("current")) {
+    normalized.unshift("current");
+  }
+
+  if (normalized.length < 2) {
+    const fallback = firstEnabledSecondaryWindow(enabledWindowTypes);
+    if (fallback && !normalized.includes(fallback)) normalized.push(fallback);
+  }
+
+  return normalized.slice(0, MAX_CANVAS_SPLIT_PANES);
+}
+
+export function addCanvasWindowToSplit(
+  windows: readonly CanvasWindowType[],
+  enabledWindowTypes: readonly CanvasWindowType[],
+  windowType: CanvasWindowType,
+): CanvasSplitWindows {
+  const normalized = normalizeCanvasSplitWindows(windows, enabledWindowTypes);
+  if (!enabledWindowTypes.includes(windowType) || normalized.includes(windowType)) return normalized;
+  if (normalized.length < MAX_CANVAS_SPLIT_PANES) return [...normalized, windowType];
+  return [...normalized.slice(0, MAX_CANVAS_SPLIT_PANES - 1), windowType];
+}
 
 export function normalizeName(value: string): string {
   return value

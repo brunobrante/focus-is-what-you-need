@@ -21,7 +21,9 @@ export function Toolbar({
   defaultTool = "cursor",
   onToolChange,
   canvasExpanded,
-  onCollapseCanvas,
+  canvasControlsVisible,
+  canvasControlsCompact,
+  onCanvasExpandedChange,
   zoom,
   onZoomChange,
   zoomLimits,
@@ -35,7 +37,9 @@ export function Toolbar({
   defaultTool?: CanvasToolId;
   onToolChange?: (tool: CanvasToolId) => void;
   canvasExpanded?: boolean;
-  onCollapseCanvas?: () => void;
+  canvasControlsVisible?: boolean;
+  canvasControlsCompact?: boolean;
+  onCanvasExpandedChange?: (expanded: boolean) => void;
   zoom?: number;
   onZoomChange?: ZoomSetter;
   zoomLimits?: ZoomLimits;
@@ -50,6 +54,7 @@ export function Toolbar({
   const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const active = activeTool ?? uncontrolledActive;
+  const showCanvasControls = canvasControlsVisible ?? canvasExpanded;
   const selectTool = (tool: CanvasToolId) => {
     setUncontrolledActive(tool);
     onToolChange?.(tool);
@@ -123,9 +128,11 @@ export function Toolbar({
         <ActionsPanel />
       )}
 
-      {canvasExpanded && (
+      {showCanvasControls && (
         <div className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
           <CanvasExpandedControls
+            expanded={Boolean(canvasExpanded)}
+            compact={Boolean(canvasControlsCompact)}
             zoom={zoom}
             onZoomChange={onZoomChange}
             zoomLimits={zoomLimits}
@@ -134,7 +141,7 @@ export function Toolbar({
             onToggleDevice={() => setDeviceOverlayEnabled((value) => !value)}
             parentTarget={parentTarget}
             onBackToParent={onBackToParent}
-            onCollapse={onCollapseCanvas}
+            onToggleExpanded={() => onCanvasExpandedChange?.(!canvasExpanded)}
           />
         </div>
       )}
@@ -540,6 +547,8 @@ function ToolTooltip({ tool }: { tool: ToolEntry }) {
 }
 
 function CanvasExpandedControls({
+  expanded,
+  compact,
   zoom,
   onZoomChange,
   zoomLimits,
@@ -548,8 +557,10 @@ function CanvasExpandedControls({
   onToggleDevice,
   parentTarget,
   onBackToParent,
-  onCollapse,
+  onToggleExpanded,
 }: {
+  expanded: boolean;
+  compact: boolean;
   zoom?: number;
   onZoomChange?: ZoomSetter;
   zoomLimits?: ZoomLimits;
@@ -558,42 +569,63 @@ function CanvasExpandedControls({
   onToggleDevice: () => void;
   parentTarget?: ToolbarParentTarget | null;
   onBackToParent?: () => void;
-  onCollapse?: () => void;
+  onToggleExpanded?: () => void;
 }) {
   return (
     <div
       className="inline-flex items-center gap-1.5 rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-[3px]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35)" }}
     >
-      <ToolbarDeviceButton
-        enabled={deviceEnabled}
-        projectType={projectType}
-        onClick={onToggleDevice}
-      />
-      {parentTarget ? (
-        <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
-      ) : null}
-      <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
-      {zoom != null && onZoomChange ? (
+      {!compact ? (
         <>
-          <ZoomControl zoom={zoom} setZoom={onZoomChange} limits={zoomLimits} bare />
+          <ToolbarDeviceButton
+            enabled={deviceEnabled}
+            projectType={projectType}
+            onClick={onToggleDevice}
+          />
+          {parentTarget ? (
+            <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
+          ) : null}
           <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
+          {zoom != null && onZoomChange ? (
+            <>
+              <ZoomControl zoom={zoom} setZoom={onZoomChange} limits={zoomLimits} bare />
+              <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
+            </>
+          ) : null}
         </>
       ) : null}
       <button
         type="button"
-        onClick={onCollapse}
-        aria-label="Exit fullscreen"
+        onClick={onToggleExpanded}
+        aria-label={expanded ? "Exit fullscreen" : "Expand canvas"}
         className="grid h-9 w-9 place-items-center rounded-lg text-[#888] transition-colors duration-[90ms] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="4 14 10 14 10 20" />
-          <polyline points="20 10 14 10 14 4" />
-          <line x1="10" y1="14" x2="3" y2="21" />
-          <line x1="21" y1="3" x2="14" y2="10" />
-        </svg>
+        {expanded ? <CollapseIcon /> : <ExpandIcon />}
       </button>
     </div>
+  );
+}
+
+function ExpandIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+function CollapseIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 14 10 14 10 20" />
+      <polyline points="20 10 14 10 14 4" />
+      <line x1="10" y1="14" x2="3" y2="21" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+    </svg>
   );
 }
 
