@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Monitor, RotateCcw, Smartphone } from "lucide-react";
+import { ChevronDown, Plus, Monitor, RotateCcw, Smartphone } from "lucide-react";
 
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
 import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
@@ -46,6 +46,36 @@ const INSPECTOR_WIDTH = 280;
 const PANEL_MARGIN = 12;
 
 const HEADER_HEIGHT = 64;
+
+const VERSION_MENU_ITEMS = [
+  { id: "v3", name: "Version 3", description: "Latest snapshot", meta: "2 min ago" },
+  { id: "v2", name: "Version 2", description: "Layout pass", meta: "Yesterday" },
+  { id: "v1", name: "Version 1", description: "Initial canvas", meta: "Last week" },
+];
+
+const REFERENCE_MENU_ITEMS = [
+  {
+    id: "ref-checkout",
+    name: "Checkout reference",
+    description: "Mobile purchase flow",
+    accent: "#0D99FF",
+    palette: ["#F6F8FB", "#172033", "#0D99FF"],
+  },
+  {
+    id: "ref-list",
+    name: "Product list",
+    description: "Cards and filters",
+    accent: "#49B66E",
+    palette: ["#F7FAF6", "#263326", "#49B66E"],
+  },
+  {
+    id: "ref-profile",
+    name: "Profile screen",
+    description: "Settings reference",
+    accent: "#D58C2A",
+    palette: ["#FBF7EF", "#30261C", "#D58C2A"],
+  },
+];
 
 export type ZoomSetter = (next: number | ((zoom: number) => number)) => void;
 type CanvasParentTarget = {
@@ -320,9 +350,15 @@ function CanvasPlaceholderSurface({
   onClick?: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onClick?.();
+      }}
       className="relative flex flex-1 cursor-default items-center justify-center overflow-hidden rounded-xl border text-left transition-all duration-150"
       style={{
         borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
@@ -332,6 +368,7 @@ function CanvasPlaceholderSurface({
           : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
       }}
     >
+      <FeaturePlaceholderControls windowType={windowType} />
       <span className="flex flex-col items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
           <PlaceholderWindowIcon />
@@ -343,7 +380,191 @@ function CanvasPlaceholderSurface({
           No canvas yet
         </span>
       </span>
-    </button>
+    </div>
+  );
+}
+
+function FeaturePlaceholderControls({ windowType }: { windowType: CanvasFeatureWindowType }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState(VERSION_MENU_ITEMS[0]?.id ?? "");
+  const [selectedReferenceId, setSelectedReferenceId] = useState(REFERENCE_MENU_ITEMS[0]?.id ?? "");
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (ref.current?.contains(event.target as Node)) return;
+      setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [menuOpen]);
+
+  if (windowType === "drafts") return null;
+
+  const references = windowType === "references";
+  const selectedVersion = VERSION_MENU_ITEMS.find((item) => item.id === selectedVersionId) ?? VERSION_MENU_ITEMS[0];
+  const selectedReference = REFERENCE_MENU_ITEMS.find((item) => item.id === selectedReferenceId) ?? REFERENCE_MENU_ITEMS[0];
+  const selectedLabel = references ? selectedReference?.name : selectedVersion?.name;
+
+  return (
+    <div
+      ref={ref}
+      className="absolute left-3 top-3 z-[12] flex items-center gap-1.5"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => setMenuOpen((open) => !open)}
+        aria-label={`Select ${CANVAS_WINDOW_LABELS[windowType].toLowerCase()}`}
+        aria-expanded={menuOpen}
+        className="inline-flex h-8 max-w-[220px] items-center gap-2 rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222]"
+      >
+        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <ChevronDown
+          size={13}
+          strokeWidth={2}
+          className="shrink-0 text-[#777] transition-transform duration-150"
+          style={{ transform: menuOpen ? "rotate(180deg)" : "none" }}
+        />
+      </button>
+
+      <button
+        type="button"
+        aria-label={`Add ${references ? "reference" : "version"}`}
+        className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222] hover:text-[#E2E2E2]"
+      >
+        <Plus size={14} strokeWidth={2} />
+      </button>
+
+      {menuOpen ? (
+        references ? (
+          <ReferenceDropdownMenu
+            selectedId={selectedReferenceId}
+            onSelect={(id) => {
+              setSelectedReferenceId(id);
+              setMenuOpen(false);
+            }}
+          />
+        ) : (
+          <VersionDropdownMenu
+            selectedId={selectedVersionId}
+            onSelect={(id) => {
+              setSelectedVersionId(id);
+              setMenuOpen(false);
+            }}
+          />
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function VersionDropdownMenu({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="absolute left-0 top-[calc(100%+6px)] w-[230px] overflow-hidden rounded-xl border border-[#2E2E2E] bg-[#171717] p-1.5 shadow-[0_14px_34px_rgba(0,0,0,0.55)]">
+      {VERSION_MENU_ITEMS.map((item) => {
+        const selected = selectedId === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item.id)}
+            className={[
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
+              selected ? "bg-[#263545]" : "hover:bg-[#222]",
+            ].join(" ")}
+          >
+            <span
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-md border text-[10px] font-semibold"
+              style={{
+                borderColor: selected ? "rgba(13,153,255,0.45)" : "#303030",
+                color: selected ? "#8CCBFF" : "#8A8A8A",
+                background: selected ? "rgba(13,153,255,0.14)" : "#1D1D1D",
+              }}
+            >
+              {item.name.replace("Version ", "V")}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12px] font-semibold text-[#E2E2E2]">{item.name}</span>
+              <span className="block truncate text-[10.5px] text-[#777]">{item.description}</span>
+            </span>
+            <span className="shrink-0 text-[10px] text-[#5F5F5F]">{item.meta}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReferenceDropdownMenu({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="absolute left-0 top-[calc(100%+6px)] w-[330px] overflow-hidden rounded-xl border border-[#2E2E2E] bg-[#171717] p-2 shadow-[0_14px_34px_rgba(0,0,0,0.55)]">
+      <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#666]">
+        Available references
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {REFERENCE_MENU_ITEMS.map((item) => {
+          const selected = selectedId === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              className={[
+                "flex min-h-[72px] w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors duration-100",
+                selected ? "border-[#0D99FF]/45 bg-[#223241]" : "border-[#272727] bg-[#1B1B1B] hover:border-[#363636] hover:bg-[#212121]",
+              ].join(" ")}
+            >
+              <ReferencePreview palette={item.palette} accent={item.accent} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-semibold text-[#E4E4E4]">{item.name}</span>
+                <span className="mt-1 block truncate text-[10.5px] text-[#777]">{item.description}</span>
+                <span className="mt-2 inline-flex h-4 items-center rounded border border-[#303030] px-1.5 text-[9px] font-medium uppercase tracking-[0.06em] text-[#686868]">
+                  Reference
+                </span>
+              </span>
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: selected ? item.accent : "#3A3A3A" }}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ReferencePreview({ palette, accent }: { palette: string[]; accent: string }) {
+  return (
+    <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md border border-[#303030] bg-[#101010]">
+      <span className="absolute inset-0" style={{ background: palette[0] }} />
+      <span className="absolute left-2 top-2 h-1.5 w-8 rounded-full" style={{ background: palette[1] }} />
+      <span className="absolute left-2 top-5 h-2.5 w-12 rounded" style={{ background: accent, opacity: 0.9 }} />
+      <span className="absolute bottom-2 left-2 h-2 w-5 rounded" style={{ background: palette[1], opacity: 0.35 }} />
+      <span className="absolute bottom-2 right-2 h-2 w-5 rounded" style={{ background: palette[2], opacity: 0.7 }} />
+    </span>
   );
 }
 
