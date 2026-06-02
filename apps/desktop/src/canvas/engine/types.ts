@@ -4,6 +4,8 @@ export type Tool = "select" | "rect" | "ellipse" | "text" | "image" | "icon" | "
 
 export type ShellGridType = "dots" | "squares";
 
+export type ViewportMode = "frame" | "draft";
+
 export type ElementStyles = {
   background?: string;
   color?: string;
@@ -110,6 +112,7 @@ export type ViewportMatrix = {
 
 export type EditorState = {
   document: CanvasDocument;
+  viewportMode: ViewportMode;
   selectedIds: string[];
   isolatedParentId: string | null;
   editingTextId: string | null;
@@ -227,6 +230,7 @@ export type DrawInteraction = {
   startPoint: Point;
   tool: Exclude<Tool, "select">;
   elementId: string;
+  elementSizeScale?: number;
   beforeDocument: CanvasDocument;
   lastDocument: CanvasDocument;
   moved: boolean;
@@ -247,6 +251,7 @@ export type PanInteraction = {
   startOffsetX: number;
   startOffsetY: number;
   zoom: number;
+  viewportMode: ViewportMode;
   moved: boolean;
 };
 

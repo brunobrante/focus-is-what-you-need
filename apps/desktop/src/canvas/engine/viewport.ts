@@ -1,8 +1,9 @@
 import { clamp } from "./geometry";
-import type { Point, Rect, Size, ViewportMatrix } from "./types";
+import type { Point, Rect, Size, ViewportMatrix, ViewportMode } from "./types";
 
 export type { Size, ViewportMatrix } from "./types";
 export type ViewportState = { zoom: number; offsetX: number; offsetY: number };
+export type ZoomLimits = { min: number; max: number; step: number };
 export type ViewportTransformInput = {
   displayZoom: number;
   offsetX: number;
@@ -18,11 +19,14 @@ export type ViewportTransform = ViewportTransformInput & {
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 25;
+export const DRAFT_MAX_ZOOM = 250;
 export const ZOOM_STEP = 0.25;
 export const VIEWPORT_EPSILON = 0.01;
 export const STAGE_VIEWPORT_PADDING = 24;
 export const MAX_SAFE_TRANSFORMED_STAGE_SIDE = 10_000;
 export const SCALED_DOM_PROJECTION_MIN_ZOOM = MIN_ZOOM;
+export const DRAFT_VIEWPORT_SCALE = 0.1;
+export const DRAFT_ELEMENT_SIZE_SCALE = 1 / DRAFT_VIEWPORT_SCALE;
 
 const AUTO_ZOOM_FILL_RATIO = 0.88;
 const AUTO_ZOOM_LONG_SIDE_RATIO = 0.72;
@@ -30,7 +34,18 @@ const AUTO_ZOOM_LONG_SIDE_MIN = 260;
 const AUTO_ZOOM_SHORT_SIDE_RATIO = 0.46;
 const AUTO_ZOOM_SHORT_SIDE_MIN = 300;
 
-export function getCanvasDisplayScale(containerSize: Size, canvasSize: Size): number {
+export function getViewportZoomLimits(mode: ViewportMode = "frame"): ZoomLimits {
+  return mode === "draft"
+    ? { min: MIN_ZOOM, max: DRAFT_MAX_ZOOM, step: ZOOM_STEP }
+    : { min: MIN_ZOOM, max: MAX_ZOOM, step: ZOOM_STEP };
+}
+
+export function getCanvasDisplayScale(
+  containerSize: Size,
+  canvasSize: Size,
+  mode: ViewportMode = "frame",
+): number {
+  if (mode === "draft") return DRAFT_VIEWPORT_SCALE;
   const availableWidth = Math.max(1, containerSize.width - STAGE_VIEWPORT_PADDING * 2);
   const availableHeight = Math.max(1, containerSize.height - STAGE_VIEWPORT_PADDING * 2);
   return Math.min(
@@ -40,7 +55,12 @@ export function getCanvasDisplayScale(containerSize: Size, canvasSize: Size): nu
   );
 }
 
-export function getInitialZoomForCanvas(containerSize: Size, canvasSize: Size): number {
+export function getInitialZoomForCanvas(
+  containerSize: Size,
+  canvasSize: Size,
+  mode: ViewportMode = "frame",
+): number {
+  if (mode === "draft") return MIN_ZOOM;
   const availableWidth = Math.max(1, containerSize.width - STAGE_VIEWPORT_PADDING * 2);
   const availableHeight = Math.max(1, containerSize.height - STAGE_VIEWPORT_PADDING * 2);
   const canvasWidth = Math.max(1, canvasSize.width);
@@ -68,7 +88,11 @@ export function getInitialZoomForCanvas(containerSize: Size, canvasSize: Size): 
   return quantizeZoom(nextZoom);
 }
 
-export function getInitialZoomForSubjectSize(canvasSize: Size): number {
+export function getInitialZoomForSubjectSize(
+  canvasSize: Size,
+  mode: ViewportMode = "frame",
+): number {
+  if (mode === "draft") return MIN_ZOOM;
   const canvasWidth = Math.max(1, canvasSize.width);
   const canvasHeight = Math.max(1, canvasSize.height);
   const longSide = Math.max(canvasWidth, canvasHeight);
@@ -83,12 +107,14 @@ export function clampViewportState(
   containerSize: Size,
   canvasSize: Size,
   preserveSmallCanvasOffset = false,
+  mode: ViewportMode = "frame",
 ): ViewportState {
   // `zoom` is the user-facing zoom. `displayScale` is an internal fit scale used
   // so oversized subjects can still fit in the editor while the UI remains at
   // 100% and zoom-out stays disabled.
-  const zoom = clamp(viewport.zoom, MIN_ZOOM, MAX_ZOOM);
-  const displayScale = getCanvasDisplayScale(containerSize, canvasSize);
+  const limits = getViewportZoomLimits(mode);
+  const zoom = clamp(viewport.zoom, limits.min, limits.max);
+  const displayScale = getCanvasDisplayScale(containerSize, canvasSize, mode);
   const displayZoom = zoom * displayScale;
   const scaledWidth = canvasSize.width * displayZoom;
   const scaledHeight = canvasSize.height * displayZoom;

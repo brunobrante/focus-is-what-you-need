@@ -75,6 +75,10 @@ function getReparentChangedIds(
   return Array.from(ids);
 }
 
+function elementCreationOptions(elementSizeScale?: number): { sizeScale?: number } | undefined {
+  return elementSizeScale === undefined ? undefined : { sizeScale: elementSizeScale };
+}
+
 // === MOVE HANDLERS ===
 
 export function handlePanMove(
@@ -89,7 +93,7 @@ export function handlePanMove(
     offsetX: interaction.startOffsetX + event.clientX - interaction.startScreenPoint.x,
     offsetY: interaction.startOffsetY + event.clientY - interaction.startScreenPoint.y,
   };
-  const next = clampViewportState(raw, getCurrentViewportSize(), getCanvasSize(document));
+  const next = clampViewportState(raw, getCurrentViewportSize(), getCanvasSize(document), false, interaction.viewportMode);
   interaction.moved =
     interaction.moved ||
     Math.hypot(event.clientX - interaction.startScreenPoint.x, event.clientY - interaction.startScreenPoint.y) > 0.5;
@@ -107,7 +111,14 @@ export function handleDrawMove(
   const distance = Math.hypot(point.x - interaction.startPoint.x, point.y - interaction.startPoint.y);
   interaction.moved = interaction.moved || distance > 2;
 
-  const node = createElementForTool(interaction.tool, 0, 0, interaction.beforeDocument.canvas, settings);
+  const node = createElementForTool(
+    interaction.tool,
+    0,
+    0,
+    interaction.beforeDocument.canvas,
+    settings,
+    elementCreationOptions(interaction.elementSizeScale),
+  );
   const def = getToolElementDefinition(interaction.tool);
   const drawMode = def?.capabilities.drawMode ?? "free";
   const constrainAspect = isModifierCommandActive(event, settings, "canvas.transform.constrainAspect");
@@ -316,6 +327,7 @@ export function finishDrawInteraction(
       interaction.startPoint.y,
       interaction.beforeDocument.canvas,
       settings,
+      elementCreationOptions(interaction.elementSizeScale),
     );
     node.id = interaction.elementId;
     next.elements[node.id] = node;

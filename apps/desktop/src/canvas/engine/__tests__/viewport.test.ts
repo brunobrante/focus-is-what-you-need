@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
 
 import {
+  DRAFT_ELEMENT_SIZE_SCALE,
+  DRAFT_MAX_ZOOM,
+  DRAFT_VIEWPORT_SCALE,
   MAX_ZOOM,
   MIN_ZOOM,
   canvasPointToViewport,
@@ -15,6 +18,8 @@ import {
   snapViewportOffset,
   viewportPointToCanvas,
 } from "@/canvas/engine/viewport";
+import { createElementForTool } from "@/canvas/engine/actions";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 
 test("keeps screen-sized canvases at the minimum zoom", () => {
   expect(getInitialZoomForCanvas({ width: 900, height: 600 }, { width: 390, height: 844 })).toBe(MIN_ZOOM);
@@ -78,6 +83,50 @@ test("allows manual zoom beyond 1000 percent", () => {
 
   expect(viewport.zoom).toBe(18);
   expect(MAX_ZOOM).toBe(25);
+});
+
+test("uses a fixed draft projection instead of fitting the whole free canvas", () => {
+  const container = { width: 900, height: 600 };
+  const draftCanvas = { width: 100_000, height: 100_000 };
+
+  expect(getCanvasDisplayScale(container, draftCanvas, "draft")).toBe(DRAFT_VIEWPORT_SCALE);
+  expect(getInitialZoomForCanvas(container, draftCanvas, "draft")).toBe(MIN_ZOOM);
+
+  const viewport = clampViewportState(
+    { zoom: 120, offsetX: 0, offsetY: 0 },
+    container,
+    draftCanvas,
+    false,
+    "draft",
+  );
+
+  expect(viewport.zoom).toBe(120);
+  expect(DRAFT_MAX_ZOOM).toBeGreaterThan(MAX_ZOOM);
+});
+
+test("keeps the frame zoom cap separate from draft zoom", () => {
+  const viewport = clampViewportState(
+    { zoom: DRAFT_MAX_ZOOM, offsetX: 0, offsetY: 0 },
+    { width: 900, height: 600 },
+    { width: 390, height: 844 },
+  );
+
+  expect(viewport.zoom).toBe(MAX_ZOOM);
+});
+
+test("scales draft element defaults back to the draft visual proportion", () => {
+  const normal = createElementForTool("rect", 0, 0, { width: 390, height: 390 });
+  const draft = createElementForTool(
+    "rect",
+    0,
+    0,
+    { width: 100_000, height: 100_000 },
+    DEFAULT_GLOBAL_SETTINGS,
+    { sizeScale: DRAFT_ELEMENT_SIZE_SCALE },
+  );
+
+  expect(draft.width * DRAFT_VIEWPORT_SCALE).toBeCloseTo(normal.width);
+  expect(draft.height * DRAFT_VIEWPORT_SCALE).toBeCloseTo(normal.height);
 });
 
 test("switches DOM rendering away from giant transformed layers", () => {

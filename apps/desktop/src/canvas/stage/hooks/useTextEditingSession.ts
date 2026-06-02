@@ -154,6 +154,7 @@ export function useTextEditingSession({
           latestStateRef.current.zoom,
           latestStateRef.current.offsetX,
           latestStateRef.current.offsetY,
+          latestStateRef.current.viewportMode,
         )
       : null;
     const caretIndex = viewport && requestedPoint && activeViewportTransform

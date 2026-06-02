@@ -5,7 +5,7 @@ import { deleteElements, duplicateElements } from "@/canvas/engine/actions";
 import { isEditableTarget } from "@/canvas/engine/hitTesting";
 import { clamp } from "@/canvas/engine/geometry";
 import type { EditorState } from "@/canvas/engine/types";
-import { MAX_ZOOM, MIN_ZOOM } from "@/canvas/engine/viewport";
+import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import type { CanvasToolId } from "@/canvas/tools";
 import { TOOL_BY_CANVAS_COMMAND } from "@/domain/settings/commands";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -69,17 +69,19 @@ export function useKeyboardShortcuts({
       if (matchesKeyCommand(event, settings, "canvas.viewport.zoomReset")) { event.preventDefault(); dispatch({ type: "setZoom", zoom: 1 }); return; }
       if (matchesKeyCommand(event, settings, "canvas.viewport.zoomIn")) {
         event.preventDefault();
+        const limits = getViewportZoomLimits(currentState.viewportMode);
         dispatch({
           type: "setZoom",
-          zoom: clamp(currentState.zoom + settings.canvas.viewport.zoomStep, MIN_ZOOM, MAX_ZOOM),
+          zoom: clamp(currentState.zoom + settings.canvas.viewport.zoomStep, limits.min, limits.max),
         });
         return;
       }
       if (matchesKeyCommand(event, settings, "canvas.viewport.zoomOut")) {
         event.preventDefault();
+        const limits = getViewportZoomLimits(currentState.viewportMode);
         dispatch({
           type: "setZoom",
-          zoom: clamp(currentState.zoom - settings.canvas.viewport.zoomStep, MIN_ZOOM, MAX_ZOOM),
+          zoom: clamp(currentState.zoom - settings.canvas.viewport.zoomStep, limits.min, limits.max),
         });
         return;
       }

@@ -33,13 +33,22 @@ const DEFAULT_SIZE_RANGES: Record<
   star: { width: [16, 400], height: [16, 400] },
 };
 
+type ElementCreationOptions = {
+  sizeScale?: number;
+};
+
 function scaleDefault(
   canvasSize: { width: number; height: number } | undefined,
   settings: GlobalSettings,
   base: number,
   min: number,
   max: number,
+  options: ElementCreationOptions = {},
 ): number {
+  if (options.sizeScale !== undefined) {
+    const scale = Math.max(0.0001, options.sizeScale);
+    return roundPixel(clamp(base * scale, min * scale, max * scale));
+  }
   if (!canvasSize) return base;
   const dim = Math.min(canvasSize.width, canvasSize.height);
   const elementDefaults = settings.canvas.elementDefaults;
@@ -57,12 +66,13 @@ export function createElementForTool(
   y: number,
   canvasSize?: { width: number; height: number },
   settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
+  options: ElementCreationOptions = {},
 ): ElementNode {
   const id = createId(tool);
   const base = { id, parentId: null, children: [], x: 0, y: 0, rotation: 0, visible: true, locked: false };
   const ranges = DEFAULT_SIZE_RANGES[tool];
   const configured = settings.canvas.elementDefaults.tools[tool];
-  const sd = (b: number, min: number, max: number) => scaleDefault(canvasSize, settings, b, min, max);
+  const sd = (b: number, min: number, max: number) => scaleDefault(canvasSize, settings, b, min, max, options);
   const styles = { ...configured.styles };
   if (typeof styles.fontSize === "number" && ranges.fontSize) {
     styles.fontSize = sd(styles.fontSize, ranges.fontSize[0], ranges.fontSize[1]);

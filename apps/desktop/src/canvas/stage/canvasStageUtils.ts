@@ -7,9 +7,12 @@ export {
 } from "./canvasCoordinates";
 
 export {
-  DRAFT_BOUNDS,
   getTransformIds,
   getFallbackCanvasBounds,
+  getSurfaceCreationBounds,
+  getRootParentBounds,
+  getSurfaceParentBounds,
+  getInteractionParentBounds,
   getResizeBox,
   getDragBox,
   rectsIntersect,

@@ -154,7 +154,6 @@ export function CanvasStage({
     viewportRef,
     getCurrentViewportSize,
     getCurrentViewportRect,
-    draftMode,
     viewportSubjectKey,
     viewportSize,
     viewportInitializedSubjectRef,
@@ -274,13 +273,13 @@ export function CanvasStage({
     [state.document.canvas.height, state.document.canvas.width],
   );
   const displayScale = useMemo(
-    () => viewportSize.width > 0 && viewportSize.height > 0 ? getCanvasDisplayScale(viewportSize, canvasSize) : 1,
-    [canvasSize, viewportSize],
+    () => viewportSize.width > 0 && viewportSize.height > 0 ? getCanvasDisplayScale(viewportSize, canvasSize, state.viewportMode) : 1,
+    [canvasSize, state.viewportMode, viewportSize],
   );
   const displayZoom = state.zoom * displayScale;
   const viewportTransform = useMemo(
-    () => buildViewportTransform(state.document, viewportSize, state.zoom, state.offsetX, state.offsetY),
-    [state.document.canvas.height, state.document.canvas.rotation, state.document.canvas.width, state.offsetX, state.offsetY, state.zoom, viewportSize],
+    () => buildViewportTransform(state.document, viewportSize, state.zoom, state.offsetX, state.offsetY, state.viewportMode),
+    [state.document.canvas.height, state.document.canvas.rotation, state.document.canvas.width, state.offsetX, state.offsetY, state.viewportMode, state.zoom, viewportSize],
   );
   const scaledDomProjection = useMemo(
     () => shouldUseScaledDomProjection({ canvasSize, displayZoom, canvasRotation: state.document.canvas.rotation ?? 0 }),

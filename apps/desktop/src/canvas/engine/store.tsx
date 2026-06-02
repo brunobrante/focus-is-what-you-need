@@ -8,12 +8,12 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Dispatch, ReactNode } from "react";
-import type { CanvasDocument, EditorState, SnapGuide, Tool } from "./types";
+import type { CanvasDocument, EditorState, SnapGuide, Tool, ViewportMode } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
 import { CANVAS_DOCUMENT_SAVED_EVENT, CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
-import { getInitialZoomForSubjectSize, MAX_ZOOM, MIN_ZOOM } from "./viewport";
+import { getInitialZoomForSubjectSize, getViewportZoomLimits } from "./viewport";
 
 const STORAGE_KEY = CURRENT_CANVAS_STORAGE_KEY;
 
@@ -126,16 +126,18 @@ function createInitialState(
   storageKey: string,
   fallbackDocument?: CanvasDocument,
   persistStorage = true,
+  viewportMode: ViewportMode = "frame",
 ): EditorState {
   const document = readStoredDocument(storageKey, fallbackDocument, persistStorage);
   return {
     document,
+    viewportMode,
     selectedIds: [],
     isolatedParentId: null,
     editingTextId: null,
     canvasStageActive: false,
     tool: "select",
-    zoom: getInitialZoomForSubjectSize(document.canvas),
+    zoom: getInitialZoomForSubjectSize(document.canvas, viewportMode),
     offsetX: 0,
     offsetY: 0,
     guides: [],
@@ -161,12 +163,14 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     return { ...state, tool: action.tool, isolatedParentId, editingTextId: null };
   },
   setZoom(state, action) {
-    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom));
+    const limits = getViewportZoomLimits(state.viewportMode);
+    const zoom = Math.max(limits.min, Math.min(limits.max, action.zoom));
     if (state.zoom === zoom) return state;
     return { ...state, zoom };
   },
   setViewport(state, action) {
-    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, action.zoom ?? state.zoom));
+    const limits = getViewportZoomLimits(state.viewportMode);
+    const zoom = Math.max(limits.min, Math.min(limits.max, action.zoom ?? state.zoom));
     const offsetX = action.offsetX ?? state.offsetX;
     const offsetY = action.offsetY ?? state.offsetY;
     if (state.zoom === zoom && state.offsetX === offsetX && state.offsetY === offsetY) return state;
@@ -237,11 +241,12 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     return {
       ...state,
       document: constrainAll(action.document),
+      viewportMode: state.viewportMode,
       selectedIds: [],
       isolatedParentId: null,
       editingTextId: null,
       canvasStageActive: false,
-      zoom: getInitialZoomForSubjectSize(action.document.canvas),
+      zoom: getInitialZoomForSubjectSize(action.document.canvas, state.viewportMode),
       offsetX: 0,
       offsetY: 0,
       guides: [],
@@ -330,8 +335,8 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       editingTextId: null,
     };
   },
-  reset(_state) {
-    return { ...createInitialState(STORAGE_KEY), document: createDefaultDocument() };
+  reset(state) {
+    return { ...createInitialState(STORAGE_KEY, undefined, true, state.viewportMode), document: createDefaultDocument() };
   },
 };
 
@@ -352,19 +357,21 @@ export function EditorProvider({
   storageKey = STORAGE_KEY,
   fallbackDocument,
   persistStorage = true,
+  viewportMode = "frame",
   onDocumentChange,
 }: {
   children: ReactNode;
   storageKey?: string;
   fallbackDocument?: CanvasDocument;
   persistStorage?: boolean;
+  viewportMode?: ViewportMode;
   onDocumentChange?: (document: CanvasDocument) => void;
 }) {
   const hydratedRef = useRef(!persistStorage);
   const [state, dispatch] = useReducer(
     reducer,
     undefined,
-    () => createInitialState(storageKey, fallbackDocument, persistStorage),
+    () => createInitialState(storageKey, fallbackDocument, persistStorage, viewportMode),
   );
 
   const hoverStoreRef = useRef<HoverStore | null>(null);

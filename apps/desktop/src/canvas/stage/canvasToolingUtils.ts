@@ -2,12 +2,11 @@ import {
   filterTopLevelIds,
   getAbsoluteRect,
   getElementAABB,
+  getParentBounds,
   getSelectionAABB,
   getSelectionBox,
 } from "@/canvas/engine/geometry";
-import type { CanvasDocument, Rect } from "@/canvas/engine/types";
-
-export const DRAFT_BOUNDS: Rect = { x: -50000, y: -50000, width: 100000, height: 100000 };
+import type { CanvasDocument, Rect, ViewportMode } from "@/canvas/engine/types";
 
 export function getTransformIds(document: CanvasDocument, selectedIds: string[]): string[] {
   return filterTopLevelIds(document, selectedIds).filter((id) => {
@@ -18,6 +17,34 @@ export function getTransformIds(document: CanvasDocument, selectedIds: string[])
 
 export function getFallbackCanvasBounds(document: CanvasDocument): Rect {
   return { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
+}
+
+export function getSurfaceCreationBounds(document: CanvasDocument, _viewportMode: ViewportMode): Rect {
+  return getFallbackCanvasBounds(document);
+}
+
+export function getRootParentBounds(document: CanvasDocument, _viewportMode: ViewportMode): Rect {
+  return getFallbackCanvasBounds(document);
+}
+
+export function getSurfaceParentBounds(
+  document: CanvasDocument,
+  viewportMode: ViewportMode,
+  elementId: string | undefined,
+): Rect {
+  const node = elementId ? document.elements[elementId] : null;
+  if (!node?.parentId) return getRootParentBounds(document, viewportMode);
+  return getParentBounds(document, elementId);
+}
+
+export function getInteractionParentBounds(
+  document: CanvasDocument,
+  viewportMode: ViewportMode,
+  commonParentId: string | null | undefined,
+  elementId: string | undefined,
+): Rect {
+  if (commonParentId === undefined) return getSurfaceCreationBounds(document, viewportMode);
+  return getSurfaceParentBounds(document, viewportMode, elementId);
 }
 
 export function getResizeBox(document: CanvasDocument, ids: string[]): Rect | null {

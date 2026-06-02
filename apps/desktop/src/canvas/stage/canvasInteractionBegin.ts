@@ -17,8 +17,8 @@ import type { Interaction } from "./canvasInteractionTypes";
 import type { RadiusCorner } from "./canvasHitTesting";
 import { getCanvasSize } from "./canvasCoordinates";
 import {
-  DRAFT_BOUNDS,
   getFallbackCanvasBounds,
+  getInteractionParentBounds,
   getResizeBox,
   getTransformIds,
 } from "./canvasToolingUtils";
@@ -44,6 +44,7 @@ export function startPanInteraction(
     startOffsetX: state.offsetX,
     startOffsetY: state.offsetY,
     zoom: state.zoom,
+    viewportMode: state.viewportMode,
     moved: false,
   };
   setInteractionActive(true);
@@ -60,7 +61,7 @@ export function startResizeInteraction(
   event.preventDefault();
   event.stopPropagation();
   if (state.canvasStageActive) {
-    const displayScale = getCanvasDisplayScale(getCurrentViewportSize(), getCanvasSize(state.document));
+    const displayScale = getCanvasDisplayScale(getCurrentViewportSize(), getCanvasSize(state.document), state.viewportMode);
     interactionRef.current = {
       type: "canvas-resize",
       pointerId: event.pointerId,
@@ -102,7 +103,7 @@ export function startResizeInteraction(
     startRects,
     commonParentId,
     parentBounds: draftMode
-      ? DRAFT_BOUNDS
+      ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])
       : transformIds[0]
         ? getParentBounds(state.document, transformIds[0])
         : getFallbackCanvasBounds(state.document),
@@ -142,6 +143,7 @@ export function startRotateInteraction(
   const transformIds = getTransformIds(state.document, state.selectedIds);
   const startBox = getSelectionBox(state.document, transformIds);
   if (!startBox || transformIds.length !== 1) return;
+  const commonParentId = getCommonParentId(state.document, transformIds);
   const startRotations: Record<string, number> = {};
   for (const id of transformIds) startRotations[id] = state.document.elements[id]?.rotation ?? 0;
   const center = { x: rectCenterX(startBox), y: rectCenterY(startBox) };
@@ -153,9 +155,9 @@ export function startRotateInteraction(
     selectedIds: state.selectedIds,
     transformIds,
     startBox,
-    commonParentId: getCommonParentId(state.document, transformIds),
+    commonParentId,
     parentBounds: draftMode
-      ? DRAFT_BOUNDS
+      ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])
       : transformIds[0]
         ? getParentBounds(state.document, transformIds[0])
         : getFallbackCanvasBounds(state.document),

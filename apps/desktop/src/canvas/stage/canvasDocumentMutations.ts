@@ -159,7 +159,7 @@ export function commitDragMove(
     if (!source || !sourceRect) continue;
     const node = mutateElementShallow(next, id);
     if (!node) continue;
-    // Use interaction.parentBounds so draft mode (DRAFT_BOUNDS) is respected.
+    // Use interaction.parentBounds so the active surface policy is respected.
     // Per-id parent bounds depend only on beforeDocument (constant for the drag),
     // so cache them to avoid an ancestor walk per element per frame.
     let parentBounds: Rect;
@@ -191,7 +191,7 @@ function resizeSingleElement(
   const source = interaction.beforeDocument.elements[id];
   const startRect = interaction.startRects[id];
   if (!source || !startRect) return { document: interaction.beforeDocument, guides: [] };
-  // Use interaction.parentBounds for root-level elements so DRAFT_BOUNDS is respected
+  // Use interaction.parentBounds for root-level elements so the active surface policy is respected.
   const parentBounds = source.parentId
     ? getParentBounds(interaction.beforeDocument, id)
     : interaction.parentBounds;

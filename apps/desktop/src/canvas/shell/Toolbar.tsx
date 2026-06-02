@@ -9,6 +9,7 @@ import {
 } from "@/canvas/toolbarConfig";
 import type { ProjectType } from "@/lib/data/types";
 import { ZoomControl, type ZoomSetter } from "@/canvas/shell/CanvasRender";
+import type { ZoomLimits } from "@/canvas/engine/viewport";
 
 type ToolbarParentTarget = {
   name: string;
@@ -23,6 +24,7 @@ export function Toolbar({
   onCollapseCanvas,
   zoom,
   onZoomChange,
+  zoomLimits,
   projectType = "desktop",
   parentTarget,
   onBackToParent,
@@ -36,6 +38,7 @@ export function Toolbar({
   onCollapseCanvas?: () => void;
   zoom?: number;
   onZoomChange?: ZoomSetter;
+  zoomLimits?: ZoomLimits;
   projectType?: ProjectType;
   parentTarget?: ToolbarParentTarget | null;
   onBackToParent?: () => void;
@@ -125,6 +128,7 @@ export function Toolbar({
           <CanvasExpandedControls
             zoom={zoom}
             onZoomChange={onZoomChange}
+            zoomLimits={zoomLimits}
             projectType={projectType}
             deviceEnabled={deviceOverlayEnabled}
             onToggleDevice={() => setDeviceOverlayEnabled((value) => !value)}
@@ -538,6 +542,7 @@ function ToolTooltip({ tool }: { tool: ToolEntry }) {
 function CanvasExpandedControls({
   zoom,
   onZoomChange,
+  zoomLimits,
   projectType,
   deviceEnabled,
   onToggleDevice,
@@ -547,6 +552,7 @@ function CanvasExpandedControls({
 }: {
   zoom?: number;
   onZoomChange?: ZoomSetter;
+  zoomLimits?: ZoomLimits;
   projectType: ProjectType;
   deviceEnabled: boolean;
   onToggleDevice: () => void;
@@ -570,7 +576,7 @@ function CanvasExpandedControls({
       <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
       {zoom != null && onZoomChange ? (
         <>
-          <ZoomControl zoom={zoom} setZoom={onZoomChange} bare />
+          <ZoomControl zoom={zoom} setZoom={onZoomChange} limits={zoomLimits} bare />
           <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
         </>
       ) : null}

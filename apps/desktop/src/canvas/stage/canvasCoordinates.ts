@@ -1,4 +1,4 @@
-import type { CanvasDocument, Point } from "@/canvas/engine/types";
+import type { CanvasDocument, Point, ViewportMode } from "@/canvas/engine/types";
 import {
   canvasPointToViewport,
   createViewportTransform,
@@ -62,11 +62,12 @@ export function buildViewportTransform(
   zoom: number,
   offsetX: number,
   offsetY: number,
+  viewportMode: ViewportMode = "frame",
 ): ViewportTransform {
   const canvasSize = getCanvasSize(document);
   const displayScale =
     viewportSize.width > 0 && viewportSize.height > 0
-      ? getCanvasDisplayScale(viewportSize, canvasSize)
+      ? getCanvasDisplayScale(viewportSize, canvasSize, viewportMode)
       : 1;
   return createViewportTransform({
     displayZoom: zoom * displayScale,

@@ -8,7 +8,8 @@ import { EditorProvider, useEditor } from "@/canvas/engine/store";
 import { createDraftDocument } from "@/canvas/engine/actions";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
-import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "@/canvas/engine/viewport";
+import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, getViewportZoomLimits } from "@/canvas/engine/viewport";
+import type { ZoomLimits } from "@/canvas/engine/viewport";
 import { canvasSizeForProjectType } from "@/canvas/canvasUtils";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasStage } from "../stage/CanvasStage";
@@ -418,6 +419,7 @@ function CanvasSurface({
           storageKey={storageKey}
           fallbackDocument={fallbackDocument}
           persistStorage={persistStorage}
+          viewportMode={draftMode ? "draft" : "frame"}
           onDocumentChange={onDocumentChange}
         >
           <EditorBridgePublisher sourceId={sourceId} active={publishBridge} />
@@ -597,7 +599,7 @@ function SurfaceCanvasControls({
       )}
       {shellZoomVisibility !== "hidden" && (
         <div style={zoomStyle}>
-          <ZoomControl zoom={state.zoom} setZoom={setZoom} />
+          <ZoomControl zoom={state.zoom} setZoom={setZoom} limits={getViewportZoomLimits(state.viewportMode)} />
         </div>
       )}
     </div>
@@ -767,20 +769,25 @@ function OriginAlignIcon() {
 export function ZoomControl({
   zoom,
   setZoom,
+  limits,
   bare,
 }: {
   zoom: number;
   setZoom: ZoomSetter;
+  limits?: ZoomLimits;
   bare?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draftPercent, setDraftPercent] = useState(() => String(Math.round(zoom * 100)));
-  const canIn    = zoom < MAX_ZOOM - 1e-6;
-  const canOut   = zoom > MIN_ZOOM + 1e-6;
+  const minZoom = limits?.min ?? MIN_ZOOM;
+  const maxZoom = limits?.max ?? MAX_ZOOM;
+  const zoomStep = limits?.step ?? ZOOM_STEP;
+  const canIn    = zoom < maxZoom - 1e-6;
+  const canOut   = zoom > minZoom + 1e-6;
   const canReset = Math.abs(zoom - 1) > 1e-6;
-  const clampedPercentMin = Math.round(MIN_ZOOM * 100);
-  const clampedPercentMax = Math.round(MAX_ZOOM * 100);
+  const clampedPercentMin = Math.round(minZoom * 100);
+  const clampedPercentMax = Math.round(maxZoom * 100);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -811,7 +818,7 @@ export function ZoomControl({
 
   const buttons = (
     <>
-      <ZoomBtn active={canOut} ariaLabel="Diminuir zoom" onClick={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - ZOOM_STEP).toFixed(4)))}>
+      <ZoomBtn active={canOut} ariaLabel="Diminuir zoom" onClick={() => setZoom((z) => Math.max(minZoom, +(z - zoomStep).toFixed(4)))}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <path d="M5 12h14" />
         </svg>
@@ -884,7 +891,7 @@ export function ZoomControl({
           </div>
         )}
       </div>
-      <ZoomBtn active={canIn} ariaLabel="Aumentar zoom" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(4)))}>
+      <ZoomBtn active={canIn} ariaLabel="Aumentar zoom" onClick={() => setZoom((z) => Math.min(maxZoom, +(z + zoomStep).toFixed(4)))}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>

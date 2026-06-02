@@ -48,6 +48,7 @@ export function useCanvasTextInteraction({
       latestStateRef.current.zoom,
       latestStateRef.current.offsetX,
       latestStateRef.current.offsetY,
+      latestStateRef.current.viewportMode,
     );
 
   const textIndexAtPoint = (nodeId: string, clientX: number, clientY: number): number | null => {
@@ -124,6 +125,7 @@ export function useCanvasTextInteraction({
       state.zoom,
       state.offsetX,
       state.offsetY,
+      state.viewportMode,
     );
     for (const id of [...state.selectedIds].reverse()) {
       const node = state.document.elements[id];

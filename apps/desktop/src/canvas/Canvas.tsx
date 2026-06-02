@@ -14,6 +14,7 @@ import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
 import { useScene } from "@/lib/storage/hooks";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
@@ -103,6 +104,7 @@ function CanvasPageContent() {
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
+  const activeViewportMode = useEditorBridge((v) => v?.state.viewportMode);
   const selectedNodeIds = useEditorBridge((v) => {
     if (!v || v.state.canvasStageActive) return [];
     return v.state.selectedIds;
@@ -235,6 +237,10 @@ function CanvasPageContent() {
   });
 
   const toolbarConfig = useMemo(() => createToolbarConfig(settings), [settings]);
+  const activeZoomLimits = useMemo(
+    () => getViewportZoomLimits(activeViewportMode ?? "frame"),
+    [activeViewportMode],
+  );
 
   const handleToolChange = useCallback(
     (tool: CanvasToolId): boolean => {
@@ -437,6 +443,7 @@ function CanvasPageContent() {
           canvasExpanded={canvasExpanded}
           zoom={activeZoom}
           onZoomChange={setActiveZoom}
+          zoomLimits={activeZoomLimits}
           projectType={projectType}
           parentTarget={parentProjectNode}
           onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}

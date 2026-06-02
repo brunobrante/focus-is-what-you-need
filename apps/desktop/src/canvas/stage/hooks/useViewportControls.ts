@@ -5,13 +5,12 @@ import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import { clamp } from "@/canvas/engine/geometry";
 import {
-  MAX_ZOOM,
-  MIN_ZOOM,
   canvasPointToViewport,
   clampViewportState,
   createViewportTransform,
   getCanvasDisplayScale,
   getInitialZoomForCanvas,
+  getViewportZoomLimits,
   snapViewportOffset,
   viewportChanged,
   viewportPointToCanvas,
@@ -26,7 +25,6 @@ type Params = {
   viewportRef: MutableRefObject<HTMLDivElement | null>;
   getCurrentViewportSize: () => Size;
   getCurrentViewportRect: () => ViewportClientRect;
-  draftMode: boolean;
   viewportSubjectKey?: string;
   viewportSize: Size;
   viewportInitializedSubjectRef: MutableRefObject<string | null>;
@@ -39,7 +37,6 @@ export function useViewportControls({
   viewportRef,
   getCurrentViewportSize,
   getCurrentViewportRect,
-  draftMode,
   viewportSubjectKey,
   viewportSize,
   viewportInitializedSubjectRef,
@@ -56,18 +53,18 @@ export function useViewportControls({
   useLayoutEffect(() => {
     const canvasSize = getCanvasSize(state.document);
     const subjectKey = viewportSubjectKey
-      ? `${viewportSubjectKey}:${canvasSize.width}x${canvasSize.height}`
-      : `${canvasSize.width}x${canvasSize.height}`;
-    if (draftMode) return;
+      ? `${viewportSubjectKey}:${state.viewportMode}:${canvasSize.width}x${canvasSize.height}`
+      : `${state.viewportMode}:${canvasSize.width}x${canvasSize.height}`;
     if (viewportInitializedSubjectRef.current === subjectKey) return;
     if (viewportSize.width <= 0 || viewportSize.height <= 0) return;
 
-    const zoom = getInitialZoomForCanvas(viewportSize, canvasSize);
+    const zoom = getInitialZoomForCanvas(viewportSize, canvasSize, state.viewportMode);
     const next = clampViewportState(
       { zoom, offsetX: state.offsetX, offsetY: state.offsetY },
       viewportSize,
       canvasSize,
       state.canvasStageActive,
+      state.viewportMode,
     );
     viewportInitializedSubjectRef.current = subjectKey;
     if (viewportChanged(next, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
@@ -79,12 +76,12 @@ export function useViewportControls({
     // frame just to early-return on the subjectKey guard.
   }, [
     dispatch,
-    draftMode,
     state.canvasStageActive,
     state.document.canvas.height,
     state.document.canvas.width,
     state.offsetX,
     state.offsetY,
+    state.viewportMode,
     state.zoom,
     viewportInitializedSubjectRef,
     viewportSize,
@@ -100,12 +97,13 @@ export function useViewportControls({
     let nextViewport;
 
     if (event.ctrlKey || event.metaKey) {
+      const zoomLimits = getViewportZoomLimits(state.viewportMode);
       const nextZoom = clamp(
         state.zoom * Math.exp(-event.deltaY * settings.canvas.viewport.wheelZoomSensitivity),
-        MIN_ZOOM,
-        MAX_ZOOM,
+        zoomLimits.min,
+        zoomLimits.max,
       );
-      const displayScale = getCanvasDisplayScale(containerSize, canvasSize);
+      const displayScale = getCanvasDisplayScale(containerSize, canvasSize, state.viewportMode);
       const currentDisplayZoom = state.zoom * displayScale;
       const nextDisplayZoom = nextZoom * displayScale;
       const cursor = { x: event.clientX - viewportRect.left, y: event.clientY - viewportRect.top };
@@ -118,10 +116,12 @@ export function useViewportControls({
         canvasHeight: canvasSize.height,
       });
       const cursorCanvas = viewportPointToCanvas(cursor, currentTransform);
-      const clampedCursorCanvas = {
-        x: clamp(cursorCanvas.x, 0, canvasSize.width),
-        y: clamp(cursorCanvas.y, 0, canvasSize.height),
-      };
+      const clampedCursorCanvas = state.viewportMode === "draft"
+        ? cursorCanvas
+        : {
+            x: clamp(cursorCanvas.x, 0, canvasSize.width),
+            y: clamp(cursorCanvas.y, 0, canvasSize.height),
+          };
       const nextBaseTransform = createViewportTransform({
         displayZoom: nextDisplayZoom,
         offsetX: 0,
@@ -136,7 +136,7 @@ export function useViewportControls({
       nextViewport = { zoom: state.zoom, offsetX: state.offsetX - event.deltaX, offsetY: state.offsetY - event.deltaY };
     }
 
-    const clampedViewport = clampViewportState(nextViewport, containerSize, canvasSize);
+    const clampedViewport = clampViewportState(nextViewport, containerSize, canvasSize, false, state.viewportMode);
     if (viewportChanged(clampedViewport, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
       dispatch({ type: "setViewport", zoom: clampedViewport.zoom, offsetX: clampedViewport.offsetX, offsetY: clampedViewport.offsetY });
     }

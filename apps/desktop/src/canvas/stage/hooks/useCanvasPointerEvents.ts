@@ -6,7 +6,7 @@ import type { EditorState, Point, Rect } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import { buildViewportTransform } from "../canvasCoordinates";
-import { viewportPointToCanvas } from "@/canvas/engine/viewport";
+import { DRAFT_ELEMENT_SIZE_SCALE, viewportPointToCanvas } from "@/canvas/engine/viewport";
 import type { Size } from "@/canvas/engine/viewport";
 import { createElementForTool, insertElement } from "@/canvas/engine/actions";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -16,9 +16,9 @@ import { findChildAtPoint, retargetForIsolatedParent } from "../canvasHitTesting
 import { clearNativeTextSelection } from "../canvasStageHelpers";
 import { isPointInsideCanvas } from "../canvasCoordinates";
 import {
-  DRAFT_BOUNDS,
   getFallbackCanvasBounds,
   getDragBox,
+  getInteractionParentBounds,
   getTransformIds,
 } from "../canvasToolingUtils";
 import type { Interaction } from "../canvasInteractionTypes";
@@ -119,7 +119,14 @@ export function useCanvasPointerEvents({
   const getCanvasPoint = (event: ReactPointerEvent): Point | null => {
     const viewport = viewportRef.current;
     if (!viewport) return null;
-    const transform = buildViewportTransform(state.document, getCurrentViewportSize(), state.zoom, state.offsetX, state.offsetY);
+    const transform = buildViewportTransform(
+      state.document,
+      getCurrentViewportSize(),
+      state.zoom,
+      state.offsetX,
+      state.offsetY,
+      state.viewportMode,
+    );
     const vpRect = getCurrentViewportRect();
     return viewportPointToCanvas({ x: event.clientX - vpRect.left, y: event.clientY - vpRect.top }, transform);
   };
@@ -191,13 +198,21 @@ export function useCanvasPointerEvents({
 
     if (state.tool !== "select") {
       event.preventDefault();
-      const node = createElementForTool(state.tool, point.x, point.y, state.document.canvas, settings);
+      const elementSizeScale = draftMode ? DRAFT_ELEMENT_SIZE_SCALE : undefined;
+      const node = createElementForTool(
+        state.tool,
+        point.x,
+        point.y,
+        state.document.canvas,
+        settings,
+        elementSizeScale === undefined ? undefined : { sizeScale: elementSizeScale },
+      );
       node.x = roundPixel(point.x);
       node.y = roundPixel(point.y);
       node.width = 0;
       node.height = 0;
       const next = insertElement(state.document, node);
-      interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, beforeDocument: state.document, lastDocument: next, moved: false };
+      interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, elementSizeScale, beforeDocument: state.document, lastDocument: next, moved: false };
       setInteractionActive(true);
       dispatch({ type: "setDocumentTransient", document: next, changedIds: [node.id] });
       viewport.setPointerCapture(event.pointerId);
@@ -231,10 +246,17 @@ export function useCanvasPointerEvents({
     const startBox = getDragBox(state.document, transformIds);
     if (transformIds.length === 0 || !startBox) return;
 
-    const startTransform = buildViewportTransform(state.document, getCurrentViewportSize(), state.zoom, state.offsetX, state.offsetY);
+    const startTransform = buildViewportTransform(
+      state.document,
+      getCurrentViewportSize(),
+      state.zoom,
+      state.offsetX,
+      state.offsetY,
+      state.viewportMode,
+    );
     const commonParentId = getCommonParentId(state.document, transformIds);
     const parentBounds = draftMode
-      ? DRAFT_BOUNDS
+      ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])
       : commonParentId === undefined
         ? getFallbackCanvasBounds(state.document)
         : getParentBounds(state.document, transformIds[0]);
