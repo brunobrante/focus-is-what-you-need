@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { clamp } from "@/domain/canvas/geometry";
+
+export { clamp };
+
 export type CommitResult = boolean | void;
 
 export function updateNumber(value: string, commit: (value: number) => void): boolean {
@@ -8,10 +12,6 @@ export function updateNumber(value: string, commit: (value: number) => void): bo
   if (!Number.isFinite(next)) return false;
   commit(next);
   return true;
-}
-
-export function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 export function useDeferredCommitField(value: string, onChange: (v: string) => CommitResult) {
@@ -214,10 +214,23 @@ export function InsTextarea({
   );
 }
 
-export function InsColor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function InsColor({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
   const colorInputValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000";
   return (
-    <>
+    <div
+      className={[
+        "flex min-w-0 flex-1 items-center gap-1.5",
+        disabled ? "pointer-events-none opacity-40" : "",
+      ].join(" ")}
+    >
       <label
         className="relative h-[22px] w-[22px] shrink-0 cursor-pointer overflow-hidden rounded-[5px] border border-[#2C2C2C]"
         style={{ background: value }}
@@ -227,13 +240,14 @@ export function InsColor({ value, onChange }: { value: string; onChange: (v: str
           value={colorInputValue}
           onChange={(e) => onChange(e.target.value)}
           className="absolute inset-0 cursor-pointer opacity-0"
+          disabled={disabled}
         />
       </label>
       <InsInput
         value={value.toUpperCase().replace("#", "")}
         onChange={(v) => onChange("#" + v.replace("#", ""))}
       />
-    </>
+    </div>
   );
 }
 

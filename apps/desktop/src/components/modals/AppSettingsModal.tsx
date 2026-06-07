@@ -163,9 +163,32 @@ function CanvasTab({
   onSettingsChange: (settings: GlobalSettings) => void;
 }) {
   const autoRevealSelection = settings.canvas.shell.tree.autoRevealSelection;
+  const inheritParentBackground = settings.canvas.shell.inheritParentBackground;
 
   return (
     <div className="px-[22px] py-5 grid gap-6">
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+          Shell
+        </div>
+        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
+          <div className="flex items-center justify-between gap-5 px-4 py-3">
+            <div>
+              <div className="text-[13px] text-[var(--text)]">Inherit parent background</div>
+              <p className="m-0 mt-1 max-w-[520px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                When opening a component, the shell color inherits the background of its parent frame.
+              </p>
+            </div>
+            <Switch
+              checked={inheritParentBackground}
+              ariaLabel="Inherit parent background"
+              onChange={(checked) =>
+                onSettingsChange(updateInheritParentBackground(settings, checked))
+              }
+            />
+          </div>
+        </div>
+      </div>
       <div>
         <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
           Layers tree
@@ -291,6 +314,19 @@ function ShortcutsTab({
       </div>
     </div>
   );
+}
+
+function updateInheritParentBackground(
+  settings: GlobalSettings,
+  inheritParentBackground: boolean,
+): GlobalSettings {
+  return {
+    ...settings,
+    canvas: {
+      ...settings.canvas,
+      shell: { ...settings.canvas.shell, inheritParentBackground },
+    },
+  };
 }
 
 function updateTreeAutoRevealSelection(

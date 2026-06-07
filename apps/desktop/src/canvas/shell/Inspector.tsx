@@ -39,6 +39,9 @@ type InspectorProps = {
   onShellExpandVisibilityChange: (v: ShellControlVisibility) => void;
   /** Incrementing this counter forces the Shell tab to become active. */
   openShellTabSignal?: number;
+  inheritParentBackground?: boolean;
+  hasParent?: boolean;
+  onInheritParentBackgroundChange?: (value: boolean) => void;
 };
 
 type InspectorTab = "element" | "canvas" | "shell";
@@ -47,6 +50,9 @@ export function Inspector({
   open,
   onClose,
   editor: editorProp,
+  inheritParentBackground = false,
+  hasParent = false,
+  onInheritParentBackgroundChange,
   shellDeviceVisibility,
   shellBackVisibility,
   shellZoomVisibility,
@@ -224,6 +230,9 @@ export function Inspector({
             onBackVisibilityChange={onShellBackVisibilityChange}
             onZoomVisibilityChange={onShellZoomVisibilityChange}
             onExpandVisibilityChange={onShellExpandVisibilityChange}
+            inheritParentBackground={inheritParentBackground}
+            hasParent={hasParent}
+            onInheritParentBackgroundChange={onInheritParentBackgroundChange}
           />
         ) : selectedCount > 1 ? (
           <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />

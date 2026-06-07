@@ -8,12 +8,13 @@ import { SearchPalette, SearchToggle } from "@/canvas/shell/SearchPalette";
 import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
-import { moveElementBefore, setElementLocked, setElementVisible, wrapElements } from "@/canvas/engine/actions";
+import { DEFAULT_SHELL_BACKGROUND, moveElementBefore, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
 import { useScene } from "@/lib/storage/hooks";
@@ -195,13 +196,33 @@ function CanvasPageContent() {
     return effectiveSceneGraphJSON;
   }, [component, effectiveSceneGraphJSON, mockScene.graphJSON, projectType]);
 
-  const currentDocument = useMemo(
-    () =>
+  const hasParent = !!component && (!!component.parentVariantId || !!component.screenId);
+  const inheritParentBackground = settings.canvas.shell.inheritParentBackground;
+
+  const effectiveShellBackground = useMemo(() => {
+    if (!inheritParentBackground || !component) return DEFAULT_SHELL_BACKGROUND;
+    const parentDoc = canvasDocumentFromHtmlGraphJSON(parentScene?.graphJSON ?? null);
+    return parentDoc?.canvas.background || DEFAULT_SHELL_BACKGROUND;
+  }, [inheritParentBackground, component, parentScene?.graphJSON]);
+
+  const currentDocument = useMemo(() => {
+    const doc =
       canvasDocumentFromHtmlGraphJSON(resolvedSceneGraphJSON, { promoteSubjectRoot: true }) ??
-      createBlankDocumentForProjectType(projectType),
+      createBlankDocumentForProjectType(projectType);
+    return { ...doc, shellBackground: effectiveShellBackground };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [component, projectType, resolvedSceneGraphJSON],
-  );
+  }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground]);
+
+  useEffect(() => {
+    const editor = getEditor();
+    if (!editor) return;
+    const doc = editor.state.document;
+    if (doc.shellBackground === effectiveShellBackground) return;
+    editor.dispatch({
+      type: "commitDocument",
+      document: updateShellBackground(doc, effectiveShellBackground),
+    });
+  }, [effectiveShellBackground, getEditor]);
 
   const currentReady =
     (!sceneOwner || !sceneLoading) &&
@@ -258,6 +279,19 @@ function CanvasPageContent() {
     projectType,
     flushPendingSave,
   });
+
+  const handleInheritParentBackgroundChange = useCallback(
+    (value: boolean) => {
+      putGlobalSettings({
+        ...settings,
+        canvas: {
+          ...settings.canvas,
+          shell: { ...settings.canvas.shell, inheritParentBackground: value },
+        },
+      });
+    },
+    [settings],
+  );
 
   const toolbarConfig = useMemo(() => createToolbarConfig(settings), [settings]);
   const activeZoomLimits = useMemo(
@@ -503,6 +537,9 @@ function CanvasPageContent() {
           onShellZoomVisibilityChange={setShellZoomVisibility}
           onShellExpandVisibilityChange={setShellExpandVisibility}
           openShellTabSignal={shellTabSignal}
+          inheritParentBackground={inheritParentBackground}
+          hasParent={hasParent}
+          onInheritParentBackgroundChange={handleInheritParentBackgroundChange}
         />
       </div>
 

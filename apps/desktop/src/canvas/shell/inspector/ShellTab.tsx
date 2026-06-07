@@ -39,6 +39,9 @@ type ShellTabProps = {
   onBackVisibilityChange: (v: ShellControlVisibility) => void;
   onZoomVisibilityChange: (v: ShellControlVisibility) => void;
   onExpandVisibilityChange: (v: ShellControlVisibility) => void;
+  inheritParentBackground?: boolean;
+  hasParent?: boolean;
+  onInheritParentBackgroundChange?: (value: boolean) => void;
 };
 
 export function ShellTab({
@@ -54,6 +57,9 @@ export function ShellTab({
   onBackVisibilityChange,
   onZoomVisibilityChange,
   onExpandVisibilityChange,
+  inheritParentBackground = false,
+  hasParent = false,
+  onInheritParentBackgroundChange,
 }: ShellTabProps) {
   const [shapeRenderModes, setShapeRenderModes] = useState<Record<string, ShapeRenderMode>>(
     Object.fromEntries(SHAPE_LIST.map((s) => [s.id, "svg" as ShapeRenderMode])),
@@ -62,10 +68,21 @@ export function ShellTab({
   return (
     <>
       <InsSection title="Shell">
+        {hasParent && (
+          <InsRow label="Inherit">
+            <InsSwitch
+              checked={inheritParentBackground}
+              onChange={(checked) => onInheritParentBackgroundChange?.(checked)}
+            />
+          </InsRow>
+        )}
         <InsRow label="BG">
-          <InsColor value={background} onChange={onUpdateBackground} />
+          <InsColor
+            value={background}
+            onChange={onUpdateBackground}
+            disabled={inheritParentBackground && hasParent}
+          />
         </InsRow>
-
       </InsSection>
 
       <InsSection title="Controles">
