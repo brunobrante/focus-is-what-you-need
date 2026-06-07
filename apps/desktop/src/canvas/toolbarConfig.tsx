@@ -104,6 +104,12 @@ const ICONS: Record<CanvasToolId, ReactNode> = {
       <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
     </svg>
   ),
+  pencil: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  ),
   text: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
       <path d="M5 6V4.5h14V6" />
@@ -149,6 +155,7 @@ export const TOOL_ENTRIES: Record<CanvasToolId, ToolEntry> = {
   polygon:   { id: "polygon",   name: "Polygon",    icon: ICONS.polygon },
   star:      { id: "star",      name: "Star",       icon: ICONS.star },
   pen:       { id: "pen",       name: "Pen",        icon: ICONS.pen },
+  pencil:    { id: "pencil",    name: "Pencil",     icon: ICONS.pencil },
   text:      { id: "text",      name: "Text",       icon: ICONS.text },
   image:     { id: "image",     name: "Image",      icon: ICONS.image },
   svg:       { id: "svg",       name: "Icon",       icon: ICONS.svg },

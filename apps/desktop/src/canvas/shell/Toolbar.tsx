@@ -132,6 +132,12 @@ export function Toolbar({
         />
       )}
 
+      {showCanvasControls && parentTarget && (
+        <div className="absolute right-full top-1/2 mr-2 -translate-y-1/2">
+          <CanvasBackControl parentTarget={parentTarget} onBackToParent={onBackToParent} />
+        </div>
+      )}
+
       {showCanvasControls && (
         <div className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
           <CanvasExpandedControls
@@ -142,8 +148,6 @@ export function Toolbar({
             projectType={projectType}
             deviceEnabled={deviceOverlayEnabled}
             onToggleDevice={() => setDeviceOverlayEnabled((value) => !value)}
-            parentTarget={parentTarget}
-            onBackToParent={onBackToParent}
             onToggleExpanded={() => onCanvasExpandedChange?.(!canvasExpanded)}
           />
         </div>
@@ -171,14 +175,29 @@ function DropdownToolButton({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hover, setHover] = useState(false);
-  const [hoveredBadgeId, setHoveredBadgeId] = useState<string | null>(null);
+  const [pillVisible, setPillVisible] = useState(false);
+  const [renderMode, setRenderMode] = useState<"SVG" | "DIV">("SVG");
   const [selectedToolId, setSelectedToolId] = useState<CanvasToolId | null>(tools[0]?.id ?? null);
   const ref = useRef<HTMLDivElement>(null);
+  const autoFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isGroupActive = tools.some((t) => t.id === active);
   const current =
     tools.find((t) => t.id === (isGroupActive ? active : selectedToolId)) ??
     tools[0];
+
+  // Show pill briefly whenever this group becomes active, then auto-fade
+  useEffect(() => {
+    if (!badge) return;
+    if (autoFadeTimer.current) clearTimeout(autoFadeTimer.current);
+    if (!isGroupActive) { setPillVisible(false); return; }
+    setPillVisible(true);
+    autoFadeTimer.current = setTimeout(() => setPillVisible(false), 1400);
+    return () => { if (autoFadeTimer.current) clearTimeout(autoFadeTimer.current); };
+  }, [isGroupActive, active, badge]);
+
+  const onPillEnter = () => { if (isGroupActive) { if (autoFadeTimer.current) clearTimeout(autoFadeTimer.current); setPillVisible(true); } };
+  const onPillLeave = () => { setPillVisible(false); };
 
   useEffect(() => {
     if (isGroupActive) setSelectedToolId(active);
@@ -242,6 +261,42 @@ function DropdownToolButton({
         </svg>
       </button>
 
+      {badge && isGroupActive && (
+        <div
+          className="absolute left-1/2 z-50 -translate-x-1/2"
+          style={{ top: "calc(100% + 5px)" }}
+          onMouseEnter={onPillEnter}
+          onMouseLeave={onPillLeave}
+        >
+          <div
+            className={`flex items-stretch overflow-hidden rounded-[5px] border border-[#333] bg-[#141414] transition-opacity duration-300 ${pillVisible ? "opacity-100" : "opacity-0"}`}
+            style={{ boxShadow: "0 4px 14px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.4)" }}
+          >
+            <button
+              type="button"
+              onClick={() => setRenderMode((m) => (m === "SVG" ? "DIV" : "SVG"))}
+              className="flex items-center border-0 bg-transparent px-2 py-[5px] transition-colors duration-[90ms] hover:bg-[#1E1E1E]"
+              aria-label="Toggle render mode"
+            >
+              <span className="font-mono text-[9px] font-semibold leading-none tracking-wide text-[#ADADAD]">
+                {renderMode}
+              </span>
+            </button>
+            <div className="w-px shrink-0 bg-[#2A2A2A]" />
+            <button
+              type="button"
+              onClick={onBadgeClick}
+              className="flex items-center border-0 bg-transparent px-1.5 py-[5px] text-[#484848] transition-colors duration-[90ms] hover:bg-[#1E1E1E] hover:text-[#909090]"
+              aria-label="Open render settings"
+            >
+              <svg width="5" height="8" viewBox="0 0 5 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 1l3 3-3 3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {menuOpen && (
         <div
           className="absolute left-0 z-50 overflow-hidden rounded-[10px] border border-[#2C2C2C] bg-[#1E1E1E] p-1"
@@ -253,7 +308,6 @@ function DropdownToolButton({
         >
           {tools.map((tool) => {
             const isSelected = current.id === tool.id;
-            const badgeLit = hoveredBadgeId === tool.id;
             return (
               <div
                 key={tool.id}
@@ -279,40 +333,16 @@ function DropdownToolButton({
                   </span>
                   <span className="flex-1">{tool.name}</span>
                   {tool.shortcut ? (
-                    <span className="ml-4 rounded border border-[#343434] bg-[#171717] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[#8E8E8E]">
+                    <span className="font-mono text-[9px] leading-none text-[#686868]">
                       {tool.shortcut}
                     </span>
                   ) : null}
                 </button>
-
-                {badge && (
-                  <button
-                    type="button"
-                    onMouseEnter={() => setHoveredBadgeId(tool.id)}
-                    onMouseLeave={() => setHoveredBadgeId(null)}
-                    onClick={(e) => { e.stopPropagation(); onBadgeClick?.(); }}
-                    className="mr-1.5 shrink-0 cursor-pointer border-0 bg-transparent p-0"
-                    aria-label={`Rendering mode: ${badge}`}
-                  >
-                    <span
-                      className="rounded px-1 py-px font-mono text-[9px] font-semibold leading-none transition-all duration-[90ms]"
-                      style={{
-                        letterSpacing: "0.5px",
-                        color: badgeLit ? "#CFCFCF" : "#555",
-                        background: badgeLit ? "#2A2A2A" : "transparent",
-                        border: `1px solid ${badgeLit ? "#3A3A3A" : "transparent"}`,
-                      }}
-                    >
-                      {badge}
-                    </span>
-                  </button>
-                )}
               </div>
             );
           })}
         </div>
       )}
-
     </div>
   );
 }
@@ -452,6 +482,11 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
       <rect x="2" y="2" width="9" height="9" rx="1" /><rect x="13" y="2" width="9" height="9" rx="1" /><rect x="2" y="13" width="9" height="9" rx="1" /><rect x="13" y="13" width="9" height="9" rx="1" />
     </svg>
   ),
+  "TMB Assets Library": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3h7v7H3z" /><path d="M14 3h7v7h-7z" /><path d="M3 14h7v7H3z" /><circle cx="17.5" cy="17.5" r="3.5" />
+    </svg>
+  ),
   "Figma Make": (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -478,6 +513,70 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
     </svg>
   ),
 };
+
+const IMAGE_LIBRARY_SOURCES = ["Unsplash", "Pexels", "Getty Images", "iStock"];
+const ICON_LIBRARY_SOURCES = ["Lucide", "Heroicons", "Material", "Phosphor"];
+const TMB_ASSET_CATEGORIES = ["All", "Logos", "Brand", "UI Kit", "Patterns"];
+
+type MockTmbAsset = { id: string; name: string; category: string; bg: string };
+const MOCK_TMB_ASSETS: MockTmbAsset[] = [
+  { id: "tmb-logo-primary",  name: "Primary Logo",      category: "Logos",    bg: "linear-gradient(135deg,#0f0f14,#1a1a2e)" },
+  { id: "tmb-logo-white",    name: "Logo White",         category: "Logos",    bg: "linear-gradient(135deg,#2a2a2a,#1e1e1e)" },
+  { id: "tmb-logo-mark",     name: "Logo Mark",          category: "Logos",    bg: "linear-gradient(135deg,#4a1d8a,#7b4fd8)" },
+  { id: "tmb-logo-horiz",    name: "Horizontal",         category: "Logos",    bg: "linear-gradient(135deg,#0f0f14,#1e1e2e)" },
+  { id: "tmb-brand-blue",    name: "Primary Blue",       category: "Brand",    bg: "linear-gradient(135deg,#1f7ae0,#0b55c0)" },
+  { id: "tmb-brand-dark",    name: "Dark BG",            category: "Brand",    bg: "linear-gradient(135deg,#0f0f10,#1a1a1a)" },
+  { id: "tmb-brand-purple",  name: "Accent Purple",      category: "Brand",    bg: "linear-gradient(135deg,#6b21a8,#9333ea)" },
+  { id: "tmb-brand-grad",    name: "Brand Gradient",     category: "Brand",    bg: "linear-gradient(135deg,#4a1d8a,#1f7ae0)" },
+  { id: "tmb-ui-button",     name: "Button Set",         category: "UI Kit",   bg: "linear-gradient(135deg,#1e1e2e,#2a2a3e)" },
+  { id: "tmb-ui-card",       name: "Card",               category: "UI Kit",   bg: "linear-gradient(135deg,#1a1a1e,#242430)" },
+  { id: "tmb-ui-input",      name: "Input Field",        category: "UI Kit",   bg: "linear-gradient(135deg,#1e1e1e,#2a2a2a)" },
+  { id: "tmb-ui-nav",        name: "Navigation",         category: "UI Kit",   bg: "linear-gradient(135deg,#141418,#1e1e24)" },
+  { id: "tmb-pat-dots",      name: "Dot Grid",           category: "Patterns", bg: "radial-gradient(circle,#3a3a4a 1px,transparent 1px) 0 0/8px 8px #0f0f14" },
+  { id: "tmb-pat-lines",     name: "Line Grid",          category: "Patterns", bg: "repeating-linear-gradient(0deg,#1e1e2a,#1e1e2a 1px,#0f0f14 0,#0f0f14 12px)" },
+  { id: "tmb-pat-noise",     name: "Noise Texture",      category: "Patterns", bg: "linear-gradient(135deg,#1a1a20,#252530)" },
+  { id: "tmb-pat-mesh",      name: "Mesh Gradient",      category: "Patterns", bg: "radial-gradient(at 30% 30%,#4a1d8a,transparent 60%),radial-gradient(at 70% 70%,#1f4ae0,transparent 60%) #0f0f14" },
+];
+
+type MockImageItem = { id: string; name: string; bg: string };
+const MOCK_IMAGES: MockImageItem[] = [
+  { id: "img-1", name: "Abstract", bg: "linear-gradient(135deg,#1a1a2e,#0f3460)" },
+  { id: "img-2", name: "Forest", bg: "linear-gradient(135deg,#134e5e,#71b280)" },
+  { id: "img-3", name: "Night city", bg: "linear-gradient(135deg,#0f0c29,#302b63)" },
+  { id: "img-4", name: "Sunset", bg: "linear-gradient(135deg,#f093fb,#f5576c)" },
+  { id: "img-5", name: "Snow peak", bg: "linear-gradient(135deg,#c9d6ff,#e2e2e2)" },
+  { id: "img-6", name: "Desert", bg: "linear-gradient(135deg,#f7971e,#ffd200)" },
+  { id: "img-7", name: "Autumn", bg: "linear-gradient(135deg,#e65c00,#f9d423)" },
+  { id: "img-8", name: "Rain", bg: "linear-gradient(135deg,#373b44,#4286f4)" },
+  { id: "img-9", name: "Blossom", bg: "linear-gradient(135deg,#f8b4c8,#e96d8c)" },
+  { id: "img-10", name: "Neon", bg: "linear-gradient(135deg,#8e2de2,#4a00e0)" },
+  { id: "img-11", name: "Meadow", bg: "linear-gradient(135deg,#56ab2f,#a8e063)" },
+  { id: "img-12", name: "Arctic", bg: "linear-gradient(135deg,#2980b9,#6dd5fa)" },
+];
+
+type MockIconItem = { id: string; name: string; d: React.ReactNode };
+const MOCK_ICONS: MockIconItem[] = [
+  { id: "home", name: "Home", d: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></> },
+  { id: "user", name: "User", d: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></> },
+  { id: "bell", name: "Bell", d: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></> },
+  { id: "heart", name: "Heart", d: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /> },
+  { id: "star", name: "Star", d: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /> },
+  { id: "search", name: "Search", d: <><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></> },
+  { id: "mail", name: "Mail", d: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></> },
+  { id: "phone", name: "Phone", d: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.22a2 2 0 0 1 1.99-2.18h3a2 2 0 0 1 2 1.72c.127.527.265 1.044.42 1.55" /> },
+  { id: "camera", name: "Camera", d: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></> },
+  { id: "map-pin", name: "Location", d: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></> },
+  { id: "folder", name: "Folder", d: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /> },
+  { id: "file", name: "File", d: <><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><polyline points="13 2 13 9 20 9" /></> },
+  { id: "lock", name: "Lock", d: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></> },
+  { id: "calendar", name: "Calendar", d: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></> },
+  { id: "clock", name: "Clock", d: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></> },
+  { id: "trash", name: "Trash", d: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" /></> },
+  { id: "edit", name: "Edit", d: <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /> },
+  { id: "download", name: "Download", d: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></> },
+  { id: "share", name: "Share", d: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></> },
+  { id: "bookmark", name: "Bookmark", d: <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /> },
+];
 
 const MOCK_CONVERSATION = [
   { role: "user" as const, content: "Rewrite the hero headline" },
@@ -524,6 +623,27 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
     const id = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, [recording]);
+
+  const [libraryMode, setLibraryMode] = useState<"images" | "icons" | "tmb" | null>(null);
+  const [libraryExpanded, setLibraryExpanded] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [imageSource, setImageSource] = useState(IMAGE_LIBRARY_SOURCES[0]);
+  const [iconSource, setIconSource] = useState(ICON_LIBRARY_SOURCES[0]);
+  const [tmbCategory, setTmbCategory] = useState(TMB_ASSET_CATEGORIES[0]);
+  const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
+  const sourceDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sourceDropdownOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (sourceDropdownRef.current && !sourceDropdownRef.current.contains(event.target as Node)) {
+        setSourceDropdownOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [sourceDropdownOpen]);
+
   const tabs = [
     { id: "all" as const, label: "All" },
     { id: "assets" as const, label: "Assets" },
@@ -543,6 +663,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
     assets: [
       { title: "Image library" },
       { title: "Icon library" },
+      { title: "TMB Assets Library" },
       { title: "Color styles" },
       { title: "Text styles" },
       { title: "Local uploads" },
@@ -568,7 +689,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
 
   return (
     <div
-      className="group absolute bottom-[calc(100%+4px)] left-1/2 z-50 flex h-[264px] w-[420px] -translate-x-1/2 flex-col rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-2 pb-0"
+      className={`group absolute bottom-[calc(100%+4px)] left-1/2 z-50 flex w-[420px] -translate-x-1/2 flex-col rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-2 pb-0 transition-[height] duration-200 ${libraryExpanded ? "h-[500px]" : "h-[264px]"}`}
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 28px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)" }}
     >
       {checklistMode ? (
@@ -660,6 +781,223 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
             </div>
           </div>
         </div>
+      ) : libraryMode ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <div className="flex h-7 shrink-0 items-center justify-between px-1">
+            <button
+              type="button"
+              aria-label="Back"
+              onClick={() => { setLibraryMode(null); setLibraryExpanded(false); setSourceDropdownOpen(false); }}
+              className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.3px] text-[#4A4A4A] transition-colors duration-100 hover:text-[#8E8E8E]"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+              {libraryMode === "images" ? "Image library" : libraryMode === "icons" ? "Icon library" : "TMB Assets Library"}
+            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label={libraryExpanded ? "Collapse" : "Expand"}
+                onClick={() => setLibraryExpanded((v) => !v)}
+                className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+              >
+                {libraryExpanded ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Close library"
+                onClick={() => { setLibraryMode(null); setLibraryExpanded(false); setSourceDropdownOpen(false); }}
+                className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#2E2E2E] bg-[#252525] px-2.5">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+              </svg>
+              <input
+                type="text"
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                placeholder={libraryMode === "images" ? "Search images…" : libraryMode === "icons" ? "Search icons…" : "Search assets…"}
+                className="min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#CFCFCF] outline-none placeholder:text-[#555]"
+              />
+              {librarySearch && (
+                <button
+                  type="button"
+                  onClick={() => setLibrarySearch("")}
+                  className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#555] transition-colors duration-100 hover:text-[#CFCFCF]"
+                >
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <div ref={sourceDropdownRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setSourceDropdownOpen((v) => !v)}
+                className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition-colors duration-100 ${
+                  sourceDropdownOpen
+                    ? "border-[#383838] bg-[#2E2E2E] text-[#CFCFCF]"
+                    : "border-[#2E2E2E] bg-[#252525] text-[#8E8E8E] hover:border-[#333] hover:text-[#CFCFCF]"
+                }`}
+              >
+                {libraryMode === "images" ? imageSource : libraryMode === "icons" ? iconSource : tmbCategory}
+                <svg width="7" height="5" viewBox="0 0 8 5" fill="currentColor" style={{ opacity: 0.55 }}>
+                  <path d="M0 0.5L4 4.5L8 0.5H0Z" />
+                </svg>
+              </button>
+
+              {sourceDropdownOpen && (
+                <div
+                  className="absolute right-0 z-[60] overflow-hidden rounded-[10px] border border-[#2C2C2C] bg-[#1E1E1E] p-1"
+                  style={{ bottom: "calc(100% + 4px)", minWidth: 128, boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3)" }}
+                >
+                  {(libraryMode === "images" ? IMAGE_LIBRARY_SOURCES : libraryMode === "icons" ? ICON_LIBRARY_SOURCES : TMB_ASSET_CATEGORIES).map((src) => {
+                    const isActive = libraryMode === "images" ? imageSource === src : libraryMode === "icons" ? iconSource === src : tmbCategory === src;
+                    return (
+                      <button
+                        key={src}
+                        type="button"
+                        onClick={() => {
+                          if (libraryMode === "images") setImageSource(src);
+                          else if (libraryMode === "icons") setIconSource(src);
+                          else setTmbCategory(src);
+                          setSourceDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors duration-[90ms] ${
+                          isActive ? "bg-[#2A2A2A] text-[#CFCFCF]" : "text-[#8E8E8E] hover:bg-[#252525] hover:text-[#CFCFCF]"
+                        }`}
+                      >
+                        <span className="flex-1">{src}</span>
+                        {isActive && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333]">
+            {libraryMode === "images" ? (
+              (() => {
+                const filtered = MOCK_IMAGES.filter((img) =>
+                  img.name.toLowerCase().includes(librarySearch.toLowerCase()),
+                );
+                return filtered.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-1.5 pb-1">
+                    {filtered.map((img) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        className="group/img flex flex-col gap-1 rounded-md p-0.5 transition-all duration-[90ms] hover:bg-[#2A2A2A]"
+                      >
+                        <div className="h-[52px] w-full rounded" style={{ background: img.bg }} />
+                        <span className="truncate px-0.5 text-[10px] text-[#555] transition-colors duration-100 group-hover/img:text-[#8E8E8E]">
+                          {img.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-2 py-2 text-[11px] text-[#555]">No images found.</div>
+                );
+              })()
+            ) : libraryMode === "icons" ? (
+              (() => {
+                const filtered = MOCK_ICONS.filter((icon) =>
+                  icon.name.toLowerCase().includes(librarySearch.toLowerCase()),
+                );
+                return filtered.length > 0 ? (
+                  <div className="grid grid-cols-5 gap-0.5 pb-1">
+                    {filtered.map((icon) => (
+                      <button
+                        key={icon.id}
+                        type="button"
+                        className="flex flex-col items-center gap-1 rounded-lg px-1 py-2.5 transition-colors duration-[90ms] hover:bg-[#2A2A2A]"
+                      >
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#CFCFCF"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          {icon.d}
+                        </svg>
+                        <span className="w-full truncate text-center text-[9px] text-[#555]">
+                          {icon.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-2 py-2 text-[11px] text-[#555]">No icons found.</div>
+                );
+              })()
+            ) : (
+              (() => {
+                const q = librarySearch.toLowerCase();
+                const filtered = MOCK_TMB_ASSETS.filter((asset) => {
+                  const matchesSearch = asset.name.toLowerCase().includes(q);
+                  const matchesCategory = tmbCategory === "All" || asset.category === tmbCategory;
+                  return matchesSearch && matchesCategory;
+                });
+                return filtered.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-1.5 pb-1">
+                    {filtered.map((asset) => (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        className="group/asset flex flex-col gap-1 rounded-md p-0.5 transition-all duration-[90ms] hover:bg-[#2A2A2A]"
+                      >
+                        <div className="h-[52px] w-full rounded" style={{ background: asset.bg }} />
+                        <div className="flex items-center gap-1 px-0.5">
+                          <span className="min-w-0 flex-1 truncate text-[10px] text-[#555] transition-colors duration-100 group-hover/asset:text-[#8E8E8E]">
+                            {asset.name}
+                          </span>
+                          {tmbCategory === "All" && (
+                            <span className="shrink-0 rounded px-1 py-px text-[8px] font-medium text-[#3A3A3A] transition-colors duration-100 group-hover/asset:text-[#555]">
+                              {asset.category}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-2 py-2 text-[11px] text-[#555]">No assets found.</div>
+                );
+              })()
+            )}
+          </div>
+        </div>
       ) : !aiMode ? (
         <>
           <div className="flex h-9 items-center gap-2 rounded-lg border border-[#333] bg-[#2A2A2A] px-2.5">
@@ -724,7 +1062,12 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                   <button
                     key={item.title}
                     type="button"
-                    onClick={() => { if (item.title === "Checklist") setChecklistMode(true); }}
+                    onClick={() => {
+                      if (item.title === "Checklist") setChecklistMode(true);
+                      else if (item.title === "Image library") { setLibraryMode("images"); setLibrarySearch(""); setLibraryExpanded(false); }
+                      else if (item.title === "Icon library") { setLibraryMode("icons"); setLibrarySearch(""); setLibraryExpanded(false); }
+                      else if (item.title === "TMB Assets Library") { setLibraryMode("tmb"); setLibrarySearch(""); setTmbCategory(TMB_ASSET_CATEGORIES[0]); setLibraryExpanded(false); }
+                    }}
                     className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors duration-[90ms] hover:bg-[#2A2A2A]"
                   >
                     <span className="grid h-4 w-4 shrink-0 place-items-center text-[#CFCFCF]">
@@ -962,7 +1305,7 @@ function ToolTooltip({ tool }: { tool: ToolEntry }) {
     >
       {tool.name}
       {tool.shortcut ? (
-        <span className="rounded border border-[#343434] bg-[#171717] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[#8E8E8E]">
+        <span className="rounded border border-[#262626] px-1 py-px font-mono text-[9px] leading-none text-[#555]">
           {tool.shortcut}
         </span>
       ) : null}
@@ -978,8 +1321,6 @@ function CanvasExpandedControls({
   projectType,
   deviceEnabled,
   onToggleDevice,
-  parentTarget,
-  onBackToParent,
   onToggleExpanded,
 }: {
   expanded: boolean;
@@ -989,8 +1330,6 @@ function CanvasExpandedControls({
   projectType: ProjectType;
   deviceEnabled: boolean;
   onToggleDevice: () => void;
-  parentTarget?: ToolbarParentTarget | null;
-  onBackToParent?: () => void;
   onToggleExpanded?: () => void;
 }) {
   return (
@@ -1003,9 +1342,6 @@ function CanvasExpandedControls({
         projectType={projectType}
         onClick={onToggleDevice}
       />
-      {parentTarget ? (
-        <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
-      ) : null}
       <div aria-hidden className="mx-0.5 h-5 w-px bg-[#2C2C2C]" />
       {zoom != null && onZoomChange ? (
         <>
@@ -1079,6 +1415,23 @@ function ToolbarDeviceButton({
   );
 }
 
+function CanvasBackControl({
+  parentTarget,
+  onBackToParent,
+}: {
+  parentTarget: ToolbarParentTarget;
+  onBackToParent?: () => void;
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-1.5 rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-[3px]"
+      style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35)" }}
+    >
+      <ToolbarBackButton parentTarget={parentTarget} onClick={onBackToParent} />
+    </div>
+  );
+}
+
 function ToolbarBackButton({
   parentTarget,
   onClick,
@@ -1089,15 +1442,18 @@ function ToolbarBackButton({
   return (
     <button
       type="button"
-      aria-label={`Voltar para ${parentTarget.name}`}
-      title={`Voltar para ${parentTarget.name}`}
+      aria-label={`Back to ${parentTarget.name}`}
+      title={`Back to ${parentTarget.name}`}
       onClick={onClick}
-      className="grid h-9 w-9 place-items-center rounded-lg text-[#888] transition-colors duration-[90ms] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+      className="flex h-9 items-center gap-2 rounded-lg px-3 text-[#888] transition-colors duration-[90ms] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M15 6l-6 6 6 6" />
-        {parentTarget.kind === "component" ? <path d="M20 5h-4v4M4 19h4v-4" /> : null}
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 14L4 9l5-5" />
+        <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
       </svg>
+      <span className="max-w-[120px] truncate text-[12px] font-medium leading-none text-[#CFCFCF]">
+        {parentTarget.name}
+      </span>
     </button>
   );
 }

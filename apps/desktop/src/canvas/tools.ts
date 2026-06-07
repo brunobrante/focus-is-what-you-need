@@ -10,6 +10,7 @@ export type CanvasToolId =
   | "polygon"
   | "star"
   | "pen"
+  | "pencil"
   | "text"
   | "image"
   | "svg"
@@ -26,6 +27,7 @@ const INSERT_TOOLS: CanvasToolId[] = [
   "polygon",
   "star",
   "pen",
+  "pencil",
   "text",
   "image",
   "svg",

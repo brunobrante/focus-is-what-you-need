@@ -33,6 +33,7 @@ export type CanvasKeyCommandId =
   | "canvas.tool.polygon"
   | "canvas.tool.star"
   | "canvas.tool.pen"
+  | "canvas.tool.pencil"
   | "canvas.tool.text"
   | "canvas.tool.image"
   | "canvas.tool.svg"

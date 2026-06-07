@@ -46,6 +46,14 @@ export function resolveGlobalSettings(
   return {
     ...resolved,
     schemaVersion: DEFAULT_GLOBAL_SETTINGS.schemaVersion,
+    canvas: {
+      ...resolved.canvas,
+      tools: {
+        ...resolved.canvas.tools,
+        // toolbar layout is code-defined; never let stale persisted data override it
+        toolbar: DEFAULT_GLOBAL_SETTINGS.canvas.tools.toolbar,
+      },
+    },
   };
 }
 
