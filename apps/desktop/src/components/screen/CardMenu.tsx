@@ -47,7 +47,10 @@ export function CardMenu({ buttons }: { buttons: CardMenuButton[] }) {
       ref={rootRef}
       role="toolbar"
       aria-label="Actions"
-      className="pointer-events-none absolute bottom-2 left-1/2 z-[2] flex -translate-x-1/2 translate-y-1.5 items-center gap-0 rounded-md border border-[var(--border-strong)] bg-[rgba(20,20,20,0.92)] p-1 opacity-0 backdrop-blur-md transition-[opacity,transform] duration-[120ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
+      className={[
+        "pointer-events-none absolute bottom-2 left-1/2 z-[2] flex -translate-x-1/2 translate-y-1.5 items-center gap-0 rounded-md border border-[var(--border-strong)] bg-[rgba(20,20,20,0.92)] p-1 opacity-0 backdrop-blur-md transition-[opacity,transform] duration-[120ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100",
+        openKey ? "!pointer-events-auto !translate-y-0 !opacity-100" : "",
+      ].join(" ")}
     >
       {buttons.map((btn, i) => (
         <span key={btn.key} className="contents">
@@ -169,7 +172,10 @@ export function CardMoreMenu({
   return (
     <div
       ref={rootRef}
-      className="absolute right-2 top-2 z-10 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-within:opacity-100"
+      className={[
+        "absolute right-2 top-2 z-10 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-within:opacity-100",
+        open ? "!pointer-events-auto !opacity-100" : "",
+      ].join(" ")}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
