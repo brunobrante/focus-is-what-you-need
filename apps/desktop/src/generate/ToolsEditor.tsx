@@ -167,8 +167,22 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     () => readCropsOverlayColor(),
   );
 
+  // Repaints are coalesced to one per animation frame. N cut images settling
+  // asynchronously (plus resize/onload) would otherwise trigger N full canvas
+  // repaints in the same tick; rAF collapses them into a single bump.
+  const paintRafRef = useRef<number | null>(null);
   const bumpPaintVersion = useCallback(() => {
-    setImagePaintVersion((value) => value + 1);
+    if (paintRafRef.current != null) return;
+    paintRafRef.current = requestAnimationFrame(() => {
+      paintRafRef.current = null;
+      setImagePaintVersion((value) => value + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (paintRafRef.current != null) cancelAnimationFrame(paintRafRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -195,24 +209,68 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       ? componentState.items
       : ensureRootComponent(readSavedComponents(componentKey), item);
 
+  // Persisting the component array to localStorage serialises every cut's PNG
+  // data URL. Doing that synchronously inside the state updater stalls the main
+  // thread on each commit. Instead we keep the latest snapshot in a ref and flush
+  // it on a debounce / at unmount, off the interaction's critical path.
+  const persistTimerRef = useRef<number | null>(null);
+  const pendingPersistRef = useRef<{ items: SavedComponent[]; isDraft: boolean } | null>(null);
+
+  const flushPendingPersist = useCallback(() => {
+    if (persistTimerRef.current != null) {
+      clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    const pending = pendingPersistRef.current;
+    if (!pending) return;
+    pendingPersistRef.current = null;
+    if (pending.isDraft) {
+      writeDraftComponents(componentKey, pending.items);
+    } else {
+      writeSavedComponents(componentKey, pending.items);
+    }
+  }, [componentKey]);
+
+  const cancelPendingPersist = useCallback(() => {
+    if (persistTimerRef.current != null) {
+      clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    pendingPersistRef.current = null;
+  }, []);
+
+  const schedulePersist = useCallback(
+    (items: SavedComponent[], isDraft: boolean) => {
+      pendingPersistRef.current = { items, isDraft };
+      if (persistTimerRef.current != null) return;
+      persistTimerRef.current = window.setTimeout(() => {
+        persistTimerRef.current = null;
+        flushPendingPersist();
+      }, 250);
+    },
+    [flushPendingPersist],
+  );
+
+  // Flush any queued draft before the editor unmounts (e.g. switching references,
+  // which remounts via `key={item.id}`), so unsaved edits are never dropped.
+  useEffect(() => flushPendingPersist, [flushPendingPersist]);
+
   const updateComponents = useCallback(
     (updater: (items: SavedComponent[]) => SavedComponent[]) => {
       setStackSaveStatus(null);
       setComponentState((current) => {
-        const base = ensureRootComponent(
-          current.key === componentKey ? current.items : readSavedComponents(componentKey),
-          item,
-        );
+        // `current.items` is already normalised; only re-normalise when the key
+        // changed (stale snapshot from a previous reference).
+        const base =
+          current.key === componentKey
+            ? current.items
+            : ensureRootComponent(readSavedComponents(componentKey), item);
         const next = ensureRootComponent(updater(base), item);
-        if (referenceId && item.id === referenceId) {
-          writeDraftComponents(componentKey, next);
-        } else {
-          writeSavedComponents(componentKey, next);
-        }
+        schedulePersist(next, Boolean(referenceId && item.id === referenceId));
         return { key: componentKey, items: next };
       });
     },
-    [componentKey, item, referenceId],
+    [componentKey, item, referenceId, schedulePersist],
   );
 
   const selectedComponent = components.find((component) => component.id === selectedComponentId) ?? null;
@@ -477,6 +535,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   );
 
   const resetToOriginalRoot = useCallback(() => {
+    cancelPendingPersist();
     const resetComponents = ensureRootComponent([], item);
     writeSavedComponents(componentKey, resetComponents);
     setComponentState({ key: componentKey, items: resetComponents });
@@ -487,7 +546,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     setViewMode("original");
     cancelSelection();
     resetToolViewport();
-  }, [cancelSelection, componentKey, item, resetToolViewport, rootComponentId]);
+  }, [cancelPendingPersist, cancelSelection, componentKey, item, resetToolViewport, rootComponentId]);
 
   const selectStackComponent = useCallback(
     (id: string) => {
@@ -521,6 +580,9 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
 
   const persistReferenceStack = useCallback(async () => {
     if (savingStack) return;
+    // An explicit save supersedes any queued draft write; drop it so a late
+    // flush can't resurrect the draft we are about to clear.
+    cancelPendingPersist();
     setSavingStack(true);
     setStackSaveStatus(null);
     try {
@@ -551,7 +613,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     } finally {
       setSavingStack(false);
     }
-  }, [componentKey, components, item, referenceId, rootComponentId, savingStack]);
+  }, [cancelPendingPersist, componentKey, components, item, referenceId, rootComponentId, savingStack]);
 
   const selectionToSubjectCoords = useCallback(
     (box: CropBox): CropBox | null => {

@@ -318,10 +318,12 @@ fn read_reference_file(
     app: tauri::AppHandle,
     id: String,
     ext: String,
-) -> Result<String, String> {
+) -> Result<tauri::ipc::Response, String> {
     let cfg = read_config(&app);
     let data = read_reference_blob(&cfg, &id, &ext)?;
-    Ok(BASE64.encode(&data))
+    // Raw bytes over IPC (ArrayBuffer on the JS side). Avoids base64 encode here
+    // and a synchronous main-thread atob() decode in the renderer.
+    Ok(tauri::ipc::Response::new(data))
 }
 
 #[tauri::command]
@@ -368,7 +370,7 @@ fn read_reference_stack_file(
     app: tauri::AppHandle,
     id: String,
     file_name: String,
-) -> Result<String, String> {
+) -> Result<tauri::ipc::Response, String> {
     let cfg = read_config(&app);
     let id = safe_path_segment(&id, "reference id")?;
     let file_name = safe_path_segment(&file_name, "stack file name")?;
@@ -381,7 +383,7 @@ fn read_reference_stack_file(
         .find(|path| path.exists())
         .ok_or_else(|| "reference stack file not found".to_string())?;
     let data = fs::read(&path).map_err(|e| e.to_string())?;
-    Ok(BASE64.encode(&data))
+    Ok(tauri::ipc::Response::new(data))
 }
 
 #[tauri::command]
@@ -604,15 +606,15 @@ fn extract_video_frames_blocking(
     Ok(frames)
 }
 
-// Extract a single full-resolution frame at a timestamp as a PNG (base64).
+// Extract a single full-resolution frame at a timestamp as a PNG (raw bytes).
 #[tauri::command]
 async fn extract_video_frame_full(
     app: tauri::AppHandle,
     id: String,
     ext: String,
     timestamp_ms: u64,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+) -> Result<tauri::ipc::Response, String> {
+    let data = tauri::async_runtime::spawn_blocking(move || {
         let cfg = read_config(&app);
         let id = safe_path_segment(&id, "reference id")?;
         let src = reference_original_path(&cfg, &id, &ext).ok_or("video file not found")?;
@@ -640,10 +642,11 @@ async fn extract_video_frame_full(
         }
         let data = fs::read(&out).map_err(|e| e.to_string())?;
         let _ = fs::remove_file(&out);
-        Ok(BASE64.encode(&data))
+        Ok::<Vec<u8>, String>(data)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(data))
 }
 
 #[tauri::command]
@@ -651,7 +654,7 @@ fn read_reference_frame(
     app: tauri::AppHandle,
     id: String,
     file_name: String,
-) -> Result<String, String> {
+) -> Result<tauri::ipc::Response, String> {
     let cfg = read_config(&app);
     let id = safe_path_segment(&id, "reference id")?;
     let file_name = safe_path_segment(&file_name, "frame file name")?;
@@ -660,7 +663,7 @@ fn read_reference_frame(
         return Err("frame not found".to_string());
     }
     let data = fs::read(&path).map_err(|e| e.to_string())?;
-    Ok(BASE64.encode(&data))
+    Ok(tauri::ipc::Response::new(data))
 }
 
 #[tauri::command]

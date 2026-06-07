@@ -94,9 +94,9 @@ export async function saveReferenceFile(id: string, blob: Blob): Promise<string>
 
 export async function loadReferenceFile(id: string, ext: string): Promise<Blob | null> {
   try {
-    const b64 = await invoke<string>("read_reference_file", { id, ext });
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return new Blob([bytes], { type: mimeFromExt(ext) });
+    // Command returns raw bytes (ArrayBuffer) — no base64, no main-thread atob().
+    const buffer = await invoke<ArrayBuffer>("read_reference_file", { id, ext });
+    return new Blob([buffer], { type: mimeFromExt(ext) });
   } catch {
     return null;
   }
@@ -121,9 +121,8 @@ export async function loadReferenceStackFile(
   mimeType = "image/png",
 ): Promise<Blob | null> {
   try {
-    const b64 = await invoke<string>("read_reference_stack_file", { id, fileName });
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return new Blob([bytes], { type: mimeType });
+    const buffer = await invoke<ArrayBuffer>("read_reference_stack_file", { id, fileName });
+    return new Blob([buffer], { type: mimeType });
   } catch {
     return null;
   }
@@ -186,9 +185,8 @@ export async function extractVideoFrameFull(
   timestampMs: number,
 ): Promise<Blob | null> {
   try {
-    const b64 = await invoke<string>("extract_video_frame_full", { id, ext, timestampMs });
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return new Blob([bytes], { type: "image/png" });
+    const buffer = await invoke<ArrayBuffer>("extract_video_frame_full", { id, ext, timestampMs });
+    return new Blob([buffer], { type: "image/png" });
   } catch {
     return null;
   }
@@ -196,9 +194,8 @@ export async function extractVideoFrameFull(
 
 export async function loadReferenceFrame(id: string, fileName: string): Promise<Blob | null> {
   try {
-    const b64 = await invoke<string>("read_reference_frame", { id, fileName });
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return new Blob([bytes], { type: "image/jpeg" });
+    const buffer = await invoke<ArrayBuffer>("read_reference_frame", { id, fileName });
+    return new Blob([buffer], { type: "image/jpeg" });
   } catch {
     return null;
   }
