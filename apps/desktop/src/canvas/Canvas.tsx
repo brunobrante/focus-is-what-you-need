@@ -9,7 +9,7 @@ import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { DEFAULT_SHELL_BACKGROUND, moveElementBefore, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
-import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
+import { canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
@@ -201,8 +201,10 @@ function CanvasPageContent() {
 
   const effectiveShellBackground = useMemo(() => {
     if (!inheritParentBackground || !component) return DEFAULT_SHELL_BACKGROUND;
-    const parentDoc = canvasDocumentFromHtmlGraphJSON(parentScene?.graphJSON ?? null);
-    return parentDoc?.canvas.background || DEFAULT_SHELL_BACKGROUND;
+    return (
+      getInheritedShellBackgroundFromGraph(parentScene?.graphJSON, component.sourceNodeId) ??
+      DEFAULT_SHELL_BACKGROUND
+    );
   }, [inheritParentBackground, component, parentScene?.graphJSON]);
 
   const currentDocument = useMemo(() => {

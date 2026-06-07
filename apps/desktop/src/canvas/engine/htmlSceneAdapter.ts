@@ -579,3 +579,38 @@ export function getNodeAbsoluteBoundsInGraph(
 
   return { x, y, width: target.bounds.width, height: target.bounds.height };
 }
+
+/**
+ * Returns the background color that the shell should inherit when a component
+ * is opened in the canvas with "inherit parent background" enabled.
+ *
+ * The graphJSON node tree is structured as:
+ *   rootId (transparent outer wrapper)
+ *     └── subjectId (actual frame node — carries the frame's style.background)
+ *           ├── sourceNodeId  ← this component's element in the parent scene
+ *           └── …siblings
+ *
+ * We walk one level up from sourceNodeId to its immediate parent node and
+ * return that node's style.background. This is the fill of the frame (or
+ * nested container) that directly surrounds the component, which is exactly
+ * what should be visible in the shell.
+ *
+ * Returns null if no opaque background is found; caller falls back to default.
+ */
+export function getInheritedShellBackgroundFromGraph(
+  graphJSON: string | null | undefined,
+  sourceNodeId: string | null | undefined,
+): string | null {
+  if (!graphJSON || !sourceNodeId) return null;
+
+  const doc = htmlCanvasDocumentFromJSON(graphJSON);
+  if (!doc) return null;
+
+  const nodeMap = new Map(doc.nodes.map((n) => [n.id, n]));
+  const sourceNode = nodeMap.get(sourceNodeId);
+  if (!sourceNode?.parentId) return null;
+
+  const parentNode = nodeMap.get(sourceNode.parentId);
+  const bg = parentNode?.style.background;
+  return bg && bg !== "transparent" ? bg : null;
+}
