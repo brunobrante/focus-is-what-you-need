@@ -39,6 +39,7 @@ type ShellTabProps = {
   onBackVisibilityChange: (v: ShellControlVisibility) => void;
   onZoomVisibilityChange: (v: ShellControlVisibility) => void;
   onExpandVisibilityChange: (v: ShellControlVisibility) => void;
+  isComponent?: boolean;
   inheritParentBackground?: boolean;
   hasParent?: boolean;
   onInheritParentBackgroundChange?: (value: boolean) => void;
@@ -57,6 +58,7 @@ export function ShellTab({
   onBackVisibilityChange,
   onZoomVisibilityChange,
   onExpandVisibilityChange,
+  isComponent = false,
   inheritParentBackground = false,
   hasParent = false,
   onInheritParentBackgroundChange,
@@ -77,15 +79,29 @@ export function ShellTab({
           </InsRow>
         )}
         <InsRow label="BG">
-          <InsColor
-            value={background}
-            onChange={onUpdateBackground}
-            disabled={inheritParentBackground && hasParent}
-          />
+          <InsColor value={background} onChange={onUpdateBackground} />
         </InsRow>
       </InsSection>
 
       <InsSection title="Controles">
+        {isComponent && (
+          <InsRow label="Device">
+            <InsToggle
+              value={deviceVisibility}
+              onChange={(value) => onDeviceVisibilityChange(value as ShellControlVisibility)}
+              options={SHELL_VISIBILITY_OPTIONS}
+            />
+          </InsRow>
+        )}
+        {isComponent && (
+          <InsRow label="Back">
+            <InsToggle
+              value={backVisibility}
+              onChange={(value) => onBackVisibilityChange(value as ShellControlVisibility)}
+              options={SHELL_VISIBILITY_OPTIONS}
+            />
+          </InsRow>
+        )}
         <InsRow label="Zoom">
           <InsToggle
             value={zoomVisibility}

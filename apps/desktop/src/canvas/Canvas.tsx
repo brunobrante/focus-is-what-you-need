@@ -537,6 +537,7 @@ function CanvasPageContent() {
           onShellZoomVisibilityChange={setShellZoomVisibility}
           onShellExpandVisibilityChange={setShellExpandVisibility}
           openShellTabSignal={shellTabSignal}
+          isComponent={!!component}
           inheritParentBackground={inheritParentBackground}
           hasParent={hasParent}
           onInheritParentBackgroundChange={handleInheritParentBackgroundChange}

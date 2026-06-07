@@ -39,6 +39,7 @@ type InspectorProps = {
   onShellExpandVisibilityChange: (v: ShellControlVisibility) => void;
   /** Incrementing this counter forces the Shell tab to become active. */
   openShellTabSignal?: number;
+  isComponent?: boolean;
   inheritParentBackground?: boolean;
   hasParent?: boolean;
   onInheritParentBackgroundChange?: (value: boolean) => void;
@@ -50,6 +51,7 @@ export function Inspector({
   open,
   onClose,
   editor: editorProp,
+  isComponent = false,
   inheritParentBackground = false,
   hasParent = false,
   onInheritParentBackgroundChange,
@@ -230,6 +232,7 @@ export function Inspector({
             onBackVisibilityChange={onShellBackVisibilityChange}
             onZoomVisibilityChange={onShellZoomVisibilityChange}
             onExpandVisibilityChange={onShellExpandVisibilityChange}
+            isComponent={isComponent}
             inheritParentBackground={inheritParentBackground}
             hasParent={hasParent}
             onInheritParentBackgroundChange={onInheritParentBackgroundChange}
