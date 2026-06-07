@@ -69,17 +69,23 @@ export function ReferenceGroupNavigator({
   );
 }
 
+// Object URLs for thumbnails are cached for the page session, keyed by
+// reference id. Switching the active image (or revisiting a group) reuses the
+// already-decoded thumbnail instead of re-reading the file from disk.
+const thumbnailUrlCache = new Map<string, string>();
+
 function ReferenceGroupNavigatorThumbnail({
   reference,
 }: {
   reference: ToolReferenceGroupContext["references"][number];
 }) {
   const containerRef = useRef<HTMLSpanElement>(null);
-  const [url, setUrl] = useState(reference.url ?? null);
-  const [shouldLoad, setShouldLoad] = useState(Boolean(reference.url));
+  const initialUrl = thumbnailUrlCache.get(reference.id) ?? reference.url ?? null;
+  const [url, setUrl] = useState<string | null>(initialUrl);
+  const [shouldLoad, setShouldLoad] = useState(Boolean(initialUrl));
 
   useEffect(() => {
-    if (reference.url) {
+    if (thumbnailUrlCache.has(reference.id) || reference.url) {
       setShouldLoad(true);
       return;
     }
@@ -103,23 +109,27 @@ function ReferenceGroupNavigatorThumbnail({
   }, [reference.id, reference.url]);
 
   useEffect(() => {
-    let loadedObjectUrl: string | null = null;
-    setUrl(reference.url ?? null);
-    if (reference.url || !shouldLoad) return;
+    const cachedUrl = thumbnailUrlCache.get(reference.id) ?? reference.url ?? null;
+    if (cachedUrl) {
+      setUrl(cachedUrl);
+      return;
+    }
+    if (!shouldLoad) return;
 
     let cancelled = false;
     void loadReferenceNavigatorThumbnail(reference).then((loadedUrl) => {
-      if (cancelled) {
+      if (!loadedUrl) return;
+      // Cache for reuse; if a concurrent load already won the slot, drop ours.
+      if (thumbnailUrlCache.has(reference.id)) {
         revokeObjectUrl(loadedUrl);
-        return;
+      } else {
+        thumbnailUrlCache.set(reference.id, loadedUrl);
       }
-      loadedObjectUrl = loadedUrl;
-      setUrl(loadedUrl);
+      if (!cancelled) setUrl(thumbnailUrlCache.get(reference.id) ?? loadedUrl);
     });
 
     return () => {
       cancelled = true;
-      revokeObjectUrl(loadedObjectUrl);
     };
   }, [reference.ext, reference.id, reference.name, reference.url, shouldLoad]);
 
