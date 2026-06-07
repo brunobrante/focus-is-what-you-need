@@ -347,10 +347,10 @@ function AddProjectCard() {
       <div className="flex flex-col gap-[3px] px-0.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[13.5px] font-medium text-[var(--text-muted)]">
-            Adicionar
+            New project
           </span>
         </div>
-        <div className="text-[11.5px] text-[var(--text-muted)]">comece do zero</div>
+        <div className="text-[11.5px] text-[var(--text-muted)]">start from scratch</div>
       </div>
     </Link>
   );

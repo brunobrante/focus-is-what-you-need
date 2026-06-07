@@ -42,7 +42,7 @@ import {
 } from "@/components/screen/CardMenu";
 import { Snapshot } from "@/components/Snapshot";
 import { Badge } from "@/components/ui/badge";
-import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
+import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import { fileFormatLabel, readFileAsDataUrl } from "@/lib/utils";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import {
@@ -67,7 +67,7 @@ import type {
   ScreenRow,
   VariantRow,
 } from "@/lib/storage/schema";
-import { IconChevronDown, IconEye, IconFastEdit, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPlus, IconScreen, IconSearch, IconSettings, IconChevronLeft } from "@/components/icons";
+import { IconChevronDown, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconSettings, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
 
 type Tab = "screens" | "components" | "references" | "system";
 type CmpKindFilter = "all" | ComponentKind;
@@ -148,25 +148,18 @@ export function Gallery() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]" data-type={type}>
-      <header className="flex h-14 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
+      <header className="flex h-14 items-center border-b border-[var(--border)] px-5">
         <Crumbs projectName={projectName} type={type} />
-        <div className="flex items-center gap-2">
-          {screens.length > 0 ? (
-            <button type="button" onClick={() => setPreviewOpen(true)} className="btn btn-ghost">
-              <IconEye size={14} strokeWidth={1.7} />
-              Preview
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setProjectSettingsOpen(true)}
-            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-            aria-label="Project settings"
-          >
-            <IconSettings size={14} strokeWidth={1.6} />
-          </button>
-        </div>
       </header>
+
+      <ProjectOverview
+        project={project}
+        screensCount={screens.length}
+        componentsCount={components.length}
+        referencesCount={references.length}
+        onPreview={screens.length > 0 ? () => setPreviewOpen(true) : null}
+        onSettings={() => setProjectSettingsOpen(true)}
+      />
 
       <Tabs
         tab={tab}
@@ -282,6 +275,124 @@ export function Gallery() {
   );
 }
 
+const LOGO_COLORS = [
+  "#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#14b8a6",
+];
+
+function projectLogoColor(name: string): string {
+  const idx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % LOGO_COLORS.length;
+  return LOGO_COLORS[idx]!;
+}
+
+function ProjectOverview({
+  project,
+  screensCount,
+  componentsCount,
+  referencesCount,
+  onPreview,
+  onSettings,
+}: {
+  project: ProjectRow | undefined;
+  screensCount: number;
+  componentsCount: number;
+  referencesCount: number;
+  onPreview: (() => void) | null;
+  onSettings: () => void;
+}) {
+  const initial = (project?.name ?? "P")[0]!.toUpperCase();
+  const logoColor = projectLogoColor(project?.name ?? "");
+  const typeLabel = PROJECT_TYPE_LABEL[project?.type ?? "desktop"];
+  const dims = PROJECT_TYPE_DIMS[project?.type ?? "desktop"];
+
+  const updatedDate = project?.updatedAt
+    ? new Date(project.updatedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  return (
+    <div className="flex items-start gap-6 border-b border-[var(--border)] px-7 py-7">
+      <div
+        className="flex h-[60px] w-[60px] flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl text-[22px] font-semibold text-white"
+        style={{ background: project?.thumbnailDataUrl ? undefined : logoColor }}
+      >
+        {project?.thumbnailDataUrl ? (
+          <img
+            src={project.thumbnailDataUrl}
+            alt={project.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          initial
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.3px] text-[var(--text)]">
+            {project?.name ?? "—"}
+          </h1>
+          <span className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+            {typeLabel}
+          </span>
+          {updatedDate && (
+            <span className="text-[11px] text-[var(--text-faint)]">· Updated {updatedDate}</span>
+          )}
+        </div>
+
+        {project?.description ? (
+          <p className="m-0 max-w-[520px] text-[13px] leading-[1.55] text-[var(--text-muted)]">
+            {project.description}
+          </p>
+        ) : null}
+
+        <div className="flex items-center gap-3 text-[12px] text-[var(--text-faint)]">
+          <span>
+            <span className="font-medium text-[var(--text-muted)]">{screensCount}</span>{" "}
+            {screensCount === 1 ? "Screen" : "Screens"}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>
+            <span className="font-medium text-[var(--text-muted)]">{componentsCount}</span>{" "}
+            {componentsCount === 1 ? "Component" : "Components"}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>
+            <span className="font-medium text-[var(--text-muted)]">{referencesCount}</span>{" "}
+            {referencesCount === 1 ? "Reference" : "References"}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>{dims}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-shrink-0 items-center gap-2 self-start pt-0.5">
+        {onPreview && (
+          <button
+            type="button"
+            onClick={onPreview}
+            className="inline-flex items-center gap-2 rounded-[10px] bg-[var(--text)] px-4 py-2 text-[13px] font-medium text-[var(--bg)] transition-opacity hover:opacity-80"
+          >
+            <IconPlay size={11} />
+            Preview
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onSettings}
+          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          aria-label="Project settings"
+        >
+          <IconSettings size={14} strokeWidth={1.6} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
@@ -317,7 +428,7 @@ function Tabs({
   const tabs: Array<{ id: Tab; label: string; count?: number }> = [
     { id: "screens", label: "Screens", count: screensCount },
     { id: "components", label: "Components", count: componentsCount },
-    { id: "references", label: "References", count: referencesCount },
+    { id: "references", label: "References" },
     { id: "system", label: "System" },
   ];
   return (
@@ -358,6 +469,88 @@ function Tabs({
   );
 }
 
+function CreateScreenDropdown({
+  onNewScreen,
+  onNewSection,
+  type,
+}: {
+  onNewScreen: () => void;
+  onNewSection: () => void;
+  type: ProjectType;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos({ top: rect.bottom + 5, right: window.innerWidth - rect.right });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (
+        !rootRef.current?.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={toggle}
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-[var(--text)] px-3 text-[12.5px] font-medium text-[var(--bg)] transition-opacity hover:opacity-85"
+      >
+        <IconPlus size={13} strokeWidth={2.2} />
+        New
+        <IconChevronDown size={10} strokeWidth={2.4} className={["transition-transform duration-150", open ? "rotate-180" : ""].join(" ")} />
+      </button>
+      {open && pos ? createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-[80] w-[190px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+        >
+          <button
+            type="button"
+            onClick={() => { onNewScreen(); setOpen(false); }}
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
+          >
+            {type === "mobile"
+              ? <IconPhone size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+              : <IconScreen size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />}
+            New screen
+          </button>
+          <div className="my-1 border-t border-[var(--border)]" />
+          <button
+            type="button"
+            onClick={() => { onNewSection(); setOpen(false); }}
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
+          >
+            <IconFolder size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+            New section
+          </button>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
 function ScreensTab({
   screens,
   type,
@@ -380,39 +573,55 @@ function ScreensTab({
   onRequestDelete: (screen: ScreenRow) => void;
 }) {
   const [createSectionRequest, setCreateSectionRequest] = useState(0);
+  const [query, setQuery] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("all");
+
+  const filtered = query.trim()
+    ? screens.filter((s) => s.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : screens;
 
   return (
     <>
-      <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
-        <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Screens</h1>
-          <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Click a screen to open its components.{" "}
-            <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-              {screens.length} {screens.length === 1 ? "screen" : "screens"}
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCreateSectionRequest((value) => value + 1)}
-            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
-          >
-            <IconPlus size={13} strokeWidth={1.8} />
-            New section
-          </button>
-          <button type="button" onClick={onNewScreen} className="btn btn-primary h-9 px-3.5">
-            <IconPlus size={14} strokeWidth={2} />
-            New Screen
-          </button>
-          <ViewToggle />
-        </div>
+      <div className="flex items-center gap-2 px-7 pb-4 pt-5">
+        <label className="relative min-w-0 flex-1">
+          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search screens..."
+            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+          />
+        </label>
+
+        <FilterPill
+          label="Section"
+          value={sectionFilter}
+          onChange={setSectionFilter}
+          options={[
+            { value: "all", label: "All sections" },
+            { value: "unassigned", label: "No section" },
+            ...sections.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+
+        <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />
+
+        <CreateScreenDropdown
+          onNewScreen={onNewScreen}
+          onNewSection={() => setCreateSectionRequest((v) => v + 1)}
+          type={type}
+        />
       </div>
 
       <main className="flex-1 px-7 pb-20">
         <ScreensGrid
-          screens={screens}
+          screens={sectionFilter === "all"
+            ? filtered
+            : sectionFilter === "unassigned"
+              ? filtered.filter((s) => !sectionById[s.id])
+              : filtered.filter((s) => sectionById[s.id] === sectionFilter)
+          }
           type={type}
           projectId={projectId}
           onNewScreen={onNewScreen}
@@ -932,8 +1141,8 @@ function ScreenCard({
         />
         <CardMenu
           actions={[
-            { id: "components", label: "Componentes", icon: <IconGrid size={14} strokeWidth={1.6} />, onClick: () => navigate(href) },
-            { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={14} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
+            { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
+            { id: "edit", label: "Edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => navigate(href) },
             {
               id: "more",
               label: "Mais",
@@ -1289,10 +1498,12 @@ function CreateDropdown({
   onNewComponent,
   canCreate,
   onNewSection,
+  type,
 }: {
   onNewComponent: () => void;
   canCreate: boolean;
   onNewSection: () => void;
+  type: ProjectType;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -1347,7 +1558,9 @@ function CreateDropdown({
             onClick={() => { onNewComponent(); setOpen(false); }}
             className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <IconPlus size={12} strokeWidth={2} className="shrink-0 text-[var(--text-muted)]" />
+            {type === "mobile"
+              ? <IconPhone size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+              : <IconScreen size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />}
             Create component
           </button>
           <div className="my-1 border-t border-[var(--border)]" />
@@ -1356,7 +1569,7 @@ function CreateDropdown({
             onClick={() => { onNewSection(); setOpen(false); }}
             className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
           >
-            <IconPlus size={12} strokeWidth={2} className="shrink-0 text-[var(--text-muted)]" />
+            <IconFolder size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
             New section
           </button>
         </div>,
@@ -1445,17 +1658,7 @@ function ComponentsTab({
 
   return (
     <>
-      <div className="px-7 pb-3 pt-7">
-        <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Components</h1>
-        <p className="m-0 text-[13px] text-[var(--text-muted)]">
-          All project components.{" "}
-          <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-            {labelTotal} {noun}
-          </span>
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2 px-7 pb-4">
+      <div className="flex items-center gap-2 px-7 pb-4 pt-5">
         <label className="relative min-w-0 flex-1">
           <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input
@@ -1511,12 +1714,13 @@ function ComponentsTab({
 
         <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />
 
+        <ViewToggle value={view} onChange={setView} />
         <CreateDropdown
           onNewComponent={onNewComponent}
           canCreate={canCreate}
           onNewSection={() => setCreateSectionRequest((value) => value + 1)}
+          type={type}
         />
-        <ViewToggle value={view} onChange={setView} />
       </div>
 
       <main className="flex-1 px-7 pb-20">
@@ -2197,17 +2401,7 @@ function ReferencesTab({
 
   return (
     <>
-      <div className="px-7 pb-3 pt-7">
-        <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">References</h1>
-        <p className="m-0 text-[13px] text-[var(--text-muted)]">
-          Visual cards connected to the project, screens or components.{" "}
-          <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-            {references.length} {references.length === 1 ? "reference" : "references"}
-          </span>
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2 px-7 pb-4">
+      <div className="flex items-center gap-2 px-7 pb-4 pt-5">
         <label className="relative min-w-0 flex-1">
           <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input
@@ -2571,16 +2765,8 @@ function SystemTab({ project }: { project: ProjectRow }) {
 
   return (
     <>
-      <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
-        <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">System</h1>
-          <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Real project tokens and assets, with dedicated fields for colors, fonts, icons and images.
-          </p>
-        </div>
-      </div>
-      <main className="flex flex-1 flex-col gap-9 px-7 pb-10">
-        <SysBlock title="Cores" actionLabel="New color" onAction={() => setModal({ kind: "color" })}>
+      <main className="flex flex-1 flex-col gap-9 px-7 pb-10 pt-5">
+        <SysBlock title="Cores" icon={<IconColorStyles size={13} strokeWidth={1.7} />} actionLabel="New color" onAction={() => setModal({ kind: "color" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))" }}>
             {project.designSystem.colors.map((color) => (
               <div key={color.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
@@ -2609,7 +2795,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Fontes" actionLabel="Add font" onAction={() => setModal({ kind: "font" })}>
+        <SysBlock title="Fontes" icon={<IconText size={13} strokeWidth={1.7} />} actionLabel="Add font" onAction={() => setModal({ kind: "font" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
             {project.designSystem.fonts.map((font) => (
               <div key={font.id} className="group relative flex min-h-[168px] flex-col gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-[18px] pb-3.5 pt-[18px] transition-colors hover:border-[var(--border-strong)]">
@@ -2640,7 +2826,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Icons" actionLabel="Add icon" onAction={() => setModal({ kind: "icon" })}>
+        <SysBlock title="Icons" icon={<IconGrid size={12} strokeWidth={1.6} />} actionLabel="Add icon" onAction={() => setModal({ kind: "icon" })}>
           <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}>
             {project.designSystem.icons.map((icon) => (
               <div key={icon.id} className="group relative grid aspect-square gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]">
@@ -2666,7 +2852,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Images" actionLabel="Add image" onAction={() => setModal({ kind: "image" })}>
+        <SysBlock title="Images" icon={<IconImage size={13} strokeWidth={1.6} />} actionLabel="Add image" onAction={() => setModal({ kind: "image" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
             {project.designSystem.images.map((image) => (
               <div key={image.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
@@ -2689,6 +2875,54 @@ function SystemTab({ project }: { project: ProjectRow }) {
                   <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
                     {image.format}
                   </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SysBlock>
+
+        <SysBlock title="Spacing" icon={<IconDiamond size={10} strokeWidth={2.4} />} actionLabel="Add token" onAction={() => {}}>
+          <div className="flex flex-col divide-y divide-[var(--border)]">
+            {([
+              { name: "xs", value: 4 },
+              { name: "sm", value: 8 },
+              { name: "md", value: 12 },
+              { name: "base", value: 16 },
+              { name: "lg", value: 20 },
+              { name: "xl", value: 24 },
+              { name: "2xl", value: 32 },
+              { name: "3xl", value: 40 },
+              { name: "4xl", value: 48 },
+              { name: "5xl", value: 64 },
+            ] as const).map((s) => (
+              <div key={s.name} className="flex items-center gap-5 py-2.5">
+                <span className="w-12 shrink-0 font-mono text-[12px] text-[var(--text-faint)]">{s.name}</span>
+                <div className="shrink-0 rounded-[2px] bg-[var(--text-muted)]" style={{ width: s.value, height: 10 }} />
+                <span className="font-mono text-[12px] text-[var(--text-muted)]">{s.value}px</span>
+              </div>
+            ))}
+          </div>
+        </SysBlock>
+
+        <SysBlock title="Radius" icon={<IconRectangle size={12} strokeWidth={1.6} />} actionLabel="Add token" onAction={() => {}}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+            {([
+              { name: "none", value: 0 },
+              { name: "sm", value: 4 },
+              { name: "md", value: 8 },
+              { name: "lg", value: 12 },
+              { name: "xl", value: 16 },
+              { name: "2xl", value: 20 },
+              { name: "full", value: 9999 },
+            ] as const).map((r) => (
+              <div key={r.name} className="flex flex-col gap-2.5 rounded-xl border border-[var(--border)] p-3 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface)]">
+                <div
+                  className="h-12 w-full border border-[var(--border-strong)] bg-[var(--surface-hover)]"
+                  style={{ borderRadius: Math.min(r.value, 24) }}
+                />
+                <div>
+                  <div className="text-[12px] font-medium text-[var(--text)]">{r.name}</div>
+                  <div className="font-mono text-[11px] text-[var(--text-faint)]">{r.value === 9999 ? "9999px" : `${r.value}px`}</div>
                 </div>
               </div>
             ))}
@@ -2734,21 +2968,26 @@ function upsertById<T extends { id: string }>(items: T[], nextItem: T): T[] {
 
 function SysBlock({
   title,
+  icon,
   actionLabel,
   children,
   onAction,
 }: {
   title: string;
+  icon?: ReactNode;
   actionLabel: string;
   children: ReactNode;
   onAction: () => void;
 }) {
   return (
     <div className="flex flex-col gap-3.5">
-      <div className="flex items-baseline justify-between border-b border-[var(--border)] pb-2.5">
-        <h2 className="m-0 text-[14px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
-          {title}
-        </h2>
+      <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+        <div className="flex items-center gap-2">
+          {icon ? <span className="text-[var(--text-faint)]">{icon}</span> : null}
+          <h2 className="m-0 text-[14px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
+            {title}
+          </h2>
+        </div>
         <button
           type="button"
           onClick={onAction}
