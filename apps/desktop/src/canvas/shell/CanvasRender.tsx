@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ChevronDown, Plus, Monitor, RotateCcw, Smartphone } from "lucide-react";
+import {
+  IconCenterAlign, IconChevronLeft, IconChevronUp, IconCollapse, IconExpand,
+  IconGrid, IconMinus, IconOriginAlign, IconPlus, IconScreen, IconWindow,
+} from "@/components/icons";
 
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
 import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
@@ -294,16 +298,6 @@ function gridPaneStyle(index: number, count: number): CSSProperties | undefined 
   return undefined;
 }
 
-function ExpandIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 3 21 3 21 9" />
-      <polyline points="9 21 3 21 3 15" />
-      <line x1="21" y1="3" x2="14" y2="10" />
-      <line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-  );
-}
 
 function ExpandButton({
   shellExpandVisibility,
@@ -333,7 +327,7 @@ function ExpandButton({
       onMouseEnter={() => setLocalHovered(true)}
       onMouseLeave={() => setLocalHovered(false)}
     >
-      <ExpandIcon />
+      <IconExpand />
     </button>
   );
 }
@@ -371,7 +365,7 @@ function CanvasPlaceholderSurface({
       <FeaturePlaceholderControls windowType={windowType} />
       <span className="flex flex-col items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
-          <PlaceholderWindowIcon />
+          <IconWindow />
         </span>
         <span className="text-[13px] font-semibold text-[#E6E6E6]">
           {CANVAS_WINDOW_LABELS[windowType]}
@@ -568,15 +562,6 @@ function ReferencePreview({ palette, accent }: { palette: string[]; accent: stri
   );
 }
 
-function PlaceholderWindowIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M8 9h8" />
-      <path d="M8 14h5" />
-    </svg>
-  );
-}
 
 function CanvasSurface({
   active,
@@ -754,9 +739,7 @@ function CanvasParentBackButton({
       onMouseLeave={() => setLocalHovered(false)}
     >
       <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded text-[#6A6A6A] transition-colors duration-[100ms] group-hover:text-[#BCBCBC]">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
+        <IconChevronLeft />
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-[8px] font-medium uppercase tracking-[0.08em] leading-none text-[#5E5E5E] transition-colors duration-[100ms] group-hover:text-[#767676]">
@@ -778,23 +761,11 @@ function CanvasParentBackButton({
 }
 
 function ParentScreenIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <path d="M8 21h8M12 17v4" />
-    </svg>
-  );
+  return <IconScreen />;
 }
 
 function ParentComponentIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  );
+  return <IconGrid />;
 }
 
 function SurfaceCanvasControls({
@@ -929,19 +900,10 @@ function DeviceButton({
               : "text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
         ].join(" ")}
       >
-        <svg
-          width="8"
-          height="8"
-          viewBox="0 0 10 10"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }}
-        >
-          <path d="M2 6.5l3-3 3 3" />
-        </svg>
+        <IconChevronUp
+          size={8} strokeWidth={1.8}
+          className={menuOpen ? "rotate-180 transition-transform duration-150" : "transition-transform duration-150"}
+        />
       </button>
     </div>
   );
@@ -1013,21 +975,11 @@ function AlignmentOption({
 }
 
 function CenterAlignIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <rect x="1" y="1" width="16" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <rect x="5.5" y="5.5" width="7" height="7" rx="1" fill="currentColor" />
-    </svg>
-  );
+  return <IconCenterAlign />;
 }
 
 function OriginAlignIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <rect x="1" y="1" width="16" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <rect x="2.5" y="2.5" width="13" height="4" rx="0.8" fill="currentColor" />
-    </svg>
-  );
+  return <IconOriginAlign />;
 }
 
 export function ZoomControl({
@@ -1083,9 +1035,7 @@ export function ZoomControl({
   const buttons = (
     <>
       <ZoomBtn active={canOut} ariaLabel="Diminuir zoom" onClick={() => setZoom((z) => Math.max(minZoom, +(z - zoomStep).toFixed(4)))}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M5 12h14" />
-        </svg>
+        <IconMinus size={13} strokeWidth={1.8} />
       </ZoomBtn>
       <div className="relative">
         <button
@@ -1156,9 +1106,7 @@ export function ZoomControl({
         )}
       </div>
       <ZoomBtn active={canIn} ariaLabel="Aumentar zoom" onClick={() => setZoom((z) => Math.min(maxZoom, +(z + zoomStep).toFixed(4)))}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
+        <IconPlus size={13} strokeWidth={1.8} />
       </ZoomBtn>
     </>
   );

@@ -2,7 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
-import { IconChevronRight, IconEye, IconEyeOff, IconLock, IconOpenCanvas, IconUnlock } from "@/components/icons";
+import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLock, IconOpenCanvas, IconUnlock } from "@/components/icons";
 
 export function TreeRow({
   node,
@@ -16,6 +16,8 @@ export function TreeRow({
   onToggleLocked,
   canOpenNodeCanvas,
   onOpenNodeCanvas,
+  showFocusButton,
+  onFocusNode,
   onContextMenuNode,
 }: {
   node: Node;
@@ -29,6 +31,8 @@ export function TreeRow({
   onToggleLocked?: (nodeId: string, locked: boolean) => void;
   canOpenNodeCanvas?: (nodeId: string) => boolean;
   onOpenNodeCanvas?: (nodeId: string) => void;
+  showFocusButton?: boolean;
+  onFocusNode?: (nodeId: string) => void;
   onContextMenuNode?: (nodeId: string, x: number, y: number) => void;
 }) {
   const {
@@ -45,6 +49,7 @@ export function TreeRow({
   const visible = node.visible !== false;
   const locked = node.locked === true;
   const canOpenCanvas = Boolean(onOpenNodeCanvas && (canOpenNodeCanvas?.(node.id) ?? false));
+  const canFocus = Boolean(showFocusButton && onFocusNode);
 
   const baseColor = isSelected ? "#FFFFFF" : "#CFCFCF";
 
@@ -122,6 +127,21 @@ export function TreeRow({
         >
           {node.name}
         </span>
+        {canFocus ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocusNode?.(node.id);
+            }}
+            aria-label="Focus on canvas"
+            title="Focus on canvas"
+            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#7A7A7A] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+            style={{ opacity: 0.72 }}
+          >
+            <IconCrosshair size={12} strokeWidth={1.8} />
+          </button>
+        ) : null}
         {canOpenCanvas ? (
           <button
             type="button"
@@ -189,6 +209,8 @@ export function TreeRow({
               onToggleLocked={onToggleLocked}
               canOpenNodeCanvas={canOpenNodeCanvas}
               onOpenNodeCanvas={onOpenNodeCanvas}
+              showFocusButton={showFocusButton}
+              onFocusNode={onFocusNode}
               onContextMenuNode={onContextMenuNode}
             />
           ))

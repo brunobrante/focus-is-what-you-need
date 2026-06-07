@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -218,6 +218,16 @@ export function Tree({
   const pickerRef = useRef<HTMLDivElement>(null);
   const pickerTriggerRef = useRef<HTMLDivElement>(null);
   const readEditor = useEditorBridgeReader();
+  // The focus-on-node button is a draft-canvas affordance: the draft is huge and
+  // freeform, so jumping the camera to a node is far more useful there than in a
+  // tightly-bounded frame.
+  const isDraftMode = useEditorBridge((value) => value?.state.viewportMode === "draft");
+  const focusNode = useCallback(
+    (nodeId: string) => {
+      readEditor()?.dispatch({ type: "requestNodeFocus", nodeId });
+    },
+    [readEditor],
+  );
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -312,6 +322,8 @@ export function Tree({
                   onToggleLocked={onToggleLocked}
                   canOpenNodeCanvas={canOpenNodeCanvas}
                   onOpenNodeCanvas={onOpenNodeCanvas}
+                  showFocusButton={isDraftMode}
+                  onFocusNode={focusNode}
                   onContextMenuNode={(nodeId, x, y) => {
                     setContextMenu({ x, y, targetId: nodeId });
                   }}

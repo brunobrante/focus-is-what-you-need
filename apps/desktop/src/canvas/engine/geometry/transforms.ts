@@ -1,11 +1,9 @@
+import { clamp } from "@/domain/canvas/geometry";
 import type { Point, Rect, ResizeHandle } from "../types";
 
 export const MIN_ELEMENT_SIZE = 8;
 
-export function clamp(value: number, min: number, max: number): number {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
-}
+export { clamp };
 
 export function maxBorderRadiusForSize(width: number, height: number): number {
   return Math.max(0, Math.min(Math.abs(width), Math.abs(height)) / 2);

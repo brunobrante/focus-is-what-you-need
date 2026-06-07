@@ -4,10 +4,13 @@ import {
   DRAFT_ELEMENT_SIZE_SCALE,
   DRAFT_MAX_ZOOM,
   DRAFT_VIEWPORT_SCALE,
+  DRAFT_WORKING_AREA,
   MAX_ZOOM,
   MIN_ZOOM,
   canvasPointToViewport,
   canvasRectToViewport,
+  centerViewportOnPoint,
+  centerViewportState,
   clampViewportState,
   createViewportTransform,
   getCanvasDisplayScale,
@@ -85,12 +88,22 @@ test("allows manual zoom beyond 1000 percent", () => {
   expect(MAX_ZOOM).toBe(25);
 });
 
-test("uses a fixed draft projection instead of fitting the whole free canvas", () => {
+test("opens the draft canvas zoomed into a working area instead of fitting the whole free canvas", () => {
   const container = { width: 900, height: 600 };
   const draftCanvas = { width: 100_000, height: 100_000 };
 
   expect(getCanvasDisplayScale(container, draftCanvas, "draft")).toBe(DRAFT_VIEWPORT_SCALE);
-  expect(getInitialZoomForCanvas(container, draftCanvas, "draft")).toBe(MIN_ZOOM);
+
+  // Draft no longer pins to 1x (which renders at 0.1 and forces oversized
+  // components). It starts proportional to a nominal working area so drawing
+  // feels close to 1:1.
+  const draftZoom = getInitialZoomForCanvas(container, draftCanvas, "draft");
+  expect(draftZoom).toBeGreaterThan(MIN_ZOOM);
+  expect(draftZoom).toBeLessThanOrEqual(DRAFT_MAX_ZOOM);
+  // The working area should fill most of the viewport at the chosen zoom.
+  const workingAreaScreenHeight = DRAFT_WORKING_AREA.height * draftZoom * DRAFT_VIEWPORT_SCALE;
+  expect(workingAreaScreenHeight).toBeLessThanOrEqual(600 - 48);
+  expect(workingAreaScreenHeight).toBeGreaterThan((600 - 48) * 0.7);
 
   const viewport = clampViewportState(
     { zoom: 120, offsetX: 0, offsetY: 0 },
@@ -112,6 +125,49 @@ test("keeps the frame zoom cap separate from draft zoom", () => {
   );
 
   expect(viewport.zoom).toBe(MAX_ZOOM);
+});
+
+test("scales the proportional subject zoom up in draft mode", () => {
+  const frameZoom = getInitialZoomForSubjectSize({ width: 60, height: 60 });
+  const draftZoom = getInitialZoomForSubjectSize({ width: 60, height: 60 }, "draft");
+
+  // Same proportional rule, scaled by 1 / DRAFT_VIEWPORT_SCALE so a small
+  // selected component still fills a comfortable portion of the draft viewport.
+  expect(draftZoom).toBeCloseTo(frameZoom / DRAFT_VIEWPORT_SCALE);
+  expect(draftZoom).toBeLessThanOrEqual(DRAFT_MAX_ZOOM);
+});
+
+test("re-centers the subject at the viewport center keeping zoom", () => {
+  const container = { width: 900, height: 600 };
+  const canvas = { width: 390, height: 844 };
+
+  // A subject smaller than the viewport: centered with symmetric margins.
+  const small = centerViewportState(1, container, { width: 200, height: 200 }, "frame");
+  expect(small.zoom).toBe(1);
+  expect(small.offsetX).toBeCloseTo((900 - 200) / 2);
+  expect(small.offsetY).toBeCloseTo((600 - 200) / 2);
+
+  // A subject taller than the viewport (uses internal display scale): still
+  // centered, overflowing symmetrically (negative offset is allowed).
+  const tall = centerViewportState(1, container, canvas, "frame");
+  const displayScale = getCanvasDisplayScale(container, canvas, "frame");
+  expect(tall.offsetX).toBeCloseTo((900 - canvas.width * displayScale) / 2);
+  expect(tall.offsetY).toBeCloseTo((600 - canvas.height * displayScale) / 2);
+});
+
+test("centers an arbitrary focus point at the viewport center", () => {
+  const container = { width: 900, height: 600 };
+  const canvas = { width: 390, height: 844 };
+  const displayScale = getCanvasDisplayScale(container, canvas, "frame");
+
+  const focus = { x: 100, y: 700 };
+  const viewport = centerViewportOnPoint(2, container, canvas, focus, "frame");
+
+  // The focus point, projected through the resulting transform, lands dead
+  // center of the viewport.
+  const displayZoom = viewport.zoom * displayScale;
+  expect(viewport.offsetX + focus.x * displayZoom).toBeCloseTo(900 / 2);
+  expect(viewport.offsetY + focus.y * displayZoom).toBeCloseTo(600 / 2);
 });
 
 test("scales draft element defaults back to the draft visual proportion", () => {

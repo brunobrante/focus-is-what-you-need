@@ -28,6 +28,12 @@ export const SCALED_DOM_PROJECTION_MIN_ZOOM = MIN_ZOOM;
 export const DRAFT_VIEWPORT_SCALE = 0.1;
 export const DRAFT_ELEMENT_SIZE_SCALE = 1 / DRAFT_VIEWPORT_SCALE;
 
+// The draft canvas is freeform and huge (100k x 100k), so there is no real
+// "subject" to fit. Instead we open it at a nominal working area so newly drawn
+// components come out at a realistic size instead of being created excessively
+// large to compensate for the 0.1 display scale.
+export const DRAFT_WORKING_AREA: Size = { width: 390, height: 844 };
+
 const AUTO_ZOOM_FILL_RATIO = 0.88;
 const AUTO_ZOOM_LONG_SIDE_RATIO = 0.72;
 const AUTO_ZOOM_LONG_SIDE_MIN = 260;
@@ -60,7 +66,7 @@ export function getInitialZoomForCanvas(
   canvasSize: Size,
   mode: ViewportMode = "frame",
 ): number {
-  if (mode === "draft") return MIN_ZOOM;
+  if (mode === "draft") return getDraftInitialZoom(containerSize);
   const availableWidth = Math.max(1, containerSize.width - STAGE_VIEWPORT_PADDING * 2);
   const availableHeight = Math.max(1, containerSize.height - STAGE_VIEWPORT_PADDING * 2);
   const canvasWidth = Math.max(1, canvasSize.width);
@@ -88,18 +94,37 @@ export function getInitialZoomForCanvas(
   return quantizeZoom(nextZoom);
 }
 
+// Draft initial zoom is proportional: fit the nominal working area into the
+// viewport, then divide out the fixed draft display scale so the user-facing
+// zoom lands where drawing feels 1:1-ish instead of pinned at 1x (which renders
+// at 0.1 and pushes users to draw oversized components).
+function getDraftInitialZoom(containerSize: Size): number {
+  const availableWidth = Math.max(1, containerSize.width - STAGE_VIEWPORT_PADDING * 2);
+  const availableHeight = Math.max(1, containerSize.height - STAGE_VIEWPORT_PADDING * 2);
+  const fitDisplayZoom =
+    Math.min(
+      availableWidth / DRAFT_WORKING_AREA.width,
+      availableHeight / DRAFT_WORKING_AREA.height,
+    ) * AUTO_ZOOM_FILL_RATIO;
+  return quantizeZoom(fitDisplayZoom / DRAFT_VIEWPORT_SCALE, "draft");
+}
+
 export function getInitialZoomForSubjectSize(
   canvasSize: Size,
   mode: ViewportMode = "frame",
 ): number {
-  if (mode === "draft") return MIN_ZOOM;
   const canvasWidth = Math.max(1, canvasSize.width);
   const canvasHeight = Math.max(1, canvasSize.height);
   const longSide = Math.max(canvasWidth, canvasHeight);
   const shortSide = Math.min(canvasWidth, canvasHeight);
   const subjectZoom = Math.min(720 / longSide, AUTO_ZOOM_SHORT_SIDE_MIN / shortSide);
-
-  return quantizeZoom(clamp(subjectZoom, MIN_ZOOM, MAX_ZOOM));
+  // In draft mode every document unit renders at DRAFT_VIEWPORT_SCALE, so the
+  // proportional subject zoom has to be scaled up by the same factor to make a
+  // small selected component fill a comfortable portion of the viewport.
+  if (mode === "draft") {
+    return quantizeZoom(subjectZoom / DRAFT_VIEWPORT_SCALE, "draft");
+  }
+  return quantizeZoom(subjectZoom, "frame");
 }
 
 export function clampViewportState(
@@ -141,6 +166,46 @@ export function clampViewportState(
           STAGE_VIEWPORT_PADDING,
         );
   return { zoom, offsetX, offsetY };
+}
+
+// Place an arbitrary canvas-space point at the center of the viewport at a given
+// zoom. This is the primitive behind every "look at X" camera move: re-centering
+// the subject, centering the device overlay, or focusing a node.
+export function centerViewportOnPoint(
+  zoom: number,
+  containerSize: Size,
+  canvasSize: Size,
+  focus: Point,
+  mode: ViewportMode = "frame",
+): ViewportState {
+  const limits = getViewportZoomLimits(mode);
+  const clampedZoom = clamp(zoom, limits.min, limits.max);
+  const displayScale = getCanvasDisplayScale(containerSize, canvasSize, mode);
+  const displayZoom = clampedZoom * displayScale;
+  return {
+    zoom: clampedZoom,
+    offsetX: containerSize.width / 2 - focus.x * displayZoom,
+    offsetY: containerSize.height / 2 - focus.y * displayZoom,
+  };
+}
+
+// Recenter the subject in the viewport at a given zoom. Unlike
+// `clampViewportState`, this always places the subject's center at the viewport
+// center (symmetric overflow when the subject is larger than the viewport),
+// which is what "re-center the element" means after a resize or overlay toggle.
+export function centerViewportState(
+  zoom: number,
+  containerSize: Size,
+  canvasSize: Size,
+  mode: ViewportMode = "frame",
+): ViewportState {
+  return centerViewportOnPoint(
+    zoom,
+    containerSize,
+    canvasSize,
+    { x: canvasSize.width / 2, y: canvasSize.height / 2 },
+    mode,
+  );
 }
 
 export function viewportChanged(a: ViewportState, b: ViewportState): boolean {
@@ -298,6 +363,7 @@ function cleanMatrixValue(value: number): number {
   return Math.abs(value) < 0.0000000001 ? 0 : value;
 }
 
-function quantizeZoom(value: number): number {
-  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value / ZOOM_STEP) * ZOOM_STEP));
+function quantizeZoom(value: number, mode: ViewportMode = "frame"): number {
+  const limits = getViewportZoomLimits(mode);
+  return clamp(Math.round(value / ZOOM_STEP) * ZOOM_STEP, limits.min, limits.max);
 }

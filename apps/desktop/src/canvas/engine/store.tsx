@@ -26,6 +26,7 @@ export type EditorAction =
   | { type: "setIsolatedParent"; isolatedParentId: string | null }
   | { type: "setEditingText"; editingTextId: string | null }
   | { type: "setCanvasStageActive"; active: boolean }
+  | { type: "requestNodeFocus"; nodeId: string | null }
   | { type: "setGuides"; guides: SnapGuide[] }
   | { type: "setExportOpen"; exportOpen: boolean }
   | { type: "hydrateDocument"; document: CanvasDocument }
@@ -147,6 +148,7 @@ function createInitialState(
     past: [],
     future: [],
     transientChangedIds: null,
+    focusNodeId: null,
   };
 }
 
@@ -184,6 +186,10 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const offsetY = action.offsetY ?? state.offsetY;
     if (state.zoom === zoom && state.offsetX === offsetX && state.offsetY === offsetY) return state;
     return { ...state, zoom, offsetX, offsetY };
+  },
+  requestNodeFocus(state, action) {
+    if (state.focusNodeId === action.nodeId) return state;
+    return { ...state, focusNodeId: action.nodeId };
   },
   setSelected(state, action) {
     const selectedIds = sanitizeSelection(state.document, action.selectedIds);
@@ -261,6 +267,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       guides: [],
       past: [],
       future: [],
+      focusNodeId: null,
     };
   },
   setDocumentTransient(state, action) {

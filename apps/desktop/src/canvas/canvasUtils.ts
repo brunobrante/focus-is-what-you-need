@@ -1,5 +1,6 @@
-import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
+import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { createBlankDocument } from "@/canvas/engine/actions";
+import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ComponentRow, SceneOwnerType, ScreenRow } from "@/lib/storage/schema";
 import type { MockComponentSeed } from "@/components/mocks/data/canvasMocks";
@@ -201,6 +202,59 @@ export function componentPathFromRoot(
     if (current.screenId) return { screenId: current.screenId, names };
     if (!current.parentVariantId) return { screenId: null, names };
     current = byParentVariantId.get(current.parentVariantId);
+  }
+
+  return null;
+}
+
+/**
+ * Returns a component's ABSOLUTE position on its root device (screen), walking
+ * the full component ancestry. Reading a single parent scene only yields the
+ * position relative to the immediate parent's frame; for a component nested
+ * several levels deep that is wrong. This sums each ancestor's position within
+ * its own parent scene until it reaches the screen, which is the device origin.
+ *
+ * Returns null if the chain cannot be fully resolved (missing scene, missing
+ * sourceNodeId, missing parent component, or a cycle), so callers can fall back.
+ */
+export async function computeComponentDeviceOrigin(
+  component: ComponentRow,
+  components: ComponentRow[],
+): Promise<{ x: number; y: number } | null> {
+  const byActiveVariantId = new Map<string, ComponentRow>();
+  for (const row of components) {
+    byActiveVariantId.set(row.activeVariantId, row);
+  }
+
+  let x = 0;
+  let y = 0;
+  let current: ComponentRow | undefined = component;
+  const visited = new Set<string>();
+
+  while (current) {
+    if (visited.has(current.id)) return null;
+    visited.add(current.id);
+    if (!current.sourceNodeId) return null;
+
+    const owner: { ownerType: SceneOwnerType; ownerId: string } | null =
+      current.parentVariantId
+        ? { ownerType: "variant", ownerId: current.parentVariantId }
+        : current.screenId
+          ? { ownerType: "screen", ownerId: current.screenId }
+          : null;
+    if (!owner) return null;
+
+    const parentScene = await getSceneByOwner(owner.ownerType, owner.ownerId);
+    const bounds = getNodeAbsoluteBoundsInGraph(parentScene?.graphJSON, current.sourceNodeId);
+    if (!bounds) return null;
+    x += bounds.x;
+    y += bounds.y;
+
+    // Reached a screen: that's the device, so the accumulated offset is absolute.
+    if (owner.ownerType === "screen") return { x, y };
+
+    // Otherwise climb to the component that owns the parent variant and repeat.
+    current = byActiveVariantId.get(current.parentVariantId as string);
   }
 
   return null;

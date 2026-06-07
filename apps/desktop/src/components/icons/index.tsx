@@ -658,6 +658,15 @@ export function IconMoveTo({ size = 13, className, strokeWidth = 1.7 }: IconProp
   )
 }
 
+export function IconCrosshair({ size = 12, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="6" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    </svg>
+  )
+}
+
 export function IconFrame({ size = 13, className, strokeWidth = 1.7 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>

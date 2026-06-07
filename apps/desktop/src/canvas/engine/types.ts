@@ -150,6 +150,10 @@ export type EditorState = {
   // it instead of the per-frame deep diff; otherwise it falls back to the diff.
   // Cleared on the next non-transient action.
   transientChangedIds?: readonly string[] | null;
+  // One-shot camera focus request: a node id the stage should pan/zoom to so it
+  // sits centered, without moving the node. The stage consumes it and clears it
+  // back to null. Transient — never persisted.
+  focusNodeId?: string | null;
 };
 
 // ─── Text editing types ───────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ import {
   addCanvasWindowToSplit,
   buildProjectTree,
   canvasSizeForProjectType,
+  computeComponentDeviceOrigin,
   createBlankDocumentForProjectType,
   enabledCanvasWindowTypes,
   findTreeNodeById,
@@ -146,12 +147,25 @@ function CanvasPageContent() {
 
   const { data: parentScene } = useScene(parentSceneOwner?.ownerType ?? null, parentSceneOwner?.ownerId ?? null);
 
-  const componentOriginPosition = useMemo(() => {
-    if (!component?.sourceNodeId) return null;
-    const bounds = getNodeAbsoluteBoundsInGraph(parentScene?.graphJSON, component.sourceNodeId);
-    if (!bounds) return null;
-    return { x: bounds.x, y: bounds.y };
-  }, [component?.sourceNodeId, parentScene?.graphJSON]);
+  // The device overlay's "original position" must be the component's absolute
+  // position on the screen (device), which means walking the full ancestry — a
+  // component nested inside another component is positioned relative to that
+  // parent's frame, not the device. That walk loads ancestor scenes, so it runs
+  // async into state rather than a synchronous useMemo.
+  const [componentOriginPosition, setComponentOriginPosition] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!component?.sourceNodeId) {
+      setComponentOriginPosition(null);
+      return;
+    }
+    let cancelled = false;
+    void computeComponentDeviceOrigin(component, projectComponents).then((origin) => {
+      if (!cancelled) setComponentOriginPosition(origin);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [component, projectComponents]);
 
   const currentOwnerKey = sceneOwner
     ? `${sceneOwner.ownerType}:${sceneOwner.ownerId}`

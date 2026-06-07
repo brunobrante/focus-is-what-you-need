@@ -2,17 +2,19 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { CSSProperties } from "react";
 import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
 import { useEditor, useHoverStore } from "@/canvas/engine/store";
-import type { CanvasDocument } from "@/canvas/engine/types";
+import type { CanvasDocument, Point } from "@/canvas/engine/types";
 import type { CanvasToolId } from "@/canvas/tools";
 import { isInsertTool } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import {
-  centerViewportState,
+  centerViewportOnPoint,
   getCanvasDisplayScale,
+  getInitialZoomForSubjectSize,
   shouldUseScaledDomProjection,
   viewportChanged,
 } from "@/canvas/engine/viewport";
+import { getAbsoluteRect } from "@/canvas/engine/geometry/bounds";
 import { CanvasContextMenu } from "./CanvasContextMenu";
 import { CanvasToolingLayer } from "./CanvasToolingLayer";
 import type { CanvasToolingRef } from "./CanvasToolingLayer";
@@ -94,6 +96,29 @@ export function CanvasStage({
 
   const { viewportSize, getCurrentViewportSize, getCurrentViewportRect } = useViewportMetrics(viewportRef);
 
+  const canvasSize = useMemo(
+    () => getCanvasSize(state.document),
+    [state.document.canvas.height, state.document.canvas.width],
+  );
+
+  // The camera focus point drives re-centering on resize and overlay changes
+  // (handled in useViewportControls). The device overlay is a purely visual
+  // guide, so:
+  //  - "center" alignment keeps the component centered (the device is drawn
+  //    symmetrically around it), so the focus stays the component center.
+  //  - "origin" alignment centers the DEVICE overlay itself; the component then
+  //    sits at its real offset inside that centered device.
+  const viewportFocusPoint = useMemo<Point | null>(() => {
+    if (!screenOverlay) return null;
+    if (screenOverlay.alignment === "origin" && screenOverlay.originPosition) {
+      return {
+        x: screenOverlay.width / 2 - screenOverlay.originPosition.x,
+        y: screenOverlay.height / 2 - screenOverlay.originPosition.y,
+      };
+    }
+    return { x: canvasSize.width / 2, y: canvasSize.height / 2 };
+  }, [screenOverlay, canvasSize.width, canvasSize.height]);
+
   const {
     textEdit,
     syncTextSelection,
@@ -135,7 +160,32 @@ export function CanvasStage({
     viewportSize,
     viewportInitializedSubjectRef,
     settings,
+    viewportFocusPoint,
   });
+
+  // Focus request from the canvas tree: move the camera to frame a node without
+  // moving the node itself. Used by the draft canvas "focus" button. We zoom to
+  // the node's intrinsic size (proportional rule) and center on it, then clear
+  // the request so a repeat click on the same node re-triggers.
+  useEffect(() => {
+    const nodeId = state.focusNodeId;
+    if (!nodeId) return;
+    const size = getCurrentViewportSize();
+    const rect = getAbsoluteRect(state.document, nodeId);
+    if (rect && size.width > 0 && size.height > 0) {
+      const zoom = getInitialZoomForSubjectSize(
+        { width: rect.width, height: rect.height },
+        state.viewportMode,
+      );
+      const focus = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      const next = centerViewportOnPoint(zoom, size, canvasSize, focus, state.viewportMode);
+      if (viewportChanged(next, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
+        dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
+      }
+    }
+    dispatch({ type: "requestNodeFocus", nodeId: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.focusNodeId]);
 
   const commitContextToolbarDocument = useCallback((document: CanvasDocument, selectedIds?: string[]) => {
     dispatch({ type: "commitDocument", document, selectedIds });
@@ -246,34 +296,11 @@ export function CanvasStage({
     () => getShellPatternStyle(state.document),
     [state.document.shellBackground],
   );
-  const canvasSize = useMemo(
-    () => getCanvasSize(state.document),
-    [state.document.canvas.height, state.document.canvas.width],
-  );
   const displayScale = useMemo(
     () => viewportSize.width > 0 && viewportSize.height > 0 ? getCanvasDisplayScale(viewportSize, canvasSize, state.viewportMode) : 1,
     [canvasSize, state.viewportMode, viewportSize],
   );
   const displayZoom = state.zoom * displayScale;
-
-  // The device overlay is a purely visual guide, so the component stays the
-  // centered subject in both alignment modes. Re-center it whenever the overlay
-  // is toggled on or its alignment changes, so the guide is drawn symmetrically
-  // around the item instead of the item drifting off to one side.
-  const overlayActive = screenOverlay != null;
-  const overlayAlignment = screenOverlay?.alignment;
-  useEffect(() => {
-    if (!overlayActive) return;
-    if (viewportSize.width <= 0 || viewportSize.height <= 0) return;
-    const { zoom, offsetX, offsetY, viewportMode } = latestStateRef.current;
-    const next = centerViewportState(zoom, viewportSize, canvasSize, viewportMode);
-    if (viewportChanged(next, { zoom, offsetX, offsetY })) {
-      dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
-    }
-    // Only re-center on overlay toggle / alignment change; resize re-centering is
-    // handled in useViewportControls.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overlayActive, overlayAlignment]);
 
   const viewportTransform = useMemo(
     () => buildViewportTransform(state.document, viewportSize, state.zoom, state.offsetX, state.offsetY, state.viewportMode),
