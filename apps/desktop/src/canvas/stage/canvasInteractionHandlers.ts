@@ -222,12 +222,16 @@ export function handleDragMove(
           ? { targetId: detachParentId, intent: "detach" }
           : null,
     );
-    const staysInSameParent = isSameParentDropTarget(interaction, targetId);
-    const reparentTargetId = staysInSameParent ? null : targetId;
-    nextDocument = staysInSameParent
-      ? commitDragMove(interaction, move.delta)
-      : reparentElements(committed, interaction.transformIds, reparentTargetId);
-    if (!staysInSameParent) changedIds = getReparentChangedIds(interaction, reparentTargetId);
+    // While the reparent modifier is held, the dragged element floats free of any
+    // parent: it is detached to the canvas root so it tracks the cursor without
+    // being clipped by — or leaving a stale "trail" copy inside — the components it
+    // sweeps over. Re-nesting into the hovered component every frame instead would
+    // leave the prior frame's parent painting a ghost (its memoized subtree is not
+    // in `changedIds`), which is exactly the trail this avoids. Only the drop-target
+    // highlight signals where it will land; the actual reparent into that target
+    // happens once on release in `finishMovedInteraction`.
+    nextDocument = reparentElements(committed, interaction.transformIds, null);
+    changedIds = getReparentChangedIds(interaction, null);
   } else {
     if (commandModeRef.current) { commandModeRef.current = false; updateDropTarget(null); }
     move = computeDragMoveFromScreenDelta(interaction, screenDelta);
