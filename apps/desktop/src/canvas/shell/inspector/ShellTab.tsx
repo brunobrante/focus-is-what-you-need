@@ -69,20 +69,6 @@ export function ShellTab({
       </InsSection>
 
       <InsSection title="Controles">
-        <InsRow label="Device">
-          <InsToggle
-            value={deviceVisibility}
-            onChange={(value) => onDeviceVisibilityChange(value as ShellControlVisibility)}
-            options={SHELL_VISIBILITY_OPTIONS}
-          />
-        </InsRow>
-        <InsRow label="Back">
-          <InsToggle
-            value={backVisibility}
-            onChange={(value) => onBackVisibilityChange(value as ShellControlVisibility)}
-            options={SHELL_VISIBILITY_OPTIONS}
-          />
-        </InsRow>
         <InsRow label="Zoom">
           <InsToggle
             value={zoomVisibility}

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 
+import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import type { CanvasToolId } from "@/canvas/tools";
 import {
   DEFAULT_TOOLBAR_CONFIG,
@@ -51,6 +52,7 @@ export function Toolbar({
   const [uncontrolledActive, setUncontrolledActive] = useState<CanvasToolId>(defaultTool);
   const [deviceOverlayEnabled, setDeviceOverlayEnabled] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [actionsAiMode, setActionsAiMode] = useState(false);
   const active = activeTool ?? uncontrolledActive;
   const showCanvasControls = canvasControlsVisible ?? canvasExpanded;
   const selectTool = (tool: CanvasToolId) => {
@@ -62,12 +64,12 @@ export function Toolbar({
     if (!actionsMenuOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
-        setActionsMenuOpen(false);
+        if (!actionsAiMode) setActionsMenuOpen(false);
       }
     };
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [actionsMenuOpen]);
+  }, [actionsMenuOpen, actionsAiMode]);
 
   useEffect(() => {
     if (active === "actions") setActionsMenuOpen(true);
@@ -123,7 +125,11 @@ export function Toolbar({
         })}
       </div>
       {actionsMenuOpen && (
-        <ActionsPanel />
+        <ActionsPanel
+          onClose={() => { setActionsMenuOpen(false); setActionsAiMode(false); }}
+          aiMode={actionsAiMode}
+          onAiModeChange={setActionsAiMode}
+        />
       )}
 
       {showCanvasControls && (
@@ -375,11 +381,131 @@ function ActionsMenuButton({
   );
 }
 
-function ActionsPanel() {
+const ACTION_ICONS: Record<string, React.ReactNode> = {
+  "Make an image": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="m21 15-5-5L5 21" /><circle cx="8.5" cy="8.5" r="1.5" />
+    </svg>
+  ),
+  "Replace content": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    </svg>
+  ),
+  "Translate to...": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
+  "Rewrite this...": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
+  ),
+  "Rename layers": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  ),
+  "Find more like Coupon": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+    </svg>
+  ),
+  "First Draft": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" />
+    </svg>
+  ),
+  "Image library": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="m21 15-5-5L5 21" /><circle cx="8.5" cy="8.5" r="1.5" />
+    </svg>
+  ),
+  "Icon library": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  ),
+  "Color styles": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M12 2a5 5 0 0 1 0 10 5 5 0 0 0 0 10" /><path d="M12 2v20" />
+    </svg>
+  ),
+  "Text styles": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" />
+    </svg>
+  ),
+  "Local uploads": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  ),
+  "Shared components": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="9" height="9" rx="1" /><rect x="13" y="2" width="9" height="9" rx="1" /><rect x="2" y="13" width="9" height="9" rx="1" /><rect x="13" y="13" width="9" height="9" rx="1" />
+    </svg>
+  ),
+  "Figma Make": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  ),
+  "Auto layout helper": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  "Accessibility checker": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  ),
+  "Content generator": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3l1 2.5L12.5 6 10 7l-1 2.5L8 7 5.5 6 8 5.5 9 3z" /><path d="M16 8l.6 1.4L18 10l-1.4.6L16 12l-.6-1.4L14 10l1.4-.6L16 8z" /><path d="M19 14l.5 1.1L20.6 16l-1.1.5L19 17.6l-.5-1.1L17.4 16l1.1-.5L19 14z" />
+    </svg>
+  ),
+  "Localization helper": (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
+};
+
+const MOCK_CONVERSATION = [
+  { role: "user" as const, content: "Rewrite the hero headline" },
+  { role: "assistant" as const, content: "Here are a few options:\n\n• \"Track, plan, and deliver on time.\"\n• \"One dashboard. Every metric.\"\n• \"Your operations, simplified.\"" },
+];
+
+function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => void; aiMode: boolean; onAiModeChange: (v: boolean) => void }) {
   const [activeTab, setActiveTab] = useState<"all" | "assets" | "plugins">("all");
   const [searchValue, setSearchValue] = useState("");
-  const [aiMode, setAiMode] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
+  const setAiMode = onAiModeChange;
+  const [aiInput, setAiInput] = useState("");
+  const [wandHover, setWandHover] = useState(false);
+  const selectedNodes = useEditorBridge((v) => {
+    if (!v) return [];
+    return v.state.selectedIds
+      .filter((id) => Boolean(v.state.document.elements[id]))
+      .map((id) => ({ id, name: v.state.document.elements[id]!.name }));
+  }) ?? [];
+  const getEditor = useEditorBridgeReader();
+  const deselectNode = (nodeId: string) => {
+    const editor = getEditor();
+    if (!editor) return;
+    editor.dispatch({ type: "setSelected", selectedIds: editor.state.selectedIds.filter((id) => id !== nodeId) });
+  };
+  const TAG_LIMIT = 3;
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  useEffect(() => {
+    if (!recording) { setRecordingSeconds(0); return; }
+    const id = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [recording]);
   const tabs = [
     { id: "all" as const, label: "All" },
     { id: "assets" as const, label: "Assets" },
@@ -423,13 +549,13 @@ function ActionsPanel() {
 
   return (
     <div
-      className="absolute bottom-[calc(100%+8px)] left-1/2 z-50 flex h-[286px] w-[404px] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-[#3A3A3A] bg-[#2B2B2B] p-2 pb-[2px]"
-      style={{ boxShadow: "0 18px 40px rgba(0,0,0,0.58), 0 1px 0 rgba(255,255,255,0.03) inset" }}
+      className="group absolute bottom-[calc(100%+4px)] left-1/2 z-50 flex h-[264px] w-[420px] -translate-x-1/2 flex-col rounded-[14px] border border-[#2C2C2C] bg-[#1E1E1E] p-2 pb-0"
+      style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 28px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)" }}
     >
       {!aiMode ? (
         <>
-          <div className="flex h-9 items-center gap-2 rounded-lg border border-[#424242] bg-[#363636] px-2.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8E8E8E" strokeWidth="1.8" strokeLinecap="round">
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-[#333] bg-[#2A2A2A] px-2.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.8" strokeLinecap="round">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
@@ -438,27 +564,32 @@ function ActionsPanel() {
               value={searchValue}
               onChange={(event) => setSearchValue(event.target.value)}
               placeholder="Search"
-              className="h-full min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#E5E5E5] outline-none placeholder:text-[#A4A4A4]"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#CFCFCF] outline-none placeholder:text-[#666]"
             />
             <button
               type="button"
               aria-label="Open AI chat"
               onClick={() => setAiMode(true)}
-              className="relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#D8D8D8] transition-colors duration-100 hover:bg-[#3B3B3B]"
+              onMouseEnter={() => setWandHover(true)}
+              onMouseLeave={() => setWandHover(false)}
+              className="relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#CFCFCF] transition-colors duration-100 hover:bg-[#383838]"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 20l7.5-7.5" />
-                <path d="M9 3l1 2.5L12.5 6 10 7l-1 2.5L8 7 5.5 6 8 5.5 9 3z" />
-                <path d="M16 8l.6 1.4L18 10l-1.4.6L16 12l-.6-1.4L14 10l1.4-.6L16 8z" />
-                <path d="M19 14l.5 1.1L20.6 16l-1.1.5L19 17.6l-.5-1.1L17.4 16l1.1-.5L19 14z" />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20L11 9" />
+                <path d="M13 3L15 5L17 7L15 9L13 11L11 9L9 7L11 5Z" />
+                <path d="M19.5 6.5H21" />
+                <path d="M18.5 3.5L19.5 4.5" />
+                <path d="M18.5 9.5L19.5 8.5" />
               </svg>
-              <span className="absolute -right-1 -top-1 rounded-full bg-[#0D99FF] px-1 text-[8px] font-semibold leading-[14px] text-white shadow-[0_0_0_1px_#2B2B2B]">
-                IA
-              </span>
+              {wandHover && (
+                <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-[#2A2A2A] bg-[#0E0E0E] px-2 py-1.5 text-[11px] font-medium leading-none tracking-[0.1px] text-[#F5F5F5]">
+                  AI Chat
+                </span>
+              )}
             </button>
           </div>
 
-          <div className="mt-2 flex items-center gap-1">
+          <div className="mt-2 flex items-center gap-0.5">
             {tabs.map((tab) => {
               const active = activeTab === tab.id;
               return (
@@ -467,8 +598,8 @@ function ActionsPanel() {
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={[
-                    "h-7 rounded-md px-2.5 text-[11px] font-medium transition-colors duration-100",
-                    active ? "bg-[#444] text-[#F2F2F2]" : "text-[#BDBDBD] hover:bg-[#343434] hover:text-[#E8E8E8]",
+                    "h-7 rounded-lg px-2.5 text-[11px] font-medium transition-colors duration-100",
+                    active ? "bg-[#2A2A2A] text-[#CFCFCF]" : "text-[#666] hover:bg-[#242424] hover:text-[#999]",
                   ].join(" ")}
                 >
                   {tab.label}
@@ -478,49 +609,236 @@ function ActionsPanel() {
           </div>
 
           <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="mb-1 px-2 text-[10px] font-medium tracking-[0.2px] text-[#8B8B8B]">{sectionTitle}</div>
-            <div className="min-h-0 max-h-[150px] flex-1 overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-width:thin] [scrollbar-color:#4A4A4A_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#4A4A4A]">
-              <div className="space-y-0.5 pb-1">
+            <div className="mb-1 px-2 text-[10px] font-medium tracking-[0.3px] uppercase text-[#4A4A4A]">{sectionTitle}</div>
+            <div className="min-h-0 max-h-[160px] flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333]">
+              <div className="space-y-px pb-1">
                 {visibleItems.map((item) => (
                   <button
                     key={item.title}
                     type="button"
-                    className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left transition-colors duration-100 hover:bg-[#343434]"
+                    className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors duration-[90ms] hover:bg-[#2A2A2A]"
                   >
-                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#DFDFDF]">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M5 12h14" />
-                        <path d="M12 5v14" />
-                      </svg>
+                    <span className="grid h-4 w-4 shrink-0 place-items-center text-[#CFCFCF]">
+                      {ACTION_ICONS[item.title] ?? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14" /><path d="M12 5v14" />
+                        </svg>
+                      )}
                     </span>
-                    <span className="truncate text-[12px] text-[#EFEFEF]">{item.title}</span>
+                    <span className="truncate text-[12px] text-[#CFCFCF]">{item.title}</span>
                   </button>
                 ))}
                 {visibleItems.length === 0 ? (
-                  <div className="px-2 py-2 text-[11px] text-[#7C7C7C]">No items found.</div>
+                  <div className="px-2 py-2 text-[11px] text-[#555]">No items found.</div>
                 ) : null}
               </div>
             </div>
           </div>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-1.5 flex items-center justify-between px-1">
-            <span className="text-[10px] font-medium tracking-[0.2px] text-[#8B8B8B]">AI Chat</span>
-            <button
-              type="button"
-              onClick={() => setAiMode(false)}
-              className="rounded px-1.5 py-0.5 text-[10px] text-[#BDBDBD] transition-colors duration-100 hover:bg-[#343434] hover:text-[#F2F2F2]"
-            >
-              Back
-            </button>
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <div className="flex h-7 shrink-0 items-center justify-between px-1">
+            <span className="text-[10px] font-medium uppercase tracking-[0.3px] text-[#4A4A4A]">AI Chat</span>
+            <div className="flex items-center gap-0.5">
+              {tagsExpanded && (
+                <button
+                  type="button"
+                  aria-label="Collapse tags"
+                  onClick={() => setTagsExpanded(false)}
+                  className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}>
+                    <path d="M17 11l-5-5-5 5" /><path d="M17 18l-5-5-5 5" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label="AI chat settings"
+                className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Expand conversation"
+                className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Close AI chat"
+                onClick={() => { setAiMode(false); setTagsExpanded(false); }}
+                className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <textarea
-            value={aiPrompt}
-            onChange={(event) => setAiPrompt(event.target.value)}
-            placeholder="Ask AI to generate or edit..."
-            className="min-h-0 flex-1 resize-none rounded-lg border border-[#424242] bg-[#363636] px-3 py-2 text-[12px] text-[#E5E5E5] outline-none placeholder:text-[#A4A4A4]"
-          />
+
+          {tagsExpanded ? (
+            <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333]">
+              <div className="flex flex-wrap gap-1 pb-1">
+                {selectedNodes.map((node) => (
+                  <span
+                    key={node.id}
+                    className="flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#252525] py-[3px] pl-2 pr-1"
+                  >
+                    <span className="max-w-[120px] truncate text-[11px] text-[#8E8E8E]">{node.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => deselectNode(node.id)}
+                      className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#505050] transition-colors duration-100 hover:text-[#CFCFCF]"
+                    >
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333]">
+              <div className="flex flex-col gap-2.5 pb-1">
+                {MOCK_CONVERSATION.map((msg, i) => (
+                  <div key={i} className={msg.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                    {msg.role === "assistant" && (
+                      <div className="mr-2 mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#0D99FF]">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 3l1 2.5L12.5 6 10 7l-1 2.5L8 7 5.5 6 8 5.5 9 3z" />
+                          <path d="M16 8l.6 1.4L18 10l-1.4.6L16 12l-.6-1.4L14 10l1.4-.6L16 8z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div
+                      className={[
+                        "max-w-[76%] rounded-xl px-3 py-2 text-[11.5px] leading-[1.55]",
+                        msg.role === "user"
+                          ? "rounded-tr-sm bg-[#2A2A2A] text-[#CFCFCF]"
+                          : "rounded-tl-sm bg-transparent text-[#ABABAB]",
+                      ].join(" ")}
+                    >
+                      {msg.content.split("\n").map((line, li) => (
+                        <span key={li}>
+                          {line}
+                          {li < msg.content.split("\n").length - 1 && <br />}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="-mx-2 shrink-0 border-t border-[#252525] px-2 pb-2 pt-2">
+            {selectedNodes.length > 0 && !tagsExpanded && (
+              <div className="mb-2 flex items-center gap-1 overflow-hidden">
+                {selectedNodes.slice(0, TAG_LIMIT).map((node) => (
+                  <span
+                    key={node.id}
+                    className="flex shrink-0 items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#252525] py-[3px] pl-2 pr-1"
+                  >
+                    <span className="max-w-[80px] truncate text-[11px] text-[#8E8E8E]">{node.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => deselectNode(node.id)}
+                      className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#505050] transition-colors duration-100 hover:text-[#CFCFCF]"
+                    >
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+                {selectedNodes.length > TAG_LIMIT && (
+                  <button
+                    type="button"
+                    onClick={() => setTagsExpanded(true)}
+                    className="shrink-0 rounded-md border border-[#2E2E2E] bg-[#252525] px-2 py-[3px] text-[11px] text-[#505050] transition-colors duration-100 hover:border-[#3A3A3A] hover:text-[#8E8E8E]"
+                  >
+                    +{selectedNodes.length - TAG_LIMIT}
+                  </button>
+                )}
+              </div>
+            )}
+            <div className={`flex h-9 items-center gap-2 rounded-lg border px-2.5 transition-colors duration-150 ${recording ? "border-[#5C2020] bg-[#1E1010]" : "border-[#2E2E2E] bg-[#252525]"}`}>
+              <style>{`@keyframes ai-wave{0%,100%{transform:scaleY(0.25)}50%{transform:scaleY(1)}}`}</style>
+              {recording ? (
+                <>
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E05555] opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E05555]" />
+                  </span>
+                  <span className="w-9 shrink-0 text-[11px] tabular-nums text-[#E05555]">
+                    {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, "0")}
+                  </span>
+                  <div className="flex min-w-0 flex-1 items-center justify-center gap-[2px]">
+                    {[0.35, 0.7, 0.5, 1, 0.6, 0.85, 0.4, 0.9, 0.55, 0.75, 0.3, 0.65, 0.45].map((h, i) => (
+                      <div
+                        key={i}
+                        className="w-[2px] rounded-full bg-[#B04040]"
+                        style={{
+                          height: `${Math.round(h * 14)}px`,
+                          transformOrigin: "center",
+                          animation: `ai-wave ${0.6 + (i % 3) * 0.15}s ease-in-out ${(i * 0.07).toFixed(2)}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Cancel recording"
+                    onClick={() => setRecording(false)}
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[#6B3030] transition-colors duration-100 hover:bg-[#3A1818] hover:text-[#E05555]"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+                    </svg>
+                  </button>
+                </>
+              ) : (
+                <input
+                  type="text"
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  placeholder="Ask anything..."
+                  className="min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#CFCFCF] outline-none placeholder:text-[#555]"
+                />
+              )}
+              <button
+                type="button"
+                aria-label={recording ? "Record voice message active" : "Record voice message"}
+                onClick={() => setRecording((r) => !r)}
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors duration-100 ${recording ? "text-[#E05555] hover:bg-[#3A1818]" : "text-[#505050] hover:bg-[#333] hover:text-[#CFCFCF]"}`}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="2" width="6" height="11" rx="3" />
+                  <path d="M5 10a7 7 0 0 0 14 0" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                  <line x1="9" y1="22" x2="15" y2="22" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Send"
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors duration-100 ${recording ? "text-[#E05555] hover:bg-[#3A1818] hover:text-[#FF7070]" : "text-[#505050] hover:bg-[#333] hover:text-[#CFCFCF]"}`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 19V5" /><path d="M5 12l7-7 7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
