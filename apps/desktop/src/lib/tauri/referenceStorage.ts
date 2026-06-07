@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   stackSummaryFromData,
   type ReferenceStackData,
+  type ReferenceStackRoot,
   type ReferenceStackSummary,
 } from "@/lib/references/stackTypes";
 import {
@@ -132,6 +133,81 @@ export async function writeReferenceStackData(id: string, data: ReferenceStackDa
   await invoke("write_reference_stack_data", { id, content: JSON.stringify(data, null, 2) });
 }
 
+export type StackBatchFile = { fileName: string; dataB64: string };
+
+// Writes every crop PNG + data.json in a single IPC call (replaces the per-file loop).
+export async function writeReferenceStackBatch(
+  id: string,
+  files: StackBatchFile[],
+  data: ReferenceStackData,
+): Promise<void> {
+  await invoke("write_reference_stack_batch", {
+    id,
+    files: files.map((file) => ({ file_name: file.fileName, data_b64: file.dataB64 })),
+    dataJson: JSON.stringify(data, null, 2),
+  });
+}
+
+/* ---------- Video frames (ffmpeg sidecar) ---------- */
+
+export type ExtractedFrame = {
+  file: string;
+  index: number;
+  timestamp_ms: number;
+  w: number;
+  h: number;
+};
+
+export async function ffmpegAvailable(): Promise<boolean> {
+  try {
+    return await invoke<boolean>("ffmpeg_available");
+  } catch {
+    return false;
+  }
+}
+
+export async function extractVideoFrames(
+  id: string,
+  ext: string,
+  options?: { fps?: number; maxFrames?: number; maxWidth?: number },
+): Promise<ExtractedFrame[]> {
+  return invoke<ExtractedFrame[]>("extract_video_frames", {
+    id,
+    ext,
+    fps: options?.fps ?? 1.5,
+    maxFrames: options?.maxFrames ?? 240,
+    maxWidth: options?.maxWidth ?? 480,
+  });
+}
+
+export async function extractVideoFrameFull(
+  id: string,
+  ext: string,
+  timestampMs: number,
+): Promise<Blob | null> {
+  try {
+    const b64 = await invoke<string>("extract_video_frame_full", { id, ext, timestampMs });
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return new Blob([bytes], { type: "image/png" });
+  } catch {
+    return null;
+  }
+}
+
+export async function loadReferenceFrame(id: string, fileName: string): Promise<Blob | null> {
+  try {
+    const b64 = await invoke<string>("read_reference_frame", { id, fileName });
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return new Blob([bytes], { type: "image/jpeg" });
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteReferenceFrames(id: string): Promise<void> {
+  await invoke("delete_reference_frames", { id }).catch(() => {});
+}
+
 export async function readReferenceStackData(id: string): Promise<ReferenceStackData | null> {
   try {
     const raw = await invoke<string>("read_reference_stack_data", { id });
@@ -208,6 +284,14 @@ function normalizeReferenceStackData(value: unknown, fallbackReferenceId: string
   const original = input.original && typeof input.original === "object"
     ? input.original
     : null;
+  const normalizeBox = (box: { x?: unknown; y?: unknown; w?: unknown; h?: unknown; r?: unknown } | undefined) => ({
+    x: Number(box?.x ?? 0),
+    y: Number(box?.y ?? 0),
+    w: Number(box?.w ?? 0),
+    h: Number(box?.h ?? 0),
+    r: box?.r === undefined ? undefined : Number(box.r),
+  });
+
   const components = input.components
     .filter((component) => component && typeof component === "object")
     .map((component) => {
@@ -216,23 +300,41 @@ function normalizeReferenceStackData(value: unknown, fallbackReferenceId: string
         id: String(item.id || ""),
         name: String(item.name || "Component"),
         type: String(item.type || "PNG"),
-        box: {
-          x: Number(item.box?.x ?? 0),
-          y: Number(item.box?.y ?? 0),
-          w: Number(item.box?.w ?? 0),
-          h: Number(item.box?.h ?? 0),
-          r: item.box?.r === undefined ? undefined : Number(item.box.r),
-        },
+        box: normalizeBox(item.box),
         file: item.file ? String(item.file) : null,
         parentId: item.parentId ? String(item.parentId) : null,
+        rootId: item.rootId ? String(item.rootId) : null,
         createdAt: String(item.createdAt || new Date(0).toISOString()),
       };
     })
     .filter((component) => component.id && component.box.w >= 0 && component.box.h >= 0);
 
   const rootComponentId = String(input.rootComponentId || components[0]?.id || `root-${fallbackReferenceId}`);
+
+  // v2: a `roots` array. v1: synthesize one default full-image root from
+  // rootComponentId so older stacks still load (without the destructive primary scope).
+  const roots: ReferenceStackRoot[] | undefined = Array.isArray(input.roots)
+    ? input.roots
+        .filter((root) => root && typeof root === "object")
+        .map((root) => {
+          const entry = root as ReferenceStackRoot;
+          return {
+            id: String(entry.id || ""),
+            name: String(entry.name || "Frame"),
+            box: normalizeBox(entry.box),
+            file: entry.file ? String(entry.file) : null,
+            isDefault: Boolean(entry.isDefault),
+            createdAt: String(entry.createdAt || new Date(0).toISOString()),
+            sourceFrame: entry.sourceFrame ? String(entry.sourceFrame) : null,
+          };
+        })
+        .filter((root) => root.id)
+    : undefined;
+
+  const version: ReferenceStackData["version"] = roots && roots.length > 0 ? 2 : 1;
+
   return {
-    version: 1,
+    version,
     referenceId: String(input.referenceId || fallbackReferenceId),
     mediaKind,
     original: {
@@ -242,6 +344,7 @@ function normalizeReferenceStackData(value: unknown, fallbackReferenceId: string
       w: Number(original?.w ?? 0),
       h: Number(original?.h ?? 0),
     },
+    ...(roots ? { roots } : {}),
     rootComponentId,
     primaryComponentId: String(input.primaryComponentId || rootComponentId),
     components,

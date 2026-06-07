@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
@@ -78,10 +79,16 @@ fn sqlite_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .join(SQLITE_FILE_NAME))
 }
 
-fn default_config() -> WorkspaceConfig {
-    let base = dirs::document_dir()
+fn default_config(app: &tauri::AppHandle) -> WorkspaceConfig {
+    // Default to the app data dir (e.g. ~/Library/Application Support/<bundle>), which
+    // the app can always write to. Avoid ~/Documents — macOS TCC blocks writes there
+    // with "Operation not permitted" until the user grants Files-and-Folders access.
+    let base = app
+        .path()
+        .app_data_dir()
+        .ok()
+        .or_else(|| dirs::data_dir().map(|dir| dir.join(APP_FOLDER_NAME)))
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(APP_FOLDER_NAME)
         .to_string_lossy()
         .into_owned();
     WorkspaceConfig {
@@ -97,7 +104,7 @@ fn read_config(app: &tauri::AppHandle) -> WorkspaceConfig {
             return cfg;
         }
     }
-    default_config()
+    default_config(app)
 }
 
 fn save_config(app: &tauri::AppHandle, cfg: &WorkspaceConfig) -> Result<(), String> {
@@ -173,6 +180,24 @@ fn ensure_local_structure(cfg: &WorkspaceConfig) -> Result<(), String> {
         )?;
     }
     Ok(())
+}
+
+static ATOMIC_WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
+
+// Write a file atomically via a unique temp file + rename. The unique suffix makes
+// concurrent writes to the same target safe (no shared temp, no truncate race that
+// can surface as EPERM), and rename is atomic so readers never see a partial file.
+fn atomic_write_string(path: &Path, content: &str) -> Result<(), String> {
+    let parent = path.parent().ok_or_else(|| "invalid target path".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("data");
+    let seq = ATOMIC_WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = parent.join(format!(".{}.{}.tmp", file_name, seq));
+    fs::write(&tmp, content).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })
 }
 
 fn safe_path_segment(value: &str, label: &str) -> Result<String, String> {
@@ -401,6 +426,254 @@ fn delete_reference_stack(app: tauri::AppHandle, id: String) -> Result<(), Strin
     Ok(())
 }
 
+#[derive(Deserialize)]
+pub struct StackFileInput {
+    pub file_name: String,
+    pub data_b64: String,
+}
+
+// Writes an entire stack (all crop PNGs + data.json) in a single IPC call,
+// replacing the previous stack folder atomically-ish. This collapses the old
+// O(cuts) round-trips into one.
+#[tauri::command]
+fn write_reference_stack_batch(
+    app: tauri::AppHandle,
+    id: String,
+    files: Vec<StackFileInput>,
+    data_json: String,
+) -> Result<(), String> {
+    let cfg = read_config(&app);
+    ensure_local_structure(&cfg)?;
+    let id = safe_path_segment(&id, "reference id")?;
+    let stack_dir = reference_dir(&cfg, &id).join("stack");
+    if stack_dir.exists() {
+        let _ = fs::remove_dir_all(&stack_dir);
+    }
+    fs::create_dir_all(&stack_dir).map_err(|e| e.to_string())?;
+    for file in &files {
+        let file_name = safe_path_segment(&file.file_name, "stack file name")?;
+        let data = BASE64.decode(&file.data_b64).map_err(|e| e.to_string())?;
+        fs::write(stack_dir.join(file_name), &data).map_err(|e| e.to_string())?;
+    }
+    fs::write(stack_dir.join("data.json"), data_json).map_err(|e| e.to_string())
+}
+
+/* ---------- Video frame extraction (ffmpeg sidecar) ---------- */
+
+#[derive(Serialize, Clone, Debug)]
+pub struct ExtractedFrame {
+    pub file: String,
+    pub index: u32,
+    pub timestamp_ms: u64,
+    pub w: u32,
+    pub h: u32,
+}
+
+fn reference_original_path(cfg: &WorkspaceConfig, id: &str, ext: &str) -> Option<PathBuf> {
+    let ext = safe_extension(ext);
+    let candidates = [
+        reference_dir(cfg, id).join(format!("original.{}", ext)),
+        references_dir(cfg).join(format!("{}.{}", id, ext)),
+        legacy_reference_dir(cfg, id).join(format!("original.{}", ext)),
+        legacy_references_dir(cfg).join(format!("{}.{}", id, ext)),
+    ];
+    candidates.into_iter().find(|path| path.exists())
+}
+
+// Resolve ffmpeg: the bundled sidecar next to the app executable first, then a
+// system ffmpeg on PATH (Homebrew etc.) as a dev/no-sidecar fallback.
+fn resolve_ffmpeg() -> Option<PathBuf> {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            for name in ["ffmpeg", "ffmpeg.exe"] {
+                let candidate = dir.join(name);
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+    for candidate in ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"] {
+        let path = PathBuf::from(candidate);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    if let Ok(output) = std::process::Command::new("/bin/sh")
+        .arg("-c")
+        .arg("command -v ffmpeg")
+        .output()
+    {
+        if output.status.success() {
+            let resolved = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !resolved.is_empty() {
+                return Some(PathBuf::from(resolved));
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn ffmpeg_available() -> bool {
+    resolve_ffmpeg().is_some()
+}
+
+#[tauri::command]
+async fn extract_video_frames(
+    app: tauri::AppHandle,
+    id: String,
+    ext: String,
+    fps: f32,
+    max_frames: u32,
+    max_width: u32,
+) -> Result<Vec<ExtractedFrame>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        extract_video_frames_blocking(&app, &id, &ext, fps, max_frames, max_width)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn extract_video_frames_blocking(
+    app: &tauri::AppHandle,
+    id: &str,
+    ext: &str,
+    fps: f32,
+    max_frames: u32,
+    max_width: u32,
+) -> Result<Vec<ExtractedFrame>, String> {
+    let cfg = read_config(app);
+    ensure_local_structure(&cfg)?;
+    let id = safe_path_segment(id, "reference id")?;
+    let src = reference_original_path(&cfg, &id, ext).ok_or("video file not found")?;
+    let ffmpeg = resolve_ffmpeg().ok_or("ffmpeg is not available")?;
+
+    let fps = if fps.is_finite() && fps > 0.0 { fps } else { 1.5 };
+    let max_frames = max_frames.clamp(1, 1000);
+    let max_width = max_width.clamp(64, 4096);
+
+    let frames_dir = reference_dir(&cfg, &id).join("frames");
+    let _ = fs::remove_dir_all(&frames_dir);
+    fs::create_dir_all(&frames_dir).map_err(|e| e.to_string())?;
+
+    let vf = format!("fps={:.4},scale='min({},iw)':-2", fps, max_width);
+    let pattern = frames_dir.join("frame-%06d.jpg");
+    let status = std::process::Command::new(&ffmpeg)
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-i")
+        .arg(&src)
+        .arg("-vf")
+        .arg(&vf)
+        .arg("-frames:v")
+        .arg(max_frames.to_string())
+        .arg("-q:v")
+        .arg("4")
+        .arg(&pattern)
+        .status()
+        .map_err(|e| format!("ffmpeg failed to start: {e}"))?;
+    if !status.success() {
+        return Err("ffmpeg failed to extract frames".to_string());
+    }
+
+    let mut paths: Vec<PathBuf> = fs::read_dir(&frames_dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.extension().and_then(|x| x.to_str()) == Some("jpg"))
+        .collect();
+    paths.sort();
+
+    let frames = paths
+        .iter()
+        .enumerate()
+        .filter_map(|(index, path)| {
+            let file = path.file_name()?.to_string_lossy().into_owned();
+            let (w, h) = image::image_dimensions(path).unwrap_or((0, 0));
+            let timestamp_ms = ((index as f64) / (fps as f64) * 1000.0) as u64;
+            Some(ExtractedFrame {
+                file,
+                index: index as u32,
+                timestamp_ms,
+                w,
+                h,
+            })
+        })
+        .collect();
+    Ok(frames)
+}
+
+// Extract a single full-resolution frame at a timestamp as a PNG (base64).
+#[tauri::command]
+async fn extract_video_frame_full(
+    app: tauri::AppHandle,
+    id: String,
+    ext: String,
+    timestamp_ms: u64,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let cfg = read_config(&app);
+        let id = safe_path_segment(&id, "reference id")?;
+        let src = reference_original_path(&cfg, &id, &ext).ok_or("video file not found")?;
+        let ffmpeg = resolve_ffmpeg().ok_or("ffmpeg is not available")?;
+        let frames_dir = reference_dir(&cfg, &id).join("frames");
+        fs::create_dir_all(&frames_dir).map_err(|e| e.to_string())?;
+        let out = frames_dir.join(format!("full-{}.png", timestamp_ms));
+        let seconds = format!("{:.3}", timestamp_ms as f64 / 1000.0);
+        let status = std::process::Command::new(&ffmpeg)
+            .arg("-hide_banner")
+            .arg("-loglevel")
+            .arg("error")
+            .arg("-ss")
+            .arg(&seconds)
+            .arg("-i")
+            .arg(&src)
+            .arg("-frames:v")
+            .arg("1")
+            .arg("-y")
+            .arg(&out)
+            .status()
+            .map_err(|e| format!("ffmpeg failed to start: {e}"))?;
+        if !status.success() {
+            return Err("ffmpeg failed to extract frame".to_string());
+        }
+        let data = fs::read(&out).map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(&out);
+        Ok(BASE64.encode(&data))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn read_reference_frame(
+    app: tauri::AppHandle,
+    id: String,
+    file_name: String,
+) -> Result<String, String> {
+    let cfg = read_config(&app);
+    let id = safe_path_segment(&id, "reference id")?;
+    let file_name = safe_path_segment(&file_name, "frame file name")?;
+    let path = reference_dir(&cfg, &id).join("frames").join(&file_name);
+    if !path.exists() {
+        return Err("frame not found".to_string());
+    }
+    let data = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(BASE64.encode(&data))
+}
+
+#[tauri::command]
+fn delete_reference_frames(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let cfg = read_config(&app);
+    let id = safe_path_segment(&id, "reference id")?;
+    let frames_dir = reference_dir(&cfg, &id).join("frames");
+    if frames_dir.exists() {
+        let _ = fs::remove_dir_all(frames_dir);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn read_references_meta(app: tauri::AppHandle) -> Result<String, String> {
     let cfg = read_config(&app);
@@ -419,7 +692,7 @@ fn read_references_meta(app: tauri::AppHandle) -> Result<String, String> {
 fn write_references_meta(app: tauri::AppHandle, content: String) -> Result<(), String> {
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
-    fs::write(references_dir(&cfg).join("meta.json"), content).map_err(|e| e.to_string())
+    atomic_write_string(&references_dir(&cfg).join("meta.json"), &content)
 }
 
 #[tauri::command]
@@ -440,7 +713,7 @@ fn read_reference_groups(app: tauri::AppHandle) -> Result<String, String> {
 fn write_reference_groups(app: tauri::AppHandle, content: String) -> Result<(), String> {
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
-    fs::write(references_dir(&cfg).join("groups.json"), content).map_err(|e| e.to_string())
+    atomic_write_string(&references_dir(&cfg).join("groups.json"), &content)
 }
 
 #[tauri::command]
@@ -956,6 +1229,12 @@ pub fn run() {
             write_reference_stack_data,
             read_reference_stack_data,
             delete_reference_stack,
+            write_reference_stack_batch,
+            ffmpeg_available,
+            extract_video_frames,
+            extract_video_frame_full,
+            read_reference_frame,
+            delete_reference_frames,
             read_references_meta,
             write_references_meta,
             read_reference_groups,

@@ -1,4 +1,4 @@
-import type { SavedComponent, PendingConfirmation } from "../engine/types";
+import type { PendingConfirmation } from "../engine/types";
 
 export function ConfirmActionModal({
   title,
@@ -39,20 +39,11 @@ export function ConfirmActionModal({
   );
 }
 
-export function confirmationDialogCopy(action: PendingConfirmation, components: SavedComponent[]) {
-  if (action.type === "reset") {
-    return {
-      title: "Reset tool",
-      description:
-        "This removes current crops and returns to the original image root. The tree will be recreated with only the root component.",
-      confirmLabel: "Reset",
-    };
-  }
-
-  const component = components.find((entry) => entry.id === action.componentId);
+export function confirmationDialogCopy(_action: PendingConfirmation) {
   return {
-    title: "Make primary",
-    description: `This will use ${component?.name ?? "this component"} as the primary component and remove parents and siblings no longer in scope.`,
-    confirmLabel: "Make primary",
+    title: "Reset tool",
+    description:
+      "This removes every root and crop and returns to the original image. The tree will be recreated with only the default full-image root.",
+    confirmLabel: "Reset",
   };
 }

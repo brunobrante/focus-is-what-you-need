@@ -5,17 +5,15 @@ export function ElementInfoCard({
   width,
   height,
   type,
-  thumbnailUrl,
-  canPromote,
-  onPromote,
+  showBecomeRoot = false,
+  onBecomeRoot,
 }: {
   name: string;
   width: number;
   height: number;
   type: string;
-  thumbnailUrl: string;
-  canPromote: boolean;
-  onPromote: () => void;
+  showBecomeRoot?: boolean;
+  onBecomeRoot?: () => void;
 }) {
   return (
     <div
@@ -38,20 +36,18 @@ export function ElementInfoCard({
           {type}
         </span>
       </div>
-      <button
-        type="button"
-        disabled={!canPromote}
-        onClick={onPromote}
-        className={[
-          "mt-2 h-7 w-full cursor-pointer rounded-[8px] border px-3 text-[11.5px] font-semibold transition-colors duration-[120ms]",
-          canPromote
-            ? "border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-            : "cursor-not-allowed border-[var(--border)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)]",
-        ].join(" ")}
-      >
-        <Layers size={12} strokeWidth={1.7} className="mr-1.5 inline-block align-[-2px]" />
-        Tornar root
-      </button>
+
+      {showBecomeRoot ? (
+        <button
+          type="button"
+          data-selection-action
+          onClick={onBecomeRoot}
+          className="mt-2 inline-flex h-7 w-full cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[11.5px] font-semibold text-[var(--text)] transition-colors duration-[120ms] hover:border-[var(--text)] hover:bg-[var(--surface-hover)]"
+        >
+          <Layers size={12} strokeWidth={1.8} />
+          Become root
+        </button>
+      ) : null}
     </div>
   );
 }

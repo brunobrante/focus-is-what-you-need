@@ -7,6 +7,26 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/png"): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error("Could not encode canvas"));
+    }, type);
+  });
+}
+
+export async function canvasToDataUrl(canvas: HTMLCanvasElement, type = "image/png"): Promise<string> {
+  return blobToDataUrl(await canvasToBlob(canvas, type));
+}
+
+export function blobToObjectUrl(blob: Blob): string {
+  return URL.createObjectURL(blob);
+}
+
 export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   const response = await fetch(dataUrl);
   return response.blob();

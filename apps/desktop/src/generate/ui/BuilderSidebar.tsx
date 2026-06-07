@@ -48,14 +48,14 @@ function SidebarTabButton({
 }
 
 export function SidebarComponentsHeader({
-  primaryName,
+  rootName,
   scopedCount,
   showReset,
   onExpandAll,
   onCollapseAll,
   onReset,
 }: {
-  primaryName: string;
+  rootName: string;
   scopedCount: number;
   showReset: boolean;
   onExpandAll: () => void;
@@ -72,7 +72,7 @@ export function SidebarComponentsHeader({
           </span>
         </div>
         <p className="m-0 mt-0.5 max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--text-faint)]">
-          Primary: {primaryName}
+          Root: {rootName}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">

@@ -42,7 +42,11 @@ import {
   writeReferenceGroups,
   writeRefsMeta,
   extFromName,
+  extractVideoFrameFull,
+  deleteReferenceFrames,
+  type ExtractedFrame,
 } from "@/lib/tauri/referenceStorage";
+import { VideoFramePicker, type FramePickerVideo } from "./import/VideoFramePicker";
 import type {
   ReferenceStackData,
   ReferenceStackItem,
@@ -161,7 +165,9 @@ function persistMeta(library: ReferenceItem[]): void {
     ...rest,
     ext: rest.ext ?? extFromName(rest.name),
   }));
-  void writeRefsMeta(metas);
+  void writeRefsMeta(metas).catch((err) => {
+    console.error("[references] failed to persist metadata:", err);
+  });
 }
 
 /* ---------- Main component ---------- */
@@ -184,6 +190,8 @@ export function References() {
   const [deleteGroup, setDeleteGroup] = useState<ReferenceGroup | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus>(null);
   const [stackThumbnailUrls, setStackThumbnailUrls] = useState<Record<string, string>>({});
+  const [frameVideo, setFrameVideo] = useState<FramePickerVideo | null>(null);
+  const [frameBusy, setFrameBusy] = useState(false);
 
   // Keep a ref to the current library so the unmount cleanup sees the latest value.
   const libraryRef = useRef<ReferenceItem[]>([]);
@@ -213,7 +221,9 @@ export function References() {
 
   useEffect(() => {
     if (loading) return;
-    void writeReferenceGroups(groups);
+    void writeReferenceGroups(groups).catch((err) => {
+      console.error("[references] failed to persist groups:", err);
+    });
   }, [groups, loading]);
 
   useEffect(() => {
@@ -385,6 +395,87 @@ export function References() {
     }
   }, [importTargetGroupId]);
 
+  // Create a brand-new group from a multi-image import (each image is a stack).
+  const addItemsAsGroup = useCallback((items: ReferenceItem[]) => {
+    if (items.length === 0) return;
+    const now = new Date().toISOString();
+    const group: ReferenceGroup = {
+      id: newReferenceGroupId(),
+      name: "New group",
+      referenceIds: [],
+      coverReferenceId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const withGroup = items.map((item) => ({ ...item, groupId: group.id }));
+    setLibrary((prev) => [...withGroup, ...prev]);
+    setGroups((prev) => addReferencesToGroup([group, ...prev], group.id, withGroup.map((item) => item.id)));
+    setSelectedSubject({ kind: "group", id: group.id });
+  }, []);
+
+  // Turn selected video frames into a group of image references (one stack each).
+  const createFrameGroup = useCallback(
+    async (video: FramePickerVideo, frames: ExtractedFrame[]) => {
+      if (frames.length === 0) return;
+      setFrameBusy(true);
+      try {
+        const baseName = video.name.replace(/\.[^.]+$/, "");
+        const now = new Date().toISOString();
+        const frameItems: ReferenceItem[] = [];
+
+        for (const frame of frames) {
+          const blob = await extractVideoFrameFull(video.id, video.ext, frame.timestamp_ms);
+          if (!blob) continue;
+          const id = newId();
+          let ext: string;
+          try {
+            ext = await saveReferenceFile(id, blob);
+          } catch (err) {
+            console.error("[frames] saveReferenceFile failed:", err);
+            continue;
+          }
+          const url = URL.createObjectURL(blob);
+          const dims = await measureImage(url).catch(() => ({ w: 0, h: 0 }));
+          frameItems.push({
+            id,
+            name: `${baseName} — ${formatDuration(frame.timestamp_ms / 1000)}`,
+            mediaKind: "image",
+            type: inferType(`frame.${ext}`),
+            w: dims.w,
+            h: dims.h,
+            size: Math.max(1, Math.round(blob.size / 1024)),
+            ext,
+            tags: ["image", "frame"],
+            added: now,
+            url,
+          });
+        }
+
+        await deleteReferenceFrames(video.id).catch(() => {});
+        if (frameItems.length === 0) return;
+
+        const group: ReferenceGroup = {
+          id: newReferenceGroupId(),
+          name: baseName || "Video frames",
+          referenceIds: [],
+          coverReferenceId: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const memberIds = frameItems.map((item) => item.id);
+        const withGroup = frameItems.map((item) => ({ ...item, groupId: group.id }));
+
+        setLibrary((prev) => [...withGroup, ...prev]);
+        setGroups((prev) => addReferencesToGroup([group, ...prev], group.id, memberIds));
+        setSelectedSubject({ kind: "group", id: group.id });
+        setFrameVideo(null);
+      } finally {
+        setFrameBusy(false);
+      }
+    },
+    [],
+  );
+
   const removeItem = useCallback((id: string) => {
     setLibrary((prev) => {
       const item = prev.find((i) => i.id === id);
@@ -513,13 +604,13 @@ export function References() {
                     References
                   </h1>
                   <p className="m-0 text-[13px] text-[var(--text-muted)]">
-                    Images, stacks, and stack groups saved locally.
+                    Images, stacks, and groups saved locally.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <SmallButton type="button" onClick={() => setGroupDialog({ mode: "create" })}>
                     <FolderPlus size={14} />
-                    New stack group
+                    New group
                   </SmallButton>
                   <SmallButton
                     type="button"
@@ -649,6 +740,14 @@ export function References() {
               onSourceUrlChange={updateSourceUrl}
               groups={groups}
               onGroupChange={updateReferenceGroup}
+              onExtractFrames={(video) =>
+                setFrameVideo({
+                  id: video.id,
+                  ext: video.ext || extFromName(video.name),
+                  name: video.name,
+                  duration: video.duration,
+                })
+              }
             />
           )}
         </aside>
@@ -661,8 +760,12 @@ export function References() {
           setImportOpen(false);
           setImportTargetGroupId(null);
         }}
-        onAdd={(items) => {
-          addItems(items);
+        onAdd={(items, options) => {
+          if (options?.groupTogether && !importTargetGroupId) {
+            addItemsAsGroup(items);
+          } else {
+            addItems(items);
+          }
           setImportOpen(false);
           setImportTargetGroupId(null);
         }}
@@ -678,6 +781,19 @@ export function References() {
         }}
         targetGroupName={importTargetGroup?.name ?? null}
       />
+
+      {frameVideo ? (
+        <VideoFramePicker
+          video={frameVideo}
+          busy={frameBusy}
+          onCancel={() => {
+            if (frameBusy) return;
+            void deleteReferenceFrames(frameVideo.id);
+            setFrameVideo(null);
+          }}
+          onConfirm={(frames) => void createFrameGroup(frameVideo, frames)}
+        />
+      ) : null}
 
       <Lightbox item={lightboxItem} onClose={() => setLightboxItem(null)} />
       <ReferenceGroupModal
@@ -717,7 +833,7 @@ function ReferenceGroupModal({
   if (!state) return null;
 
   const trimmedName = name.trim();
-  const title = state.mode === "edit" ? "Edit stack group" : "Create stack group";
+  const title = state.mode === "edit" ? "Edit group" : "Create group";
 
   return (
     <div
@@ -789,7 +905,7 @@ function ReferenceGroupModal({
               })
             }
           >
-            Save stack group
+            Save group
           </SmallButton>
         </div>
       </div>
@@ -812,7 +928,7 @@ function DeleteGroupModal({
     <div
       role="dialog"
       aria-modal
-      aria-label="Delete stack group"
+      aria-label="Delete group"
       onClick={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}
@@ -824,9 +940,9 @@ function DeleteGroupModal({
         style={{ boxShadow: "var(--shadow-pop)" }}
       >
         <div className="border-b border-[var(--border)] px-[18px] py-4">
-          <h3 className="m-0 text-[15px] font-semibold text-[var(--text)]">Delete stack group?</h3>
+          <h3 className="m-0 text-[15px] font-semibold text-[var(--text)]">Delete group?</h3>
           <p className="m-0 mt-2 text-[12px] leading-[1.5] text-[var(--text-muted)]">
-            This removes the stack group "{group.name}" but keeps every screen, stack file, and cut.
+            This removes the group "{group.name}" but keeps every screen, stack file, and cut.
           </p>
         </div>
         <div className="flex justify-end gap-2 px-[18px] py-3">
@@ -834,7 +950,7 @@ function DeleteGroupModal({
             Cancel
           </SmallButton>
           <SmallButton type="button" onClick={onConfirm}>
-            Delete stack group
+            Delete group
           </SmallButton>
         </div>
       </div>
@@ -995,7 +1111,7 @@ function GroupPin({
             </div>
           )}
           <span className="pointer-events-none absolute left-2 top-2 rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
-            Stack group
+            Group
           </span>
           {archiveStatus ? (
             <span className="pointer-events-none absolute right-2 top-2 max-w-[96px] truncate rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] text-white backdrop-blur">
@@ -1172,6 +1288,7 @@ function Inspector({
   onTagsChange,
   onSourceUrlChange,
   onGroupChange,
+  onExtractFrames,
 }: {
   item: ReferenceItem | null;
   groups: ReferenceGroup[];
@@ -1182,6 +1299,7 @@ function Inspector({
   onTagsChange: (id: string, tags: string[]) => void;
   onSourceUrlChange: (id: string, sourceUrl: string) => void;
   onGroupChange: (id: string, groupId: string | null) => void;
+  onExtractFrames: (item: ReferenceItem) => void;
 }) {
   // Keep last item rendered during the sidebar close animation
   const lastItemRef = useRef<ReferenceItem | null>(null);
@@ -1305,13 +1423,13 @@ function Inspector({
           />
         </Section>
 
-        <Section title="Stack group">
+        <Section title="Group">
           <select
             value={display.groupId ?? ""}
             onChange={(event) => onGroupChange(display.id, event.target.value || null)}
             className="h-[34px] w-full cursor-pointer rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] text-[var(--text)] outline-none hover:border-[var(--border-strong)] focus:border-[var(--text-muted)]"
           >
-            <option value="">No stack group</option>
+            <option value="">No group</option>
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -1360,6 +1478,13 @@ function Inspector({
             icon={<Layers size={12} />}
             label="Builder"
             to={builderHref}
+          />
+        ) : null}
+        {display.mediaKind === "video" ? (
+          <InspectorAction
+            icon={<Film size={12} />}
+            label="Extract frames"
+            onClick={() => onExtractFrames(display)}
           />
         ) : null}
         <InspectorAction
@@ -1428,7 +1553,7 @@ function GroupInspector({
     <div className="flex h-full w-[320px] flex-col overflow-hidden bg-[var(--bg-elev)]">
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-3 py-2.5">
         <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-muted)]">
-          Stack group
+          Group
         </span>
         <button
           type="button"
@@ -1795,13 +1920,14 @@ function ImportModal({
   existingItems: ReferenceItem[];
   targetGroupName: string | null;
   onClose: () => void;
-  onAdd: (items: ReferenceItem[]) => void;
+  onAdd: (items: ReferenceItem[], options?: { groupTogether?: boolean }) => void;
   onUseExisting: (item: ReferenceItem) => void;
 }) {
   const [tab, setTab] = useState<ImportTab>("local");
   const [dragActive, setDragActive] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<string[]>([]);
   const [staged, setStaged] = useState<StagedItem[]>([]);
+  const [groupTogether, setGroupTogether] = useState(false);
   const [duplicateQueue, setDuplicateQueue] = useState<PendingDuplicate[]>([]);
   const [duplicateDecision, setDuplicateDecision] = useState<DuplicateDecision>("existing");
   const [processing, setProcessing] = useState(false);
@@ -1841,6 +1967,7 @@ function ImportModal({
       setRejectedFiles([]);
       setDuplicateDecision("existing");
       setProcessing(false);
+      setGroupTogether(false);
     }
   }, [open]);
 
@@ -1912,7 +2039,7 @@ function ImportModal({
       description: desc.trim() || undefined,
       sourceUrl: item.sourceUrl?.trim() || undefined,
     }));
-    onAdd(items);
+    onAdd(items, { groupTogether: groupTogether && !targetGroupName && items.length >= 2 });
   }
 
   function resolveDuplicate() {
@@ -1958,7 +2085,7 @@ function ImportModal({
             {isStaged
               ? `${staged.length} ${staged.length === 1 ? "file selected" : "files selected"}`
               : targetGroupName
-                ? `Add screens to ${targetGroupName}`
+                ? `Add to ${targetGroupName}`
                 : "Add reference"}
           </h3>
           <button
@@ -2137,7 +2264,33 @@ function ImportModal({
           )}
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--border)] px-[18px] py-3">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] px-[18px] py-3">
+          {isStaged && !targetGroupName && staged.length >= 2 ? (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={groupTogether}
+              onClick={() => setGroupTogether((value) => !value)}
+              className="mr-auto inline-flex cursor-pointer items-center gap-2.5 text-[12px] text-[var(--text-muted)]"
+            >
+              <span
+                className={[
+                  "relative h-[18px] w-[32px] shrink-0 rounded-full transition-colors duration-150",
+                  groupTogether
+                    ? "bg-[var(--accent)]"
+                    : "border border-[var(--border-strong)] bg-[var(--surface-hover)]",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform duration-150",
+                    groupTogether ? "translate-x-[15px]" : "translate-x-[2px]",
+                  ].join(" ")}
+                />
+              </span>
+              Create a group
+            </button>
+          ) : null}
           {isStaged ? (
             <>
               <SmallButton type="button" onClick={doCancel}>
@@ -2149,7 +2302,11 @@ function ImportModal({
                 disabled={staged.length === 0}
                 onClick={handleConfirm}
               >
-                {targetGroupName ? "Add to stack group" : `Add ${staged.length} ${staged.length === 1 ? "item" : "items"}`}
+                {targetGroupName
+                  ? "Add to group"
+                  : groupTogether
+                    ? `Create group of ${staged.length}`
+                    : `Add ${staged.length} ${staged.length === 1 ? "item" : "items"}`}
               </SmallButton>
             </>
           ) : (

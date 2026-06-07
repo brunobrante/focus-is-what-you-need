@@ -7,17 +7,27 @@ import {
   extFromName,
   loadReferenceStackFile,
   removeReferenceStack,
-  saveReferenceFile,
-  saveReferenceStackFile,
-  writeReferenceStackData,
+  writeReferenceStackBatch,
   readReferenceStackData,
   writeRefsMeta,
   readRefsMeta,
 } from "@/lib/tauri/referenceStorage";
-import { stackSummaryFromData, type ReferenceStackData } from "@/lib/references/stackTypes";
+import {
+  stackSummaryFromData,
+  type ReferenceStackData,
+  type ReferenceStackRoot,
+} from "@/lib/references/stackTypes";
+
+const REFERENCE_STACK_IO_CONCURRENCY = 3;
 
 export function sourceRootComponentId(sourceId: string) {
   return `root-${sourceId}`;
+}
+
+// Additional (non-default) roots get this prefix so they never collide with the
+// implicit full-image default root id (`root-${referenceId}`) or with cuts (`c-…`).
+export function newRootComponentId() {
+  return `root-r${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export function createRootComponent(item: ToolReference): SavedComponent {
@@ -29,6 +39,9 @@ export function createRootComponent(item: ToolReference): SavedComponent {
     type: item.type || "IMG",
     createdAt: new Date(0).toISOString(),
     parentId: null,
+    kind: "root",
+    rootId: sourceRootComponentId(item.id),
+    isDefaultRoot: true,
   };
 }
 
@@ -110,15 +123,9 @@ export function findSpatialParent(
   items: SavedComponent[],
   rootId: string,
 ): SavedComponent | null {
-  const candidates = items
-    .filter((candidate) => candidate.id !== component.id)
-    .filter((candidate) => isSpatialParent(candidate.box, component.box));
-
-  if (candidates.length === 0) return items.find((item) => item.id === rootId) ?? null;
-
-  return candidates.reduce((smallest, candidate) =>
-    cropBoxArea(candidate.box) < cropBoxArea(smallest.box) ? candidate : smallest,
-  );
+  const root = items.find((item) => item.id === rootId) ?? null;
+  const candidates = [...items].sort((a, b) => cropBoxArea(a.box) - cropBoxArea(b.box));
+  return findSpatialParentFromSortedCandidates(component, candidates, root);
 }
 
 export function componentAreaAlreadyExists(
@@ -135,45 +142,124 @@ export function componentAreaAlreadyExists(
 export function rebuildComponentHierarchy(items: SavedComponent[], rootId: string): SavedComponent[] {
   const root = items.find((item) => item.id === rootId);
   if (!root) return items;
+  const candidatesBySmallestArea = [...items].sort((a, b) => cropBoxArea(a.box) - cropBoxArea(b.box));
 
   return items.map((item) => {
     if (item.id === rootId) return { ...item, parentId: null };
-    const parent = findSpatialParent(item, items, rootId);
+    const parent = findSpatialParentFromSortedCandidates(item, candidatesBySmallestArea, root);
     return { ...item, parentId: parent?.id ?? rootId };
   });
 }
 
+// Multi-root spatial rebuild. Cuts are partitioned by their owning root (`rootId`)
+// and parent inference runs ONLY against members of the same root, so two roots
+// that overlap on the original image never steal each other's children.
+export function rebuildAllRoots(items: SavedComponent[], defaultRootId: string): SavedComponent[] {
+  const roots = items.filter((entry) => entry.parentId == null);
+  const rootIds = new Set(roots.map((root) => root.id));
+  if (!rootIds.has(defaultRootId) && roots[0]) defaultRootId = roots[0].id;
+
+  const groups = new Map<string, SavedComponent[]>();
+  for (const root of roots) groups.set(root.id, [root]);
+
+  for (const entry of items) {
+    if (entry.parentId == null) continue;
+    const rid = entry.rootId && rootIds.has(entry.rootId) ? entry.rootId : defaultRootId;
+    (groups.get(rid) ?? groups.get(defaultRootId))?.push(entry);
+  }
+
+  const rebuiltById = new Map<string, SavedComponent>();
+  for (const [rid, group] of groups) {
+    const rebuilt = rebuildComponentHierarchy(group, rid);
+    for (const entry of rebuilt) {
+      rebuiltById.set(entry.id, {
+        ...entry,
+        rootId: entry.parentId == null ? entry.id : rid,
+        kind: entry.parentId == null ? "root" : "cut",
+      });
+    }
+  }
+
+  return items.map((entry) => rebuiltById.get(entry.id) ?? entry);
+}
+
+function findSpatialParentFromSortedCandidates(
+  component: SavedComponent,
+  sortedCandidates: SavedComponent[],
+  root: SavedComponent | null,
+): SavedComponent | null {
+  for (const candidate of sortedCandidates) {
+    if (candidate.id === component.id) continue;
+    if (isSpatialParent(candidate.box, component.box)) return candidate;
+  }
+  return root;
+}
+
 export function ensureRootComponent(items: SavedComponent[], item: ToolReference): SavedComponent[] {
-  const root = createRootComponent(item);
-  let hasRoot = false;
-  const normalized = items.map((entry) => {
-    if (entry.id !== root.id) return entry;
-    hasRoot = true;
+  const defaultRoot = createRootComponent(item);
+
+  // 1. Upsert the implicit full-image default root. If the default-id root has been
+  // redefined (trimmed) into a real root, preserve its box/dataUrl/name instead of
+  // pinning it back to the full image — the original is not necessarily the root.
+  let hasDefault = false;
+  let normalized = items.map((entry) => {
+    if (entry.id !== defaultRoot.id) return entry;
+    hasDefault = true;
+    if (entry.isDefaultRoot === false) {
+      return { ...entry, parentId: null, kind: "root" as const, rootId: defaultRoot.id };
+    }
     return {
       ...entry,
-      name: root.name,
-      box: root.box,
-      dataUrl: root.dataUrl,
-      type: root.type,
+      name: "root",
+      box: defaultRoot.box,
+      dataUrl: defaultRoot.dataUrl,
+      type: defaultRoot.type,
       parentId: null,
+      kind: "root" as const,
+      rootId: defaultRoot.id,
+      isDefaultRoot: true,
     };
   });
+  if (!hasDefault) normalized = [defaultRoot, ...normalized];
 
-  if (!hasRoot) normalized.unshift(root);
+  // 2. Every parentless node is a root that owns its own stack.
+  normalized = normalized.map((entry) =>
+    entry.parentId == null
+      ? { ...entry, parentId: null, kind: "root" as const, rootId: entry.id }
+      : entry,
+  );
 
-  const ids = new Set(normalized.map((entry) => entry.id));
-  const withParents = normalized.map((entry) => {
-    if (entry.id === root.id) return entry;
-    if (entry.parentId && ids.has(entry.parentId) && entry.parentId !== entry.id) return entry;
-    return { ...entry, parentId: root.id };
+  const rootIds = new Set(
+    normalized.filter((entry) => entry.parentId == null).map((entry) => entry.id),
+  );
+  const byId = new Map(normalized.map((entry) => [entry.id, entry]));
+
+  const resolveRootForCut = (entry: SavedComponent): string => {
+    if (entry.rootId && rootIds.has(entry.rootId)) return entry.rootId;
+    let current: SavedComponent | undefined = entry;
+    let guard = 0;
+    while (current && guard < normalized.length) {
+      if (current.parentId == null) {
+        return rootIds.has(current.id) ? current.id : defaultRoot.id;
+      }
+      const parent = byId.get(current.parentId);
+      if (!parent) break;
+      current = parent;
+      guard += 1;
+    }
+    return defaultRoot.id;
+  };
+
+  // 3. Assign each cut's owning root and guarantee its parent still resolves.
+  normalized = normalized.map((entry) => {
+    if (entry.parentId == null) return entry;
+    const rid = resolveRootForCut(entry);
+    const parentExists = Boolean(entry.parentId && byId.has(entry.parentId) && entry.parentId !== entry.id);
+    return { ...entry, kind: "cut" as const, rootId: rid, parentId: parentExists ? entry.parentId : rid };
   });
 
-  const withRootFirst = [
-    ...withParents.filter((entry) => entry.id === root.id),
-    ...withParents.filter((entry) => entry.id !== root.id),
-  ];
-
-  return rebuildComponentHierarchy(withRootFirst, root.id);
+  // 4. Re-infer spatial nesting within each root group.
+  return rebuildAllRoots(normalized, defaultRoot.id);
 }
 
 export function referenceStackDataFromComponents(input: {
@@ -181,12 +267,17 @@ export function referenceStackDataFromComponents(input: {
   components: SavedComponent[];
   rootComponentId: string;
   primaryComponentId: string;
+  mediaKind?: ReferenceStackData["mediaKind"];
 }): ReferenceStackData {
   const updatedAt = new Date().toISOString();
+  const defaultRootId = input.rootComponentId;
+  const roots = input.components.filter((component) => component.parentId == null);
+  const cuts = input.components.filter((component) => component.parentId != null);
+
   return {
-    version: 1,
+    version: 2,
     referenceId: input.item.id,
-    mediaKind: "image",
+    mediaKind: input.mediaKind ?? "image",
     original: {
       name: input.item.name,
       type: input.item.type || "IMG",
@@ -194,18 +285,28 @@ export function referenceStackDataFromComponents(input: {
       w: input.item.w,
       h: input.item.h,
     },
-    rootComponentId: input.rootComponentId,
+    roots: roots.map((root): ReferenceStackRoot => {
+      const isDefault = root.isDefaultRoot ?? root.id === defaultRootId;
+      return {
+        id: root.id,
+        name: isDefault ? "root" : root.name,
+        box: root.box,
+        file: isDefault ? null : safeStackFileName(root.id),
+        isDefault,
+        createdAt: root.createdAt || updatedAt,
+      };
+    }),
+    // Legacy single-root fields kept for v1 readers.
+    rootComponentId: defaultRootId,
     primaryComponentId: input.primaryComponentId,
-    components: input.components.map((component) => ({
+    components: cuts.map((component) => ({
       id: component.id,
-      name: component.id === input.rootComponentId ? "root" : component.name,
+      name: component.name,
       type: component.type || "PNG",
       box: component.box,
-      file: component.id === input.rootComponentId ? null : safeStackFileName(component.id),
-      parentId:
-        component.id === input.rootComponentId
-          ? null
-          : component.parentId ?? input.rootComponentId,
+      file: safeStackFileName(component.id),
+      parentId: component.parentId ?? component.rootId ?? defaultRootId,
+      rootId: component.rootId ?? defaultRootId,
       createdAt: component.createdAt || updatedAt,
     })),
     updatedAt,
@@ -240,66 +341,157 @@ export async function writeReferenceStackFromComponents(input: {
   primaryComponentId: string;
 }): Promise<ReferenceStackData | null> {
   const components = ensureRootComponent(input.components, input.item);
-  const stackComponents = components.filter((component) => component.id !== input.rootComponentId);
-  await saveReferenceFile(input.item.id, await dataUrlToBlob(input.item.url));
-  await removeReferenceStack(input.item.id);
+  // Persist a PNG for every cut and every non-default root (the default root's
+  // pixels are the original image, so it needs no file).
+  const filesToWrite = components.filter(
+    (component) => component.parentId != null || !component.isDefaultRoot,
+  );
 
-  if (stackComponents.length === 0) {
+  if (filesToWrite.length === 0) {
+    await removeReferenceStack(input.item.id);
     await updateReferenceStackMeta(input.item.id, null);
     return null;
   }
 
   const data = referenceStackDataFromComponents({ ...input, components });
 
-  for (const component of stackComponents) {
-    const fileName = safeStackFileName(component.id);
-    const blob = await dataUrlToBlob(component.dataUrl);
-    await saveReferenceStackFile(input.item.id, fileName, blob);
-  }
+  const files = await mapWithConcurrency(
+    filesToWrite,
+    REFERENCE_STACK_IO_CONCURRENCY,
+    async (component) => ({
+      fileName: safeStackFileName(component.id),
+      dataB64: await dataUrlToBase64(component.dataUrl),
+    }),
+  );
 
-  await writeReferenceStackData(input.item.id, data);
+  await writeReferenceStackBatch(input.item.id, files, data);
   await updateReferenceStackMeta(input.item.id, data);
   return data;
 }
 
-export async function readReferenceStackComponents(
-  item: ToolReference,
-): Promise<{ items: SavedComponent[]; primaryComponentId: string } | null> {
-  const data = await readReferenceStackData(item.id);
-  if (!data || data.components.length === 0) return null;
-
-  const items: SavedComponent[] = [];
-  for (const component of data.components) {
-    if (component.id === data.rootComponentId) {
-      items.push({
-        id: component.id,
-        name: "root",
-        box: { x: 0, y: 0, w: item.w || component.box.w, h: item.h || component.box.h },
-        dataUrl: item.url,
-        type: item.type || component.type || "IMG",
-        createdAt: component.createdAt,
-        parentId: null,
-      });
-      continue;
-    }
-
-    if (!component.file) continue;
-    const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
-    if (!blob) continue;
-    items.push({
-      id: component.id,
-      name: component.name,
-      box: component.box,
-      dataUrl: await blobToDataUrl(blob),
-      type: component.type || "PNG",
-      createdAt: component.createdAt,
-      parentId: component.parentId,
-    });
+async function dataUrlToBase64(dataUrl: string): Promise<string> {
+  if (dataUrl.startsWith("data:")) {
+    const comma = dataUrl.indexOf(",");
+    return comma >= 0 ? dataUrl.slice(comma + 1) : "";
   }
+  // blob:/http: URL — round-trip through a Blob to obtain base64.
+  const asDataUrl = await blobToDataUrl(await dataUrlToBlob(dataUrl));
+  const comma = asDataUrl.indexOf(",");
+  return comma >= 0 ? asDataUrl.slice(comma + 1) : "";
+}
 
-  if (items.length <= 1) return null;
+export async function readReferenceStackComponents(item: ToolReference): Promise<{
+  items: SavedComponent[];
+  roots: ReferenceStackRoot[];
+  activeRootId: string;
+} | null> {
+  const data = await readReferenceStackData(item.id);
+  if (!data) return null;
+
+  const fallbackRootId = data.rootComponentId ?? sourceRootComponentId(item.id);
+  const rootsData: ReferenceStackRoot[] =
+    data.roots && data.roots.length > 0
+      ? data.roots
+      : [
+          {
+            id: fallbackRootId,
+            name: "root",
+            box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
+            file: null,
+            isDefault: true,
+            createdAt: data.updatedAt,
+          },
+        ];
+  const defaultRootId = rootsData.find((root) => root.isDefault)?.id ?? rootsData[0]?.id ?? fallbackRootId;
+
+  // Cuts that legacy v1 inlined the root into `components` are filtered out here.
+  const rootIdSet = new Set(rootsData.map((root) => root.id));
+  const cutRecords = data.components.filter((component) => !rootIdSet.has(component.id));
+
+  const [rootItems, cutItems] = await Promise.all([
+    mapWithConcurrency(rootsData, REFERENCE_STACK_IO_CONCURRENCY, async (root): Promise<SavedComponent> => {
+      if (root.isDefault || !root.file) {
+        return {
+          id: root.id,
+          name: "root",
+          box: { x: 0, y: 0, w: item.w || root.box.w, h: item.h || root.box.h },
+          dataUrl: item.url,
+          type: item.type || "IMG",
+          createdAt: root.createdAt,
+          parentId: null,
+          kind: "root",
+          rootId: root.id,
+          isDefaultRoot: true,
+        };
+      }
+      const blob = await loadReferenceStackFile(item.id, root.file, "image/png");
+      return {
+        id: root.id,
+        name: root.name,
+        box: root.box,
+        dataUrl: blob ? await blobToDataUrl(blob) : item.url,
+        type: "PNG",
+        createdAt: root.createdAt,
+        parentId: null,
+        kind: "root",
+        rootId: root.id,
+        isDefaultRoot: false,
+      };
+    }),
+    mapWithConcurrency(
+      cutRecords,
+      REFERENCE_STACK_IO_CONCURRENCY,
+      async (component): Promise<SavedComponent | null> => {
+        if (!component.file) return null;
+        const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
+        if (!blob) return null;
+        return {
+          id: component.id,
+          name: component.name,
+          box: component.box,
+          dataUrl: await blobToDataUrl(blob),
+          type: component.type || "PNG",
+          createdAt: component.createdAt,
+          parentId: component.parentId,
+          rootId: component.rootId ?? defaultRootId,
+          kind: "cut",
+        };
+      },
+    ),
+  ]);
+
+  const loaded = [...rootItems, ...cutItems.filter((component): component is SavedComponent => component != null)];
+  const items = ensureRootComponent(loaded, item);
+
+  const hasCuts = items.some((component) => component.parentId != null);
+  const rootCount = items.filter((component) => component.parentId == null).length;
+  if (!hasCuts && rootCount <= 1) return null;
+
   return {
-    items: ensureRootComponent(items, item),
-    primaryComponentId: data.primaryComponentId,
+    items,
+    roots: rootsData,
+    activeRootId: defaultRootId,
   };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await worker(items[index]!, index);
+      }
+    }),
+  );
+
+  return results;
 }

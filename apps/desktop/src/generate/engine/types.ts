@@ -31,6 +31,8 @@ export type ToolReferenceGroupItem = {
   url?: string;
 };
 
+export type ComponentKind = "root" | "cut";
+
 export type SavedComponent = {
   id: string;
   name: string;
@@ -39,11 +41,17 @@ export type SavedComponent = {
   type: string;
   createdAt: string;
   parentId?: string | null;
+  // A root is a top-level node (`parentId === null`). One reference may own many
+  // roots; each root is the source of its own independent stack.
+  kind?: ComponentKind;
+  // Owning root id. For a root this equals its own id. Denormalized so cuts can be
+  // grouped by stack in O(1) without walking the ancestor chain.
+  rootId?: string | null;
+  // The implicit full-image root created for every reference (back-compat).
+  isDefaultRoot?: boolean;
 };
 
-export type PendingConfirmation =
-  | { type: "primary"; componentId: string }
-  | { type: "reset" };
+export type PendingConfirmation = { type: "reset" };
 
 export type ComponentTreeNode = {
   component: SavedComponent;
@@ -63,6 +71,7 @@ export type ActiveSubject =
       w: number;
       h: number;
       originBox: CropBox;
+      rootId?: string | null;
     }
   | {
       kind: "component";
@@ -74,6 +83,7 @@ export type ActiveSubject =
       h: number;
       originBox: CropBox;
       component: SavedComponent;
+      rootId?: string | null;
     };
 
 export type DrawingPath = { points: Array<{ x: number; y: number }> };
@@ -141,7 +151,6 @@ export type PaintOverlayArgs = {
   editingComponentId: string | null;
   selectionMatchesExistingCut: boolean;
   selectionCrop: CropBox | null;
-  componentImageCache: Map<string, HTMLImageElement>;
 };
 
 export type PaintCropsArgs = {
@@ -149,10 +158,12 @@ export type PaintCropsArgs = {
   img: HTMLImageElement | null;
   toolZoom: number;
   components: SavedComponent[];
+  stackedComponents: SavedComponent[];
   activeSubject: ActiveSubject;
   rootComponentId: string;
   editingComponentId: string | null;
   showCropsOverlay: boolean;
   viewMode: ViewMode;
   overlayFill: string;
+  componentImageCache: Map<string, HTMLImageElement>;
 };

@@ -166,19 +166,38 @@ export function paintCropsCanvas(args: PaintCropsArgs) {
     img,
     toolZoom,
     components,
+    stackedComponents,
     activeSubject,
     rootComponentId,
     editingComponentId,
     showCropsOverlay,
     viewMode,
     overlayFill,
+    componentImageCache,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
   if (!setup || !img) return;
-  if (!showCropsOverlay || viewMode === "stack") return;
 
   const { ctx } = setup;
+  if (viewMode === "stack") {
+    ctx.imageSmoothingEnabled = toolZoom <= MIN_TOOL_ZOOM;
+    for (const component of stackedComponents) {
+      if (component.id === editingComponentId) continue;
+      const subjectBox = componentBoxInSubject(component.box, activeSubject);
+      if (!subjectBox) continue;
+      const rect = imageClientFromSubjectBox(subjectBox, img);
+      if (!rect) continue;
+      const cached = componentImageCache.get(component.id);
+      if (cached && cached.complete && cached.naturalWidth) {
+        ctx.drawImage(cached, rect.left, rect.top, rect.width, rect.height);
+      }
+    }
+    return;
+  }
+
+  if (!showCropsOverlay) return;
+
   ctx.fillStyle = overlayFill;
   for (const component of components) {
     if (component.id === rootComponentId) continue;
@@ -216,7 +235,6 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     editingComponentId,
     selectionMatchesExistingCut,
     selectionCrop,
-    componentImageCache,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
@@ -227,38 +245,21 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
   const stroke = 1 / safeZoom;
 
   if (viewMode === "stack") {
-    ctx.imageSmoothingEnabled = toolZoom <= MIN_TOOL_ZOOM;
-    for (let i = 0; i < stackedComponents.length; i++) {
-      const component = stackedComponents[i];
-      const subjectBox = componentBoxInSubject(component.box, activeSubject);
+    const outlinedIds = new Set(
+      [selectedComponentId, hoveredComponentId].filter((id): id is string => Boolean(id)),
+    );
+    for (const id of outlinedIds) {
+      const outlined = stackedComponents.find((component) => component.id === id);
+      if (!outlined) continue;
+      const subjectBox = componentBoxInSubject(outlined.box, activeSubject);
       if (!subjectBox) continue;
       const rect = imageClientFromSubjectBox(subjectBox, img);
       if (!rect) continue;
-      const cached = componentImageCache.get(component.id);
-      if (cached && cached.complete && cached.naturalWidth) {
-        ctx.drawImage(cached, rect.left, rect.top, rect.width, rect.height);
-      }
       const highlighted =
-        selectedComponentId === component.id || hoveredComponentId === component.id;
-      if (highlighted) {
-        ctx.strokeStyle = "#4C8DFF";
-        ctx.lineWidth = stroke;
-        ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
-      }
-    }
-
-    const focusedId = hoveredComponentId ?? selectedComponentId;
-    const focused = focusedId ? components.find((c) => c.id === focusedId) : null;
-    if (focused) {
-      const subjectBox = componentBoxInSubject(focused.box, activeSubject);
-      if (subjectBox) {
-        const rect = imageClientFromSubjectBox(subjectBox, img);
-        if (rect) {
-          ctx.strokeStyle = "#4C8DFF";
-          ctx.lineWidth = 1.5 * stroke;
-          ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
-        }
-      }
+        id === hoveredComponentId || (id === selectedComponentId && !hoveredComponentId);
+      ctx.strokeStyle = "#4C8DFF";
+      ctx.lineWidth = highlighted ? 1.5 * stroke : stroke;
+      ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
     }
   }
 

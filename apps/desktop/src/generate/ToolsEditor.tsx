@@ -1,19 +1,16 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type PointerEvent,
-  type WheelEvent,
 } from "react";
 import { Link } from "react-router-dom";
 import {
   Check,
   ChevronRight,
   Crop,
-  FolderOpen,
   Image as ImageIcon,
   Minus,
   Move,
@@ -25,10 +22,6 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TopBar } from "@/components/layout/TopBar";
 import { readFileAsDataUrl } from "@/lib/utils";
-import {
-  extFromName,
-  loadReferenceFile,
-} from "@/lib/tauri/referenceStorage";
 
 import type {
   CropBox,
@@ -46,14 +39,11 @@ import type {
 } from "./types";
 import {
   MIN_TOOL_ZOOM,
-  MAX_TOOL_ZOOM,
-  CROPS_OVERLAY_ALPHA,
   CROPS_OVERLAY_COLOR_STORAGE_KEY,
   COMPONENT_STORAGE_PREFIX,
 } from "./types";
 
 import {
-  clamp,
   clampToolPan,
   intersectCropBoxes,
   cropBoxFromPoints,
@@ -71,12 +61,7 @@ import {
   selectionHitTest,
   componentHitTest,
 } from "./engine/hitTesting";
-import {
-  hexToRgba,
-  roundedRectPath,
-  paintOverlayCanvas,
-  paintCropsCanvas,
-} from "./engine/drawing";
+import { roundedRectPath } from "./engine/drawing";
 import {
   sourceRootComponentId,
   createRootComponent,
@@ -92,13 +77,20 @@ import {
   componentAncestorIds,
 } from "./engine/componentTree";
 import {
-  readPrimaryComponentId,
-  writePrimaryComponentId,
   readSavedComponents,
   writeSavedComponents,
+  writeDraftComponents,
+  hasDraftComponents,
+  removeSavedComponents,
   readCropsOverlayColor,
 } from "./engine/storage";
-import { blobToDataUrl, inferType, measureImage, shortComponentName, waitForImage } from "./engine/image";
+import {
+  canvasToDataUrl,
+  inferType,
+  measureImage,
+  shortComponentName,
+  waitForImage,
+} from "./engine/image";
 
 import { ComponentTreeItem } from "./ui/ComponentTreeItem";
 import { ElementInfoCard } from "./ui/ElementInfoCard";
@@ -117,6 +109,10 @@ import {
   SidebarConfigPanel,
 } from "./ui/BuilderSidebar";
 import { ConfirmActionModal, confirmationDialogCopy } from "./ui/ConfirmModal";
+import { ReferenceGroupNavigator } from "./ui/ReferenceGroupNavigator";
+import { RootSwitcher } from "./ui/RootSwitcher";
+import { useBuilderViewport } from "./hooks/useBuilderViewport";
+import { useBuilderCanvasPainter } from "./hooks/useBuilderCanvasPainter";
 
 // Re-export CROPS_OVERLAY_COLOR_STORAGE_KEY and COMPONENT_STORAGE_PREFIX from types
 // but they are already imported above
@@ -135,9 +131,6 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageViewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const cropsCanvasRef = useRef<HTMLCanvasElement>(null);
-  const componentImageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const selectionInteractionRef = useRef<SelectionInteraction | null>(null);
 
   const [currentTool, setCurrentTool] = useState<EditorTool>("move");
@@ -149,8 +142,6 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   const [drawingPath, setDrawingPath] = useState<DrawingPath | null>(null);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [showCropsOverlay, setShowCropsOverlay] = useState(false);
-  const [toolZoom, setToolZoom] = useState(MIN_TOOL_ZOOM);
-  const [toolPan, setToolPan] = useState({ x: 0, y: 0 });
   const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -163,15 +154,22 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   );
   const [componentState, setComponentState] = useState<ComponentState>(() => ({
     key: componentKey,
-    items: ensureRootComponent(readSavedComponents(componentKey), item),
+    items: ensureRootComponent(
+      referenceId && item.id === referenceId && !hasDraftComponents(componentKey)
+        ? []
+        : readSavedComponents(componentKey),
+      item,
+    ),
   }));
-  const [primaryComponentId, setPrimaryComponentId] = useState(
-    () => readPrimaryComponentId(componentKey) ?? rootComponentId,
-  );
+  const [activeRootId, setActiveRootId] = useState(rootComponentId);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("components");
   const [cropsOverlayColor, setCropsOverlayColor] = useState<string>(
     () => readCropsOverlayColor(),
   );
+
+  const bumpPaintVersion = useCallback(() => {
+    setImagePaintVersion((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     try {
@@ -180,6 +178,17 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       // ignore quota errors
     }
   }, [cropsOverlayColor]);
+
+  const {
+    toolZoom,
+    toolPan,
+    setToolPan,
+    resetToolViewport,
+    handleStageWheel,
+    handleZoomIn,
+    handleZoomOut,
+    zoomPercent,
+  } = useBuilderViewport({ stageViewportRef, imgRef, imageError });
 
   const components =
     componentState.key === componentKey
@@ -195,28 +204,49 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
           item,
         );
         const next = ensureRootComponent(updater(base), item);
-        writeSavedComponents(componentKey, next);
+        if (referenceId && item.id === referenceId) {
+          writeDraftComponents(componentKey, next);
+        } else {
+          writeSavedComponents(componentKey, next);
+        }
         return { key: componentKey, items: next };
       });
     },
-    [componentKey, item],
+    [componentKey, item, referenceId],
   );
 
   const selectedComponent = components.find((component) => component.id === selectedComponentId) ?? null;
   const rootComponent = components.find((component) => component.id === rootComponentId) ?? createRootComponent(item);
-  const primaryScopeId = components.some((component) => component.id === primaryComponentId)
-    ? primaryComponentId
+  const roots = useMemo(() => {
+    const list = components.filter((component) => component.parentId == null);
+    return list.sort((a, b) => {
+      if (a.isDefaultRoot && !b.isDefaultRoot) return -1;
+      if (!a.isDefaultRoot && b.isDefaultRoot) return 1;
+      return (a.createdAt || "").localeCompare(b.createdAt || "");
+    });
+  }, [components]);
+  const activeScopeId = components.some((component) => component.id === activeRootId)
+    ? activeRootId
     : rootComponentId;
-  const primaryComponent = components.find((component) => component.id === primaryScopeId) ?? rootComponent;
+  const activeRoot = components.find((component) => component.id === activeScopeId) ?? rootComponent;
   const componentTree = useMemo(
-    () => buildComponentTree(components, primaryScopeId),
-    [components, primaryScopeId],
+    () => buildComponentTree(components, activeScopeId),
+    [components, activeScopeId],
   );
   const scopedComponents = useMemo(() => flattenComponentTree(componentTree), [componentTree]);
   const stackedComponents = useMemo(
-    () => scopedComponents.filter((component) => component.id !== primaryScopeId),
-    [primaryScopeId, scopedComponents],
+    () => scopedComponents.filter((component) => component.id !== activeScopeId),
+    [activeScopeId, scopedComponents],
   );
+  const cutCountByRoot = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const component of components) {
+      if (component.parentId == null) continue;
+      const rid = component.rootId ?? rootComponentId;
+      counts.set(rid, (counts.get(rid) ?? 0) + 1);
+    }
+    return counts;
+  }, [components, rootComponentId]);
 
   const activeSubject = useMemo<ActiveSubject>(() => {
     if (viewMode === "component" && selectedComponent) {
@@ -230,19 +260,21 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
         h: selectedComponent.box.h,
         originBox: selectedComponent.box,
         component: selectedComponent,
+        rootId: selectedComponent.rootId ?? selectedComponent.id,
       };
     }
 
     if (viewMode === "stack") {
       return {
         kind: "stack",
-        id: primaryComponent.id,
-        name: primaryComponent.name,
-        type: primaryComponent.type || "PNG",
-        url: primaryComponent.dataUrl,
-        w: primaryComponent.box.w,
-        h: primaryComponent.box.h,
-        originBox: primaryComponent.box,
+        id: activeRoot.id,
+        name: activeRoot.name,
+        type: activeRoot.type || "PNG",
+        url: activeRoot.dataUrl,
+        w: activeRoot.box.w,
+        h: activeRoot.box.h,
+        originBox: activeRoot.box,
+        rootId: activeRoot.id,
       };
     }
 
@@ -255,8 +287,9 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       w: item.w,
       h: item.h,
       originBox: { x: 0, y: 0, w: item.w, h: item.h },
+      rootId: rootComponentId,
     };
-  }, [item.h, item.id, item.name, item.type, item.url, item.w, primaryComponent, selectedComponent, viewMode]);
+  }, [activeRoot, item.h, item.id, item.name, item.type, item.url, item.w, rootComponentId, selectedComponent, viewMode]);
 
   const headerSubject =
     viewMode === "stack" && selectedComponent
@@ -267,6 +300,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
           type: selectedComponent.type || "PNG",
         }
       : activeSubject;
+  // Cutting happens inside an opened root (component view) and produces child
+  // components. Any component can later be promoted to a root via "Become root".
   const canCrop = activeSubject.kind === "component";
 
   const cancelSelection = useCallback(() => {
@@ -276,11 +311,6 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     setSelectionLocked(false);
     setDrawingPath(null);
     setEditingComponentId(null);
-  }, []);
-
-  const resetToolViewport = useCallback(() => {
-    setToolZoom(MIN_TOOL_ZOOM);
-    setToolPan({ x: 0, y: 0 });
   }, []);
 
   const expandComponentPath = useCallback(
@@ -353,22 +383,80 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     setViewMode("stack");
   }, [cancelSelection, resetToolViewport, stackedComponents.length]);
 
+  // Opening any node (root or cut) shows it as the editable subject and scopes the
+  // tree to its owning root. A root opens as its own croppable subject.
   const openComponent = useCallback(
     (id: string) => {
+      const component = components.find((entry) => entry.id === id);
+      const rid = component
+        ? component.parentId == null
+          ? component.id
+          : component.rootId ?? rootComponentId
+        : rootComponentId;
       cancelSelection();
       expandComponentPath(id);
+      setActiveRootId(rid);
       setSelectedComponentId(id);
       setViewMode("component");
       resetToolViewport();
     },
-    [cancelSelection, expandComponentPath, resetToolViewport],
+    [cancelSelection, components, expandComponentPath, resetToolViewport, rootComponentId],
+  );
+
+  // Select a root from the switcher and open it for editing.
+  const selectRoot = useCallback(
+    (id: string) => {
+      openComponent(id);
+    },
+    [openComponent],
+  );
+
+  // Open the full-image root with the crop tool ready, so the user can cut a region
+  // and then promote it to a root via "Become root".
+  const beginRootCreation = useCallback(() => {
+    cancelSelection();
+    setActiveRootId(rootComponentId);
+    setSelectedComponentId(rootComponentId);
+    setViewMode("component");
+    setCurrentTool("crop");
+    resetToolViewport();
+  }, [cancelSelection, resetToolViewport, rootComponentId]);
+
+  // Promote an existing component (and its subtree) into an independent root.
+  const promoteToRoot = useCallback(
+    (id: string) => {
+      const component = components.find((entry) => entry.id === id);
+      if (!component || component.parentId == null) return;
+      const subtree = componentSubtreeIds(components, id);
+      updateComponents((current) =>
+        current.map((entry) => {
+          if (entry.id === id) {
+            return { ...entry, parentId: null, kind: "root", rootId: id, isDefaultRoot: false };
+          }
+          if (subtree.has(entry.id)) return { ...entry, rootId: id };
+          return entry;
+        }),
+      );
+      cancelSelection();
+      setEditingComponentId(null);
+      setActiveRootId(id);
+      setSelectedComponentId(id);
+      setExpandedComponentIds((current) => {
+        const next = new Set(current);
+        next.add(id);
+        return next;
+      });
+      setViewMode("component");
+      resetToolViewport();
+    },
+    [cancelSelection, components, resetToolViewport, updateComponents],
   );
 
   const startEditComponent = useCallback(
     (id: string) => {
       const component = components.find((entry) => entry.id === id);
-      if (!component || id === rootComponentId) return;
-      const parentId = component.parentId ?? rootComponentId;
+      if (!component || component.parentId == null) return;
+      const parentId = component.parentId;
 
       selectionInteractionRef.current = null;
       setDrawing(false);
@@ -377,13 +465,9 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       setDrawingPath(null);
 
       expandComponentPath(parentId);
-      if (parentId === rootComponentId) {
-        setSelectedComponentId(null);
-        setViewMode("original");
-      } else {
-        setSelectedComponentId(parentId);
-        setViewMode("component");
-      }
+      setActiveRootId(component.rootId ?? rootComponentId);
+      setSelectedComponentId(parentId);
+      setViewMode("component");
 
       resetToolViewport();
       setEditingComponentId(id);
@@ -392,33 +476,11 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     [components, expandComponentPath, resetToolViewport, rootComponentId],
   );
 
-  const setPrimaryComponent = useCallback(
-    (id: string) => {
-      if (!components.some((component) => component.id === id)) return;
-      const keepIds = componentSubtreeIds(components, id);
-      writePrimaryComponentId(componentKey, id);
-      updateComponents((current) =>
-        current
-          .filter((component) => component.id === rootComponentId || keepIds.has(component.id))
-          .map((component) =>
-            component.id === id && component.parentId && !keepIds.has(component.parentId)
-              ? { ...component, parentId: rootComponentId }
-              : component,
-          ),
-      );
-      setPrimaryComponentId(id);
-      setExpandedComponentIds(new Set([id]));
-      openComponent(id);
-    },
-    [componentKey, components, openComponent, rootComponentId, updateComponents],
-  );
-
   const resetToOriginalRoot = useCallback(() => {
     const resetComponents = ensureRootComponent([], item);
     writeSavedComponents(componentKey, resetComponents);
-    writePrimaryComponentId(componentKey, rootComponentId);
     setComponentState({ key: componentKey, items: resetComponents });
-    setPrimaryComponentId(rootComponentId);
+    setActiveRootId(rootComponentId);
     setExpandedComponentIds(new Set([rootComponentId]));
     setSelectedComponentId(null);
     setCurrentTool("move");
@@ -426,46 +488,6 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     cancelSelection();
     resetToolViewport();
   }, [cancelSelection, componentKey, item, resetToolViewport, rootComponentId]);
-
-  const changeToolZoom = useCallback((direction: 1 | -1) => {
-    setToolZoom((current) => {
-      if (direction < 0 && current <= MIN_TOOL_ZOOM) return MIN_TOOL_ZOOM;
-      const multiplier = direction > 0 ? 1.14 : 1 / 1.14;
-      const next = clamp(current * multiplier, MIN_TOOL_ZOOM, MAX_TOOL_ZOOM);
-      const rounded = Number(next.toFixed(2));
-      setToolPan((pan) => clampToolPan(pan, rounded, stageViewportRef.current, imgRef.current));
-      return rounded;
-    });
-  }, []);
-
-  const handleStageWheel = useCallback(
-    (event: WheelEvent<HTMLDivElement>) => {
-      if (imageError) return;
-      event.preventDefault();
-
-      if (event.ctrlKey || event.metaKey || event.altKey || toolZoom <= MIN_TOOL_ZOOM) {
-        if (event.deltaY < 0) {
-          changeToolZoom(1);
-        } else if (toolZoom > MIN_TOOL_ZOOM) {
-          changeToolZoom(-1);
-        }
-        return;
-      }
-
-      setToolPan((pan) =>
-        clampToolPan(
-          {
-            x: pan.x - event.deltaX,
-            y: pan.y - event.deltaY,
-          },
-          toolZoom,
-          stageViewportRef.current,
-          imgRef.current,
-        ),
-      );
-    },
-    [changeToolZoom, imageError, toolZoom],
-  );
 
   const selectStackComponent = useCallback(
     (id: string) => {
@@ -487,32 +509,23 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     [openComponent, selectStackComponent, viewMode],
   );
 
-  const requestPrimaryConfirmation = useCallback((componentId: string) => {
-    setPendingConfirmation({ type: "primary", componentId });
-  }, []);
-
   const requestResetConfirmation = useCallback(() => {
     setPendingConfirmation({ type: "reset" });
   }, []);
 
   const confirmPendingAction = useCallback(() => {
-    const action = pendingConfirmation;
-    if (!action) return;
+    if (!pendingConfirmation) return;
     setPendingConfirmation(null);
-    if (action.type === "primary") {
-      setPrimaryComponent(action.componentId);
-      return;
-    }
     resetToOriginalRoot();
-  }, [pendingConfirmation, resetToOriginalRoot, setPrimaryComponent]);
+  }, [pendingConfirmation, resetToOriginalRoot]);
 
   const persistReferenceStack = useCallback(async () => {
     if (savingStack) return;
     setSavingStack(true);
     setStackSaveStatus(null);
     try {
-      writeSavedComponents(componentKey, components);
       if (!referenceId || item.id !== referenceId) {
+        writeSavedComponents(componentKey, components);
         setStackSaveStatus("Local state saved");
         return;
       }
@@ -520,31 +533,25 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       const data = await writeReferenceStackFromComponents({
         components,
         item,
-        primaryComponentId: primaryScopeId,
+        primaryComponentId: rootComponentId,
         rootComponentId,
       });
+      const cutCount = data?.components.length ?? 0;
+      const rootCount = Math.max(0, (data?.roots?.length ?? 1) - 1);
       setStackSaveStatus(
         data
-          ? `${data.components.length - 1} ${data.components.length - 1 === 1 ? "component saved" : "components saved"}`
+          ? `${cutCount} ${cutCount === 1 ? "cut" : "cuts"}` +
+              (rootCount > 0 ? `, ${rootCount} ${rootCount === 1 ? "root" : "roots"} saved` : " saved")
           : "Stack removed",
       );
+      removeSavedComponents(componentKey);
     } catch (err) {
       console.error("[tools] stack save failed:", err);
       setStackSaveStatus("Failed to save stack");
     } finally {
       setSavingStack(false);
     }
-  }, [componentKey, components, item, primaryScopeId, referenceId, rootComponentId, savingStack]);
-
-  const handleZoomIn = useCallback(() => {
-    changeToolZoom(1);
-  }, [changeToolZoom]);
-
-  const handleZoomOut = useCallback(() => {
-    if (toolZoom > MIN_TOOL_ZOOM) {
-      changeToolZoom(-1);
-    }
-  }, [changeToolZoom, toolZoom]);
+  }, [componentKey, components, item, referenceId, rootComponentId, savingStack]);
 
   const selectionToSubjectCoords = useCallback(
     (box: CropBox): CropBox | null => {
@@ -626,7 +633,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
           canvas.height,
         );
         if (radius > 0) ctx.restore();
-        dataUrl = canvas.toDataURL("image/png");
+        dataUrl = await canvasToDataUrl(canvas, "image/png");
       } catch {
         dataUrl = activeSubject.url;
       }
@@ -656,6 +663,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
 
     const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
     const parentId = activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
+    const rootId = activeSubject.rootId ?? activeScopeId;
     updateComponents((current) => [
       {
         id: nextId,
@@ -665,6 +673,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
         type: "PNG",
         createdAt: new Date().toISOString(),
         parentId,
+        kind: "cut",
+        rootId,
       },
       ...current,
     ]);
@@ -679,6 +689,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     resetToolViewport();
     cancelSelection();
   }, [
+    activeScopeId,
     activeSubject,
     canCrop,
     cancelSelection,
@@ -708,7 +719,6 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
           url,
         };
         writeSavedComponents(`${COMPONENT_STORAGE_PREFIX}${next.id}`, ensureRootComponent([], next));
-        writePrimaryComponentId(`${COMPONENT_STORAGE_PREFIX}${next.id}`, sourceRootComponentId(next.id));
         onUploadedLocally(next);
       } finally {
         setUploading(false);
@@ -721,20 +731,35 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   useEffect(() => {
     let cancelled = false;
 
-    const applyState = (items: SavedComponent[], preferredPrimaryId: string | null) => {
+    const hasContent = (items: SavedComponent[]) =>
+      items.some((component) => component.parentId != null) ||
+      items.filter((component) => component.parentId == null).length > 1;
+
+    const applyState = (
+      items: SavedComponent[],
+      preferredRootId: string | null,
+      persistDraft: boolean,
+    ) => {
       const next = ensureRootComponent(items, item);
-      const nextPrimaryId = preferredPrimaryId && next.some((component) => component.id === preferredPrimaryId)
-        ? preferredPrimaryId
+      const nextRootId = preferredRootId && next.some((component) => component.id === preferredRootId)
+        ? preferredRootId
         : rootComponentId;
-      const hasStack = next.some((component) => component.id !== rootComponentId);
-      writeSavedComponents(componentKey, next);
-      writePrimaryComponentId(componentKey, nextPrimaryId);
+      const hasStack = hasContent(next);
+      if (persistDraft) {
+        if (referenceId && item.id === referenceId) {
+          writeDraftComponents(componentKey, next);
+        } else {
+          writeSavedComponents(componentKey, next);
+        }
+      }
       setComponentState({ key: componentKey, items: next });
-      setPrimaryComponentId(nextPrimaryId);
-      setExpandedComponentIds(new Set([nextPrimaryId]));
+      setActiveRootId(nextRootId);
+      setExpandedComponentIds(new Set([nextRootId]));
       setImageError(false);
       setHoveredComponentId(null);
-      setSelectedComponentId(hasStack ? null : nextPrimaryId);
+      // Fresh image with no stack: open the default root for immediate cropping.
+      // Existing stack: land on the original overview so the user picks a root.
+      setSelectedComponentId(hasStack ? null : nextRootId);
       setViewMode(hasStack ? "original" : "component");
       resetToolViewport();
       cancelSelection();
@@ -742,12 +767,16 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       setStackSaveStatus(null);
     };
 
-    const localComponents = ensureRootComponent(readSavedComponents(componentKey), item);
-    const storedPrimaryId = readPrimaryComponentId(componentKey);
-    const hasLocalStack = localComponents.some((component) => component.id !== rootComponentId);
+    const hasDraft = hasDraftComponents(componentKey);
+    const shouldReadLocalImmediately = !referenceId || item.id !== referenceId || hasDraft;
+    const localComponents = ensureRootComponent(
+      shouldReadLocalImmediately ? readSavedComponents(componentKey) : [],
+      item,
+    );
+    const hasLocalStack = hasContent(localComponents);
 
-    if (!referenceId || item.id !== referenceId || hasLocalStack) {
-      applyState(localComponents, storedPrimaryId);
+    if (!referenceId || item.id !== referenceId || (hasDraft && hasLocalStack)) {
+      applyState(localComponents, rootComponentId, !referenceId || item.id !== referenceId || hasLocalStack);
       return () => {
         cancelled = true;
       };
@@ -755,11 +784,16 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
 
     void readReferenceStackComponents(item).then((savedStack) => {
       if (cancelled) return;
-      if (!savedStack) {
-        applyState(localComponents, storedPrimaryId);
+      if (savedStack) {
+        if (!hasDraft) removeSavedComponents(componentKey);
+        applyState(savedStack.items, savedStack.activeRootId, false);
         return;
       }
-      applyState(savedStack.items, savedStack.primaryComponentId);
+
+      const fallbackLocalComponents = hasDraft
+        ? localComponents
+        : ensureRootComponent(readSavedComponents(componentKey), item);
+      applyState(fallbackLocalComponents, rootComponentId, hasContent(fallbackLocalComponents));
     });
 
     return () => {
@@ -772,26 +806,6 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     setSelectedComponentId(null);
     setViewMode("original");
   }, [selectedComponent, selectedComponentId, viewMode]);
-
-  useEffect(() => {
-    const cache = componentImageCacheRef.current;
-    const activeIds = new Set(components.map((component) => component.id));
-    for (const id of Array.from(cache.keys())) {
-      if (!activeIds.has(id)) cache.delete(id);
-    }
-    for (const component of components) {
-      const existing = cache.get(component.id);
-      if (existing && existing.src === component.dataUrl) continue;
-      const image = new Image();
-      image.crossOrigin = "anonymous";
-      image.decoding = "async";
-      const handleSettled = () => setImagePaintVersion((value) => value + 1);
-      image.onload = handleSettled;
-      image.onerror = handleSettled;
-      image.src = component.dataUrl;
-      cache.set(component.id, image);
-    }
-  }, [components]);
 
   useEffect(() => {
     if (!editingComponentId || selection) return;
@@ -840,7 +854,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   }, [expandComponentPath, selectedComponentId]);
 
   useEffect(() => {
-    if (canCrop || (currentTool !== "crop" && currentTool !== "draw")) return;
+    if ((currentTool !== "crop" && currentTool !== "draw") || canCrop) return;
     setCurrentTool("move");
     cancelSelection();
   }, [canCrop, cancelSelection, currentTool]);
@@ -856,6 +870,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
         setTool("crop");
       } else if (event.key === "d" || event.key === "D") {
         setTool("draw");
+      } else if (event.key === "f" || event.key === "F") {
+        beginRootCreation();
       } else if (event.key === "Escape") {
         if (selection || drawingPath) cancelSelection();
       } else if (event.key === "Enter") {
@@ -865,20 +881,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cancelSelection, saveSelection, selection, selectionLocked, setTool]);
-
-  useEffect(() => {
-    const onResize = () => {
-      setImagePaintVersion((current) => current + 1);
-      setToolPan((pan) => clampToolPan(pan, toolZoom, stageViewportRef.current, imgRef.current));
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [toolZoom]);
-
-  useEffect(() => {
-    if (toolZoom <= MIN_TOOL_ZOOM) setToolPan({ x: 0, y: 0 });
-  }, [toolZoom]);
+  }, [beginRootCreation, cancelSelection, drawingPath, saveSelection, selection, selectionLocked, setTool]);
 
   const selectionCrop = selection ? selectionToSubjectCoords(selection) : null;
   const selectionSourceBox = selectionCrop && canCrop ? toOriginalCoords(selectionCrop) : null;
@@ -886,72 +889,37 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     selectionSourceBox &&
       componentAreaAlreadyExists(selectionSourceBox, scopedComponents, rootComponentId),
   );
-  const canSaveSelection = Boolean(selectionLocked && selectionCrop && canCrop);
+  const canSaveSelection = Boolean(
+    selectionLocked && selectionCrop && canCrop,
+  );
   const selectionSize = selectionCrop ?? { x: 0, y: 0, w: 0, h: 0 };
-  const zoomPercent = Math.round(toolZoom * 100);
   const confirmationCopy = pendingConfirmation
-    ? confirmationDialogCopy(pendingConfirmation, components)
+    ? confirmationDialogCopy(pendingConfirmation)
     : null;
   const showGroupNavigator = Boolean(groupContext && groupContext.references.length > 1);
 
-  useLayoutEffect(() => {
-    const overlayCanvas = overlayCanvasRef.current;
-    if (overlayCanvas) {
-      paintOverlayCanvas({
-        canvas: overlayCanvas,
-        img: imgRef.current,
-        toolZoom,
-        selection,
-        selectionLocked,
-        drawingPath,
-        viewMode,
-        components,
-        stackedComponents,
-        activeSubject,
-        rootComponentId,
-        selectedComponentId,
-        hoveredComponentId,
-        editingComponentId,
-        selectionMatchesExistingCut,
-        selectionCrop,
-        componentImageCache: componentImageCacheRef.current,
-      });
-    }
-    const cropsCanvas = cropsCanvasRef.current;
-    if (cropsCanvas) {
-      paintCropsCanvas({
-        canvas: cropsCanvas,
-        img: imgRef.current,
-        toolZoom,
-        components,
-        activeSubject,
-        rootComponentId,
-        editingComponentId,
-        showCropsOverlay,
-        viewMode,
-        overlayFill: hexToRgba(cropsOverlayColor, CROPS_OVERLAY_ALPHA),
-      });
-    }
-  }, [
-    activeSubject,
+  const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
+    imgRef,
     components,
-    cropsOverlayColor,
-    drawingPath,
-    editingComponentId,
-    hoveredComponentId,
-    imagePaintVersion,
-    rootComponentId,
-    selectedComponentId,
-    selection,
-    selectionCrop,
-    selectionLocked,
-    selectionMatchesExistingCut,
-    showCropsOverlay,
     stackedComponents,
-    toolPan,
-    toolZoom,
+    activeSubject,
+    rootComponentId,
     viewMode,
-  ]);
+    toolZoom,
+    toolPan,
+    selection,
+    selectionLocked,
+    selectionCrop,
+    selectionMatchesExistingCut,
+    drawingPath,
+    selectedComponentId,
+    hoveredComponentId,
+    editingComponentId,
+    showCropsOverlay,
+    cropsOverlayColor,
+    imagePaintVersion,
+    bumpPaintVersion,
+  });
 
   function updateIdleCursorAndHover(event: PointerEvent<HTMLDivElement>) {
     const stage = stageViewportRef.current;
@@ -960,8 +928,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     let nextHovered: string | null = null;
 
     if (point) {
-      const cropOrDraw = currentTool === "crop" || currentTool === "draw";
-      if (canCrop && selection && selectionLocked && cropOrDraw) {
+      const selectionTool = currentTool === "crop" || currentTool === "draw";
+      if (canCrop && selection && selectionLocked && selectionTool) {
         const hit = selectionHitTest(point, selection, true, toolZoom);
         if (hit?.kind === "radius") cursor = "grab";
         else if (hit?.kind === "resize") cursor = resizeCursor(hit.handle);
@@ -1274,7 +1242,9 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
               ref={stageViewportRef}
               className={[
                 "relative flex flex-1 items-center justify-center overflow-hidden p-8",
-                currentTool === "crop" || currentTool === "draw" ? "cursor-crosshair" : "cursor-default",
+                (currentTool === "crop" || currentTool === "draw") && canCrop
+                  ? "cursor-crosshair"
+                  : "cursor-default",
               ].join(" ")}
               onWheel={handleStageWheel}
               onPointerDown={handlePointerDown}
@@ -1295,12 +1265,14 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                 width={headerSubject.w}
                 height={headerSubject.h}
                 type={activeSubject.kind === "stack" && !selectedComponent ? "Full stack" : headerSubject.type || "—"}
-                thumbnailUrl={activeSubject.kind === "component" ? activeSubject.url : selectedComponent?.dataUrl ?? activeSubject.url}
-                canPromote={Boolean(selectedComponent && selectedComponent.id !== primaryScopeId)}
-                onPromote={() => {
-                  if (selectedComponent && selectedComponent.id !== primaryScopeId) {
-                    requestPrimaryConfirmation(selectedComponent.id);
-                  }
+                showBecomeRoot={Boolean(
+                  selectedComponent &&
+                    selectedComponent.parentId != null &&
+                    !editingComponentId &&
+                    !selection,
+                )}
+                onBecomeRoot={() => {
+                  if (selectedComponent) promoteToRoot(selectedComponent.id);
                 }}
               />
 
@@ -1334,7 +1306,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                       draggable={false}
                       onLoad={() => {
                         setImageError(false);
-                        setImagePaintVersion((current) => current + 1);
+                        bumpPaintVersion();
                       }}
                       onError={() => setImageError(true)}
                       className="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px]"
@@ -1344,7 +1316,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                   <canvas
                     ref={cropsCanvasRef}
                     className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-                    style={{ mixBlendMode: "screen" }}
+                    style={{ mixBlendMode: viewMode === "stack" ? "normal" : "screen" }}
                   />
                   <canvas
                     ref={overlayCanvasRef}
@@ -1397,29 +1369,34 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                   >
                     Cancelar
                   </button>
-                  <button
-                    type="button"
-                    data-selection-action
-                    disabled={!canSaveSelection}
-                    onClick={() => void saveSelection()}
-                    className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
-                  >
-                    <Check size={11} strokeWidth={2.2} />
-                    Save component
-                  </button>
+                  {canCrop ? (
+                    <button
+                      type="button"
+                      data-selection-action
+                      disabled={!canSaveSelection}
+                      onClick={() => void saveSelection()}
+                      className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
+                    >
+                      <Check size={11} strokeWidth={2.2} />
+                      Save component
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
                 {!canCrop ? (
-                  <span>Open a component from the tree to crop. Original and full stack are view-only.</span>
+                  <span>
+                    Open a root from the switcher to crop inside it. Click any component to{" "}
+                    <b className="text-[var(--text-muted)]">Become root</b>.
+                  </span>
                 ) : editingComponentId ? (
                   <span>
                     Editing existing crop. Adjust the box and <Key>Enter</Key> saves · <Key>Esc</Key> cancels
                   </span>
                 ) : currentTool === "crop" ? (
                   <span>
-                    Click and drag over the open subject. Child areas already cropped appear as a warning. <Key>Enter</Key> saves ·{" "}
+                    Click and drag over the open subject. <Key>Enter</Key> saves a component ·{" "}
                     <Key>Esc</Key> cancels
                   </span>
                 ) : currentTool === "draw" ? (
@@ -1429,7 +1406,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                   </span>
                 ) : (
                   <span>
-                    Select a component to crop inside it, or use <Key>C</Key> to crop or <Key>D</Key> to draw.
+                    Use <Key>C</Key> to crop or <Key>D</Key> to draw a component. Click a component to{" "}
+                    <b className="text-[var(--text-muted)]">Become root</b>.
                   </span>
                 )}
               </div>
@@ -1441,10 +1419,19 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
 
             {sidebarTab === "components" ? (
               <>
+                <RootSwitcher
+                  roots={roots}
+                  activeRootId={activeScopeId}
+                  cutCountByRoot={cutCountByRoot}
+                  onSelect={selectRoot}
+                  onNewRoot={beginRootCreation}
+                  creating={false}
+                />
+
                 <SidebarComponentsHeader
-                  primaryName={primaryComponent.name}
+                  rootName={activeRoot.isDefaultRoot ? "Full image" : activeRoot.name}
                   scopedCount={scopedComponents.length}
-                  showReset={primaryScopeId !== rootComponentId}
+                  showReset={components.length > 1}
                   onExpandAll={expandAllComponents}
                   onCollapseAll={collapseAllComponents}
                   onReset={requestResetConfirmation}
@@ -1460,7 +1447,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                       editingId={editingComponentId}
                       expandedIds={expandedComponentIds}
                       rootId={rootComponentId}
-                      primaryId={primaryScopeId}
+                      primaryId={activeScopeId}
                       onOpen={openTreeComponent}
                       onToggle={toggleComponentExpanded}
                       onHover={setHoveredComponentId}
@@ -1470,10 +1457,10 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                         updateComponents((current) =>
                           current.filter((entry) => !removedIds.has(entry.id)),
                         );
-                        if (removedIds.has(primaryScopeId)) {
-                          resetToOriginalRoot();
-                        }
-                        if (selectedComponentId && removedIds.has(selectedComponentId)) {
+                        if (removedIds.has(activeScopeId)) {
+                          setActiveRootId(rootComponentId);
+                          openOriginal();
+                        } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
                           openOriginal();
                         }
                       }}
@@ -1509,111 +1496,3 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   );
 }
 
-function ReferenceGroupNavigator({
-  group,
-  activeReferenceId,
-}: {
-  group: ToolReferenceGroupContext;
-  activeReferenceId: string;
-}) {
-  return (
-    <aside className="flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--bg-elev)]">
-      <div className="shrink-0 border-b border-[var(--border)] px-3 py-3">
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
-            <FolderOpen size={14} strokeWidth={1.8} />
-          </span>
-          <div className="min-w-0">
-            <h2 className="m-0 truncate text-[12.5px] font-semibold text-[var(--text)]">
-              {group.name}
-            </h2>
-            <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">
-              {group.references.length} {group.references.length === 1 ? "screen" : "screens"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
-        <div className="flex flex-col gap-1.5">
-          {group.references.map((reference) => {
-            const active = reference.id === activeReferenceId;
-            return (
-              <Link
-                key={reference.id}
-                to={`/tools?id=${encodeURIComponent(reference.id)}&groupId=${encodeURIComponent(group.id)}`}
-                className={[
-                  "flex min-w-0 gap-2 rounded-[10px] border p-1.5 text-left text-inherit no-underline transition-colors",
-                  active
-                    ? "border-[var(--border-strong)] bg-[var(--surface)]"
-                    : "border-transparent bg-transparent hover:border-[var(--border)] hover:bg-[rgba(255,255,255,0.02)]",
-                ].join(" ")}
-              >
-                <ReferenceGroupNavigatorThumbnail reference={reference} />
-                <span className="min-w-0 flex-1 py-0.5">
-                  <span className="block truncate text-[12px] font-medium text-[var(--text)]">
-                    {reference.name}
-                  </span>
-                  <span className="mt-0.5 block text-[10.5px] tabular-nums text-[var(--text-faint)]">
-                    {reference.w} x {reference.h}
-                  </span>
-                  {active ? (
-                    <span className="mt-1 inline-flex rounded-[4px] border border-[var(--border)] px-1.5 py-[2px] text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-muted)]">
-                      Open
-                    </span>
-                  ) : null}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function ReferenceGroupNavigatorThumbnail({
-  reference,
-}: {
-  reference: ToolReferenceGroupContext["references"][number];
-}) {
-  const [url, setUrl] = useState(reference.url ?? null);
-
-  useEffect(() => {
-    setUrl(reference.url ?? null);
-    if (reference.url) return;
-
-    let cancelled = false;
-    void loadReferenceNavigatorThumbnail(reference).then((loadedUrl) => {
-      if (!cancelled) setUrl(loadedUrl);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [reference.ext, reference.id, reference.name, reference.url]);
-
-  return (
-    <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-[7px] border border-[var(--border)] bg-[var(--bg)] text-[var(--text-faint)]">
-      {url ? (
-        <img
-          src={url}
-          alt={reference.name}
-          draggable={false}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <ImageIcon size={16} strokeWidth={1.6} />
-      )}
-    </span>
-  );
-}
-
-async function loadReferenceNavigatorThumbnail(
-  reference: ToolReferenceGroupContext["references"][number],
-): Promise<string | null> {
-  const blob = await loadReferenceFile(reference.id, reference.ext || extFromName(reference.name)).catch(
-    () => null,
-  );
-  return blob ? blobToDataUrl(blob) : null;
-}

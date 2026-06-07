@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ToolReference, ToolReferenceGroupContext } from "./engine/types";
 import {
@@ -28,9 +28,12 @@ export function Generate() {
   const [groupContext, setGroupContext] = useState<ToolReferenceGroupContext | null>(null);
   const [referenceLoading, setReferenceLoading] = useState(false);
   const requestedGroupId = searchParams.get("groupId");
+  const diskObjectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!referenceId) {
+      revokeObjectUrl(diskObjectUrlRef.current);
+      diskObjectUrlRef.current = null;
       setDiskReference(null);
       setGroupContext(null);
       setReferenceLoading(false);
@@ -38,20 +41,19 @@ export function Generate() {
     }
 
     let cancelled = false;
+    revokeObjectUrl(diskObjectUrlRef.current);
+    diskObjectUrlRef.current = null;
     setDiskReference(null);
     setGroupContext(null);
     setReferenceLoading(true);
     void readDiskReference(referenceId)
-      .then(async (reference) => {
-        const context = reference
-          ? await readToolReferenceGroupContext(referenceId, requestedGroupId, reference)
-          : null;
-        return { reference, context };
-      })
-      .then(({ reference, context }) => {
-        if (cancelled) return;
+      .then((reference) => {
+        if (cancelled) {
+          revokeObjectUrl(reference?.url);
+          return;
+        }
+        diskObjectUrlRef.current = reference?.url?.startsWith("blob:") ? reference.url : null;
         setDiskReference(reference);
-        setGroupContext(context);
       })
       .finally(() => {
         if (!cancelled) setReferenceLoading(false);
@@ -60,7 +62,31 @@ export function Generate() {
     return () => {
       cancelled = true;
     };
-  }, [referenceId, requestedGroupId]);
+  }, [referenceId]);
+
+  useEffect(() => {
+    return () => {
+      revokeObjectUrl(diskObjectUrlRef.current);
+      diskObjectUrlRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!referenceId || !diskReference) {
+      setGroupContext(null);
+      return;
+    }
+
+    let cancelled = false;
+    setGroupContext(null);
+    void readToolReferenceGroupContext(referenceId, requestedGroupId, diskReference).then((context) => {
+      if (!cancelled) setGroupContext(context);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [diskReference, referenceId, requestedGroupId]);
 
   const item = referenceId ? diskReference : localSource;
 
@@ -98,6 +124,12 @@ export function Generate() {
       }}
     />
   );
+}
+
+function revokeObjectUrl(url: string | null | undefined) {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
 }
 
 async function readToolReferenceGroupContext(

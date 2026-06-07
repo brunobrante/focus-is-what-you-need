@@ -1,18 +1,12 @@
+import { clamp, intersectBox, boxFromPoints, boundsOfPoints } from "@/domain/canvas/geometry";
 import type { CropBox, ActiveSubject, ResizeHandle, RadiusHandle } from "./types";
 import { RADIUS_HANDLE_MIN_INSET } from "./types";
 import { MIN_TOOL_ZOOM, SELECTION_MIN_SIZE } from "../types";
 
-export function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+export { clamp };
 
 export function intersectCropBoxes(a: CropBox, b: CropBox): CropBox | null {
-  const left = Math.max(a.x, b.x);
-  const top = Math.max(a.y, b.y);
-  const right = Math.min(a.x + a.w, b.x + b.w);
-  const bottom = Math.min(a.y + a.h, b.y + b.h);
-  if (right <= left || bottom <= top) return null;
-  return { x: left, y: top, w: right - left, h: bottom - top };
+  return intersectBox(a, b);
 }
 
 export function clampToolPan(
@@ -168,28 +162,11 @@ export function cropBoxFromPoints(
   start: { x: number; y: number },
   point: { x: number; y: number },
 ): CropBox {
-  return {
-    x: Math.min(start.x, point.x),
-    y: Math.min(start.y, point.y),
-    w: Math.abs(point.x - start.x),
-    h: Math.abs(point.y - start.y),
-  };
+  return boxFromPoints(start, point);
 }
 
 export function boundsFromDrawingPath(points: Array<{ x: number; y: number }>): CropBox | null {
-  if (points.length < 2) return null;
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const p of points) {
-    if (p.x < minX) minX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y > maxY) maxY = p.y;
-  }
-  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
-  return { x: minX, y: minY, w: Math.max(0, maxX - minX), h: Math.max(0, maxY - minY) };
+  return boundsOfPoints(points);
 }
 
 export function getContentPoint(
