@@ -101,6 +101,7 @@ export function startResizeInteraction(
     transformIds,
     startBox,
     startRects,
+    scaleMode: state.tool === "scale",
     commonParentId,
     parentBounds: draftMode
       ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])

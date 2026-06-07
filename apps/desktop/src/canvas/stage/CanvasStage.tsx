@@ -4,6 +4,7 @@ import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
 import { useEditor, useHoverStore } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { CanvasToolId } from "@/canvas/tools";
+import { isInsertTool } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import {
@@ -262,8 +263,9 @@ export function CanvasStage({
     [state.document, state.transientChangedIds],
   );
 
-  const isDrawTool = state.tool !== "select";
-  const shellClassName = `canvas-shell${isDrawTool ? " is-draw-tool" : ""}`;
+  const isDrawTool = isInsertTool(state.tool);
+  const isHandTool = state.tool === "hand";
+  const shellClassName = `canvas-shell${isDrawTool ? " is-draw-tool" : ""}${isHandTool ? " is-hand-tool" : ""}`;
   const shellStyle = useMemo(
     () => getShellPatternStyle(state.document),
     [state.document.shellBackground],

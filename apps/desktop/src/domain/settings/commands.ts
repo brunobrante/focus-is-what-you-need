@@ -26,6 +26,7 @@ export type CanvasCommandDefinition =
 export const CANVAS_TOOL_COMMANDS: Record<CanvasToolId, CanvasKeyCommandId> = {
   cursor: "canvas.tool.cursor",
   hand: "canvas.tool.hand",
+  scale: "canvas.tool.scale",
   wrapper: "canvas.tool.wrapper",
   rectangle: "canvas.tool.rectangle",
   ellipse: "canvas.tool.ellipse",
@@ -78,6 +79,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
     commands: [
       { id: "canvas.tool.cursor", label: "Select tool", group: "Tools", type: "key", toolbarToolId: "cursor" },
       { id: "canvas.tool.hand", label: "Hand tool", group: "Tools", type: "key", toolbarToolId: "hand" },
+      { id: "canvas.tool.scale", label: "Scale tool", group: "Tools", type: "key", toolbarToolId: "scale" },
       { id: "canvas.tool.wrapper", label: "Wrapper tool", group: "Tools", type: "key", toolbarToolId: "wrapper" },
       { id: "canvas.tool.rectangle", label: "Rectangle tool", group: "Tools", type: "key", toolbarToolId: "rectangle" },
       { id: "canvas.tool.ellipse", label: "Ellipse tool", group: "Tools", type: "key", toolbarToolId: "ellipse" },

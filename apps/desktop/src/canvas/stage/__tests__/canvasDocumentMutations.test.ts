@@ -197,6 +197,105 @@ test("resizes a 180 degree element from the visual handle direction", () => {
   });
 });
 
+test("scale tool resizes an element and its children proportionally", () => {
+  const document = createDocument();
+  document.rootIds = ["parent"];
+  document.elements = {
+    parent: {
+      id: "parent",
+      type: "rect",
+      parentId: null,
+      children: ["child"],
+      name: "Parent",
+      x: 100,
+      y: 80,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      styles: { borderRadius: 8 },
+    },
+    child: {
+      id: "child",
+      type: "text",
+      parentId: "parent",
+      children: [],
+      name: "Child",
+      x: 10,
+      y: 10,
+      width: 20,
+      height: 20,
+      rotation: 0,
+      styles: { fontSize: 12 },
+    },
+  };
+
+  const interaction: ResizeInteraction = {
+    type: "resize",
+    handle: "se",
+    pointerId: 1,
+    startPoint: { x: 200, y: 180 },
+    beforeDocument: document,
+    selectedIds: ["parent"],
+    transformIds: ["parent"],
+    startBox: { x: 100, y: 80, width: 100, height: 100 },
+    startRects: { parent: { x: 100, y: 80, width: 100, height: 100 } },
+    scaleMode: true,
+    commonParentId: null,
+    parentBounds: { x: 0, y: 0, width: 500, height: 500 },
+    moved: true,
+    lastDocument: document,
+    lastGuides: [],
+  };
+
+  // Drag the SE corner by +100 in both axes → uniform 2x scale.
+  const result = resizeDocument(
+    interaction,
+    { x: 300, y: 280 },
+    { altKey: false, shiftKey: false } as ReactPointerEvent,
+  );
+
+  expect(result.document.elements.parent).toMatchObject({ x: 100, y: 80, width: 200, height: 200 });
+  expect(result.document.elements.parent.styles.borderRadius).toBe(16);
+  // Child keeps its proportional placement and grows with the parent.
+  expect(result.document.elements.child).toMatchObject({ x: 20, y: 20, width: 40, height: 40 });
+  expect(result.document.elements.child.styles.fontSize).toBe(24);
+});
+
+test("scale tool grows uniformly even when dragging a single-axis edge handle", () => {
+  const document = createDocument();
+  // node: 50x40 at (100,80); start box matches.
+  const interaction: ResizeInteraction = {
+    type: "resize",
+    handle: "e",
+    pointerId: 1,
+    startPoint: { x: 150, y: 100 },
+    beforeDocument: document,
+    selectedIds: ["node"],
+    transformIds: ["node"],
+    startBox: { x: 100, y: 80, width: 50, height: 40 },
+    startRects: { node: { x: 100, y: 80, width: 50, height: 40 } },
+    scaleMode: true,
+    commonParentId: null,
+    parentBounds: { x: 0, y: 0, width: 500, height: 500 },
+    moved: true,
+    lastDocument: document,
+    lastGuides: [],
+  };
+
+  // Drag the east edge by +50 → width doubles, and height scales to match (uniform).
+  const result = resizeDocument(
+    interaction,
+    { x: 200, y: 100 },
+    { altKey: false, shiftKey: false } as ReactPointerEvent,
+  );
+
+  expect(result.document.elements.node.width).toBe(100);
+  expect(result.document.elements.node.height).toBe(80);
+  // East-edge anchor keeps the west edge fixed; vertical center is preserved.
+  expect(result.document.elements.node.x).toBe(100);
+  expect(result.document.elements.node.y).toBe(60);
+});
+
 test("fits text bounds to the current content and font size", () => {
   const document = createDocument();
   document.rootIds = ["node"];

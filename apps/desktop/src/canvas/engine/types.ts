@@ -1,6 +1,23 @@
 export type ElementType = "rect" | "ellipse" | "text" | "image" | "icon" | "line" | "arrow" | "polygon" | "star";
 
-export type Tool = "select" | "rect" | "ellipse" | "text" | "image" | "icon" | "wrapper" | "line" | "arrow" | "polygon" | "star";
+export type Tool = "select" | "hand" | "scale" | "rect" | "ellipse" | "text" | "image" | "icon" | "wrapper" | "line" | "arrow" | "polygon" | "star";
+
+/**
+ * Tools that insert a new element on the canvas. Excludes the non-inserting
+ * "select", "scale" (a selection variant that resizes proportionally), and
+ * "hand" (pan) tools.
+ */
+export type InsertTool = Exclude<Tool, "select" | "hand" | "scale">;
+
+/** Selection-style tools: they pick/move existing elements rather than insert. */
+export function isSelectionTool(tool: Tool): boolean {
+  return tool === "select" || tool === "scale";
+}
+
+/** Tools that create a new element when the pointer is pressed on the canvas. */
+export function isInsertTool(tool: Tool): tool is InsertTool {
+  return tool !== "select" && tool !== "hand" && tool !== "scale";
+}
 
 export type ShellGridType = "dots" | "squares";
 
@@ -123,6 +140,9 @@ export type EditorState = {
   offsetY: number;
   guides: SnapGuide[];
   exportOpen: boolean;
+  // True while a transient pan gesture (middle-mouse / space-drag) is in flight.
+  // Drives the toolbar's "hand" affordance without changing the persistent tool.
+  panning: boolean;
   past: CanvasDocument[];
   future: CanvasDocument[];
   // Set only by the transient action that carried it (drag/resize/rotate/radius
@@ -202,6 +222,9 @@ export type ResizeInteraction = BaseInteraction & {
   type: "resize";
   handle: ResizeHandle;
   startRects: Record<string, Rect>;
+  // When the Scale tool is active: resize uniformly (proportionally) and apply the
+  // same scale factor to every descendant of the resized element(s).
+  scaleMode?: boolean;
 };
 
 export type RotateInteraction = BaseInteraction & {
@@ -228,7 +251,7 @@ export type DrawInteraction = {
   type: "draw";
   pointerId: number;
   startPoint: Point;
-  tool: Exclude<Tool, "select">;
+  tool: InsertTool;
   elementId: string;
   elementSizeScale?: number;
   beforeDocument: CanvasDocument;

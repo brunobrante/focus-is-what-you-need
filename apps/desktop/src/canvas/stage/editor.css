@@ -62,6 +62,18 @@
   cursor: crosshair;
 }
 
+.canvas-shell.is-hand-tool,
+.canvas-shell.is-hand-tool .canvas-stage,
+.canvas-shell.is-hand-tool .stage-space {
+  cursor: grab;
+}
+
+.canvas-shell.is-hand-tool.is-panning,
+.canvas-shell.is-hand-tool.is-panning .canvas-stage,
+.canvas-shell.is-hand-tool.is-panning .stage-space {
+  cursor: grabbing;
+}
+
 .render-layer {
   position: absolute;
   inset: 0;

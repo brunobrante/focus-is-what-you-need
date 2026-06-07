@@ -11,6 +11,8 @@ export function getShellPatternStyle(document: CanvasDocument): CSSProperties {
 
 export const TOOLBAR_TOOL_MAP: Record<string, Tool> = {
   cursor: "select",
+  hand: "hand",
+  scale: "scale",
   wrapper: "wrapper",
   rectangle: "rect",
   ellipse: "ellipse",
@@ -25,6 +27,8 @@ export const TOOLBAR_TOOL_MAP: Record<string, Tool> = {
 
 export const EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP: Partial<Record<Tool, CanvasToolId>> = {
   select: "cursor",
+  hand: "hand",
+  scale: "scale",
   wrapper: "wrapper",
   rect: "rectangle",
   ellipse: "ellipse",

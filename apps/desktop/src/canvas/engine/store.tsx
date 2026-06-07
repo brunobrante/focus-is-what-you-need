@@ -19,6 +19,7 @@ const STORAGE_KEY = CURRENT_CANVAS_STORAGE_KEY;
 
 export type EditorAction =
   | { type: "setTool"; tool: Tool }
+  | { type: "setPanning"; panning: boolean }
   | { type: "setZoom"; zoom: number }
   | { type: "setViewport"; zoom?: number; offsetX?: number; offsetY?: number }
   | { type: "setSelected"; selectedIds: string[] }
@@ -142,6 +143,7 @@ function createInitialState(
     offsetY: 0,
     guides: [],
     exportOpen: false,
+    panning: false,
     past: [],
     future: [],
     transientChangedIds: null,
@@ -152,7 +154,10 @@ type Handler<A extends EditorAction> = (state: EditorState, action: A) => Editor
 
 const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { type: K }>> } = {
   setTool(state, action) {
-    const isolatedParentId = action.tool === "select" ? state.isolatedParentId : null;
+    // "scale" is a selection-style tool, so it preserves the isolated-parent
+    // context exactly like "select"; insert tools and "hand" clear it.
+    const keepsIsolation = action.tool === "select" || action.tool === "scale";
+    const isolatedParentId = keepsIsolation ? state.isolatedParentId : null;
     if (
       state.tool === action.tool &&
       state.isolatedParentId === isolatedParentId &&
@@ -161,6 +166,10 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       return state;
     }
     return { ...state, tool: action.tool, isolatedParentId, editingTextId: null };
+  },
+  setPanning(state, action) {
+    if (state.panning === action.panning) return state;
+    return { ...state, panning: action.panning };
   },
   setZoom(state, action) {
     const limits = getViewportZoomLimits(state.viewportMode);

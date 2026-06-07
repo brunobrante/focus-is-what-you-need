@@ -1,6 +1,7 @@
 export type CanvasToolId =
   | "cursor"
   | "hand"
+  | "scale"
   | "wrapper"
   | "rectangle"
   | "ellipse"
@@ -14,7 +15,7 @@ export type CanvasToolId =
   | "svg"
   | "actions";
 
-export type CanvasInsertToolId = Exclude<CanvasToolId, "cursor" | "hand">;
+export type CanvasInsertToolId = Exclude<CanvasToolId, "cursor" | "hand" | "scale">;
 
 const INSERT_TOOLS: CanvasToolId[] = [
   "wrapper",

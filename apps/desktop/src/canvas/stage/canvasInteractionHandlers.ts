@@ -282,6 +282,17 @@ export function handleCanvasRotateMove(
   dispatch({ type: "setDocumentTransient", document: next, changedIds: [] });
 }
 
+// The Scale tool mutates every descendant of the resized element(s), so the
+// transient render set must include them — unlike a normal resize, where nested
+// children move with their parent via layout and don't re-render.
+function resizeScaleChangedIds(interaction: ResizeInteraction): string[] {
+  const ids = new Set<string>(interaction.transformIds);
+  for (const id of interaction.transformIds) {
+    for (const descId of getDescendantIds(interaction.beforeDocument, id)) ids.add(descId);
+  }
+  return Array.from(ids);
+}
+
 export function handleTransformMove(
   interaction: ResizeInteraction | RotateInteraction | RadiusInteraction,
   point: Point,
@@ -300,7 +311,11 @@ export function handleTransformMove(
   if ("lastGuides" in interaction) interaction.lastGuides = result.guides;
   latestDocumentRef.current = result.document;
   const changedIds =
-    interaction.type === "radius" ? [interaction.elementId] : interaction.transformIds;
+    interaction.type === "radius"
+      ? [interaction.elementId]
+      : interaction.type === "resize" && interaction.scaleMode
+        ? resizeScaleChangedIds(interaction)
+        : interaction.transformIds;
   dispatch({
     type: "setDocumentTransient",
     document: result.document,

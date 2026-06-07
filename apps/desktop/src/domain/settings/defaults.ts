@@ -34,6 +34,9 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
   "canvas.viewport.pan": [{ code: "Space" }],
   "canvas.tool.cursor": [{ key: "v" }],
   "canvas.tool.hand": [{ key: "h" }],
+  // "k" (Figma's scale key) is taken by the actions menu, so Scale defaults to "e".
+  // Bindings are user-rebindable in settings.
+  "canvas.tool.scale": [{ key: "e" }],
   "canvas.tool.wrapper": [{ key: "w" }],
   "canvas.tool.rectangle": [{ key: "r" }],
   "canvas.tool.ellipse": [{ key: "o" }],
@@ -64,7 +67,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       defaultTool: "cursor",
       toolbar: {
         groups: [
-          [{ kind: "dropdown", tools: ["cursor", "hand"] }],
+          [{ kind: "dropdown", tools: ["cursor", "hand", "scale"] }],
           [
             { kind: "button", tool: "wrapper" },
             {

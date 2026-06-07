@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import { getCommonParentId, getParentBounds, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget } from "@/canvas/engine/hitTesting";
 import type { EditorState, Point, Rect } from "@/canvas/engine/types";
+import { isInsertTool, isSelectionTool } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import { buildViewportTransform } from "../canvasCoordinates";
@@ -138,8 +139,18 @@ export function useCanvasPointerEvents({
     if (contextMenu) setContextMenu(null);
 
     const viewport = viewportRef.current;
-    if (event.button === 1 || (event.button === 0 && spacePressedRef.current)) {
-      if (viewport) startPanInteraction(event, { state, draftMode, viewport, interactionRef, setInteractionActive, getCurrentViewportSize });
+    // Pan when: middle mouse, space held (temporary pan), or the Hand tool is the
+    // active tool and the user presses the left button.
+    if (
+      event.button === 1 ||
+      (event.button === 0 && (spacePressedRef.current || state.tool === "hand"))
+    ) {
+      if (viewport) {
+        startPanInteraction(event, { state, draftMode, viewport, interactionRef, setInteractionActive, getCurrentViewportSize });
+        // Flag the transient pan so the toolbar shows the Hand affordance for the
+        // duration of the gesture (reverts on release; see finishInteraction).
+        dispatch({ type: "setPanning", panning: true });
+      }
       return;
     }
     if (event.button !== 0) return;
@@ -186,7 +197,7 @@ export function useCanvasPointerEvents({
     if (!point || !viewport) return;
 
     if (!draftMode && !isPointInsideCanvas(point, state.document)) {
-      if (state.tool === "select") {
+      if (isSelectionTool(state.tool)) {
         dispatch({ type: "setSelected", selectedIds: [] });
         interactionRef.current = { type: "marquee", pointerId: event.pointerId, startPoint: point, currentPoint: point, moved: false };
         setInteractionActive(true);
@@ -196,7 +207,7 @@ export function useCanvasPointerEvents({
       return;
     }
 
-    if (state.tool !== "select") {
+    if (isInsertTool(state.tool)) {
       event.preventDefault();
       const elementSizeScale = draftMode ? DRAFT_ELEMENT_SIZE_SCALE : undefined;
       const node = createElementForTool(
@@ -337,7 +348,12 @@ export function useCanvasPointerEvents({
     interactionRef.current = null;
     setInteractionActive(false);
 
-    if (interaction.type === "pan") return;
+    if (interaction.type === "pan") {
+      // End the transient pan affordance: the toolbar reverts to the persistent
+      // tool (e.g. Select) unless Hand is the actual active tool.
+      dispatch({ type: "setPanning", panning: false });
+      return;
+    }
     if (interaction.type === "canvas-resize" || interaction.type === "canvas-rotate") {
       if (interaction.moved) dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: interaction.lastDocument });
       return;

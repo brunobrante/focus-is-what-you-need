@@ -1,10 +1,10 @@
-import type { ElementNode, ElementType, Tool } from "../types";
+import type { ElementNode, ElementType, InsertTool } from "../types";
 import { clamp, roundPixel } from "../geometry";
 import { createId } from "./coreUtils";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 
-const TOOL_TYPES: Record<Exclude<Tool, "select">, ElementType> = {
+const TOOL_TYPES: Record<InsertTool, ElementType> = {
   wrapper: "rect",
   rect: "rect",
   ellipse: "ellipse",
@@ -18,7 +18,7 @@ const TOOL_TYPES: Record<Exclude<Tool, "select">, ElementType> = {
 };
 
 const DEFAULT_SIZE_RANGES: Record<
-  Exclude<Tool, "select">,
+  InsertTool,
   { width: [number, number]; height: [number, number]; fontSize?: [number, number] }
 > = {
   wrapper: { width: [40, 700], height: [40, 600] },
@@ -61,7 +61,7 @@ function scaleDefault(
 }
 
 export function createElementForTool(
-  tool: Exclude<Tool, "select">,
+  tool: InsertTool,
   x: number,
   y: number,
   canvasSize?: { width: number; height: number },

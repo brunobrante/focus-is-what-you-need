@@ -1,4 +1,4 @@
-import type { ElementType, ResizeHandle, Tool } from "./types";
+import type { ElementType, InsertTool, ResizeHandle } from "./types";
 
 export type DimensionRange = {
   min: number;
@@ -106,7 +106,7 @@ const DEFINITIONS: Record<ElementType, ElementDefinition> = {
   },
 };
 
-const TOOL_TO_ELEMENT_TYPE: Partial<Record<Exclude<Tool, "select">, ElementType>> = {
+const TOOL_TO_ELEMENT_TYPE: Partial<Record<InsertTool, ElementType>> = {
   rect: "rect",
   wrapper: "rect",
   ellipse: "ellipse",
@@ -123,7 +123,7 @@ export function getElementDefinition(type: ElementType): ElementDefinition {
   return DEFINITIONS[type];
 }
 
-export function getToolElementDefinition(tool: Exclude<Tool, "select">): ElementDefinition | undefined {
+export function getToolElementDefinition(tool: InsertTool): ElementDefinition | undefined {
   const type = TOOL_TO_ELEMENT_TYPE[tool];
   return type !== undefined ? DEFINITIONS[type] : undefined;
 }

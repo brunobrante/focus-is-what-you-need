@@ -8,11 +8,14 @@ import {
   clampRectToBounds,
   clampRotatedRectToBounds,
   getAbsoluteRect,
+  getDescendantIds,
   getEffectiveRotation,
   getParentBounds,
   getParentSize,
   MIN_ELEMENT_SIZE,
   normalizeAngle,
+  rectCenterX,
+  rectCenterY,
   resizeBoxFromHandle,
   resizeRotatedRectFromHandle,
   rotatePoint,
@@ -264,12 +267,116 @@ function resizeSingleElement(
   return { document: next, guides: [] };
 }
 
+/**
+ * The fixed point of a proportional scale, derived from the handle being dragged.
+ * Dragging a corner anchors the opposite corner; dragging an edge anchors the
+ * opposite edge's midline; Alt (resize-from-center) anchors the box center.
+ */
+function scaleAnchor(box: Rect, handle: string, fromCenter: boolean): Point {
+  if (fromCenter) return { x: rectCenterX(box), y: rectCenterY(box) };
+  const left = box.x;
+  const right = box.x + box.width;
+  const top = box.y;
+  const bottom = box.y + box.height;
+  let x = rectCenterX(box);
+  let y = rectCenterY(box);
+  if (handle.includes("w")) x = right;
+  else if (handle.includes("e")) x = left;
+  if (handle.includes("n")) y = bottom;
+  else if (handle.includes("s")) y = top;
+  return { x, y };
+}
+
+/** Numeric style properties scaled alongside an element's geometry. */
+const SCALABLE_STYLE_KEYS = ["fontSize", "borderRadius", "borderWidth", "gap", "padding"] as const;
+
+function applyScaledNode(
+  doc: CanvasDocument,
+  id: string,
+  geom: Rect,
+  scale: number,
+): void {
+  const node = mutateElementWithStyles(doc, id);
+  if (!node) return;
+  node.x = roundPixel(geom.x);
+  node.y = roundPixel(geom.y);
+  node.width = roundPixel(Math.max(geom.width, MIN_ELEMENT_SIZE));
+  node.height = roundPixel(Math.max(geom.height, MIN_ELEMENT_SIZE));
+  for (const key of SCALABLE_STYLE_KEYS) {
+    const value = node.styles[key];
+    if (typeof value === "number") node.styles[key] = roundPixel(value * scale);
+  }
+}
+
+/**
+ * Scale tool: resize the selected element(s) uniformly (proportionally) about the
+ * handle's anchor, and apply the same scale factor to every descendant — position,
+ * size, font size, radii, padding — so the whole subtree grows or shrinks together.
+ *
+ * Unlike a normal resize, dragging any handle (edge or corner) produces a single
+ * uniform scale factor, so the aspect ratio is always preserved.
+ */
+export function scaleDocument(
+  interaction: ResizeInteraction,
+  currentPoint: Point,
+  event: ReactPointerEvent,
+  settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
+): { document: CanvasDocument; guides: SnapGuide[] } {
+  const fromCenter = isModifierCommandActive(event, settings, "canvas.resize.fromCenter");
+  // Force aspect lock (shiftKey) so the box scales uniformly regardless of handle.
+  const nextBox = resizeBoxFromHandle(interaction.startBox, interaction.startPoint, currentPoint, interaction.handle, {
+    altKey: fromCenter,
+    shiftKey: true,
+  });
+  const scale = nextBox.width / Math.max(interaction.startBox.width, 1);
+  const anchor = scaleAnchor(interaction.startBox, interaction.handle, fromCenter);
+
+  const next = shallowCloneDocument(interaction.beforeDocument);
+  for (const id of interaction.transformIds) {
+    const startRect = interaction.startRects[id];
+    if (!startRect) continue;
+    // Selected element: similarity transform about the anchor in absolute space,
+    // then back to parent-relative coordinates (the parent itself is not scaled).
+    const parentBounds = getParentBounds(interaction.beforeDocument, id);
+    applyScaledNode(
+      next,
+      id,
+      {
+        x: anchor.x + (startRect.x - anchor.x) * scale - parentBounds.x,
+        y: anchor.y + (startRect.y - anchor.y) * scale - parentBounds.y,
+        width: startRect.width * scale,
+        height: startRect.height * scale,
+      },
+      scale,
+    );
+    // Descendants render nested inside the parent, so their parent-relative
+    // coordinates simply scale by the same factor.
+    for (const descId of getDescendantIds(interaction.beforeDocument, id)) {
+      const source = interaction.beforeDocument.elements[descId];
+      if (!source) continue;
+      applyScaledNode(
+        next,
+        descId,
+        {
+          x: source.x * scale,
+          y: source.y * scale,
+          width: source.width * scale,
+          height: source.height * scale,
+        },
+        scale,
+      );
+    }
+  }
+  return { document: next, guides: [] };
+}
+
 export function resizeDocument(
   interaction: ResizeInteraction,
   currentPoint: Point,
   event: ReactPointerEvent,
   settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
 ): { document: CanvasDocument; guides: SnapGuide[] } {
+  if (interaction.scaleMode) return scaleDocument(interaction, currentPoint, event, settings);
   if (interaction.transformIds.length === 1) return resizeSingleElement(interaction, currentPoint, event, settings);
   const fromCenter = isModifierCommandActive(event, settings, "canvas.resize.fromCenter");
   const constrainAspect = isModifierCommandActive(event, settings, "canvas.transform.constrainAspect");

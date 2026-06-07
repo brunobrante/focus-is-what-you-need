@@ -57,6 +57,12 @@ const ICONS: Record<CanvasToolId, ReactNode> = {
       <path d="M17 8.5a1.5 1.5 0 0 1 3 0v6.5c0 3.5-2.7 6-6.5 6S7 18.5 7 15v-2l-2-2.2a1.4 1.4 0 0 1 2-2L8 9.5" />
     </svg>
   ),
+  scale: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 5h6M5 5v6M5 5l6 6" />
+      <rect x="11" y="11" width="8" height="8" rx="1" />
+    </svg>
+  ),
   wrapper: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M7 3v18M17 3v18M3 7h18M3 17h18" />
@@ -134,6 +140,7 @@ const ICONS: Record<CanvasToolId, ReactNode> = {
 export const TOOL_ENTRIES: Record<CanvasToolId, ToolEntry> = {
   cursor:    { id: "cursor",    name: "Select",     icon: ICONS.cursor },
   hand:      { id: "hand",      name: "Hand",       icon: ICONS.hand },
+  scale:     { id: "scale",     name: "Scale",      icon: ICONS.scale },
   wrapper:   { id: "wrapper",   name: "Wrapper",    icon: ICONS.wrapper },
   rectangle: { id: "rectangle", name: "Rectangle",  icon: ICONS.rectangle },
   ellipse:   { id: "ellipse",   name: "Ellipse",    icon: ICONS.ellipse },

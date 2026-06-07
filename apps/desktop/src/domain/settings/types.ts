@@ -1,8 +1,8 @@
 import type { CanvasToolId } from "@/canvas/tools";
 import type {
   ElementStyles,
+  InsertTool,
   ShellGridType,
-  Tool,
 } from "@/canvas/engine/types";
 
 export type SettingsScope = "global" | "project";
@@ -24,6 +24,7 @@ export type CanvasKeyCommandId =
   | "canvas.viewport.pan"
   | "canvas.tool.cursor"
   | "canvas.tool.hand"
+  | "canvas.tool.scale"
   | "canvas.tool.wrapper"
   | "canvas.tool.rectangle"
   | "canvas.tool.ellipse"
@@ -101,7 +102,7 @@ export type CanvasElementDefaultsSettings = {
   referenceSize: number;
   minScale: number;
   maxScale: number;
-  tools: Record<Exclude<Tool, "select">, CanvasElementDefault>;
+  tools: Record<InsertTool, CanvasElementDefault>;
 };
 
 export type CanvasViewportSettings = {

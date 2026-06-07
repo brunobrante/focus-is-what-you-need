@@ -125,6 +125,7 @@ function CanvasPageContent() {
   );
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
+  const editorPanning = useEditorBridge((v) => v?.state.panning ?? false);
   const activeZoom = useEditorBridge((v) => v?.state.zoom);
   const activeViewportMode = useEditorBridge((v) => v?.state.viewportMode);
   const selectedNodeIds = useEditorBridge((v) => {
@@ -360,6 +361,10 @@ function CanvasPageContent() {
   const selectedSubjectSize = component
     ? currentDocument.canvas
     : canvasSizeForProjectType(projectType);
+  // While a transient pan gesture is active, surface the Hand tool in the toolbar
+  // without changing the persistent tool. The gesture reverts to the real active
+  // tool on release; only an explicit Hand selection keeps it active.
+  const toolbarActiveTool: CanvasToolId = editorPanning ? "hand" : activeTool;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--bg)]">
@@ -516,7 +521,7 @@ function CanvasPageContent() {
 
       <div className="fixed bottom-6 left-1/2 z-[10] -translate-x-1/2 flex items-end gap-2">
         <Toolbar
-          activeTool={activeTool}
+          activeTool={toolbarActiveTool}
           onToolChange={handleToolChange}
           canvasExpanded={canvasExpanded}
           canvasControlsVisible={canvasExpanded || splitActive}
