@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { IconChevronLeft, IconCirclePlus, IconCompare, IconHistory, IconOpenCanvas, IconPlus, IconSearch } from "@/components/icons";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { AddCard } from "@/components/screen/AddCard";
 import { PreviewShell } from "@/components/screen/PreviewShell";
@@ -205,9 +206,7 @@ export function Component() {
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
         <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
           <Link to={screenHref} aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
+            <IconChevronLeft size={14} strokeWidth={1.6} />
           </Link>
           <span className="text-[var(--text-faint)]">/</span>
           <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
@@ -229,16 +228,11 @@ export function Component() {
         </div>
         <div className="flex items-center gap-2">
           <Link to={canvasHref} className="btn btn-ghost">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="14" rx="2" />
-              <path d="M3 9h18" />
-            </svg>
+            <IconOpenCanvas size={14} strokeWidth={1.6} />
             Edit in canvas
           </Link>
           <button type="button" onClick={() => addElement()} className="btn btn-primary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={14} strokeWidth={2} />
             New variant
           </button>
         </div>
@@ -264,11 +258,7 @@ export function Component() {
             onClick={() => historyRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 3-6.7" />
-              <polyline points="3 4 3 10 9 10" />
-              <path d="M12 7v5l3 2" />
-            </svg>
+            <IconHistory size={13} strokeWidth={1.7} />
             History
           </button>
           <button
@@ -277,10 +267,7 @@ export function Component() {
             onClick={() => compareRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="5" width="8" height="14" rx="1" />
-              <rect x="13" y="5" width="8" height="14" rx="1" />
-            </svg>
+            <IconCompare size={13} strokeWidth={1.7} />
             Comparar
           </button>
           <button
@@ -289,10 +276,7 @@ export function Component() {
             onClick={() => referencesRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9 12h6M12 9v6" />
-            </svg>
+            <IconCirclePlus size={13} strokeWidth={1.7} />
             References
           </button>
           <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
@@ -325,10 +309,7 @@ export function Component() {
             <div className="grid h-full place-items-center p-7">
               <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-5 text-center">
                 <span className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-strong)] text-[var(--text-faint)]">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="14" rx="2" />
-                    <path d="M3 9h18" />
-                  </svg>
+                  <IconOpenCanvas size={16} strokeWidth={1.6} />
                 </span>
                 <span className="text-[13px] font-medium text-[var(--text-muted)]">
                   Empty component
@@ -348,20 +329,7 @@ export function Component() {
             </div>
             <div className="flex items-center gap-2">
               <div className="relative w-[220px]">
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
+                <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
                 <input
                   type="search"
                   value={query}
@@ -507,9 +475,7 @@ function ElementCard({
         }}
         className="pointer-events-none absolute right-[-10px] top-1/2 z-10 grid h-5 w-5 -translate-y-[calc(50%+24px)] cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] opacity-0 transition-opacity duration-[120ms] group-hover/card:pointer-events-auto group-hover/card:opacity-100 hover:border-white hover:bg-white hover:text-[#111]"
       >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
+        <IconPlus size={10} strokeWidth={2.4} />
       </button>
     </div>
   );

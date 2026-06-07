@@ -1,5 +1,14 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
+import {
+  IconAccessibilityCheck, IconBackArrow, IconChecklist, IconChevronDownFill,
+  IconChevronDownMed, IconChevronLeft, IconChevronRight, IconClose,
+  IconCollapse, IconColorStyles, IconDocument, IconExpand, IconGlobe,
+  IconGrid, IconLightning, IconMicrophone, IconPlus, IconRenameLayers,
+  IconReplace, IconRewrite, IconSearch, IconSend, IconSettings, IconSparkles,
+  IconStar, IconTmbAssets, IconTypeStyles, IconUpload, IconWand,
+  IconChevronDoubleUp, IconCheck, IconImage, IconTrash,
+} from "@/components/icons";
 
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import type { CanvasToolId } from "@/canvas/tools";
@@ -256,9 +265,7 @@ function DropdownToolButton({
           menuOpen ? "bg-[#2A2A2A] text-white" : "text-[#666] hover:bg-[#2A2A2A] hover:text-[#DADADA]",
         ].join(" ")}
       >
-        <svg width="6" height="4" viewBox="0 0 6 4" fill="currentColor">
-          <path d="M0.5 0.5L3 3.5L5.5 0.5H0.5Z" />
-        </svg>
+        <IconChevronDownFill />
       </button>
 
       {badge && isGroupActive && (
@@ -289,9 +296,7 @@ function DropdownToolButton({
               className="flex items-center border-0 bg-transparent px-1.5 py-[5px] text-[#484848] transition-colors duration-[90ms] hover:bg-[#1E1E1E] hover:text-[#909090]"
               aria-label="Open render settings"
             >
-              <svg width="5" height="8" viewBox="0 0 5 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 1l3 3-3 3" />
-              </svg>
+              <IconChevronRight />
             </button>
           </div>
         </div>
@@ -412,106 +417,26 @@ function ActionsMenuButton({
 }
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
-  "Checklist": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-    </svg>
-  ),
-  "Make an image": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="m21 15-5-5L5 21" /><circle cx="8.5" cy="8.5" r="1.5" />
-    </svg>
-  ),
-  "Replace content": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-    </svg>
-  ),
-  "Translate to...": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  ),
-  "Rewrite this...": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-    </svg>
-  ),
-  "Rename layers": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  ),
-  "Find more like Coupon": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-    </svg>
-  ),
-  "First Draft": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" />
-    </svg>
-  ),
-  "Image library": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="m21 15-5-5L5 21" /><circle cx="8.5" cy="8.5" r="1.5" />
-    </svg>
-  ),
-  "Icon library": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  ),
-  "Color styles": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" /><path d="M12 2a5 5 0 0 1 0 10 5 5 0 0 0 0 10" /><path d="M12 2v20" />
-    </svg>
-  ),
-  "Text styles": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" />
-    </svg>
-  ),
-  "Local uploads": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  ),
-  "Shared components": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="2" width="9" height="9" rx="1" /><rect x="13" y="2" width="9" height="9" rx="1" /><rect x="2" y="13" width="9" height="9" rx="1" /><rect x="13" y="13" width="9" height="9" rx="1" />
-    </svg>
-  ),
-  "TMB Assets Library": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 3h7v7H3z" /><path d="M14 3h7v7h-7z" /><path d="M3 14h7v7H3z" /><circle cx="17.5" cy="17.5" r="3.5" />
-    </svg>
-  ),
-  "Figma Make": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  ),
-  "Auto layout helper": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  ),
-  "Accessibility checker": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  ),
-  "Content generator": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 3l1 2.5L12.5 6 10 7l-1 2.5L8 7 5.5 6 8 5.5 9 3z" /><path d="M16 8l.6 1.4L18 10l-1.4.6L16 12l-.6-1.4L14 10l1.4-.6L16 8z" /><path d="M19 14l.5 1.1L20.6 16l-1.1.5L19 17.6l-.5-1.1L17.4 16l1.1-.5L19 14z" />
-    </svg>
-  ),
-  "Localization helper": (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  ),
+  "Checklist":           <IconChecklist />,
+  "Make an image":       <IconImage size={12} strokeWidth={1.8} />,
+  "Replace content":     <IconReplace />,
+  "Translate to...":     <IconGlobe />,
+  "Rewrite this...":     <IconRewrite />,
+  "Rename layers":       <IconRenameLayers />,
+  "Find more like Coupon": <IconSearch size={12} strokeWidth={1.8} />,
+  "First Draft":         <IconDocument />,
+  "Image library":       <IconImage size={12} strokeWidth={1.8} />,
+  "Icon library":        <IconStar size={12} strokeWidth={1.8} />,
+  "Color styles":        <IconColorStyles />,
+  "Text styles":         <IconTypeStyles />,
+  "Local uploads":       <IconUpload />,
+  "Shared components":   <IconGrid size={12} strokeWidth={1.8} />,
+  "TMB Assets Library":  <IconTmbAssets />,
+  "Figma Make":          <IconLightning />,
+  "Auto layout helper":  <IconGrid size={12} strokeWidth={1.8} />,
+  "Accessibility checker": <IconAccessibilityCheck />,
+  "Content generator":   <IconSparkles />,
+  "Localization helper": <IconGlobe />,
 };
 
 const IMAGE_LIBRARY_SOURCES = ["Unsplash", "Pexels", "Getty Images", "iStock"];
@@ -702,9 +627,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
               onClick={() => setChecklistMode(false)}
               className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
+              <IconChevronLeft />
             </button>
           </div>
 
@@ -734,9 +657,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                     onClick={() => setChecklistItems((prev) => prev.filter((i) => i.id !== item.id))}
                     className="grid h-5 w-5 shrink-0 place-items-center rounded text-[#505050] opacity-0 transition-all duration-100 hover:text-[#E4A1A1] group-hover:opacity-100"
                   >
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6L6 18" />
-                    </svg>
+                    <IconClose size={9} strokeWidth={2} />
                   </button>
                 </div>
               ))}
@@ -774,9 +695,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 }}
                 className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[#505050] transition-colors duration-100 hover:bg-[#333] hover:text-[#CFCFCF]"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
+                <IconPlus size={12} strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -790,9 +709,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
               onClick={() => { setLibraryMode(null); setLibraryExpanded(false); setSourceDropdownOpen(false); }}
               className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.3px] text-[#4A4A4A] transition-colors duration-100 hover:text-[#8E8E8E]"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
+              <IconChevronLeft />
               {libraryMode === "images" ? "Image library" : libraryMode === "icons" ? "Icon library" : "TMB Assets Library"}
             </button>
             <div className="flex items-center gap-0.5">
@@ -802,15 +719,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 onClick={() => setLibraryExpanded((v) => !v)}
                 className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
               >
-                {libraryExpanded ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" />
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
-                  </svg>
-                )}
+                {libraryExpanded ? <IconCollapse /> : <IconExpand />}
               </button>
               <button
                 type="button"
@@ -818,18 +727,14 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 onClick={() => { setLibraryMode(null); setLibraryExpanded(false); setSourceDropdownOpen(false); }}
                 className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-                </svg>
+                <IconClose size={11} strokeWidth={2} />
               </button>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
             <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#2E2E2E] bg-[#252525] px-2.5">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.8" strokeLinecap="round">
-                <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-              </svg>
+              <IconSearch size={11} strokeWidth={1.8} />
               <input
                 type="text"
                 value={librarySearch}
@@ -843,9 +748,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                   onClick={() => setLibrarySearch("")}
                   className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#555] transition-colors duration-100 hover:text-[#CFCFCF]"
                 >
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-                  </svg>
+                  <IconClose size={8} strokeWidth={2.5} />
                 </button>
               )}
             </div>
@@ -861,9 +764,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 }`}
               >
                 {libraryMode === "images" ? imageSource : libraryMode === "icons" ? iconSource : tmbCategory}
-                <svg width="7" height="5" viewBox="0 0 8 5" fill="currentColor" style={{ opacity: 0.55 }}>
-                  <path d="M0 0.5L4 4.5L8 0.5H0Z" />
-                </svg>
+                <IconChevronDownMed />
               </button>
 
               {sourceDropdownOpen && (
@@ -888,11 +789,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                         }`}
                       >
                         <span className="flex-1">{src}</span>
-                        {isActive && (
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
+                        {isActive && <IconCheck />}
                       </button>
                     );
                   })}
@@ -1001,10 +898,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
       ) : !aiMode ? (
         <>
           <div className="flex h-9 items-center gap-2 rounded-lg border border-[#333] bg-[#2A2A2A] px-2.5">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.8" strokeLinecap="round">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
+            <IconSearch size={13} strokeWidth={1.8} />
             <input
               type="text"
               value={searchValue}
@@ -1020,13 +914,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
               onMouseLeave={() => setWandHover(false)}
               className="relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#CFCFCF] transition-colors duration-100 hover:bg-[#383838]"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 20L11 9" />
-                <path d="M13 3L15 5L17 7L15 9L13 11L11 9L9 7L11 5Z" />
-                <path d="M19.5 6.5H21" />
-                <path d="M18.5 3.5L19.5 4.5" />
-                <path d="M18.5 9.5L19.5 8.5" />
-              </svg>
+              <IconWand size={14} />
               {wandHover && (
                 <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-[#2A2A2A] bg-[#0E0E0E] px-2 py-1.5 text-[11px] font-medium leading-none tracking-[0.1px] text-[#F5F5F5]">
                   AI Chat
@@ -1071,11 +959,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                     className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors duration-[90ms] hover:bg-[#2A2A2A]"
                   >
                     <span className="grid h-4 w-4 shrink-0 place-items-center text-[#CFCFCF]">
-                      {ACTION_ICONS[item.title] ?? (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 12h14" /><path d="M12 5v14" />
-                        </svg>
-                      )}
+                      {ACTION_ICONS[item.title] ?? <IconPlus size={12} strokeWidth={1.8} />}
                     </span>
                     <span className="truncate text-[12px] text-[#CFCFCF]">{item.title}</span>
                   </button>
@@ -1099,9 +983,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                   onClick={() => setTagsExpanded(false)}
                   className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}>
-                    <path d="M17 11l-5-5-5 5" /><path d="M17 18l-5-5-5 5" />
-                  </svg>
+                  <IconChevronDoubleUp />
                 </button>
               )}
               <button
@@ -1109,19 +991,14 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 aria-label="AI chat settings"
                 className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
+                <IconSettings size={12} strokeWidth={1.8} />
               </button>
               <button
                 type="button"
                 aria-label="Expand conversation"
                 className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" />
-                </svg>
+                <IconExpand size={12} strokeWidth={1.8} />
               </button>
               <button
                 type="button"
@@ -1129,9 +1006,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 onClick={() => { setAiMode(false); setTagsExpanded(false); }}
                 className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-                </svg>
+                <IconClose size={11} strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -1150,9 +1025,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                       onClick={() => deselectNode(node.id)}
                       className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#505050] transition-colors duration-100 hover:text-[#CFCFCF]"
                     >
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-                      </svg>
+                      <IconClose size={8} strokeWidth={2.5} />
                     </button>
                   </span>
                 ))}
@@ -1165,10 +1038,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                   <div key={i} className={msg.role === "user" ? "flex justify-end" : "flex justify-start"}>
                     {msg.role === "assistant" && (
                       <div className="mr-2 mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#0D99FF]">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M9 3l1 2.5L12.5 6 10 7l-1 2.5L8 7 5.5 6 8 5.5 9 3z" />
-                          <path d="M16 8l.6 1.4L18 10l-1.4.6L16 12l-.6-1.4L14 10l1.4-.6L16 8z" />
-                        </svg>
+                        <IconSparkles size={10} strokeWidth={1.8} className="text-white" />
                       </div>
                     )}
                     <div
@@ -1206,9 +1076,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                       onClick={() => deselectNode(node.id)}
                       className="grid h-4 w-4 shrink-0 place-items-center rounded text-[#505050] transition-colors duration-100 hover:text-[#CFCFCF]"
                     >
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-                      </svg>
+                      <IconClose size={8} strokeWidth={2.5} />
                     </button>
                   </span>
                 ))}
@@ -1253,9 +1121,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                     onClick={() => setRecording(false)}
                     className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[#6B3030] transition-colors duration-100 hover:bg-[#3A1818] hover:text-[#E05555]"
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
-                    </svg>
+                    <IconTrash size={12} strokeWidth={1.8} />
                   </button>
                 </>
               ) : (
@@ -1273,21 +1139,14 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 onClick={() => setRecording((r) => !r)}
                 className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors duration-100 ${recording ? "text-[#E05555] hover:bg-[#3A1818]" : "text-[#505050] hover:bg-[#333] hover:text-[#CFCFCF]"}`}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="2" width="6" height="11" rx="3" />
-                  <path d="M5 10a7 7 0 0 0 14 0" />
-                  <line x1="12" y1="19" x2="12" y2="22" />
-                  <line x1="9" y1="22" x2="15" y2="22" />
-                </svg>
+                <IconMicrophone size={12} strokeWidth={1.8} />
               </button>
               <button
                 type="button"
                 aria-label="Send"
                 className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors duration-100 ${recording ? "text-[#E05555] hover:bg-[#3A1818] hover:text-[#FF7070]" : "text-[#505050] hover:bg-[#333] hover:text-[#CFCFCF]"}`}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 19V5" /><path d="M5 12l7-7 7 7" />
-                </svg>
+                <IconSend size={13} strokeWidth={1.8} />
               </button>
             </div>
           </div>
@@ -1362,25 +1221,11 @@ function CanvasExpandedControls({
 }
 
 function ExpandIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 3 21 3 21 9" />
-      <polyline points="9 21 3 21 3 15" />
-      <line x1="21" y1="3" x2="14" y2="10" />
-      <line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-  );
+  return <IconExpand size={13} />;
 }
 
 function CollapseIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="4 14 10 14 10 20" />
-      <polyline points="20 10 14 10 14 4" />
-      <line x1="10" y1="14" x2="3" y2="21" />
-      <line x1="21" y1="3" x2="14" y2="10" />
-    </svg>
-  );
+  return <IconCollapse size={13} />;
 }
 
 function ToolbarDeviceButton({
@@ -1447,10 +1292,7 @@ function ToolbarBackButton({
       onClick={onClick}
       className="flex h-9 items-center gap-2 rounded-lg px-3 text-[#888] transition-colors duration-[90ms] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 14L4 9l5-5" />
-        <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-      </svg>
+      <IconBackArrow size={13} strokeWidth={2} />
       <span className="max-w-[120px] truncate text-[12px] font-medium leading-none text-[#CFCFCF]">
         {parentTarget.name}
       </span>

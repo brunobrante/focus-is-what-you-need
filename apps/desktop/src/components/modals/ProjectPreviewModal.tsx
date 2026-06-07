@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { IconChevronLeft, IconChevronRight } from "@/components/icons";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
 import { Snapshot } from "@/components/Snapshot";
 import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
@@ -112,9 +113,7 @@ export function ProjectPreviewModal({
                   disabled={screens.length < 2}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 6l-6 6 6 6" />
-                  </svg>
+                  <IconChevronLeft size={14} strokeWidth={1.8} />
                 </button>
                 <button
                   type="button"
@@ -122,9 +121,7 @@ export function ProjectPreviewModal({
                   disabled={screens.length < 2}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
+                  <IconChevronRight size={14} strokeWidth={1.8} />
                 </button>
               </div>
             </div>

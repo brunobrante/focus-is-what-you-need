@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { IconCheck, IconChevronLeft, IconChevronRight, IconClose, IconUpload } from "@/components/icons";
 import {
   PROJECT_TYPE_DIMS,
   PROJECT_TYPE_LABEL,
@@ -90,17 +91,7 @@ export function NewProject() {
             aria-label="Close"
             className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-lg border border-[var(--border)] bg-transparent text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+            <IconClose size={14} strokeWidth={1.6} />
           </Link>
         </div>
         <div className="h-[3px] overflow-hidden rounded-[2px] bg-[#1A1A1A]">
@@ -136,18 +127,7 @@ export function NewProject() {
         </div>
         <div className="flex gap-2">
           <button type="button" className="btn btn-ghost" onClick={back} disabled={step === 1}>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
+            <IconChevronLeft size={14} strokeWidth={1.8} />
             Voltar
           </button>
           {step === 3 ? (
@@ -162,18 +142,7 @@ export function NewProject() {
           ) : null}
           <button type="button" className="btn btn-primary" onClick={() => void next()} disabled={!canNext}>
             <span>{creating ? "Creating…" : step === TOTAL_STEPS ? "Create project" : "Next"}</span>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
+            <IconChevronRight size={14} strokeWidth={1.8} />
           </button>
         </div>
       </footer>
@@ -264,11 +233,7 @@ function StepAdvanced({
           <div className="grid flex-1 place-items-center px-8 py-12 text-center">
             <div className="flex max-w-[340px] flex-col items-center gap-4">
               <span className="grid h-14 w-14 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--bg)] text-[var(--text)]">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
+                <IconUpload size={22} strokeWidth={1.7} />
               </span>
               <div className="space-y-2">
                 <div className="text-[16px] font-semibold text-[var(--text)]">Project thumbnail</div>
@@ -339,19 +304,7 @@ function TypeCard({
             : "border-[var(--border-strong)]",
         ].join(" ")}
       >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={selected ? "opacity-100" : "opacity-0"}
-        >
-          <path d="M5 12l5 5L20 7" />
-        </svg>
+        <IconCheck size={10} strokeWidth={3} className={selected ? "opacity-100" : "opacity-0"} />
       </span>
     </button>
   );

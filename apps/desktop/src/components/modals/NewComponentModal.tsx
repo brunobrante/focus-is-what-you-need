@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
+import { IconCheck } from "@/components/icons";
 import {
   type ComponentParent,
   createComponent,
@@ -184,19 +185,7 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
                                 : "border-[var(--border-strong)]",
                             ].join(" ")}
                           >
-                            <svg
-                              width="9"
-                              height="9"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className={checked ? "opacity-100" : "opacity-0"}
-                            >
-                              <path d="M20 6 9 17l-5-5" />
-                            </svg>
+                            <IconCheck size={9} strokeWidth={3} className={checked ? "opacity-100" : "opacity-0"} />
                           </span>
                           <span>{screen.title}</span>
                         </label>

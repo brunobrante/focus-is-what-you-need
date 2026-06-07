@@ -1,3 +1,5 @@
+import { IconPlus } from "@/components/icons";
+
 export function AddCard({
   label,
   onClick,
@@ -27,9 +29,7 @@ export function AddCard({
               compact ? "h-7 w-7" : "h-8 w-8",
             ].join(" ")}
           >
-            <svg width={compact ? "12" : "14"} height={compact ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={compact ? 12 : 14} strokeWidth={2} />
           </span>
           <span className={compact ? "text-[11px]" : ""}>{label}</span>
         </div>

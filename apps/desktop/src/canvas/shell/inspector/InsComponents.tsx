@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { IconChevronDown } from "@/components/icons";
 
 import { clamp } from "@/domain/canvas/geometry";
 
@@ -117,18 +118,7 @@ export function InsSection({
         style={{ letterSpacing: "0.4px" }}
       >
         <span>{title}</span>
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="transition-transform duration-[120ms]"
-          style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        <IconChevronDown size={10} strokeWidth={2} className={`transition-transform duration-[120ms] ${open ? "rotate-0" : "-rotate-90"}`} />
       </button>
       {open ? <div className="flex flex-col gap-2.5 px-3.5 pb-3.5">{children}</div> : null}
     </div>

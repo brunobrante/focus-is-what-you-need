@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { Modal, ModalHeader } from "./Modal";
+import { IconChevronLeft, IconChevronRight, IconImage, IconTrash } from "@/components/icons";
 
 export interface ReferencesModalHandle {
   open: (index?: number) => void;
@@ -74,12 +75,7 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
                 onClick={removeCurrent}
                 className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M19 6l-1 14H6L5 6" />
-                  <path d="M10 11v5M14 11v5" />
-                </svg>
+                <IconTrash size={12} strokeWidth={1.8} />
                 Remove from project
               </button>
             ) : null}
@@ -103,9 +99,7 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
             onClick={prev}
             className="absolute left-[18px] top-1/2 grid h-[38px] w-[38px] -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[rgba(20,20,20,0.85)] text-[var(--text)] backdrop-blur transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            <IconChevronLeft size={14} strokeWidth={2} />
           </button>
         ) : null}
         {r ? (
@@ -121,11 +115,7 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
               ) : (
                 <div className="grid h-full w-full place-items-center bg-[#0E0E0E] text-[var(--text-faint)]">
                   <div className="flex flex-col items-center gap-3">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="9" cy="9" r="2" />
-                      <path d="m21 15-5-5L5 21" />
-                    </svg>
+                    <IconImage size={32} strokeWidth={1.3} />
                     <span className="text-[12px]">No preview</span>
                   </div>
                 </div>
@@ -142,9 +132,7 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
             onClick={next}
             className="absolute right-[18px] top-1/2 grid h-[38px] w-[38px] -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[rgba(20,20,20,0.85)] text-[var(--text)] backdrop-blur transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <IconChevronRight size={14} strokeWidth={2} />
           </button>
         ) : null}
       </div>

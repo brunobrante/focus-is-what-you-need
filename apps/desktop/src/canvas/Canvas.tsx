@@ -41,6 +41,7 @@ import {
   type CanvasWindowType,
   type SplitMode,
 } from "./canvasUtils";
+import { IconChevronLeft, IconPanelRight } from "@/components/icons";
 
 export type { SplitMode } from "./canvasUtils";
 
@@ -457,9 +458,7 @@ function CanvasPageContent() {
           onClick={() => { void flushPendingSave(); }}
           className="grid place-items-center text-[var(--text-muted)] hover:text-[var(--text)]"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
+          <IconChevronLeft size={14} strokeWidth={1.6} />
         </Link>
         <span className="h-3.5 w-px bg-[var(--border)]" />
         <span className="font-medium text-[var(--text)]">{projectName}</span>
@@ -549,11 +548,7 @@ function CanvasPageContent() {
       <div className="fixed bottom-6 right-3 z-[11] flex items-center gap-2">
         {!inspectorOpen && (
           <FloatingToggle onClick={() => setInspectorOpen(true)} aria="Inspector">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="16" rx="2.4" />
-              <path d="M14 4v16" />
-              <path d="M7 9h3M7 15h4" />
-            </svg>
+            <IconPanelRight size={13} strokeWidth={1.7} />
             Inspector
           </FloatingToggle>
         )}

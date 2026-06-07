@@ -21,6 +21,7 @@ import {
   setWorkspaceFolder,
   pickFolderDialog,
 } from "@/lib/tauri/workspace";
+import { IconClock, IconDatabase, IconFolder, IconShield } from "@/components/icons";
 
 type AppSettingsTab = "canvas" | "shortcuts" | "storage";
 
@@ -473,19 +474,7 @@ function StorageTab({
           </p>
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center gap-2 h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0 text-[var(--text-faint)]"
-              >
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-              </svg>
+              <IconFolder size={14} strokeWidth={1.7} className="shrink-0 text-[var(--text-faint)]" />
               <span className="flex-1 text-[13.5px] font-medium text-[var(--text)] truncate">
                 {folderPath || "Loading…"}
               </span>
@@ -506,42 +495,23 @@ function StorageTab({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <InfoCard
-              icon={
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
-              }
+              icon={<IconFolder size={15} strokeWidth={1.7} />}
               label="References folder"
               value={referencesPath || "—"}
               mono
             />
             <InfoCard
-              icon={
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <ellipse cx="12" cy="5" rx="9" ry="3" />
-                  <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
-                  <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
-                </svg>
-              }
+              icon={<IconDatabase size={15} strokeWidth={1.7} />}
               label="Formato"
               value=".figx"
             />
             <InfoCard
-              icon={
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              }
+              icon={<IconClock size={15} strokeWidth={1.7} />}
               label="Auto-save"
               value="Automatic"
             />
             <InfoCard
-              icon={
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-              }
+              icon={<IconShield size={15} strokeWidth={1.7} />}
               label="Backup"
               value="Desativado"
             />

@@ -67,6 +67,7 @@ import type {
   ScreenRow,
   VariantRow,
 } from "@/lib/storage/schema";
+import { IconEye, IconFastEdit, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPlus, IconScreen, IconSearch, IconSettings, IconChevronLeft } from "@/components/icons";
 
 type Tab = "screens" | "components" | "references" | "system";
 type CmpKindFilter = "all" | ComponentKind;
@@ -152,19 +153,7 @@ export function Gallery() {
         <div className="flex items-center gap-2">
           {screens.length > 0 ? (
             <button type="button" onClick={() => setPreviewOpen(true)} className="btn btn-ghost">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
-                <circle cx="12" cy="12" r="2.5" />
-              </svg>
+              <IconEye size={14} strokeWidth={1.7} />
               Preview
             </button>
           ) : null}
@@ -174,19 +163,7 @@ export function Gallery() {
             className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
             aria-label="Project settings"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2.75 14.2 4l2.53-.33.95 2.36 2.25 1.22-.53 2.49 1.25 2.26-1.88 1.71-.31 2.54-2.5.51-1.74 1.88-2.25-1.28-2.27 1.28-1.73-1.88-2.51-.51-.3-2.54L3.36 14.3l1.25-2.26-.53-2.49 2.25-1.22.95-2.36L9.8 4 12 2.75Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
+            <IconSettings size={14} strokeWidth={1.6} />
           </button>
         </div>
       </header>
@@ -309,18 +286,7 @@ function Crumbs({ projectName, type }: { projectName: string; type: ProjectType 
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
       <Link to="/" aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
+        <IconChevronLeft size={14} strokeWidth={1.6} />
       </Link>
       <span className="text-[var(--text-faint)]">/</span>
       <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
@@ -433,15 +399,11 @@ function ScreensTab({
             onClick={() => setCreateSectionRequest((value) => value + 1)}
             className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={13} strokeWidth={1.8} />
             New section
           </button>
           <button type="button" onClick={onNewScreen} className="btn btn-primary h-9 px-3.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={14} strokeWidth={2} />
             New Screen
           </button>
           <ViewToggle />
@@ -506,10 +468,7 @@ function ScreensGrid({
       <div className="grid min-h-[420px] place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-6 py-10">
         <div className="max-w-[360px] text-center">
           <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-faint)]">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="14" rx="2" />
-              <path d="M3 9h18" />
-            </svg>
+            <IconOpenCanvas size={24} strokeWidth={1.5} />
           </div>
           <h2 className="m-0 text-[20px] font-semibold tracking-[-0.2px] text-[var(--text)]">Empty Screen</h2>
           <p className="mt-2 text-[13px] leading-[1.6] text-[var(--text-muted)]">
@@ -517,9 +476,7 @@ function ScreensGrid({
           </p>
           <div className="mt-6">
             <button type="button" onClick={onNewScreen} className="btn btn-primary">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <IconPlus size={14} strokeWidth={2} />
               Create first screen
             </button>
           </div>
@@ -767,9 +724,7 @@ function SectionedGrid<T>({
           onClick={openSectionModal}
           className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={13} strokeWidth={1.8} />
           Nova section
         </button>
       </div>
@@ -974,8 +929,8 @@ function ScreenCard({
         />
         <CardMenu
           actions={[
-            { id: "components", label: "Componentes", icon: <IconGrid />, onClick: () => navigate(href) },
-            { id: "canvas", label: "Canvas", icon: <IconCanvas />, onClick: () => navigate(canvasHref) },
+            { id: "components", label: "Componentes", icon: <IconGrid size={14} strokeWidth={1.6} />, onClick: () => navigate(href) },
+            { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={14} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
             {
               id: "more",
               label: "Mais",
@@ -1022,17 +977,7 @@ function AddScreenCard({ type, onClick }: { type: ProjectType; onClick: () => vo
       >
         <div className="flex flex-col items-center gap-2 text-[12px] tracking-[0.2px]">
           <span className="grid h-8 w-8 place-items-center rounded-full border border-current">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={14} strokeWidth={2} />
           </span>
           <span>New screen</span>
         </div>
@@ -1197,7 +1142,7 @@ function ViewToggle({
         ].join(" ")}
         style={view === "grid" ? { background: "var(--pill)" } : undefined}
       >
-        <IconGrid />
+        <IconGrid size={14} strokeWidth={1.6} />
       </button>
       <button
         type="button"
@@ -1211,45 +1156,12 @@ function ViewToggle({
         ].join(" ")}
         style={view === "list" ? { background: "var(--pill)" } : undefined}
       >
-        <IconList />
+        <IconListView size={14} strokeWidth={1.6} />
       </button>
     </div>
   );
 }
 
-function IconGrid() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="4" y="4" width="7" height="7" rx="1" />
-      <rect x="13" y="4" width="7" height="7" rx="1" />
-      <rect x="4" y="13" width="7" height="7" rx="1" />
-      <rect x="13" y="13" width="7" height="7" rx="1" />
-    </svg>
-  );
-}
-function IconList() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    >
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-function IconCanvas() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="3" y="4" width="18" height="14" rx="2" />
-      <path d="M3 9h18" strokeLinecap="round" />
-    </svg>
-  );
-}
 function ComponentsTab({
   components,
   activeVariants,
@@ -1344,9 +1256,7 @@ function ComponentsTab({
             onClick={() => setCreateSectionRequest((value) => value + 1)}
             className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={13} strokeWidth={1.8} />
             New section
           </button>
           <button
@@ -1355,9 +1265,7 @@ function ComponentsTab({
             disabled={!canCreate}
             className="btn btn-primary"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={14} strokeWidth={2} />
             Create New Component
           </button>
           <ViewToggle />
@@ -1367,10 +1275,7 @@ function ComponentsTab({
       <main className="flex-1 px-7 pb-20">
         <div className="mb-5 grid gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 lg:grid-cols-[1.2fr_repeat(4,minmax(0,0.8fr))]">
           <label className="relative">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+            <IconSearch size={14} strokeWidth={1.7} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input
               type="search"
               value={query}
@@ -1537,8 +1442,8 @@ function ComponentCard({
         ) : null}
         <CardMenu
           actions={[
-            { id: "edit", label: "Edit", icon: <IconEdit />, onClick: () => navigate(canvasHref) },
-            { id: "inspect", label: "Inspecionar", icon: <IconSearch />, onClick: () => navigate(href) },
+            { id: "edit", label: "Edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
+            { id: "inspect", label: "Inspecionar", icon: <IconSearch size={13} strokeWidth={1.6} />, onClick: () => navigate(href) },
             {
               id: "more",
               label: "Mais",
@@ -1552,7 +1457,7 @@ function ComponentCard({
                 {
                   key: "screens",
                   label: "Link screens",
-                  icon: <IconScreen />,
+                  icon: <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />,
                   onClick: onRequestAssignScreens,
                 },
                 {
@@ -1712,7 +1617,7 @@ function CmpSource({
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
       <span className="group/source relative inline-flex min-w-0 items-center gap-1.5" title={title}>
-        {primaryScreen ? <IconScreen /> : <IconGlobal />}
+        {primaryScreen ? <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" /> : <IconGlobe size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />}
         <span className="min-w-0 truncate">
           {primaryScreen ? (
             <>
@@ -1831,43 +1736,6 @@ function getComponentSourceScreens(component: ComponentRow, screens: ScreenRow[]
   return screens.filter((screen) => ids.has(screen.id));
 }
 
-function IconScreen() {
-  return (
-    <svg
-      width="11"
-      height="11"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="flex-shrink-0 text-[var(--text)] opacity-90"
-    >
-      <rect x="3" y="4" width="18" height="14" rx="2" />
-      <path d="M8 21h8M12 18v3" />
-    </svg>
-  );
-}
-
-function IconGlobal() {
-  return (
-    <svg
-      width="11"
-      height="11"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="flex-shrink-0 text-[var(--text)] opacity-90"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-    </svg>
-  );
-}
 
 function KindPill({ kind }: { kind: ComponentKind | null }) {
   if (!kind) return null;
@@ -1875,23 +1743,6 @@ function KindPill({ kind }: { kind: ComponentKind | null }) {
     <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[var(--text-faint)]">
       {kind}
     </span>
-  );
-}
-
-function IconEdit() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-    </svg>
-  );
-}
-function IconSearch() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
   );
 }
 
@@ -1984,9 +1835,7 @@ function ReferencesTab({
         <div className="flex items-center gap-2">
           <ViewToggle value={view} onChange={setView} />
           <button type="button" onClick={() => modalRef.current?.open()} className="btn btn-primary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={14} strokeWidth={2} />
             Add Reference
           </button>
         </div>
@@ -1995,10 +1844,7 @@ function ReferencesTab({
       <main className="flex-1 px-7 pb-10">
         <div className="mb-5 grid gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 lg:grid-cols-[1.2fr_repeat(3,minmax(0,0.8fr))]">
           <label className="relative">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+            <IconSearch size={14} strokeWidth={1.7} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input
               type="search"
               value={query}
@@ -2164,11 +2010,7 @@ function ReferenceProjectCard({
           </>
         ) : (
           <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2.5 text-[var(--text-faint)]">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
+            <IconImage size={24} strokeWidth={1.3} />
             <span className="px-4 text-center text-[11px] leading-snug">{reference.title}</span>
           </div>
         )}
@@ -2252,11 +2094,7 @@ function ReferenceProjectRow({
           />
         ) : (
           <div className="flex aspect-[16/10] items-center justify-center text-[var(--text-faint)]">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
+            <IconImage size={22} strokeWidth={1.4} />
           </div>
         )}
       </div>
@@ -2370,7 +2208,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
                 <CardMoreMenu
                   label="More color actions"
                   items={[
-                    { key: "edit", label: "Edit color", icon: <IconEdit />, onClick: () => setModal({ kind: "color", assetId: color.id }) },
+                    { key: "edit", label: "Edit color", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "color", assetId: color.id }) },
                     {
                       key: "delete",
                       label: "Delete color",
@@ -2399,7 +2237,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
                 <CardMoreMenu
                   label="More font actions"
                   items={[
-                    { key: "edit", label: "Edit font", icon: <IconEdit />, onClick: () => setModal({ kind: "font", assetId: font.id }) },
+                    { key: "edit", label: "Edit font", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "font", assetId: font.id }) },
                     {
                       key: "delete",
                       label: "Delete font",
@@ -2430,7 +2268,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
                 <CardMoreMenu
                   label="More icon actions"
                   items={[
-                    { key: "edit", label: "Edit icon", icon: <IconEdit />, onClick: () => setModal({ kind: "icon", assetId: icon.id }) },
+                    { key: "edit", label: "Edit icon", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "icon", assetId: icon.id }) },
                     {
                       key: "delete",
                       label: "Delete icon",
@@ -2456,7 +2294,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
                 <CardMoreMenu
                   label="More image actions"
                   items={[
-                    { key: "edit", label: "Edit image", icon: <IconEdit />, onClick: () => setModal({ kind: "image", assetId: image.id }) },
+                    { key: "edit", label: "Edit image", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "image", assetId: image.id }) },
                     {
                       key: "delete",
                       label: "Delete image",
@@ -2537,9 +2375,7 @@ function SysBlock({
           onClick={onAction}
           className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={12} strokeWidth={2} />
           {actionLabel}
         </button>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { IconCheck, IconDuplicate, IconEllipsis, IconFastEdit, IconGlobe, IconGrid, IconMoveTo, IconOpenCanvas, IconTrash, IconZoomIn } from "@/components/icons";
 
 type CardMenuButton = {
   key: string;
@@ -231,50 +232,14 @@ export function CardMoreMenu({
 }
 
 export const CardMenuIcons = {
-  Open: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="4" y="4" width="7" height="7" rx="1" />
-      <rect x="13" y="4" width="7" height="7" rx="1" />
-      <rect x="4" y="13" width="7" height="7" rx="1" />
-      <rect x="13" y="13" width="7" height="7" rx="1" />
-    </svg>
-  ),
-  Canvas: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-      <rect x="3" y="4" width="18" height="14" rx="2" />
-      <path d="M3 9h18" />
-    </svg>
-  ),
-  More: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="5" cy="12" r="1.6" />
-      <circle cx="12" cy="12" r="1.6" />
-      <circle cx="19" cy="12" r="1.6" />
-    </svg>
-  ),
-  Check: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  ),
-  Duplicate: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="9" y="9" width="11" height="11" rx="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
-    </svg>
-  ),
-  Zoom: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-      <path d="M11 8v6M8 11h6" />
-    </svg>
-  ),
-  Trash: (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-    </svg>
-  ),
+  Open: <IconGrid size={13} strokeWidth={1.6} />,
+  Canvas: <IconOpenCanvas size={13} strokeWidth={1.6} />,
+  More: <IconEllipsis size={13} />,
+  Check: <IconCheck size={13} strokeWidth={1.8} />,
+  Duplicate: <IconDuplicate size={13} strokeWidth={1.6} />,
+  Zoom: <IconZoomIn size={13} strokeWidth={1.8} />,
+  Trash: <IconTrash size={13} strokeWidth={1.7} />,
+  FastEdit: <IconFastEdit size={13} strokeWidth={1.7} />,
+  MoveTo: <IconMoveTo size={13} strokeWidth={1.7} />,
+  MakeGlobal: <IconGlobe size={13} strokeWidth={1.7} />,
 };

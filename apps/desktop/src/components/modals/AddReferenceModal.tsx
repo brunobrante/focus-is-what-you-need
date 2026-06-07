@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { Modal, ModalBody } from "./Modal";
+import { IconCheck, IconClose, IconImage, IconSearch, IconVideo } from "@/components/icons";
 import type {
   ComponentRow,
   ReferenceAttachment,
@@ -234,14 +235,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
 
           {/* Search bar */}
           <div className="flex shrink-0 items-center gap-2.5 border-b border-[rgba(255,255,255,0.07)] px-4 py-3">
-            <svg
-              width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
-              className="shrink-0 text-[var(--text-faint)]"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+            <IconSearch size={16} strokeWidth={1.8} className="shrink-0 text-[var(--text-faint)]" />
             <input
               ref={inputRef}
               type="search"
@@ -256,9 +250,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
               aria-label="Close"
               className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
+              <IconClose size={12} strokeWidth={2} />
             </button>
           </div>
 
@@ -351,11 +343,7 @@ function EmptyLibrary() {
   return (
     <div className="flex flex-col items-center gap-4 py-14 text-center">
       <span className="grid h-10 w-10 place-items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)]">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="9" cy="9" r="2" />
-          <path d="m21 15-5-5L5 21" />
-        </svg>
+        <IconImage size={18} strokeWidth={1.6} />
       </span>
       <div>
         <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">Empty library</p>
@@ -444,16 +432,9 @@ function GridCard({
           ) : (
             <div className="flex h-full w-full items-center justify-center text-[var(--text-faint)]">
               {item.mediaKind === "video" ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <rect x="2" y="7" width="15" height="10" rx="2" />
-                  <path d="m17 9 5-2v10l-5-2" />
-                </svg>
+                <IconVideo size={18} strokeWidth={1.5} />
               ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="9" cy="9" r="2" />
-                  <path d="m21 15-5-5L5 21" />
-                </svg>
+                <IconImage size={18} strokeWidth={1.5} />
               )}
             </div>
           )}
@@ -465,9 +446,7 @@ function GridCard({
         </div>
         {linked && (
           <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-[rgba(94,162,255,0.9)]">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M5 13l4 4L19 7" />
-            </svg>
+            <IconCheck size={10} strokeWidth={2.5} className="text-white" />
           </span>
         )}
         {item.stack?.enabled ? (
@@ -543,11 +522,7 @@ function SearchRow({
           <img src={item._objectUrl} alt="" draggable={false} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[var(--text-faint)]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
+            <IconImage size={14} strokeWidth={1.5} />
           </div>
         )}
       </div>

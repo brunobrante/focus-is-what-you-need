@@ -1,6 +1,7 @@
 import type { DeviceType } from "./treeTypes";
 import { DeviceIcon } from "./DeviceIcon";
 import { TypeIcon } from "./TypeIcon";
+import { IconChevronDown } from "@/components/icons";
 
 export function CurrentSceneTreeRow({
   active,
@@ -49,14 +50,10 @@ export function CurrentSceneTreeRow({
             </span>
           ) : null}
         </span>
-        <svg
-          width="10" height="10" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          className="ml-auto shrink-0 text-[#666] transition-colors duration-100 group-hover:text-[#A0A0A0]"
-          style={{ transform: pickerOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        <IconChevronDown
+          size={10} strokeWidth={2}
+          className={`ml-auto shrink-0 text-[#666] transition-colors duration-100 group-hover:text-[#A0A0A0] ${pickerOpen ? "rotate-180" : "rotate-0"}`}
+        />
       </button>
       <button
         type="button"

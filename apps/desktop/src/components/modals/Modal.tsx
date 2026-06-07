@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { IconClose } from "@/components/icons";
 
 let openModalCount = 0;
 let previousBodyOverflow = "";
@@ -122,9 +123,7 @@ export function ModalHeader({
           onClick={onClose}
           className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
+          <IconClose size={12} strokeWidth={2} />
         </button>
       </div>
     </div>

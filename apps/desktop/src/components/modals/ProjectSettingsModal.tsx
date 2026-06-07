@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { IconUpload } from "@/components/icons";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { updateProject } from "@/lib/storage/repos/projects.repo";
@@ -266,11 +267,7 @@ function ThumbnailField({
           <div className="grid flex-1 place-items-center p-6 text-center">
             <div className="flex max-w-[240px] flex-col items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
+                <IconUpload size={18} strokeWidth={1.8} />
               </span>
               <div className="text-[13px] font-medium text-[var(--text)]">Adicionar thumbnail</div>
               <div className="text-[12px] leading-[1.5] text-[var(--text-muted)]">

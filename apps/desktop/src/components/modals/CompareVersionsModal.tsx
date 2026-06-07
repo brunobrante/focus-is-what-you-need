@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Modal, ModalHeader } from "./Modal";
+import { IconClose, IconLayoutHorizontal, IconLayoutVertical, IconOpenCanvas } from "@/components/icons";
 import { getCanvasMockForTemplate } from "@/components/mocks/data/canvasMocks";
 import type { ScreenVersion } from "@/lib/data/screenVersions";
 import type { ProjectType } from "@/lib/data/types";
@@ -89,10 +90,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
               onClick={() => onOpenInCanvas?.(selection)}
               className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                <rect x="3" y="4" width="18" height="14" rx="2" />
-                <path d="M3 9h18" />
-              </svg>
+              <IconOpenCanvas size={13} strokeWidth={1.7} />
               Open in canvas
             </button>
           }
@@ -153,15 +151,9 @@ function Toolbar({
               ].join(" ")}
             >
               {d === "cols" ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="4" y="4" width="6" height="16" rx="1" />
-                  <rect x="14" y="4" width="6" height="16" rx="1" />
-                </svg>
+                <IconLayoutVertical size={12} strokeWidth={1.8} />
               ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="4" y="4" width="16" height="6" rx="1" />
-                  <rect x="4" y="14" width="16" height="6" rx="1" />
-                </svg>
+                <IconLayoutHorizontal size={12} strokeWidth={1.8} />
               )}
               {d === "cols" ? "Colunas" : "Linhas"}
             </button>
@@ -323,10 +315,7 @@ function Panel({
           onClick={onOpenCanvas}
           className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-            <rect x="3" y="4" width="18" height="14" rx="2" />
-            <path d="M3 9h18" />
-          </svg>
+          <IconOpenCanvas size={13} strokeWidth={1.6} />
         </button>
         <button
           type="button"
@@ -334,9 +323,7 @@ function Panel({
           onClick={onRemove}
           className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
+          <IconClose size={13} strokeWidth={1.8} />
         </button>
       </div>
       <div className="flex flex-1 items-stretch justify-stretch overflow-hidden bg-[var(--bg)] p-3.5">

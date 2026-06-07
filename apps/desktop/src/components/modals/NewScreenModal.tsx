@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
+import { IconCheck } from "@/components/icons";
 import { DEFAULT_SCREENS } from "@/lib/data/projects";
 import type { ScreenVariant } from "@/lib/data/types";
 import { createScreen, findScreenByTitle } from "@/lib/storage/repos/screens.repo";
@@ -171,19 +172,7 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
                               : "border-[var(--border-strong)]",
                           ].join(" ")}
                         >
-                          <svg
-                            width="10"
-                            height="10"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className={selected ? "opacity-100" : "opacity-0"}
-                          >
-                            <path d="M20 6 9 17l-5-5" />
-                          </svg>
+                          <IconCheck size={10} strokeWidth={3} className={selected ? "opacity-100" : "opacity-0"} />
                         </span>
                       </div>
                     </button>

@@ -1,4 +1,5 @@
 import type { ReferenceRow } from "@/lib/storage/schema";
+import { IconImage, IconPlus, IconTrash } from "@/components/icons";
 
 const masonryItemStyle = {
   breakInside: "avoid",
@@ -23,11 +24,7 @@ export function SideReferencesTab({
     return (
       <div className="col-span-full flex flex-col items-center gap-4 py-16 text-center">
         <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-5-5L5 21" />
-          </svg>
+          <IconImage size={17} strokeWidth={1.7} />
         </span>
         <div>
           <p className="m-0 text-[13px] font-medium text-[var(--text)]">
@@ -42,9 +39,7 @@ export function SideReferencesTab({
           onClick={onAdd}
           className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={13} strokeWidth={2} />
           Add reference
         </button>
       </div>
@@ -89,9 +84,7 @@ function ReferenceAddPin({ onClick }: { onClick: () => void }) {
     >
       <div className="relative flex aspect-[4/3] min-h-[102px] flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--surface)_0%,var(--bg)_100%)] p-3 text-center text-[var(--text-muted)] shadow-[0_1px_0_rgba(255,255,255,0.03)] group-focus-visible:border-[var(--text)] group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-[rgba(255,255,255,0.12)]">
         <span className="grid h-7 w-7 place-items-center rounded-full border border-current bg-[rgba(255,255,255,0.03)]">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={12} strokeWidth={2} />
         </span>
         <span className="text-[11px] font-medium leading-tight">New reference</span>
       </div>
@@ -165,11 +158,7 @@ function RefSidePin({
           </>
         ) : (
           <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 text-[var(--text-faint)] bg-[linear-gradient(180deg,var(--surface) 0%,var(--bg) 100%)]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
+            <IconImage size={18} strokeWidth={1.4} />
             <span className="px-3 text-center text-[10.5px] leading-snug">{reference.title}</span>
           </div>
         )}
@@ -186,12 +175,7 @@ function RefSidePin({
           }}
           className="absolute right-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-white/15 bg-black/70 text-white/78 opacity-0 backdrop-blur transition-[opacity,background-color,color,border-color] duration-150 hover:border-white/30 hover:bg-black/90 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18" />
-            <path d="M8 6V4h8v2" />
-            <path d="M19 6l-1 14H6L5 6" />
-            <path d="M10 11v5M14 11v5" />
-          </svg>
+          <IconTrash size={12} strokeWidth={1.8} />
         </button>
       ) : null}
     </div>

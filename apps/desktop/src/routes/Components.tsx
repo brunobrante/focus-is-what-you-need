@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
+import { IconChevronLeft, IconCompare, IconFastEdit, IconGrid, IconHistory, IconOpenCanvas, IconPlus, IconSearch } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { AddCard } from "@/components/screen/AddCard";
@@ -87,6 +88,7 @@ export function Components() {
   const [filter, setFilter] = useState<CmpKindFilter>("all");
   const [pendingComponentDelete, setPendingComponentDelete] = useState<ComponentRow | null>(null);
   const [fastEditOpen, setFastEditOpen] = useState(false);
+  const [fastEditComponent, setFastEditComponent] = useState<ComponentRow | null>(null);
 
   const [versions, setVersions] = useState<ScreenVersion[]>(() =>
     DEFAULT_SCREEN_VERSIONS.map((v, i) => ({ ...v, tpl: i === DEFAULT_SCREEN_VERSIONS.length - 1 ? "detail" : tpl })),
@@ -183,9 +185,7 @@ export function Components() {
             to={`/project/${encodeURIComponent(project?.id ?? projectId)}`}
             className="text-[var(--text-muted)] hover:text-[var(--text)]"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
+            <IconChevronLeft size={14} strokeWidth={1.6} />
           </Link>
           <span className="text-[var(--text-faint)]">/</span>
           <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
@@ -206,10 +206,7 @@ export function Components() {
         </div>
         <div className="flex items-center gap-2">
           <Link to={canvasHref} className="btn btn-ghost">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="14" rx="2" />
-              <path d="M3 9h18" />
-            </svg>
+            <IconOpenCanvas size={14} strokeWidth={1.6} />
             Open canvas
           </Link>
         </div>
@@ -246,11 +243,7 @@ export function Components() {
             onClick={() => historyRef.current?.open()}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 3-6.7" />
-              <polyline points="3 4 3 10 9 10" />
-              <path d="M12 7v5l3 2" />
-            </svg>
+            <IconHistory size={13} strokeWidth={1.7} />
             History
           </button>
           <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
@@ -322,10 +315,7 @@ export function Components() {
                   onClick={() => compareRef.current?.open()}
                   className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="5" width="8" height="14" rx="1" />
-                    <rect x="13" y="5" width="8" height="14" rx="1" />
-                  </svg>
+                  <IconCompare size={13} strokeWidth={1.7} />
                   Comparar
                 </button>
               ) : null}
@@ -385,6 +375,9 @@ export function Components() {
                         `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&variant=${variantId}`,
                       )
                     }
+                    onFastEdit={setFastEditComponent}
+                    onMoveTo={() => {}}
+                    onMakeGlobal={() => {}}
                   />
                 ))}
                 {filteredComponents.length === 0 && (
@@ -477,6 +470,21 @@ export function Components() {
         type={type}
         canvasHref={canvasHref}
       />
+      {fastEditComponent && (
+        <FastEditModal
+          mode="component"
+          open={Boolean(fastEditComponent)}
+          onClose={() => setFastEditComponent(null)}
+          component={fastEditComponent}
+          variant={activeVariants.get(fastEditComponent.id) ?? null}
+          type={type}
+          canvasHref={
+            fastEditComponent.activeVariantId
+              ? `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&variant=${fastEditComponent.activeVariantId}`
+              : canvasHref
+          }
+        />
+      )}
       <NewComponentModal
         ref={newComponentRef}
         projectId={project?.id ?? null}
@@ -559,10 +567,7 @@ function EditableTitle({
     >
       <span>{value}</span>
       <span className="grid h-6 w-6 place-items-center rounded-md border border-[var(--border)] text-[var(--text-faint)] opacity-0 transition-opacity group-hover/title:opacity-100">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-        </svg>
+        <IconFastEdit size={12} strokeWidth={1.7} />
       </span>
     </button>
   );
@@ -571,20 +576,7 @@ function EditableTitle({
 function SideSearch({ query, onChange }: { query: string; onChange: (v: string) => void }) {
   return (
     <div className="relative w-[220px]">
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]"
-      >
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
+      <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
       <input
         type="search"
         placeholder="Search..."
@@ -634,6 +626,9 @@ function ComponentSideCard({
   type,
   onRequestDelete,
   onOpenCanvas,
+  onFastEdit,
+  onMoveTo,
+  onMakeGlobal,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
@@ -641,6 +636,9 @@ function ComponentSideCard({
   type: ProjectType;
   onRequestDelete: (component: ComponentRow) => void;
   onOpenCanvas: (variantId: string) => void;
+  onFastEdit: (component: ComponentRow) => void;
+  onMoveTo: (component: ComponentRow) => void;
+  onMakeGlobal: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
@@ -662,20 +660,38 @@ function ComponentSideCard({
         ) : null}
         <CardMenu
           buttons={[
-            { key: "open", label: "Open component", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
             {
               key: "canvas",
               label: "Open in canvas",
               icon: CardMenuIcons.Canvas,
               onClick: () => {
                 if (variant) onOpenCanvas(variant.id);
+                else navigate(href);
               },
             },
             {
+              key: "fast-edit",
+              label: "Fast edit",
+              icon: CardMenuIcons.FastEdit,
+              onClick: () => onFastEdit(component),
+            },
+            {
               key: "more",
-              label: "Mais",
+              label: "More",
               icon: CardMenuIcons.More,
               menuItems: [
+                {
+                  key: "move-to",
+                  label: "Move to",
+                  icon: CardMenuIcons.MoveTo,
+                  onClick: () => onMoveTo(component),
+                },
+                {
+                  key: "make-global",
+                  label: "Make global",
+                  icon: CardMenuIcons.MakeGlobal,
+                  onClick: () => onMakeGlobal(component),
+                },
                 {
                   key: "delete",
                   label: "Delete component",
@@ -823,15 +839,10 @@ function SideEmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="col-span-full grid min-h-[220px] place-items-center rounded-[14px] border border-dashed border-[var(--border)] bg-[var(--bg)] px-6 py-10 text-center">
+    <div className="col-span-full grid min-h-[220px] place-items-center rounded-[14px] border border-dashed border-[var(--border)] px-6 py-10 text-center">
       <div className="max-w-[300px]">
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)]">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="4" width="7" height="7" rx="1" />
-            <rect x="13" y="4" width="7" height="7" rx="1" />
-            <rect x="4" y="13" width="7" height="7" rx="1" />
-            <rect x="13" y="13" width="7" height="7" rx="1" />
-          </svg>
+          <IconGrid size={18} strokeWidth={1.6} />
         </div>
         <div className="text-[13px] font-medium text-[var(--text)]">{title}</div>
         <p className="m-0 mt-1.5 text-[12px] leading-[1.5] text-[var(--text-muted)]">
@@ -843,9 +854,7 @@ function SideEmptyState({
             onClick={onAction}
             className="mx-auto mt-5 inline-flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <IconPlus size={13} strokeWidth={1.8} />
             {actionLabel}
           </button>
         ) : null}

@@ -8,8 +8,10 @@ import { isInsertTool } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import {
+  centerViewportState,
   getCanvasDisplayScale,
   shouldUseScaledDomProjection,
+  viewportChanged,
 } from "@/canvas/engine/viewport";
 import { CanvasContextMenu } from "./CanvasContextMenu";
 import { CanvasToolingLayer } from "./CanvasToolingLayer";
@@ -79,38 +81,12 @@ export function CanvasStage({
   const previousRenderDocumentRef = useRef<CanvasDocument | null>(null);
   const viewportInitializedSubjectRef = useRef<string | null>(null);
   const commandModeRef = useRef(false);
-  const originPanRef = useRef<{ x: number; y: number } | null>(null);
   const [interactionActive, setInteractionActive] = useState(false);
 
   useEffect(() => {
     latestStateRef.current = state;
     latestDocumentRef.current = state.document;
   }, [state]);
-
-  useEffect(() => {
-    const alignment = screenOverlay?.alignment;
-    const origin = screenOverlay?.originPosition;
-
-    if (alignment === "origin" && origin) {
-      const { offsetX, offsetY } = latestStateRef.current;
-      originPanRef.current = { x: origin.x, y: origin.y };
-      dispatch({
-        type: "setViewport",
-        offsetX: offsetX + origin.x * displayZoom,
-        offsetY: offsetY + origin.y * displayZoom,
-      });
-    } else if (originPanRef.current) {
-      const { x, y } = originPanRef.current;
-      const { offsetX, offsetY } = latestStateRef.current;
-      originPanRef.current = null;
-      dispatch({
-        type: "setViewport",
-        offsetX: offsetX - x * displayZoom,
-        offsetY: offsetY - y * displayZoom,
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screenOverlay?.alignment]);
 
   useLayoutEffect(() => {
     previousRenderDocumentRef.current = state.document;
@@ -279,6 +255,26 @@ export function CanvasStage({
     [canvasSize, state.viewportMode, viewportSize],
   );
   const displayZoom = state.zoom * displayScale;
+
+  // The device overlay is a purely visual guide, so the component stays the
+  // centered subject in both alignment modes. Re-center it whenever the overlay
+  // is toggled on or its alignment changes, so the guide is drawn symmetrically
+  // around the item instead of the item drifting off to one side.
+  const overlayActive = screenOverlay != null;
+  const overlayAlignment = screenOverlay?.alignment;
+  useEffect(() => {
+    if (!overlayActive) return;
+    if (viewportSize.width <= 0 || viewportSize.height <= 0) return;
+    const { zoom, offsetX, offsetY, viewportMode } = latestStateRef.current;
+    const next = centerViewportState(zoom, viewportSize, canvasSize, viewportMode);
+    if (viewportChanged(next, { zoom, offsetX, offsetY })) {
+      dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
+    }
+    // Only re-center on overlay toggle / alignment change; resize re-centering is
+    // handled in useViewportControls.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayActive, overlayAlignment]);
+
   const viewportTransform = useMemo(
     () => buildViewportTransform(state.document, viewportSize, state.zoom, state.offsetX, state.offsetY, state.viewportMode),
     [state.document.canvas.height, state.document.canvas.rotation, state.document.canvas.width, state.offsetX, state.offsetY, state.viewportMode, state.zoom, viewportSize],

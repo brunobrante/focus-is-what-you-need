@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { IconWindow } from "@/components/icons";
 
 import type { ComponentVariant, ProjectType, ScreenVariant } from "@/lib/data/types";
 import { getInitialZoomForSubjectSize, type Size } from "@/canvas/engine/viewport";
@@ -186,10 +187,7 @@ function EmptyPreviewPlaceholder({ kind }: { kind: SnapshotProps["kind"] }) {
     <div className="grid h-full w-full place-items-center text-center">
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-5">
         <span className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-strong)] text-[var(--text-faint)]">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="14" rx="2" />
-            <path d="M3 9h18" />
-          </svg>
+          <IconWindow size={16} strokeWidth={1.6} />
         </span>
         <span className="text-[13px] font-medium text-[var(--text-muted)]">
           {kind === "screen" ? "Empty screen" : "Empty component"}

@@ -9,6 +9,10 @@ import {
   type SplitMode,
   LAYOUT_LABELS,
 } from "./canvasUtils";
+import {
+  IconClose, IconEllipsisVertical, IconExpand, IconGrid,
+  IconLayoutHorizontal, IconLayoutVertical, IconPlus,
+} from "@/components/icons";
 
 export type { SplitMode };
 
@@ -316,65 +320,12 @@ function SplitPanePicker({
   );
 }
 
-function VerticalDotsIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="5" r="1.7" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.7" fill="currentColor" />
-      <circle cx="12" cy="19" r="1.7" fill="currentColor" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
-
+function VerticalDotsIcon() { return <IconEllipsisVertical size={14} aria-hidden />; }
+function PlusIcon() { return <IconPlus size={11} strokeWidth={2} />; }
+function CloseIcon() { return <IconClose size={9} strokeWidth={2} />; }
 function LayoutIcon({ mode }: { mode: SplitMode }) {
-  if (mode === "vertical") {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="8" height="18" rx="1.5" />
-        <rect x="13" y="3" width="8" height="18" rx="1.5" />
-      </svg>
-    );
-  }
-  if (mode === "horizontal") {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="8" rx="1.5" />
-        <rect x="3" y="13" width="18" height="8" rx="1.5" />
-      </svg>
-    );
-  }
-  if (mode === "grid") {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="8" height="8" rx="1.5" />
-        <rect x="13" y="3" width="8" height="8" rx="1.5" />
-        <rect x="3" y="13" width="8" height="8" rx="1.5" />
-        <rect x="13" y="13" width="8" height="8" rx="1.5" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 3H3v6" />
-      <path d="M15 3h6v6" />
-      <path d="M9 21H3v-6" />
-      <path d="M15 21h6v-6" />
-    </svg>
-  );
+  if (mode === "vertical") return <IconLayoutVertical size={13} strokeWidth={1.6} />;
+  if (mode === "horizontal") return <IconLayoutHorizontal size={13} strokeWidth={1.6} />;
+  if (mode === "grid") return <IconGrid size={13} strokeWidth={1.6} />;
+  return <IconExpand size={13} strokeWidth={1.8} />;
 }

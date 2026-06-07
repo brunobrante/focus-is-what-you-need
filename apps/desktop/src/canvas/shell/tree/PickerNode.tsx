@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ProjectTreeNode } from "./treeTypes";
+import { IconChevronRight, IconGrid, IconScreen } from "@/components/icons";
 
 export function PickerNode({
   node,
@@ -35,27 +36,15 @@ export function PickerNode({
           onClick={(e) => { e.stopPropagation(); if (hasChildren) setOpen((v) => !v); }}
         >
           {hasChildren && (
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 100ms ease" }}
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
+            <IconChevronRight size={10} strokeWidth={2.2} className={open ? "rotate-90 transition-transform duration-100" : "rotate-0 transition-transform duration-100"} />
           )}
         </span>
 
         <span className="grid shrink-0 place-items-center text-[#666]">
           {node.kind === "screen" ? (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <path d="M8 21h8M12 17v4" />
-            </svg>
+            <IconScreen size={13} strokeWidth={1.7} />
           ) : (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
+            <IconGrid size={13} strokeWidth={1.7} />
           )}
         </span>
 

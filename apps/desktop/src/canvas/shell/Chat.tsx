@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  IconChevronDown, IconClose, IconDiamond, IconPaperclip, IconRefresh, IconSend,
+} from "@/components/icons";
 
 type Role = "user" | "assistant";
 type Message = {
@@ -107,19 +110,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
               className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] text-[#0E0A1A]"
               style={{ background: "linear-gradient(135deg, #C49BFF 0%, #7E5BF2 100%)" }}
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 3l4 4-4 4-4-4 4-4z" />
-                <path d="M12 13l4 4-4 4-4-4 4-4z" />
-              </svg>
+              <IconDiamond size={10} strokeWidth={2.6} />
             </span>
             <span
               className="text-[13px] font-semibold text-[#F2F2F2]"
@@ -144,24 +135,10 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
                 setThinking(false);
               }}
             >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12a9 9 0 11-3-6.7" />
-                <path d="M21 4v5h-5" />
-              </svg>
+              <IconRefresh size={12} strokeWidth={1.8} />
             </IconBtn>
             <IconBtn ariaLabel="Close chat" onClick={onClose}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
+              <IconClose size={11} strokeWidth={1.8} />
             </IconBtn>
           </div>
         </div>
@@ -169,18 +146,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
         {/* Context bar */}
         {(componentName || screenName) && (
           <div className="flex shrink-0 items-center gap-1.5 border-b border-[#2C2C2C] bg-[#141414] px-3.5 py-2 text-[11.5px] text-[#9A9A9A]">
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-            </svg>
+            <IconPaperclip size={11} strokeWidth={2} />
             <span className="text-[#6B6B6B]">contexto</span>
             <span
               className="truncate font-medium"
@@ -232,18 +198,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1">
                 <IconBtn ariaLabel="Anexar" title="Anexar contexto" size={24}>
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                  </svg>
+                  <IconPaperclip size={11} strokeWidth={1.8} />
                 </IconBtn>
                 <button
                   type="button"
@@ -251,18 +206,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
                   style={{ letterSpacing: "0.2px" }}
                 >
                   Sonnet 4.5
-                  <svg
-                    width="9"
-                    height="9"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
+                  <IconChevronDown size={9} strokeWidth={2} />
                 </button>
               </div>
               <button
@@ -277,19 +221,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
                   cursor: canSend ? "pointer" : "default",
                 }}
               >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 19V5" />
-                  <path d="M5 12l7-7 7 7" />
-                </svg>
+                <IconSend size={12} strokeWidth={2.2} />
               </button>
             </div>
           </div>
@@ -335,18 +267,7 @@ function ChatMessage({ msg }: { msg: Message }) {
                 key={i}
                 className="inline-flex items-center gap-1.5 rounded border border-[#2C2C2C] bg-[#1E1E1E] px-1.5 py-0.5 text-[11px] text-[#9A9A9A]"
               >
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                </svg>
+                <IconPaperclip size={10} strokeWidth={2} />
                 {c}
               </span>
             ))}
@@ -390,19 +311,7 @@ function ChatAvatar({ role }: { role: Role }) {
       className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[#0E0A1A]"
       style={{ background: "linear-gradient(135deg, #C49BFF 0%, #7E5BF2 100%)" }}
     >
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 3l4 4-4 4-4-4 4-4z" />
-        <path d="M12 13l4 4-4 4-4-4 4-4z" />
-      </svg>
+      <IconDiamond size={13} strokeWidth={2.4} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
+import { IconChevronRight, IconEye, IconEyeOff, IconLock, IconOpenCanvas, IconUnlock } from "@/components/icons";
 
 export function TreeRow({
   node,
@@ -99,22 +100,10 @@ export function TreeRow({
           style={{ cursor: hasChildren ? "pointer" : "default" }}
         >
           {hasChildren ? (
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
-                transition: "transform 100ms ease",
-              }}
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
+            <IconChevronRight
+              size={11} strokeWidth={2.4}
+              className={isOpen ? "rotate-90 transition-transform duration-100" : "rotate-0 transition-transform duration-100"}
+            />
           ) : null}
         </span>
         <span
@@ -145,11 +134,7 @@ export function TreeRow({
             className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#7A7A7A] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
             style={{ opacity: 0.72 }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="4" y="4" width="16" height="16" rx="2" />
-              <path d="M9 9h6v6" />
-              <path d="M15 9l-7 7" />
-            </svg>
+            <IconOpenCanvas size={12} strokeWidth={1.8} />
           </button>
         ) : null}
         {onToggleLocked ? (
@@ -164,15 +149,9 @@ export function TreeRow({
             style={{ opacity: locked ? 1 : 0.55 }}
           >
             {locked ? (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="11" width="14" height="9" rx="2" />
-                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-              </svg>
+              <IconLock size={11} strokeWidth={1.8} />
             ) : (
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="11" width="14" height="9" rx="2" />
-                <path d="M8 11V8a4 4 0 0 1 7.5-2" />
-              </svg>
+              <IconUnlock size={11} strokeWidth={1.8} />
             )}
           </button>
         ) : null}
@@ -188,17 +167,9 @@ export function TreeRow({
             style={{ opacity: visible ? 0.55 : 1 }}
           >
             {visible ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
+              <IconEye size={12} strokeWidth={1.8} />
             ) : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.5 0-10-7-10-7a18.45 18.45 0 0 1 5.06-5.94" />
-                <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c6.5 0 10 7 10 7a18.45 18.45 0 0 1-3.17 4.19" />
-                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
-                <path d="M1 1l22 22" />
-              </svg>
+              <IconEyeOff size={12} strokeWidth={1.8} />
             )}
           </button>
         ) : null}

@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { IconChevronLeft, IconClose, IconFrame, IconImage, IconPlus, IconSearch } from "@/components/icons";
 
 type DraftKind = "frame" | "image";
 
@@ -71,9 +72,7 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
             aria-label="Close gallery"
             className="grid h-[22px] w-[22px] cursor-pointer place-items-center rounded-[5px] border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+            <IconClose size={10} strokeWidth={1.8} />
           </button>
         </div>
       </div>
@@ -85,19 +84,7 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
           {/* Search */}
           <div className="px-2.5 pb-1.5 pt-2.5">
             <div className="flex h-7 items-center gap-1.5 rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2">
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#7A7A7A"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
+              <IconSearch size={12} strokeWidth={1.8} className="text-[#7A7A7A]" />
               <input
                 type="text"
                 value={query}
@@ -168,9 +155,7 @@ export function GalleryPanel({ open, onClose }: { open: boolean; onClose: () => 
               type="button"
               className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[10.5px] text-[#9A9A9A]"
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <IconPlus size={10} strokeWidth={2} />
               novo
             </button>
           </div>
@@ -230,18 +215,7 @@ function GalleryDetail({ draft, onBack }: { draft: Draft; onBack: () => void }) 
           aria-label="Back"
           className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md border border-[#2C2C2C] bg-transparent text-[#CFCFCF]"
         >
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
+          <IconChevronLeft size={11} strokeWidth={1.8} />
         </button>
         <span className="shrink-0 text-[#9A9A9A]">
           <DraftIcon kind={draft.kind} />
@@ -316,31 +290,7 @@ function SidebarBtn({ children, primary }: { children: ReactNode; primary?: bool
 }
 
 function DraftIcon({ kind }: { kind: DraftKind }) {
-  const common = {
-    width: 11,
-    height: 11,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  if (kind === "frame") {
-    return (
-      <svg {...common}>
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M3 9h18M9 3v18" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="9" cy="9" r="1.6" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
-  );
+  return kind === "frame" ? <IconFrame size={11} strokeWidth={1.8} /> : <IconImage size={11} strokeWidth={1.8} />;
 }
 
 function ThumbPlaceholder({
@@ -388,10 +338,7 @@ export function GalleryToggle({ open, onClick }: { open: boolean; onClick: () =>
       className="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-lg border border-[#2C2C2C] bg-[#1E1E1E] px-3 text-[13px] font-medium text-[#CFCFCF] transition-colors hover:bg-[#2A2A2A] hover:text-[var(--text)]"
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)" }}
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M3 9h18M9 3v18" />
-      </svg>
+      <IconFrame size={13} strokeWidth={1.6} />
       Galeria
     </button>
   );

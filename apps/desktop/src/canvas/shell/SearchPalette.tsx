@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { IconCirclePlus, IconDiamond, IconDocument, IconFrame, IconSearch } from "@/components/icons";
 
 type Kind = "component" | "page" | "frame" | "action";
 type Item = { id: string; kind: Kind; name: string; subtitle: string };
@@ -24,78 +25,22 @@ const KIND_META: Record<Kind, { label: string; color: string; icon: React.ReactN
   component: {
     label: "Component",
     color: "#D7C2FF",
-    icon: (
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 3l4 4-4 4-4-4 4-4z" />
-        <path d="M12 13l4 4-4 4-4-4 4-4z" />
-      </svg>
-    ),
+    icon: <IconDiamond size={13} strokeWidth={1.7} />,
   },
   page: {
     label: "Page",
     color: "#9DD0FF",
-    icon: (
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z" />
-        <path d="M14 3v6h6" />
-      </svg>
-    ),
+    icon: <IconDocument size={13} strokeWidth={1.7} />,
   },
   frame: {
     label: "Frame",
     color: "#CFCFCF",
-    icon: (
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M3 9h18M9 3v18" />
-      </svg>
-    ),
+    icon: <IconFrame size={13} strokeWidth={1.7} />,
   },
   action: {
     label: "Action",
     color: "#9AE6B4",
-    icon: (
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 8v8M8 12h8" />
-      </svg>
-    ),
+    icon: <IconCirclePlus size={13} strokeWidth={1.7} />,
   },
 };
 
@@ -172,19 +117,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
         }}
       >
         <div className="flex items-center gap-2.5 border-b border-[#2C2C2C] px-3.5 py-3">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            className="text-[var(--text-faint)]"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
+          <IconSearch size={14} strokeWidth={1.8} className="text-[var(--text-faint)]" />
           <input
             ref={inputRef}
             value={query}
@@ -256,18 +189,7 @@ export function SearchToggle({ onClick }: { onClick: () => void }) {
       aria-label="Search"
       className="grid h-6 w-6 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[var(--text-muted)] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
     >
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      >
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
+      <IconSearch size={13} strokeWidth={1.8} />
     </button>
   );
 }

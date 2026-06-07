@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { Wand2 } from "lucide-react";
 import { AppSettingsModal } from "@/components/modals/AppSettingsModal";
+import { IconGrid, IconImage, IconSettings, IconTrash } from "@/components/icons";
 
 export function TopBar({
   onResetToFactory,
@@ -50,40 +51,11 @@ export function TopBar({
       <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--border)]" />
       <nav aria-label="Workspace" className="inline-flex items-center gap-0.5">
         <TopNavLink to="/" end>
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="opacity-85"
-          >
-            <rect x="3" y="3" width="7" height="7" rx="1.2" />
-            <rect x="14" y="3" width="7" height="7" rx="1.2" />
-            <rect x="3" y="14" width="7" height="7" rx="1.2" />
-            <rect x="14" y="14" width="7" height="7" rx="1.2" />
-          </svg>
+          <IconGrid size={13} strokeWidth={1.7} className="opacity-85" />
           Projects
         </TopNavLink>
         <TopNavLink to="/references">
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="opacity-85"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-5-5L5 21" />
-          </svg>
+          <IconImage size={13} strokeWidth={1.7} className="opacity-85" />
           References
         </TopNavLink>
         <TopNavLink to="/generate">
@@ -138,10 +110,7 @@ export function TopBar({
                 }}
                 className="mt-1 flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
+                <IconSettings size={13} />
                 <span>Settings</span>
               </button>
               {onResetToFactory ? (
@@ -158,11 +127,7 @@ export function TopBar({
                     disabled={isResettingFactory}
                     className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[#ffb0b0] transition-colors hover:bg-[rgba(255,80,80,0.12)] disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                      <path d="M3 6h18" />
-                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                    </svg>
+                    <IconTrash size={13} />
                     <span>{isResettingFactory ? "Resetting data…" : "Factory reset"}</span>
                   </button>
                 </>

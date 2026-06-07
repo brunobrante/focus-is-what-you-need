@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { IconPlus, IconSearch } from "@/components/icons";
 import { TopBar } from "@/components/layout/TopBar";
 import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
@@ -144,37 +145,14 @@ function ProjectsView({
           </p>
         </div>
         <Link to="/new" className="btn btn-primary">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={14} strokeWidth={2} />
           New project
         </Link>
       </header>
 
       <div className="mb-[18px] flex items-center gap-2.5">
         <div className="relative w-full max-w-[320px] flex-1">
-          <svg
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
+          <IconSearch size={14} strokeWidth={1.7} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input
             type="search"
             placeholder="Search projects..."
@@ -362,17 +340,7 @@ function AddProjectCard() {
     >
       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)] transition-colors duration-[120ms] group-hover:border-[var(--text)] group-hover:text-[var(--text)]">
         <div className="flex flex-col items-center gap-1.5 text-[12px] tracking-[0.2px]">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={22} strokeWidth={1.6} />
           <span>New project</span>
         </div>
       </div>
@@ -396,36 +364,14 @@ function EmptyState() {
           aria-hidden
           className="mx-auto mb-7 grid h-[120px] w-[120px] place-items-center rounded-2xl border border-dashed border-[var(--border-strong)] text-[var(--text-faint)]"
         >
-          <svg
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M12 8v8M8 12h8" />
-          </svg>
+          <IconPlus size={40} strokeWidth={1.4} />
         </div>
         <h1 className="mb-2 text-[22px] font-semibold tracking-[-0.2px]">No projects yet</h1>
         <p className="mb-7 text-[14px] leading-[1.5] text-[var(--text-muted)]">
           Start by creating your first project. You can choose the format and give it a name.
         </p>
         <Link to="/new" className="btn btn-primary">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <IconPlus size={14} strokeWidth={2} />
           Create project
         </Link>
       </div>

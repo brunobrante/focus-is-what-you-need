@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { NavTooltip } from "./NavTooltip";
 import { ZOOM_DEFAULT_IDX, ZOOM_STEPS, ZoomControls } from "./ZoomControls";
+import { IconChevronDown, IconChevronLeft, IconChevronRight, IconFastEdit, IconOpenCanvas } from "@/components/icons";
 
 type NeighborScreen = { name: string; details?: string[]; href?: string; screenId?: string };
 
@@ -159,9 +160,7 @@ export function PreviewShell({
               deviceMenuOpen ? "border-[var(--blue)] bg-[rgba(31,122,224,0.08)] text-[var(--blue)]" : "",
             ].join(" ")}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            <IconChevronDown size={10} strokeWidth={2} />
           </button>
         </div>
       </div>
@@ -221,11 +220,7 @@ export function PreviewShell({
             onClick={onFastEdit}
             className="grid h-[34px] w-[34px] cursor-pointer place-items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-              <path d="M4 4h7" />
-            </svg>
+            <IconFastEdit size={15} strokeWidth={1.7} />
           </button>
         ) : null}
         {canvasHref ? (
@@ -233,10 +228,7 @@ export function PreviewShell({
             to={canvasHref}
             className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3.5 py-2 text-[13px] font-medium text-[var(--text)] no-underline transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="14" rx="2" />
-              <path d="M3 9h18" />
-            </svg>
+            <IconOpenCanvas size={14} strokeWidth={1.7} />
             Open in canvas
           </Link>
         ) : null}
@@ -250,9 +242,7 @@ export function PreviewShell({
             aria-label="Previous screen"
             className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] no-underline transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            <IconChevronLeft size={14} strokeWidth={2} />
           </Link>
           <NavTooltip side="prev" name={prev.name} details={prev.details} screenId={prev.screenId} />
         </div>
@@ -266,9 +256,7 @@ export function PreviewShell({
             aria-label="Next screen"
             className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] no-underline transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <IconChevronRight size={14} strokeWidth={2} />
           </Link>
           <NavTooltip side="next" name={next.name} details={next.details} screenId={next.screenId} />
         </div>
