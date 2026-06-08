@@ -1213,8 +1213,6 @@ pub fn run() {
             set_workspace_folder,
             pick_folder_dialog,
             ensure_workspace_folders,
-            db::kv_get,
-            db::kv_set,
             db::db_apply,
             db::db_get_scene,
             db::db_load_scene_nodes,
