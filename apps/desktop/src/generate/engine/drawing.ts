@@ -198,10 +198,14 @@ export function paintCropsCanvas(args: PaintCropsArgs) {
 
   if (!showCropsOverlay) return;
 
+  // The overlay is a guide for where you've already cropped *inside the element
+  // you currently have open*. Only the direct children of that element are
+  // shown — ancestors and unrelated crops would just clutter the view.
+  const openedId = activeSubject.kind === "component" ? activeSubject.id : rootComponentId;
+
   ctx.fillStyle = overlayFill;
   for (const component of components) {
-    if (component.id === rootComponentId) continue;
-    if (activeSubject.kind === "component" && component.id === activeSubject.id) continue;
+    if (component.parentId !== openedId) continue;
     if (component.id === editingComponentId) continue;
     const subjectBox = componentBoxInSubject(component.box, activeSubject);
     if (!subjectBox) continue;

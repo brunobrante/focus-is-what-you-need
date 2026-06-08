@@ -40,6 +40,7 @@ import type {
 import {
   MIN_TOOL_ZOOM,
   CROPS_OVERLAY_COLOR_STORAGE_KEY,
+  CROPS_OVERLAY_ALPHA_STORAGE_KEY,
   COMPONENT_STORAGE_PREFIX,
 } from "./types";
 
@@ -64,6 +65,7 @@ import {
 import { roundedRectPath } from "./engine/drawing";
 import {
   sourceRootComponentId,
+  newRootComponentId,
   createRootComponent,
   ensureRootComponent,
   componentAreaAlreadyExists,
@@ -83,6 +85,7 @@ import {
   hasDraftComponents,
   removeSavedComponents,
   readCropsOverlayColor,
+  readCropsOverlayAlpha,
 } from "./engine/storage";
 import {
   canvasToDataUrl,
@@ -166,6 +169,9 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   const [cropsOverlayColor, setCropsOverlayColor] = useState<string>(
     () => readCropsOverlayColor(),
   );
+  const [cropsOverlayAlpha, setCropsOverlayAlpha] = useState<number>(
+    () => readCropsOverlayAlpha(),
+  );
 
   // Repaints are coalesced to one per animation frame. N cut images settling
   // asynchronously (plus resize/onload) would otherwise trigger N full canvas
@@ -192,6 +198,14 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
       // ignore quota errors
     }
   }, [cropsOverlayColor]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CROPS_OVERLAY_ALPHA_STORAGE_KEY, String(cropsOverlayAlpha));
+    } catch {
+      // ignore quota errors
+    }
+  }, [cropsOverlayAlpha]);
 
   const {
     toolZoom,
@@ -469,45 +483,96 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     [openComponent],
   );
 
-  // Open the full-image root with the crop tool ready, so the user can cut a region
-  // and then promote it to a root via "Become root".
+  // "+ New" creates a brand-new, independent root seeded with the original image.
+  // The original is only a starting point: each root is its own workspace and can
+  // later be narrowed to a section via "Become root".
   const beginRootCreation = useCallback(() => {
+    const id = newRootComponentId();
+    const newRoot: SavedComponent = {
+      id,
+      name: "New stack",
+      box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
+      dataUrl: item.url,
+      type: item.type || "IMG",
+      createdAt: new Date().toISOString(),
+      parentId: null,
+      kind: "root",
+      rootId: id,
+      isDefaultRoot: false,
+    };
     cancelSelection();
-    setActiveRootId(rootComponentId);
-    setSelectedComponentId(rootComponentId);
+    updateComponents((current) => [...current, newRoot]);
+    setActiveRootId(id);
+    setSelectedComponentId(id);
+    setExpandedComponentIds((current) => {
+      const next = new Set(current);
+      next.add(id);
+      return next;
+    });
     setViewMode("component");
     setCurrentTool("crop");
     resetToolViewport();
-  }, [cancelSelection, resetToolViewport, rootComponentId]);
+  }, [cancelSelection, item.h, item.type, item.url, item.w, resetToolViewport, updateComponents]);
 
-  // Promote an existing component (and its subtree) into an independent root.
+  // "Become root" redefines the currently open root *in place* to be the selected
+  // section: the section's pixels/bounds replace the root's, its own children move
+  // up to the root, and the other crops of that root (along with the previous root
+  // image) are discarded. No copy is made and no extra root is created — the
+  // element simply becomes the root of its workspace.
   const promoteToRoot = useCallback(
     (id: string) => {
-      const component = components.find((entry) => entry.id === id);
-      if (!component || component.parentId == null) return;
+      const section = components.find((entry) => entry.id === id);
+      if (!section || section.parentId == null) return;
+      const targetRootId = section.rootId ?? activeScopeId ?? rootComponentId;
       const subtree = componentSubtreeIds(components, id);
       updateComponents((current) =>
-        current.map((entry) => {
-          if (entry.id === id) {
-            return { ...entry, parentId: null, kind: "root", rootId: id, isDefaultRoot: false };
-          }
-          if (subtree.has(entry.id)) return { ...entry, rootId: id };
-          return entry;
-        }),
+        current
+          .filter((entry) => {
+            // Drop the redefined root's crops that aren't part of the section's subtree.
+            const inTargetRoot = (entry.rootId ?? null) === targetRootId && entry.id !== targetRootId;
+            return !inTargetRoot || subtree.has(entry.id);
+          })
+          .map((entry): SavedComponent | null => {
+            if (entry.id === targetRootId) {
+              // Adopt the section's identity while keeping the root id stable so the
+              // surviving subtree's rootId references stay valid.
+              return {
+                ...entry,
+                name: section.name,
+                box: section.box,
+                dataUrl: section.dataUrl,
+                type: section.type || "PNG",
+                parentId: null,
+                kind: "root",
+                rootId: targetRootId,
+                isDefaultRoot: false,
+              };
+            }
+            if (entry.id === id) return null; // section is now merged into the root
+            if (subtree.has(entry.id)) {
+              return {
+                ...entry,
+                parentId: entry.parentId === id ? targetRootId : entry.parentId,
+                rootId: targetRootId,
+              };
+            }
+            return entry;
+          })
+          .filter((entry): entry is SavedComponent => entry != null),
       );
       cancelSelection();
       setEditingComponentId(null);
-      setActiveRootId(id);
-      setSelectedComponentId(id);
+      setActiveRootId(targetRootId);
+      setSelectedComponentId(targetRootId);
       setExpandedComponentIds((current) => {
         const next = new Set(current);
-        next.add(id);
+        next.add(targetRootId);
         return next;
       });
       setViewMode("component");
       resetToolViewport();
     },
-    [cancelSelection, components, resetToolViewport, updateComponents],
+    [activeScopeId, cancelSelection, components, resetToolViewport, rootComponentId, updateComponents],
   );
 
   const startEditComponent = useCallback(
@@ -534,19 +599,54 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     [components, expandComponentPath, resetToolViewport, rootComponentId],
   );
 
-  const resetToOriginalRoot = useCallback(() => {
+  // Reset only the active stack back to the original image: drop its crops and
+  // restore its root node to the full original image. Other stacks of this image
+  // are left untouched.
+  const resetActiveStack = useCallback(() => {
     cancelPendingPersist();
-    const resetComponents = ensureRootComponent([], item);
-    writeSavedComponents(componentKey, resetComponents);
-    setComponentState({ key: componentKey, items: resetComponents });
-    setActiveRootId(rootComponentId);
-    setExpandedComponentIds(new Set([rootComponentId]));
-    setSelectedComponentId(null);
+    const stackId = activeScopeId;
+    const isDefault = stackId === rootComponentId;
+    updateComponents((current) =>
+      current
+        .filter((entry) => {
+          const belongsToStack = (entry.rootId ?? null) === stackId && entry.id !== stackId;
+          return !belongsToStack;
+        })
+        .map((entry): SavedComponent =>
+          entry.id === stackId
+            ? {
+                ...entry,
+                name: isDefault ? "root" : entry.name,
+                box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
+                dataUrl: item.url,
+                type: item.type || "IMG",
+                parentId: null,
+                kind: "root",
+                rootId: stackId,
+                isDefaultRoot: isDefault,
+              }
+            : entry,
+        ),
+    );
+    setActiveRootId(stackId);
+    setExpandedComponentIds(new Set([stackId]));
+    setSelectedComponentId(isDefault ? null : stackId);
     setCurrentTool("move");
-    setViewMode("original");
+    setViewMode(isDefault ? "original" : "component");
     cancelSelection();
     resetToolViewport();
-  }, [cancelPendingPersist, cancelSelection, componentKey, item, resetToolViewport, rootComponentId]);
+  }, [
+    activeScopeId,
+    cancelPendingPersist,
+    cancelSelection,
+    item.h,
+    item.type,
+    item.url,
+    item.w,
+    resetToolViewport,
+    rootComponentId,
+    updateComponents,
+  ]);
 
   const selectStackComponent = useCallback(
     (id: string) => {
@@ -575,8 +675,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
   const confirmPendingAction = useCallback(() => {
     if (!pendingConfirmation) return;
     setPendingConfirmation(null);
-    resetToOriginalRoot();
-  }, [pendingConfirmation, resetToOriginalRoot]);
+    resetActiveStack();
+  }, [pendingConfirmation, resetActiveStack]);
 
   const persistReferenceStack = useCallback(async () => {
     if (savingStack) return;
@@ -599,11 +699,13 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
         rootComponentId,
       });
       const cutCount = data?.components.length ?? 0;
-      const rootCount = Math.max(0, (data?.roots?.length ?? 1) - 1);
+      const extraStackCount = Math.max(0, (data?.roots?.length ?? 1) - 1);
       setStackSaveStatus(
         data
           ? `${cutCount} ${cutCount === 1 ? "cut" : "cuts"}` +
-              (rootCount > 0 ? `, ${rootCount} ${rootCount === 1 ? "root" : "roots"} saved` : " saved")
+              (extraStackCount > 0
+                ? `, ${extraStackCount} ${extraStackCount === 1 ? "stack" : "stacks"} saved`
+                : " saved")
           : "Stack removed",
       );
       removeSavedComponents(componentKey);
@@ -979,6 +1081,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
     editingComponentId,
     showCropsOverlay,
     cropsOverlayColor,
+    cropsOverlayAlpha,
     imagePaintVersion,
     bumpPaintVersion,
   });
@@ -1449,7 +1552,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
                 {!canCrop ? (
                   <span>
-                    Open a root from the switcher to crop inside it. Click any component to{" "}
+                    Open a stack from the switcher to crop inside it. Click any component to{" "}
                     <b className="text-[var(--text-muted)]">Become root</b>.
                   </span>
                 ) : editingComponentId ? (
@@ -1493,7 +1596,7 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
                 <SidebarComponentsHeader
                   rootName={activeRoot.isDefaultRoot ? "Full image" : activeRoot.name}
                   scopedCount={scopedComponents.length}
-                  showReset={components.length > 1}
+                  showReset={scopedComponents.length > 1 || !activeRoot.isDefaultRoot}
                   onExpandAll={expandAllComponents}
                   onCollapseAll={collapseAllComponents}
                   onReset={requestResetConfirmation}
@@ -1540,6 +1643,8 @@ export function ToolsEditor({ item, referenceId, groupContext, onUploadedLocally
               <SidebarConfigPanel
                 cropsOverlayColor={cropsOverlayColor}
                 onChangeCropsOverlayColor={setCropsOverlayColor}
+                cropsOverlayAlpha={cropsOverlayAlpha}
+                onChangeCropsOverlayAlpha={setCropsOverlayAlpha}
               />
             )}
           </aside>

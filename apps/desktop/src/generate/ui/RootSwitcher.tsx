@@ -20,12 +20,12 @@ export function RootSwitcher({
     <div className="flex shrink-0 flex-col gap-2 border-b border-[var(--border)] px-3 py-2.5">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
-          Roots
+          Stacks
         </span>
         <button
           type="button"
-          aria-label="New root"
-          title="Open the full image to cut a region, then use Become root"
+          aria-label="New stack"
+          title="Create a new stack from the original image"
           onClick={onNewRoot}
           className={[
             "inline-flex h-6 cursor-pointer items-center gap-1 rounded-[6px] border px-1.5 text-[10.5px] font-medium transition-colors duration-[120ms]",
@@ -75,7 +75,7 @@ export function RootSwitcher({
         {roots.length === 0 ? (
           <div className="flex h-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-[var(--border)] text-[10.5px] text-[var(--text-faint)]">
             <SquareDashed size={13} strokeWidth={1.7} />
-            No roots yet
+            No stacks yet
           </div>
         ) : null}
       </div>
