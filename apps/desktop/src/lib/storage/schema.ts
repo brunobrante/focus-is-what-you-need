@@ -160,38 +160,6 @@ export type ThumbnailRow = {
   capturedAt: number;
 };
 
-// v1 legacy shapes — referenced only by the migration. After migrateV1toV2
-// runs once, these are gone from the store and not used anywhere else.
-export type V1ComponentRow = {
-  id: string;
-  projectId: string;
-  screenId: string | null;
-  title: string;
-  kind: ComponentKind;
-  variant: ComponentVariant;
-  createdAt: number;
-  updatedAt: number;
-};
-
-export type V1SceneOwnerType = "screen" | "component";
-
-export type V1SceneRow = {
-  id: string;
-  ownerType: V1SceneOwnerType;
-  ownerId: string;
-  graphJSON: string;
-  sceneVersion: number;
-  updatedAt: number;
-};
-
-export type V1ThumbnailRow = {
-  id: string;
-  ownerType: V1SceneOwnerType;
-  ownerId: string;
-  dataUrl: string;
-  capturedAt: number;
-};
-
 // ---------------------------------------------------------------------------
 // Workspace — groups projects, top level of the hierarchy
 // ---------------------------------------------------------------------------
