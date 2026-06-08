@@ -28,6 +28,17 @@ import {
   IconTrash,
   IconClose,
 } from "@/components/icons";
+import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
+import { useSystemDesigns } from "@/lib/storage/hooks";
+import {
+  addSystemDesignIcon,
+  addSystemDesignLibrary,
+  createSystemDesign,
+  deleteSystemDesign,
+  removeSystemDesignIcon,
+  removeSystemDesignLibrary,
+  setSystemDesignShared,
+} from "@/lib/storage/repos/systemDesigns.repo";
 
 const LUCIDE_CATALOGUE: Array<{ name: string; component: LucideIcon }> = [
   { name: "home", component: Home },
@@ -216,6 +227,8 @@ export function SystemDesign() {
           </div>
         </header>
 
+        <SystemDesignManager />
+
         <TabBar active={tab} onChange={setTab} />
 
         <main className="flex-1 overflow-y-auto">
@@ -267,6 +280,196 @@ export function SystemDesign() {
             {tab === "assets" && <AssetsTab />}
           </div>
         </main>
+      </div>
+    </div>
+  );
+}
+
+// ─── Persisted system designs (per workspace) ──────────────────────────────────
+
+function SystemDesignManager() {
+  const [activeWorkspaceId] = useActiveWorkspaceId();
+  const { data: designs } = useSystemDesigns("workspace", activeWorkspaceId);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [newDesignName, setNewDesignName] = useState("");
+  const [newLibraryName, setNewLibraryName] = useState("");
+  const [newIconName, setNewIconName] = useState("");
+
+  useEffect(() => {
+    if (designs.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !designs.some((d) => d.id === selectedId)) {
+      setSelectedId(designs[0]!.id);
+    }
+  }, [designs, selectedId]);
+
+  const selected = designs.find((d) => d.id === selectedId) ?? null;
+
+  const createDesign = async () => {
+    const name = newDesignName.trim();
+    if (!activeWorkspaceId || !name) return;
+    const created = await createSystemDesign({
+      name,
+      ownerScope: "workspace",
+      ownerId: activeWorkspaceId,
+    });
+    setSelectedId(created.id);
+    setNewDesignName("");
+  };
+
+  if (!activeWorkspaceId) {
+    return (
+      <div className="border-b border-[var(--border)] px-7 py-3 text-[12px] text-[var(--text-faint)]">
+        Select or create a workspace to manage its system designs.
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-b border-[var(--border)] px-7 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">
+          Designs
+        </span>
+        {designs.map((design) => (
+          <button
+            key={design.id}
+            type="button"
+            onClick={() => setSelectedId(design.id)}
+            className={[
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors",
+              design.id === selectedId
+                ? "border-[var(--text)] bg-[var(--surface)] text-[var(--text)]"
+                : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]",
+            ].join(" ")}
+          >
+            {design.name}
+            {design.shared && (
+              <span className="text-[9px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+                shared
+              </span>
+            )}
+          </button>
+        ))}
+        <input
+          type="text"
+          value={newDesignName}
+          placeholder="New design name…"
+          onChange={(e) => setNewDesignName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void createDesign();
+          }}
+          className="h-7 w-[160px] rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
+        />
+        <button
+          type="button"
+          onClick={() => void createDesign()}
+          disabled={!newDesignName.trim()}
+          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border border-[var(--border)] bg-transparent px-2 text-[12px] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+        >
+          <IconPlus size={12} strokeWidth={2} />
+          New
+        </button>
+      </div>
+
+      {selected && (
+        <div className="mt-3 flex flex-wrap items-start gap-x-8 gap-y-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-[12px] text-[var(--text-muted)]">
+            <input
+              type="checkbox"
+              checked={selected.shared}
+              onChange={(e) => void setSystemDesignShared(selected.id, e.target.checked)}
+            />
+            Shared with projects
+          </label>
+
+          <NameListEditor
+            label="Libraries"
+            items={selected.libraries}
+            value={newLibraryName}
+            onValueChange={setNewLibraryName}
+            onAdd={() => {
+              void addSystemDesignLibrary(selected.id, newLibraryName);
+              setNewLibraryName("");
+            }}
+            onRemove={(id) => void removeSystemDesignLibrary(selected.id, id)}
+          />
+
+          <NameListEditor
+            label="Icons"
+            items={selected.icons}
+            value={newIconName}
+            onValueChange={setNewIconName}
+            onAdd={() => {
+              void addSystemDesignIcon(selected.id, newIconName);
+              setNewIconName("");
+            }}
+            onRemove={(id) => void removeSystemDesignIcon(selected.id, id)}
+          />
+
+          <button
+            type="button"
+            onClick={() => void deleteSystemDesign(selected.id)}
+            className="ml-auto inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-2.5 text-[12px] text-[#ffb0b0] transition-colors hover:bg-[rgba(255,80,80,0.12)]"
+          >
+            <IconTrash size={12} />
+            Delete design
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NameListEditor({
+  label,
+  items,
+  value,
+  onValueChange,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  items: { id: string; name: string }[];
+  value: string;
+  onValueChange: (v: string) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="min-w-[220px]">
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">
+        {label}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {items.map((item) => (
+          <span
+            key={item.id}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] py-0.5 pl-2 pr-1 text-[12px] text-[var(--text)]"
+          >
+            {item.name}
+            <button
+              type="button"
+              aria-label={`Remove ${item.name}`}
+              onClick={() => onRemove(item.id)}
+              className="inline-grid h-4 w-4 cursor-pointer place-items-center rounded text-[var(--text-faint)] hover:text-[var(--text)]"
+            >
+              <IconClose size={10} strokeWidth={2} />
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          value={value}
+          placeholder={`Add ${label.toLowerCase().replace(/s$/, "")}…`}
+          onChange={(e) => onValueChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onAdd();
+          }}
+          className="h-7 w-[140px] rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
+        />
       </div>
     </div>
   );

@@ -3,11 +3,10 @@ import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { Wand2 } from "lucide-react";
 import { AppSettingsModal } from "@/components/modals/AppSettingsModal";
-import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconSettings, IconTrash } from "@/components/icons";
-
-const WORKSPACES = [
-  { id: "local", name: "workspace", description: "Local desktop workspace" },
-];
+import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPlus, IconSettings, IconTrash } from "@/components/icons";
+import { useWorkspaces } from "@/lib/storage/hooks";
+import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
+import { createWorkspace } from "@/lib/storage/repos/workspace.repo";
 
 export function TopBar({
   onResetToFactory,
@@ -23,7 +22,10 @@ export function TopBar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
   const [wsPosition, setWsPosition] = useState<{ top: number; left: number } | null>(null);
-  const [activeWs, setActiveWs] = useState(WORKSPACES[0]!.id);
+  const { data: workspaces } = useWorkspaces();
+  const [activeWsId, setActiveWsId] = useActiveWorkspaceId();
+  const [newWsName, setNewWsName] = useState("");
+  const [creatingWs, setCreatingWs] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wsTriggerRef = useRef<HTMLButtonElement>(null);
@@ -69,7 +71,23 @@ export function TopBar({
     };
   }, [wsOpen]);
 
-  const currentWs = WORKSPACES.find((w) => w.id === activeWs) ?? WORKSPACES[0]!;
+  const currentWs =
+    workspaces.find((w) => w.id === activeWsId) ?? workspaces[0] ?? null;
+
+  const handleCreateWorkspace = async () => {
+    const name = newWsName.trim();
+    if (!name || creatingWs) return;
+    setCreatingWs(true);
+    try {
+      const created = await createWorkspace({ name });
+      setActiveWsId(created.id);
+      setNewWsName("");
+      setWsOpen(false);
+      setWsPosition(null);
+    } finally {
+      setCreatingWs(false);
+    }
+  };
 
   return (
     <>
@@ -85,7 +103,7 @@ export function TopBar({
         className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] tracking-[0.3px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
       >
         <span aria-hidden className="h-3 w-3 shrink-0 rounded-[3px] bg-[var(--text)]" />
-        {currentWs.name}
+        {currentWs?.name ?? "workspace"}
         <IconChevronDown
           size={9}
           strokeWidth={2.4}
@@ -104,25 +122,48 @@ export function TopBar({
               Workspaces
             </div>
           </div>
-          {WORKSPACES.map((ws) => (
+          {workspaces.map((ws) => (
             <button
               key={ws.id}
               type="button"
-              onClick={() => { setActiveWs(ws.id); setWsOpen(false); setWsPosition(null); }}
+              onClick={() => { setActiveWsId(ws.id); setWsOpen(false); setWsPosition(null); }}
               className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-2 text-left transition-colors hover:bg-[var(--surface)]"
             >
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[5px] bg-[var(--text)] text-[9px] font-bold text-[var(--bg)]">
-                {ws.name[0]!.toUpperCase()}
+                {ws.name[0]?.toUpperCase() ?? "W"}
               </span>
               <div className="min-w-0">
                 <div className="text-[12.5px] font-medium text-[var(--text)]">{ws.name}</div>
-                <div className="truncate text-[11px] text-[var(--text-faint)]">{ws.description}</div>
+                <div className="truncate text-[11px] text-[var(--text-faint)]">
+                  {ws.projectIds.length} {ws.projectIds.length === 1 ? "project" : "projects"}
+                </div>
               </div>
-              {ws.id === activeWs && (
+              {currentWs?.id === ws.id && (
                 <span className="ml-auto text-[10px] text-[var(--text-faint)]">✓</span>
               )}
             </button>
           ))}
+          <div className="mt-1 border-t border-[var(--border)] px-2 pt-2">
+            <input
+              type="text"
+              value={newWsName}
+              placeholder="New workspace name…"
+              onChange={(e) => setNewWsName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreateWorkspace();
+              }}
+              className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
+            />
+            <button
+              type="button"
+              onClick={() => void handleCreateWorkspace()}
+              disabled={!newWsName.trim() || creatingWs}
+              className="mt-1.5 flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-1 py-1.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+            >
+              <IconPlus size={13} strokeWidth={2} />
+              {creatingWs ? "Creating…" : "Create workspace"}
+            </button>
+          </div>
         </div>,
         document.body,
       ) : null}

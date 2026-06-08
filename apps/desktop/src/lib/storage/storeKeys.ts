@@ -9,6 +9,7 @@ export const TABLES = {
   thumbnails: "thumbnails",
   settings: "settings",
   workspaces: "workspaces",
+  systemDesigns: "system_designs",
   screenVersions: "screen_versions",
   placements: "placements",
   history: "history",

@@ -47,7 +47,6 @@ import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import {
   DEFAULT_HISTORY,
-  DEFAULT_SCREEN_VERSIONS,
   type ScreenVersion,
 } from "@/lib/data/screenVersions";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
@@ -90,10 +89,10 @@ export function Components() {
   const [fastEditOpen, setFastEditOpen] = useState(false);
   const [fastEditComponent, setFastEditComponent] = useState<ComponentRow | null>(null);
 
-  const [versions, setVersions] = useState<ScreenVersion[]>(() =>
-    DEFAULT_SCREEN_VERSIONS.map((v, i) => ({ ...v, tpl: i === DEFAULT_SCREEN_VERSIONS.length - 1 ? "detail" : tpl })),
-  );
-  const [activeVersionId, setActiveVersionId] = useState(versions[0]?.id ?? "v3");
+  // A newly created screen starts with no versions. Versions are only created
+  // explicitly by the user — never auto-seeded.
+  const [versions, setVersions] = useState<ScreenVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 
   const activeVersion = versions.find((v) => v.id === activeVersionId) ?? versions[0];
   const activeTpl = activeVersion?.tpl ?? tpl;

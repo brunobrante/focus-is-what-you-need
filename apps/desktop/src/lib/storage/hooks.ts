@@ -10,8 +10,11 @@ import {
   listComponents,
   listComponentsByProject,
   listTopLevelByScreen,
+  listWorkspaceComponents,
 } from "@/lib/storage/repos/components.repo";
 import { findProjectByName, getProject, listProjects } from "@/lib/storage/repos/projects.repo";
+import { getWorkspace, listWorkspaces } from "@/lib/storage/repos/workspace.repo";
+import { listSystemDesignsByOwner } from "@/lib/storage/repos/systemDesigns.repo";
 import {
   listReferencesByOwner,
   listReferencesByProject,
@@ -33,8 +36,11 @@ import type {
   SceneOwnerType,
   SceneRow,
   ScreenRow,
+  SystemDesignOwnerScope,
+  SystemDesignRow,
   ThumbnailRow,
   VariantRow,
+  WorkspaceRow,
 } from "@/lib/storage/schema";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 import { TABLES, type TableKey, subscribe } from "@/lib/storage/store";
@@ -131,6 +137,46 @@ function useInvalidationQuery<T>(
 
 export function useProjects(): State<ProjectRow[]> {
   return useTableQuery<ProjectRow[]>([TABLES.projects], listProjects, [], []);
+}
+
+export function useWorkspaces(): State<WorkspaceRow[]> {
+  return useTableQuery<WorkspaceRow[]>([TABLES.workspaces], listWorkspaces, [], []);
+}
+
+export function useWorkspace(
+  id: string | null | undefined,
+): State<WorkspaceRow | null> {
+  return useTableQuery<WorkspaceRow | null>(
+    [TABLES.workspaces],
+    async () => (id ? getWorkspace(id) : null),
+    null,
+    [id ?? ""],
+  );
+}
+
+export function useSystemDesigns(
+  ownerScope: SystemDesignOwnerScope | null | undefined,
+  ownerId: string | null | undefined,
+): State<SystemDesignRow[]> {
+  return useTableQuery<SystemDesignRow[]>(
+    [TABLES.systemDesigns],
+    async () =>
+      ownerScope && ownerId ? listSystemDesignsByOwner(ownerScope, ownerId) : [],
+    [],
+    [ownerScope ?? "", ownerId ?? ""],
+  );
+}
+
+/** Workspace-global components for the Global Components page. */
+export function useWorkspaceComponents(
+  workspaceId: string | null | undefined,
+): State<ComponentRow[]> {
+  return useTableQuery<ComponentRow[]>(
+    [TABLES.components],
+    async () => (workspaceId ? listWorkspaceComponents(workspaceId) : []),
+    [],
+    [workspaceId ?? ""],
+  );
 }
 
 export function useProject(id: string | null | undefined): State<ProjectRow | null> {
