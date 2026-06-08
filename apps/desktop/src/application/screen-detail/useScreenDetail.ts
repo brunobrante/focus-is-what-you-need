@@ -29,6 +29,8 @@ import type { CompareVersionsModalHandle } from "@/components/modals/CompareVers
 import type { NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import type { ReferencesModalHandle } from "@/components/modals/ReferencesModal";
 import type { AddReferenceModalHandle } from "@/components/modals/AddReferenceModal";
+import type { FastEditModalHandle } from "@/components/screen/FastEditModal";
+import type { ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 export type SideTab = "components" | "versions" | "references";
 export type CmpKindFilter = "all" | ComponentKind;
 
@@ -64,12 +66,6 @@ export interface ScreenDetailState {
   setQuery: (q: string) => void;
   filter: CmpKindFilter;
   setFilter: (f: CmpKindFilter) => void;
-  pendingComponentDelete: ComponentRow | null;
-  setPendingComponentDelete: (c: ComponentRow | null) => void;
-  fastEditOpen: boolean;
-  setFastEditOpen: (open: boolean) => void;
-  fastEditComponent: ComponentRow | null;
-  setFastEditComponent: (c: ComponentRow | null) => void;
   versions: ScreenVersion[];
   setVersions: React.Dispatch<React.SetStateAction<ScreenVersion[]>>;
   activeVersionId: string | null;
@@ -83,6 +79,8 @@ export interface ScreenDetailState {
   referencesRef: React.RefObject<ReferencesModalHandle | null>;
   newComponentRef: React.RefObject<NewComponentModalHandle | null>;
   addRefModalRef: React.RefObject<AddReferenceModalHandle | null>;
+  fastEditRef: React.RefObject<FastEditModalHandle | null>;
+  confirmRef: React.RefObject<ConfirmActionModalHandle | null>;
 
   // history data
   defaultHistory: typeof DEFAULT_HISTORY;
@@ -93,7 +91,7 @@ export interface ScreenDetailState {
   openNewComponent: () => void;
   addVersion: () => void;
   removeLinkedReference: (referenceId: string) => void;
-  handleConfirmDeleteComponent: () => Promise<void>;
+  requestDeleteComponent: (component: ComponentRow) => void;
   handleOpenCanvas: (variantId: string) => void;
   handleScreenTitleSave: (title: string) => void;
   handleNewComponentCreated: (r: { component: ComponentRow }) => void;
@@ -131,9 +129,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   const [sideTab, setSideTab] = useState<SideTab>("components");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
-  const [pendingComponentDelete, setPendingComponentDelete] = useState<ComponentRow | null>(null);
-  const [fastEditOpen, setFastEditOpen] = useState(false);
-  const [fastEditComponent, setFastEditComponent] = useState<ComponentRow | null>(null);
 
   const [versions, setVersions] = useState<ScreenVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
@@ -146,6 +141,8 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   const referencesRef = useRef<ReferencesModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
   const addRefModalRef = useRef<AddReferenceModalHandle>(null);
+  const fastEditRef = useRef<FastEditModalHandle>(null);
+  const confirmRef = useRef<ConfirmActionModalHandle>(null);
 
   const buildScreenHref = (id: string) =>
     `/project/${encodeURIComponent(project?.id ?? projectId)}/screen/${encodeURIComponent(id)}`;
@@ -221,10 +218,12 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     void removeReferenceFromOwner(referenceId, "screen", screen.id);
   };
 
-  const handleConfirmDeleteComponent = async () => {
-    if (!pendingComponentDelete) return;
-    await deleteComponentTree(pendingComponentDelete.id);
-    setPendingComponentDelete(null);
+  const requestDeleteComponent = (component: ComponentRow) => {
+    confirmRef.current?.open({
+      title: "Delete component",
+      message: `The component "${component.name}" will be removed along with subcomponents and variants.`,
+      onConfirm: () => deleteComponentTree(component.id),
+    });
   };
 
   const handleOpenCanvas = (variantId: string) => {
@@ -287,12 +286,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     setQuery,
     filter,
     setFilter,
-    pendingComponentDelete,
-    setPendingComponentDelete,
-    fastEditOpen,
-    setFastEditOpen,
-    fastEditComponent,
-    setFastEditComponent,
     versions,
     setVersions,
     activeVersionId,
@@ -304,13 +297,15 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     referencesRef,
     newComponentRef,
     addRefModalRef,
+    fastEditRef,
+    confirmRef,
     defaultHistory: DEFAULT_HISTORY,
     projectDims: PROJECT_TYPE_DIMS,
     buildScreenHref,
     openNewComponent,
     addVersion,
     removeLinkedReference,
-    handleConfirmDeleteComponent,
+    requestDeleteComponent,
     handleOpenCanvas,
     handleScreenTitleSave,
     handleNewComponentCreated,

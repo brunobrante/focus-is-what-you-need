@@ -58,12 +58,6 @@ export function ScreenDetailPage() {
     setQuery,
     filter,
     setFilter,
-    pendingComponentDelete,
-    setPendingComponentDelete,
-    fastEditOpen,
-    setFastEditOpen,
-    fastEditComponent,
-    setFastEditComponent,
     versions,
     setVersions,
     activeVersionId,
@@ -75,21 +69,21 @@ export function ScreenDetailPage() {
     referencesRef,
     newComponentRef,
     addRefModalRef,
+    fastEditRef,
+    confirmRef,
     defaultHistory,
     projectDims,
     buildScreenHref,
     openNewComponent,
     addVersion,
     removeLinkedReference,
-    handleConfirmDeleteComponent,
+    requestDeleteComponent,
     handleOpenCanvas,
     handleScreenTitleSave,
     handleNewComponentCreated,
     handleCompareOpenInCanvas,
     handleAddReference,
   } = useScreenDetail(screenId, projectId);
-
-  const navigate = useNavigate();
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]" data-type={type}>
@@ -162,7 +156,7 @@ export function ScreenDetailPage() {
       {/* Split layout */}
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
         <PreviewShell
-          onFastEdit={() => setFastEditOpen(true)}
+          onFastEdit={() => fastEditRef.current?.open({ mode: "screen", screen, components, type, canvasHref })}
           canvasHref={canvasHref}
           prev={prevScreen ? {
             name: prevScreen.title,
@@ -276,9 +270,15 @@ export function ScreenDetailPage() {
                     variant={activeVariants.get(c.id) ?? null}
                     projectId={project?.id ?? projectId}
                     type={type}
-                    onRequestDelete={setPendingComponentDelete}
+                    onRequestDelete={requestDeleteComponent}
                     onOpenCanvas={handleOpenCanvas}
-                    onFastEdit={setFastEditComponent}
+                    onFastEdit={(component) => {
+                      const variant = activeVariants.get(component.id) ?? null;
+                      const href = component.activeVariantId
+                        ? `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&variant=${component.activeVariantId}`
+                        : canvasHref;
+                      fastEditRef.current?.open({ mode: "component", component, variant, type, canvasHref: href });
+                    }}
                     onMoveTo={() => {}}
                     onMakeGlobal={() => {}}
                   />
@@ -356,47 +356,14 @@ export function ScreenDetailPage() {
         defaultScreenId={screen?.id}
         onAdd={handleAddReference}
       />
-      <FastEditModal
-        mode="screen"
-        open={fastEditOpen}
-        onClose={() => setFastEditOpen(false)}
-        screen={screen}
-        components={components}
-        type={type}
-        canvasHref={canvasHref}
-      />
-      {fastEditComponent && (
-        <FastEditModal
-          mode="component"
-          open={Boolean(fastEditComponent)}
-          onClose={() => setFastEditComponent(null)}
-          component={fastEditComponent}
-          variant={activeVariants.get(fastEditComponent.id) ?? null}
-          type={type}
-          canvasHref={
-            fastEditComponent.activeVariantId
-              ? `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&variant=${fastEditComponent.activeVariantId}`
-              : canvasHref
-          }
-        />
-      )}
+      <FastEditModal ref={fastEditRef} />
       <NewComponentModal
         ref={newComponentRef}
         projectId={project?.id ?? null}
         screens={screens}
         onCreated={handleNewComponentCreated}
       />
-      <ConfirmActionModal
-        open={Boolean(pendingComponentDelete)}
-        title="Delete component"
-        message={
-          pendingComponentDelete
-            ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
-            : ""
-        }
-        onClose={() => setPendingComponentDelete(null)}
-        onConfirm={handleConfirmDeleteComponent}
-      />
+      <ConfirmActionModal ref={confirmRef} />
     </div>
   );
 }

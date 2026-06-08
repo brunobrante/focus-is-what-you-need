@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { Wand2 } from "lucide-react";
-import { AppSettingsModal } from "@/components/modals/AppSettingsModal";
+import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
 import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPlus, IconSettings, IconTrash } from "@/components/icons";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
@@ -19,7 +19,7 @@ export function TopBar({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<AppSettingsModalHandle>(null);
   const [wsOpen, setWsOpen] = useState(false);
   const [wsPosition, setWsPosition] = useState<{ top: number; left: number } | null>(null);
   const { data: workspaces } = useWorkspaces();
@@ -234,7 +234,7 @@ export function TopBar({
                 onClick={() => {
                   setMenuOpen(false);
                   setMenuPosition(null);
-                  setSettingsOpen(true);
+                  settingsRef.current?.open();
                 }}
                 className="mt-1 flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
               >
@@ -265,7 +265,7 @@ export function TopBar({
           )
         : null}
     </header>
-    <AppSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    <AppSettingsModal ref={settingsRef} />
     </>
   );
 }

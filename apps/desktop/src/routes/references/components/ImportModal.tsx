@@ -1,5 +1,7 @@
 import {
+  forwardRef,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type ChangeEvent,
@@ -18,391 +20,409 @@ import { discardReferenceItem, fileToReference, findDuplicateReference } from ".
 import { formatDuration, formatSize, MAX_VIDEO_BYTES } from "../lib/utils";
 import { SmallButton, TagEditor } from "./ui";
 
-export function ImportModal({
-  open,
-  existingItems,
-  targetGroupName,
-  onClose,
-  onAdd,
-  onUseExisting,
-}: {
-  open: boolean;
+type ImportConfig = {
   existingItems: ReferenceItem[];
   targetGroupName: string | null;
-  onClose: () => void;
   onAdd: (items: ReferenceItem[], options?: { groupTogether?: boolean }) => void;
   onUseExisting: (item: ReferenceItem) => void;
-}) {
-  const [tab, setTab] = useState<ImportTab>("local");
-  const [dragActive, setDragActive] = useState(false);
-  const [rejectedFiles, setRejectedFiles] = useState<string[]>([]);
-  const [staged, setStaged] = useState<StagedItem[]>([]);
-  const [groupTogether, setGroupTogether] = useState(false);
-  const [duplicateQueue, setDuplicateQueue] = useState<PendingDuplicate[]>([]);
-  const [duplicateDecision, setDuplicateDecision] = useState<DuplicateDecision>("existing");
-  const [processing, setProcessing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const confirmedRef = useRef(false);
-  const pendingDuplicate = duplicateQueue[0] ?? null;
+};
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && duplicateQueue.length === 0) onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, duplicateQueue.length]);
+export interface ImportModalHandle {
+  open: (config: ImportConfig) => void;
+  close: () => void;
+}
 
-  useEffect(() => {
-    if (!open) {
-      if (!confirmedRef.current) {
-        setStaged((prev) => {
-          for (const item of prev) discardReferenceItem(item);
-          return [];
-        });
-        setDuplicateQueue((prev) => {
-          for (const dup of prev) discardReferenceItem(dup.imported);
-          return [];
-        });
-      } else {
-        setStaged([]);
-        setDuplicateQueue([]);
-        confirmedRef.current = false;
-      }
-      setTab("local");
-      setDragActive(false);
-      setRejectedFiles([]);
-      setDuplicateDecision("existing");
-      setProcessing(false);
-      setGroupTogether(false);
-    }
-  }, [open]);
+export const ImportModal = forwardRef<ImportModalHandle>(
+  function ImportModal(_, ref) {
+    const [isOpen, setIsOpen] = useState(false);
+    const configRef = useRef<ImportConfig | null>(null);
 
-  function doCancel() {
-    for (const item of staged) discardReferenceItem(item);
-    for (const dup of duplicateQueue) discardReferenceItem(dup.imported);
-    setStaged([]);
-    setDuplicateQueue([]);
-    setRejectedFiles([]);
-  }
+    const [tab, setTab] = useState<ImportTab>("local");
+    const [dragActive, setDragActive] = useState(false);
+    const [rejectedFiles, setRejectedFiles] = useState<string[]>([]);
+    const [staged, setStaged] = useState<StagedItem[]>([]);
+    const [groupTogether, setGroupTogether] = useState(false);
+    const [duplicateQueue, setDuplicateQueue] = useState<PendingDuplicate[]>([]);
+    const [duplicateDecision, setDuplicateDecision] = useState<DuplicateDecision>("existing");
+    const [processing, setProcessing] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const confirmedRef = useRef(false);
+    const pendingDuplicate = duplicateQueue[0] ?? null;
 
-  async function handleFiles(files: FileList | File[]) {
-    const arr = Array.from(files);
-    const accepted: File[] = [];
-    const rejected: string[] = [];
-
-    for (const file of arr) {
-      const isVideo = file.type.startsWith("video/");
-      const isImage = file.type.startsWith("image/");
-      if (!isVideo && !isImage) continue;
-      if (isVideo && file.size > MAX_VIDEO_BYTES) {
-        rejected.push(file.name);
-        continue;
-      }
-      accepted.push(file);
-    }
-
-    setRejectedFiles(rejected);
-    if (accepted.length === 0) return;
-
-    setProcessing(true);
-    try {
-      const created = await Promise.all(accepted.map(fileToReference));
-      const valid = created.filter(Boolean) as ReferenceItem[];
-      const nextStaged: StagedItem[] = [];
-      const nextDuplicates: PendingDuplicate[] = [];
-
-      for (const item of valid) {
-        const imported: StagedItem = { ...item, desc: "" };
-        const duplicate = findDuplicateReference(item, [...existingItems, ...nextStaged]);
-        if (duplicate) {
-          nextDuplicates.push({ existing: duplicate, imported });
-        } else {
-          nextStaged.push(imported);
-        }
-      }
-
-      setStaged((prev) => { for (const item of prev) discardReferenceItem(item); return nextStaged; });
-      setDuplicateQueue((prev) => { for (const dup of prev) discardReferenceItem(dup.imported); return nextDuplicates; });
-      setDuplicateDecision("existing");
-    } finally {
-      setProcessing(false);
-    }
-  }
-
-  function handleConfirm() {
-    if (duplicateQueue.length > 0) return;
-    confirmedRef.current = true;
-    const items: ReferenceItem[] = staged.map(({ desc, ...item }) => ({
-      ...item,
-      description: desc.trim() || undefined,
-      sourceUrl: item.sourceUrl?.trim() || undefined,
+    useImperativeHandle(ref, () => ({
+      open: (config) => {
+        configRef.current = config;
+        setIsOpen(true);
+      },
+      close: () => setIsOpen(false),
     }));
-    onAdd(items, { groupTogether: groupTogether && !targetGroupName && items.length >= 2 });
-  }
 
-  function resolveDuplicate() {
-    if (!pendingDuplicate) return;
-    const remaining = duplicateQueue.slice(1);
-    if (duplicateDecision === "existing") {
-      discardReferenceItem(pendingDuplicate.imported);
+    useEffect(() => {
+      if (!isOpen) return;
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape" && duplicateQueue.length === 0) setIsOpen(false);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [isOpen, duplicateQueue.length]);
+
+    useEffect(() => {
+      if (!isOpen) {
+        if (!confirmedRef.current) {
+          setStaged((prev) => {
+            for (const item of prev) discardReferenceItem(item);
+            return [];
+          });
+          setDuplicateQueue((prev) => {
+            for (const dup of prev) discardReferenceItem(dup.imported);
+            return [];
+          });
+        } else {
+          setStaged([]);
+          setDuplicateQueue([]);
+          confirmedRef.current = false;
+        }
+        setTab("local");
+        setDragActive(false);
+        setRejectedFiles([]);
+        setDuplicateDecision("existing");
+        setProcessing(false);
+        setGroupTogether(false);
+      }
+    }, [isOpen]);
+
+    function doCancel() {
+      for (const item of staged) discardReferenceItem(item);
+      for (const dup of duplicateQueue) discardReferenceItem(dup.imported);
+      setStaged([]);
+      setDuplicateQueue([]);
+      setRejectedFiles([]);
+    }
+
+    async function handleFiles(files: FileList | File[]) {
+      const arr = Array.from(files);
+      const accepted: File[] = [];
+      const rejected: string[] = [];
+      const config = configRef.current;
+      if (!config) return;
+
+      for (const file of arr) {
+        const isVideo = file.type.startsWith("video/");
+        const isImage = file.type.startsWith("image/");
+        if (!isVideo && !isImage) continue;
+        if (isVideo && file.size > MAX_VIDEO_BYTES) {
+          rejected.push(file.name);
+          continue;
+        }
+        accepted.push(file);
+      }
+
+      setRejectedFiles(rejected);
+      if (accepted.length === 0) return;
+
+      setProcessing(true);
+      try {
+        const created = await Promise.all(accepted.map(fileToReference));
+        const valid = created.filter(Boolean) as ReferenceItem[];
+        const nextStaged: StagedItem[] = [];
+        const nextDuplicates: PendingDuplicate[] = [];
+
+        for (const item of valid) {
+          const imported: StagedItem = { ...item, desc: "" };
+          const duplicate = findDuplicateReference(item, [...config.existingItems, ...nextStaged]);
+          if (duplicate) {
+            nextDuplicates.push({ existing: duplicate, imported });
+          } else {
+            nextStaged.push(imported);
+          }
+        }
+
+        setStaged((prev) => { for (const item of prev) discardReferenceItem(item); return nextStaged; });
+        setDuplicateQueue((prev) => { for (const dup of prev) discardReferenceItem(dup.imported); return nextDuplicates; });
+        setDuplicateDecision("existing");
+      } finally {
+        setProcessing(false);
+      }
+    }
+
+    function handleConfirm() {
+      const config = configRef.current;
+      if (duplicateQueue.length > 0 || !config) return;
+      confirmedRef.current = true;
+      const items: ReferenceItem[] = staged.map(({ desc, ...item }) => ({
+        ...item,
+        description: desc.trim() || undefined,
+        sourceUrl: item.sourceUrl?.trim() || undefined,
+      }));
+      config.onAdd(items, { groupTogether: groupTogether && !config.targetGroupName && items.length >= 2 });
+      setIsOpen(false);
+    }
+
+    function resolveDuplicate() {
+      const config = configRef.current;
+      if (!pendingDuplicate || !config) return;
+      const remaining = duplicateQueue.slice(1);
+      if (duplicateDecision === "existing") {
+        discardReferenceItem(pendingDuplicate.imported);
+        setDuplicateQueue(remaining);
+        setDuplicateDecision("existing");
+        if (remaining.length === 0 && staged.length === 0) {
+          confirmedRef.current = true;
+          config.onUseExisting(pendingDuplicate.existing);
+          setIsOpen(false);
+        }
+        return;
+      }
+      setStaged((prev) => [pendingDuplicate.imported, ...prev]);
       setDuplicateQueue(remaining);
       setDuplicateDecision("existing");
-      if (remaining.length === 0 && staged.length === 0) {
-        confirmedRef.current = true;
-        onUseExisting(pendingDuplicate.existing);
-      }
-      return;
     }
-    setStaged((prev) => [pendingDuplicate.imported, ...prev]);
-    setDuplicateQueue(remaining);
-    setDuplicateDecision("existing");
-  }
 
-  if (!open) return null;
+    if (!isOpen || !configRef.current) return null;
 
-  const isStaged = staged.length > 0;
+    const config = configRef.current;
+    const isStaged = staged.length > 0;
 
-  return (
-    <div
-      role="dialog"
-      aria-modal
-      aria-label="Add reference"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(0,0,0,0.65)] p-8 backdrop-blur-[6px]"
-    >
+    return (
       <div
-        role="document"
-        className="flex w-[min(560px,100%)] flex-col overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--bg-elev)]"
-        style={{ boxShadow: "var(--shadow-pop)" }}
+        role="dialog"
+        aria-modal
+        aria-label="Add reference"
+        onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(0,0,0,0.65)] p-8 backdrop-blur-[6px]"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-[18px] py-3.5">
-          <h3 className="m-0 text-[14px] font-semibold text-[var(--text)]">
-            {isStaged
-              ? `${staged.length} ${staged.length === 1 ? "file selected" : "files selected"}`
-              : targetGroupName
-                ? `Add to ${targetGroupName}`
-                : "Add reference"}
-          </h3>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        {!isStaged && (
-          <div className="flex shrink-0 gap-0.5 border-b border-[var(--border)] px-4 pt-3">
-            <TabButton active={tab === "local"} onClick={() => setTab("local")}>
-              <ImageIcon size={13} className="opacity-70" />
-              Arquivo local
-            </TabButton>
-            <TabButton active={tab === "figx"} onClick={() => setTab("figx")}>
-              <Sparkles size={13} className="opacity-70" />
-              .figx
-              <span className="ml-1 rounded-[4px] border border-[var(--border)] bg-[var(--surface)] px-1.5 py-[2px] text-[9px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                em breve
-              </span>
-            </TabButton>
-          </div>
-        )}
-
         <div
-          className={[
-            "flex flex-col gap-3.5 overflow-y-auto p-[18px]",
-            isStaged ? "max-h-[480px]" : "min-h-[300px] flex-1",
-          ].join(" ")}
+          role="document"
+          className="flex w-[min(560px,100%)] flex-col overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--bg-elev)]"
+          style={{ boxShadow: "var(--shadow-pop)" }}
         >
-          {isStaged ? (
-            <div className="flex flex-col gap-2.5">
-              {staged.map((item) => (
-                <StagedItemRow
-                  key={item.id}
-                  item={item}
-                  onDescChange={(desc) =>
-                    setStaged((prev) => prev.map((s) => (s.id === item.id ? { ...s, desc } : s)))
-                  }
-                  onSourceUrlChange={(sourceUrl) =>
-                    setStaged((prev) => prev.map((s) => (s.id === item.id ? { ...s, sourceUrl } : s)))
-                  }
-                  onTagAdd={(tag) =>
-                    setStaged((prev) =>
-                      prev.map((s) => (s.id === item.id ? { ...s, tags: [...s.tags, tag] } : s))
-                    )
-                  }
-                  onTagRemove={(tag) =>
-                    setStaged((prev) =>
-                      prev.map((s) =>
-                        s.id === item.id ? { ...s, tags: s.tags.filter((t) => t !== tag) } : s
-                      )
-                    )
-                  }
-                  onRemove={() => {
-                    discardReferenceItem(item);
-                    setStaged((prev) => prev.filter((s) => s.id !== item.id));
-                  }}
-                />
-              ))}
-            </div>
-          ) : tab === "local" ? (
-            <>
-              <label
-                onDragOver={(e: DragEvent<HTMLLabelElement>) => { e.preventDefault(); setDragActive(true); }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={(e: DragEvent<HTMLLabelElement>) => {
-                  e.preventDefault();
-                  setDragActive(false);
-                  void handleFiles(e.dataTransfer.files);
-                }}
-                className={[
-                  "flex cursor-pointer flex-col items-center gap-3 rounded-[10px] border-[1.5px] border-dashed px-[18px] py-9 text-center transition-colors",
-                  processing
-                    ? "pointer-events-none border-[var(--border-strong)] opacity-60"
-                    : dragActive
-                      ? "border-[var(--text)] bg-[rgba(255,255,255,0.02)]"
-                      : "border-[var(--border-strong)] hover:border-[var(--text)] hover:bg-[rgba(255,255,255,0.02)]",
-                ].join(" ")}
-                style={{
-                  backgroundImage: "radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0)",
-                  backgroundSize: "22px 22px",
-                  backgroundColor: dragActive ? "rgba(255,255,255,0.02)" : "var(--bg)",
-                }}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  hidden
-                  disabled={processing}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    if (e.target.files) void handleFiles(e.target.files);
-                    e.currentTarget.value = "";
-                  }}
-                />
-                <span className="grid h-[42px] w-[42px] place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]">
-                  {processing ? (
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-[var(--text)]" />
-                  ) : (
-                    <Upload size={20} />
-                  )}
-                </span>
-                <div>
-                  <h4 className="m-0 text-[13.5px] font-semibold text-[var(--text)]">
-                    {processing ? "Processing…" : "Drag files here"}
-                  </h4>
-                  <p className="m-0 mt-1 max-w-[340px] text-[12px] text-[var(--text-muted)]">
-                    Imagens: PNG, JPG, GIF, WebP, SVG
-                    <br />
-                    Videos: MP4, MOV, WebM, AVI, MKV (max. 150 MB)
-                  </p>
-                </div>
-                <div className="flex gap-3 text-[11.5px] text-[var(--text-muted)]">
-                  <span className="flex items-center gap-1.5">
-                    <ImageIcon size={12} className="opacity-60" /> Imagens
-                  </span>
-                  <span className="opacity-40">·</span>
-                  <span className="flex items-center gap-1.5">
-                    <Film size={12} className="opacity-60" /> Videos
-                  </span>
-                </div>
-              </label>
-
-              {rejectedFiles.length > 0 ? (
-                <div className="rounded-[8px] border border-[rgba(255,100,100,0.25)] bg-[rgba(255,80,80,0.08)] px-3 py-2.5">
-                  <p className="m-0 text-[12px] font-medium text-[#ff8a8a]">
-                    {rejectedFiles.length === 1
-                      ? "1 video ignored — exceeds 150 MB:"
-                      : `${rejectedFiles.length} videos ignored — exceed 150 MB:`}
-                  </p>
-                  <ul className="m-0 mt-1 list-none p-0">
-                    {rejectedFiles.map((name) => (
-                      <li key={name} className="text-[11.5px] text-[#ff8a8a]/70">{name}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
-              <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)]">
-                <Sparkles size={22} />
-              </span>
-              <div>
-                <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">.figx import</p>
-                <p className="m-0 mt-2 max-w-[340px] text-[12px] leading-[1.55] text-[var(--text-muted)]">
-                  <code className="text-[11px] text-[var(--text)]">.figx</code> files are native
-                  platform references — they import multiple items in a single operation directly from
-                  your projects.
-                </p>
-                <p className="m-0 mt-3 text-[11.5px] text-[var(--text-faint)]">Coming soon.</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] px-[18px] py-3">
-          {isStaged && !targetGroupName && staged.length >= 2 ? (
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-[18px] py-3.5">
+            <h3 className="m-0 text-[14px] font-semibold text-[var(--text)]">
+              {isStaged
+                ? `${staged.length} ${staged.length === 1 ? "file selected" : "files selected"}`
+                : config.targetGroupName
+                  ? `Add to ${config.targetGroupName}`
+                  : "Add reference"}
+            </h3>
             <button
               type="button"
-              role="switch"
-              aria-checked={groupTogether}
-              onClick={() => setGroupTogether((v) => !v)}
-              className="mr-auto inline-flex cursor-pointer items-center gap-2.5 text-[12px] text-[var(--text-muted)]"
+              aria-label="Close"
+              onClick={() => setIsOpen(false)}
+              className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
             >
-              <span
-                className={[
-                  "relative h-[18px] w-[32px] shrink-0 rounded-full transition-colors duration-150",
-                  groupTogether
-                    ? "bg-[var(--accent)]"
-                    : "border border-[var(--border-strong)] bg-[var(--surface-hover)]",
-                ].join(" ")}
+              <X size={14} />
+            </button>
+          </div>
+
+          {!isStaged && (
+            <div className="flex shrink-0 gap-0.5 border-b border-[var(--border)] px-4 pt-3">
+              <TabButton active={tab === "local"} onClick={() => setTab("local")}>
+                <ImageIcon size={13} className="opacity-70" />
+                Arquivo local
+              </TabButton>
+              <TabButton active={tab === "figx"} onClick={() => setTab("figx")}>
+                <Sparkles size={13} className="opacity-70" />
+                .figx
+                <span className="ml-1 rounded-[4px] border border-[var(--border)] bg-[var(--surface)] px-1.5 py-[2px] text-[9px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+                  em breve
+                </span>
+              </TabButton>
+            </div>
+          )}
+
+          <div
+            className={[
+              "flex flex-col gap-3.5 overflow-y-auto p-[18px]",
+              isStaged ? "max-h-[480px]" : "min-h-[300px] flex-1",
+            ].join(" ")}
+          >
+            {isStaged ? (
+              <div className="flex flex-col gap-2.5">
+                {staged.map((item) => (
+                  <StagedItemRow
+                    key={item.id}
+                    item={item}
+                    onDescChange={(desc) =>
+                      setStaged((prev) => prev.map((s) => (s.id === item.id ? { ...s, desc } : s)))
+                    }
+                    onSourceUrlChange={(sourceUrl) =>
+                      setStaged((prev) => prev.map((s) => (s.id === item.id ? { ...s, sourceUrl } : s)))
+                    }
+                    onTagAdd={(tag) =>
+                      setStaged((prev) =>
+                        prev.map((s) => (s.id === item.id ? { ...s, tags: [...s.tags, tag] } : s))
+                      )
+                    }
+                    onTagRemove={(tag) =>
+                      setStaged((prev) =>
+                        prev.map((s) =>
+                          s.id === item.id ? { ...s, tags: s.tags.filter((t) => t !== tag) } : s
+                        )
+                      )
+                    }
+                    onRemove={() => {
+                      discardReferenceItem(item);
+                      setStaged((prev) => prev.filter((s) => s.id !== item.id));
+                    }}
+                  />
+                ))}
+              </div>
+            ) : tab === "local" ? (
+              <>
+                <label
+                  onDragOver={(e: DragEvent<HTMLLabelElement>) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={(e: DragEvent<HTMLLabelElement>) => {
+                    e.preventDefault();
+                    setDragActive(false);
+                    void handleFiles(e.dataTransfer.files);
+                  }}
+                  className={[
+                    "flex cursor-pointer flex-col items-center gap-3 rounded-[10px] border-[1.5px] border-dashed px-[18px] py-9 text-center transition-colors",
+                    processing
+                      ? "pointer-events-none border-[var(--border-strong)] opacity-60"
+                      : dragActive
+                        ? "border-[var(--text)] bg-[rgba(255,255,255,0.02)]"
+                        : "border-[var(--border-strong)] hover:border-[var(--text)] hover:bg-[rgba(255,255,255,0.02)]",
+                  ].join(" ")}
+                  style={{
+                    backgroundImage: "radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0)",
+                    backgroundSize: "22px 22px",
+                    backgroundColor: dragActive ? "rgba(255,255,255,0.02)" : "var(--bg)",
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    hidden
+                    disabled={processing}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.files) void handleFiles(e.target.files);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                  <span className="grid h-[42px] w-[42px] place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]">
+                    {processing ? (
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-[var(--text)]" />
+                    ) : (
+                      <Upload size={20} />
+                    )}
+                  </span>
+                  <div>
+                    <h4 className="m-0 text-[13.5px] font-semibold text-[var(--text)]">
+                      {processing ? "Processing…" : "Drag files here"}
+                    </h4>
+                    <p className="m-0 mt-1 max-w-[340px] text-[12px] text-[var(--text-muted)]">
+                      Imagens: PNG, JPG, GIF, WebP, SVG
+                      <br />
+                      Videos: MP4, MOV, WebM, AVI, MKV (max. 150 MB)
+                    </p>
+                  </div>
+                  <div className="flex gap-3 text-[11.5px] text-[var(--text-muted)]">
+                    <span className="flex items-center gap-1.5">
+                      <ImageIcon size={12} className="opacity-60" /> Imagens
+                    </span>
+                    <span className="opacity-40">·</span>
+                    <span className="flex items-center gap-1.5">
+                      <Film size={12} className="opacity-60" /> Videos
+                    </span>
+                  </div>
+                </label>
+
+                {rejectedFiles.length > 0 ? (
+                  <div className="rounded-[8px] border border-[rgba(255,100,100,0.25)] bg-[rgba(255,80,80,0.08)] px-3 py-2.5">
+                    <p className="m-0 text-[12px] font-medium text-[#ff8a8a]">
+                      {rejectedFiles.length === 1
+                        ? "1 video ignored — exceeds 150 MB:"
+                        : `${rejectedFiles.length} videos ignored — exceed 150 MB:`}
+                    </p>
+                    <ul className="m-0 mt-1 list-none p-0">
+                      {rejectedFiles.map((name) => (
+                        <li key={name} className="text-[11.5px] text-[#ff8a8a]/70">{name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
+                <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)]">
+                  <Sparkles size={22} />
+                </span>
+                <div>
+                  <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">.figx import</p>
+                  <p className="m-0 mt-2 max-w-[340px] text-[12px] leading-[1.55] text-[var(--text-muted)]">
+                    <code className="text-[11px] text-[var(--text)]">.figx</code> files are native
+                    platform references — they import multiple items in a single operation directly from
+                    your projects.
+                  </p>
+                  <p className="m-0 mt-3 text-[11.5px] text-[var(--text-faint)]">Coming soon.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] px-[18px] py-3">
+            {isStaged && !config.targetGroupName && staged.length >= 2 ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={groupTogether}
+                onClick={() => setGroupTogether((v) => !v)}
+                className="mr-auto inline-flex cursor-pointer items-center gap-2.5 text-[12px] text-[var(--text-muted)]"
               >
                 <span
                   className={[
-                    "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform duration-150",
-                    groupTogether ? "translate-x-[15px]" : "translate-x-[2px]",
+                    "relative h-[18px] w-[32px] shrink-0 rounded-full transition-colors duration-150",
+                    groupTogether
+                      ? "bg-[var(--accent)]"
+                      : "border border-[var(--border-strong)] bg-[var(--surface-hover)]",
                   ].join(" ")}
-                />
-              </span>
-              Create a group
-            </button>
-          ) : null}
-          {isStaged ? (
-            <>
-              <SmallButton type="button" onClick={doCancel}>Voltar</SmallButton>
-              <SmallButton type="button" primary disabled={staged.length === 0} onClick={handleConfirm}>
-                {targetGroupName
-                  ? "Add to group"
-                  : groupTogether
-                    ? `Create group of ${staged.length}`
-                    : `Add ${staged.length} ${staged.length === 1 ? "item" : "items"}`}
-              </SmallButton>
-            </>
-          ) : (
-            <SmallButton type="button" onClick={onClose}>Fechar</SmallButton>
-          )}
+                >
+                  <span
+                    className={[
+                      "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform duration-150",
+                      groupTogether ? "translate-x-[15px]" : "translate-x-[2px]",
+                    ].join(" ")}
+                  />
+                </span>
+                Create a group
+              </button>
+            ) : null}
+            {isStaged ? (
+              <>
+                <SmallButton type="button" onClick={doCancel}>Voltar</SmallButton>
+                <SmallButton type="button" primary disabled={staged.length === 0} onClick={handleConfirm}>
+                  {config.targetGroupName
+                    ? "Add to group"
+                    : groupTogether
+                      ? `Create group of ${staged.length}`
+                      : `Add ${staged.length} ${staged.length === 1 ? "item" : "items"}`}
+                </SmallButton>
+              </>
+            ) : (
+              <SmallButton type="button" onClick={() => setIsOpen(false)}>Fechar</SmallButton>
+            )}
+          </div>
         </div>
-      </div>
 
-      <DuplicateFileAlert
-        duplicate={pendingDuplicate}
-        decision={duplicateDecision}
-        onDecisionChange={setDuplicateDecision}
-        onClose={() => {
-          if (pendingDuplicate) discardReferenceItem(pendingDuplicate.imported);
-          setDuplicateQueue((prev) => prev.slice(1));
-          setDuplicateDecision("existing");
-        }}
-        onConfirm={resolveDuplicate}
-      />
-    </div>
-  );
-}
+        <DuplicateFileAlert
+          duplicate={pendingDuplicate}
+          decision={duplicateDecision}
+          onDecisionChange={setDuplicateDecision}
+          onClose={() => {
+            if (pendingDuplicate) discardReferenceItem(pendingDuplicate.imported);
+            setDuplicateQueue((prev) => prev.slice(1));
+            setDuplicateDecision("existing");
+          }}
+          onConfirm={resolveDuplicate}
+        />
+      </div>
+    );
+  },
+);
 
 function DuplicateFileAlert({
   duplicate,

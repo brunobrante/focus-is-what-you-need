@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
 import { TopBar } from "@/components/layout/TopBar";
-import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
-import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { ProjectSettingsModal, type ProjectSettingsModalHandle } from "@/components/modals/ProjectSettingsModal";
+import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 import { CardMoreMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
@@ -31,9 +31,9 @@ function relativeTime(ts: number): string {
 export function Landing() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [pendingDelete, setPendingDelete] = useState<ProjectRow | null>(null);
-  const [editingProject, setEditingProject] = useState<ProjectRow | null>(null);
   const [isResettingFactory, setIsResettingFactory] = useState(false);
+  const confirmRef = useRef<ConfirmActionModalHandle>(null);
+  const settingsRef = useRef<ProjectSettingsModalHandle>(null);
 
   const { data: allProjects } = useProjects();
   const { data: allScreens } = useAllScreens();
@@ -94,33 +94,22 @@ export function Landing() {
           onQueryChange={setQuery}
           filter={filter}
           onFilterChange={setFilter}
-          onRequestEdit={setEditingProject}
-          onRequestDelete={setPendingDelete}
+          onRequestEdit={(project) => {
+            const screens = allScreens.filter((s) => s.projectId === project.id);
+            settingsRef.current?.open(project, screens);
+          }}
+          onRequestDelete={(project) => {
+            confirmRef.current?.open({
+              title: "Delete project",
+              message: `The project "${project.name}" will be removed along with its screens, components, and references.`,
+              onConfirm: () => deleteProject(project.id),
+            });
+          }}
         />}
       </main>
 
-      <ConfirmActionModal
-        open={Boolean(pendingDelete)}
-        title="Delete project"
-        message={
-          pendingDelete
-            ? `The project "${pendingDelete.name}" will be removed along with its screens, components, and references.`
-            : ""
-        }
-        onClose={() => setPendingDelete(null)}
-        onConfirm={async () => {
-          if (!pendingDelete) return;
-          await deleteProject(pendingDelete.id);
-          setPendingDelete(null);
-        }}
-      />
-      <ProjectSettingsModal
-        open={Boolean(editingProject)}
-        project={editingProject}
-        screens={allScreens.filter((screen) => screen.projectId === editingProject?.id)}
-        onClose={() => setEditingProject(null)}
-        onSaved={(project) => setEditingProject(project)}
-      />
+      <ConfirmActionModal ref={confirmRef} />
+      <ProjectSettingsModal ref={settingsRef} />
 
       <footer className="border-t border-[var(--border)] py-4 text-center text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
         v0.1 · design preview

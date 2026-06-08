@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Modal, ModalBody } from "@/components/modals/Modal";
 import { ZoomControls, ZOOM_STEPS, ZOOM_DEFAULT_IDX } from "@/components/screen/ZoomControls";
@@ -8,11 +8,9 @@ import type { ProjectType } from "@/lib/data/types";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
 import { htmlCanvasDocumentFromJSON, type HtmlCanvasDocument, type HtmlCanvasNode } from "@/lib/canvas/htmlScene";
 
-type FastEditModalProps =
+type FastEditConfig =
   | {
       mode: "screen";
-      open: boolean;
-      onClose: () => void;
       screen: ScreenRow | null;
       components: ComponentRow[];
       type: ProjectType;
@@ -20,13 +18,16 @@ type FastEditModalProps =
     }
   | {
       mode: "component";
-      open: boolean;
-      onClose: () => void;
       component: ComponentRow;
       variant: VariantRow | null;
       type: ProjectType;
       canvasHref: string;
     };
+
+export interface FastEditModalHandle {
+  open: (config: FastEditConfig) => void;
+  close: () => void;
+}
 
 type SceneSize = { w: number; h: number; radius: number; label: string };
 type NodeKind = "frame" | "surface" | "text" | "badge" | "button" | "media";
@@ -58,290 +59,297 @@ type Scene = {
   root: Node;
 };
 
-export function FastEditModal(props: FastEditModalProps) {
-  const [scene, setScene] = useState<Scene | null>(null);
-  const [selectedId, setSelectedId] = useState("");
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
-  const pickerTriggerRef = useRef<HTMLButtonElement>(null);
-  const pickerDropRef = useRef<HTMLDivElement>(null);
+export const FastEditModal = forwardRef<FastEditModalHandle>(
+  function FastEditModal(_, ref) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [config, setConfig] = useState<FastEditConfig | null>(null);
 
-  const ownerType = props.mode === "screen" ? ("screen" as const) : ("variant" as const);
-  const ownerId = props.mode === "screen" ? (props.screen?.id ?? null) : (props.variant?.id ?? null);
+    const [scene, setScene] = useState<Scene | null>(null);
+    const [selectedId, setSelectedId] = useState("");
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
+    const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
+    const pickerTriggerRef = useRef<HTMLButtonElement>(null);
+    const pickerDropRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!props.open || !ownerId) { setScene(null); return; }
-    let cancelled = false;
-    getSceneByOwner(ownerType, ownerId).then((row) => {
-      if (cancelled || !row) return;
-      const doc = htmlCanvasDocumentFromJSON(row.graphJSON);
-      if (!doc) return;
-      const built = buildSceneFromHtmlCanvas(doc);
-      if (!cancelled && built) setScene(built);
-    });
-    return () => { cancelled = true; };
-  }, [props.open, ownerId, ownerType]);
-
-  useEffect(() => {
-    if (!props.open || !scene) return;
-    setSelectedId(scene.root.id);
-    setHoveredId(null);
-    setDrafts({});
-    setPickerOpen(false);
-    setZoomIdx(ZOOM_DEFAULT_IDX);
-  }, [props.open, scene?.root.id]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        !pickerTriggerRef.current?.contains(e.target as globalThis.Node) &&
-        !pickerDropRef.current?.contains(e.target as globalThis.Node)
-      ) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [pickerOpen]);
-
-  const treeOptions = useMemo(() => (scene ? flattenTree(scene.root) : []), [scene]);
-  const selectedNode = scene ? (findNode(scene.root, selectedId) ?? scene.root) : null;
-  const selectedDraft = selectedNode ? (drafts[selectedNode.id] ?? {}) : {};
-  const allNodes = scene ? treeOptions.filter(({ node }) => node.id !== scene.root.id) : [];
-  const hoveredNode = hoveredId ? (allNodes.find(({ node }) => node.id === hoveredId)?.node ?? null) : null;
-  const selectedSceneNode = scene && selectedId !== scene.root.id
-    ? (allNodes.find(({ node }) => node.id === selectedId)?.node ?? null)
-    : null;
-
-  const z = ZOOM_STEPS[zoomIdx] ?? 1;
-
-  const updateSelectedDraft = (patch: Draft) => {
-    if (!selectedNode) return;
-    setDrafts((prev) => ({
-      ...prev,
-      [selectedNode.id]: { ...(prev[selectedNode.id] ?? {}), ...patch },
+    useImperativeHandle(ref, () => ({
+      open: (nextConfig) => {
+        setConfig(nextConfig);
+        setIsOpen(true);
+      },
+      close: () => setIsOpen(false),
     }));
-  };
 
-  return (
-    <Modal open={props.open} onClose={props.onClose} ariaLabel="FastEdit" size="wide">
-      {/* Compact header */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.07)] px-5 py-2.5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="text-[13px] font-semibold tracking-[-0.1px] text-[var(--text)]">FastEdit</span>
-          <span className="h-3 w-px shrink-0 rounded-full bg-[rgba(255,255,255,0.12)]" />
-          <span className="truncate text-[11.5px] text-[var(--text-faint)]">
-            Quick editing of color, text, border, and radius per layer.
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Link
-            to={props.canvasHref}
-            className="flex h-7 items-center gap-1.5 rounded-[7px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 text-[11.5px] text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.07)] hover:text-[var(--text)]"
-          >
-            <IconOpenCanvas size={12} strokeWidth={1.7} />
-            Canvas
-          </Link>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={props.onClose}
-            className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
-          >
-            <IconClose size={10} strokeWidth={2.2} />
-          </button>
-        </div>
-      </div>
-      <ModalBody className="min-h-0 p-0">
-        {(!scene || !selectedNode) ? (
-          <div className="flex min-h-[640px] flex-col items-center justify-center gap-2">
-            <IconSpinner size={20} strokeWidth={1.5} className="text-[var(--text-faint)]" />
-            <span className="text-[12px] text-[var(--text-faint)]">Carregando cena…</span>
+    const ownerType = config?.mode === "screen" ? ("screen" as const) : ("variant" as const);
+    const ownerId =
+      config?.mode === "screen"
+        ? (config.screen?.id ?? null)
+        : (config?.variant?.id ?? null);
+
+    useEffect(() => {
+      if (!isOpen || !ownerId) { setScene(null); return; }
+      let cancelled = false;
+      getSceneByOwner(ownerType, ownerId).then((row) => {
+        if (cancelled || !row) return;
+        const doc = htmlCanvasDocumentFromJSON(row.graphJSON);
+        if (!doc) return;
+        const built = buildSceneFromHtmlCanvas(doc);
+        if (!cancelled && built) setScene(built);
+      });
+      return () => { cancelled = true; };
+    }, [isOpen, ownerId, ownerType]);
+
+    useEffect(() => {
+      if (!isOpen || !scene) return;
+      setSelectedId(scene.root.id);
+      setHoveredId(null);
+      setDrafts({});
+      setPickerOpen(false);
+      setZoomIdx(ZOOM_DEFAULT_IDX);
+    }, [isOpen, scene?.root.id]);
+
+    useEffect(() => {
+      if (!pickerOpen) return;
+      const handler = (e: MouseEvent) => {
+        if (
+          !pickerTriggerRef.current?.contains(e.target as globalThis.Node) &&
+          !pickerDropRef.current?.contains(e.target as globalThis.Node)
+        ) {
+          setPickerOpen(false);
+        }
+      };
+      document.addEventListener("mousedown", handler);
+      return () => document.removeEventListener("mousedown", handler);
+    }, [pickerOpen]);
+
+    const treeOptions = useMemo(() => (scene ? flattenTree(scene.root) : []), [scene]);
+    const selectedNode = scene ? (findNode(scene.root, selectedId) ?? scene.root) : null;
+    const selectedDraft = selectedNode ? (drafts[selectedNode.id] ?? {}) : {};
+    const allNodes = scene ? treeOptions.filter(({ node }) => node.id !== scene.root.id) : [];
+    const hoveredNode = hoveredId ? (allNodes.find(({ node }) => node.id === hoveredId)?.node ?? null) : null;
+    const selectedSceneNode = scene && selectedId !== scene.root.id
+      ? (allNodes.find(({ node }) => node.id === selectedId)?.node ?? null)
+      : null;
+
+    const z = ZOOM_STEPS[zoomIdx] ?? 1;
+
+    const updateSelectedDraft = (patch: Draft) => {
+      if (!selectedNode) return;
+      setDrafts((prev) => ({
+        ...prev,
+        [selectedNode.id]: { ...(prev[selectedNode.id] ?? {}), ...patch },
+      }));
+    };
+
+    if (!config) return null;
+
+    return (
+      <Modal open={isOpen} onClose={() => setIsOpen(false)} ariaLabel="FastEdit" size="wide">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.07)] px-5 py-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="text-[13px] font-semibold tracking-[-0.1px] text-[var(--text)]">FastEdit</span>
+            <span className="h-3 w-px shrink-0 rounded-full bg-[rgba(255,255,255,0.12)]" />
+            <span className="truncate text-[11.5px] text-[var(--text-faint)]">
+              Quick editing of color, text, border, and radius per layer.
+            </span>
           </div>
-        ) : (
-        <>
-        <div className="grid h-full min-h-[640px] grid-cols-[minmax(0,1fr)_360px]">
-          {/* Canvas */}
-          <div
-            className="relative min-h-0 overflow-hidden border-r border-[var(--border)]"
-            style={{
-              background:
-                "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.038) 1px, transparent 0) 0 0/24px 24px, #0b0d10",
-            }}
-          >
-            {/* Floating controls row */}
-            <div className="absolute left-4 top-4 z-[10] flex items-center gap-2">
-              {/* Device badge */}
-              <div className="flex items-center gap-1.5 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 backdrop-blur-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--blue)] opacity-80" />
-                <span className="text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                  {scene.size.label}
-                </span>
-              </div>
-              {/* Layer select trigger */}
-              <button
-                ref={pickerTriggerRef}
-                type="button"
-                onClick={() => setPickerOpen((v) => !v)}
-                className="flex h-[26px] items-center gap-1.5 rounded-[8px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] px-2.5 text-left backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.09)]"
-                style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.35)" }}
-              >
-                <span className="grid shrink-0 place-items-center" style={{ color: "#9A9A9A" }}>
-                  <NodeKindIcon kind={selectedNode.kind} hasChildren={selectedNode.children.length > 0} />
-                </span>
-                <span className="max-w-[160px] truncate text-[11.5px] font-medium" style={{ color: "#F2F2F2", letterSpacing: "0.05px" }}>
-                  {selectedNode.name}
-                </span>
-                <IconChevronDown
-                  size={9} strokeWidth={2.2}
-                  className={`ml-0.5 shrink-0 transition-transform duration-150 text-[#666] ${pickerOpen ? "rotate-180" : "rotate-0"}`}
-                />
-              </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Link
+              to={config.canvasHref}
+              className="flex h-7 items-center gap-1.5 rounded-[7px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 text-[11.5px] text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.07)] hover:text-[var(--text)]"
+            >
+              <IconOpenCanvas size={12} strokeWidth={1.7} />
+              Canvas
+            </Link>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setIsOpen(false)}
+              className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
+            >
+              <IconClose size={10} strokeWidth={2.2} />
+            </button>
+          </div>
+        </div>
+        <ModalBody className="min-h-0 p-0">
+          {(!scene || !selectedNode) ? (
+            <div className="flex min-h-[640px] flex-col items-center justify-center gap-2">
+              <IconSpinner size={20} strokeWidth={1.5} className="text-[var(--text-faint)]" />
+              <span className="text-[12px] text-[var(--text-faint)]">Carregando cena…</span>
             </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              {/* Wrapper sized to the scene — rings share the same coordinate space */}
-              <div style={{ position: "relative", width: scene.size.w, height: scene.size.h, flexShrink: 0, transform: `scale(${z})`, transformOrigin: "center", transition: "transform 150ms" }}>
-                <FastEditScene
-                  scene={scene}
-                  selectedId={selectedNode.id}
-                  drafts={drafts}
-                  onSelect={setSelectedId}
-                  onHover={setHoveredId}
-                />
-                {/* Overlay rings in scene coordinates — no offset math needed */}
-                <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 500 }}>
-                  {hoveredNode && hoveredId !== selectedId && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: hoveredNode.x,
-                        top: hoveredNode.y,
-                        width: hoveredNode.w,
-                        height: hoveredNode.h,
-                        outline: "2px solid rgba(251,146,60,0.85)",
-                        outlineOffset: "-1px",
-                      }}
-                    />
-                  )}
-                  {selectedSceneNode && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: selectedSceneNode.x,
-                        top: selectedSceneNode.y,
-                        width: selectedSceneNode.w,
-                        height: selectedSceneNode.h,
-                        outline: "2px solid #1F7AE0",
-                        outlineOffset: "-1px",
-                      }}
-                    />
-                  )}
+          ) : (
+          <>
+          <div className="grid h-full min-h-[640px] grid-cols-[minmax(0,1fr)_360px]">
+            <div
+              className="relative min-h-0 overflow-hidden border-r border-[var(--border)]"
+              style={{
+                background:
+                  "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.038) 1px, transparent 0) 0 0/24px 24px, #0b0d10",
+              }}
+            >
+              <div className="absolute left-4 top-4 z-[10] flex items-center gap-2">
+                <div className="flex items-center gap-1.5 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 backdrop-blur-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--blue)] opacity-80" />
+                  <span className="text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+                    {scene.size.label}
+                  </span>
+                </div>
+                <button
+                  ref={pickerTriggerRef}
+                  type="button"
+                  onClick={() => setPickerOpen((v) => !v)}
+                  className="flex h-[26px] items-center gap-1.5 rounded-[8px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] px-2.5 text-left backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.09)]"
+                  style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.35)" }}
+                >
+                  <span className="grid shrink-0 place-items-center" style={{ color: "#9A9A9A" }}>
+                    <NodeKindIcon kind={selectedNode.kind} hasChildren={selectedNode.children.length > 0} />
+                  </span>
+                  <span className="max-w-[160px] truncate text-[11.5px] font-medium" style={{ color: "#F2F2F2", letterSpacing: "0.05px" }}>
+                    {selectedNode.name}
+                  </span>
+                  <IconChevronDown
+                    size={9} strokeWidth={2.2}
+                    className={`ml-0.5 shrink-0 transition-transform duration-150 text-[#666] ${pickerOpen ? "rotate-180" : "rotate-0"}`}
+                  />
+                </button>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div style={{ position: "relative", width: scene.size.w, height: scene.size.h, flexShrink: 0, transform: `scale(${z})`, transformOrigin: "center", transition: "transform 150ms" }}>
+                  <FastEditScene
+                    scene={scene}
+                    selectedId={selectedNode.id}
+                    drafts={drafts}
+                    onSelect={setSelectedId}
+                    onHover={setHoveredId}
+                  />
+                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 500 }}>
+                    {hoveredNode && hoveredId !== selectedId && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: hoveredNode.x,
+                          top: hoveredNode.y,
+                          width: hoveredNode.w,
+                          height: hoveredNode.h,
+                          outline: "2px solid rgba(251,146,60,0.85)",
+                          outlineOffset: "-1px",
+                        }}
+                      />
+                    )}
+                    {selectedSceneNode && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: selectedSceneNode.x,
+                          top: selectedSceneNode.y,
+                          width: selectedSceneNode.w,
+                          height: selectedSceneNode.h,
+                          outline: "2px solid #1F7AE0",
+                          outlineOffset: "-1px",
+                        }}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
+              <ZoomControls
+                index={zoomIdx}
+                onZoomIn={() => setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
+                onZoomOut={() => setZoomIdx((i) => Math.max(i - 1, 0))}
+                onReset={() => setZoomIdx(ZOOM_DEFAULT_IDX)}
+              />
             </div>
-            <ZoomControls
-              index={zoomIdx}
-              onZoomIn={() => setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
-              onZoomOut={() => setZoomIdx((i) => Math.max(i - 1, 0))}
-              onReset={() => setZoomIdx(ZOOM_DEFAULT_IDX)}
-            />
+
+            <aside className="flex min-h-0 flex-col bg-[var(--bg)]">
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="grid gap-3 p-4">
+                  <Section title="Texto">
+                    <Field label="Content">
+                      <input
+                        value={selectedDraft.text ?? selectedNode.text}
+                        onChange={(event) => updateSelectedDraft({ text: event.target.value })}
+                        className="h-9 w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
+                      />
+                    </Field>
+                    <Field label="Text color">
+                      <ColorInput
+                        value={selectedDraft.textColor ?? selectedNode.textColor}
+                        onChange={(value) => updateSelectedDraft({ textColor: value })}
+                      />
+                    </Field>
+                  </Section>
+                  <Section title="Surface">
+                    <Field label="Fundo">
+                      <ColorInput
+                        value={selectedDraft.background ?? selectedNode.background}
+                        onChange={(value) => updateSelectedDraft({ background: value })}
+                      />
+                    </Field>
+                    <Field label="Borda">
+                      <ColorInput
+                        value={selectedDraft.borderColor ?? selectedNode.borderColor}
+                        onChange={(value) => updateSelectedDraft({ borderColor: value })}
+                      />
+                    </Field>
+                    <Field label="Espessura">
+                      <SliderWithValue
+                        min={0}
+                        max={4}
+                        step={1}
+                        value={selectedDraft.borderWidth ?? selectedNode.borderWidth}
+                        onChange={(value) => updateSelectedDraft({ borderWidth: value })}
+                        format={(v) => `${v}px`}
+                      />
+                    </Field>
+                    <Field label="Radius">
+                      <SliderWithValue
+                        min={0}
+                        max={64}
+                        step={1}
+                        value={selectedDraft.radius ?? selectedNode.radius}
+                        onChange={(value) => updateSelectedDraft({ radius: value })}
+                        format={(v) => `${v}px`}
+                      />
+                    </Field>
+                  </Section>
+                </div>
+              </div>
+
+              <div className="shrink-0 border-t border-[var(--border)] p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-semibold text-[var(--text)]">{selectedNode.name}</span>
+                  <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
+                    {selectedNode.kind}
+                  </span>
+                </div>
+                <div className="mb-3 mt-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
+                  {selectedNode.w} × {selectedNode.h} px
+                </div>
+                <NodePreview node={selectedNode} draft={selectedDraft} />
+              </div>
+            </aside>
           </div>
 
-          {/* Sidebar */}
-          <aside className="flex min-h-0 flex-col bg-[var(--bg)]">
-            {/* Properties — scrollable */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="grid gap-3 p-4">
-                <Section title="Texto">
-                  <Field label="Content">
-                    <input
-                      value={selectedDraft.text ?? selectedNode.text}
-                      onChange={(event) => updateSelectedDraft({ text: event.target.value })}
-                      className="h-9 w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
-                    />
-                  </Field>
-                  <Field label="Text color">
-                    <ColorInput
-                      value={selectedDraft.textColor ?? selectedNode.textColor}
-                      onChange={(value) => updateSelectedDraft({ textColor: value })}
-                    />
-                  </Field>
-                </Section>
-                <Section title="Surface">
-                  <Field label="Fundo">
-                    <ColorInput
-                      value={selectedDraft.background ?? selectedNode.background}
-                      onChange={(value) => updateSelectedDraft({ background: value })}
-                    />
-                  </Field>
-                  <Field label="Borda">
-                    <ColorInput
-                      value={selectedDraft.borderColor ?? selectedNode.borderColor}
-                      onChange={(value) => updateSelectedDraft({ borderColor: value })}
-                    />
-                  </Field>
-                  <Field label="Espessura">
-                    <SliderWithValue
-                      min={0}
-                      max={4}
-                      step={1}
-                      value={selectedDraft.borderWidth ?? selectedNode.borderWidth}
-                      onChange={(value) => updateSelectedDraft({ borderWidth: value })}
-                      format={(v) => `${v}px`}
-                    />
-                  </Field>
-                  <Field label="Radius">
-                    <SliderWithValue
-                      min={0}
-                      max={64}
-                      step={1}
-                      value={selectedDraft.radius ?? selectedNode.radius}
-                      onChange={(value) => updateSelectedDraft({ radius: value })}
-                      format={(v) => `${v}px`}
-                    />
-                  </Field>
-                </Section>
-              </div>
-            </div>
-
-            {/* Bottom: node info + preview */}
-            <div className="shrink-0 border-t border-[var(--border)] p-4">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-[var(--text)]">{selectedNode.name}</span>
-                <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
-                  {selectedNode.kind}
-                </span>
-              </div>
-              <div className="mb-3 mt-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
-                {selectedNode.w} × {selectedNode.h} px
-              </div>
-              <NodePreview node={selectedNode} draft={selectedDraft} />
-            </div>
-          </aside>
-        </div>
-
-        {/* Layer picker dropdown — fixed, outside overflow-hidden containers */}
-        {pickerOpen && (
-          <LayerPickerDropdown
-            ref={pickerDropRef}
-            triggerRef={pickerTriggerRef}
-            treeOptions={treeOptions}
-            selectedId={selectedNode.id}
-            onSelect={(id) => {
-              setSelectedId(id);
-              setPickerOpen(false);
-            }}
-          />
-        )}
-        </>
-        )}
-      </ModalBody>
-    </Modal>
-  );
-}
+          {pickerOpen && (
+            <LayerPickerDropdown
+              ref={pickerDropRef}
+              triggerRef={pickerTriggerRef}
+              treeOptions={treeOptions}
+              selectedId={selectedNode.id}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setPickerOpen(false);
+              }}
+            />
+          )}
+          </>
+          )}
+        </ModalBody>
+      </Modal>
+    );
+  },
+);
 
 function FastEditScene({
   scene,
@@ -459,14 +467,12 @@ function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
   const root = nodeMap.get(doc.rootId);
   if (!root) return null;
 
-  // If the root is a canvas wrapper with a single centered child, use that child as subject
   const rootChildren = (childrenMap.get(root.id) ?? []).filter((n) => n.visible !== false);
   const subject =
     root.name.endsWith(" Canvas") && rootChildren.length === 1 && rootChildren[0]
       ? rootChildren[0]
       : root;
 
-  // Compute absolute canvas position of a node by walking up to root
   function absPos(nodeId: string): { x: number; y: number } {
     let x = 0; let y = 0;
     let cur = nodeMap.get(nodeId);
@@ -520,7 +526,6 @@ function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
 
   return { label: subject.name, size, root: rootNode };
 }
-
 
 function flattenTree(node: Node, depth = 0): Array<{ node: Node; depth: number }> {
   const out: Array<{ node: Node; depth: number }> = [{ node, depth }];

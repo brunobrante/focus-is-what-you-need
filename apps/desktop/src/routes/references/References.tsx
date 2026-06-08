@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Upload, FolderPlus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { extFromName, deleteReferenceFrames } from "@/lib/tauri/referenceStorage";
@@ -6,13 +7,16 @@ import { VideoFramePicker } from "../import/VideoFramePicker";
 import { useReferenceLibrary } from "./hooks/useReferenceLibrary";
 import { CatalogGrid } from "./components/CatalogGrid";
 import { Inspector, GroupInspector } from "./components/Inspector";
-import { ImportModal } from "./components/ImportModal";
+import { ImportModal, type ImportModalHandle } from "./components/ImportModal";
 import { Lightbox } from "./components/Lightbox";
-import { ReferenceGroupModal, DeleteGroupModal } from "./components/GroupDialogs";
+import { ReferenceGroupModal, type ReferenceGroupModalHandle, DeleteGroupModal, type DeleteGroupModalHandle } from "./components/GroupDialogs";
 import { SmallButton, SearchInput, SelectControl } from "./components/ui";
 
 export function References() {
   const lib = useReferenceLibrary();
+  const importRef = useRef<ImportModalHandle>(null);
+  const groupModalRef = useRef<ReferenceGroupModalHandle>(null);
+  const deleteGroupRef = useRef<DeleteGroupModalHandle>(null);
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg)]">
@@ -34,7 +38,7 @@ export function References() {
                 <div className="flex items-center gap-2">
                   <SmallButton
                     type="button"
-                    onClick={() => lib.setGroupDialog({ mode: "create" })}
+                    onClick={() => groupModalRef.current?.open({ mode: "create", onSave: (input) => lib.createGroup(input) })}
                   >
                     <FolderPlus size={14} />
                     New group
@@ -43,8 +47,17 @@ export function References() {
                     type="button"
                     primary
                     onClick={() => {
-                      lib.setImportTargetGroupId(null);
-                      lib.setImportOpen(true);
+                      importRef.current?.open({
+                        existingItems: lib.library,
+                        targetGroupName: null,
+                        onAdd: (items, opts) => {
+                          if (opts?.groupTogether) lib.addItemsAsGroup(items);
+                          else lib.addItems(items, null);
+                        },
+                        onUseExisting: (item) => {
+                          lib.setSelectedSubject({ kind: "reference", id: item.id });
+                        },
+                      });
                     }}
                   >
                     <Upload size={14} />
@@ -101,8 +114,17 @@ export function References() {
               ) : lib.visibleGroups.length + lib.visible.length === 0 ? (
                 <EmptyState
                   onUpload={() => {
-                    lib.setImportTargetGroupId(null);
-                    lib.setImportOpen(true);
+                    importRef.current?.open({
+                      existingItems: lib.library,
+                      targetGroupName: null,
+                      onAdd: (items, opts) => {
+                        if (opts?.groupTogether) lib.addItemsAsGroup(items);
+                        else lib.addItems(items, null);
+                      },
+                      onUseExisting: (item) => {
+                        lib.setSelectedSubject({ kind: "reference", id: item.id });
+                      },
+                    });
                   }}
                 />
               ) : (
@@ -154,11 +176,31 @@ export function References() {
               onClose={() => lib.setSelectedSubject(null)}
               onOpenLightbox={(item) => lib.setLightboxItem(item)}
               onUpload={() => {
-                lib.setImportTargetGroupId(lib.selectedGroup!.id);
-                lib.setImportOpen(true);
+                const group = lib.selectedGroup!;
+                importRef.current?.open({
+                  existingItems: lib.library,
+                  targetGroupName: group.name,
+                  onAdd: (items) => {
+                    lib.addItems(items, group.id);
+                  },
+                  onUseExisting: (item) => {
+                    lib.updateReferenceGroup(item.id, group.id);
+                    lib.setSelectedSubject({ kind: "group", id: group.id });
+                  },
+                });
               }}
-              onEdit={() => lib.setGroupDialog({ mode: "edit", group: lib.selectedGroup! })}
-              onDelete={() => lib.setDeleteGroup(lib.selectedGroup)}
+              onEdit={() => {
+                const group = lib.selectedGroup!;
+                groupModalRef.current?.open({
+                  mode: "edit",
+                  group,
+                  onSave: (input) => lib.updateGroup(group.id, input),
+                });
+              }}
+              onDelete={() => {
+                const group = lib.selectedGroup!;
+                deleteGroupRef.current?.open(group, () => lib.confirmDeleteGroup(group.id));
+              }}
               onSyncArchive={() => void lib.syncGroupArchive(lib.selectedGroup!)}
               onGroupChange={lib.updateReferenceGroup}
             />
@@ -186,34 +228,7 @@ export function References() {
         </aside>
       </div>
 
-      <ImportModal
-        open={lib.importOpen}
-        existingItems={lib.library}
-        onClose={() => {
-          lib.setImportOpen(false);
-          lib.setImportTargetGroupId(null);
-        }}
-        onAdd={(items, options) => {
-          if (options?.groupTogether && !lib.importTargetGroupId) {
-            lib.addItemsAsGroup(items);
-          } else {
-            lib.addItems(items);
-          }
-          lib.setImportOpen(false);
-          lib.setImportTargetGroupId(null);
-        }}
-        onUseExisting={(item) => {
-          if (lib.importTargetGroupId) {
-            lib.updateReferenceGroup(item.id, lib.importTargetGroupId);
-            lib.setSelectedSubject({ kind: "group", id: lib.importTargetGroupId });
-          } else {
-            lib.setSelectedSubject({ kind: "reference", id: item.id });
-          }
-          lib.setImportOpen(false);
-          lib.setImportTargetGroupId(null);
-        }}
-        targetGroupName={lib.importTargetGroup?.name ?? null}
-      />
+      <ImportModal ref={importRef} />
 
       {lib.frameVideo ? (
         <VideoFramePicker
@@ -229,16 +244,8 @@ export function References() {
       ) : null}
 
       <Lightbox item={lib.lightboxItem} onClose={() => lib.setLightboxItem(null)} />
-      <ReferenceGroupModal
-        state={lib.groupDialog}
-        onCancel={() => lib.setGroupDialog(null)}
-        onSave={lib.saveGroupDialog}
-      />
-      <DeleteGroupModal
-        group={lib.deleteGroup}
-        onCancel={() => lib.setDeleteGroup(null)}
-        onConfirm={lib.confirmDeleteGroup}
-      />
+      <ReferenceGroupModal ref={groupModalRef} />
+      <DeleteGroupModal ref={deleteGroupRef} />
     </div>
   );
 }

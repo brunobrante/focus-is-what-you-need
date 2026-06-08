@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
 import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -30,131 +30,136 @@ type RecordingCommand = {
   type: "key" | "modifier";
 } | null;
 
-type AppSettingsModalProps = {
-  open: boolean;
-  onClose: () => void;
-};
-
-export function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
-  const [tab, setTab] = useState<AppSettingsTab>("shortcuts");
-  const [recordingCommand, setRecordingCommand] = useState<RecordingCommand>(null);
-  const [folderPath, setFolderPath] = useState("");
-  const [workspaceName, setWorkspaceName] = useState("workspace");
-  const [saving, setSaving] = useState(false);
-  const { settings: persistedSettings } = useGlobalSettings();
-  const [settingsDraft, setSettingsDraft] = useState<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
-
-  // Load real config whenever the modal opens
-  useEffect(() => {
-    if (!open) return;
-    setSettingsDraft(persistedSettings);
-    setRecordingCommand(null);
-    getWorkspaceConfig()
-      .then((cfg) => {
-        setFolderPath(cfg.base_folder);
-        setWorkspaceName(cfg.workspace_name);
-      })
-      .catch(() => {});
-  }, [open, persistedSettings]);
-
-  async function handlePickFolder() {
-    const picked = await pickFolderDialog().catch(() => null);
-    if (picked) setFolderPath(picked);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      await setWorkspaceFolder(folderPath);
-      putGlobalSettings(settingsDraft);
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const referencesPath = folderPath
-    ? `${folderPath}/references`
-    : "";
-
-  return (
-    <Modal open={open} onClose={onClose} size="wide" ariaLabel="Settings">
-      <ModalHeader
-        title="Settings"
-        subtitle="Manage canvas behavior, keyboard shortcuts, and project save location."
-        onClose={onClose}
-      />
-      <ModalBody className="!p-0 flex flex-col">
-        <div className="border-b border-[var(--border)] px-[22px] shrink-0">
-          <div className="flex gap-1 pt-3">
-            {(
-              [
-                { id: "canvas", label: "Canvas" },
-                { id: "shortcuts", label: "Keyboard shortcuts" },
-                { id: "storage", label: "Save location" },
-              ] as { id: AppSettingsTab; label: string }[]
-            ).map((item) => {
-              const active = tab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTab(item.id)}
-                  className={[
-                    "relative cursor-pointer border-0 bg-transparent px-3 py-2.5 text-[13px] font-medium",
-                    active
-                      ? "text-[var(--text)]"
-                      : "text-[var(--text-muted)] hover:text-[var(--text)]",
-                  ].join(" ")}
-                >
-                  {item.label}
-                  {active ? (
-                    <span className="absolute -bottom-px left-2.5 right-2.5 h-0.5 rounded-[2px] bg-[var(--text)]" />
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {tab === "canvas" ? (
-            <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
-          ) : tab === "shortcuts" ? (
-            <ShortcutsTab
-              settings={settingsDraft}
-              recordingCommand={recordingCommand}
-              onStartRecording={setRecordingCommand}
-              onStopRecording={() => setRecordingCommand(null)}
-              onSettingsChange={setSettingsDraft}
-            />
-          ) : (
-            <StorageTab
-              folderPath={folderPath}
-              referencesPath={referencesPath}
-              workspaceName={workspaceName}
-              onPickFolder={() => void handlePickFolder()}
-            />
-          )}
-        </div>
-
-        <div className="shrink-0 border-t border-[var(--border)] px-[22px] py-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn btn-ghost">
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving || !folderPath}
-            className="btn btn-primary"
-          >
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
+export interface AppSettingsModalHandle {
+  open: () => void;
+  close: () => void;
 }
+
+export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
+  function AppSettingsModal(_, ref) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [tab, setTab] = useState<AppSettingsTab>("shortcuts");
+    const [recordingCommand, setRecordingCommand] = useState<RecordingCommand>(null);
+    const [folderPath, setFolderPath] = useState("");
+    const [workspaceName, setWorkspaceName] = useState("workspace");
+    const [saving, setSaving] = useState(false);
+    const { settings: persistedSettings } = useGlobalSettings();
+    const [settingsDraft, setSettingsDraft] = useState<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
+
+    useImperativeHandle(ref, () => ({
+      open: () => setIsOpen(true),
+      close: () => setIsOpen(false),
+    }));
+
+    useEffect(() => {
+      if (!isOpen) return;
+      setSettingsDraft(persistedSettings);
+      setRecordingCommand(null);
+      getWorkspaceConfig()
+        .then((cfg) => {
+          setFolderPath(cfg.base_folder);
+          setWorkspaceName(cfg.workspace_name);
+        })
+        .catch(() => {});
+    }, [isOpen, persistedSettings]);
+
+    async function handlePickFolder() {
+      const picked = await pickFolderDialog().catch(() => null);
+      if (picked) setFolderPath(picked);
+    }
+
+    async function handleSave() {
+      setSaving(true);
+      try {
+        await setWorkspaceFolder(folderPath);
+        putGlobalSettings(settingsDraft);
+        setIsOpen(false);
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    const referencesPath = folderPath ? `${folderPath}/references` : "";
+
+    return (
+      <Modal open={isOpen} onClose={() => setIsOpen(false)} size="wide" ariaLabel="Settings">
+        <ModalHeader
+          title="Settings"
+          subtitle="Manage canvas behavior, keyboard shortcuts, and project save location."
+          onClose={() => setIsOpen(false)}
+        />
+        <ModalBody className="!p-0 flex flex-col">
+          <div className="border-b border-[var(--border)] px-[22px] shrink-0">
+            <div className="flex gap-1 pt-3">
+              {(
+                [
+                  { id: "canvas", label: "Canvas" },
+                  { id: "shortcuts", label: "Keyboard shortcuts" },
+                  { id: "storage", label: "Save location" },
+                ] as { id: AppSettingsTab; label: string }[]
+              ).map((item) => {
+                const active = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                    className={[
+                      "relative cursor-pointer border-0 bg-transparent px-3 py-2.5 text-[13px] font-medium",
+                      active
+                        ? "text-[var(--text)]"
+                        : "text-[var(--text-muted)] hover:text-[var(--text)]",
+                    ].join(" ")}
+                  >
+                    {item.label}
+                    {active ? (
+                      <span className="absolute -bottom-px left-2.5 right-2.5 h-0.5 rounded-[2px] bg-[var(--text)]" />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {tab === "canvas" ? (
+              <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
+            ) : tab === "shortcuts" ? (
+              <ShortcutsTab
+                settings={settingsDraft}
+                recordingCommand={recordingCommand}
+                onStartRecording={setRecordingCommand}
+                onStopRecording={() => setRecordingCommand(null)}
+                onSettingsChange={setSettingsDraft}
+              />
+            ) : (
+              <StorageTab
+                folderPath={folderPath}
+                referencesPath={referencesPath}
+                workspaceName={workspaceName}
+                onPickFolder={() => void handlePickFolder()}
+              />
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-[var(--border)] px-[22px] py-4 flex justify-end gap-2">
+            <button type="button" onClick={() => setIsOpen(false)} className="btn btn-ghost">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving || !folderPath}
+              className="btn btn-primary"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </ModalBody>
+      </Modal>
+    );
+  },
+);
 
 function CanvasTab({
   settings,

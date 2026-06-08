@@ -23,7 +23,6 @@ import type {
   FilterKind,
   FilterSort,
   FilterType,
-  GroupDialogState,
   ReferenceItem,
   SelectedSubject,
 } from "../types";
@@ -83,12 +82,8 @@ export function useReferenceLibrary() {
   const [filterKind, setFilterKind] = useState<FilterKind>("all");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterSort, setFilterSort] = useState<FilterSort>("recent");
-  const [importTargetGroupId, setImportTargetGroupId] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<SelectedSubject>(null);
-  const [importOpen, setImportOpen] = useState(false);
   const [lightboxItem, setLightboxItem] = useState<ReferenceItem | null>(null);
-  const [groupDialog, setGroupDialog] = useState<GroupDialogState>(null);
-  const [deleteGroup, setDeleteGroup] = useState<ReferenceGroup | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus>(null);
   const [stackThumbnailUrls, setStackThumbnailUrls] = useState<Record<string, string>>({});
   const [frameVideo, setFrameVideo] = useState<FramePickerVideo | null>(null);
@@ -190,11 +185,6 @@ export function useReferenceLibrary() {
 
   const typeOptions = useMemo(() => typeOptionsForKind(filterKind), [filterKind]);
 
-  const importTargetGroup = useMemo(
-    () => (importTargetGroupId ? groups.find((g) => g.id === importTargetGroupId) ?? null : null),
-    [groups, importTargetGroupId],
-  );
-
   const groupNameById = useMemo(
     () => new Map(groups.map((g) => [g.id, g.name])),
     [groups],
@@ -278,25 +268,25 @@ export function useReferenceLibrary() {
   );
 
   const addItems = useCallback(
-    (items: ReferenceItem[]) => {
+    (items: ReferenceItem[], targetGroupId?: string | null) => {
       if (items.length === 0) return;
-      const targetGroupId = importTargetGroupId;
-      const nextItems = targetGroupId
-        ? items.map((item) => ({ ...item, groupId: targetGroupId }))
+      const resolvedGroupId = targetGroupId ?? null;
+      const nextItems = resolvedGroupId
+        ? items.map((item) => ({ ...item, groupId: resolvedGroupId }))
         : items;
       setLibrary((prev) => [...nextItems, ...prev]);
-      if (targetGroupId) {
+      if (resolvedGroupId) {
         setGroups((prev) =>
-          addReferencesToGroup(prev, targetGroupId, nextItems.map((item) => item.id)),
+          addReferencesToGroup(prev, resolvedGroupId, nextItems.map((item) => item.id)),
         );
       }
-      if (targetGroupId) {
-        setSelectedSubject({ kind: "group", id: targetGroupId });
+      if (resolvedGroupId) {
+        setSelectedSubject({ kind: "group", id: resolvedGroupId });
       } else if (nextItems[0]) {
         setSelectedSubject({ kind: "reference", id: nextItems[0].id });
       }
     },
-    [importTargetGroupId],
+    [],
   );
 
   const addItemsAsGroup = useCallback((items: ReferenceItem[]) => {
@@ -448,45 +438,37 @@ export function useReferenceLibrary() {
     setGroups((prev) => moveReferenceToGroup(prev, id, groupId));
   }, []);
 
-  const saveGroupDialog = useCallback(
-    (input: { name: string; description?: string }) => {
-      const now = new Date().toISOString();
-      if (groupDialog?.mode === "edit") {
-        setGroups((prev) =>
-          prev.map((group) =>
-            group.id === groupDialog.group.id
-              ? { ...group, name: input.name, description: input.description, updatedAt: now }
-              : group,
-          ),
-        );
-        setGroupDialog(null);
-        return;
-      }
-      const group: ReferenceGroup = {
-        id: newReferenceGroupId(),
-        name: input.name,
-        description: input.description,
-        referenceIds: [],
-        coverReferenceId: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setGroups((prev) => [group, ...prev]);
-      setGroupDialog(null);
-    },
-    [groupDialog],
-  );
+  const createGroup = useCallback((input: { name: string; description?: string }) => {
+    const now = new Date().toISOString();
+    const group: ReferenceGroup = {
+      id: newReferenceGroupId(),
+      name: input.name,
+      description: input.description,
+      referenceIds: [],
+      coverReferenceId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setGroups((prev) => [group, ...prev]);
+  }, []);
 
-  const confirmDeleteGroup = useCallback(() => {
-    if (!deleteGroup) return;
-    const groupId = deleteGroup.id;
+  const updateGroup = useCallback((groupId: string, input: { name: string; description?: string }) => {
+    const now = new Date().toISOString();
+    setGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId
+          ? { ...group, name: input.name, description: input.description, updatedAt: now }
+          : group,
+      ),
+    );
+  }, []);
+
+  const confirmDeleteGroup = useCallback((groupId: string) => {
     setGroups((prev) => prev.filter((g) => g.id !== groupId));
     setLibrary((prev) =>
       prev.map((item) => (item.groupId === groupId ? { ...item, groupId: null } : item)),
     );
-    setImportTargetGroupId((current) => (current === groupId ? null : current));
-    setDeleteGroup(null);
-  }, [deleteGroup]);
+  }, []);
 
   const syncGroupArchive = useCallback(
     async (group: ReferenceGroup) => {
@@ -525,19 +507,10 @@ export function useReferenceLibrary() {
     filterSort,
     setFilterSort,
     typeOptions,
-    importTargetGroupId,
-    setImportTargetGroupId,
-    importTargetGroup,
     selectedSubject,
     setSelectedSubject,
-    importOpen,
-    setImportOpen,
     lightboxItem,
     setLightboxItem,
-    groupDialog,
-    setGroupDialog,
-    deleteGroup,
-    setDeleteGroup,
     archiveStatus,
     stackThumbnailUrls,
     frameVideo,
@@ -558,7 +531,8 @@ export function useReferenceLibrary() {
     updateTags,
     updateSourceUrl,
     updateReferenceGroup,
-    saveGroupDialog,
+    createGroup,
+    updateGroup,
     confirmDeleteGroup,
     syncGroupArchive,
   };

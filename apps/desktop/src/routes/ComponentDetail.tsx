@@ -21,6 +21,8 @@ import {
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
 import { deleteComponentTree, getComponent, setActiveVariant, updateComponent } from "@/lib/storage/repos/components.repo";
+import type { FastEditModalHandle } from "@/components/screen/FastEditModal";
+import type { ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
@@ -71,14 +73,14 @@ export function ComponentDetail() {
   const [sideTab, setSideTab] = useState<SideTab>("components");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
-  const [fastEditOpen, setFastEditOpen] = useState(false);
   const [creatingVariant, setCreatingVariant] = useState(false);
-  const [pendingChildDelete, setPendingChildDelete] = useState<ComponentRow | null>(null);
 
   const historyRef = useRef<HistoryModalHandle>(null);
   const referencesRef = useRef<ReferencesModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
   const addRefModalRef = useRef<AddReferenceModalHandle>(null);
+  const fastEditRef = useRef<FastEditModalHandle>(null);
+  const confirmRef = useRef<ConfirmActionModalHandle>(null);
 
   const filteredChildren = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -212,7 +214,7 @@ export function ComponentDetail() {
         style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}
       >
         <PreviewShell
-          onFastEdit={() => setFastEditOpen(true)}
+          onFastEdit={() => fastEditRef.current?.open({ mode: "component", component, variant: activeVariant ?? null, type, canvasHref })}
           canvasHref={canvasHref}
         >
           <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
@@ -308,7 +310,13 @@ export function ComponentDetail() {
                     variant={childVariants.get(c.id) ?? null}
                     projectId={projectId}
                     type={type}
-                    onRequestDelete={setPendingChildDelete}
+                    onRequestDelete={(child) => {
+                      confirmRef.current?.open({
+                        title: "Delete component",
+                        message: `The component "${child.name}" will be removed along with subcomponents and variants.`,
+                        onConfirm: () => deleteComponentTree(child.id),
+                      });
+                    }}
                     onOpenCanvas={(variantId) =>
                       navigate(
                         `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&variant=${variantId}`,
@@ -378,15 +386,7 @@ export function ComponentDetail() {
         references={filteredReferences}
         onRemove={(reference) => removeLinkedReference(reference.id)}
       />
-      <FastEditModal
-        mode="component"
-        open={fastEditOpen}
-        onClose={() => setFastEditOpen(false)}
-        component={component}
-        variant={activeVariant}
-        type={type}
-        canvasHref={canvasHref}
-      />
+      <FastEditModal ref={fastEditRef} />
       <NewComponentModal
         ref={newComponentRef}
         projectId={project?.id ?? null}
@@ -395,21 +395,7 @@ export function ComponentDetail() {
           navigate(`/project/${encodeURIComponent(r.component.projectId)}/c/${r.component.id}`);
         }}
       />
-      <ConfirmActionModal
-        open={Boolean(pendingChildDelete)}
-        title="Delete component"
-        message={
-          pendingChildDelete
-            ? `The component "${pendingChildDelete.name}" will be removed along with subcomponents and variants.`
-            : ""
-        }
-        onClose={() => setPendingChildDelete(null)}
-        onConfirm={async () => {
-          if (!pendingChildDelete) return;
-          await deleteComponentTree(pendingChildDelete.id);
-          setPendingChildDelete(null);
-        }}
-      />
+      <ConfirmActionModal ref={confirmRef} />
       <AddReferenceModal
         ref={addRefModalRef}
         projectId={project?.id ?? null}

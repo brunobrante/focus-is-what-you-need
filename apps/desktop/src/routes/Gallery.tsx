@@ -32,10 +32,10 @@ import {
   NewComponentModal,
   type NewComponentModalHandle,
 } from "@/components/modals/NewComponentModal";
-import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
-import { ProjectPreviewModal } from "@/components/modals/ProjectPreviewModal";
-import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
+import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
+import { ProjectSettingsModal, type ProjectSettingsModalHandle } from "@/components/modals/ProjectSettingsModal";
 import {
   CardMenuIcons as SharedCardMenuIcons,
   CardMoreMenu,
@@ -133,11 +133,10 @@ export function Gallery() {
   const [cmpFilter, setCmpFilter] = useState<CmpKindFilter>("all");
   const screenSectionState = usePersistentSectionState(project?.id, "screens");
   const componentSectionState = usePersistentSectionState(project?.id, "components");
-  const [pendingScreenDelete, setPendingScreenDelete] = useState<ScreenRow | null>(null);
-  const [pendingComponentDelete, setPendingComponentDelete] = useState<ComponentRow | null>(null);
-  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const newScreenRef = useRef<NewScreenModalHandle>(null);
+  const confirmRef = useRef<ConfirmActionModalHandle>(null);
+  const settingsRef = useRef<ProjectSettingsModalHandle>(null);
+  const previewRef = useRef<ProjectPreviewModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
   const navigate = useNavigate();
   const openNewScreen = () => newScreenRef.current?.open();
@@ -157,8 +156,10 @@ export function Gallery() {
         screensCount={screens.length}
         componentsCount={components.length}
         referencesCount={references.length}
-        onPreview={screens.length > 0 ? () => setPreviewOpen(true) : null}
-        onSettings={() => setProjectSettingsOpen(true)}
+        onPreview={screens.length > 0 && project ? () => previewRef.current?.open(project, screens) : null}
+        onSettings={() => project && settingsRef.current?.open(project, screens, (updated) => {
+          navigate(`/project/${encodeURIComponent(updated.id)}`, { replace: true });
+        })}
       />
 
       <Tabs
@@ -179,7 +180,13 @@ export function Gallery() {
           sectionById={screenSectionState.sectionById}
           onSectionsChange={screenSectionState.setSections}
           onSectionByIdChange={screenSectionState.setSectionById}
-          onRequestDelete={setPendingScreenDelete}
+          onRequestDelete={(screen) => {
+            confirmRef.current?.open({
+              title: "Delete screen",
+              message: `Screen "${screen.title}" will be removed along with its components.`,
+              onConfirm: () => deleteScreen(screen.id),
+            });
+          }}
         />
       )}
       {tab === "components" && (
@@ -197,7 +204,13 @@ export function Gallery() {
           sectionById={componentSectionState.sectionById}
           onSectionsChange={componentSectionState.setSections}
           onSectionByIdChange={componentSectionState.setSectionById}
-          onRequestDelete={setPendingComponentDelete}
+          onRequestDelete={(component) => {
+            confirmRef.current?.open({
+              title: "Delete component",
+              message: `The component "${component.name}" will be removed along with subcomponents and variants.`,
+              onConfirm: () => deleteComponentTree(component.id),
+            });
+          }}
         />
       )}
       {tab === "references" && (
@@ -225,52 +238,9 @@ export function Gallery() {
           navigate(`/project/${encodeURIComponent(r.component.projectId)}/c/${r.component.id}`);
         }}
       />
-      <ProjectSettingsModal
-        open={projectSettingsOpen}
-        project={project}
-        screens={screens}
-        onClose={() => setProjectSettingsOpen(false)}
-        onSaved={(updatedProject) => {
-          setProjectSettingsOpen(false);
-          navigate(`/project/${encodeURIComponent(updatedProject.id)}`, { replace: true });
-        }}
-      />
-      <ProjectPreviewModal
-        open={previewOpen}
-        project={project}
-        screens={screens}
-        onClose={() => setPreviewOpen(false)}
-      />
-      <ConfirmActionModal
-        open={Boolean(pendingScreenDelete)}
-        title="Delete screen"
-        message={
-          pendingScreenDelete
-            ? `Screen "${pendingScreenDelete.title}" will be removed along with its components.`
-            : ""
-        }
-        onClose={() => setPendingScreenDelete(null)}
-        onConfirm={async () => {
-          if (!pendingScreenDelete) return;
-          await deleteScreen(pendingScreenDelete.id);
-          setPendingScreenDelete(null);
-        }}
-      />
-      <ConfirmActionModal
-        open={Boolean(pendingComponentDelete)}
-        title="Delete component"
-        message={
-          pendingComponentDelete
-            ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
-            : ""
-        }
-        onClose={() => setPendingComponentDelete(null)}
-        onConfirm={async () => {
-          if (!pendingComponentDelete) return;
-          await deleteComponentTree(pendingComponentDelete.id);
-          setPendingComponentDelete(null);
-        }}
-      />
+      <ProjectSettingsModal ref={settingsRef} />
+      <ProjectPreviewModal ref={previewRef} />
+      <ConfirmActionModal ref={confirmRef} />
     </div>
   );
 }
@@ -755,7 +725,7 @@ function SectionedGrid<T>({
 }) {
   const [sectionModalOpen, setSectionModalOpen] = useState(false);
   const [sectionName, setSectionName] = useState("");
-  const [pendingSectionDelete, setPendingSectionDelete] = useState<SectionState | null>(null);
+  const sectionConfirmRef = useRef<ConfirmActionModalHandle>(null);
   const [assigningItemId, setAssigningItemId] = useState<string | null>(null);
   const [assignSectionId, setAssignSectionId] = useState<string>("");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -876,7 +846,22 @@ function SectionedGrid<T>({
                     aria-label="Delete section"
                     onClick={() => {
                       if (!group.id) return;
-                      setPendingSectionDelete({ id: group.id, name: group.name ?? "Section" });
+                      const sectionId = group.id;
+                      const sectionName = group.name ?? "Section";
+                      sectionConfirmRef.current?.open({
+                        title: "Delete section",
+                        message: `Section "${sectionName}" will be removed. Items will return to the unsectioned area.`,
+                        onConfirm: () => {
+                          onSectionsChange((prev) => prev.filter((s) => s.id !== sectionId));
+                          onSectionByIdChange((prev) => {
+                            const next = { ...prev };
+                            for (const key of Object.keys(next)) {
+                              if (next[key] === sectionId) next[key] = null;
+                            }
+                            return next;
+                          });
+                        },
+                      });
                     }}
                     className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-[var(--border)] bg-transparent text-[var(--text-faint)] hover:border-[rgba(255,80,80,0.45)] hover:bg-[rgba(255,80,80,0.1)] hover:text-[#ff7373]"
                   >
@@ -984,28 +969,7 @@ function SectionedGrid<T>({
           </div>
         </ModalBody>
       </Modal>
-      <ConfirmActionModal
-        open={Boolean(pendingSectionDelete)}
-        title="Delete section"
-        message={
-          pendingSectionDelete
-            ? `Section "${pendingSectionDelete.name}" will be removed. Items will return to the unsectioned area.`
-            : ""
-        }
-        onClose={() => setPendingSectionDelete(null)}
-        onConfirm={() => {
-          if (!pendingSectionDelete) return;
-          onSectionsChange((prev) => prev.filter((s) => s.id !== pendingSectionDelete.id));
-          onSectionByIdChange((prev) => {
-            const next = { ...prev };
-            for (const key of Object.keys(next)) {
-              if (next[key] === pendingSectionDelete.id) next[key] = null;
-            }
-            return next;
-          });
-          setPendingSectionDelete(null);
-        }}
-      />
+      <ConfirmActionModal ref={sectionConfirmRef} />
       <Modal
         open={Boolean(assigningItem)}
         onClose={() => setAssigningItemId(null)}
@@ -2076,8 +2040,8 @@ function ComponentScreensModal({
   onSave: (value: { screenId: string | null; assignedScreenIds: string[] }) => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [pendingPrimaryUnlink, setPendingPrimaryUnlink] = useState<ScreenRow | null>(null);
   const primaryScreenId = component?.screenId ?? null;
+  const unlinkConfirmRef = useRef<ConfirmActionModalHandle>(null);
 
   useEffect(() => {
     if (!component) return;
@@ -2111,7 +2075,14 @@ function ComponentScreensModal({
                     onChange={(event) => {
                       const isChecked = event.target.checked;
                       if (!isChecked && isPrimary) {
-                        setPendingPrimaryUnlink(screen);
+                        unlinkConfirmRef.current?.open({
+                          title: "Unlink screen?",
+                          message: `Screen "${screen.title}" will no longer be the origin of this component.`,
+                          confirmLabel: "Unlink",
+                          onConfirm: () => {
+                            setSelectedIds((current) => current.filter((id) => id !== screen.id));
+                          },
+                        });
                         return;
                       }
                       setSelectedIds((current) => {
@@ -2151,22 +2122,7 @@ function ComponentScreensModal({
           </div>
         </ModalBody>
       </Modal>
-      <ConfirmActionModal
-        open={Boolean(pendingPrimaryUnlink)}
-        title="Unlink screen?"
-        message={
-          pendingPrimaryUnlink
-            ? `Screen "${pendingPrimaryUnlink.title}" will no longer be the origin of this component.`
-            : ""
-        }
-        confirmLabel="Unlink"
-        onClose={() => setPendingPrimaryUnlink(null)}
-        onConfirm={() => {
-          if (!pendingPrimaryUnlink) return;
-          setSelectedIds((current) => current.filter((id) => id !== pendingPrimaryUnlink.id));
-          setPendingPrimaryUnlink(null);
-        }}
-      />
+      <ConfirmActionModal ref={unlinkConfirmRef} />
     </>
   );
 }
