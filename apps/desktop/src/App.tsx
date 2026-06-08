@@ -1,14 +1,14 @@
 import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
-import { Landing } from "@/routes/Landing";
-import { NewProject } from "@/routes/NewProject";
-import { Gallery } from "@/routes/Gallery";
-import { Components as ComponentsRoute } from "@/routes/Components";
-import { ComponentDetail } from "@/routes/ComponentDetail";
+import { LandingPage } from "@/pages/LandingPage";
+import { NewProjectPage } from "@/pages/NewProjectPage";
+import { GalleryPage } from "@/pages/GalleryPage";
+import { ScreenDetailPage } from "@/pages/ScreenDetailPage";
+import { ComponentDetailPage } from "@/pages/ComponentDetailPage";
 import { CanvasPage } from "@/canvas/Canvas";
 import { References } from "@/routes/References";
-import { SystemDesign } from "@/routes/SystemDesign";
-import { GlobalComponents } from "@/routes/GlobalComponents";
+import { SystemDesignPage } from "@/pages/SystemDesignPage";
+import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
 import { ensureLocalProjectsLoaded, startLocalFigxAutosave } from "@/lib/storage/localProjects";
 
@@ -28,18 +28,18 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/new" element={<NewProject />} />
-      <Route path="/project/:projectId" element={<Gallery />} />
-      <Route path="/project/:projectId/screen/:screenId" element={<ComponentsRoute />} />
-      <Route path="/project/:projectId/c/:componentId" element={<ComponentDetail />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/new" element={<NewProjectPage />} />
+      <Route path="/project/:projectId" element={<GalleryPage />} />
+      <Route path="/project/:projectId/screen/:screenId" element={<ScreenDetailPage />} />
+      <Route path="/project/:projectId/c/:componentId" element={<ComponentDetailPage />} />
       <Route path="/canvas" element={<CanvasPage />} />
       <Route path="/references" element={<References />} />
-      <Route path="/system-design" element={<SystemDesign />} />
-      <Route path="/components" element={<GlobalComponents />} />
+      <Route path="/system-design" element={<SystemDesignPage />} />
+      <Route path="/components" element={<GlobalComponentsPage />} />
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />
-      <Route path="*" element={<Landing />} />
+      <Route path="*" element={<LandingPage />} />
     </Routes>
   );
 }

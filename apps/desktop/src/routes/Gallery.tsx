@@ -284,7 +284,7 @@ function projectLogoColor(name: string): string {
   return LOGO_COLORS[idx]!;
 }
 
-function ProjectOverview({
+export function ProjectOverview({
   project,
   screensCount,
   componentsCount,
@@ -393,7 +393,7 @@ function ProjectOverview({
   );
 }
 
-function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
+export function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
       <Link to="/" aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -412,7 +412,7 @@ function Crumbs({ projectName, type }: { projectName: string; type: ProjectType 
   );
 }
 
-function Tabs({
+export function Tabs({
   tab,
   onChange,
   screensCount,
@@ -551,7 +551,7 @@ function CreateScreenDropdown({
   );
 }
 
-function ScreensTab({
+export function ScreensTab({
   screens,
   type,
   projectId,
@@ -1579,7 +1579,7 @@ function CreateDropdown({
   );
 }
 
-function ComponentsTab({
+export function ComponentsTab({
   components,
   activeVariants,
   screens,
@@ -2327,7 +2327,7 @@ function KindPill({ kind }: { kind: ComponentKind | null }) {
 
 type ReferenceView = "grid" | "list";
 
-function ReferencesTab({
+export function ReferencesTab({
   project,
   screens,
   components,
@@ -2706,7 +2706,7 @@ function ReferenceBadge({ children }: { children: ReactNode }) {
   );
 }
 
-function SystemTab({ project }: { project: ProjectRow }) {
+export function SystemTab({ project }: { project: ProjectRow }) {
   const [modal, setModal] = useState<SystemModalState | null>(null);
 
   const patchDesignSystem = async (
