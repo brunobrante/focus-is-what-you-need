@@ -12,6 +12,7 @@ import type {
   ScreenRow,
   ThumbnailRow,
   VariantRow,
+  WorkspaceRow,
 } from "@/lib/storage/schema";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
@@ -119,6 +120,22 @@ export async function deleteProject(projectId: string): Promise<void> {
     KEY,
     projects.filter((p) => p.id !== projectId),
   );
+
+  // Drop the project from any workspace that owns it so per-workspace counts
+  // and scoping stay accurate.
+  const workspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
+  if (workspaces.some((w) => w.projectIds.includes(projectId))) {
+    await replaceTable<WorkspaceRow>(
+      TABLES.workspaces,
+      workspaces.map((w) =>
+        w.projectIds.includes(projectId)
+          ? { ...w, projectIds: w.projectIds.filter((id) => id !== projectId), updatedAt: now() }
+          : w,
+      ),
+    );
+    notify(TABLES.workspaces);
+  }
+
   await replaceTable<ScreenRow>(
     TABLES.screens,
     screens.filter((s) => !screenIds.has(s.id)),

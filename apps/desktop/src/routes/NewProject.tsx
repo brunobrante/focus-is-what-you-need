@@ -8,6 +8,8 @@ import {
 import type { ProjectType } from "@/lib/data/types";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { createProject } from "@/lib/storage/repos/projects.repo";
+import { addProjectToWorkspace, getDefaultWorkspace } from "@/lib/storage/repos/workspace.repo";
+import { getActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 
 const TOTAL_STEPS = 3;
 
@@ -36,6 +38,13 @@ export function NewProject() {
         type,
         thumbnailDataUrl: thumbnail,
       });
+      // New projects belong to the workspace they were created in (falling back
+      // to the default workspace), so they show up under the right workspace.
+      const workspaceId =
+        getActiveWorkspaceId() ?? (await getDefaultWorkspace())?.id ?? null;
+      if (workspaceId) {
+        await addProjectToWorkspace(workspaceId, project.id);
+      }
       navigate(`/project/${encodeURIComponent(project.id)}`);
     } finally {
       setCreating(false);

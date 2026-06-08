@@ -352,11 +352,18 @@ function ensureWorkspaceProjectIds(
       },
     ];
   }
+  // Only adopt projects that don't already belong to a workspace into the
+  // default (first) one. Projects explicitly assigned to another workspace stay
+  // there — otherwise the default would accumulate every project and break
+  // per-workspace scoping.
+  const assigned = new Set(workspaces.flatMap((w) => w.projectIds));
+  const orphans = projectIds.filter((id) => !assigned.has(id));
+  if (orphans.length === 0) return workspaces;
   const [first, ...rest] = workspaces;
   return [
     {
       ...first!,
-      projectIds: Array.from(new Set([...first!.projectIds, ...projectIds])),
+      projectIds: Array.from(new Set([...first!.projectIds, ...orphans])),
       updatedAt: Date.now(),
     },
     ...rest,

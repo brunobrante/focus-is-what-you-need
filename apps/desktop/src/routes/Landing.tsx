@@ -9,7 +9,8 @@ import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import { resetToFactoryData } from "@/lib/storage/seed";
 import { deleteProject } from "@/lib/storage/repos/projects.repo";
-import { useAllScreens, useProjects } from "@/lib/storage/hooks";
+import { useAllScreens, useProjects, useWorkspaces } from "@/lib/storage/hooks";
+import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import type { ProjectRow } from "@/lib/storage/schema";
 
 type Filter = "all" | ProjectType;
@@ -34,8 +35,22 @@ export function Landing() {
   const [editingProject, setEditingProject] = useState<ProjectRow | null>(null);
   const [isResettingFactory, setIsResettingFactory] = useState(false);
 
-  const { data: projects } = useProjects();
+  const { data: allProjects } = useProjects();
   const { data: allScreens } = useAllScreens();
+  const { data: workspaces } = useWorkspaces();
+  const [activeWorkspaceId] = useActiveWorkspaceId();
+
+  // Scope the gallery to the active workspace. A workspace owns its projects via
+  // `projectIds`, so a freshly created (blank) workspace shows no projects.
+  const activeWorkspace =
+    workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0] ?? null;
+  const projects = useMemo(
+    () =>
+      activeWorkspace
+        ? allProjects.filter((p) => activeWorkspace.projectIds.includes(p.id))
+        : allProjects,
+    [allProjects, activeWorkspace],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
