@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+## Branching Rule
+
+This project is in active local development and has not reached production.
+Always commit directly to `main`. Never create branches, never open pull requests.
+
 ## Language Rule
 
 All code must be written in English, regardless of the language used in the prompt
