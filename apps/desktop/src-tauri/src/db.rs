@@ -38,12 +38,7 @@ pub fn open_and_migrate(path: &Path) -> Result<Connection, String> {
     conn.pragma_update(None, "synchronous", "NORMAL")
         .map_err(|e| e.to_string())?;
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS kv_store (
-            key TEXT PRIMARY KEY NOT NULL,
-            value TEXT NOT NULL,
-            updated_at INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS scenes (
+        "CREATE TABLE IF NOT EXISTS scenes (
             owner_type TEXT NOT NULL,
             owner_id TEXT NOT NULL,
             id TEXT NOT NULL,
@@ -484,43 +479,3 @@ pub async fn db_list_records(state: State<'_, Db>, table: String) -> Result<Vec<
     .map_err(|e| e.to_string())?
 }
 
-// ---------------------------------------------------------------------------
-// KV — now served from the same pooled connection (no per-call open / CREATE)
-// ---------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn kv_get(state: State<'_, Db>, key: String) -> Result<Option<String>, String> {
-    let db = state.0.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| "db mutex poisoned".to_string())?;
-        conn.query_row(
-            "SELECT value FROM kv_store WHERE key = ?1",
-            params![key],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub async fn kv_set(state: State<'_, Db>, key: String, value: String) -> Result<(), String> {
-    let db = state.0.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| "db mutex poisoned".to_string())?;
-        conn.execute(
-            "INSERT INTO kv_store (key, value, updated_at)
-             VALUES (?1, ?2, ?3)
-             ON CONFLICT(key) DO UPDATE SET
-               value = excluded.value,
-               updated_at = excluded.updated_at",
-            params![key, value, now_ms()],
-        )
-        .map(|_| ())
-        .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
