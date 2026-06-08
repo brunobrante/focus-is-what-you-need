@@ -6,7 +6,7 @@ import type {
 } from "@/lib/data/types";
 import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export type Meta = {
   schemaVersion: number;
@@ -38,8 +38,16 @@ export type ScreenRow = {
 
 export type ComponentRow = {
   id: string;
-  projectId: string;
-  // Root project-level components may keep both fields null.
+  // Scope owners. A component belongs to exactly one of:
+  //   - a workspace (workspaceId set, projectId null)        → workspace-global
+  //   - a project   (projectId set, screenId/parent null)    → project-global
+  //   - a screen     (screenId set)                           → screen-level
+  //   - a variant    (parentVariantId set)                    → nested child
+  // Derive the discriminator with `componentScope(row)` in defaults.ts.
+  // Optional so existing rows / literals stay valid; normalizeComponentRow
+  // backfills it to null.
+  workspaceId?: string | null;
+  projectId: string | null;
   screenId: string | null;
   parentVariantId: string | null;
   name: string;
@@ -192,6 +200,30 @@ export type WorkspaceRow = {
   id: string;
   name: string;
   projectIds: string[];
+  createdAt: number;
+  updatedAt: number;
+};
+
+// ---------------------------------------------------------------------------
+// SystemDesign — persisted, named design system owned by a workspace or project.
+// Minimal for now: libraries and icons store only a name (refine later).
+// Distinct from the token-based `SystemDesign` type below (a render-time shape).
+// ---------------------------------------------------------------------------
+
+export type SystemDesignLibrary = { id: string; name: string };
+export type SystemDesignIcon = { id: string; name: string };
+
+export type SystemDesignOwnerScope = "workspace" | "project";
+
+export type SystemDesignRow = {
+  id: string;
+  name: string;
+  ownerScope: SystemDesignOwnerScope;
+  ownerId: string;
+  // For workspace-owned designs: shared down to the workspace's projects.
+  shared: boolean;
+  libraries: SystemDesignLibrary[];
+  icons: SystemDesignIcon[];
   createdAt: number;
   updatedAt: number;
 };

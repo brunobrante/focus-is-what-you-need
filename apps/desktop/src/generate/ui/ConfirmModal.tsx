@@ -41,9 +41,9 @@ export function ConfirmActionModal({
 
 export function confirmationDialogCopy(_action: PendingConfirmation) {
   return {
-    title: "Reset tool",
+    title: "Reset stack",
     description:
-      "This removes every root and crop and returns to the original image. The tree will be recreated with only the default full-image root.",
-    confirmLabel: "Reset",
+      "This resets the current stack back to the original image and removes its crops. Other stacks in this image are not affected.",
+    confirmLabel: "Reset stack",
   };
 }

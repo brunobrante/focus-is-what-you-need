@@ -1,5 +1,6 @@
 import type { ComponentVariant } from "@/lib/data/types";
 import { newId, now } from "@/lib/storage/ids";
+import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import type { VariantRow } from "@/lib/storage/schema";
 import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
@@ -63,5 +64,35 @@ export async function createVariant(input: {
   };
   await replaceTable<VariantRow>(KEY, [created, ...rows]);
   notify(KEY);
+  return created;
+}
+
+/**
+ * Create a new variant that is a copy of an existing one — the "save current as
+ * a new version" flow. The source variant's scene graph is duplicated verbatim
+ * into the new variant's own scene. Node ids are scene-scoped, so a verbatim
+ * copy is safe for a sibling variant (no parent placement to reconcile). Child
+ * component rows nested under the source variant are NOT deep-cloned (follow-up).
+ */
+export async function duplicateVariant(input: {
+  componentId: string;
+  sourceVariantId: string;
+  name: string;
+}): Promise<VariantRow> {
+  const created = await createVariant({
+    componentId: input.componentId,
+    name: input.name,
+  });
+  const sourceScene = await getSceneByOwner("variant", input.sourceVariantId);
+  if (sourceScene) {
+    await upsertScene(
+      {
+        ownerType: "variant",
+        ownerId: created.id,
+        graphJSON: sourceScene.graphJSON,
+      },
+      { propagate: false },
+    );
+  }
   return created;
 }

@@ -96,6 +96,8 @@ export function useReferenceLibrary() {
 
   const libraryRef = useRef<ReferenceItem[]>([]);
   libraryRef.current = library;
+  const groupsRef = useRef<ReferenceGroup[]>([]);
+  groupsRef.current = groups;
   const stackThumbnailUrlsRef = useRef<Record<string, string>>({});
   stackThumbnailUrlsRef.current = stackThumbnailUrls;
 
@@ -356,7 +358,17 @@ export function useReferenceLibrary() {
         await deleteReferenceFrames(video.id).catch(() => {});
         if (frameItems.length === 0) return;
 
-        const group: ReferenceGroup = {
+        // A video owns a single group: extracting frames transforms the video
+        // into that group (and folds the video into it, so the catalog shows one
+        // card). Re-extracting reuses the same group instead of spawning a new
+        // one — the new frames are appended.
+        const videoItem = libraryRef.current.find((item) => item.id === video.id) ?? null;
+        const existingGroup =
+          (videoItem?.groupId
+            ? groupsRef.current.find((entry) => entry.id === videoItem.groupId)
+            : null) ?? null;
+
+        const group: ReferenceGroup = existingGroup ?? {
           id: newReferenceGroupId(),
           name: baseName || "Video frames",
           referenceIds: [],
@@ -367,8 +379,17 @@ export function useReferenceLibrary() {
         const memberIds = frameItems.map((item) => item.id);
         const withGroup = frameItems.map((item) => ({ ...item, groupId: group.id }));
 
-        setLibrary((prev) => [...withGroup, ...prev]);
-        setGroups((prev) => addReferencesToGroup([group, ...prev], group.id, memberIds));
+        setLibrary((prev) =>
+          [...withGroup, ...prev].map((item) =>
+            item.id === video.id ? { ...item, groupId: group.id } : item,
+          ),
+        );
+        setGroups((prev) => {
+          const base = existingGroup ? prev : [group, ...prev];
+          // Frames first (so the cover defaults to a frame, not the video),
+          // video last but still a member so it stays accessible for re-extract.
+          return addReferencesToGroup(base, group.id, [...memberIds, video.id]);
+        });
         setSelectedSubject({ kind: "group", id: group.id });
         setFrameVideo(null);
       } finally {

@@ -48,6 +48,7 @@ import {
   type SceneRow,
   type ScreenRow,
   type ScreenVersionRow,
+  type SystemDesignRow,
   type ThumbnailRow,
   type V1ComponentRow,
   type V1SceneRow,
@@ -149,6 +150,11 @@ export async function ensureSeededAndMigrated(): Promise<void> {
 
   if (meta.schemaVersion < 14) {
     await migrateV13toV14ProjectSources();
+    await writeMeta({ schemaVersion: 14, seededAt: meta.seededAt });
+  }
+
+  if (meta.schemaVersion < 15) {
+    await migrateV14toV15SystemDesigns();
     await writeMeta({ schemaVersion: SCHEMA_VERSION, seededAt: meta.seededAt });
   }
 
@@ -1337,6 +1343,19 @@ async function migrateV13toV14ProjectSources(): Promise<void> {
   });
   await replaceTable<ProjectRow>(TABLES.projects, nextProjects);
   notify(TABLES.projects);
+}
+
+/**
+ * v15: introduce the `system_designs` table. Existing component rows gain
+ * `workspaceId`/nullable `projectId` transparently via `normalizeComponentRow`
+ * on read, so this migration only needs to materialize the new (empty) table.
+ */
+async function migrateV14toV15SystemDesigns(): Promise<void> {
+  const existing = await listTable<SystemDesignRow>(TABLES.systemDesigns);
+  if (existing.length === 0) {
+    await replaceTable<SystemDesignRow>(TABLES.systemDesigns, []);
+  }
+  notify(TABLES.systemDesigns);
 }
 
 function ensureMockComponentRows(input: {

@@ -1,5 +1,9 @@
 import type { ComponentKind } from "@/lib/data/types";
-import { normalizeComponentRow, normalizeReferenceRow } from "@/lib/storage/defaults";
+import {
+  componentScope,
+  normalizeComponentRow,
+  normalizeReferenceRow,
+} from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import { removeComponentSubtreeFromParentScene } from "@/lib/storage/repos/scenes.repo";
 import type {
@@ -15,6 +19,7 @@ const KEY = TABLES.components;
 const VARIANTS_KEY = TABLES.variants;
 
 export type ComponentParent =
+  | { kind: "workspace"; workspaceId: string }
   | { kind: "project"; projectId: string }
   | { kind: "screen"; screenId: string }
   | { kind: "variant"; variantId: string };
@@ -55,6 +60,28 @@ export async function listComponentsByProject(
   return rows.filter((r) => r.projectId === projectId);
 }
 
+/** Workspace-global components (owned by a workspace, not any project). */
+export async function listWorkspaceComponents(
+  workspaceId: string,
+): Promise<ComponentRow[]> {
+  const rows = await listComponents();
+  return rows
+    .filter(
+      (r) => componentScope(r) === "workspace" && r.workspaceId === workspaceId,
+    )
+    .sort((a, b) => a.order - b.order);
+}
+
+/** Project-global components (root-level inside a project, not on a screen). */
+export async function listProjectGlobalComponents(
+  projectId: string,
+): Promise<ComponentRow[]> {
+  const rows = await listComponents();
+  return rows
+    .filter((r) => componentScope(r) === "project" && r.projectId === projectId)
+    .sort((a, b) => a.order - b.order);
+}
+
 export async function getComponent(id: string): Promise<ComponentRow | null> {
   const rows = await listComponents();
   return rows.find((r) => r.id === id) ?? null;
@@ -69,6 +96,14 @@ export async function findComponentByName(
   return (
     rows.find((r) => {
       if (r.name.toLowerCase() !== lower) return false;
+      if (parent.kind === "workspace") {
+        return (
+          r.workspaceId === parent.workspaceId &&
+          r.projectId === null &&
+          r.screenId === null &&
+          r.parentVariantId === null
+        );
+      }
       if (parent.kind === "project") {
         return (
           r.projectId === parent.projectId &&
@@ -93,6 +128,14 @@ export async function findComponentBySourceNode(
   return (
     rows.find((r) => {
       if (r.sourceNodeId !== sourceNodeId) return false;
+      if (parent.kind === "workspace") {
+        return (
+          r.workspaceId === parent.workspaceId &&
+          r.projectId === null &&
+          r.screenId === null &&
+          r.parentVariantId === null
+        );
+      }
       if (parent.kind === "project") {
         return (
           r.projectId === parent.projectId &&
@@ -114,7 +157,9 @@ export async function findComponentBySourceNode(
  * variants). The component carries `activeVariantId` pointing at the variant.
  */
 export async function createComponent(input: {
-  projectId: string;
+  // The owning project, when the component lives inside one. Omitted/null for
+  // workspace-global components (parent.kind === "workspace").
+  projectId?: string | null;
   parent: ComponentParent;
   name: string;
   kind?: ComponentKind | null;
@@ -133,6 +178,15 @@ export async function createComponent(input: {
   const variants = await listTable<VariantRow>(VARIANTS_KEY);
 
   const siblings = components.filter((c) => {
+    if (input.parent.kind === "workspace") {
+      const workspaceId = input.parent.workspaceId;
+      return (
+        c.workspaceId === workspaceId &&
+        c.projectId === null &&
+        c.screenId === null &&
+        c.parentVariantId === null
+      );
+    }
     if (input.parent.kind === "project") {
       return (
         c.projectId === input.projectId &&
@@ -172,7 +226,9 @@ export async function createComponent(input: {
 
   const component = normalizeComponentRow({
     id: componentId,
-    projectId: input.projectId,
+    workspaceId:
+      input.parent.kind === "workspace" ? input.parent.workspaceId : null,
+    projectId: input.parent.kind === "workspace" ? null : input.projectId ?? null,
     screenId: input.parent.kind === "screen" ? input.parent.screenId : null,
     parentVariantId:
       input.parent.kind === "variant" ? input.parent.variantId : null,
@@ -211,6 +267,31 @@ export async function updateComponent(
     assignedScreenIds: patch.assignedScreenIds
       ? Array.from(new Set(patch.assignedScreenIds))
       : components[idx]!.assignedScreenIds,
+    updatedAt: now(),
+  });
+  const nextComponents = [...components];
+  nextComponents[idx] = next;
+  await replaceTable<ComponentRow>(KEY, nextComponents);
+  notify(KEY);
+  return next;
+}
+
+/**
+ * Point a component at a different variant. Separate from `updateComponent`
+ * because `activeVariantId` is structural (it owns the editable scene), not a
+ * user-editable field.
+ */
+export async function setActiveVariant(
+  componentId: string,
+  variantId: string,
+): Promise<ComponentRow | null> {
+  const components = await listTable<ComponentRow>(KEY);
+  const idx = components.findIndex((component) => component.id === componentId);
+  if (idx < 0) return null;
+  if (components[idx]!.activeVariantId === variantId) return components[idx]!;
+  const next = normalizeComponentRow({
+    ...components[idx]!,
+    activeVariantId: variantId,
     updatedAt: now(),
   });
   const nextComponents = [...components];

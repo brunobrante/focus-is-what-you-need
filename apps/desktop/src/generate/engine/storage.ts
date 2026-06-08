@@ -12,7 +12,9 @@ export const COMPONENT_STORAGE_PREFIX = "workspace.tools.components.";
 export const COMPONENT_DRAFT_STORAGE_PREFIX = "workspace.tools.componentsDraft.";
 export const PRIMARY_COMPONENT_STORAGE_PREFIX = "workspace.tools.primary.";
 export const CROPS_OVERLAY_COLOR_STORAGE_KEY = "workspace.tools.cropsOverlayColor";
+export const CROPS_OVERLAY_ALPHA_STORAGE_KEY = "workspace.tools.cropsOverlayAlpha";
 const CROPS_OVERLAY_DEFAULT_COLOR = "#FFFFFF";
+const CROPS_OVERLAY_DEFAULT_ALPHA = 0.22;
 
 export function readPrimaryComponentId(componentKey: string): string | null {
   if (typeof window === "undefined") return null;
@@ -95,6 +97,20 @@ export function readCropsOverlayColor(): string {
     // ignore
   }
   return CROPS_OVERLAY_DEFAULT_COLOR;
+}
+
+export function readCropsOverlayAlpha(): number {
+  if (typeof window === "undefined") return CROPS_OVERLAY_DEFAULT_ALPHA;
+  try {
+    const stored = window.localStorage.getItem(CROPS_OVERLAY_ALPHA_STORAGE_KEY);
+    if (stored != null) {
+      const value = Number(stored);
+      if (Number.isFinite(value) && value >= 0 && value <= 1) return value;
+    }
+  } catch {
+    // ignore
+  }
+  return CROPS_OVERLAY_DEFAULT_ALPHA;
 }
 
 export async function readDiskReference(id: string): Promise<ToolReference | null> {

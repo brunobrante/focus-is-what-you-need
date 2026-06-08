@@ -29,30 +29,36 @@ export function Generate() {
   const [referenceLoading, setReferenceLoading] = useState(false);
   const requestedGroupId = searchParams.get("groupId");
   const diskObjectUrlRef = useRef<string | null>(null);
+  // Mirror the latest committed reference/group so the loaders can tell an
+  // initial load from an in-place switch without re-subscribing the effects.
+  const diskReferenceRef = useRef<ToolReference | null>(null);
+  const groupContextRef = useRef<ToolReferenceGroupContext | null>(null);
 
   useEffect(() => {
     if (!referenceId) {
       revokeObjectUrl(diskObjectUrlRef.current);
       diskObjectUrlRef.current = null;
+      diskReferenceRef.current = null;
       setDiskReference(null);
-      setGroupContext(null);
       setReferenceLoading(false);
       return;
     }
 
     let cancelled = false;
-    revokeObjectUrl(diskObjectUrlRef.current);
-    diskObjectUrlRef.current = null;
-    setDiskReference(null);
-    setGroupContext(null);
-    setReferenceLoading(true);
+    // Only the first load shows the full-screen shell. Switching between images
+    // in a group keeps the current editor (and the group navigator) mounted and
+    // swaps the image in place once the new one finishes loading.
+    if (diskReferenceRef.current == null) setReferenceLoading(true);
+    const previousObjectUrl = diskObjectUrlRef.current;
     void readDiskReference(referenceId)
       .then((reference) => {
         if (cancelled) {
           revokeObjectUrl(reference?.url);
           return;
         }
+        revokeObjectUrl(previousObjectUrl);
         diskObjectUrlRef.current = reference?.url?.startsWith("blob:") ? reference.url : null;
+        diskReferenceRef.current = reference;
         setDiskReference(reference);
       })
       .finally(() => {
@@ -72,21 +78,33 @@ export function Generate() {
   }, []);
 
   useEffect(() => {
-    if (!referenceId || !diskReference) {
+    if (!referenceId) {
+      groupContextRef.current = null;
       setGroupContext(null);
       return;
     }
 
+    // Moving between images of the same group must not tear down the navigator:
+    // if the current reference already belongs to the loaded group, keep it and
+    // let `activeReferenceId` move the highlight. Reload only when the group
+    // identity actually changes.
+    const current = groupContextRef.current;
+    const referenceInCurrent = current?.references.some((entry) => entry.id === referenceId);
+    if (current && referenceInCurrent && (requestedGroupId == null || requestedGroupId === current.id)) {
+      return;
+    }
+
     let cancelled = false;
-    setGroupContext(null);
-    void readToolReferenceGroupContext(referenceId, requestedGroupId, diskReference).then((context) => {
-      if (!cancelled) setGroupContext(context);
+    void readToolReferenceGroupContext(referenceId, requestedGroupId).then((context) => {
+      if (cancelled) return;
+      groupContextRef.current = context;
+      setGroupContext(context);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [diskReference, referenceId, requestedGroupId]);
+  }, [referenceId, requestedGroupId]);
 
   const item = referenceId ? diskReference : localSource;
 
@@ -114,7 +132,6 @@ export function Generate() {
 
   return (
     <ToolsEditor
-      key={item.id}
       item={item}
       referenceId={referenceId}
       groupContext={referenceId ? groupContext : null}
@@ -135,7 +152,6 @@ function revokeObjectUrl(url: string | null | undefined) {
 async function readToolReferenceGroupContext(
   referenceId: string,
   requestedGroupId: string | null,
-  activeReference: ToolReference,
 ): Promise<ToolReferenceGroupContext | null> {
   const [groups, metas] = await Promise.all([readReferenceGroups(), readRefsMeta()]);
   const meta = metas.find((entry) => entry.id === referenceId);
@@ -160,7 +176,6 @@ async function readToolReferenceGroupContext(
         w: Number(entry.w || 0),
         h: Number(entry.h || 0),
         ext: entry.ext,
-        url: entry.id === activeReference.id ? activeReference.url : undefined,
       };
     })
     .filter((reference): reference is ToolReferenceGroupContext["references"][number] => reference != null);

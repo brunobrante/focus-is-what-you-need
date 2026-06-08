@@ -1,17 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
-import { IconCompare, IconFastEdit, IconGrid, IconHistory, IconOpenCanvas, IconPlus, IconSearch } from "@/components/icons";
+import { IconFastEdit, IconGrid, IconHistory, IconOpenCanvas, IconPlus, IconSearch } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { AddCard } from "@/components/screen/AddCard";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
 import { PreviewShell } from "@/components/screen/PreviewShell";
 import { HistoryModal, type HistoryModalHandle } from "@/components/modals/HistoryModal";
-import {
-  CompareVersionsModal,
-  type CompareVersionsModalHandle,
-} from "@/components/modals/CompareVersionsModal";
 import {
   NewComponentModal,
   type NewComponentModalHandle,
@@ -24,12 +20,12 @@ import {
   AddReferenceModal,
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
-import { deleteComponentTree, getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
+import { deleteComponentTree, getComponent, setActiveVariant, updateComponent } from "@/lib/storage/repos/components.repo";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { getVariant } from "@/lib/storage/repos/variants.repo";
+import { duplicateVariant, getVariant } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
   useActiveVariants,
@@ -43,12 +39,7 @@ import {
   useVariants,
 } from "@/lib/storage/hooks";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
-import {
-  DEFAULT_HISTORY,
-  DEFAULT_SCREEN_VERSIONS,
-  type ScreenVersion,
-} from "@/lib/data/screenVersions";
-import { getCanvasMockForTemplate } from "@/components/mocks/data/canvasMocks";
+import { DEFAULT_HISTORY } from "@/lib/data/screenVersions";
 import { FastEditModal } from "@/components/screen/FastEditModal";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 
@@ -77,17 +68,14 @@ export function ComponentDetail() {
   const type: ProjectType = project?.type ?? "desktop";
   const projectId = project?.id ?? component?.projectId ?? routeProjectId;
   const projectName = project?.name ?? "Projeto";
-  const canUseFactoryMocks = project?.source === "mock";
   const [sideTab, setSideTab] = useState<SideTab>("components");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
   const [fastEditOpen, setFastEditOpen] = useState(false);
-  const [versions, setVersions] = useState<ScreenVersion[]>(DEFAULT_SCREEN_VERSIONS);
-  const [activeVersionId, setActiveVersionId] = useState(versions[0]?.id ?? "v3");
+  const [creatingVariant, setCreatingVariant] = useState(false);
   const [pendingChildDelete, setPendingChildDelete] = useState<ComponentRow | null>(null);
 
   const historyRef = useRef<HistoryModalHandle>(null);
-  const compareRef = useRef<CompareVersionsModalHandle>(null);
   const referencesRef = useRef<ReferencesModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
   const addRefModalRef = useRef<AddReferenceModalHandle>(null);
@@ -101,10 +89,15 @@ export function ComponentDetail() {
     });
   }, [children, filter, query]);
 
-  const filteredVersions = useMemo(() => {
+  const filteredVariants = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return versions.filter((v) => !q || v.title.toLowerCase().includes(q));
-  }, [query, versions]);
+    return variants.filter((v) => !q || v.name.toLowerCase().includes(q));
+  }, [query, variants]);
+
+  // The base variant holds the component's content and is not itself a
+  // "version" — only explicitly created copies count. A fresh component is
+  // therefore free of versions.
+  const variantCount = variants.length > 1 ? variants.length : 0;
 
   const filteredReferences = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -133,19 +126,19 @@ export function ComponentDetail() {
     ? `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`
     : `/project/${encodeURIComponent(projectId)}`;
 
-  const addVersion = () => {
-    const n = versions.length + 1;
-    const tpls: ScreenVersion["tpl"][] = ["hero", "detail", "form"];
-    const newV: ScreenVersion = {
-      id: `cv${n}`,
-      title: `v${n} · nova`,
-      tpl: tpls[n % tpls.length],
-      updated: "agora",
-      author: "You",
-      initials: "VC",
-    };
-    setVersions((prev) => [newV, ...prev]);
-    setActiveVersionId(newV.id);
+  const addVariant = async () => {
+    if (!component || !activeVariant || creatingVariant) return;
+    setCreatingVariant(true);
+    try {
+      const created = await duplicateVariant({
+        componentId: component.id,
+        sourceVariantId: activeVariant.id,
+        name: `Variant ${variants.length + 1}`,
+      });
+      await setActiveVariant(component.id, created.id);
+    } finally {
+      setCreatingVariant(false);
+    }
   };
 
   const removeLinkedReference = (referenceId: string) => {
@@ -193,7 +186,7 @@ export function ComponentDetail() {
           <div className="flex items-center gap-2.5 text-[12.5px] text-[var(--text-muted)]">
             {component.kind ? <span>{component.kind}</span> : <span>Componente</span>}
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-            <span>{variants.length} {variants.length === 1 ? "variante" : "variantes"}</span>
+            <span>{variantCount} {variantCount === 1 ? "variante" : "variantes"}</span>
             <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
             <span>{children.length} {children.length === 1 ? "child component" : "child components"}</span>
           </div>
@@ -255,7 +248,7 @@ export function ComponentDetail() {
                   : sideTab === "info"
                     ? "Editable description and metadata for this component."
                   : sideTab === "versions"
-                    ? "History of versions for this component."
+                    ? "Variants of this component."
                     : "Inspirations and support materials for this component."}
               </p>
             </div>
@@ -264,24 +257,13 @@ export function ComponentDetail() {
               {sideTab === "components" ? (
                 <SideKindFilter value={filter} onChange={setFilter} />
               ) : null}
-              {sideTab === "versions" ? (
-                <button
-                  type="button"
-                  aria-label="Compare versions"
-                  onClick={() => compareRef.current?.open()}
-                  className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
-                >
-                  <IconCompare size={13} strokeWidth={1.7} />
-                  Comparar
-                </button>
-              ) : null}
             </div>
           </div>
           <div role="tablist" className="flex shrink-0 gap-0.5 border-b border-[var(--border)] px-3.5">
             {([
               { id: "components", label: "Sub Components", count: children.length },
               { id: "info", label: "Information", count: 0 },
-              { id: "versions", label: "Versions", count: versions.length },
+              { id: "versions", label: "Variants", count: variantCount },
               { id: "references", label: "References", count: references.length ?? 0 },
             ] as Array<{ id: SideTab; label: string; count: number }>).map((t) => {
               const active = sideTab === t.id;
@@ -352,22 +334,24 @@ export function ComponentDetail() {
             )}
             {sideTab === "versions" && (
               <>
-                {filteredVersions.map((v) => (
-                  <VersionSideCard
-                    key={v.id}
-                    version={v}
-                    active={v.id === activeVersionId}
-                    type={type}
-                    allowMock={canUseFactoryMocks}
-                    onSelect={() => setActiveVersionId(v.id)}
-                  />
-                ))}
-                {filteredVersions.length === 0 && (
+                {variants.length > 1 &&
+                  filteredVariants.map((v) => (
+                    <VariantSideCard
+                      key={v.id}
+                      variant={v}
+                      active={v.id === activeVariant?.id}
+                      type={type}
+                      onSelect={() => {
+                        if (component) void setActiveVariant(component.id, v.id);
+                      }}
+                    />
+                  ))}
+                {variants.length <= 1 && (
                   <div className="col-span-full px-3 py-14 text-center text-[13px] text-[var(--text-faint)]">
-                    No versions found.
+                    No versions yet. Use “New variant” to save a copy of this component.
                   </div>
                 )}
-                <AddCard label="New version" onClick={addVersion} />
+                <AddCard label="New variant" onClick={() => void addVariant()} />
               </>
             )}
             {sideTab === "references" && (
@@ -388,19 +372,6 @@ export function ComponentDetail() {
         title="Component history"
         subtitle={`Changes made to "${component.name}" over time.`}
         commits={DEFAULT_HISTORY}
-      />
-      <CompareVersionsModal
-        ref={compareRef}
-        versions={versions}
-        type={type}
-        allowMock={canUseFactoryMocks}
-        onOpenInCanvas={(ids) => {
-          if (activeVariant) {
-            navigate(
-              `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&variant=${activeVariant.id}&compare=${ids.join(",")}`,
-            );
-          }
-        }}
       />
       <ReferencesModal
         ref={referencesRef}
@@ -561,17 +532,15 @@ function SideKindFilter({
   );
 }
 
-function VersionSideCard({
-  version,
+function VariantSideCard({
+  variant,
   active,
   type,
-  allowMock,
   onSelect,
 }: {
-  version: ScreenVersion;
+  variant: VariantRow;
   active: boolean;
   type: ProjectType;
-  allowMock: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -585,84 +554,43 @@ function VersionSideCard({
         <button
           type="button"
           onClick={onSelect}
-          aria-label={`Select version ${version.title}`}
+          aria-label={`Select variant ${variant.name}`}
           className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
         />
         <div className="h-full w-full overflow-hidden">
-          <VersionPreviewImage tpl={version.tpl} type={type} allowMock={allowMock} />
+          <Snapshot
+            kind="component"
+            ownerType="variant"
+            ownerId={variant.id}
+            seedKey={variant.seedKey}
+            type={type}
+            display="card"
+          />
         </div>
         <CardMenu
           buttons={[
-            { key: "select", label: "Select version", icon: CardMenuIcons.Check, onClick: onSelect },
-            { key: "duplicate", label: "Duplicate", icon: CardMenuIcons.Duplicate },
-            { key: "more", label: "More", icon: CardMenuIcons.More },
+            { key: "select", label: "Select variant", icon: CardMenuIcons.Check, onClick: onSelect },
           ]}
         />
       </div>
-      <div className="flex min-w-0 flex-col gap-1 px-0.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
-            {version.title}
-          </span>
-          {active ? (
-            <span
-              className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]"
-              style={{
-                color: "#F2F2F2",
-                borderColor: "#3FB950",
-                background: "rgba(63,185,80,0.08)",
-              }}
-            >
-              Atual
-            </span>
-          ) : (
-            <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-              {version.updated}
-            </span>
-          )}
-        </div>
-        <span className="text-[11px] text-[var(--text-muted)]">
-          <span className="rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-            {version.author}
-          </span>
+      <div className="flex min-w-0 items-center gap-2 px-0.5">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
+          {variant.name}
         </span>
+        {active ? (
+          <span
+            className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]"
+            style={{
+              color: "#F2F2F2",
+              borderColor: "#3FB950",
+              background: "rgba(63,185,80,0.08)",
+            }}
+          >
+            Active
+          </span>
+        ) : null}
       </div>
     </div>
-  );
-}
-
-function VersionPreviewImage({
-  tpl,
-  type,
-  allowMock,
-}: {
-  tpl: ScreenVersion["tpl"];
-  type: ProjectType;
-  allowMock: boolean;
-}) {
-  if (!allowMock) {
-    return (
-      <div className="grid h-full w-full place-items-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text-faint)]">
-        Empty component
-      </div>
-    );
-  }
-
-  const mock = getCanvasMockForTemplate(tpl, type);
-  if (!mock) {
-    return (
-      <div className="grid h-full w-full place-items-center rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--text-faint)]">
-        Empty component
-      </div>
-    );
-  }
-  return (
-    <img
-      src={mock.snapshot}
-      alt=""
-      className="block h-full w-full object-cover"
-      draggable={false}
-    />
   );
 }
 
@@ -733,7 +661,7 @@ function ComponentInfoPanel({ component }: { component: ComponentRow }) {
         </div>
         <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
           <span className="text-[11.5px] text-[var(--text-faint)]">Variants</span>
-          <span className="text-[11.5px] text-[var(--text-muted)]">Managed in the Versions tab</span>
+          <span className="text-[11.5px] text-[var(--text-muted)]">Managed in the Variants tab</span>
         </div>
       </div>
     </div>

@@ -137,7 +137,7 @@ function GroupPin({
         >
           {thumbnailUrl ? (
             <div
-              className="block w-full bg-cover bg-center bg-[var(--surface)]"
+              className="block w-full bg-contain bg-center bg-no-repeat bg-[var(--surface)]"
               style={{
                 paddingBottom: `${padBottom}%`,
                 backgroundImage: `url('${thumbnailUrl}')`,
@@ -173,7 +173,7 @@ function GroupPin({
             <div className="flex w-full flex-col gap-0.5 text-[11.5px] leading-[1.35] text-white">
               <span className="line-clamp-2 font-medium">{group.name}</span>
               <span className="flex items-center gap-2 text-[10.5px] tabular-nums text-white/70">
-                <span>{references.length} {references.length === 1 ? "screen" : "screens"}</span>
+                <span>{imageReferences.length} {imageReferences.length === 1 ? "screen" : "screens"}</span>
                 <span>·</span>
                 <span>{stackCount} {stackCount === 1 ? "stack" : "stacks"}</span>
               </span>
@@ -236,7 +236,7 @@ function Pin({
           </div>
         ) : (
           <div
-            className="block w-full bg-cover bg-center bg-[var(--surface)]"
+            className="block w-full bg-contain bg-center bg-no-repeat bg-[var(--surface)]"
             style={{
               paddingBottom: `${padBottom}%`,
               backgroundImage: `url('${thumbnailUrl}')`,

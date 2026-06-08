@@ -1,6 +1,7 @@
 import {
   readReferenceStackData,
   loadReferenceStackFile,
+  loadReferenceFile,
 } from "@/lib/tauri/referenceStorage";
 
 export async function loadStackThumbnailBatch(
@@ -25,27 +26,18 @@ export async function loadStackThumbnailBatch(
 
 export async function loadStackThumbnailUrl(referenceId: string): Promise<string | null> {
   const data = await readReferenceStackData(referenceId);
-  if (!data || data.components.length === 0) return null;
+  if (!data) return null;
 
-  const primaryComponent =
-    data.components.find((c) => c.id === data.primaryComponentId) ??
-    data.components.find((c) => c.id === data.rootComponentId);
-  const thumbnailComponent =
-    primaryComponent?.file
-      ? primaryComponent
-      : pickFallbackStackThumbnailComponent(data.components, data.rootComponentId);
-  if (!thumbnailComponent?.file) return null;
+  // The card represents the image by the root of its first stack. A non-default
+  // stack stores its root pixels in a file; the default stack's root is the
+  // original image itself (and legacy data without a roots list behaves the same).
+  const firstRoot = data.roots?.[0] ?? null;
 
-  const blob = await loadReferenceStackFile(referenceId, thumbnailComponent.file, "image/png");
-  return blob ? URL.createObjectURL(blob) : null;
-}
+  if (firstRoot?.file) {
+    const blob = await loadReferenceStackFile(referenceId, firstRoot.file, "image/png");
+    if (blob) return URL.createObjectURL(blob);
+  }
 
-function pickFallbackStackThumbnailComponent(
-  components: NonNullable<Awaited<ReturnType<typeof readReferenceStackData>>>["components"],
-  rootComponentId: string,
-) {
-  const withFiles = components.filter((c) => c.id !== rootComponentId && c.file);
-  const directChildren = withFiles.filter((c) => c.parentId === rootComponentId);
-  const candidates = directChildren.length > 0 ? directChildren : withFiles;
-  return candidates.sort((a, b) => b.box.w * b.box.h - a.box.w * a.box.h)[0] ?? null;
+  const original = await loadReferenceFile(referenceId, data.original.ext).catch(() => null);
+  return original ? URL.createObjectURL(original) : null;
 }

@@ -459,6 +459,23 @@ export function IconDocument({ size = 12, className, strokeWidth = 1.8 }: IconPr
   )
 }
 
+export function IconPhone({ size = 13, className, strokeWidth = 1.7 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconPlay({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <polygon points="5,3 19,12 5,21" />
+    </svg>
+  );
+}
+
 export function IconUpload({ size = 12, className, strokeWidth = 1.8 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>

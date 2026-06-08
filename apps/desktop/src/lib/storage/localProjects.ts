@@ -15,6 +15,7 @@ import {
   type SceneRow,
   type ScreenRow,
   type ScreenVersionRow,
+  type SystemDesignRow,
   type ThumbnailRow,
   type VariantRow,
   type WorkspaceRow,
@@ -40,6 +41,7 @@ type FigxArchive = {
     screenVersions: ScreenVersionRow[];
     placements: ComponentPlacementRow[];
     history: HistoryEntryRow[];
+    systemDesigns: SystemDesignRow[];
   };
 };
 
@@ -61,6 +63,7 @@ const PERSISTED_TABLES = [
   TABLES.screenVersions,
   TABLES.placements,
   TABLES.history,
+  TABLES.systemDesigns,
 ] as const;
 
 let readyPromise: Promise<void> | null = null;
@@ -147,6 +150,7 @@ async function importLocalFigxProjects(): Promise<void> {
   const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
   const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
   const history = await listTable<HistoryEntryRow>(TABLES.history);
+  const systemDesigns = await listTable<SystemDesignRow>(TABLES.systemDesigns);
 
   const importedProjects = archives.map((archive) =>
     normalizeProjectRow({ ...archive.project, source: "local" }),
@@ -164,6 +168,7 @@ async function importLocalFigxProjects(): Promise<void> {
   const importedScreenVersions = archives.flatMap((archive) => archive.tables.screenVersions);
   const importedPlacements = archives.flatMap((archive) => archive.tables.placements);
   const importedHistory = archives.flatMap((archive) => archive.tables.history);
+  const importedSystemDesigns = archives.flatMap((archive) => archive.tables.systemDesigns);
 
   const nextProjects = [
     ...projects.filter((project) => !importedProjectIds.has(project.id)),
@@ -225,6 +230,12 @@ async function importLocalFigxProjects(): Promise<void> {
     ),
     ...importedHistory,
   ];
+  const nextSystemDesigns = [
+    ...systemDesigns.filter(
+      (design) => !(design.ownerScope === "project" && importedProjectIds.has(design.ownerId)),
+    ),
+    ...importedSystemDesigns,
+  ];
   const nextWorkspaces = ensureWorkspaceProjectIds(
     workspaces,
     nextProjects.map((project) => project.id),
@@ -241,6 +252,7 @@ async function importLocalFigxProjects(): Promise<void> {
   await replaceTable<ScreenVersionRow>(TABLES.screenVersions, nextScreenVersions);
   await replaceTable<ComponentPlacementRow>(TABLES.placements, nextPlacements);
   await replaceTable<HistoryEntryRow>(TABLES.history, nextHistory);
+  await replaceTable<SystemDesignRow>(TABLES.systemDesigns, nextSystemDesigns);
 
   PERSISTED_TABLES.forEach((table) => notify(table));
   notify(TABLES.workspaces);
@@ -266,6 +278,7 @@ function parseArchive(raw: string): FigxArchive | null {
         screenVersions: parsed.tables.screenVersions ?? [],
         placements: parsed.tables.placements ?? [],
         history: parsed.tables.history ?? [],
+        systemDesigns: parsed.tables.systemDesigns ?? [],
       },
     };
   } catch {
@@ -405,6 +418,7 @@ async function buildLocalProjectArchives(): Promise<
   const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
   const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
   const history = await listTable<HistoryEntryRow>(TABLES.history);
+  const systemDesigns = await listTable<SystemDesignRow>(TABLES.systemDesigns);
 
   return projects.map((project) => {
     const projectScreens = screens.filter((screen) => screen.projectId === project.id);
@@ -457,6 +471,9 @@ async function buildLocalProjectArchives(): Promise<
         history: history.filter(
           (entry) =>
             projectScreenIds.has(entry.targetId) || projectComponentIds.has(entry.targetId),
+        ),
+        systemDesigns: systemDesigns.filter(
+          (design) => design.ownerScope === "project" && design.ownerId === project.id,
         ),
       },
     };

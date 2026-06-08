@@ -42,7 +42,7 @@ import {
 } from "@/components/screen/CardMenu";
 import { Snapshot } from "@/components/Snapshot";
 import { Badge } from "@/components/ui/badge";
-import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
+import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import { fileFormatLabel, readFileAsDataUrl } from "@/lib/utils";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import {
@@ -67,7 +67,7 @@ import type {
   ScreenRow,
   VariantRow,
 } from "@/lib/storage/schema";
-import { IconEye, IconFastEdit, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPlus, IconScreen, IconSearch, IconSettings, IconChevronLeft } from "@/components/icons";
+import { IconChevronDown, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconSettings, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
 
 type Tab = "screens" | "components" | "references" | "system";
 type CmpKindFilter = "all" | ComponentKind;
@@ -148,25 +148,18 @@ export function Gallery() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]" data-type={type}>
-      <header className="flex h-14 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
+      <header className="flex h-14 items-center border-b border-[var(--border)] px-5">
         <Crumbs projectName={projectName} type={type} />
-        <div className="flex items-center gap-2">
-          {screens.length > 0 ? (
-            <button type="button" onClick={() => setPreviewOpen(true)} className="btn btn-ghost">
-              <IconEye size={14} strokeWidth={1.7} />
-              Preview
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setProjectSettingsOpen(true)}
-            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-            aria-label="Project settings"
-          >
-            <IconSettings size={14} strokeWidth={1.6} />
-          </button>
-        </div>
       </header>
+
+      <ProjectOverview
+        project={project}
+        screensCount={screens.length}
+        componentsCount={components.length}
+        referencesCount={references.length}
+        onPreview={screens.length > 0 ? () => setPreviewOpen(true) : null}
+        onSettings={() => setProjectSettingsOpen(true)}
+      />
 
       <Tabs
         tab={tab}
@@ -282,6 +275,124 @@ export function Gallery() {
   );
 }
 
+const LOGO_COLORS = [
+  "#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#14b8a6",
+];
+
+function projectLogoColor(name: string): string {
+  const idx = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % LOGO_COLORS.length;
+  return LOGO_COLORS[idx]!;
+}
+
+function ProjectOverview({
+  project,
+  screensCount,
+  componentsCount,
+  referencesCount,
+  onPreview,
+  onSettings,
+}: {
+  project: ProjectRow | undefined;
+  screensCount: number;
+  componentsCount: number;
+  referencesCount: number;
+  onPreview: (() => void) | null;
+  onSettings: () => void;
+}) {
+  const initial = (project?.name ?? "P")[0]!.toUpperCase();
+  const logoColor = projectLogoColor(project?.name ?? "");
+  const typeLabel = PROJECT_TYPE_LABEL[project?.type ?? "desktop"];
+  const dims = PROJECT_TYPE_DIMS[project?.type ?? "desktop"];
+
+  const updatedDate = project?.updatedAt
+    ? new Date(project.updatedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  return (
+    <div className="flex items-start gap-6 border-b border-[var(--border)] px-7 py-7">
+      <div
+        className="flex h-[60px] w-[60px] flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl text-[22px] font-semibold text-white"
+        style={{ background: project?.thumbnailDataUrl ? undefined : logoColor }}
+      >
+        {project?.thumbnailDataUrl ? (
+          <img
+            src={project.thumbnailDataUrl}
+            alt={project.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          initial
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.3px] text-[var(--text)]">
+            {project?.name ?? "—"}
+          </h1>
+          <span className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+            {typeLabel}
+          </span>
+          {updatedDate && (
+            <span className="text-[11px] text-[var(--text-faint)]">· Updated {updatedDate}</span>
+          )}
+        </div>
+
+        {project?.description ? (
+          <p className="m-0 max-w-[520px] text-[13px] leading-[1.55] text-[var(--text-muted)]">
+            {project.description}
+          </p>
+        ) : null}
+
+        <div className="flex items-center gap-3 text-[12px] text-[var(--text-faint)]">
+          <span>
+            <span className="font-medium text-[var(--text-muted)]">{screensCount}</span>{" "}
+            {screensCount === 1 ? "Screen" : "Screens"}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>
+            <span className="font-medium text-[var(--text-muted)]">{componentsCount}</span>{" "}
+            {componentsCount === 1 ? "Component" : "Components"}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>
+            <span className="font-medium text-[var(--text-muted)]">{referencesCount}</span>{" "}
+            {referencesCount === 1 ? "Reference" : "References"}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>{dims}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-shrink-0 items-center gap-2 self-start pt-0.5">
+        {onPreview && (
+          <button
+            type="button"
+            onClick={onPreview}
+            className="inline-flex items-center gap-2 rounded-[10px] bg-[var(--text)] px-4 py-2 text-[13px] font-medium text-[var(--bg)] transition-opacity hover:opacity-80"
+          >
+            <IconPlay size={11} />
+            Preview
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onSettings}
+          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          aria-label="Project settings"
+        >
+          <IconSettings size={14} strokeWidth={1.6} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
@@ -317,7 +428,7 @@ function Tabs({
   const tabs: Array<{ id: Tab; label: string; count?: number }> = [
     { id: "screens", label: "Screens", count: screensCount },
     { id: "components", label: "Components", count: componentsCount },
-    { id: "references", label: "References", count: referencesCount },
+    { id: "references", label: "References" },
     { id: "system", label: "System" },
   ];
   return (
@@ -358,6 +469,88 @@ function Tabs({
   );
 }
 
+function CreateScreenDropdown({
+  onNewScreen,
+  onNewSection,
+  type,
+}: {
+  onNewScreen: () => void;
+  onNewSection: () => void;
+  type: ProjectType;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos({ top: rect.bottom + 5, right: window.innerWidth - rect.right });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (
+        !rootRef.current?.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={toggle}
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-[var(--text)] px-3 text-[12.5px] font-medium text-[var(--bg)] transition-opacity hover:opacity-85"
+      >
+        <IconPlus size={13} strokeWidth={2.2} />
+        New
+        <IconChevronDown size={10} strokeWidth={2.4} className={["transition-transform duration-150", open ? "rotate-180" : ""].join(" ")} />
+      </button>
+      {open && pos ? createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-[80] w-[190px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+        >
+          <button
+            type="button"
+            onClick={() => { onNewScreen(); setOpen(false); }}
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
+          >
+            {type === "mobile"
+              ? <IconPhone size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+              : <IconScreen size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />}
+            New screen
+          </button>
+          <div className="my-1 border-t border-[var(--border)]" />
+          <button
+            type="button"
+            onClick={() => { onNewSection(); setOpen(false); }}
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
+          >
+            <IconFolder size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+            New section
+          </button>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
 function ScreensTab({
   screens,
   type,
@@ -380,39 +573,55 @@ function ScreensTab({
   onRequestDelete: (screen: ScreenRow) => void;
 }) {
   const [createSectionRequest, setCreateSectionRequest] = useState(0);
+  const [query, setQuery] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("all");
+
+  const filtered = query.trim()
+    ? screens.filter((s) => s.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : screens;
 
   return (
     <>
-      <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
-        <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Screens</h1>
-          <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Click a screen to open its components.{" "}
-            <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-              {screens.length} {screens.length === 1 ? "screen" : "screens"}
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCreateSectionRequest((value) => value + 1)}
-            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
-          >
-            <IconPlus size={13} strokeWidth={1.8} />
-            New section
-          </button>
-          <button type="button" onClick={onNewScreen} className="btn btn-primary h-9 px-3.5">
-            <IconPlus size={14} strokeWidth={2} />
-            New Screen
-          </button>
-          <ViewToggle />
-        </div>
+      <div className="flex items-center gap-2 px-7 pb-4 pt-5">
+        <label className="relative min-w-0 flex-1">
+          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search screens..."
+            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+          />
+        </label>
+
+        <FilterPill
+          label="Section"
+          value={sectionFilter}
+          onChange={setSectionFilter}
+          options={[
+            { value: "all", label: "All sections" },
+            { value: "unassigned", label: "No section" },
+            ...sections.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+
+        <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />
+
+        <CreateScreenDropdown
+          onNewScreen={onNewScreen}
+          onNewSection={() => setCreateSectionRequest((v) => v + 1)}
+          type={type}
+        />
       </div>
 
       <main className="flex-1 px-7 pb-20">
         <ScreensGrid
-          screens={screens}
+          screens={sectionFilter === "all"
+            ? filtered
+            : sectionFilter === "unassigned"
+              ? filtered.filter((s) => !sectionById[s.id])
+              : filtered.filter((s) => sectionById[s.id] === sectionFilter)
+          }
           type={type}
           projectId={projectId}
           onNewScreen={onNewScreen}
@@ -520,6 +729,7 @@ function SectionedGrid<T>({
   onSectionByIdChange,
   getId,
   gridTemplateColumns,
+  itemGap,
   newSectionPrefix,
   renderItem,
   renderAddCard,
@@ -533,6 +743,7 @@ function SectionedGrid<T>({
   onSectionByIdChange: Dispatch<SetStateAction<Record<string, string | null>>>;
   getId: (item: T) => string;
   gridTemplateColumns: string;
+  itemGap?: string;
   newSectionPrefix: string;
   renderItem: (
     item: T,
@@ -677,7 +888,8 @@ function SectionedGrid<T>({
               <SectionDropZone id={`section:${group.id ?? "unassigned"}`}>
                 <div
                   className={[
-                    "grid gap-x-[18px] gap-y-[22px] rounded-[10px]",
+                    "grid rounded-[10px]",
+                    itemGap ?? "gap-x-[18px] gap-y-[22px]",
                     !isUncategorized && groupItems.length === 0
                       ? "min-h-[92px] border border-dashed border-[var(--border)] bg-[var(--surface)] p-4"
                       : "",
@@ -929,8 +1141,8 @@ function ScreenCard({
         />
         <CardMenu
           actions={[
-            { id: "components", label: "Componentes", icon: <IconGrid size={14} strokeWidth={1.6} />, onClick: () => navigate(href) },
-            { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={14} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
+            { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
+            { id: "edit", label: "Edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => navigate(href) },
             {
               id: "more",
               label: "Mais",
@@ -939,6 +1151,7 @@ function ScreenCard({
                 {
                   key: "section",
                   label: "Add to section",
+                  icon: SharedCardMenuIcons.MoveTo,
                   onClick: onRequestAssignSection,
                 },
                 {
@@ -1045,7 +1258,10 @@ function CardMenu({
       ref={rootRef}
       role="toolbar"
       aria-label="Actions"
-      className="pointer-events-none absolute bottom-2 left-1/2 z-[2] inline-flex -translate-x-1/2 translate-y-1.5 items-center gap-0.5 rounded-[10px] border border-[var(--border-strong)] bg-[#161616] p-1 opacity-0 shadow-[var(--shadow-pop)] transition-[opacity,transform] duration-[140ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
+      className={[
+        "pointer-events-none absolute bottom-2 left-1/2 z-[2] inline-flex -translate-x-1/2 translate-y-1.5 items-center gap-0.5 rounded-[10px] border border-[var(--border-strong)] bg-[#161616] p-1 opacity-0 shadow-[var(--shadow-pop)] transition-[opacity,transform] duration-[140ms] group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100",
+        openId ? "!pointer-events-auto !translate-y-0 !opacity-100" : "",
+      ].join(" ")}
     >
       {actions.map((a, i) => (
         <span key={a.id} className="relative inline-flex items-center">
@@ -1162,6 +1378,207 @@ function ViewToggle({
   );
 }
 
+function FilterPill({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const isActive = value !== "all";
+  const activeLabel = options.find((o) => o.value === value)?.label ?? label;
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos({ top: rect.bottom + 5, left: rect.left });
+    setOpen(true);
+  };
+
+  const clear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange("all");
+    setOpen(false);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (
+        !btnRef.current?.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        className={[
+          "inline-flex h-[30px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
+          isActive
+            ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
+            : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+        ].join(" ")}
+      >
+        {isActive ? activeLabel : label}
+        {isActive ? (
+          <span
+            role="button"
+            aria-label={`Clear ${label} filter`}
+            onClick={clear}
+            className="grid h-[14px] w-[14px] shrink-0 cursor-pointer place-items-center rounded-full bg-[rgba(255,255,255,0.2)] text-[10px] leading-none hover:bg-[rgba(255,255,255,0.35)]"
+          >
+            ×
+          </span>
+        ) : (
+          <IconChevronDown size={9} strokeWidth={2.4} />
+        )}
+      </button>
+      {open && pos ? createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left }}
+          className="z-[80] min-w-[160px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => { onChange(option.value); setOpen(false); }}
+                className={[
+                  "flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[6px] text-left text-[12.5px] transition-colors hover:bg-[var(--surface)]",
+                  isSelected ? "text-[var(--text)]" : "text-[var(--text-muted)]",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "grid h-[14px] w-[14px] shrink-0 place-items-center rounded-full border transition-colors",
+                    isSelected
+                      ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)] text-[9px]"
+                      : "border-[var(--border)]",
+                  ].join(" ")}
+                >
+                  {isSelected ? "✓" : null}
+                </span>
+                {option.label}
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      ) : null}
+    </>
+  );
+}
+
+function CreateDropdown({
+  onNewComponent,
+  canCreate,
+  onNewSection,
+  type,
+}: {
+  onNewComponent: () => void;
+  canCreate: boolean;
+  onNewSection: () => void;
+  type: ProjectType;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos({ top: rect.bottom + 5, right: window.innerWidth - rect.right });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (
+        !rootRef.current?.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={toggle}
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-[var(--text)] px-3 text-[12.5px] font-medium text-[var(--bg)] transition-opacity hover:opacity-85"
+      >
+        <IconPlus size={13} strokeWidth={2.2} />
+        New
+        <IconChevronDown size={10} strokeWidth={2.4} className={["transition-transform duration-150", open ? "rotate-180" : ""].join(" ")} />
+      </button>
+      {open && pos ? createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-[80] w-[190px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+        >
+          <button
+            type="button"
+            disabled={!canCreate}
+            onClick={() => { onNewComponent(); setOpen(false); }}
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {type === "mobile"
+              ? <IconPhone size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+              : <IconScreen size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />}
+            Create component
+          </button>
+          <div className="my-1 border-t border-[var(--border)]" />
+          <button
+            type="button"
+            onClick={() => { onNewSection(); setOpen(false); }}
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
+          >
+            <IconFolder size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
+            New section
+          </button>
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
 function ComponentsTab({
   components,
   activeVariants,
@@ -1193,6 +1610,7 @@ function ComponentsTab({
   onSectionByIdChange: Dispatch<SetStateAction<Record<string, string | null>>>;
   onRequestDelete: (component: ComponentRow) => void;
 }) {
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [screenFilter, setScreenFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
@@ -1240,92 +1658,72 @@ function ComponentsTab({
 
   return (
     <>
-      <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
-        <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">Components</h1>
-          <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            All project components.{" "}
-            <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-              {labelTotal} {noun}
-            </span>
-          </p>
-        </div>
-        <div className="inline-flex items-center gap-3.5">
-          <button
-            type="button"
-            onClick={() => setCreateSectionRequest((value) => value + 1)}
-            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
-          >
-            <IconPlus size={13} strokeWidth={1.8} />
-            New section
-          </button>
-          <button
-            type="button"
-            onClick={onNewComponent}
-            disabled={!canCreate}
-            className="btn btn-primary"
-          >
-            <IconPlus size={14} strokeWidth={2} />
-            Create New Component
-          </button>
-          <ViewToggle />
-        </div>
+      <div className="flex items-center gap-2 px-7 pb-4 pt-5">
+        <label className="relative min-w-0 flex-1">
+          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search components..."
+            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+          />
+        </label>
+
+        <FilterPill
+          label="Type"
+          value={filter}
+          onChange={(value) => onFilterChange(value as CmpKindFilter)}
+          options={[
+            { value: "all", label: "All types" },
+            { value: "Layout", label: "Layout" },
+            { value: "Atom", label: "Atom" },
+            { value: "Section", label: "Section" },
+            { value: "Pattern", label: "Pattern" },
+            { value: "Overlay", label: "Overlay" },
+          ]}
+        />
+        <FilterPill
+          label="Screen"
+          value={screenFilter}
+          onChange={setScreenFilter}
+          options={[
+            { value: "all", label: "All screens" },
+            ...screens.map((screen) => ({ value: screen.id, label: screen.title })),
+          ]}
+        />
+        <FilterPill
+          label="Section"
+          value={sectionFilter}
+          onChange={setSectionFilter}
+          options={[
+            { value: "all", label: "All sections" },
+            { value: "unassigned", label: "No section" },
+            ...sections.map((section) => ({ value: section.id, label: section.name })),
+          ]}
+        />
+        <FilterPill
+          label="Category"
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          options={[
+            { value: "all", label: "All categories" },
+            ...categories.map((category) => ({ value: category, label: category })),
+          ]}
+        />
+
+        <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />
+
+        <ViewToggle value={view} onChange={setView} />
+        <CreateDropdown
+          onNewComponent={onNewComponent}
+          canCreate={canCreate}
+          onNewSection={() => setCreateSectionRequest((value) => value + 1)}
+          type={type}
+        />
       </div>
 
       <main className="flex-1 px-7 pb-20">
-        <div className="mb-5 grid gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 lg:grid-cols-[1.2fr_repeat(4,minmax(0,0.8fr))]">
-          <label className="relative">
-            <IconSearch size={14} strokeWidth={1.7} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name or category..."
-              className="h-11 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-0 pl-9 pr-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-            />
-          </label>
-          <FilterSelectBase
-            ariaLabel="Filter by type"
-            value={filter}
-            onChange={(value) => onFilterChange(value as CmpKindFilter)}
-            options={[
-              { value: "all", label: "All Types" },
-              { value: "Layout", label: "Layout" },
-              { value: "Atom", label: "Atom" },
-              { value: "Section", label: "Section" },
-              { value: "Pattern", label: "Pattern" },
-              { value: "Overlay", label: "Overlay" },
-            ]}
-          />
-          <FilterSelectBase
-            ariaLabel="Filter by screen"
-            value={screenFilter}
-            onChange={setScreenFilter}
-            options={[
-              { value: "all", label: "All Screens" },
-              ...screens.map((screen) => ({ value: screen.id, label: screen.title })),
-            ]}
-          />
-          <FilterSelectBase
-            ariaLabel="Filter by section"
-            value={sectionFilter}
-            onChange={setSectionFilter}
-            options={[
-              { value: "all", label: "All Sections" },
-              { value: "unassigned", label: "No section" },
-              ...sections.map((section) => ({ value: section.id, label: section.name })),
-            ]}
-          />
-          <FilterSelectBase
-            ariaLabel="Filter by category"
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            options={[
-              { value: "all", label: "All Categories" },
-              ...categories.map((category) => ({ value: category, label: category })),
-            ]}
-          />
-        </div>
         <SectionedGrid
           items={filtered}
           sections={sections}
@@ -1333,23 +1731,38 @@ function ComponentsTab({
           onSectionsChange={onSectionsChange}
           onSectionByIdChange={onSectionByIdChange}
           getId={(component) => component.id}
-          gridTemplateColumns="repeat(auto-fill, minmax(240px, 1fr))"
+          gridTemplateColumns={view === "list" ? "1fr" : "repeat(auto-fill, minmax(200px, 1fr))"}
+          itemGap={view === "list" ? "gap-y-0.5" : undefined}
           newSectionPrefix="Section"
           createSectionRequest={createSectionRequest}
           showCreateSectionButton={false}
-          renderItem={(c, helpers) => (
-            <ComponentCard
-              key={c.id}
-              component={c}
-              variant={activeVariants.get(c.id) ?? null}
-              screens={screens}
-              projectId={projectId}
-              type={type}
-              onRequestDelete={onRequestDelete}
-              onRequestAssignSection={helpers.onRequestAssignSection}
-              onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
-            />
-          )}
+          renderItem={(c, helpers) =>
+            view === "list" ? (
+              <ComponentListRow
+                key={c.id}
+                component={c}
+                variant={activeVariants.get(c.id) ?? null}
+                screens={screens}
+                projectId={projectId}
+                type={type}
+                onRequestDelete={onRequestDelete}
+                onRequestAssignSection={helpers.onRequestAssignSection}
+                onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
+              />
+            ) : (
+              <ComponentCard
+                key={c.id}
+                component={c}
+                variant={activeVariants.get(c.id) ?? null}
+                screens={screens}
+                projectId={projectId}
+                type={type}
+                onRequestDelete={onRequestDelete}
+                onRequestAssignSection={helpers.onRequestAssignSection}
+                onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
+              />
+            )
+          }
         />
       </main>
       <ComponentScreensModal
@@ -1371,19 +1784,21 @@ function FilterSelectBase({
   onChange,
   options,
   ariaLabel,
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
   ariaLabel: string;
+  className?: string;
 }) {
   return (
-    <div className="relative inline-flex items-center">
+    <div className={["relative inline-flex items-center", className].filter(Boolean).join(" ")}>
       <select
         aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-0 pl-3 pr-8 text-[13px] text-[var(--text)] outline-none transition-colors duration-[120ms] hover:border-[var(--border-strong)] focus:border-[var(--text)]"
+        className="h-9 w-full cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-0 pl-3 pr-8 text-[13px] text-[var(--text)] outline-none transition-colors duration-[120ms] hover:border-[var(--border-strong)] focus:border-[var(--text)]"
         style={{ appearance: "none", WebkitAppearance: "none" as never }}
       >
         {options.map((option) => (
@@ -1442,8 +1857,8 @@ function ComponentCard({
         ) : null}
         <CardMenu
           actions={[
-            { id: "edit", label: "Edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
-            { id: "inspect", label: "Inspecionar", icon: <IconSearch size={13} strokeWidth={1.6} />, onClick: () => navigate(href) },
+            { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
+            { id: "edit", label: "Edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => navigate(href) },
             {
               id: "more",
               label: "Mais",
@@ -1452,6 +1867,7 @@ function ComponentCard({
                 {
                   key: "section",
                   label: "Add to section",
+                  icon: SharedCardMenuIcons.MoveTo,
                   onClick: onRequestAssignSection,
                 },
                 {
@@ -1479,6 +1895,169 @@ function ComponentCard({
           </span>
           {component.kind ? <KindPill kind={component.kind} /> : null}
         </div>
+        <CmpSource component={component} screens={screens} projectId={projectId} />
+      </div>
+    </Link>
+  );
+}
+
+function ComponentListRow({
+  component,
+  variant,
+  screens,
+  projectId,
+  type: _type,
+  onRequestDelete,
+  onRequestAssignSection,
+  onRequestAssignScreens,
+}: {
+  component: ComponentRow;
+  variant: VariantRow | null;
+  screens: ScreenRow[];
+  projectId: string;
+  type: ProjectType;
+  onRequestDelete: (component: ComponentRow) => void;
+  onRequestAssignSection: () => void;
+  onRequestAssignScreens: () => void;
+}) {
+  const navigate = useNavigate();
+  const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
+  const canvasHref = variant
+    ? `/canvas?project=${encodeURIComponent(projectId)}&type=${_type}&variant=${variant.id}`
+    : `/canvas?project=${encodeURIComponent(projectId)}&type=${_type}&component=${component.id}`;
+
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [morePos, setMorePos] = useState<{ top: number; left: number } | null>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointer = (e: PointerEvent) => {
+      if (
+        !moreBtnRef.current?.contains(e.target as Node) &&
+        !moreMenuRef.current?.contains(e.target as Node)
+      ) setMoreOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMoreOpen(false); };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [moreOpen]);
+
+  const stopNav = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
+
+  return (
+    <Link
+      to={href}
+      className="group flex h-[52px] cursor-pointer items-center gap-3 rounded-[10px] px-2 text-inherit no-underline transition-colors hover:bg-[var(--surface)]"
+    >
+      <div className="preview-dotgrid relative h-9 w-[52px] shrink-0 overflow-hidden rounded-md border border-[var(--border)] transition-colors group-hover:border-[var(--border-strong)]">
+        {variant ? (
+          <Snapshot
+            kind="component"
+            ownerType="variant"
+            ownerId={variant.id}
+            seedKey={variant.seedKey}
+            type={_type}
+            display="card"
+          />
+        ) : null}
+      </div>
+
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
+          {component.name}
+        </span>
+        {component.kind ? <KindPill kind={component.kind} /> : null}
+
+        <span className="inline-flex shrink-0 items-center gap-px" onClick={stopNav}>
+          <button
+            type="button"
+            aria-label="Canvas"
+            onClick={(e) => { stopNav(e); navigate(canvasHref); }}
+            className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          >
+            <IconOpenCanvas size={12} strokeWidth={1.6} />
+          </button>
+          <button
+            type="button"
+            aria-label="Edit"
+            onClick={(e) => { stopNav(e); navigate(href); }}
+            className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          >
+            <IconFastEdit size={12} strokeWidth={1.6} />
+          </button>
+          <button
+            ref={moreBtnRef}
+            type="button"
+            aria-label="More"
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            onClick={(e) => {
+              stopNav(e);
+              if (moreOpen) { setMoreOpen(false); return; }
+              const rect = moreBtnRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              setMorePos({
+                top: rect.bottom + 5,
+                left: Math.min(window.innerWidth - 184, Math.max(8, rect.right - 176)),
+              });
+              setMoreOpen(true);
+            }}
+            className={[
+              "grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+              moreOpen ? "bg-[var(--surface-hover)] text-[var(--text)]" : "",
+            ].join(" ")}
+          >
+            {SharedCardMenuIcons.More}
+          </button>
+          {moreOpen && morePos ? createPortal(
+            <div
+              ref={moreMenuRef}
+              role="menu"
+              style={{ position: "fixed", top: morePos.top, left: morePos.left }}
+              className="z-[80] min-w-44 overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1 shadow-[var(--shadow-pop)] backdrop-blur-md"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); onRequestAssignSection(); setMoreOpen(false); }}
+                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+              >
+                <span className="grid h-4 w-4 place-items-center">{SharedCardMenuIcons.MoveTo}</span>
+                <span>Add to section</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); onRequestAssignScreens(); setMoreOpen(false); }}
+                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+              >
+                <span className="grid h-4 w-4 place-items-center">
+                  <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />
+                </span>
+                <span>Link screens</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); onRequestDelete(component); setMoreOpen(false); }}
+                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] text-[#ff7373] transition-colors hover:bg-[rgba(255,80,80,0.12)]"
+              >
+                <span className="grid h-4 w-4 place-items-center">{SharedCardMenuIcons.Trash}</span>
+                <span>Delete component</span>
+              </button>
+            </div>,
+            document.body,
+          ) : null}
+        </span>
+      </div>
+
+      <div className="hidden shrink-0 xl:block">
         <CmpSource component={component} screens={screens} projectId={projectId} />
       </div>
     </Link>
@@ -1814,7 +2393,7 @@ function ReferencesTab({
   }, [componentById, kindFilter, originFilter, query, references, screenById, targetFilter, project]);
 
   const targetOptions = [
-    { value: "all", label: "All Targets" },
+    { value: "all", label: "All targets" },
     { value: "global", label: "Global" },
     ...screens.map((screen) => ({ value: screen.id, label: `Screen · ${screen.title}` })),
     ...components.map((component) => ({ value: component.id, label: `Component · ${component.name}` })),
@@ -1822,68 +2401,62 @@ function ReferencesTab({
 
   return (
     <>
-      <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
-        <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">References</h1>
-          <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Visual cards connected to the project, screens or components.{" "}
-            <span className="text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-              {references.length} {references.length === 1 ? "reference" : "references"}
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ViewToggle value={view} onChange={setView} />
-          <button type="button" onClick={() => modalRef.current?.open()} className="btn btn-primary">
-            <IconPlus size={14} strokeWidth={2} />
-            Add Reference
-          </button>
-        </div>
+      <div className="flex items-center gap-2 px-7 pb-4 pt-5">
+        <label className="relative min-w-0 flex-1">
+          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search references..."
+            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+          />
+        </label>
+
+        <FilterPill
+          label="Source"
+          value={originFilter}
+          onChange={setOriginFilter}
+          options={[
+            { value: "all", label: "All sources" },
+            { value: "external", label: "External" },
+            { value: "local", label: "Local" },
+          ]}
+        />
+        <FilterPill
+          label="Kind"
+          value={kindFilter}
+          onChange={setKindFilter}
+          options={[
+            { value: "all", label: "All kinds" },
+            { value: "hero", label: "Hero" },
+            { value: "cards", label: "Cards" },
+            { value: "form", label: "Form" },
+            { value: "dash", label: "Dash" },
+            { value: "type", label: "Type" },
+          ]}
+        />
+        <FilterPill
+          label="Target"
+          value={targetFilter}
+          onChange={setTargetFilter}
+          options={targetOptions}
+        />
+
+        <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />
+
+        <ViewToggle value={view} onChange={setView} />
+        <button
+          type="button"
+          onClick={() => modalRef.current?.open()}
+          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-[var(--text)] px-3 text-[12.5px] font-medium text-[var(--bg)] transition-opacity hover:opacity-85"
+        >
+          <IconPlus size={13} strokeWidth={2.2} />
+          Add Reference
+        </button>
       </div>
 
       <main className="flex-1 px-7 pb-10">
-        <div className="mb-5 grid gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4 lg:grid-cols-[1.2fr_repeat(3,minmax(0,0.8fr))]">
-          <label className="relative">
-            <IconSearch size={14} strokeWidth={1.7} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by title, source, link or description..."
-              className="h-11 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-0 pl-9 pr-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-            />
-          </label>
-          <FilterSelectBase
-            ariaLabel="Filter by source"
-            value={originFilter}
-            onChange={setOriginFilter}
-            options={[
-              { value: "all", label: "All Sources" },
-              { value: "external", label: "External" },
-              { value: "local", label: "Local" },
-            ]}
-          />
-          <FilterSelectBase
-            ariaLabel="Filter by type"
-            value={kindFilter}
-            onChange={setKindFilter}
-            options={[
-              { value: "all", label: "All Kinds" },
-              { value: "hero", label: "Hero" },
-              { value: "cards", label: "Cards" },
-              { value: "form", label: "Form" },
-              { value: "dash", label: "Dash" },
-              { value: "type", label: "Type" },
-            ]}
-          />
-          <FilterSelectBase
-            ariaLabel="Filter by target"
-            value={targetFilter}
-            onChange={setTargetFilter}
-            options={targetOptions}
-          />
-        </div>
-
         {filtered.length === 0 ? (
           <div className="grid min-h-[320px] place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-6 py-10 text-center">
             <div className="max-w-[340px]">
@@ -2192,16 +2765,8 @@ function SystemTab({ project }: { project: ProjectRow }) {
 
   return (
     <>
-      <div className="flex items-end justify-between gap-4 px-7 pb-3 pt-7">
-        <div>
-          <h1 className="m-0 mb-1 text-lg font-semibold tracking-[-0.1px]">System</h1>
-          <p className="m-0 text-[13px] text-[var(--text-muted)]">
-            Real project tokens and assets, with dedicated fields for colors, fonts, icons and images.
-          </p>
-        </div>
-      </div>
-      <main className="flex flex-1 flex-col gap-9 px-7 pb-10">
-        <SysBlock title="Cores" actionLabel="New color" onAction={() => setModal({ kind: "color" })}>
+      <main className="flex flex-1 flex-col gap-9 px-7 pb-10 pt-5">
+        <SysBlock title="Cores" icon={<IconColorStyles size={13} strokeWidth={1.7} />} actionLabel="New color" onAction={() => setModal({ kind: "color" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))" }}>
             {project.designSystem.colors.map((color) => (
               <div key={color.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
@@ -2230,7 +2795,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Fontes" actionLabel="Add font" onAction={() => setModal({ kind: "font" })}>
+        <SysBlock title="Fontes" icon={<IconText size={13} strokeWidth={1.7} />} actionLabel="Add font" onAction={() => setModal({ kind: "font" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
             {project.designSystem.fonts.map((font) => (
               <div key={font.id} className="group relative flex min-h-[168px] flex-col gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-[18px] pb-3.5 pt-[18px] transition-colors hover:border-[var(--border-strong)]">
@@ -2261,7 +2826,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Icons" actionLabel="Add icon" onAction={() => setModal({ kind: "icon" })}>
+        <SysBlock title="Icons" icon={<IconGrid size={12} strokeWidth={1.6} />} actionLabel="Add icon" onAction={() => setModal({ kind: "icon" })}>
           <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}>
             {project.designSystem.icons.map((icon) => (
               <div key={icon.id} className="group relative grid aspect-square gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]">
@@ -2287,7 +2852,7 @@ function SystemTab({ project }: { project: ProjectRow }) {
           </div>
         </SysBlock>
 
-        <SysBlock title="Images" actionLabel="Add image" onAction={() => setModal({ kind: "image" })}>
+        <SysBlock title="Images" icon={<IconImage size={13} strokeWidth={1.6} />} actionLabel="Add image" onAction={() => setModal({ kind: "image" })}>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
             {project.designSystem.images.map((image) => (
               <div key={image.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
@@ -2310,6 +2875,54 @@ function SystemTab({ project }: { project: ProjectRow }) {
                   <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
                     {image.format}
                   </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SysBlock>
+
+        <SysBlock title="Spacing" icon={<IconDiamond size={10} strokeWidth={2.4} />} actionLabel="Add token" onAction={() => {}}>
+          <div className="flex flex-col divide-y divide-[var(--border)]">
+            {([
+              { name: "xs", value: 4 },
+              { name: "sm", value: 8 },
+              { name: "md", value: 12 },
+              { name: "base", value: 16 },
+              { name: "lg", value: 20 },
+              { name: "xl", value: 24 },
+              { name: "2xl", value: 32 },
+              { name: "3xl", value: 40 },
+              { name: "4xl", value: 48 },
+              { name: "5xl", value: 64 },
+            ] as const).map((s) => (
+              <div key={s.name} className="flex items-center gap-5 py-2.5">
+                <span className="w-12 shrink-0 font-mono text-[12px] text-[var(--text-faint)]">{s.name}</span>
+                <div className="shrink-0 rounded-[2px] bg-[var(--text-muted)]" style={{ width: s.value, height: 10 }} />
+                <span className="font-mono text-[12px] text-[var(--text-muted)]">{s.value}px</span>
+              </div>
+            ))}
+          </div>
+        </SysBlock>
+
+        <SysBlock title="Radius" icon={<IconRectangle size={12} strokeWidth={1.6} />} actionLabel="Add token" onAction={() => {}}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+            {([
+              { name: "none", value: 0 },
+              { name: "sm", value: 4 },
+              { name: "md", value: 8 },
+              { name: "lg", value: 12 },
+              { name: "xl", value: 16 },
+              { name: "2xl", value: 20 },
+              { name: "full", value: 9999 },
+            ] as const).map((r) => (
+              <div key={r.name} className="flex flex-col gap-2.5 rounded-xl border border-[var(--border)] p-3 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface)]">
+                <div
+                  className="h-12 w-full border border-[var(--border-strong)] bg-[var(--surface-hover)]"
+                  style={{ borderRadius: Math.min(r.value, 24) }}
+                />
+                <div>
+                  <div className="text-[12px] font-medium text-[var(--text)]">{r.name}</div>
+                  <div className="font-mono text-[11px] text-[var(--text-faint)]">{r.value === 9999 ? "9999px" : `${r.value}px`}</div>
                 </div>
               </div>
             ))}
@@ -2355,21 +2968,26 @@ function upsertById<T extends { id: string }>(items: T[], nextItem: T): T[] {
 
 function SysBlock({
   title,
+  icon,
   actionLabel,
   children,
   onAction,
 }: {
   title: string;
+  icon?: ReactNode;
   actionLabel: string;
   children: ReactNode;
   onAction: () => void;
 }) {
   return (
     <div className="flex flex-col gap-3.5">
-      <div className="flex items-baseline justify-between border-b border-[var(--border)] pb-2.5">
-        <h2 className="m-0 text-[14px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
-          {title}
-        </h2>
+      <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+        <div className="flex items-center gap-2">
+          {icon ? <span className="text-[var(--text-faint)]">{icon}</span> : null}
+          <h2 className="m-0 text-[14px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
+            {title}
+          </h2>
+        </div>
         <button
           type="button"
           onClick={onAction}

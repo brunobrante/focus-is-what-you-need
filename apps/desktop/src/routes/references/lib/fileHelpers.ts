@@ -102,7 +102,7 @@ export function discardReferenceItem(item: ReferenceItem): void {
   void removeReferenceFile(item.id);
 }
 
-export { extFromName };
+export { extFromName, inferType };
 
 export function measureImage(src: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {

@@ -32,6 +32,8 @@ export function VideoFramePicker({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The frame shown large in the preview pane (independent of multi-selection).
+  const [previewFile, setPreviewFile] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +63,16 @@ export function VideoFramePicker({
     };
   }, [fps, video.ext, video.id]);
 
+  // Keep a valid focused frame: default to the first one, and recover if the
+  // current preview disappears after a re-extract.
+  useEffect(() => {
+    setPreviewFile((current) =>
+      current && frames.some((frame) => frame.file === current)
+        ? current
+        : frames[0]?.file ?? null,
+    );
+  }, [frames]);
+
   const toggle = useCallback((file: string) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -77,6 +89,7 @@ export function VideoFramePicker({
   const clearAll = useCallback(() => setSelected(new Set()), []);
 
   const selectedFrames = frames.filter((frame) => selected.has(frame.file));
+  const focusedFrame = frames.find((frame) => frame.file === previewFile) ?? null;
 
   return (
     <div
@@ -148,7 +161,7 @@ export function VideoFramePicker({
           </div>
         </div>
 
-        <div className="min-h-[280px] flex-1 overflow-y-auto p-[18px]">
+        <div className="flex min-h-[380px] flex-1 flex-col overflow-hidden p-[18px]">
           {loading ? (
             <div className="flex h-full min-h-[240px] items-center justify-center gap-2 text-[12.5px] text-[var(--text-muted)]">
               <Loader2 size={16} className="animate-spin" />
@@ -163,16 +176,31 @@ export function VideoFramePicker({
               No frames extracted.
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
-              {frames.map((frame) => (
-                <FrameTile
-                  key={frame.file}
-                  referenceId={video.id}
-                  frame={frame}
-                  selected={selected.has(frame.file)}
-                  onToggle={() => toggle(frame.file)}
-                />
-              ))}
+            <div className="flex h-full min-h-[320px] flex-col">
+              <div className="relative mb-3 flex flex-1 items-center justify-center overflow-hidden rounded-[10px] border border-[var(--border)] bg-[#0E0E0E]">
+                {focusedFrame ? (
+                  <FramePreview
+                    key={focusedFrame.file}
+                    referenceId={video.id}
+                    frame={focusedFrame}
+                    selected={selected.has(focusedFrame.file)}
+                    onToggle={() => toggle(focusedFrame.file)}
+                  />
+                ) : null}
+              </div>
+              <div className="flex shrink-0 gap-2 overflow-x-auto pb-2">
+                {frames.map((frame) => (
+                  <FrameTile
+                    key={frame.file}
+                    referenceId={video.id}
+                    frame={frame}
+                    selected={selected.has(frame.file)}
+                    focused={focusedFrame?.file === frame.file}
+                    onFocus={() => setPreviewFile(frame.file)}
+                    onToggle={() => toggle(frame.file)}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -206,7 +234,7 @@ export function VideoFramePicker({
   );
 }
 
-function FrameTile({
+function FramePreview({
   referenceId,
   frame,
   selected,
@@ -217,7 +245,66 @@ function FrameTile({
   selected: boolean;
   onToggle: () => void;
 }) {
-  const containerRef = useRef<HTMLButtonElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setUrl(null);
+    void loadReferenceFrame(referenceId, frame.file).then((blob) => {
+      if (cancelled || !blob) return;
+      objectUrl = URL.createObjectURL(blob);
+      setUrl(objectUrl);
+    });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [frame.file, referenceId]);
+
+  return (
+    <>
+      {url ? (
+        <img src={url} alt={`Frame ${frame.index}`} className="max-h-full max-w-full object-contain" />
+      ) : (
+        <Loader2 size={18} className="animate-spin text-[var(--text-muted)]" />
+      )}
+      <span className="pointer-events-none absolute left-3 top-3 rounded-[6px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.7)] px-2 py-1 text-[11px] tabular-nums text-white backdrop-blur">
+        {formatTimestamp(frame.timestamp_ms)}
+      </span>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={[
+          "absolute right-3 top-3 inline-flex cursor-pointer items-center gap-1.5 rounded-[8px] border px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors",
+          selected
+            ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
+            : "border-[var(--border-strong)] bg-[rgba(0,0,0,0.6)] text-white hover:border-[var(--text)]",
+        ].join(" ")}
+      >
+        <Check size={13} strokeWidth={2.4} />
+        {selected ? "Selected" : "Select frame"}
+      </button>
+    </>
+  );
+}
+
+function FrameTile({
+  referenceId,
+  frame,
+  selected,
+  focused,
+  onFocus,
+  onToggle,
+}: {
+  referenceId: string;
+  frame: ExtractedFrame;
+  selected: boolean;
+  focused: boolean;
+  onFocus: () => void;
+  onToggle: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -236,7 +323,7 @@ function FrameTile({
           setUrl(objectUrl);
         });
       },
-      { rootMargin: "200px" },
+      { root: node.parentElement, rootMargin: "300px" },
     );
     observer.observe(node);
 
@@ -248,32 +335,42 @@ function FrameTile({
   }, [frame.file, referenceId]);
 
   return (
-    <button
-      ref={containerRef}
-      type="button"
-      onClick={onToggle}
-      className={[
-        "group relative flex flex-col overflow-hidden rounded-[8px] border bg-[var(--bg)] text-left transition-colors duration-[120ms]",
-        selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border)] hover:border-[var(--border-strong)]",
-      ].join(" ")}
-    >
-      <div className="relative aspect-video w-full bg-[#0E0E0E]">
-        {url ? (
-          <img src={url} alt={`Frame ${frame.index}`} className="h-full w-full object-contain" />
-        ) : null}
-        <span
-          className={[
-            "absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full border text-[var(--accent-fg)] transition-colors",
-            selected ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--border-strong)] bg-[rgba(0,0,0,0.5)]",
-          ].join(" ")}
-        >
-          {selected ? <Check size={12} strokeWidth={2.6} /> : null}
+    <div ref={containerRef} className="relative w-[150px] shrink-0">
+      <button
+        type="button"
+        onClick={onFocus}
+        className={[
+          "block w-full overflow-hidden rounded-[8px] border bg-[var(--bg)] text-left transition-colors duration-[120ms]",
+          focused
+            ? "border-[var(--text)] ring-1 ring-[var(--text)]"
+            : selected
+              ? "border-[var(--accent)]"
+              : "border-[var(--border)] hover:border-[var(--border-strong)]",
+        ].join(" ")}
+      >
+        <div className="relative aspect-video w-full bg-[#0E0E0E]">
+          {url ? (
+            <img src={url} alt={`Frame ${frame.index}`} className="h-full w-full object-contain" />
+          ) : null}
+        </div>
+        <span className="block px-2 py-1 text-[10.5px] tabular-nums text-[var(--text-muted)]">
+          {formatTimestamp(frame.timestamp_ms)}
         </span>
-      </div>
-      <span className="px-2 py-1 text-[10.5px] tabular-nums text-[var(--text-muted)]">
-        {formatTimestamp(frame.timestamp_ms)}
-      </span>
-    </button>
+      </button>
+      <button
+        type="button"
+        aria-label={selected ? "Deselect frame" : "Select frame"}
+        onClick={onToggle}
+        className={[
+          "absolute right-1.5 top-1.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full border text-[var(--accent-fg)] transition-colors",
+          selected
+            ? "border-[var(--accent)] bg-[var(--accent)]"
+            : "border-[var(--border-strong)] bg-[rgba(0,0,0,0.5)] hover:border-[var(--text)]",
+        ].join(" ")}
+      >
+        {selected ? <Check size={12} strokeWidth={2.6} /> : null}
+      </button>
+    </div>
   );
 }
 

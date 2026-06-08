@@ -1,7 +1,7 @@
 import { ChevronsDownUp, ChevronsUpDown, RotateCcw, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import type { SidebarTab } from "../types";
-import { CROPS_OVERLAY_ALPHA, CROPS_OVERLAY_PRESETS } from "../types";
+import { CROPS_OVERLAY_PRESETS } from "../types";
 
 export function SidebarTabs({
   active,
@@ -72,7 +72,7 @@ export function SidebarComponentsHeader({
           </span>
         </div>
         <p className="m-0 mt-0.5 max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-[var(--text-faint)]">
-          Root: {rootName}
+          Stack: {rootName}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
@@ -99,8 +99,8 @@ export function SidebarComponentsHeader({
         {showReset ? (
           <button
             type="button"
-            aria-label="Resetar root"
-            title="Resetar root"
+            aria-label="Resetar stack"
+            title="Resetar stack"
             onClick={onReset}
             className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
@@ -143,11 +143,15 @@ export function SidebarSaveButton({
 export function SidebarConfigPanel({
   cropsOverlayColor,
   onChangeCropsOverlayColor,
+  cropsOverlayAlpha,
+  onChangeCropsOverlayAlpha,
 }: {
   cropsOverlayColor: string;
   onChangeCropsOverlayColor: (color: string) => void;
+  cropsOverlayAlpha: number;
+  onChangeCropsOverlayAlpha: (alpha: number) => void;
 }) {
-  const alphaPct = Math.round(CROPS_OVERLAY_ALPHA * 100);
+  const alphaPct = Math.round(cropsOverlayAlpha * 100);
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="flex flex-col gap-2">
@@ -156,8 +160,8 @@ export function SidebarConfigPanel({
             Crop overlay color
           </h4>
           <p className="m-0 mt-1 text-[10.5px] leading-[1.4] text-[var(--text-faint)]">
-            Base color applied over already cropped areas. Opacity {alphaPct}% and blend
-            (screen) are preserved — lighter colors appear more.
+            Base color applied over already cropped areas. The screen blend is
+            preserved — lighter colors appear more.
           </p>
         </div>
 
@@ -200,6 +204,30 @@ export function SidebarConfigPanel({
             );
           })}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h4 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">
+            Crop overlay opacity
+          </h4>
+          <span className="font-mono text-[11.5px] tabular-nums text-[var(--text-muted)]">
+            {alphaPct}%
+          </span>
+        </div>
+        <p className="m-0 text-[10.5px] leading-[1.4] text-[var(--text-faint)]">
+          How strongly already cropped areas are tinted.
+        </p>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={alphaPct}
+          aria-label="Crop overlay opacity"
+          onChange={(event) => onChangeCropsOverlayAlpha(Number(event.target.value) / 100)}
+          className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[var(--border-strong)] accent-[var(--text)]"
+        />
       </div>
     </div>
   );

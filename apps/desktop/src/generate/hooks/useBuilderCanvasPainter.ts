@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 
 import { hexToRgba, paintOverlayCanvas, paintCropsCanvas } from "../engine/drawing";
-import { CROPS_OVERLAY_ALPHA } from "../types";
 import type {
   ActiveSubject,
   CropBox,
@@ -29,6 +28,7 @@ export type BuilderCanvasPainterInput = {
   editingComponentId: string | null;
   showCropsOverlay: boolean;
   cropsOverlayColor: string;
+  cropsOverlayAlpha: number;
   /** Repaint counter bumped when async images settle; owned by the host. */
   imagePaintVersion: number;
   /** Signals the host that a source/component image finished loading. */
@@ -63,6 +63,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     editingComponentId,
     showCropsOverlay,
     cropsOverlayColor,
+    cropsOverlayAlpha,
     imagePaintVersion,
     bumpPaintVersion,
   } = input;
@@ -152,13 +153,14 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       editingComponentId,
       showCropsOverlay,
       viewMode,
-      overlayFill: hexToRgba(cropsOverlayColor, CROPS_OVERLAY_ALPHA),
+      overlayFill: hexToRgba(cropsOverlayColor, cropsOverlayAlpha),
       componentImageCache: componentImageCacheRef.current,
     });
   }, [
     activeSubject,
     components,
     cropsOverlayColor,
+    cropsOverlayAlpha,
     editingComponentId,
     imagePaintVersion,
     imgRef,

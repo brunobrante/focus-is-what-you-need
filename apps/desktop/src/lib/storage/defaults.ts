@@ -54,11 +54,31 @@ export function normalizeProjectRow(row: ProjectRow): ProjectRow {
 export function normalizeComponentRow(row: ComponentRow): ComponentRow {
   return {
     ...row,
+    workspaceId: row.workspaceId ?? null,
+    projectId: row.projectId ?? null,
     category: row.category ?? null,
     description: row.description ?? null,
     assignedScreenIds: Array.isArray(row.assignedScreenIds) ? row.assignedScreenIds : [],
     sourceNodeId: row.sourceNodeId ?? null,
   };
+}
+
+export type ComponentScope = "workspace" | "project" | "screen" | "nested";
+
+/**
+ * Derive a component's scope from its owner fields. Most specific wins, so a
+ * nested component (parentVariantId set) reports "nested" even if it also
+ * carries a projectId for convenience.
+ */
+export function componentScope(
+  row: Pick<ComponentRow, "workspaceId" | "projectId" | "screenId" | "parentVariantId">,
+): ComponentScope {
+  if (row.parentVariantId) return "nested";
+  if (row.screenId) return "screen";
+  if (row.projectId) return "project";
+  if (row.workspaceId) return "workspace";
+  // Orphan rows (no owner) are treated as project-global to stay backward safe.
+  return "project";
 }
 
 function legacyAttachment(row: ReferenceRow): ReferenceAttachment[] {
