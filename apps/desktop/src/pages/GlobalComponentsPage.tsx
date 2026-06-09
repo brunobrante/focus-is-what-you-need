@@ -6,7 +6,9 @@ import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { NewComponentModal, type NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
-import { IconPlus, IconSearch, IconGlobe, IconChevronDown } from "@/components/icons";
+import { IconPlus, IconSearch, IconGlobe, IconDiamond } from "@/components/icons";
+import { EmptyMessage } from "@/components/screen/EmptyMessage";
+import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
 import { useGlobalComponents, KIND_FILTERS } from "@/application/global-components/useGlobalComponents";
@@ -65,61 +67,65 @@ export function GlobalComponentsPage() {
           </div>
         )}
 
-        <div className="mb-6 flex items-center gap-2.5">
-          <div className="relative max-w-[280px] flex-1">
-            <IconSearch size={14} strokeWidth={1.7} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+        <div className="mb-6 flex items-center gap-2">
+          <label className="relative max-w-[280px] flex-1">
+            <IconSearch size={13} strokeWidth={1.7} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input
               type="search"
               placeholder="Search components..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] py-0 pl-8 pr-3 text-[13px] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
+              className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
             />
-          </div>
-
-          <div className="relative">
-            <select
+          </label>
+          <FilterButton activeCount={kindFilter !== "all" ? 1 : 0}>
+            <FilterSection
+              title="Kind"
+              options={KIND_FILTERS}
               value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
-              className="h-8 appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-3 pr-8 text-[13px] text-[var(--text)] outline-none transition-colors focus:border-[var(--text-muted)]"
-            >
-              {KIND_FILTERS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <IconChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          </div>
+              onChange={(v) => setKindFilter(v as typeof kindFilter)}
+            />
+          </FilterButton>
         </div>
 
-        <div
-          className="grid gap-5"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
-        >
-          {filtered.map((c) => (
-            <WorkspaceComponentCard
-              key={c.id}
-              component={c}
-              projects={workspaceProjects}
-              onRequestDelete={() => setPendingDelete(c)}
-              onFastEdit={() =>
-                fastEditRef.current?.open({
-                  mode: "component",
-                  component: c,
-                  variant: null,
-                  type: "desktop",
-                  canvasHref: `/canvas?variant=${encodeURIComponent(c.activeVariantId)}&type=desktop`,
-                })
-              }
-            />
-          ))}
-          {workspaceId && <AddComponentCard onClick={openCreateModal} />}
-        </div>
-        {filtered.length === 0 && components.length > 0 && (
-          <p className="mt-4 text-center text-[13px] text-[var(--text-muted)]">
-            Try a different search or filter
-          </p>
+        {components.length === 0 ? (
+          <EmptyMessage
+            icon={<IconDiamond size={17} strokeWidth={1.7} />}
+            title="No global components yet"
+            description="Global components are shared across all projects in this workspace."
+            onClick={workspaceId ? openCreateModal : undefined}
+          />
+        ) : (
+          <>
+            <div
+              className="grid gap-5"
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+            >
+              {filtered.map((c) => (
+                <WorkspaceComponentCard
+                  key={c.id}
+                  component={c}
+                  projects={workspaceProjects}
+                  onRequestDelete={() => setPendingDelete(c)}
+                  onFastEdit={() =>
+                    fastEditRef.current?.open({
+                      mode: "component",
+                      component: c,
+                      variant: null,
+                      type: "desktop",
+                      canvasHref: `/canvas?variant=${encodeURIComponent(c.activeVariantId)}&type=desktop`,
+                    })
+                  }
+                />
+              ))}
+              {workspaceId && <AddComponentCard onClick={openCreateModal} />}
+            </div>
+            {filtered.length === 0 && (
+              <p className="mt-4 text-center text-[13px] text-[var(--text-muted)]">
+                Try a different search or filter
+              </p>
+            )}
+          </>
         )}
       </main>
 

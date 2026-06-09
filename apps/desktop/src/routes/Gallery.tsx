@@ -69,7 +69,7 @@ import type {
   VariantRow,
 } from "@/lib/storage/schema";
 import { IconChevronDown, IconClose, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPencil, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
-import { ListFilter } from "lucide-react";
+import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 
 type Tab = "screens" | "components" | "references" | "system";
@@ -1602,34 +1602,13 @@ function ComponentSearchBar({
   onSectionFilterChange: (v: string) => void;
   sectionOptions: CmpChipOption[];
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const activeCount =
     (typeFilter !== "all" ? 1 : 0) +
     (screenFilter !== "all" ? 1 : 0) +
     (sectionFilter !== "all" ? 1 : 0);
 
   return (
-    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <label className="relative min-w-0 flex-1">
         <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
         <input
@@ -1640,77 +1619,13 @@ function ComponentSearchBar({
           className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
         />
       </label>
-
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-label="Filters"
-          className={[
-            "relative inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
-            open || activeCount > 0
-              ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
-              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
-          ].join(" ")}
-        >
-          <ListFilter size={12} />
-          Filters
-          {activeCount > 0 && (
-            <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.2)] text-[9px] font-bold leading-none">
-              {activeCount}
-            </span>
-          )}
-        </button>
-
-        {open && (
-          <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[240px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
-            <div className="flex flex-col gap-4">
-              <CmpFilterSection title="Type" options={typeOptions} value={typeFilter} onChange={onTypeFilterChange} />
-              <CmpFilterSection title="Screen" options={screenOptions} value={screenFilter} onChange={onScreenFilterChange} />
-              {sectionOptions.length > 2 && (
-                <CmpFilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />
-              )}
-            </div>
-          </div>
+      <FilterButton activeCount={activeCount}>
+        <FilterSection title="Type" options={typeOptions} value={typeFilter} onChange={onTypeFilterChange} />
+        <FilterSection title="Screen" options={screenOptions} value={screenFilter} onChange={onScreenFilterChange} />
+        {sectionOptions.length > 2 && (
+          <FilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />
         )}
-      </div>
-    </div>
-  );
-}
-
-function CmpFilterSection({
-  title,
-  options,
-  value,
-  onChange,
-}: {
-  title: string;
-  options: CmpChipOption[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">
-        {title}
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className={[
-              "h-[26px] cursor-pointer rounded-full border px-3 text-[11px] font-medium transition-colors duration-[100ms]",
-              value === opt.value
-                ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
-                : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
-            ].join(" ")}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      </FilterButton>
     </div>
   );
 }
@@ -1728,31 +1643,10 @@ function ScreenSearchBar({
   onSectionFilterChange: (v: string) => void;
   sectionOptions: CmpChipOption[];
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const isActive = sectionFilter !== "all";
+  const activeCount = sectionFilter !== "all" ? 1 : 0;
 
   return (
-    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <label className="relative min-w-0 flex-1">
         <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
         <input
@@ -1763,34 +1657,9 @@ function ScreenSearchBar({
           className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
         />
       </label>
-
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-label="Filters"
-          className={[
-            "relative inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
-            open || isActive
-              ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
-              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
-          ].join(" ")}
-        >
-          <ListFilter size={12} />
-          Filters
-          {isActive && (
-            <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.2)] text-[9px] font-bold leading-none">
-              1
-            </span>
-          )}
-        </button>
-
-        {open && (
-          <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[240px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
-            <CmpFilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />
-          </div>
-        )}
-      </div>
+      <FilterButton activeCount={activeCount}>
+        <FilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />
+      </FilterButton>
     </div>
   );
 }
@@ -1820,34 +1689,13 @@ function RefSearchBar({
   onTargetFilterChange: (v: string) => void;
   targetOptions: CmpChipOption[];
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const activeCount =
     (originFilter !== "all" ? 1 : 0) +
     (kindFilter !== "all" ? 1 : 0) +
     (targetFilter !== "all" ? 1 : 0);
 
   return (
-    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <label className="relative min-w-0 flex-1">
         <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
         <input
@@ -1858,57 +1706,30 @@ function RefSearchBar({
           className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
         />
       </label>
-
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-label="Filters"
-          className={[
-            "relative inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
-            open || activeCount > 0
-              ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
-              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
-          ].join(" ")}
-        >
-          <ListFilter size={12} />
-          Filters
-          {activeCount > 0 && (
-            <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.2)] text-[9px] font-bold leading-none">
-              {activeCount}
-            </span>
-          )}
-        </button>
-
-        {open && (
-          <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[260px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
-            <div className="flex flex-col gap-4">
-              <CmpFilterSection title="Source" options={originOptions} value={originFilter} onChange={onOriginFilterChange} />
-              <CmpFilterSection title="Kind" options={kindOptions} value={kindFilter} onChange={onKindFilterChange} />
-              <div className="flex flex-col gap-2">
-                <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Target</p>
-                <div className="flex max-h-[140px] flex-wrap gap-1.5 overflow-y-auto">
-                  {targetOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => onTargetFilterChange(opt.value)}
-                      className={[
-                        "h-[26px] cursor-pointer rounded-full border px-3 text-[11px] font-medium transition-colors duration-[100ms]",
-                        targetFilter === opt.value
-                          ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
-                          : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
-                      ].join(" ")}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+      <FilterButton activeCount={activeCount}>
+        <FilterSection title="Source" options={originOptions} value={originFilter} onChange={onOriginFilterChange} />
+        <FilterSection title="Kind" options={kindOptions} value={kindFilter} onChange={onKindFilterChange} />
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Target</p>
+          <div className="flex max-h-[140px] flex-wrap gap-1.5 overflow-y-auto">
+            {targetOptions.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onTargetFilterChange(opt.value)}
+                className={[
+                  "h-[26px] cursor-pointer rounded-full border px-3 text-[11px] font-medium transition-colors duration-[100ms]",
+                  targetFilter === opt.value
+                    ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+                    : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      </FilterButton>
     </div>
   );
 }
