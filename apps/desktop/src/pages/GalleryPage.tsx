@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useParams } from "react-router-dom";
 import {
   NewScreenModal,
@@ -6,7 +7,7 @@ import {
   NewComponentModal,
 } from "@/components/modals/NewComponentModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
-import { ProjectPreviewModal } from "@/components/modals/ProjectPreviewModal";
+import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
 import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
 import { useGallery } from "@/application/gallery/useGallery";
 
@@ -23,6 +24,8 @@ import {
 export function GalleryPage() {
   const { projectId: rawProjectId } = useParams<{ projectId: string }>();
   const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : "";
+
+  const previewRef = useRef<ProjectPreviewModalHandle>(null);
 
   const {
     project,
@@ -50,8 +53,6 @@ export function GalleryPage() {
     setPendingComponentDelete,
     projectSettingsOpen,
     setProjectSettingsOpen,
-    previewOpen,
-    setPreviewOpen,
     newScreenRef,
     newComponentRef,
     openNewScreen,
@@ -74,7 +75,7 @@ export function GalleryPage() {
         screensCount={screens.length}
         componentsCount={components.length}
         referencesCount={references.length}
-        onPreview={screens.length > 0 ? () => setPreviewOpen(true) : null}
+        onPreview={screens.length > 0 && project ? () => previewRef.current?.open(project, screens) : null}
         onSettings={() => setProjectSettingsOpen(true)}
       />
 
@@ -145,12 +146,7 @@ export function GalleryPage() {
         onClose={() => setProjectSettingsOpen(false)}
         onSaved={handleSettingsSaved}
       />
-      <ProjectPreviewModal
-        open={previewOpen}
-        project={project}
-        screens={screens}
-        onClose={() => setPreviewOpen(false)}
-      />
+      <ProjectPreviewModal ref={previewRef} />
       <ConfirmActionModal
         open={Boolean(pendingScreenDelete)}
         title="Delete screen"

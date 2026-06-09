@@ -3,8 +3,7 @@ import { useEffect } from "react";
 import { LandingPage } from "@/pages/LandingPage";
 import { NewProjectPage } from "@/pages/NewProjectPage";
 import { GalleryPage } from "@/pages/GalleryPage";
-import { ScreenDetailPage } from "@/pages/ScreenDetailPage";
-import { ComponentDetailPage } from "@/pages/ComponentDetailPage";
+import { DetailPage } from "@/pages/DetailPage";
 import { CanvasPage } from "@/canvas/Canvas";
 import { References } from "@/routes/References";
 import { SystemDesignPage } from "@/pages/SystemDesignPage";
@@ -31,8 +30,8 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/new" element={<NewProjectPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />
-      <Route path="/project/:projectId/screen/:screenId" element={<ScreenDetailPage />} />
-      <Route path="/project/:projectId/c/:componentId" element={<ComponentDetailPage />} />
+      <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
+      <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />
       <Route path="/canvas" element={<CanvasPage />} />
       <Route path="/references" element={<References />} />
       <Route path="/system-design" element={<SystemDesignPage />} />
