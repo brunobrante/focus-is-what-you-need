@@ -186,10 +186,6 @@ export function TopBar({
           <IconImage size={13} strokeWidth={1.7} className="opacity-85" />
           References
         </TopNavLink>
-        <TopNavLink to="/generate">
-          <Wand2 size={13} strokeWidth={1.7} className="opacity-85" />
-          Generate
-        </TopNavLink>
       </nav>
       {extra ? (
         <>
@@ -198,6 +194,20 @@ export function TopBar({
         </>
       ) : null}
       <span className="flex-1" />
+      <NavLink
+        to="/generate"
+        className={({ isActive }) =>
+          [
+            "inline-flex h-7 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
+            isActive
+              ? "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
+              : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+          ].join(" ")
+        }
+      >
+        <Wand2 size={12} strokeWidth={1.7} className="opacity-80" />
+        Builder
+      </NavLink>
       <button
         ref={triggerRef}
         type="button"

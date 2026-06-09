@@ -12,7 +12,7 @@ import {
   Upload,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { TopBar } from "@/components/layout/TopBar";
+import { GeneratorHeader } from "./ui/GeneratorHeader";
 
 import { componentSubtreeIds } from "./engine/componentTree";
 
@@ -140,21 +140,20 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   return (
     <TooltipProvider>
       <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
-        <TopBar
-          extra={
-            <div className="inline-flex min-w-0 items-center gap-2 text-[12.5px] font-medium">
-              <span className="text-[var(--text-muted)]">Generate</span>
-              <ChevronRight size={10} strokeWidth={1.8} />
+        <GeneratorHeader
+          breadcrumb={
+            <div className="inline-flex min-w-0 items-center gap-2 text-[12.5px]">
+              <ChevronRight size={10} strokeWidth={1.8} className="text-[var(--text-faint)]" />
               {groupContext ? (
                 <>
                   <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-muted)]">
                     {groupContext.name}
                   </span>
-                  <ChevronRight size={10} strokeWidth={1.8} />
+                  <ChevronRight size={10} strokeWidth={1.8} className="text-[var(--text-faint)]" />
                 </>
               ) : null}
-              <span className="max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text)]">
-                {item.name || "Ferramentas"}
+              <span className="max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap">
+                {item.name || "Untitled"}
               </span>
             </div>
           }

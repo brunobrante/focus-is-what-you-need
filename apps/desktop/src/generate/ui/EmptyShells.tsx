@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Image as ImageIcon, Upload } from "lucide-react";
-import { TopBar } from "@/components/layout/TopBar";
+import { GeneratorHeader } from "./GeneratorHeader";
 import { readFileAsDataUrl } from "@/lib/utils";
 import type { ToolReference } from "../engine/types";
 import { inferType, measureImage } from "../engine/image";
@@ -10,13 +10,7 @@ import type { ReactNode } from "react";
 function ToolsShellContainer({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
-      <TopBar
-        extra={
-          <div className="inline-flex min-w-0 items-center gap-2 text-[12.5px] font-medium">
-            <span className="text-[var(--text-muted)]">Generate</span>
-          </div>
-        }
-      />
+      <GeneratorHeader />
       <div
         className="flex flex-1 items-center justify-center"
         style={{

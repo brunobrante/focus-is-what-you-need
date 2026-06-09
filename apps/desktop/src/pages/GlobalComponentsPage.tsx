@@ -1,13 +1,14 @@
+import { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { NewComponentModal, type NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import { IconPlus, IconSearch, IconGlobe, IconChevronDown } from "@/components/icons";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
-import type { ComponentKind } from "@/lib/data/types";
 import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
-import { useGlobalComponents, KINDS, KIND_FILTERS } from "@/application/global-components/useGlobalComponents";
+import { useGlobalComponents, KIND_FILTERS } from "@/application/global-components/useGlobalComponents";
 
 export function GlobalComponentsPage() {
   const {
@@ -18,19 +19,18 @@ export function GlobalComponentsPage() {
     setQuery,
     kindFilter,
     setKindFilter,
-    creating,
-    setCreating,
-    newName,
-    setNewName,
-    newKind,
-    setNewKind,
-    submitting,
     pendingDelete,
     setPendingDelete,
     filtered,
-    createWorkspaceComponent,
     handleConfirmDelete,
   } = useGlobalComponents();
+
+  const newComponentModalRef = useRef<NewComponentModalHandle>(null);
+
+  const openCreateModal = () => {
+    if (!workspaceId) return;
+    newComponentModalRef.current?.open({ kind: "workspace", workspaceId });
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
@@ -48,7 +48,7 @@ export function GlobalComponentsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setCreating((v) => !v)}
+            onClick={openCreateModal}
             disabled={!workspaceId}
             className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -60,44 +60,6 @@ export function GlobalComponentsPage() {
         {!workspaceId && (
           <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[13px] text-[var(--text-muted)]">
             Create a workspace from the top-left menu to add global components.
-          </div>
-        )}
-
-        {creating && workspaceId && (
-          <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-            <input
-              type="text"
-              autoFocus
-              value={newName}
-              placeholder="Component name…"
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void createWorkspaceComponent();
-              }}
-              className="h-9 w-[240px] rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
-            />
-            <select
-              value={newKind}
-              onChange={(e) => setNewKind(e.target.value as ComponentKind)}
-              className="h-9 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[13px] text-[var(--text)] outline-none"
-            >
-              {KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => void createWorkspaceComponent()}
-              disabled={!newName.trim() || submitting}
-              className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? "Creating…" : "Create"}
-            </button>
-            <button type="button" onClick={() => setCreating(false)} className="btn btn-ghost">
-              Cancel
-            </button>
           </div>
         )}
 
@@ -141,7 +103,7 @@ export function GlobalComponentsPage() {
               onRequestDelete={() => setPendingDelete(c)}
             />
           ))}
-          {workspaceId && <AddComponentCard onClick={() => setCreating((v) => !v)} />}
+          {workspaceId && <AddComponentCard onClick={openCreateModal} />}
         </div>
         {filtered.length === 0 && components.length > 0 && (
           <p className="mt-4 text-center text-[13px] text-[var(--text-muted)]">
@@ -161,6 +123,8 @@ export function GlobalComponentsPage() {
         onClose={() => setPendingDelete(null)}
         onConfirm={handleConfirmDelete}
       />
+
+      <NewComponentModal ref={newComponentModalRef} />
 
       <PageFooter />
     </div>

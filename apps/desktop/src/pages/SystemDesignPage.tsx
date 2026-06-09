@@ -15,6 +15,7 @@ import {
 import { useState, useEffect } from "react";
 import { Modal, ModalHeader, ModalBody } from "@/components/modals/Modal";
 import { TopBar } from "@/components/layout/TopBar";
+import { PageFooter } from "@/components/layout/PageFooter";
 import {
   IconColorStyles,
   IconSearch,
@@ -194,7 +195,7 @@ export function SystemDesignPage() {
 
         <TabBar active={tab} onChange={setTab} />
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex flex-1 flex-col overflow-y-auto">
           <div className="mx-auto w-full max-w-[1100px] px-7 py-10">
             {tab === "colors" && (
               <ColorsTab
@@ -242,6 +243,7 @@ export function SystemDesignPage() {
             )}
             {tab === "assets" && <AssetsTab />}
           </div>
+          <PageFooter />
         </main>
       </div>
     </div>

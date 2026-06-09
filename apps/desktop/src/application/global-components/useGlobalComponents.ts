@@ -1,10 +1,7 @@
 import { useMemo, useState } from "react";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { useWorkspaceComponents, useWorkspaces, useProjects } from "@/lib/storage/hooks";
-import {
-  createComponent,
-  deleteComponentTree,
-} from "@/lib/storage/repos/components.repo";
+import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
 import type { ComponentKind } from "@/lib/data/types";
 import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
 
@@ -30,17 +27,9 @@ export interface GlobalComponentsState {
   setQuery: (value: string) => void;
   kindFilter: ComponentKind | "all";
   setKindFilter: (value: ComponentKind | "all") => void;
-  creating: boolean;
-  setCreating: (value: boolean | ((prev: boolean) => boolean)) => void;
-  newName: string;
-  setNewName: (value: string) => void;
-  newKind: ComponentKind;
-  setNewKind: (value: ComponentKind) => void;
-  submitting: boolean;
   pendingDelete: ComponentRow | null;
   setPendingDelete: (value: ComponentRow | null) => void;
   filtered: ComponentRow[];
-  createWorkspaceComponent: () => Promise<void>;
   handleConfirmDelete: () => Promise<void>;
 }
 
@@ -61,10 +50,6 @@ export function useGlobalComponents(): GlobalComponentsState {
 
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<ComponentKind | "all">("all");
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newKind, setNewKind] = useState<ComponentKind>("Custom");
-  const [submitting, setSubmitting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ComponentRow | null>(null);
 
   const filtered = useMemo(() => {
@@ -75,24 +60,6 @@ export function useGlobalComponents(): GlobalComponentsState {
       return matchKind && matchQ;
     });
   }, [components, kindFilter, query]);
-
-  const createWorkspaceComponent = async () => {
-    const name = newName.trim();
-    if (!workspaceId || !name || submitting) return;
-    setSubmitting(true);
-    try {
-      await createComponent({
-        parent: { kind: "workspace", workspaceId },
-        name,
-        kind: newKind,
-      });
-      setNewName("");
-      setNewKind("Custom");
-      setCreating(false);
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleConfirmDelete = async () => {
     if (!pendingDelete) return;
@@ -108,17 +75,9 @@ export function useGlobalComponents(): GlobalComponentsState {
     setQuery,
     kindFilter,
     setKindFilter,
-    creating,
-    setCreating,
-    newName,
-    setNewName,
-    newKind,
-    setNewKind,
-    submitting,
     pendingDelete,
     setPendingDelete,
     filtered,
-    createWorkspaceComponent,
     handleConfirmDelete,
   };
 }
