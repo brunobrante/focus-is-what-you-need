@@ -5,7 +5,7 @@ import type {
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
 import type { ReferenceItem, RefType } from "@/lib/references/referenceItemTypes";
 
-export type { MediaKind, RefType, ReferenceItem, ArchiveStatus } from "@/lib/references/referenceItemTypes";
+export type { MediaKind, RefType, ReferenceItem } from "@/lib/references/referenceItemTypes";
 
 export type StagedItem = ReferenceItem & { desc: string };
 export type DuplicateDecision = "existing" | "both";

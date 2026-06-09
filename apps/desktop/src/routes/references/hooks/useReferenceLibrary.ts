@@ -8,7 +8,6 @@ import {
   loadReferenceFile,
   removeReferenceFile,
   extFromName,
-  syncReferenceGroupArchive,
   extractVideoFrameFull,
   deleteReferenceFrames,
   type ExtractedFrame,
@@ -19,7 +18,6 @@ import {
   type ReferenceGroup,
 } from "@/lib/references/groupTypes";
 import type {
-  ArchiveStatus,
   FilterKind,
   FilterSort,
   FilterType,
@@ -32,7 +30,6 @@ import {
   addReferencesToGroup,
   removeReferenceFromGroups,
   moveReferenceToGroup,
-  updateGroupArchive,
 } from "../lib/groupHelpers";
 import {
   releaseReferenceItemUrls,
@@ -84,7 +81,6 @@ export function useReferenceLibrary() {
   const [filterSort, setFilterSort] = useState<FilterSort>("recent");
   const [selectedSubject, setSelectedSubject] = useState<SelectedSubject>(null);
   const [lightboxItem, setLightboxItem] = useState<ReferenceItem | null>(null);
-  const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus>(null);
   const [stackThumbnailUrls, setStackThumbnailUrls] = useState<Record<string, string>>({});
   const [frameVideo, setFrameVideo] = useState<FramePickerVideo | null>(null);
   const [frameBusy, setFrameBusy] = useState(false);
@@ -470,30 +466,6 @@ export function useReferenceLibrary() {
     );
   }, []);
 
-  const syncGroupArchive = useCallback(
-    async (group: ReferenceGroup) => {
-      const referenceIds = group.referenceIds.filter((id) => library.some((item) => item.id === id));
-      if (referenceIds.length === 0) {
-        setArchiveStatus({ groupId: group.id, label: "No references", saving: false });
-        return;
-      }
-      setArchiveStatus({ groupId: group.id, label: "Saving .figx...", saving: true });
-      try {
-        const archive = await syncReferenceGroupArchive({
-          id: group.id,
-          name: group.name,
-          referenceIds,
-        });
-        setGroups((prev) => updateGroupArchive(prev, group.id, archive));
-        setArchiveStatus({ groupId: group.id, label: ".figx saved", saving: false });
-      } catch (error) {
-        console.error("[references] syncReferenceGroupArchive failed:", error);
-        setArchiveStatus({ groupId: group.id, label: "Failed to save", saving: false });
-      }
-    },
-    [library],
-  );
-
   return {
     library,
     groups,
@@ -511,7 +483,6 @@ export function useReferenceLibrary() {
     setSelectedSubject,
     lightboxItem,
     setLightboxItem,
-    archiveStatus,
     stackThumbnailUrls,
     frameVideo,
     setFrameVideo,
@@ -534,6 +505,5 @@ export function useReferenceLibrary() {
     createGroup,
     updateGroup,
     confirmDeleteGroup,
-    syncGroupArchive,
   };
 }

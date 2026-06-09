@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { Folder, Play } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
-import type { ArchiveStatus, ReferenceItem } from "@/lib/references/referenceItemTypes";
+import type { ReferenceItem } from "@/lib/references/referenceItemTypes";
 
-export type { ReferenceItem, ArchiveStatus };
+export type { ReferenceItem };
 
 function referenceCardThumbnailUrl(item: ReferenceItem, stackThumbnailUrl?: string | null): string {
   if (item.stack?.enabled && stackThumbnailUrl) return stackThumbnailUrl;
@@ -15,7 +15,6 @@ export function ReferenceGrid({
   references,
   allReferences,
   groupNameById,
-  archiveStatus,
   stackThumbnailUrls,
   selectedReferenceId,
   selectedGroupId,
@@ -27,7 +26,6 @@ export function ReferenceGrid({
   references: ReferenceItem[];
   allReferences: ReferenceItem[];
   groupNameById: Map<string, string>;
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   selectedReferenceId: string | null;
   selectedGroupId: string | null;
@@ -63,8 +61,7 @@ export function ReferenceGrid({
             references={group.referenceIds
               .map((id) => referencesById.get(id))
               .filter((item): item is ReferenceItem => item != null)}
-            archiveStatus={archiveStatus?.groupId === group.id ? archiveStatus : null}
-            stackThumbnailUrls={stackThumbnailUrls}
+              stackThumbnailUrls={stackThumbnailUrls}
             selected={group.id === selectedGroupId}
             onSelect={() => onSelectGroup(group.id)}
           />
@@ -95,14 +92,12 @@ export function ReferenceGrid({
 function GroupCard({
   group,
   references,
-  archiveStatus,
   stackThumbnailUrls,
   selected,
   onSelect,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   selected: boolean;
   onSelect: () => void;
@@ -155,11 +150,6 @@ function GroupCard({
         {isGroup ? (
           <span className="pointer-events-none absolute left-2 top-2 rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
             Group
-          </span>
-        ) : null}
-        {archiveStatus ? (
-          <span className="pointer-events-none absolute right-2 top-2 max-w-[96px] truncate rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] text-white backdrop-blur">
-            {archiveStatus.label}
           </span>
         ) : null}
         <div

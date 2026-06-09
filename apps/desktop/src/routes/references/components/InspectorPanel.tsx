@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Archive, Edit3, ExternalLink, Film, Folder, Layers, Trash2, Upload, X } from "lucide-react";
+import { Edit3, ExternalLink, Film, Folder, Layers, Trash2, Upload, X } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
-import type { ArchiveStatus, ReferenceItem } from "../types";
+import type { ReferenceItem } from "../types";
 import { referenceCardThumbnailUrl } from "../lib/fileHelpers";
 import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
 import { DetailList, Section, TagEditor } from "./ui";
@@ -15,7 +15,6 @@ export function InspectorPanel({
   groupReferences,
   groups,
   looseReferences,
-  archiveStatus,
   stackThumbnailUrls,
   onClose,
   onOpen,
@@ -28,14 +27,12 @@ export function InspectorPanel({
   onUpload,
   onEditGroup,
   onDeleteGroup,
-  onSyncArchive,
 }: {
   item: ReferenceItem | null;
   selectedGroup: ReferenceGroup | null;
   groupReferences: ReferenceItem[];
   groups: ReferenceGroup[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
   onOpen: (item: ReferenceItem) => void;
@@ -48,7 +45,6 @@ export function InspectorPanel({
   onUpload: () => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
-  onSyncArchive: () => void;
 }) {
   // item's parent group (when a reference with a groupId is selected)
   const itemGroup = item?.groupId ? groups.find((g) => g.id === item.groupId) ?? null : null;
@@ -129,13 +125,11 @@ export function InspectorPanel({
               group={activeGroup}
               references={groupReferences}
               looseReferences={looseReferences}
-              archiveStatus={archiveStatus}
               stackThumbnailUrls={stackThumbnailUrls}
               onOpen={onOpen}
               onUpload={onUpload}
               onEditGroup={onEditGroup}
               onDeleteGroup={onDeleteGroup}
-              onSyncArchive={onSyncArchive}
               onGroupChange={onGroupChange}
             />
           ) : null}
@@ -319,25 +313,21 @@ function GroupTab({
   group,
   references,
   looseReferences,
-  archiveStatus,
   stackThumbnailUrls,
   onOpen,
   onUpload,
   onEditGroup,
   onDeleteGroup,
-  onSyncArchive,
   onGroupChange,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   onOpen: (item: ReferenceItem) => void;
   onUpload: () => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
-  onSyncArchive: () => void;
   onGroupChange: (id: string, groupId: string | null) => void;
 }) {
   const [addReferenceId, setAddReferenceId] = useState("");
@@ -436,12 +426,6 @@ function GroupTab({
         )}
       </Section>
 
-      {archiveStatus ? (
-        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
-          {archiveStatus.label}
-        </div>
-      ) : null}
-
       {/* actions */}
       <div className="grid grid-cols-2 gap-1.5 border-t border-[var(--border)] pt-3">
         {builderHref ? (
@@ -450,12 +434,6 @@ function GroupTab({
           <PanelAction icon={<Layers size={12} />} label="Builder" disabled onClick={() => undefined} />
         )}
         <PanelAction icon={<Upload size={12} />} label="Add" onClick={onUpload} />
-        <PanelAction
-          icon={<Archive size={12} />}
-          label=".figx"
-          disabled={archiveStatus?.saving || references.length === 0}
-          onClick={onSyncArchive}
-        />
         <PanelAction icon={<Edit3 size={12} />} label="Edit" onClick={onEditGroup} />
         <PanelAction icon={<Trash2 size={12} />} label="Delete" danger onClick={onDeleteGroup} />
       </div>

@@ -144,7 +144,6 @@ export function References() {
                 references={lib.visible}
                 allReferences={lib.library}
                 groupNameById={lib.groupNameById}
-                archiveStatus={lib.archiveStatus}
                 stackThumbnailUrls={lib.stackThumbnailUrls}
                 selectedReferenceId={
                   lib.selectedSubject?.kind === "reference" ? lib.selectedSubject.id : null
@@ -182,7 +181,6 @@ export function References() {
         subject={modalSubject}
         groups={lib.groups}
         looseReferences={lib.looseGroupCandidates}
-        archiveStatus={lib.archiveStatus}
         stackThumbnailUrls={lib.stackThumbnailUrls}
         onClose={() => lib.setSelectedSubject(null)}
         onDelete={(id) => lib.removeItem(id)}
@@ -225,7 +223,6 @@ export function References() {
           const group = lib.selectedGroup;
           deleteGroupRef.current?.open(group, () => lib.confirmDeleteGroup(group.id));
         }}
-        onSyncArchive={() => void lib.syncGroupArchive(lib.selectedGroup!)}
       />
 
       <ReferenceGroupModal ref={groupModalRef} />

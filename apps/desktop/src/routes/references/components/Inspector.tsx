@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Archive, Edit3, ExternalLink, Film, Folder, Layers, Trash2, Upload, X } from "lucide-react";
+import { Edit3, ExternalLink, Film, Folder, Layers, Trash2, Upload, X } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
-import type { ArchiveStatus, ReferenceItem } from "../types";
+import type { ReferenceItem } from "../types";
 import { referenceCardThumbnailUrl } from "../lib/fileHelpers";
 import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
 import { DetailList, Section, SmallButton, TagEditor } from "./ui";
@@ -223,27 +223,23 @@ export function GroupInspector({
   group,
   references,
   looseReferences,
-  archiveStatus,
   stackThumbnailUrls,
   onClose,
   onOpenLightbox,
   onUpload,
   onEdit,
   onDelete,
-  onSyncArchive,
   onGroupChange,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
   onOpenLightbox: (item: ReferenceItem) => void;
   onUpload: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onSyncArchive: () => void;
   onGroupChange: (id: string, groupId: string | null) => void;
 }) {
   const [addReferenceId, setAddReferenceId] = useState("");
@@ -363,11 +359,6 @@ export function GroupInspector({
           )}
         </Section>
 
-        {archiveStatus ? (
-          <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
-            {archiveStatus.label}
-          </div>
-        ) : null}
       </div>
 
       <div className="grid shrink-0 grid-cols-2 gap-1.5 border-t border-[var(--border)] px-3 py-2.5">
@@ -377,12 +368,6 @@ export function GroupInspector({
           <InspectorAction icon={<Layers size={12} />} label="Builder" disabled onClick={() => undefined} />
         )}
         <InspectorAction icon={<Upload size={12} />} label="Add" onClick={onUpload} />
-        <InspectorAction
-          icon={<Archive size={12} />}
-          label=".figx"
-          disabled={archiveStatus?.saving || references.length === 0}
-          onClick={onSyncArchive}
-        />
         <InspectorAction icon={<Edit3 size={12} />} label="Edit" onClick={onEdit} />
         <InspectorAction icon={<Trash2 size={12} />} label="Delete" danger onClick={onDelete} />
       </div>

@@ -1,9 +1,3 @@
-export type ReferenceGroupArchive = {
-  file: string;
-  path: string;
-  updatedAt: string;
-};
-
 export type ReferenceGroup = {
   id: string;
   name: string;
@@ -12,13 +6,6 @@ export type ReferenceGroup = {
   coverReferenceId?: string | null;
   createdAt: string;
   updatedAt: string;
-  archive?: ReferenceGroupArchive;
-};
-
-export type ReferenceGroupArchiveResult = {
-  file: string;
-  path: string;
-  updated_at: number;
 };
 
 export function normalizeReferenceGroups(value: unknown): ReferenceGroup[] {
@@ -32,7 +19,6 @@ export function normalizeReferenceGroups(value: unknown): ReferenceGroup[] {
         : [];
       const createdAt = String(item.createdAt || new Date(0).toISOString());
       const updatedAt = String(item.updatedAt || createdAt);
-      const archive = normalizeReferenceGroupArchive(item.archive);
       return {
         id: String(item.id || ""),
         name: String(item.name || "Untitled group"),
@@ -41,7 +27,6 @@ export function normalizeReferenceGroups(value: unknown): ReferenceGroup[] {
         coverReferenceId: item.coverReferenceId ? String(item.coverReferenceId) : null,
         createdAt,
         updatedAt,
-        ...(archive ? { archive } : {}),
       };
     })
     .filter((group) => group.id);
@@ -54,25 +39,3 @@ export function newReferenceGroupId(): string {
   return `g-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export function referenceGroupArchiveFromResult(
-  result: ReferenceGroupArchiveResult,
-): ReferenceGroupArchive {
-  return {
-    file: result.file,
-    path: result.path,
-    updatedAt: new Date(result.updated_at).toISOString(),
-  };
-}
-
-function normalizeReferenceGroupArchive(
-  value: ReferenceGroup["archive"] | unknown,
-): ReferenceGroupArchive | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const input = value as Partial<ReferenceGroupArchive>;
-  if (!input.file || !input.path || !input.updatedAt) return undefined;
-  return {
-    file: String(input.file),
-    path: String(input.path),
-    updatedAt: String(input.updatedAt),
-  };
-}

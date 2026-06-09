@@ -1,4 +1,4 @@
-import type { ReferenceGroup, ReferenceGroupArchive } from "@/lib/references/groupTypes";
+import type { ReferenceGroup } from "@/lib/references/groupTypes";
 import type { ReferenceItem } from "../types";
 
 export function applyGroupsToLibrary(
@@ -94,16 +94,6 @@ export function moveReferenceToGroup(
   });
 }
 
-export function updateGroupArchive(
-  groups: ReferenceGroup[],
-  groupId: string,
-  archive: ReferenceGroupArchive,
-): ReferenceGroup[] {
-  const updatedAt = new Date().toISOString();
-  return groups.map((group) =>
-    group.id === groupId ? { ...group, archive, updatedAt } : group,
-  );
-}
 
 export function withGroupReferences(
   group: ReferenceGroup,

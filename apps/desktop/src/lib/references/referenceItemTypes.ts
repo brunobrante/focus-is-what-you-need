@@ -36,8 +36,3 @@ export type ReferenceItem = {
   url: string;
 };
 
-export type ArchiveStatus = {
-  groupId: string;
-  label: string;
-  saving: boolean;
-} | null;

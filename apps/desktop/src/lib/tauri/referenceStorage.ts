@@ -7,10 +7,7 @@ import {
 } from "@/lib/references/stackTypes";
 import {
   normalizeReferenceGroups,
-  referenceGroupArchiveFromResult,
   type ReferenceGroup,
-  type ReferenceGroupArchive,
-  type ReferenceGroupArchiveResult,
 } from "@/lib/references/groupTypes";
 
 // Matches StoredMeta from References.tsx (Omit<ReferenceItem, "url">),
@@ -249,21 +246,6 @@ export async function readReferenceGroups(): Promise<ReferenceGroup[]> {
 
 export async function writeReferenceGroups(groups: ReferenceGroup[]): Promise<void> {
   await invoke("write_reference_groups", { content: JSON.stringify(groups, null, 2) });
-}
-
-export async function syncReferenceGroupArchive(input: {
-  id: string;
-  name: string;
-  referenceIds: string[];
-}): Promise<ReferenceGroupArchive> {
-  const result = await invoke<ReferenceGroupArchiveResult>("sync_reference_group_archive", {
-    group: {
-      group_id: input.id,
-      group_name: input.name,
-      reference_ids: input.referenceIds,
-    },
-  });
-  return referenceGroupArchiveFromResult(result);
 }
 
 export async function refreshReferenceStackSummary(meta: StoredRefMeta): Promise<StoredRefMeta> {

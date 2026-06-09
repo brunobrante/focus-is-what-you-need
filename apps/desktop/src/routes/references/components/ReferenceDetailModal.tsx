@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  Archive, ChevronLeft, Edit3, ExternalLink, Film, Folder,
+  ChevronLeft, Edit3, ExternalLink, Film, Folder,
   Layers, Trash2, Upload, X, Play,
 } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
@@ -11,7 +11,7 @@ import {
   loadReferenceStackFile,
 } from "@/lib/tauri/referenceStorage";
 import type {
-  ArchiveStatus, LightboxTab, ReferenceItem,
+  LightboxTab, ReferenceItem,
   StackPreviewState, StackTreeNode,
 } from "../types";
 import { referenceCardThumbnailUrl } from "../lib/fileHelpers";
@@ -29,7 +29,6 @@ export function ReferenceDetailModal({
   subject,
   groups,
   looseReferences,
-  archiveStatus,
   stackThumbnailUrls,
   onClose,
   onDelete,
@@ -41,12 +40,10 @@ export function ReferenceDetailModal({
   onUpload,
   onEditGroup,
   onDeleteGroup,
-  onSyncArchive,
 }: {
   subject: ReferenceDetailSubject;
   groups: ReferenceGroup[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
   onDelete: (id: string) => void;
@@ -58,7 +55,6 @@ export function ReferenceDetailModal({
   onUpload: () => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
-  onSyncArchive: () => void;
 }) {
   useEffect(() => {
     if (!subject) return;
@@ -81,7 +77,6 @@ export function ReferenceDetailModal({
         <ItemModal
           item={subject.item}
           groups={groups}
-          archiveStatus={archiveStatus}
           stackThumbnailUrls={stackThumbnailUrls}
           onClose={onClose}
           onDelete={onDelete}
@@ -96,13 +91,11 @@ export function ReferenceDetailModal({
           group={subject.group}
           references={subject.references}
           looseReferences={looseReferences}
-          archiveStatus={archiveStatus}
           stackThumbnailUrls={stackThumbnailUrls}
           onClose={onClose}
           onUpload={onUpload}
           onEditGroup={onEditGroup}
           onDeleteGroup={onDeleteGroup}
-          onSyncArchive={onSyncArchive}
           onGroupChange={onGroupChange}
         />
       )}
@@ -115,7 +108,6 @@ export function ReferenceDetailModal({
 function ItemModal({
   item,
   groups,
-  archiveStatus,
   stackThumbnailUrls,
   onClose,
   onDelete,
@@ -127,7 +119,6 @@ function ItemModal({
 }: {
   item: ReferenceItem;
   groups: ReferenceGroup[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
   onDelete: (id: string) => void;
@@ -251,7 +242,6 @@ function ItemModal({
         groupReferences={[]}
         groups={groups}
         looseReferences={[]}
-        archiveStatus={archiveStatus}
         stackThumbnailUrls={stackThumbnailUrls}
         builderHref={builderHref}
         onDelete={() => { onDelete(item.id); onClose(); }}
@@ -263,7 +253,6 @@ function ItemModal({
         onUpload={onUpload}
         onEditGroup={onEditGroup}
         onDeleteGroup={onDeleteGroup}
-        onSyncArchive={onSyncArchive}
       />
     </ModalShell>
   );
@@ -275,25 +264,21 @@ function GroupModal({
   group,
   references,
   looseReferences,
-  archiveStatus,
   stackThumbnailUrls,
   onClose,
   onUpload,
   onEditGroup,
   onDeleteGroup,
-  onSyncArchive,
   onGroupChange,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
   onUpload: () => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
-  onSyncArchive: () => void;
   onGroupChange: (id: string, groupId: string | null) => void;
 }) {
   type GroupTab = "screens" | "stacks";
@@ -400,7 +385,6 @@ function GroupModal({
         groupReferences={references}
         groups={[]}
         looseReferences={looseReferences}
-        archiveStatus={archiveStatus}
         stackThumbnailUrls={stackThumbnailUrls}
         builderHref={builderHref}
         onDelete={() => {}}
@@ -412,7 +396,6 @@ function GroupModal({
         onUpload={onUpload}
         onEditGroup={onEditGroup}
         onDeleteGroup={() => { onDeleteGroup(); onClose(); }}
-        onSyncArchive={onSyncArchive}
       />
     </ModalShell>
   );
@@ -537,12 +520,11 @@ function ItemDetails({
 // ─── group details (right panel, group tab) ───────────────────────────────────
 
 function GroupDetails({
-  group, references, looseReferences, archiveStatus, onGroupChange,
+  group, references, looseReferences, onGroupChange,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   onGroupChange: (id: string, groupId: string | null) => void;
 }) {
   const [addReferenceId, setAddReferenceId] = useState("");
@@ -590,11 +572,6 @@ function GroupDetails({
         </select>
       </Section>
 
-      {archiveStatus ? (
-        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
-          {archiveStatus.label}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -654,17 +631,16 @@ function ModalShell({
 }
 
 function DetailPanel({
-  item, group, groupReferences, groups, looseReferences, archiveStatus,
+  item, group, groupReferences, groups, looseReferences,
   stackThumbnailUrls, builderHref,
   onDelete, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
-  onExtractFrames, onUpload, onEditGroup, onDeleteGroup, onSyncArchive,
+  onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
 }: {
   item: ReferenceItem | null;
   group: ReferenceGroup | null;
   groupReferences: ReferenceItem[];
   groups: ReferenceGroup[];
   looseReferences: ReferenceItem[];
-  archiveStatus: ArchiveStatus;
   stackThumbnailUrls: Record<string, string>;
   builderHref: string | null;
   onDelete: () => void;
@@ -676,7 +652,6 @@ function DetailPanel({
   onUpload: () => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
-  onSyncArchive: () => void;
 }) {
   type SideTab = "inspector" | "group";
   const defaultTab: SideTab = !item && group ? "group" : "inspector";
@@ -719,7 +694,6 @@ function DetailPanel({
             group={group}
             references={groupReferences}
             looseReferences={looseReferences}
-            archiveStatus={archiveStatus}
             onGroupChange={onGroupChange}
           />
         ) : null}
@@ -745,12 +719,6 @@ function DetailPanel({
               <Action icon={<Layers size={12} />} label="Builder" disabled onClick={() => {}} />
             )}
             <Action icon={<Upload size={12} />} label="Add" onClick={onUpload} />
-            <Action
-              icon={<Archive size={12} />}
-              label=".figx"
-              disabled={archiveStatus?.saving || groupReferences.length === 0}
-              onClick={onSyncArchive}
-            />
             <Action icon={<Edit3 size={12} />} label="Edit" onClick={onEditGroup} />
             <Action icon={<Trash2 size={12} />} label="Delete" danger onClick={onDeleteGroup} />
           </>
