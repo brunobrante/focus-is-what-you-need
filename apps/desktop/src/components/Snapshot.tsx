@@ -199,24 +199,11 @@ function EmptyPreviewPlaceholder({ kind }: { kind: SnapshotProps["kind"] }) {
 
 function EmptyCardPlaceholder({
   type,
-  kind,
 }: {
   type: ProjectType;
   kind: SnapshotProps["kind"];
 }) {
-  return (
-    <div
-      aria-label={kind === "screen" ? "Empty screen" : "Empty component"}
-      data-empty-card={`${type}-${kind}`}
-      className="grid h-full w-full place-items-center overflow-hidden rounded-md text-[var(--text-faint)]"
-      style={{
-        background:
-          "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.045) 1px, transparent 0) 0 0/14px 14px, #111312",
-      }}
-    >
-      {type === "mobile" ? <PhoneEmpty /> : type === "tablet" ? <TabletEmpty /> : <DesktopEmpty />}
-    </div>
-  );
+  return type === "mobile" ? <PhoneEmpty /> : type === "tablet" ? <TabletEmpty /> : <DesktopEmpty />;
 }
 
 function DesktopEmpty() {

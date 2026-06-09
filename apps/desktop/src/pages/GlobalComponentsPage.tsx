@@ -1,16 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/layout/TopBar";
+import { PageFooter } from "@/components/layout/PageFooter";
 import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
-import { IconPlus, IconSearch, IconLayers, IconTrash } from "@/components/icons";
+import { IconPlus, IconSearch, IconGlobe, IconChevronDown } from "@/components/icons";
+import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import type { ComponentKind } from "@/lib/data/types";
-import type { ComponentRow } from "@/lib/storage/schema";
+import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
 import { useGlobalComponents, KINDS, KIND_FILTERS } from "@/application/global-components/useGlobalComponents";
 
 export function GlobalComponentsPage() {
   const {
     workspaceId,
     components,
+    workspaceProjects,
     query,
     setQuery,
     kindFilter,
@@ -35,9 +38,6 @@ export function GlobalComponentsPage() {
       <main className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-14">
         <header className="mb-8 flex items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-              <IconLayers size={16} strokeWidth={1.6} className="text-[var(--text-muted)]" />
-            </div>
             <div>
               <h1 className="m-0 mb-0.5 text-2xl font-semibold tracking-[-0.3px]">Global components</h1>
               <p className="m-0 text-[13.5px] text-[var(--text-muted)]">
@@ -113,55 +113,40 @@ export function GlobalComponentsPage() {
             />
           </div>
 
-          <div
-            role="tablist"
-            className="inline-flex gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
-          >
-            {KIND_FILTERS.map((opt) => {
-              const isActive = opt.value === kindFilter;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="tab"
-                  onClick={() => setKindFilter(opt.value)}
-                  className={[
-                    "h-[26px] cursor-pointer rounded-md border-0 bg-transparent px-2.5 text-[12px]",
-                    isActive
-                      ? "bg-[var(--pill)] text-[var(--text)]"
-                      : "text-[var(--text-muted)] hover:text-[var(--text)]",
-                  ].join(" ")}
-                  style={isActive ? { background: "var(--pill)" } : undefined}
-                >
+          <div className="relative">
+            <select
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+              className="h-8 appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-3 pr-8 text-[13px] text-[var(--text)] outline-none transition-colors focus:border-[var(--text-muted)]"
+            >
+              {KIND_FILTERS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
                   {opt.label}
-                </button>
-              );
-            })}
+                </option>
+              ))}
+            </select>
+            <IconChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           </div>
         </div>
 
-        {filtered.length > 0 ? (
-          <div
-            className="grid gap-5"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
-          >
-            {filtered.map((c) => (
-              <WorkspaceComponentCard
-                key={c.id}
-                component={c}
-                onRequestDelete={() => setPendingDelete(c)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
-            <p className="text-[14px] font-medium text-[var(--text)]">No components yet</p>
-            <p className="text-[13px] text-[var(--text-muted)]">
-              {components.length === 0
-                ? "Add a workspace-global component to share across projects."
-                : "Try a different search or filter"}
-            </p>
-          </div>
+        <div
+          className="grid gap-5"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+        >
+          {filtered.map((c) => (
+            <WorkspaceComponentCard
+              key={c.id}
+              component={c}
+              projects={workspaceProjects}
+              onRequestDelete={() => setPendingDelete(c)}
+            />
+          ))}
+          {workspaceId && <AddComponentCard onClick={() => setCreating((v) => !v)} />}
+        </div>
+        {filtered.length === 0 && components.length > 0 && (
+          <p className="mt-4 text-center text-[13px] text-[var(--text-muted)]">
+            Try a different search or filter
+          </p>
         )}
       </main>
 
@@ -177,29 +162,30 @@ export function GlobalComponentsPage() {
         onConfirm={handleConfirmDelete}
       />
 
-      <footer className="border-t border-[var(--border)] py-4 text-center text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
-        <Link to="/" className="text-[var(--text-faint)] no-underline hover:text-[var(--text-muted)]">
-          ← Back to projects
-        </Link>
-      </footer>
+      <PageFooter />
     </div>
   );
 }
 
 function WorkspaceComponentCard({
   component,
+  projects,
   onRequestDelete,
 }: {
   component: ComponentRow;
+  projects: ProjectRow[];
   onRequestDelete: () => void;
 }) {
+  const navigate = useNavigate();
   const canvasHref = `/canvas?variant=${encodeURIComponent(component.activeVariantId)}&type=desktop`;
+  const primary = projects[0] ?? null;
+  const extra = projects.length - 1;
   return (
-    <div className="group flex flex-col gap-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
-      <Link
-        to={canvasHref}
-        className="flex h-28 items-center justify-center bg-[var(--bg)] no-underline"
-      >
+    <Link
+      to={canvasHref}
+      className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
+    >
+      <div className="preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] p-4 transition-colors group-hover:border-[var(--border-strong)]">
         <Snapshot
           kind="component"
           ownerType="variant"
@@ -208,36 +194,78 @@ function WorkspaceComponentCard({
           type="desktop"
           display="card"
         />
-      </Link>
-      <div className="flex flex-col gap-2 p-3.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[13.5px] font-semibold text-[var(--text)]">
+        <CardMenu
+          buttons={[
+            {
+              key: "canvas",
+              label: "Open in canvas",
+              icon: CardMenuIcons.Canvas,
+              onClick: () => navigate(canvasHref),
+            },
+            {
+              key: "more",
+              label: "More",
+              icon: CardMenuIcons.More,
+              menuItems: [
+                {
+                  key: "delete",
+                  label: "Delete component",
+                  icon: CardMenuIcons.Trash,
+                  destructive: true,
+                  onClick: onRequestDelete,
+                },
+              ],
+            },
+          ]}
+        />
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 px-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
             {component.name}
           </span>
-          {component.kind && (
-            <span className="shrink-0 rounded-full bg-[var(--pill)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+          {component.kind ? (
+            <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[var(--text-faint)]">
               {component.kind}
             </span>
-          )}
+          ) : null}
         </div>
-        <div className="flex items-center justify-between pt-1">
-          <Link
-            to={canvasHref}
-            className="rounded-md border border-[var(--border)] bg-transparent px-2.5 py-1 text-[11px] text-[var(--text-muted)] no-underline transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
-          >
-            Edit in canvas
-          </Link>
-          <button
-            type="button"
-            aria-label="Delete component"
-            onClick={onRequestDelete}
-            className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-[var(--border)] bg-transparent text-[var(--text-faint)] opacity-0 transition-all group-hover:opacity-100 hover:border-[var(--border-strong)] hover:text-[#ffb0b0]"
-          >
-            <IconTrash size={13} />
-          </button>
+        <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-[var(--text-muted)]">
+          <IconGlobe size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />
+          <span className="min-w-0 truncate">
+            {primary ? `em ${primary.name}` : "Global"}
+          </span>
+          {extra > 0 ? (
+            <span className="flex-shrink-0 rounded border border-[var(--border)] px-1 py-px text-[9.5px] text-[var(--text-faint)]">
+              +{extra}
+            </span>
+          ) : null}
         </div>
       </div>
-    </div>
+    </Link>
+  );
+}
+
+function AddComponentCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex cursor-pointer flex-col gap-2.5 border-0 bg-transparent p-0 text-left text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5"
+    >
+      <div className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)] transition-colors duration-[120ms] group-hover:border-[var(--text)] group-hover:text-[var(--text)]">
+        <div className="flex flex-col items-center gap-1.5 text-[12px] tracking-[0.2px]">
+          <IconPlus size={22} strokeWidth={1.6} />
+          <span>New component</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-[3px] px-0.5">
+        <span className="truncate text-[13px] font-medium text-[var(--text-muted)]">
+          New component
+        </span>
+        <div className="text-[11.5px] text-[var(--text-muted)]">workspace-global</div>
+      </div>
+    </button>
   );
 }
 

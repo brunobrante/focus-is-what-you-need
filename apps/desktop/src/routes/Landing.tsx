@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
 import { TopBar } from "@/components/layout/TopBar";
+import { PageFooter } from "@/components/layout/PageFooter";
 import { ProjectSettingsModal, type ProjectSettingsModalHandle } from "@/components/modals/ProjectSettingsModal";
 import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 import { CardMoreMenu, CardMenuIcons } from "@/components/screen/CardMenu";
@@ -111,9 +112,7 @@ export function Landing() {
       <ConfirmActionModal ref={confirmRef} />
       <ProjectSettingsModal ref={settingsRef} />
 
-      <footer className="border-t border-[var(--border)] py-4 text-center text-[11px] tracking-[0.4px] text-[var(--text-faint)]">
-        v0.1 · design preview
-      </footer>
+      <PageFooter />
     </div>
   );
 }

@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
-import { useWorkspaceComponents, useWorkspaces } from "@/lib/storage/hooks";
+import { useWorkspaceComponents, useWorkspaces, useProjects } from "@/lib/storage/hooks";
 import {
   createComponent,
   deleteComponentTree,
 } from "@/lib/storage/repos/components.repo";
 import type { ComponentKind } from "@/lib/data/types";
-import type { ComponentRow } from "@/lib/storage/schema";
+import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
 
 export const KINDS: ComponentKind[] = [
   "Layout",
@@ -25,6 +25,7 @@ export const KIND_FILTERS: Array<{ value: ComponentKind | "all"; label: string }
 export interface GlobalComponentsState {
   workspaceId: string | null;
   components: ComponentRow[];
+  workspaceProjects: ProjectRow[];
   query: string;
   setQuery: (value: string) => void;
   kindFilter: ComponentKind | "all";
@@ -45,11 +46,18 @@ export interface GlobalComponentsState {
 
 export function useGlobalComponents(): GlobalComponentsState {
   const { data: workspaces } = useWorkspaces();
+  const { data: allProjects } = useProjects();
   const [activeWorkspaceId] = useActiveWorkspaceId();
-  const workspaceId =
-    workspaces.find((w) => w.id === activeWorkspaceId)?.id ?? workspaces[0]?.id ?? null;
+  const workspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0] ?? null;
+  const workspaceId = workspace?.id ?? null;
 
   const { data: components } = useWorkspaceComponents(workspaceId);
+
+  const workspaceProjects = useMemo(() => {
+    if (!workspace) return [];
+    const ids = new Set(workspace.projectIds);
+    return allProjects.filter((p) => ids.has(p.id));
+  }, [workspace, allProjects]);
 
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<ComponentKind | "all">("all");
@@ -95,6 +103,7 @@ export function useGlobalComponents(): GlobalComponentsState {
   return {
     workspaceId,
     components,
+    workspaceProjects,
     query,
     setQuery,
     kindFilter,
