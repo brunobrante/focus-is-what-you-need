@@ -1,5 +1,6 @@
 import type { ReferenceRow } from "@/lib/storage/schema";
 import { IconImage, IconPlus, IconTrash } from "@/components/icons";
+import { EmptyMessage } from "./EmptyMessage";
 
 const masonryItemStyle = {
   breakInside: "avoid",
@@ -22,27 +23,13 @@ export function SideReferencesTab({
 }) {
   if (references.length === 0) {
     return (
-      <div className="col-span-full flex flex-col items-center gap-4 py-16 text-center">
-        <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
-          <IconImage size={17} strokeWidth={1.7} />
-        </span>
-        <div>
-          <p className="m-0 text-[13px] font-medium text-[var(--text)]">
-            {query.trim() ? "No reference found" : "No references yet"}
-          </p>
-          <p className="m-0 mt-1 text-[12px] text-[var(--text-faint)]">
-            Add reference images or videos
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-        >
-          <IconPlus size={13} strokeWidth={2} />
-          Add reference
-        </button>
-      </div>
+      <EmptyMessage
+        icon={<IconImage size={17} strokeWidth={1.7} />}
+        title={query.trim() ? "No reference found" : "No references yet"}
+        description="Add reference images or videos"
+        actionLabel="Add reference"
+        onAction={onAdd}
+      />
     );
   }
 
