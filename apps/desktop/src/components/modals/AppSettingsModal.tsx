@@ -508,7 +508,7 @@ function StorageTab({
             <InfoCard
               icon={<IconDatabase size={15} strokeWidth={1.7} />}
               label="Formato"
-              value=".figx"
+              value="SQLite"
             />
             <InfoCard
               icon={<IconClock size={15} strokeWidth={1.7} />}
@@ -524,11 +524,11 @@ function StorageTab({
         </div>
 
         <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-4 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
-          Projects are saved as files{" "}
+          Projects are stored in a local SQLite database.{" "}
           <code className="rounded-[4px] bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[11.5px] text-[var(--text)]">
             .figx
           </code>{" "}
-          within the local workspace. Mocked projects remain internal and are not saved to this folder.
+          is an export format — use “Export .figx” on a project to write one to the workspace folder.
         </div>
       </div>
     </div>

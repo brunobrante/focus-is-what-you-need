@@ -763,6 +763,27 @@ fn sync_figx_projects(
     serde_json::to_string(&meta).map_err(|e| e.to_string())
 }
 
+// Explicit, user-triggered export of a single project to a `.figx` file. Unlike
+// `sync_figx_projects` this does NOT rewrite the workspace meta — it only writes
+// the one archive, so exporting a project never disturbs the others.
+#[tauri::command]
+fn export_figx_project(
+    app: tauri::AppHandle,
+    project: FigxProjectInput,
+) -> Result<String, String> {
+    let cfg = read_config(&app);
+    ensure_local_structure(&cfg)?;
+
+    let filename = figx_filename(&project.project_id, &project.project_name);
+    let path = workspace_dir(&cfg).join(&filename);
+    remove_stale_project_files(&workspace_dir(&cfg), &project.project_id, &filename);
+
+    let entries = project_archive_entries(&cfg, &project)?;
+    write_zip_file(&path, &entries)?;
+
+    Ok(path.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 fn delete_figx_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
     let cfg = read_config(&app);
@@ -1166,6 +1187,7 @@ pub fn run() {
             write_reference_groups,
             read_local_figx_projects,
             sync_figx_projects,
+            export_figx_project,
             delete_figx_project,
         ])
         .run(tauri::generate_context!())

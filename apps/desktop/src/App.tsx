@@ -9,20 +9,13 @@ import { References } from "@/routes/References";
 import { SystemDesignPage } from "@/pages/SystemDesignPage";
 import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
-import { ensureLocalProjectsLoaded, startLocalFigxAutosave } from "@/lib/storage/localProjects";
+import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 
 export default function App() {
   useEffect(() => {
-    let cancelled = false;
-    let stopAutosave: (() => void) | null = null;
-    void ensureLocalProjectsLoaded().then(() => {
-      if (cancelled) return;
-      stopAutosave = startLocalFigxAutosave();
-    });
-    return () => {
-      cancelled = true;
-      stopAutosave?.();
-    };
+    // Storage lives in SQLite (the `records` table). Kick off seeding/migration
+    // early; `.figx` files are no longer autosaved — they are an explicit export.
+    void ensureLocalProjectsLoaded();
   }, []);
 
   return (

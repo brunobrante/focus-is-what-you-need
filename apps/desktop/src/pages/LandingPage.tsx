@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
+import { exportLocalProjectToFigx, isLocalProject } from "@/lib/storage/localProjects";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
@@ -33,6 +34,22 @@ export function LandingPage() {
     onSavedProject,
   } = useLanding();
 
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+
+  const onRequestExport = async (project: ProjectRow) => {
+    try {
+      const ok = await exportLocalProjectToFigx(project.id);
+      setExportNotice(
+        ok
+          ? `Exported "${project.name}" to .figx in the workspace folder.`
+          : `"${project.name}" can't be exported.`,
+      );
+    } catch {
+      setExportNotice(`Failed to export "${project.name}".`);
+    }
+    window.setTimeout(() => setExportNotice(null), 4000);
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
       <TopBar
@@ -51,8 +68,15 @@ export function LandingPage() {
           onFilterChange={setFilter}
           onRequestEdit={setEditingProject}
           onRequestDelete={setPendingDelete}
+          onRequestExport={onRequestExport}
         />}
       </main>
+
+      {exportNotice ? (
+        <div className="pointer-events-none fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 rounded-[10px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.96)] px-4 py-2.5 text-[12.5px] text-[var(--text)] shadow-[0_12px_40px_rgba(0,0,0,0.4)]">
+          {exportNotice}
+        </div>
+      ) : null}
 
       <ConfirmActionModal
         open={Boolean(pendingDelete)}
@@ -90,6 +114,7 @@ function ProjectsView({
   onFilterChange,
   onRequestEdit,
   onRequestDelete,
+  onRequestExport,
 }: {
   allProjects: ProjectRow[];
   filtered: ProjectRow[];
@@ -100,6 +125,7 @@ function ProjectsView({
   onFilterChange: (f: Filter) => void;
   onRequestEdit: (project: ProjectRow) => void;
   onRequestDelete: (project: ProjectRow) => void;
+  onRequestExport: (project: ProjectRow) => void;
 }) {
   return (
     <div className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-14">
@@ -151,6 +177,7 @@ function ProjectsView({
             screensCount={screensByProject.get(p.id) ?? 0}
             onRequestEdit={onRequestEdit}
             onRequestDelete={onRequestDelete}
+            onRequestExport={onRequestExport}
           />
         ))}
         <AddProjectCard />
@@ -202,11 +229,13 @@ function ProjectCard({
   screensCount,
   onRequestEdit,
   onRequestDelete,
+  onRequestExport,
 }: {
   project: ProjectRow;
   screensCount: number;
   onRequestEdit: (project: ProjectRow) => void;
   onRequestDelete: (project: ProjectRow) => void;
+  onRequestExport: (project: ProjectRow) => void;
 }) {
   return (
     <Link
@@ -222,6 +251,16 @@ function ProjectCard({
               icon: CardMenuIcons.Open,
               onClick: () => onRequestEdit(project),
             },
+            ...(isLocalProject(project)
+              ? [
+                  {
+                    key: "export",
+                    label: "Export .figx",
+                    icon: CardMenuIcons.MoveTo,
+                    onClick: () => void onRequestExport(project),
+                  },
+                ]
+              : []),
             {
               key: "delete",
               label: "Delete project",

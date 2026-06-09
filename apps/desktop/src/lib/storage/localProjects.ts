@@ -20,10 +20,14 @@ import {
   type VariantRow,
   type WorkspaceRow,
 } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, replaceTable, subscribe } from "@/lib/storage/store";
+import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const FIGX_FORMAT_VERSION = 1;
-const AUTOSAVE_DELAY_MS = 650;
+// SQLite (the `records` table) is the source of truth. `.figx` files are no
+// longer written automatically — they are an explicit, user-triggered export
+// format. This flag marks that any pre-existing `.figx` files were absorbed into
+// SQLite once, so we never auto-read (and risk clobbering) them again.
+const FIGX_ABSORBED_FLAG = "local_figx_absorbed_v1";
 
 type FigxArchive = {
   format: "figx";
@@ -67,10 +71,6 @@ const PERSISTED_TABLES = [
 ] as const;
 
 let readyPromise: Promise<void> | null = null;
-let autosaveStarted = false;
-let autosaveTimer: number | null = null;
-let autosaveRunning = false;
-let autosavePending = false;
 
 export function isLocalProject(project: ProjectRow | null | undefined): boolean {
   return Boolean(project && project.source !== "mock");
@@ -85,33 +85,42 @@ export async function ensureLocalProjectsLoaded(): Promise<void> {
     readyPromise = (async () => {
       await ensureSeededAndMigrated();
       try {
-        await importLocalFigxProjects();
+        await absorbLegacyFigxProjectsOnce();
       } catch (error) {
-        console.warn("[storage] Failed to load local .figx projects", error);
+        console.warn("[storage] Failed to absorb legacy .figx projects", error);
       }
     })();
   }
   return readyPromise;
 }
 
-export function startLocalFigxAutosave(): () => void {
-  if (autosaveStarted) return () => undefined;
-  autosaveStarted = true;
+function figxAlreadyAbsorbed(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(FIGX_ABSORBED_FLAG) === "1";
+  } catch {
+    return false;
+  }
+}
 
-  const unsubscribe = PERSISTED_TABLES.map((table) =>
-    subscribe(table, () => scheduleLocalFigxSync()),
-  );
+function markFigxAbsorbed(): void {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(FIGX_ABSORBED_FLAG, "1");
+  } catch {
+    // localStorage unavailable — the import simply runs again next boot, which is
+    // harmless: it is an idempotent merge into SQLite.
+  }
+}
 
-  void ensureLocalProjectsLoaded().then(() => scheduleLocalFigxSync());
-
-  return () => {
-    unsubscribe.forEach((fn) => fn());
-    autosaveStarted = false;
-    if (autosaveTimer != null) {
-      window.clearTimeout(autosaveTimer);
-      autosaveTimer = null;
-    }
-  };
+/**
+ * One-time transition: pull any pre-existing `.figx` files into SQLite, then
+ * never read them automatically again. Because `.figx` autosave is gone, reading
+ * a now-stale file on a later boot could overwrite fresher SQLite data — the
+ * flag prevents that.
+ */
+async function absorbLegacyFigxProjectsOnce(): Promise<void> {
+  if (figxAlreadyAbsorbed()) return;
+  await importLocalFigxProjects();
+  markFigxAbsorbed();
 }
 
 async function importLocalFigxProjects(): Promise<void> {
@@ -370,38 +379,24 @@ function ensureWorkspaceProjectIds(
   ];
 }
 
-function scheduleLocalFigxSync(): void {
-  if (autosaveTimer != null) window.clearTimeout(autosaveTimer);
-  autosaveTimer = window.setTimeout(() => {
-    autosaveTimer = null;
-    void syncLocalFigxProjects();
-  }, AUTOSAVE_DELAY_MS);
-}
-
-async function syncLocalFigxProjects(): Promise<void> {
-  if (autosaveRunning) {
-    autosavePending = true;
-    return;
-  }
-  autosaveRunning = true;
-  try {
-    await ensureLocalProjectsLoaded();
-    const archives = await buildLocalProjectArchives();
-    const payload: FigxProjectSyncInput[] = archives.map(({ archive, referenceIds }) => ({
-      project_id: archive.project.id,
-      project_name: archive.project.name,
-      archive_json: JSON.stringify(archive),
-      reference_ids: referenceIds,
-    }));
-    if (payload.length === 0) return;
-    await invoke("sync_figx_projects", { projects: payload }).catch(() => undefined);
-  } finally {
-    autosaveRunning = false;
-    if (autosavePending) {
-      autosavePending = false;
-      scheduleLocalFigxSync();
-    }
-  }
+/**
+ * Explicitly export a single local project to a `.figx` file in the workspace.
+ * This is the only path that writes `.figx` now — it runs on user action, never
+ * automatically. Returns false if the project isn't a local project.
+ */
+export async function exportLocalProjectToFigx(projectId: string): Promise<boolean> {
+  await ensureLocalProjectsLoaded();
+  const archives = await buildLocalProjectArchives();
+  const target = archives.find(({ archive }) => archive.project.id === projectId);
+  if (!target) return false;
+  const project: FigxProjectSyncInput = {
+    project_id: target.archive.project.id,
+    project_name: target.archive.project.name,
+    archive_json: JSON.stringify(target.archive),
+    reference_ids: target.referenceIds,
+  };
+  await invoke("export_figx_project", { project });
+  return true;
 }
 
 async function buildLocalProjectArchives(): Promise<
