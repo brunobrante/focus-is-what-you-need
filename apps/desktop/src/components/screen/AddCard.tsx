@@ -13,7 +13,7 @@ export function AddCard({
     <button
       type="button"
       onClick={onClick}
-      className="mb-2 block w-full cursor-pointer border-0 bg-transparent p-0 text-left text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5"
+      className="mb-2 block w-full self-start cursor-pointer border-0 bg-transparent p-0 text-left text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5"
       style={{ breakInside: "avoid" }}
     >
       <div

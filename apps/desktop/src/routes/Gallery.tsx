@@ -68,7 +68,7 @@ import type {
   ScreenRow,
   VariantRow,
 } from "@/lib/storage/schema";
-import { IconChevronDown, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconSettings, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
+import { IconChevronDown, IconClose, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPencil, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 
 type Tab = "screens" | "components" | "references" | "system";
@@ -133,11 +133,11 @@ export function Gallery() {
 
   const [tab, setTab] = useState<Tab>("screens");
   const [cmpFilter, setCmpFilter] = useState<CmpKindFilter>("all");
+  const [editOpen, setEditOpen] = useState(false);
   const screenSectionState = usePersistentSectionState(project?.id, "screens");
   const componentSectionState = usePersistentSectionState(project?.id, "components");
   const newScreenRef = useRef<NewScreenModalHandle>(null);
   const confirmRef = useRef<ConfirmActionModalHandle>(null);
-  const settingsRef = useRef<ProjectSettingsModalHandle>(null);
   const previewRef = useRef<ProjectPreviewModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
   const navigate = useNavigate();
@@ -159,10 +159,19 @@ export function Gallery() {
         componentsCount={components.length}
         referencesCount={references.length}
         onPreview={screens.length > 0 && project ? () => previewRef.current?.open(project, screens) : null}
-        onSettings={() => project && settingsRef.current?.open(project, screens, (updated) => {
-          navigate(`/project/${encodeURIComponent(updated.id)}`, { replace: true });
-        })}
+        onEdit={() => setEditOpen((v) => !v)}
+        editOpen={editOpen}
       />
+      {editOpen && project && (
+        <ProjectEditPanel
+          project={project}
+          screens={screens}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            navigate(`/project/${encodeURIComponent(updated.id)}`, { replace: true });
+          }}
+        />
+      )}
 
       <Tabs
         tab={tab}
@@ -240,7 +249,6 @@ export function Gallery() {
           navigate(`/project/${encodeURIComponent(r.component.projectId)}/c/${r.component.id}`);
         }}
       />
-      <ProjectSettingsModal ref={settingsRef} />
       <ProjectPreviewModal ref={previewRef} />
       <ConfirmActionModal ref={confirmRef} />
     </div>
@@ -262,14 +270,16 @@ export function ProjectOverview({
   componentsCount,
   referencesCount,
   onPreview,
-  onSettings,
+  onEdit,
+  editOpen,
 }: {
   project: ProjectRow | undefined;
   screensCount: number;
   componentsCount: number;
   referencesCount: number;
   onPreview: (() => void) | null;
-  onSettings: () => void;
+  onEdit: () => void;
+  editOpen: boolean;
 }) {
   const initial = (project?.name ?? "P")[0]!.toUpperCase();
   const logoColor = projectLogoColor(project?.name ?? "");
@@ -354,11 +364,17 @@ export function ProjectOverview({
         )}
         <button
           type="button"
-          onClick={onSettings}
-          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[var(--border)] bg-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-          aria-label="Project settings"
+          onClick={onEdit}
+          className={[
+            "inline-flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border px-3.5 text-[13px] font-medium transition-colors",
+            editOpen
+              ? "border-[var(--text)] bg-[var(--surface-hover)] text-[var(--text)]"
+              : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+          ].join(" ")}
+          aria-label="Edit project"
         >
-          <IconSettings size={14} strokeWidth={1.6} />
+          <IconPencil size={13} strokeWidth={1.7} />
+          Edit
         </button>
       </div>
     </div>
@@ -621,6 +637,112 @@ function aspectForType(type: ProjectType): string {
   return "aspect-[16/10]";
 }
 
+export function ProjectEditPanel({
+  project,
+  screens,
+  onClose,
+  onSaved,
+}: {
+  project: ProjectRow;
+  screens: ScreenRow[];
+  onClose: () => void;
+  onSaved: (project: ProjectRow) => void;
+}) {
+  const [name, setName] = useState(project.name);
+  const [description, setDescription] = useState(project.description ?? "");
+  const [previewScreenId, setPreviewScreenId] = useState(project.previewScreenId ?? "");
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 60);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  async function save() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const updated = await updateProject(project.id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        previewScreenId: previewScreenId || null,
+      });
+      if (updated) {
+        onSaved(updated);
+        onClose();
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-[var(--border)] bg-[var(--bg)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-7 py-3">
+        <span className="text-[13px] font-medium text-[var(--text)]">Edit project</span>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+        >
+          <IconClose size={11} strokeWidth={2} />
+        </button>
+      </div>
+      <div className="grid gap-5 px-7 py-5 md:grid-cols-[1fr_1fr_auto]">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Project name</span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void save()}
+            placeholder="Project name"
+            className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Description</span>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void save()}
+            placeholder="Briefly describe this project..."
+            className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Preview screen</span>
+          <select
+            value={previewScreenId}
+            onChange={(e) => setPreviewScreenId(e.target.value)}
+            className="h-9 cursor-pointer rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none transition-colors focus:border-[var(--border-strong)]"
+          >
+            <option value="">First screen</option>
+            {screens.map((s) => (
+              <option key={s.id} value={s.id}>{s.title}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="flex justify-end gap-2 px-7 pb-5">
+        <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={!name.trim() || saving}
+          className="btn btn-primary"
+        >
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ScreensGrid({
   screens,
   type,
@@ -646,23 +768,12 @@ function ScreensGrid({
 }) {
   if (screens.length === 0) {
     return (
-      <div className="grid min-h-[420px] place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-6 py-10">
-        <div className="max-w-[360px] text-center">
-          <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--bg)] text-[var(--text-faint)]">
-            <IconOpenCanvas size={24} strokeWidth={1.5} />
-          </div>
-          <h2 className="m-0 text-[20px] font-semibold tracking-[-0.2px] text-[var(--text)]">Empty Screen</h2>
-          <p className="mt-2 text-[13px] leading-[1.6] text-[var(--text-muted)]">
-            Start by creating the first screen of the project. New screens stay inside this area to keep the tab navigation flow.
-          </p>
-          <div className="mt-6">
-            <button type="button" onClick={onNewScreen} className="btn btn-primary">
-              <IconPlus size={14} strokeWidth={2} />
-              Create first screen
-            </button>
-          </div>
-        </div>
-      </div>
+      <EmptyMessage
+        icon={<IconScreen size={17} strokeWidth={1.7} />}
+        title="No screens yet"
+        description="Create your first screen to start building your project."
+        onClick={onNewScreen}
+      />
     );
   }
 
@@ -1161,12 +1272,6 @@ function AddScreenCard({ type, onClick }: { type: ProjectType; onClick: () => vo
           <span>New screen</span>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 px-0.5">
-        <span className="truncate text-[13px] font-medium text-[var(--text-muted)]">Adicionar</span>
-        <span className="text-[11px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
-          {PROJECT_TYPE_DIMS[type]}
-        </span>
-      </div>
     </button>
   );
 }
@@ -1185,9 +1290,6 @@ function AddComponentCard({ onClick }: { onClick: () => void }) {
           </span>
           <span>New component</span>
         </div>
-      </div>
-      <div className="px-0.5">
-        <span className="truncate text-[13px] font-medium text-[var(--text-muted)]">New component</span>
       </div>
     </button>
   );
@@ -1689,6 +1791,14 @@ export function ComponentsTab({
       </div>
 
       <main className="flex-1 px-7 pb-20">
+        {components.length === 0 ? (
+          <EmptyMessage
+            icon={<IconDiamond size={17} strokeWidth={1.7} />}
+            title="No components yet"
+            description="Create your first component to start building your hierarchy."
+            onClick={canCreate ? onNewComponent : undefined}
+          />
+        ) : (
         <SectionedGrid
           items={filtered}
           sections={sections}
@@ -1744,6 +1854,7 @@ export function ComponentsTab({
             );
           }}
         />
+        )}
       </main>
       <ComponentScreensModal
         component={screenAssignmentComponent}

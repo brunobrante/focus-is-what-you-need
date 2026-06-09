@@ -245,7 +245,7 @@ function TabletEmpty() {
 
 function PhoneEmpty() {
   return (
-    <div className="flex h-[82%] w-[74%] min-w-[122px] flex-col gap-2 overflow-hidden rounded-[12px] border border-[#2C2C2C] bg-[#181818] p-3">
+    <div className="flex h-[82%] w-[86%] min-w-[122px] flex-col gap-2 overflow-hidden rounded-[12px] border border-[#2C2C2C] bg-[#181818] p-3">
       <i className="h-2.5 w-[68%] rounded-full bg-[#303030]" />
       <i className="h-1.5 w-[88%] rounded-full bg-[#252525]" />
       <i className="h-1.5 w-[56%] rounded-full bg-[#252525]" />

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   NewScreenModal,
@@ -8,12 +8,12 @@ import {
 } from "@/components/modals/NewComponentModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
-import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
 import { useGallery } from "@/application/gallery/useGallery";
 
 import {
   Crumbs,
   ProjectOverview,
+  ProjectEditPanel,
   Tabs,
   ScreensTab,
   ComponentsTab,
@@ -26,6 +26,7 @@ export function GalleryPage() {
   const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : "";
 
   const previewRef = useRef<ProjectPreviewModalHandle>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const {
     project,
@@ -76,8 +77,20 @@ export function GalleryPage() {
         componentsCount={components.length}
         referencesCount={references.length}
         onPreview={screens.length > 0 && project ? () => previewRef.current?.open(project, screens) : null}
-        onSettings={() => setProjectSettingsOpen(true)}
+        onEdit={() => setEditOpen((v) => !v)}
+        editOpen={editOpen}
       />
+      {editOpen && project && (
+        <ProjectEditPanel
+          project={project}
+          screens={screens}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            handleSettingsSaved(updated);
+            setEditOpen(false);
+          }}
+        />
+      )}
 
       <Tabs
         tab={tab}
@@ -138,13 +151,6 @@ export function GalleryPage() {
         projectId={project?.id ?? null}
         screens={screens}
         onCreated={handleComponentCreated}
-      />
-      <ProjectSettingsModal
-        open={projectSettingsOpen}
-        project={project}
-        screens={screens}
-        onClose={() => setProjectSettingsOpen(false)}
-        onSaved={handleSettingsSaved}
       />
       <ProjectPreviewModal ref={previewRef} />
       <ConfirmActionModal
