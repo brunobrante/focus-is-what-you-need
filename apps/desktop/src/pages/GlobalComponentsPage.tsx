@@ -237,9 +237,11 @@ function AddComponentCard({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="group flex cursor-pointer flex-col gap-2.5 border-0 bg-transparent p-0 text-left text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5"
     >
-      <div className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)] transition-colors duration-[120ms] group-hover:border-[var(--text)] group-hover:text-[var(--text)]">
-        <div className="flex flex-col items-center gap-1.5 text-[12px] tracking-[0.2px]">
-          <IconPlus size={22} strokeWidth={1.6} />
+      <div className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--border)] text-[var(--text-faint)] transition-colors duration-[120ms] group-hover:border-[var(--text)] group-hover:text-[var(--text)]">
+        <div className="flex flex-col items-center gap-2 text-[12px] tracking-[0.2px]">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-black">
+            <IconPlus size={14} strokeWidth={2} />
+          </span>
           <span>New component</span>
         </div>
       </div>

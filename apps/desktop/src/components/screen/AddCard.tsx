@@ -25,7 +25,7 @@ export function AddCard({
         <div className={["flex flex-col items-center text-[12px] tracking-[0.2px]", compact ? "gap-1.5" : "gap-2"].join(" ")}>
           <span
             className={[
-              "grid place-items-center rounded-full border border-current",
+              "grid place-items-center rounded-full bg-[var(--surface)]",
               compact ? "h-7 w-7" : "h-8 w-8",
             ].join(" ")}
           >
