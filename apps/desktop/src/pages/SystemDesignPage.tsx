@@ -191,6 +191,12 @@ export function SystemDesignPage() {
           newIconName={newIconName}
           setNewIconName={setNewIconName}
           createDesign={createDesign}
+          handleToggleShared={handleToggleShared}
+          handleAddLibrary={handleAddLibrary}
+          handleRemoveLibrary={handleRemoveLibrary}
+          handleAddIcon={handleAddIcon}
+          handleRemoveIcon={handleRemoveIcon}
+          handleDeleteDesign={handleDeleteDesign}
         />
 
         <TabBar active={tab} onChange={setTab} />
@@ -277,6 +283,12 @@ type SystemDesignManagerProps = {
   newIconName: string;
   setNewIconName: (v: string) => void;
   createDesign: () => Promise<void>;
+  handleToggleShared: (shared: boolean) => void;
+  handleAddLibrary: () => void;
+  handleRemoveLibrary: (id: string) => void;
+  handleAddIcon: () => void;
+  handleRemoveIcon: (id: string) => void;
+  handleDeleteDesign: () => void;
 };
 
 function SystemDesignManager({
@@ -292,6 +304,12 @@ function SystemDesignManager({
   newIconName,
   setNewIconName,
   createDesign,
+  handleToggleShared,
+  handleAddLibrary,
+  handleRemoveLibrary,
+  handleAddIcon,
+  handleRemoveIcon,
+  handleDeleteDesign,
 }: SystemDesignManagerProps) {
   if (!activeWorkspaceId) {
     return (
