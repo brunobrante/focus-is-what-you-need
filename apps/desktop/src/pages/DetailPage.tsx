@@ -4,9 +4,11 @@ import { Snapshot } from "@/components/Snapshot";
 import {
   IconFastEdit,
   IconChevronLeft,
+  IconClose,
   IconCompare,
   IconHistory,
   IconOpenCanvas,
+  IconPencil,
   IconSearch,
 } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
@@ -24,7 +26,8 @@ import { NewComponentModal } from "@/components/modals/NewComponentModal";
 import { ReferencesModal } from "@/components/modals/ReferencesModal";
 import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
-import type { ComponentKind, ProjectType } from "@/lib/data/types";
+import type { ComponentKind, ProjectType, ScreenVariant } from "@/lib/data/types";
+import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import { useScreenDetail, type CmpKindFilter as ScreenCmpKindFilter } from "@/application/screen-detail/useScreenDetail";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 
@@ -61,6 +64,8 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
+
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: components.length },
@@ -136,12 +141,31 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                 <IconHistory size={13} strokeWidth={1.7} />
                 History
               </button>
+              <button type="button" aria-label="Edit information" onClick={() => setInfoOpen(true)}
+                className="grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
+              >
+                <IconPencil size={12} strokeWidth={1.7} />
+              </button>
               <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
                 {components.length} component{components.length === 1 ? "" : "s"}
               </span>
             </div>
           </div>
 
+          {infoOpen ? (
+            <InlineInfoPanel title="Screen information" onClose={() => setInfoOpen(false)}>
+              {screen ? (
+                <ScreenInfoPanel
+                  screen={screen}
+                  type={type}
+                  onSave={(patch) => void updateScreen(screen.id, patch)}
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-faint)]">No screen data available yet.</p>
+              )}
+            </InlineInfoPanel>
+          ) : (
+            <>
           <SideTabs tabs={tabs} active={sideTab} onChange={setSideTab} />
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -199,7 +223,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                     <VersionSideCard key={v.id} version={v} active={v.id === activeVersionId} type={type} allowMock={canUseFactoryMocks} onSelect={() => setActiveVersionId(v.id)} />
                   ))}
                   {filteredVersions.length === 0 && (
-                    <SideEmptyState title="No versions found" description="Versions of this screen will appear here when created." actionLabel="New version" onAction={addVersion} />
+                    <SideEmptyState title="No versions found" description="Saved versions of this screen will appear here when created." actionLabel="New version" onAction={addVersion} />
                   )}
                   {filteredVersions.length > 0 && <AddCard label="New version" onClick={addVersion} />}
                 </>
@@ -215,6 +239,8 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
               )}
             </div>
           </div>
+            </>
+          )}
         </aside>
       </div>
 
@@ -244,6 +270,8 @@ function ComponentContent({ componentId }: { componentId: string }) {
     handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
+  const [infoOpen, setInfoOpen] = useState(false);
+
   if (!component) {
     return (
       <div className="grid min-h-screen place-items-center bg-[var(--bg)] text-[13px] text-[var(--text-muted)]">
@@ -254,8 +282,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: children.length },
-    { id: "info" as const, label: "Information", count: undefined },
-    { id: "versions" as const, label: "Variants", count: variantCount },
+    { id: "versions" as const, label: "Versions", count: variantCount },
     { id: "references" as const, label: "References", count: references.length ?? 0 },
   ] as const;
 
@@ -299,21 +326,30 @@ function ComponentContent({ componentId }: { componentId: string }) {
                 <IconHistory size={13} strokeWidth={1.7} />
                 History
               </button>
+              <button type="button" aria-label="Edit information" onClick={() => setInfoOpen(true)}
+                className="grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
+              >
+                <IconPencil size={12} strokeWidth={1.7} />
+              </button>
               <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                {children.length} filhos
+                {children.length} component{children.length === 1 ? "" : "s"}
               </span>
             </div>
           </div>
 
+          {infoOpen ? (
+            <InlineInfoPanel title="Component information" onClose={() => setInfoOpen(false)}>
+              <ComponentInfoPanel component={component} onSave={handleUpdate} />
+            </InlineInfoPanel>
+          ) : (
+            <>
           <SideTabs tabs={tabs} active={sideTab} onChange={setSideTab} />
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {sideTab !== "info" ? (
-              <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
-                <SideSearch query={query} onChange={setQuery} />
-                {sideTab === "components" ? <SideKindFilter value={filter} onChange={setFilter} /> : null}
-              </div>
-            ) : null}
+            <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
+              <SideSearch query={query} onChange={setQuery} />
+              {sideTab === "components" ? <SideKindFilter value={filter} onChange={setFilter} /> : null}
+            </div>
             <div className="grid min-h-0 flex-1 content-start gap-x-4 gap-y-[22px] overflow-y-auto px-6 pb-8 pt-[22px]"
               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
             >
@@ -336,9 +372,6 @@ function ComponentContent({ componentId }: { componentId: string }) {
                   {filteredChildren.length > 0 ? <AddCard label="New component" onClick={openNewChild} /> : null}
                 </>
               )}
-              {sideTab === "info" && (
-                <ComponentInfoPanel component={component} onSave={handleUpdate} />
-              )}
               {sideTab === "versions" && (
                 <>
                   {variants.length > 1 && filteredVariants.map((v) => (
@@ -351,11 +384,14 @@ function ComponentContent({ componentId }: { componentId: string }) {
                     />
                   ))}
                   {variants.length <= 1 && (
-                    <div className="col-span-full px-3 py-14 text-center text-[13px] text-[var(--text-faint)]">
-                      No versions yet. Use "New variant" to save a copy of this component.
-                    </div>
+                    <SideEmptyState
+                      title="No versions yet"
+                      description="Save a copy of this component's current canvas state to create a version."
+                      actionLabel="New version"
+                      onAction={() => void addVariant()}
+                    />
                   )}
-                  <AddCard label="New variant" onClick={() => void addVariant()} />
+                  {variants.length > 1 && <AddCard label="New version" onClick={() => void addVariant()} />}
                 </>
               )}
               {sideTab === "references" && (
@@ -369,6 +405,8 @@ function ComponentContent({ componentId }: { componentId: string }) {
               )}
             </div>
           </div>
+            </>
+          )}
         </aside>
       </div>
 
@@ -617,6 +655,72 @@ function ChildCard({
         </div>
       </div>
     </Link>
+  );
+}
+
+// ── Inline info panel ─────────────────────────────────────────────────────────
+
+function InlineInfoPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-3">
+        <span className="text-[13px] font-medium text-[var(--text)]">{title}</span>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+        >
+          <IconClose size={11} strokeWidth={2} />
+        </button>
+      </div>
+      <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ScreenInfoPanel({ screen, type, onSave }: {
+  screen: ScreenRow;
+  type: ProjectType;
+  onSave: (patch: Partial<Pick<ScreenRow, "variant">>) => void;
+}) {
+  const SCREEN_VARIANTS: Array<{ value: ScreenVariant; label: string }> = [
+    { value: "blank", label: "Blank" },
+    { value: "empty", label: "Empty" },
+    { value: "hero", label: "Hero" },
+    { value: "list", label: "List" },
+    { value: "detail", label: "Detail" },
+    { value: "form", label: "Form" },
+    { value: "profile", label: "Profile" },
+  ];
+
+  return (
+    <>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[11px] text-[var(--text-faint)]">Template</span>
+        <select
+          value={screen.variant}
+          onChange={(e) => onSave({ variant: e.target.value as ScreenVariant })}
+          className="h-9 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--border-strong)]"
+        >
+          {SCREEN_VARIANTS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+      </label>
+      <div className="flex flex-col border-t border-[var(--border)] pt-4">
+        <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
+          <span className="text-[11.5px] text-[var(--text-faint)]">Type</span>
+          <span className="text-[11.5px] text-[var(--text-muted)]">{type}</span>
+        </div>
+        <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
+          <span className="text-[11.5px] text-[var(--text-faint)]">ID</span>
+          <span className="min-w-0 truncate font-mono text-[10.5px] text-[var(--text-muted)]">{screen.id}</span>
+        </div>
+      </div>
+    </>
   );
 }
 
