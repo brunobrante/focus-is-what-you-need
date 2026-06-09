@@ -10,11 +10,12 @@ import {
   readReferenceStackData,
   loadReferenceStackFile,
 } from "@/lib/tauri/referenceStorage";
+import { loadReferenceUrl } from "@/lib/references/referenceUrlCache";
 import type {
   LightboxTab, ReferenceItem,
   StackPreviewState, StackTreeNode,
 } from "../types";
-import { referenceCardThumbnailUrl } from "../lib/fileHelpers";
+import { useReferenceUrl } from "../hooks/useReferenceUrl";
 import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
 import { DetailList, Section, TagEditor } from "./ui";
 
@@ -129,6 +130,7 @@ function ItemModal({
   onExtractFrames: (item: ReferenceItem) => void;
 }) {
   const canStack = item.mediaKind === "image" && Boolean(item.stack?.enabled);
+  const { url: itemUrl } = useReferenceUrl(item, { eager: true });
   const [activeTab, setActiveTab] = useState<LightboxTab>("original");
   const [stackPreview, setStackPreview] = useState<StackPreviewState | null>(null);
   const [stackLoading, setStackLoading] = useState(false);
@@ -159,8 +161,9 @@ function ItemModal({
       ?? stackPreview.data.components[0]
     : null;
   const stackImageUrl = selectedComponent && stackPreview
-    ? stackPreview.urls[selectedComponent.id] ?? item.url
-    : item.url;
+    ? stackPreview.urls[selectedComponent.id] ?? itemUrl
+    : itemUrl;
+  const screenUrl = canStack && stackThumbnailUrls[item.id] ? stackThumbnailUrls[item.id] : itemUrl;
 
   const builderHref = item.groupId
     ? `/tools?id=${encodeURIComponent(item.id)}&groupId=${encodeURIComponent(item.groupId)}`
@@ -219,15 +222,19 @@ function ItemModal({
             </aside>
           </div>
         ) : item.mediaKind === "video" ? (
-          <video
-            src={item.url}
-            controls
-            autoPlay
-            className="block max-h-full max-w-full rounded-[10px]"
-          />
+          itemUrl ? (
+            <video
+              src={itemUrl}
+              controls
+              autoPlay
+              className="block max-h-full max-w-full rounded-[10px]"
+            />
+          ) : (
+            <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
+          )
         ) : (
           <img
-            src={referenceCardThumbnailUrl(item, stackThumbnailUrls[item.id])}
+            src={screenUrl}
             alt={item.name}
             className="block max-h-full max-w-full rounded-[10px] object-contain"
             draggable={false}
@@ -288,6 +295,11 @@ function GroupModal({
   const [activeTab, setActiveTab] = useState<GroupTab>("screens");
   const [focusedItem, setFocusedItem] = useState<ReferenceItem | null>(null);
   const [addReferenceId, setAddReferenceId] = useState("");
+  const focusedStackThumb = focusedItem?.stack?.enabled ? stackThumbnailUrls[focusedItem.id] : undefined;
+  const { url: focusedUrl } = useReferenceUrl(focusedItem, {
+    eager: true,
+    enabled: Boolean(focusedItem) && !focusedStackThumb,
+  });
 
   useEffect(() => { setFocusedItem(null); setAddReferenceId(""); }, [group.id]);
 
@@ -325,7 +337,7 @@ function GroupModal({
             </button>
             <div className="flex flex-1 items-center justify-center p-6">
               <img
-                src={referenceCardThumbnailUrl(focusedItem, stackThumbnailUrls[focusedItem.id])}
+                src={focusedStackThumb ?? focusedUrl}
                 alt={focusedItem.name}
                 className="block max-h-full max-w-full rounded-[10px] object-contain"
                 draggable={false}
@@ -345,12 +357,7 @@ function GroupModal({
                   onClick={() => setFocusedItem(item)}
                   className="group relative aspect-[4/3] w-full cursor-zoom-in overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-0 transition-[border-color] hover:border-[var(--border-strong)]"
                 >
-                  <div
-                    className="h-full w-full bg-cover bg-center bg-no-repeat"
-                    style={{
-                      backgroundImage: `url('${referenceCardThumbnailUrl(item, stackThumbnailUrls[item.id])}')`,
-                    }}
-                  />
+                  <GroupGridThumb item={item} stackThumbnailUrl={stackThumbnailUrls[item.id]} />
                   <div
                     className="pointer-events-none absolute inset-0 flex items-end p-2 opacity-0 transition-opacity group-hover:opacity-100"
                     style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 50%)" }}
@@ -829,13 +836,33 @@ function StackTreeRows({
   );
 }
 
+function GroupGridThumb({
+  item, stackThumbnailUrl,
+}: {
+  item: ReferenceItem; stackThumbnailUrl?: string;
+}) {
+  const stackThumb = item.stack?.enabled ? stackThumbnailUrl : undefined;
+  const { url, setRef } = useReferenceUrl(item, { enabled: !stackThumb });
+  const thumbnailUrl = stackThumb ?? url;
+  return (
+    <div
+      ref={setRef}
+      className="h-full w-full bg-cover bg-center bg-no-repeat bg-[var(--surface)]"
+      style={thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined}
+    />
+  );
+}
+
 async function loadStackPreview(item: ReferenceItem): Promise<StackPreviewState | null> {
   const data = await readReferenceStackData(item.id);
   if (!data) return null;
+  // Components without their own crop file fall back to the original image; read
+  // it through the shared cache instead of relying on a possibly-empty item.url.
+  const baseUrl = (await loadReferenceUrl(item)) ?? "";
   const urls: Record<string, string> = {};
   const ownedUrls: string[] = [];
   for (const component of data.components) {
-    if (!component.file) { urls[component.id] = item.url; continue; }
+    if (!component.file) { urls[component.id] = baseUrl; continue; }
     const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
     if (!blob) continue;
     const url = URL.createObjectURL(blob);

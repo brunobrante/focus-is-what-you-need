@@ -2,13 +2,9 @@ import { useMemo } from "react";
 import { Folder, Play } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
 import type { ReferenceItem } from "@/lib/references/referenceItemTypes";
+import { useReferenceUrl } from "@/routes/references/hooks/useReferenceUrl";
 
 export type { ReferenceItem };
-
-function referenceCardThumbnailUrl(item: ReferenceItem, stackThumbnailUrl?: string | null): string {
-  if (item.stack?.enabled && stackThumbnailUrl) return stackThumbnailUrl;
-  return item.url;
-}
 
 export function ReferenceGrid({
   groups,
@@ -109,12 +105,15 @@ function GroupCard({
       : null) ?? imageReferences[0] ?? null;
   const stackCount = references.filter((item) => item.stack?.enabled).length;
   const isGroup = stackCount > 1 || imageReferences.length > 1;
-  const thumbnailUrl = firstImage
-    ? referenceCardThumbnailUrl(firstImage, stackThumbnailUrls[firstImage.id])
-    : null;
+  const coverStackThumb = firstImage?.stack?.enabled ? stackThumbnailUrls[firstImage.id] : undefined;
+  const { url: coverUrl, setRef } = useReferenceUrl(firstImage, {
+    enabled: Boolean(firstImage) && !coverStackThumb,
+  });
+  const thumbnailUrl = firstImage ? coverStackThumb ?? coverUrl : "";
 
   return (
     <button
+      ref={setRef}
       type="button"
       onClick={onSelect}
       className="group relative aspect-[4/3] w-full cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
@@ -138,6 +137,8 @@ function GroupCard({
             className="h-full w-full bg-cover bg-center bg-no-repeat bg-[var(--surface)]"
             style={{ backgroundImage: `url('${thumbnailUrl}')` }}
           />
+        ) : firstImage ? (
+          <div className="h-full w-full bg-[var(--surface)]" />
         ) : (
           <div className="relative h-full w-full bg-[var(--bg)] text-[var(--text-muted)]">
             <Folder
@@ -188,10 +189,13 @@ function ReferenceCard({
   onSelect: () => void;
   onDoubleClick: () => void;
 }) {
-  const thumbnailUrl = referenceCardThumbnailUrl(item, stackThumbnailUrl);
+  const stackThumb = item.stack?.enabled ? stackThumbnailUrl : undefined;
+  const { url, setRef } = useReferenceUrl(item, { enabled: !stackThumb });
+  const thumbnailUrl = stackThumb ?? url;
 
   return (
     <button
+      ref={setRef}
       type="button"
       onClick={onSelect}
       onDoubleClick={onDoubleClick}
@@ -207,13 +211,17 @@ function ReferenceCard({
       >
         {item.mediaKind === "video" ? (
           <div className="relative h-full w-full">
-            <video
-              src={item.url}
-              muted
-              preload="metadata"
-              playsInline
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+            {url ? (
+              <video
+                src={url}
+                muted
+                preload="metadata"
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 h-full w-full bg-[var(--surface)]" />
+            )}
             <span className="pointer-events-none absolute left-2 top-2 flex items-center gap-1 rounded-[4px] border border-[rgba(255,255,255,0.12)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] uppercase tracking-[0.4px] text-white backdrop-blur">
               <Play size={8} className="fill-white" />
               {item.type}
@@ -222,7 +230,7 @@ function ReferenceCard({
         ) : (
           <div
             className="h-full w-full bg-cover bg-center bg-no-repeat bg-[var(--surface)]"
-            style={{ backgroundImage: `url('${thumbnailUrl}')` }}
+            style={thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined}
           />
         )}
 

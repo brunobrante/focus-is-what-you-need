@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  readReferenceGroups,
-  writeReferenceGroups,
-  writeRefsMeta,
-  readRefsMeta,
   saveReferenceFile,
-  loadReferenceFile,
   removeReferenceFile,
   extFromName,
   extractVideoFrameFull,
   deleteReferenceFrames,
   type ExtractedFrame,
+  type StoredRefMeta,
 } from "@/lib/tauri/referenceStorage";
+import {
+  loadReferenceLibrary,
+  replaceReferenceLibraryMeta,
+  replaceReferenceLibraryGroups,
+} from "@/lib/storage/repos/referenceLibrary.repo";
+import {
+  clearReferenceUrlCache,
+  primeReferenceUrl,
+} from "@/lib/references/referenceUrlCache";
 import { ensureWorkspaceFolders } from "@/lib/tauri/workspace";
 import {
   newReferenceGroupId,
@@ -47,26 +52,26 @@ import {
 } from "../lib/utils";
 import type { FramePickerVideo } from "../../import/VideoFramePicker";
 
-async function loadLibrary(): Promise<ReferenceItem[]> {
+async function loadLibrary(): Promise<{ items: ReferenceItem[]; groups: ReferenceGroup[] }> {
   await ensureWorkspaceFolders().catch(() => {});
-  const metas = await readRefsMeta();
-  const items: ReferenceItem[] = [];
-  for (const meta of metas) {
-    const ext = meta.ext || extFromName(meta.name);
-    const blob = await loadReferenceFile(meta.id, ext).catch(() => null);
-    if (!blob) continue;
-    const url = URL.createObjectURL(blob);
-    items.push({ ...meta, ext, url });
-  }
-  return items;
+  const { metas, groups } = await loadReferenceLibrary();
+  // URLs are resolved lazily on demand (see useReferenceUrl); the catalog renders
+  // immediately and each file is only read from disk when its card is shown.
+  const items: ReferenceItem[] = metas.map((meta) => ({
+    ...meta,
+    type: meta.type as ReferenceItem["type"],
+    ext: meta.ext || extFromName(meta.name),
+    url: "",
+  }));
+  return { items, groups };
 }
 
 function persistMeta(library: ReferenceItem[]): void {
-  const metas = library.map(({ url: _url, ...rest }) => ({
+  const metas: StoredRefMeta[] = library.map(({ url: _url, ...rest }) => ({
     ...rest,
     ext: rest.ext ?? extFromName(rest.name),
   }));
-  void writeRefsMeta(metas).catch((err) => {
+  void replaceReferenceLibraryMeta(metas).catch((err) => {
     console.error("[references] failed to persist metadata:", err);
   });
 }
@@ -93,7 +98,7 @@ export function useReferenceLibrary() {
   stackThumbnailUrlsRef.current = stackThumbnailUrls;
 
   useEffect(() => {
-    Promise.all([loadLibrary(), readReferenceGroups()]).then(([items, storedGroups]) => {
+    void loadLibrary().then(({ items, groups: storedGroups }) => {
       const libraryWithGroups = applyGroupsToLibrary(items, storedGroups);
       const nextGroups = normalizeGroupsForLibrary(storedGroups, libraryWithGroups);
       setLibrary(libraryWithGroups);
@@ -101,7 +106,7 @@ export function useReferenceLibrary() {
       setLoading(false);
     });
     return () => {
-      for (const item of libraryRef.current) releaseReferenceItemUrls(item);
+      clearReferenceUrlCache();
       for (const url of Object.values(stackThumbnailUrlsRef.current)) URL.revokeObjectURL(url);
     };
   }, []);
@@ -113,7 +118,7 @@ export function useReferenceLibrary() {
 
   useEffect(() => {
     if (loading) return;
-    void writeReferenceGroups(groups).catch((err) => {
+    void replaceReferenceLibraryGroups(groups).catch((err) => {
       console.error("[references] failed to persist groups:", err);
     });
   }, [groups, loading]);
@@ -325,6 +330,7 @@ export function useReferenceLibrary() {
             continue;
           }
           const url = URL.createObjectURL(blob);
+          primeReferenceUrl(id, url);
           const dims = await measureImage(url).catch(() => ({ w: 0, h: 0 }));
           frameItems.push({
             id,

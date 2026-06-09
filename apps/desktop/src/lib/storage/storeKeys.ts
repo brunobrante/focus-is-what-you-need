@@ -5,6 +5,8 @@ export const TABLES = {
   components: "components",
   variants: "variants",
   references: "references",
+  referenceLibrary: "reference_library",
+  referenceLibraryGroups: "reference_library_groups",
   scenes: "scenes",
   thumbnails: "thumbnails",
   settings: "settings",

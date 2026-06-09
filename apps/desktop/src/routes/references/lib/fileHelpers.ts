@@ -3,6 +3,10 @@ import {
   removeReferenceFile,
   extFromName,
 } from "@/lib/tauri/referenceStorage";
+import {
+  dropReferenceUrl,
+  primeReferenceUrl,
+} from "@/lib/references/referenceUrlCache";
 import type { MediaKind, ReferenceItem } from "../types";
 import { inferType, newId } from "./utils";
 
@@ -15,7 +19,7 @@ export function referenceCardThumbnailUrl(
 }
 
 export function releaseReferenceItemUrls(item: ReferenceItem): void {
-  URL.revokeObjectURL(item.url);
+  dropReferenceUrl(item.id);
 }
 
 function isVideoFile(file: File): boolean {
@@ -36,6 +40,9 @@ export async function fileToReference(file: File): Promise<ReferenceItem | null>
   }
 
   const url = URL.createObjectURL(blob);
+  // Register the in-memory blob URL so the grid shows this item instantly,
+  // without a redundant read back from disk.
+  primeReferenceUrl(id, url);
   const mediaKind: MediaKind = isVideoFile(file) ? "video" : "image";
 
   let w = 0;
