@@ -69,6 +69,7 @@ import type {
   VariantRow,
 } from "@/lib/storage/schema";
 import { IconChevronDown, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconSettings, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
+import { EmptyMessage } from "@/components/screen/EmptyMessage";
 
 type Tab = "screens" | "components" | "references" | "system";
 type CmpKindFilter = "all" | ComponentKind;
@@ -1154,7 +1155,7 @@ function AddScreenCard({ type, onClick }: { type: ProjectType; onClick: () => vo
         className={`grid place-items-center rounded-[10px] border border-dashed border-[var(--border)] text-[var(--text-muted)] transition-[border-color,color,background] duration-[120ms] group-hover:border-[var(--text)] group-hover:bg-[#161616] group-hover:text-[var(--text)] ${aspectForType(type)}`}
       >
         <div className="flex flex-col items-center gap-2 text-[12px] tracking-[0.2px]">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-black">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--surface)]">
             <IconPlus size={14} strokeWidth={2} />
           </span>
           <span>New screen</span>
@@ -1179,7 +1180,7 @@ function AddComponentCard({ onClick }: { onClick: () => void }) {
     >
       <div className="grid aspect-[4/3] place-items-center rounded-[10px] border border-dashed border-[var(--border)] text-[var(--text-muted)] transition-[border-color,color,background] duration-[120ms] group-hover:border-[var(--text)] group-hover:bg-[#161616] group-hover:text-[var(--text)]">
         <div className="flex flex-col items-center gap-2 text-[12px] tracking-[0.2px]">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-black">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--surface)]">
             <IconPlus size={14} strokeWidth={2} />
           </span>
           <span>New component</span>
@@ -2434,22 +2435,12 @@ export function ReferencesTab({
 
       <main className="flex-1 px-7 pb-10">
         {filtered.length === 0 ? (
-          <div className="grid min-h-[320px] place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] px-6 py-10 text-center">
-            <div className="max-w-[280px]">
-              <div className="mb-3 text-[16px] font-semibold text-[var(--text)]">No reference found</div>
-              <div className="text-[13px] leading-[1.6] text-[var(--text-muted)]">
-                Adjust the filters or add new references to the project via search, upload or external URL.
-              </div>
-              <button
-                type="button"
-                onClick={() => modalRef.current?.open()}
-                className="mx-auto mt-5 inline-flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-[var(--border-strong)] bg-transparent px-3.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
-              >
-                <IconPlus size={13} strokeWidth={1.8} />
-                Add Reference
-              </button>
-            </div>
-          </div>
+          <EmptyMessage
+            icon={<IconImage size={17} strokeWidth={1.7} />}
+            title="No reference found"
+            description="Adjust the filters or add new references to the project via search, upload or external URL."
+            onClick={() => modalRef.current?.open()}
+          />
         ) : view === "grid" ? (
           <div
             className="columns-2 gap-3 md:columns-3 xl:columns-4"

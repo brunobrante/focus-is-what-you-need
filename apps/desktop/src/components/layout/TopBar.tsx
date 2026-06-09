@@ -91,7 +91,7 @@ export function TopBar({
 
   return (
     <>
-    <header className="flex h-12 shrink-0 items-center gap-3.5 border-b border-[var(--border)] px-5 text-[12px] tracking-[0.3px] text-[var(--text-muted)]">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[var(--border)] px-6 text-[13px] tracking-[0.3px] text-[var(--text-muted)]">
       <button
         ref={wsTriggerRef}
         type="button"
@@ -100,12 +100,12 @@ export function TopBar({
           setWsPosition({ top: rect.bottom + 6, left: rect.left });
           setWsOpen((v) => !v);
         }}
-        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] tracking-[0.3px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+        className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] tracking-[0.3px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
       >
-        <span aria-hidden className="h-3 w-3 shrink-0 rounded-[3px] bg-[var(--text)]" />
+        <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-[3px] bg-[var(--text)]" />
         {currentWs?.name ?? "workspace"}
         <IconChevronDown
-          size={9}
+          size={10}
           strokeWidth={2.4}
           className={["transition-transform duration-150", wsOpen ? "rotate-180" : ""].join(" ")}
         />
@@ -168,28 +168,28 @@ export function TopBar({
         document.body,
       ) : null}
 
-      <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--border)]" />
-      <nav aria-label="Workspace" className="inline-flex items-center gap-0.5">
+      <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--border)]" />
+      <nav aria-label="Workspace" className="inline-flex items-center gap-1">
         <TopNavLink to="/" end>
-          <IconGrid size={13} strokeWidth={1.7} className="opacity-85" />
+          <IconGrid size={14} strokeWidth={1.7} className="opacity-85" />
           Projects
         </TopNavLink>
         <TopNavLink to="/components">
-          <IconLayers size={13} strokeWidth={1.7} className="opacity-85" />
+          <IconLayers size={14} strokeWidth={1.7} className="opacity-85" />
           Components
         </TopNavLink>
         <TopNavLink to="/system-design">
-          <IconColorStyles size={13} strokeWidth={1.7} className="opacity-85" />
+          <IconColorStyles size={14} strokeWidth={1.7} className="opacity-85" />
           System
         </TopNavLink>
         <TopNavLink to="/references">
-          <IconImage size={13} strokeWidth={1.7} className="opacity-85" />
+          <IconImage size={14} strokeWidth={1.7} className="opacity-85" />
           References
         </TopNavLink>
       </nav>
       {extra ? (
         <>
-          <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--border)]" />
+          <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--border)]" />
           {extra}
         </>
       ) : null}
@@ -198,14 +198,14 @@ export function TopBar({
         to="/generate"
         className={({ isActive }) =>
           [
-            "inline-flex h-7 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
+            "inline-flex h-8 items-center gap-2 rounded-md border px-3.5 text-[13px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
             isActive
               ? "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
               : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
           ].join(" ")
         }
       >
-        <Wand2 size={12} strokeWidth={1.7} className="opacity-80" />
+        <Wand2 size={13} strokeWidth={1.7} className="opacity-80" />
         Builder
       </NavLink>
       <button
@@ -295,7 +295,7 @@ function TopNavLink({
       end={end}
       className={({ isActive }) =>
         [
-          "relative inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
+          "relative inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
           isActive
             ? "bg-[var(--surface)] text-[var(--text)]"
             : "text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",

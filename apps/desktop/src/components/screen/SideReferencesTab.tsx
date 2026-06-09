@@ -27,8 +27,7 @@ export function SideReferencesTab({
         icon={<IconImage size={17} strokeWidth={1.7} />}
         title={query.trim() ? "No reference found" : "No references yet"}
         description="Add reference images or videos"
-        actionLabel="Add reference"
-        onAction={onAdd}
+        onClick={onAdd}
       />
     );
   }

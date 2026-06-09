@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Upload, FolderPlus } from "lucide-react";
+import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { extFromName, deleteReferenceFrames } from "@/lib/tauri/referenceStorage";
@@ -113,8 +114,11 @@ export function References() {
               {lib.loading ? (
                 <LoadingState />
               ) : lib.visibleGroups.length + lib.visible.length === 0 ? (
-                <EmptyState
-                  onUpload={() => {
+                <EmptyMessage
+                  icon={<Upload size={18} aria-hidden />}
+                  title="No references yet"
+                  description="Click to upload images or videos"
+                  onClick={() => {
                     importRef.current?.open({
                       existingItems: lib.library,
                       targetGroupName: null,
@@ -257,27 +261,3 @@ function LoadingState() {
   );
 }
 
-function EmptyState({ onUpload }: { onUpload: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onUpload}
-      className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-[12px] border border-dashed border-[var(--border-strong)] py-20 text-center transition-colors hover:border-[var(--text)] hover:bg-[rgba(255,255,255,0.01)]"
-      style={{
-        backgroundImage: "radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0)",
-        backgroundSize: "22px 22px",
-        backgroundColor: "var(--bg)",
-      }}
-    >
-      <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)]">
-        <Upload size={18} />
-      </span>
-      <div>
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">No references yet</p>
-        <p className="m-0 mt-1 text-[12px] text-[var(--text-faint)]">
-          Click to upload images or videos
-        </p>
-      </div>
-    </button>
-  );
-}

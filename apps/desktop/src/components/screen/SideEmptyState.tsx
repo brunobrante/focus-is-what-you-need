@@ -19,8 +19,7 @@ export function SideEmptyState({
       icon={icon ?? <IconGrid size={18} strokeWidth={1.6} />}
       title={title}
       description={description}
-      actionLabel={actionLabel}
-      onAction={onAction}
+      onClick={onAction}
     />
   );
 }
