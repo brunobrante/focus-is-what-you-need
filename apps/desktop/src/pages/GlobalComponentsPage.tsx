@@ -5,6 +5,7 @@ import { PageFooter } from "@/components/layout/PageFooter";
 import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { NewComponentModal, type NewComponentModalHandle } from "@/components/modals/NewComponentModal";
+import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
 import { IconPlus, IconSearch, IconGlobe, IconChevronDown } from "@/components/icons";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
@@ -26,6 +27,7 @@ export function GlobalComponentsPage() {
   } = useGlobalComponents();
 
   const newComponentModalRef = useRef<NewComponentModalHandle>(null);
+  const fastEditRef = useRef<FastEditModalHandle>(null);
 
   const openCreateModal = () => {
     if (!workspaceId) return;
@@ -101,6 +103,15 @@ export function GlobalComponentsPage() {
               component={c}
               projects={workspaceProjects}
               onRequestDelete={() => setPendingDelete(c)}
+              onFastEdit={() =>
+                fastEditRef.current?.open({
+                  mode: "component",
+                  component: c,
+                  variant: null,
+                  type: "desktop",
+                  canvasHref: `/canvas?variant=${encodeURIComponent(c.activeVariantId)}&type=desktop`,
+                })
+              }
             />
           ))}
           {workspaceId && <AddComponentCard onClick={openCreateModal} />}
@@ -125,6 +136,7 @@ export function GlobalComponentsPage() {
       />
 
       <NewComponentModal ref={newComponentModalRef} />
+      <FastEditModal ref={fastEditRef} />
 
       <PageFooter />
     </div>
@@ -135,10 +147,12 @@ function WorkspaceComponentCard({
   component,
   projects,
   onRequestDelete,
+  onFastEdit,
 }: {
   component: ComponentRow;
   projects: ProjectRow[];
   onRequestDelete: () => void;
+  onFastEdit: () => void;
 }) {
   const navigate = useNavigate();
   const canvasHref = `/canvas?variant=${encodeURIComponent(component.activeVariantId)}&type=desktop`;
@@ -165,6 +179,12 @@ function WorkspaceComponentCard({
               label: "Open in canvas",
               icon: CardMenuIcons.Canvas,
               onClick: () => navigate(canvasHref),
+            },
+            {
+              key: "fast-edit",
+              label: "Fast edit",
+              icon: CardMenuIcons.FastEdit,
+              onClick: onFastEdit,
             },
             {
               key: "more",

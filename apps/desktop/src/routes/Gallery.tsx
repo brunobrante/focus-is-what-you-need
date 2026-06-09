@@ -33,6 +33,7 @@ import {
   type NewComponentModalHandle,
 } from "@/components/modals/NewComponentModal";
 import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
+import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
 import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
 import { ProjectSettingsModal, type ProjectSettingsModalHandle } from "@/components/modals/ProjectSettingsModal";
@@ -1169,6 +1170,28 @@ function AddScreenCard({ type, onClick }: { type: ProjectType; onClick: () => vo
   );
 }
 
+function AddComponentCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex cursor-pointer flex-col gap-2.5 bg-transparent p-0 text-left text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5"
+    >
+      <div className="grid aspect-[4/3] place-items-center rounded-[10px] border border-dashed border-[var(--border)] text-[var(--text-muted)] transition-[border-color,color,background] duration-[120ms] group-hover:border-[var(--text)] group-hover:bg-[#161616] group-hover:text-[var(--text)]">
+        <div className="flex flex-col items-center gap-2 text-[12px] tracking-[0.2px]">
+          <span className="grid h-8 w-8 place-items-center rounded-full border border-current">
+            <IconPlus size={14} strokeWidth={2} />
+          </span>
+          <span>New component</span>
+        </div>
+      </div>
+      <div className="px-0.5">
+        <span className="truncate text-[13px] font-medium text-[var(--text-muted)]">New component</span>
+      </div>
+    </button>
+  );
+}
+
 function CardMenu({
   actions,
 }: {
@@ -1574,24 +1597,13 @@ export function ComponentsTab({
   onSectionByIdChange: Dispatch<SetStateAction<Record<string, string | null>>>;
   onRequestDelete: (component: ComponentRow) => void;
 }) {
+  const fastEditRef = useRef<FastEditModalHandle>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [screenFilter, setScreenFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [createSectionRequest, setCreateSectionRequest] = useState(0);
   const [screenAssignmentComponent, setScreenAssignmentComponent] = useState<ComponentRow | null>(null);
-  const categories = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          components
-            .map((component) => component.category?.trim())
-            .filter((category): category is string => Boolean(category)),
-        ),
-      ).sort((a, b) => a.localeCompare(b)),
-    [components],
-  );
   const filtered = useMemo(() => {
     const loweredQuery = query.trim().toLowerCase();
     return components.filter((component) => {
@@ -1606,11 +1618,9 @@ export function ComponentsTab({
         component.assignedScreenIds.includes(screenFilter);
       const matchesSection =
         sectionFilter === "all" || (sectionById[component.id] ?? "unassigned") === sectionFilter;
-      const matchesCategory =
-        categoryFilter === "all" || (component.category ?? "") === categoryFilter;
-      return matchesKind && matchesQuery && matchesScreen && matchesSection && matchesCategory;
+      return matchesKind && matchesQuery && matchesScreen && matchesSection;
     });
-  }, [categoryFilter, components, filter, query, screenFilter, sectionById, sectionFilter]);
+  }, [components, filter, query, screenFilter, sectionById, sectionFilter]);
   const labelTotal =
     filter === "all"
       ? `${components.length}`
@@ -1666,16 +1676,6 @@ export function ComponentsTab({
             ...sections.map((section) => ({ value: section.id, label: section.name })),
           ]}
         />
-        <FilterPill
-          label="Category"
-          value={categoryFilter}
-          onChange={setCategoryFilter}
-          options={[
-            { value: "all", label: "All categories" },
-            ...categories.map((category) => ({ value: category, label: category })),
-          ]}
-        />
-
         <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />
 
         <ViewToggle value={view} onChange={setView} />
@@ -1700,33 +1700,48 @@ export function ComponentsTab({
           newSectionPrefix="Section"
           createSectionRequest={createSectionRequest}
           showCreateSectionButton={false}
-          renderItem={(c, helpers) =>
-            view === "list" ? (
+          renderAddCard={canCreate ? () => <AddComponentCard onClick={onNewComponent} /> : undefined}
+          renderItem={(c, helpers) => {
+            const variant = activeVariants.get(c.id) ?? null;
+            const canvasHref = variant
+              ? `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&variant=${variant.id}`
+              : `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&component=${c.id}`;
+            const openFastEdit = () =>
+              fastEditRef.current?.open({
+                mode: "component",
+                component: c,
+                variant,
+                type,
+                canvasHref,
+              });
+            return view === "list" ? (
               <ComponentListRow
                 key={c.id}
                 component={c}
-                variant={activeVariants.get(c.id) ?? null}
+                variant={variant}
                 screens={screens}
                 projectId={projectId}
                 type={type}
                 onRequestDelete={onRequestDelete}
                 onRequestAssignSection={helpers.onRequestAssignSection}
                 onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
+                onFastEdit={openFastEdit}
               />
             ) : (
               <ComponentCard
                 key={c.id}
                 component={c}
-                variant={activeVariants.get(c.id) ?? null}
+                variant={variant}
                 screens={screens}
                 projectId={projectId}
                 type={type}
                 onRequestDelete={onRequestDelete}
                 onRequestAssignSection={helpers.onRequestAssignSection}
                 onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
+                onFastEdit={openFastEdit}
               />
-            )
-          }
+            );
+          }}
         />
       </main>
       <ComponentScreensModal
@@ -1739,6 +1754,7 @@ export function ComponentsTab({
           setScreenAssignmentComponent(null);
         }}
       />
+      <FastEditModal ref={fastEditRef} />
     </>
   );
 }
@@ -1788,6 +1804,7 @@ function ComponentCard({
   onRequestDelete,
   onRequestAssignSection,
   onRequestAssignScreens,
+  onFastEdit,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
@@ -1797,6 +1814,7 @@ function ComponentCard({
   onRequestDelete: (component: ComponentRow) => void;
   onRequestAssignSection: () => void;
   onRequestAssignScreens: () => void;
+  onFastEdit: () => void;
 }) {
   const navigate = useNavigate();
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
@@ -1822,7 +1840,7 @@ function ComponentCard({
         <CardMenu
           actions={[
             { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
-            { id: "edit", label: "Edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => navigate(href) },
+            { id: "edit", label: "Fast edit", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: onFastEdit },
             {
               id: "more",
               label: "Mais",
@@ -1874,6 +1892,7 @@ function ComponentListRow({
   onRequestDelete,
   onRequestAssignSection,
   onRequestAssignScreens,
+  onFastEdit,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
@@ -1883,6 +1902,7 @@ function ComponentListRow({
   onRequestDelete: (component: ComponentRow) => void;
   onRequestAssignSection: () => void;
   onRequestAssignScreens: () => void;
+  onFastEdit: () => void;
 }) {
   const navigate = useNavigate();
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
@@ -1949,8 +1969,8 @@ function ComponentListRow({
           </button>
           <button
             type="button"
-            aria-label="Edit"
-            onClick={(e) => { stopNav(e); navigate(href); }}
+            aria-label="Fast edit"
+            onClick={(e) => { stopNav(e); onFastEdit(); }}
             className="grid h-6 w-6 cursor-pointer place-items-center rounded border-0 bg-transparent text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
             <IconFastEdit size={12} strokeWidth={1.6} />

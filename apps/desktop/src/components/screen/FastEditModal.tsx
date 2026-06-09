@@ -8,7 +8,7 @@ import type { ProjectType } from "@/lib/data/types";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
 import { htmlCanvasDocumentFromJSON, type HtmlCanvasDocument, type HtmlCanvasNode } from "@/lib/canvas/htmlScene";
 
-type FastEditConfig =
+export type FastEditConfig =
   | {
       mode: "screen";
       screen: ScreenRow | null;

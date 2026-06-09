@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
+import { ModalFastEdit, type FastEditConfig } from "./ModalFastEdit";
 import { IconCheck } from "@/components/icons";
 import {
   type ComponentParent,
@@ -33,10 +34,11 @@ type Props = {
   projectId?: string | null;
   screens?: ScreenRow[];
   onCreated?: (result: { component: ComponentRow; defaultVariant: VariantRow }) => void;
+  fastEdit?: FastEditConfig | null;
 };
 
 export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
-  function NewComponentModal({ projectId, screens = [], onCreated }, ref) {
+  function NewComponentModal({ projectId, screens = [], onCreated, fastEdit }, ref) {
     const [open, setOpen] = useState(false);
     const [parent, setParent] = useState<ComponentParent | null>(null);
     const [name, setName] = useState("");
@@ -120,7 +122,12 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
 
     return (
       <Modal open={open} onClose={close} ariaLabel="New component">
-        <ModalHeader title="New component" subtitle={subtitle} onClose={close} />
+        <ModalHeader
+          title="New component"
+          subtitle={subtitle}
+          onClose={close}
+          actions={fastEdit ? <ModalFastEdit config={fastEdit} /> : undefined}
+        />
         <ModalBody>
           <div className="grid gap-4">
             <label className="flex flex-col gap-2">
