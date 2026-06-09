@@ -69,6 +69,7 @@ import type {
   VariantRow,
 } from "@/lib/storage/schema";
 import { IconChevronDown, IconClose, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPencil, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
+import { ListFilter } from "lucide-react";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 
 type Tab = "screens" | "components" | "references" | "system";
@@ -571,22 +572,12 @@ export function ScreensTab({
   return (
     <>
       <div className="flex items-center gap-2 px-7 pb-4 pt-5">
-        <label className="relative min-w-0 flex-1">
-          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search screens..."
-            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-          />
-        </label>
-
-        <FilterPill
-          label="Section"
-          value={sectionFilter}
-          onChange={setSectionFilter}
-          options={[
+        <ScreenSearchBar
+          query={query}
+          onQueryChange={setQuery}
+          sectionFilter={sectionFilter}
+          onSectionFilterChange={setSectionFilter}
+          sectionOptions={[
             { value: "all", label: "All sections" },
             { value: "unassigned", label: "No section" },
             ...sections.map((s) => ({ value: s.id, label: s.name })),
@@ -1525,7 +1516,7 @@ function FilterPill({
         type="button"
         onClick={toggle}
         className={[
-          "inline-flex h-[30px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
+          "inline-flex h-[34px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
           isActive
             ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
             : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
@@ -1581,6 +1572,344 @@ function FilterPill({
         document.body,
       ) : null}
     </>
+  );
+}
+
+type CmpChipOption = { value: string; label: string };
+
+function ComponentSearchBar({
+  query,
+  onQueryChange,
+  typeFilter,
+  onTypeFilterChange,
+  typeOptions,
+  screenFilter,
+  onScreenFilterChange,
+  screenOptions,
+  sectionFilter,
+  onSectionFilterChange,
+  sectionOptions,
+}: {
+  query: string;
+  onQueryChange: (v: string) => void;
+  typeFilter: string;
+  onTypeFilterChange: (v: string) => void;
+  typeOptions: CmpChipOption[];
+  screenFilter: string;
+  onScreenFilterChange: (v: string) => void;
+  screenOptions: CmpChipOption[];
+  sectionFilter: string;
+  onSectionFilterChange: (v: string) => void;
+  sectionOptions: CmpChipOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const activeCount =
+    (typeFilter !== "all" ? 1 : 0) +
+    (screenFilter !== "all" ? 1 : 0) +
+    (sectionFilter !== "all" ? 1 : 0);
+
+  return (
+    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+      <label className="relative min-w-0 flex-1">
+        <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Search components..."
+          className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+        />
+      </label>
+
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-label="Filters"
+          className={[
+            "relative inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
+            open || activeCount > 0
+              ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
+              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+          ].join(" ")}
+        >
+          <ListFilter size={12} />
+          Filters
+          {activeCount > 0 && (
+            <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.2)] text-[9px] font-bold leading-none">
+              {activeCount}
+            </span>
+          )}
+        </button>
+
+        {open && (
+          <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[240px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <div className="flex flex-col gap-4">
+              <CmpFilterSection title="Type" options={typeOptions} value={typeFilter} onChange={onTypeFilterChange} />
+              <CmpFilterSection title="Screen" options={screenOptions} value={screenFilter} onChange={onScreenFilterChange} />
+              {sectionOptions.length > 2 && (
+                <CmpFilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CmpFilterSection({
+  title,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  options: CmpChipOption[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">
+        {title}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={[
+              "h-[26px] cursor-pointer rounded-full border px-3 text-[11px] font-medium transition-colors duration-[100ms]",
+              value === opt.value
+                ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+                : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+            ].join(" ")}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScreenSearchBar({
+  query,
+  onQueryChange,
+  sectionFilter,
+  onSectionFilterChange,
+  sectionOptions,
+}: {
+  query: string;
+  onQueryChange: (v: string) => void;
+  sectionFilter: string;
+  onSectionFilterChange: (v: string) => void;
+  sectionOptions: CmpChipOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const isActive = sectionFilter !== "all";
+
+  return (
+    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+      <label className="relative min-w-0 flex-1">
+        <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Search screens..."
+          className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+        />
+      </label>
+
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-label="Filters"
+          className={[
+            "relative inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
+            open || isActive
+              ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
+              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+          ].join(" ")}
+        >
+          <ListFilter size={12} />
+          Filters
+          {isActive && (
+            <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.2)] text-[9px] font-bold leading-none">
+              1
+            </span>
+          )}
+        </button>
+
+        {open && (
+          <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[240px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <CmpFilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RefSearchBar({
+  query,
+  onQueryChange,
+  originFilter,
+  onOriginFilterChange,
+  originOptions,
+  kindFilter,
+  onKindFilterChange,
+  kindOptions,
+  targetFilter,
+  onTargetFilterChange,
+  targetOptions,
+}: {
+  query: string;
+  onQueryChange: (v: string) => void;
+  originFilter: string;
+  onOriginFilterChange: (v: string) => void;
+  originOptions: CmpChipOption[];
+  kindFilter: string;
+  onKindFilterChange: (v: string) => void;
+  kindOptions: CmpChipOption[];
+  targetFilter: string;
+  onTargetFilterChange: (v: string) => void;
+  targetOptions: CmpChipOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const activeCount =
+    (originFilter !== "all" ? 1 : 0) +
+    (kindFilter !== "all" ? 1 : 0) +
+    (targetFilter !== "all" ? 1 : 0);
+
+  return (
+    <div ref={containerRef} className="relative flex min-w-0 flex-1 items-center gap-2">
+      <label className="relative min-w-0 flex-1">
+        <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Search references..."
+          className="h-[34px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+        />
+      </label>
+
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-label="Filters"
+          className={[
+            "relative inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-[120ms]",
+            open || activeCount > 0
+              ? "border-[var(--text)] bg-[var(--text)] font-medium text-[var(--bg)]"
+              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+          ].join(" ")}
+        >
+          <ListFilter size={12} />
+          Filters
+          {activeCount > 0 && (
+            <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.2)] text-[9px] font-bold leading-none">
+              {activeCount}
+            </span>
+          )}
+        </button>
+
+        {open && (
+          <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[260px] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <div className="flex flex-col gap-4">
+              <CmpFilterSection title="Source" options={originOptions} value={originFilter} onChange={onOriginFilterChange} />
+              <CmpFilterSection title="Kind" options={kindOptions} value={kindFilter} onChange={onKindFilterChange} />
+              <div className="flex flex-col gap-2">
+                <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Target</p>
+                <div className="flex max-h-[140px] flex-wrap gap-1.5 overflow-y-auto">
+                  {targetOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => onTargetFilterChange(opt.value)}
+                      className={[
+                        "h-[26px] cursor-pointer rounded-full border px-3 text-[11px] font-medium transition-colors duration-[100ms]",
+                        targetFilter === opt.value
+                          ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+                          : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+                      ].join(" ")}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1736,22 +2065,12 @@ export function ComponentsTab({
   return (
     <>
       <div className="flex items-center gap-2 px-7 pb-4 pt-5">
-        <label className="relative min-w-0 flex-1">
-          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search components..."
-            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-          />
-        </label>
-
-        <FilterPill
-          label="Type"
-          value={filter}
-          onChange={(value) => onFilterChange(value as CmpKindFilter)}
-          options={[
+        <ComponentSearchBar
+          query={query}
+          onQueryChange={setQuery}
+          typeFilter={filter}
+          onTypeFilterChange={(v) => onFilterChange(v as CmpKindFilter)}
+          typeOptions={[
             { value: "all", label: "All types" },
             { value: "Layout", label: "Layout" },
             { value: "Atom", label: "Atom" },
@@ -1759,21 +2078,15 @@ export function ComponentsTab({
             { value: "Pattern", label: "Pattern" },
             { value: "Overlay", label: "Overlay" },
           ]}
-        />
-        <FilterPill
-          label="Screen"
-          value={screenFilter}
-          onChange={setScreenFilter}
-          options={[
+          screenFilter={screenFilter}
+          onScreenFilterChange={setScreenFilter}
+          screenOptions={[
             { value: "all", label: "All screens" },
             ...screens.map((screen) => ({ value: screen.id, label: screen.title })),
           ]}
-        />
-        <FilterPill
-          label="Section"
-          value={sectionFilter}
-          onChange={setSectionFilter}
-          options={[
+          sectionFilter={sectionFilter}
+          onSectionFilterChange={setSectionFilter}
+          sectionOptions={[
             { value: "all", label: "All sections" },
             { value: "unassigned", label: "No section" },
             ...sections.map((section) => ({ value: section.id, label: section.name })),
@@ -2490,32 +2803,19 @@ export function ReferencesTab({
   return (
     <>
       <div className="flex items-center gap-2 px-7 pb-4 pt-5">
-        <label className="relative min-w-0 flex-1">
-          <IconSearch size={13} strokeWidth={1.7} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search references..."
-            className="h-[30px] w-full rounded-full border border-[var(--border)] bg-[var(--bg)] py-0 pl-8 pr-3 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
-          />
-        </label>
-
-        <FilterPill
-          label="Source"
-          value={originFilter}
-          onChange={setOriginFilter}
-          options={[
+        <RefSearchBar
+          query={query}
+          onQueryChange={setQuery}
+          originFilter={originFilter}
+          onOriginFilterChange={setOriginFilter}
+          originOptions={[
             { value: "all", label: "All sources" },
             { value: "external", label: "External" },
             { value: "local", label: "Local" },
           ]}
-        />
-        <FilterPill
-          label="Kind"
-          value={kindFilter}
-          onChange={setKindFilter}
-          options={[
+          kindFilter={kindFilter}
+          onKindFilterChange={setKindFilter}
+          kindOptions={[
             { value: "all", label: "All kinds" },
             { value: "hero", label: "Hero" },
             { value: "cards", label: "Cards" },
@@ -2523,12 +2823,9 @@ export function ReferencesTab({
             { value: "dash", label: "Dash" },
             { value: "type", label: "Type" },
           ]}
-        />
-        <FilterPill
-          label="Target"
-          value={targetFilter}
-          onChange={setTargetFilter}
-          options={targetOptions}
+          targetFilter={targetFilter}
+          onTargetFilterChange={setTargetFilter}
+          targetOptions={targetOptions}
         />
 
         <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border)]" />

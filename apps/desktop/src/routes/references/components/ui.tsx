@@ -1,5 +1,5 @@
-import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { ListFilter, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function SmallButton({
@@ -46,6 +46,170 @@ export function SearchInput({ value, onChange }: { value: string; onChange: (v: 
           <X size={12} />
         </button>
       ) : null}
+    </div>
+  );
+}
+
+type ChipOption = { value: string; label: string };
+
+type FilterSearchBarProps = {
+  value: string;
+  onChange: (v: string) => void;
+  filterKind: string;
+  onFilterKindChange: (v: string) => void;
+  kindOptions: ChipOption[];
+  filterType: string;
+  onFilterTypeChange: (v: string) => void;
+  typeOptions: ChipOption[];
+  filterSort: string;
+  onFilterSortChange: (v: string) => void;
+  sortOptions: ChipOption[];
+};
+
+export function FilterSearchBar({
+  value,
+  onChange,
+  filterKind,
+  onFilterKindChange,
+  kindOptions,
+  filterType,
+  onFilterTypeChange,
+  typeOptions,
+  filterSort,
+  onFilterSortChange,
+  sortOptions,
+}: FilterSearchBarProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const activeCount =
+    (filterKind !== "all" ? 1 : 0) +
+    (filterType !== "all" ? 1 : 0) +
+    (filterSort !== "recent" ? 1 : 0);
+
+  const showFormatSection = filterKind !== "all" && typeOptions.length > 1;
+
+  return (
+    <div ref={containerRef} className="relative flex min-w-[220px] max-w-[520px] flex-1 items-center gap-1.5">
+      <div className="relative flex-1">
+        <Search
+          size={14}
+          className="pointer-events-none absolute left-[10px] top-1/2 -translate-y-1/2 text-[var(--text-faint)]"
+        />
+        <input
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Search by name or tag..."
+          className="h-[34px] w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] py-0 pl-8 pr-8 text-[12.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
+        />
+        {value ? (
+          <button
+            type="button"
+            aria-label="Clear"
+            onClick={() => onChange("")}
+            className="absolute right-1.5 top-1/2 grid h-[22px] w-[22px] -translate-y-1/2 cursor-pointer place-items-center rounded-[6px] border-0 bg-transparent text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          >
+            <X size={12} />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-label="Filters"
+          className={[
+            "relative grid h-[34px] w-[34px] cursor-pointer place-items-center rounded-[8px] border transition-colors duration-[120ms]",
+            open || activeCount > 0
+              ? "border-[var(--border-strong)] bg-[var(--surface-hover)] text-[var(--text)]"
+              : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+          ].join(" ")}
+        >
+          <ListFilter size={14} />
+          {activeCount > 0 && (
+            <span className="absolute -right-[5px] -top-[5px] flex h-[14px] w-[14px] items-center justify-center rounded-full bg-[var(--accent)] text-[8px] font-bold leading-none text-[var(--accent-fg)]">
+              {activeCount}
+            </span>
+          )}
+        </button>
+
+        {open && (
+          <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[240px] rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+            <div className="flex flex-col gap-4">
+              <FilterSection
+                title="Type"
+                options={kindOptions}
+                value={filterKind}
+                onChange={onFilterKindChange}
+              />
+              {showFormatSection && (
+                <FilterSection
+                  title="Format"
+                  options={typeOptions}
+                  value={filterType}
+                  onChange={onFilterTypeChange}
+                />
+              )}
+              <FilterSection
+                title="Sort"
+                options={sortOptions}
+                value={filterSort}
+                onChange={onFilterSortChange}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FilterSection({
+  title,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  options: ChipOption[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">
+        {title}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={[
+              "h-[26px] cursor-pointer rounded-full border px-3 text-[11px] font-medium transition-colors duration-[100ms]",
+              value === opt.value
+                ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+                : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+            ].join(" ")}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+## Design Reference
+
+UI patterns, height scale, component conventions, and visual tokens are documented in [`Design.md`](./Design.md). Before adding or modifying toolbar controls, cards, buttons, or empty states, read the relevant section there first.
+
+---
+
 ## Branching Rule
 
 This project is in active local development and has not reached production.

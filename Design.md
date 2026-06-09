@@ -210,3 +210,47 @@ The surface fill ensures the circle reads as a distinct element against any back
 ## Summary
 
 All three patterns (add cards, content cards, empty states) share one layout grammar: a centered rectangular region with a dashed or solid border, followed by a text footer. Add cards use a dashed border and transparent background to read as "potential". Content cards use a solid border and surface background to read as "existing". Empty states use a dashed border and no background to read as "available space". The action button style — dashed border, muted text, hover fill — is identical across all three contexts, keeping the affordance consistent wherever a creation action appears.
+
+---
+
+## Toolbar Controls
+
+Every page toolbar (Screens, Components, References tabs in the Gallery; the References route) uses the same height scale for its inline controls. Never mix heights within the same toolbar row.
+
+### Height scale
+
+| Role | Height | Radius | Where |
+|---|---|---|---|
+| Search bar | `h-[34px]` | `rounded-full` (Gallery tabs) / `rounded-[8px]` (References page) | All tab toolbars |
+| Filter button ("Filters" pill) | `h-[34px]` | `rounded-full` | All tab toolbars |
+| Primary action button (New, Upload, Add Reference) | `h-9` (36px) | `rounded-[10px]` | Gallery tabs, References page header |
+| Secondary action button (SmallButton) | `h-8` (32px) | `rounded-[8px]` | References page header |
+
+### Filter button pattern
+
+All tabs use a unified "Filters" pill button instead of individual per-filter dropdowns. The button:
+
+- Renders as `inline-flex h-[34px] rounded-full border px-3 text-[12px]` with a `ListFilter` icon from `lucide-react`.
+- Is **inactive** when all filters are at their default values: `border-[var(--border)] text-[var(--text-muted)]`.
+- Becomes **active** (inverted fill) when any filter is non-default: `border-[var(--text)] bg-[var(--text)] text-[var(--bg)]`.
+- Shows a badge (white circle, `text-[9px]`) inside the pill counting how many filters are active.
+- Opens a dropdown panel (`rounded-[10px] border border-[var(--border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)]`) with chip groups — one group per filter dimension.
+
+### Filter chip style (inside the dropdown panel)
+
+```
+Active chip:   h-[26px] rounded-full border border-[var(--text)] bg-[var(--text)] text-[var(--bg)] px-3 text-[11px] font-medium
+Inactive chip: h-[26px] rounded-full border border-[var(--border)] bg-transparent text-[var(--text-muted)] px-3 text-[11px] font-medium
+               hover: border-[var(--border-strong)] text-[var(--text)]
+```
+
+Section heading inside the panel: `text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]`.
+
+### Where each component lives
+
+| Tab | Search + Filter component | File |
+|---|---|---|
+| Components | `ComponentSearchBar` | `routes/Gallery.tsx` |
+| Screens | `ScreenSearchBar` | `routes/Gallery.tsx` |
+| References (Gallery) | `RefSearchBar` | `routes/Gallery.tsx` |
+| References (route) | `FilterSearchBar` | `routes/references/components/ui.tsx` |
