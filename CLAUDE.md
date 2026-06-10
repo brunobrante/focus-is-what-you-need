@@ -6,6 +6,25 @@ UI patterns, height scale, component conventions, and visual tokens are document
 
 ---
 
+## UX Specification
+
+All UX decisions are documented in [`UX.md`](./UX.md).
+
+Any time you make a change that affects UX — new screens, new modals, new routes, changed navigation flows, new or modified buttons, updated interactions, feature additions, or any alteration to how the user navigates or acts inside the app — you must update `UX.md` to reflect the change before committing.
+
+This applies to:
+
+- New pages or routes
+- New modals or dialogs
+- Changes to existing navigation flows
+- New buttons, actions, or interactive controls
+- Changes to toolbar layout or tool behavior
+- Feature additions that change how the user reaches or uses a capability
+
+Do not skip this step. `UX.md` is the living specification and must stay in sync with the actual app behavior.
+
+---
+
 ## Branching Rule
 
 This project is in active local development and has not reached production.
