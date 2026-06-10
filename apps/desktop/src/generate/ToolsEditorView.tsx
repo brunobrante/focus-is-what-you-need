@@ -265,6 +265,37 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 onToggle={() => setShowCropsOverlay((value) => !value)}
               />
 
+              {selection ? (
+                <div
+                  data-selection-action
+                  className="absolute right-3 top-3 z-30 inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-1"
+                >
+                  <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                    {Math.round(selectionSize.w)} × {Math.round(selectionSize.h)}
+                  </span>
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={cancelSelection}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+                  >
+                    Cancelar
+                  </button>
+                  {canCrop ? (
+                    <button
+                      type="button"
+                      data-selection-action
+                      disabled={!canSaveSelection}
+                      onClick={() => void saveSelection()}
+                      className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
+                    >
+                      <Check size={10} strokeWidth={2.2} />
+                      Save
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
                   <ImageIcon size={24} strokeWidth={1.6} />
@@ -340,34 +371,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 </ModeButton>
               </div>
 
-              {selection ? (
-                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-[5px]">
-                  <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
-                    {Math.round(selectionSize.w)} × {Math.round(selectionSize.h)}
-                  </span>
-                  <button
-                    type="button"
-                    data-selection-action
-                    onClick={cancelSelection}
-                    className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-                  >
-                    Cancelar
-                  </button>
-                  {canCrop ? (
-                    <button
-                      type="button"
-                      data-selection-action
-                      disabled={!canSaveSelection}
-                      onClick={() => void saveSelection()}
-                      className="inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
-                    >
-                      <Check size={11} strokeWidth={2.2} />
-                      Save component
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
                 {!canCrop ? (
                   <span>
@@ -376,16 +379,16 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   </span>
                 ) : editingComponentId ? (
                   <span>
-                    Editing existing crop. Adjust the box and <Key>Enter</Key> saves · <Key>Esc</Key> cancels
+                    Editing existing crop. Adjust the box and <Key>Space</Key> saves · <Key>Esc</Key> cancels
                   </span>
                 ) : currentTool === "crop" ? (
                   <span>
-                    Click and drag over the open subject. <Key>Enter</Key> saves a component ·{" "}
+                    Click and drag over the open subject. <Key>Space</Key> saves a component ·{" "}
                     <Key>Esc</Key> cancels
                   </span>
                 ) : currentTool === "draw" ? (
                   <span>
-                    Draw freely over the image. The drawn area becomes the crop. <Key>Enter</Key> saves ·{" "}
+                    Draw freely over the image. The drawn area becomes the crop. <Key>Space</Key> saves ·{" "}
                     <Key>Esc</Key> cancels
                   </span>
                 ) : (

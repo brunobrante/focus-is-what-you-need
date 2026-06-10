@@ -1,5 +1,5 @@
 import type { CropBox, ActiveSubject, SavedComponent, SelectionHit } from "./types";
-import { RESIZE_HANDLES, RADIUS_HANDLES, HANDLE_HIT_AREA } from "./types";
+import { CORNER_HANDLES, RADIUS_HANDLES, HANDLE_HIT_AREA } from "./types";
 import { MIN_TOOL_ZOOM } from "../types";
 import {
   resizeHandleCenter,
@@ -25,12 +25,23 @@ export function selectionHitTest(
       return { kind: "radius", handle };
     }
   }
-  for (const handle of RESIZE_HANDLES) {
+  // Corners — small square hit area, checked before edges
+  for (const handle of CORNER_HANDLES) {
     const center = resizeHandleCenter(handle, selection);
     if (Math.abs(point.x - center.x) <= resizeHit && Math.abs(point.y - center.y) <= resizeHit) {
       return { kind: "resize", handle };
     }
   }
+
+  // Edges — full-length hit zone along each side
+  const { x, y, w, h } = selection;
+  const inX = point.x >= x && point.x <= x + w;
+  const inY = point.y >= y && point.y <= y + h;
+  if (inX && Math.abs(point.y - y) <= resizeHit)           return { kind: "resize", handle: "n" };
+  if (inX && Math.abs(point.y - (y + h)) <= resizeHit)     return { kind: "resize", handle: "s" };
+  if (inY && Math.abs(point.x - (x + w)) <= resizeHit)     return { kind: "resize", handle: "e" };
+  if (inY && Math.abs(point.x - x) <= resizeHit)           return { kind: "resize", handle: "w" };
+
   if (
     point.x >= selection.x &&
     point.x <= selection.x + selection.w &&

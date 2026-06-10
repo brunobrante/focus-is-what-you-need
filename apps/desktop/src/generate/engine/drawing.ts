@@ -3,7 +3,7 @@ import type {
   PaintOverlayArgs,
   PaintCropsArgs,
 } from "./types";
-import { RESIZE_HANDLES, RADIUS_HANDLES, HANDLE_DOT_SIZE, RADIUS_DOT_SIZE } from "./types";
+import { RESIZE_HANDLES, CORNER_HANDLES, RADIUS_HANDLES, HANDLE_DOT_SIZE, RADIUS_DOT_SIZE } from "./types";
 import { MIN_TOOL_ZOOM } from "../types";
 import {
   resizeHandleCenter,
@@ -90,24 +90,24 @@ export function drawSizeBadge(
   ctx.translate(anchorX, anchorY);
   ctx.scale(scale, scale);
   ctx.font =
-    '500 10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    '700 10.5px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
   ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "right";
+  ctx.textAlign = "center";
   const metrics = ctx.measureText(text);
-  const padX = 6;
-  const padY = 3;
-  const ascent = metrics.actualBoundingBoxAscent || 8;
+  const padX = 8;
+  const padY = 4;
+  const ascent = metrics.actualBoundingBoxAscent || 9;
   const descent = metrics.actualBoundingBoxDescent || 2;
   const textHeight = ascent + descent;
   const width = metrics.width + padX * 2;
   const height = textHeight + padY * 2;
-  const offset = 4;
-  ctx.fillStyle = "#FFFFFF";
+  const offset = 6;
+  ctx.fillStyle = "#89C4FF";
   ctx.beginPath();
-  roundedRectPath(ctx, -width, offset, width, height, 4);
+  roundedRectPath(ctx, -width / 2, offset, width, height, 5);
   ctx.fill();
-  ctx.fillStyle = "#000000";
-  ctx.fillText(text, -padX, offset + padY + ascent);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText(text, 0, offset + padY + ascent);
   ctx.restore();
 }
 
@@ -123,6 +123,27 @@ export function drawCircleHandle(
   if (radius <= 0) return;
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = strokeWidth;
+  ctx.strokeStyle = stroke;
+  ctx.stroke();
+}
+
+export function drawSquareHandle(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+  fill: string,
+  stroke: string,
+  strokeWidth: number,
+) {
+  if (size <= 0) return;
+  const half = size / 2;
+  const r = size * 0.28;
+  ctx.beginPath();
+  roundedRectPath(ctx, cx - half, cy - half, size, size, r);
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.lineWidth = strokeWidth;
@@ -173,6 +194,7 @@ export function paintCropsCanvas(args: PaintCropsArgs) {
     showCropsOverlay,
     viewMode,
     overlayFill,
+    overlayStroke,
     componentImageCache,
   } = args;
 
@@ -202,8 +224,9 @@ export function paintCropsCanvas(args: PaintCropsArgs) {
   // you currently have open*. Only the direct children of that element are
   // shown — ancestors and unrelated crops would just clutter the view.
   const openedId = activeSubject.kind === "component" ? activeSubject.id : rootComponentId;
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, toolZoom);
+  const stroke = 1 / safeZoom;
 
-  ctx.fillStyle = overlayFill;
   for (const component of components) {
     if (component.parentId !== openedId) continue;
     if (component.id === editingComponentId) continue;
@@ -217,7 +240,11 @@ export function paintCropsCanvas(args: PaintCropsArgs) {
         : 0;
     ctx.beginPath();
     roundedRectPath(ctx, rect.left, rect.top, rect.width, rect.height, radius);
+    ctx.fillStyle = overlayFill;
     ctx.fill();
+    ctx.lineWidth = stroke;
+    ctx.strokeStyle = overlayStroke;
+    ctx.stroke();
   }
 }
 
@@ -302,13 +329,11 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     const sh = Math.max(0, selection.h);
     ctx.beginPath();
     roundedRectPath(ctx, selection.x, selection.y, sw, sh, selection.r ?? 0);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillStyle = "rgba(100,180,255,0.06)";
     ctx.fill();
-    ctx.setLineDash([5 * stroke, 3 * stroke]);
-    ctx.lineWidth = stroke;
-    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = 2.5 * stroke;
+    ctx.strokeStyle = "#89C4FF";
     ctx.stroke();
-    ctx.setLineDash([]);
 
     let badgeText: string;
     if (!selectionCrop) {
@@ -320,18 +345,20 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
         selectionCrop.r ? ` · r ${Math.round(selectionCrop.r)}` : ""
       }`;
     }
-    drawSizeBadge(ctx, badgeText, selection.x + sw, selection.y + sh, toolZoom);
+    drawSizeBadge(ctx, badgeText, selection.x + sw / 2, selection.y + sh, toolZoom);
 
     if (selectionLocked) {
-      const handleRadius = HANDLE_DOT_SIZE / 2 / safeZoom;
-      const radiusRadius = RADIUS_DOT_SIZE / 2 / safeZoom;
-      for (const handle of RESIZE_HANDLES) {
+      const handleSize = HANDLE_DOT_SIZE / safeZoom;
+      for (const handle of CORNER_HANDLES) {
         const center = resizeHandleCenter(handle, selection);
-        drawCircleHandle(ctx, center.x, center.y, handleRadius, "#FFFFFF", "#0A0A0B", 1.5 * stroke);
+        drawSquareHandle(ctx, center.x, center.y, handleSize, "#89C4FF", "#FFFFFF", stroke);
       }
-      for (const handle of RADIUS_HANDLES) {
-        const center = radiusHandleCenter(handle, selection, toolZoom);
-        drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#4C8DFF", "#0A0A0B", stroke);
+      if (args.isHoveringSelection) {
+        const radiusRadius = RADIUS_DOT_SIZE / 2 / safeZoom;
+        for (const handle of RADIUS_HANDLES) {
+          const center = radiusHandleCenter(handle, selection, toolZoom);
+          drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#89C4FF", "#FFFFFF", stroke);
+        }
       }
     }
   }

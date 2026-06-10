@@ -127,7 +127,7 @@ export function CropsOverlayToggle({
       title={active ? "Hide cropped areas" : "Show cropped areas"}
       onClick={onToggle}
       className={[
-        "absolute right-3 top-3 z-30 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-medium backdrop-blur-[8px] transition-colors duration-[120ms]",
+        "absolute bottom-3.5 right-3.5 z-30 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border px-2.5 text-[11.5px] font-medium backdrop-blur-[8px] transition-colors duration-[120ms]",
         active
           ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
           : "border-[var(--border)] bg-[rgba(20,20,22,0.88)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)]",

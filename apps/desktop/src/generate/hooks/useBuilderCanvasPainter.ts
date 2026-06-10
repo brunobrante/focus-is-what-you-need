@@ -20,6 +20,7 @@ export type BuilderCanvasPainterInput = {
   toolPan: { x: number; y: number };
   selection: CropBox | null;
   selectionLocked: boolean;
+  isHoveringSelection: boolean;
   selectionCrop: CropBox | null;
   selectionMatchesExistingCut: boolean;
   drawingPath: DrawingPath | null;
@@ -55,6 +56,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     toolPan,
     selection,
     selectionLocked,
+    isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
     drawingPath,
@@ -107,6 +109,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       toolZoom,
       selection,
       selectionLocked,
+      isHoveringSelection,
       drawingPath,
       viewMode,
       components,
@@ -129,6 +132,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     imgRef,
     rootComponentId,
     selectedComponentId,
+    isHoveringSelection,
     selection,
     selectionCrop,
     selectionLocked,
@@ -154,6 +158,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       showCropsOverlay,
       viewMode,
       overlayFill: hexToRgba(cropsOverlayColor, cropsOverlayAlpha),
+      overlayStroke: hexToRgba(cropsOverlayColor, Math.min(1, cropsOverlayAlpha * 4)),
       componentImageCache: componentImageCacheRef.current,
     });
   }, [

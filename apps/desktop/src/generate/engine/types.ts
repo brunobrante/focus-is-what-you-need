@@ -89,10 +89,11 @@ export type ActiveSubject =
 export type DrawingPath = { points: Array<{ x: number; y: number }> };
 
 export const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+export const CORNER_HANDLES = ["nw", "ne", "se", "sw"] as const;
 export const RADIUS_HANDLES = ["nw", "ne", "se", "sw"] as const;
 export const HANDLE_HIT_AREA = 28;
 export const HANDLE_DOT_SIZE = 8;
-export const RADIUS_DOT_SIZE = 6;
+export const RADIUS_DOT_SIZE = 10;
 export const RADIUS_HANDLE_MIN_INSET = 12;
 
 export type ResizeHandle = (typeof RESIZE_HANDLES)[number];
@@ -140,6 +141,7 @@ export type PaintOverlayArgs = {
   toolZoom: number;
   selection: CropBox | null;
   selectionLocked: boolean;
+  isHoveringSelection: boolean;
   drawingPath: DrawingPath | null;
   viewMode: ViewMode;
   components: SavedComponent[];
@@ -165,5 +167,6 @@ export type PaintCropsArgs = {
   showCropsOverlay: boolean;
   viewMode: ViewMode;
   overlayFill: string;
+  overlayStroke: string;
   componentImageCache: Map<string, HTMLImageElement>;
 };

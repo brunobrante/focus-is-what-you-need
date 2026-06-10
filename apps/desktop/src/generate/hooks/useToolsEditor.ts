@@ -243,6 +243,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [showCropsOverlay, setShowCropsOverlay] = useState(false);
   const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
+  const [isHoveringSelection, setIsHoveringSelection] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imagePaintVersion, setImagePaintVersion] = useState(0);
@@ -1135,8 +1136,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         beginRootCreation();
       } else if (event.key === "Escape") {
         if (selection || drawingPath) cancelSelection();
-      } else if (event.key === "Enter") {
-        if (selectionLocked) void saveSelection();
+      } else if (event.key === " ") {
+        if (selectionLocked) { event.preventDefault(); void saveSelection(); }
       }
     };
 
@@ -1170,6 +1171,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     toolPan,
     selection,
     selectionLocked,
+    isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
     drawingPath,
@@ -1203,6 +1205,15 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         nextHovered = hovered?.id ?? null;
         if (!cursor && hovered) cursor = "pointer";
       }
+
+      const nextHoveringSelection = Boolean(
+        selection &&
+          point.x >= selection.x && point.x <= selection.x + selection.w &&
+          point.y >= selection.y && point.y <= selection.y + selection.h,
+      );
+      if (nextHoveringSelection !== isHoveringSelection) setIsHoveringSelection(nextHoveringSelection);
+    } else if (isHoveringSelection) {
+      setIsHoveringSelection(false);
     }
 
     if (stage && stage.style.cursor !== cursor) stage.style.cursor = cursor;
@@ -1215,6 +1226,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     const stage = stageViewportRef.current;
     if (stage) stage.style.cursor = "";
     if (viewMode === "stack" && hoveredComponentId) setHoveredComponentId(null);
+    if (isHoveringSelection) setIsHoveringSelection(false);
   }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
