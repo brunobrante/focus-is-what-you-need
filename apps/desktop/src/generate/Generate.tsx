@@ -9,8 +9,8 @@ import {
   writeSavedComponents,
   writePrimaryComponentId,
   readDiskReference,
-  readReferenceGroups,
-  readRefsMeta,
+  listReferenceLibraryGroups,
+  listReferenceLibraryMeta,
   COMPONENT_STORAGE_PREFIX,
 } from "./engine/storage";
 import { ToolsEditor } from "./ToolsEditor";
@@ -153,7 +153,7 @@ async function readToolReferenceGroupContext(
   referenceId: string,
   requestedGroupId: string | null,
 ): Promise<ToolReferenceGroupContext | null> {
-  const [groups, metas] = await Promise.all([readReferenceGroups(), readRefsMeta()]);
+  const [groups, metas] = await Promise.all([listReferenceLibraryGroups(), listReferenceLibraryMeta()]);
   const meta = metas.find((entry) => entry.id === referenceId);
   const group =
     (requestedGroupId ? groups.find((entry) => entry.id === requestedGroupId) : null) ??

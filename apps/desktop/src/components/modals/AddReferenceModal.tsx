@@ -17,9 +17,9 @@ import type {
 import {
   extFromName,
   loadReferenceFile,
-  readRefsMeta,
   type StoredRefMeta,
 } from "@/lib/tauri/referenceStorage";
+import { listReferenceLibraryMeta } from "@/lib/storage/repos/referenceLibrary.repo";
 
 /* ---------- Library reading ---------- */
 
@@ -122,7 +122,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
 
     let cancelled = false;
     void (async () => {
-      const metas = await readRefsMeta();
+      const metas = await listReferenceLibraryMeta();
       metas.sort((a, b) => new Date(b.added).getTime() - new Date(a.added).getTime());
       if (cancelled) return;
       setLibraryItems(metas);

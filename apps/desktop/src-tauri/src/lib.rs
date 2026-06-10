@@ -4,7 +4,6 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
@@ -14,6 +13,7 @@ const APP_FOLDER_NAME: &str = "focus-is-what-you-need";
 const DEFAULT_WORKSPACE_NAME: &str = "workspace";
 const FIGX_ARCHIVE_ENTRY: &str = "data/archive.json";
 const SQLITE_FILE_NAME: &str = "persistence.sqlite3";
+const SQLITE_DIR_NAME: &str = "db";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WorkspaceConfig {
@@ -29,22 +29,6 @@ pub struct FigxProjectInput {
     pub reference_ids: Vec<String>,
 }
 
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct WorkspaceMetaProject {
-    id: String,
-    name: String,
-    file: String,
-    updated_at: u64,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct WorkspaceMeta {
-    name: String,
-    app_folder: String,
-    updated_at: u64,
-    projects: Vec<WorkspaceMetaProject>,
-}
 
 struct ZipEntry {
     name: String,
@@ -63,7 +47,33 @@ fn sqlite_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
+        .join(SQLITE_DIR_NAME)
         .join(SQLITE_FILE_NAME))
+}
+
+// One-time move of the database from the app-data root into the dedicated `db/`
+// subfolder. The WAL and SHM sidecars are moved together with the main file so
+// no committed-but-not-checkpointed writes are lost.
+fn migrate_legacy_sqlite(app: &tauri::AppHandle) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let new_path = data_dir.join(SQLITE_DIR_NAME).join(SQLITE_FILE_NAME);
+    if new_path.exists() {
+        return Ok(());
+    }
+    let legacy_main = data_dir.join(SQLITE_FILE_NAME);
+    if !legacy_main.exists() {
+        return Ok(());
+    }
+    let target_dir = data_dir.join(SQLITE_DIR_NAME);
+    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    for suffix in ["", "-wal", "-shm", "-journal"] {
+        let from = data_dir.join(format!("{}{}", SQLITE_FILE_NAME, suffix));
+        if from.exists() {
+            let to = target_dir.join(format!("{}{}", SQLITE_FILE_NAME, suffix));
+            fs::rename(&from, &to).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 fn default_config(app: &tauri::AppHandle) -> WorkspaceConfig {
@@ -132,14 +142,6 @@ fn workspace_dir(cfg: &WorkspaceConfig) -> PathBuf {
     workspaces_dir(cfg).join(&cfg.workspace_name)
 }
 
-fn loose_projects_dir(cfg: &WorkspaceConfig) -> PathBuf {
-    app_root(cfg).join("projects")
-}
-
-fn workspace_meta_path(cfg: &WorkspaceConfig) -> PathBuf {
-    workspace_dir(cfg).join("meta.json")
-}
-
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -148,39 +150,11 @@ fn now_ms() -> u64 {
 }
 
 fn ensure_local_structure(cfg: &WorkspaceConfig) -> Result<(), String> {
+    // Only the references binary store is needed on disk; everything structured
+    // lives in SQLite. The `workspaces/` folder is created on demand when a
+    // `.figx` export is actually written.
     fs::create_dir_all(references_dir(cfg)).map_err(|e| e.to_string())?;
-    fs::create_dir_all(workspace_dir(cfg)).map_err(|e| e.to_string())?;
-    fs::create_dir_all(loose_projects_dir(cfg)).map_err(|e| e.to_string())?;
-    if !workspace_meta_path(cfg).exists() {
-        write_workspace_meta(
-            cfg,
-            &WorkspaceMeta {
-                name: cfg.workspace_name.clone(),
-                app_folder: APP_FOLDER_NAME.into(),
-                updated_at: now_ms(),
-                projects: vec![],
-            },
-        )?;
-    }
     Ok(())
-}
-
-static ATOMIC_WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
-
-// Write a file atomically via a unique temp file + rename. The unique suffix makes
-// concurrent writes to the same target safe (no shared temp, no truncate race that
-// can surface as EPERM), and rename is atomic so readers never see a partial file.
-fn atomic_write_string(path: &Path, content: &str) -> Result<(), String> {
-    let parent = path.parent().ok_or_else(|| "invalid target path".to_string())?;
-    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("data");
-    let seq = ATOMIC_WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
-    let tmp = parent.join(format!(".{}.{}.tmp", file_name, seq));
-    fs::write(&tmp, content).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        e.to_string()
-    })
 }
 
 fn safe_path_segment(value: &str, label: &str) -> Result<String, String> {
@@ -221,28 +195,6 @@ fn read_reference_blob(cfg: &WorkspaceConfig, id: &str, ext: &str) -> Result<Vec
         .find(|path| path.exists())
         .ok_or_else(|| "reference file not found".to_string())?;
     fs::read(&path).map_err(|e| e.to_string())
-}
-
-fn read_workspace_meta(cfg: &WorkspaceConfig) -> WorkspaceMeta {
-    let path = workspace_meta_path(cfg);
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|raw| serde_json::from_str::<WorkspaceMeta>(&raw).ok())
-        .unwrap_or_else(|| WorkspaceMeta {
-            name: cfg.workspace_name.clone(),
-            app_folder: APP_FOLDER_NAME.into(),
-            updated_at: now_ms(),
-            projects: vec![],
-        })
-}
-
-fn write_workspace_meta(cfg: &WorkspaceConfig, meta: &WorkspaceMeta) -> Result<(), String> {
-    let path = workspace_meta_path(cfg);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let json = serde_json::to_string_pretty(meta).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -660,123 +612,22 @@ fn delete_reference_frames(app: tauri::AppHandle, id: String) -> Result<(), Stri
     Ok(())
 }
 
-#[tauri::command]
-fn read_references_meta(app: tauri::AppHandle) -> Result<String, String> {
-    let cfg = read_config(&app);
-    let primary = references_dir(&cfg).join("meta.json");
-    let fallback = legacy_references_dir(&cfg).join("meta.json");
-    if primary.exists() {
-        fs::read_to_string(&primary).map_err(|e| e.to_string())
-    } else if fallback.exists() {
-        fs::read_to_string(&fallback).map_err(|e| e.to_string())
-    } else {
-        Ok("[]".into())
-    }
-}
-
-#[tauri::command]
-fn write_references_meta(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-    atomic_write_string(&references_dir(&cfg).join("meta.json"), &content)
-}
-
-#[tauri::command]
-fn read_reference_groups(app: tauri::AppHandle) -> Result<String, String> {
-    let cfg = read_config(&app);
-    let primary = references_dir(&cfg).join("groups.json");
-    let fallback = legacy_references_dir(&cfg).join("groups.json");
-    if primary.exists() {
-        fs::read_to_string(&primary).map_err(|e| e.to_string())
-    } else if fallback.exists() {
-        fs::read_to_string(&fallback).map_err(|e| e.to_string())
-    } else {
-        Ok("[]".into())
-    }
-}
-
-#[tauri::command]
-fn write_reference_groups(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-    atomic_write_string(&references_dir(&cfg).join("groups.json"), &content)
-}
-
-#[tauri::command]
-fn read_local_figx_projects(app: tauri::AppHandle) -> Result<Vec<String>, String> {
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-    let mut paths = list_figx_paths(&workspace_dir(&cfg))?;
-    paths.extend(list_figx_paths(&loose_projects_dir(&cfg))?);
-    paths.sort();
-    paths.dedup();
-
-    let mut archives = Vec::new();
-    for path in paths {
-        let bytes = match fs::read(&path) {
-            Ok(bytes) => bytes,
-            Err(_) => continue,
-        };
-        let Some(entry) = read_stored_zip_entry(&bytes, FIGX_ARCHIVE_ENTRY) else {
-            continue;
-        };
-        if let Ok(raw) = String::from_utf8(entry) {
-            archives.push(raw);
-        }
-    }
-    Ok(archives)
-}
-
-#[tauri::command]
-fn sync_figx_projects(
-    app: tauri::AppHandle,
-    projects: Vec<FigxProjectInput>,
-) -> Result<String, String> {
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-
-    let mut meta_projects = Vec::new();
-
-    for project in projects {
-        let filename = figx_filename(&project.project_id, &project.project_name);
-        let path = workspace_dir(&cfg).join(&filename);
-        remove_stale_project_files(&workspace_dir(&cfg), &project.project_id, &filename);
-
-        let entries = project_archive_entries(&cfg, &project)?;
-        write_zip_file(&path, &entries)?;
-
-        meta_projects.push(WorkspaceMetaProject {
-            id: project.project_id,
-            name: project.project_name,
-            file: filename,
-            updated_at: now_ms(),
-        });
-    }
-
-    let meta = WorkspaceMeta {
-        name: cfg.workspace_name.clone(),
-        app_folder: APP_FOLDER_NAME.into(),
-        updated_at: now_ms(),
-        projects: meta_projects,
-    };
-    write_workspace_meta(&cfg, &meta)?;
-    serde_json::to_string(&meta).map_err(|e| e.to_string())
-}
-
-// Explicit, user-triggered export of a single project to a `.figx` file. Unlike
-// `sync_figx_projects` this does NOT rewrite the workspace meta — it only writes
-// the one archive, so exporting a project never disturbs the others.
+// Explicit, user-triggered export of a single project to a `.figx` file. Writes
+// only the one archive (it does not touch the workspace meta), so exporting a
+// project never disturbs the others.
 #[tauri::command]
 fn export_figx_project(
     app: tauri::AppHandle,
     project: FigxProjectInput,
 ) -> Result<String, String> {
     let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
+    // Create the workspace folder on demand — only an actual export materializes it.
+    let target_dir = workspace_dir(&cfg);
+    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
 
     let filename = figx_filename(&project.project_id, &project.project_name);
-    let path = workspace_dir(&cfg).join(&filename);
-    remove_stale_project_files(&workspace_dir(&cfg), &project.project_id, &filename);
+    let path = target_dir.join(&filename);
+    remove_stale_project_files(&target_dir, &project.project_id, &filename);
 
     let entries = project_archive_entries(&cfg, &project)?;
     write_zip_file(&path, &entries)?;
@@ -784,10 +635,11 @@ fn export_figx_project(
     Ok(path.to_string_lossy().into_owned())
 }
 
+// Removes any exported `.figx` file for a deleted project. A no-op if the
+// project was never exported (the workspace folder may not even exist).
 #[tauri::command]
 fn delete_figx_project(app: tauri::AppHandle, project_id: String) -> Result<(), String> {
     let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
     if let Ok(entries) = fs::read_dir(workspace_dir(&cfg)) {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().into_owned();
@@ -798,33 +650,7 @@ fn delete_figx_project(app: tauri::AppHandle, project_id: String) -> Result<(), 
             }
         }
     }
-    let current_meta = read_workspace_meta(&cfg);
-    let meta = WorkspaceMeta {
-        name: current_meta.name,
-        app_folder: current_meta.app_folder,
-        updated_at: now_ms(),
-        projects: current_meta
-            .projects
-            .into_iter()
-            .filter(|project| project.id != project_id)
-            .collect(),
-    };
-    write_workspace_meta(&cfg, &meta)
-}
-
-fn list_figx_paths(dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut result = Vec::new();
-    if !dir.exists() {
-        return Ok(result);
-    }
-    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) == Some("figx") {
-            result.push(path);
-        }
-    }
-    Ok(result)
+    Ok(())
 }
 
 fn figx_filename(project_id: &str, project_name: &str) -> String {
@@ -1077,54 +903,12 @@ fn write_zip_file(path: &Path, entries: &[ZipEntry]) -> Result<(), String> {
     fs::write(path, output).map_err(|e| e.to_string())
 }
 
-fn read_stored_zip_entry(bytes: &[u8], target: &str) -> Option<Vec<u8>> {
-    let mut offset = 0usize;
-    while offset + 30 <= bytes.len() {
-        if read_u32(bytes, offset)? != 0x0403_4b50 {
-            break;
-        }
-        let method = read_u16(bytes, offset + 8)?;
-        let compressed_size = read_u32(bytes, offset + 18)? as usize;
-        let name_len = read_u16(bytes, offset + 26)? as usize;
-        let extra_len = read_u16(bytes, offset + 28)? as usize;
-        let name_start = offset + 30;
-        let name_end = name_start.checked_add(name_len)?;
-        let data_start = name_end.checked_add(extra_len)?;
-        let data_end = data_start.checked_add(compressed_size)?;
-        if data_end > bytes.len() {
-            return None;
-        }
-        let name = std::str::from_utf8(&bytes[name_start..name_end]).ok()?;
-        if name == target && method == 0 {
-            return Some(bytes[data_start..data_end].to_vec());
-        }
-        offset = data_end;
-    }
-    None
-}
-
 fn push_u16(out: &mut Vec<u8>, value: u16) {
     out.extend_from_slice(&value.to_le_bytes());
 }
 
 fn push_u32(out: &mut Vec<u8>, value: u32) {
     out.extend_from_slice(&value.to_le_bytes());
-}
-
-fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {
-    Some(u16::from_le_bytes([
-        *bytes.get(offset)?,
-        *bytes.get(offset + 1)?,
-    ]))
-}
-
-fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
-    Some(u32::from_le_bytes([
-        *bytes.get(offset)?,
-        *bytes.get(offset + 1)?,
-        *bytes.get(offset + 2)?,
-        *bytes.get(offset + 3)?,
-    ]))
 }
 
 fn crc32(data: &[u8]) -> u32 {
@@ -1151,6 +935,7 @@ pub fn run() {
                 )?;
             }
             // Open the single pooled SQLite connection and run migrations once.
+            migrate_legacy_sqlite(app.handle())?;
             let path = sqlite_path(app.handle())?;
             let conn = db::open_and_migrate(&path)?;
             app.manage(db::Db::new(conn));
@@ -1181,12 +966,6 @@ pub fn run() {
             extract_video_frame_full,
             read_reference_frame,
             delete_reference_frames,
-            read_references_meta,
-            write_references_meta,
-            read_reference_groups,
-            write_reference_groups,
-            read_local_figx_projects,
-            sync_figx_projects,
             export_figx_project,
             delete_figx_project,
         ])

@@ -1,12 +1,12 @@
 import type { SavedComponent, ToolReference } from "./types";
+import { extFromName, loadReferenceFile } from "@/lib/tauri/referenceStorage";
 import {
-  extFromName,
-  loadReferenceFile,
-  readRefsMeta,
-} from "@/lib/tauri/referenceStorage";
+  listReferenceLibraryGroups,
+  listReferenceLibraryMeta,
+} from "@/lib/storage/repos/referenceLibrary.repo";
 import { inferType, blobToObjectUrl } from "./image";
 
-export { readReferenceGroups, readRefsMeta } from "@/lib/tauri/referenceStorage";
+export { listReferenceLibraryGroups, listReferenceLibraryMeta };
 
 export const COMPONENT_STORAGE_PREFIX = "workspace.tools.components.";
 export const COMPONENT_DRAFT_STORAGE_PREFIX = "workspace.tools.componentsDraft.";
@@ -114,7 +114,7 @@ export function readCropsOverlayAlpha(): number {
 }
 
 export async function readDiskReference(id: string): Promise<ToolReference | null> {
-  const metas = await readRefsMeta().catch(() => []);
+  const metas = await listReferenceLibraryMeta().catch(() => []);
   const meta = metas.find((entry) => entry.id === id);
   if (!meta || meta.mediaKind !== "image") return null;
   const ext = meta.ext || extFromName(meta.name);

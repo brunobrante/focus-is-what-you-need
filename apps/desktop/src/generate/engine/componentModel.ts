@@ -9,9 +9,11 @@ import {
   removeReferenceStack,
   writeReferenceStackBatch,
   readReferenceStackData,
-  writeRefsMeta,
-  readRefsMeta,
 } from "@/lib/tauri/referenceStorage";
+import {
+  listReferenceLibraryMeta,
+  putReferenceLibraryMeta,
+} from "@/lib/storage/repos/referenceLibrary.repo";
 import {
   stackSummaryFromData,
   type ReferenceStackData,
@@ -318,20 +320,16 @@ export async function updateReferenceStackMeta(
   data: ReferenceStackData | null,
 ): Promise<void> {
   const summary = stackSummaryFromData(data);
-  const metas = await readRefsMeta().catch(() => []);
-  await writeRefsMeta(
-    metas.map((meta) =>
-      meta.id === referenceId
-        ? {
-            ...meta,
-            stack: summary,
-            tags: summary?.enabled
-              ? Array.from(new Set([...(meta.tags ?? []), "stack"]))
-              : (meta.tags ?? []).filter((tag) => tag !== "stack"),
-          }
-        : meta,
-    ),
-  );
+  const metas = await listReferenceLibraryMeta().catch(() => []);
+  const target = metas.find((meta) => meta.id === referenceId);
+  if (!target) return;
+  putReferenceLibraryMeta({
+    ...target,
+    stack: summary,
+    tags: summary?.enabled
+      ? Array.from(new Set([...(target.tags ?? []), "stack"]))
+      : (target.tags ?? []).filter((tag) => tag !== "stack"),
+  });
 }
 
 export async function writeReferenceStackFromComponents(input: {

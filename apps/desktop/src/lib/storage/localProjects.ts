@@ -18,16 +18,13 @@ import {
   type SystemDesignRow,
   type ThumbnailRow,
   type VariantRow,
-  type WorkspaceRow,
 } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
+import { TABLES, listTable } from "@/lib/storage/store";
 
+// SQLite (the `records` table) is the source of truth for projects. `.figx` is
+// only an explicit, user-triggered export format — never written automatically
+// and never read back automatically.
 const FIGX_FORMAT_VERSION = 1;
-// SQLite (the `records` table) is the source of truth. `.figx` files are no
-// longer written automatically — they are an explicit, user-triggered export
-// format. This flag marks that any pre-existing `.figx` files were absorbed into
-// SQLite once, so we never auto-read (and risk clobbering) them again.
-const FIGX_ABSORBED_FLAG = "local_figx_absorbed_v1";
 
 type FigxArchive = {
   format: "figx";
@@ -56,20 +53,6 @@ type FigxProjectSyncInput = {
   reference_ids: string[];
 };
 
-const PERSISTED_TABLES = [
-  TABLES.projects,
-  TABLES.screens,
-  TABLES.components,
-  TABLES.variants,
-  TABLES.references,
-  TABLES.scenes,
-  TABLES.thumbnails,
-  TABLES.screenVersions,
-  TABLES.placements,
-  TABLES.history,
-  TABLES.systemDesigns,
-] as const;
-
 let readyPromise: Promise<void> | null = null;
 
 export function isLocalProject(project: ProjectRow | null | undefined): boolean {
@@ -82,306 +65,14 @@ export async function deleteLocalFigxProjectFile(projectId: string): Promise<voi
 
 export async function ensureLocalProjectsLoaded(): Promise<void> {
   if (!readyPromise) {
-    readyPromise = (async () => {
-      await ensureSeededAndMigrated();
-      try {
-        await absorbLegacyFigxProjectsOnce();
-      } catch (error) {
-        console.warn("[storage] Failed to absorb legacy .figx projects", error);
-      }
-    })();
+    readyPromise = ensureSeededAndMigrated();
   }
   return readyPromise;
 }
 
-function figxAlreadyAbsorbed(): boolean {
-  try {
-    return typeof localStorage !== "undefined" && localStorage.getItem(FIGX_ABSORBED_FLAG) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function markFigxAbsorbed(): void {
-  try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(FIGX_ABSORBED_FLAG, "1");
-  } catch {
-    // localStorage unavailable — the import simply runs again next boot, which is
-    // harmless: it is an idempotent merge into SQLite.
-  }
-}
-
-/**
- * One-time transition: pull any pre-existing `.figx` files into SQLite, then
- * never read them automatically again. Because `.figx` autosave is gone, reading
- * a now-stale file on a later boot could overwrite fresher SQLite data — the
- * flag prevents that.
- */
-async function absorbLegacyFigxProjectsOnce(): Promise<void> {
-  if (figxAlreadyAbsorbed()) return;
-  await importLocalFigxProjects();
-  markFigxAbsorbed();
-}
-
-async function importLocalFigxProjects(): Promise<void> {
-  let archiveJSONs: string[] = [];
-  try {
-    archiveJSONs = await invoke<string[]>("read_local_figx_projects");
-  } catch {
-    return;
-  }
-  const archives = archiveJSONs
-    .map(parseArchive)
-    .filter((archive): archive is FigxArchive => archive != null);
-  if (archives.length === 0) return;
-
-  const importedProjectIds = new Set(archives.map((archive) => archive.project.id));
-  const importedScreenIds = new Set<string>();
-  const importedComponentIds = new Set<string>();
-  const importedVariantIds = new Set<string>();
-  const importedScreenVersionIds = new Set<string>();
-
-  for (const archive of archives) {
-    archive.tables.screens.forEach((row) => importedScreenIds.add(row.id));
-    archive.tables.components.forEach((row) => importedComponentIds.add(row.id));
-    archive.tables.variants.forEach((row) => importedVariantIds.add(row.id));
-    archive.tables.screenVersions.forEach((row) => importedScreenVersionIds.add(row.id));
-  }
-
-  const projects = await listTable<ProjectRow>(TABLES.projects);
-  const screens = await listTable<ScreenRow>(TABLES.screens);
-  const components = await listTable<ComponentRow>(TABLES.components);
-  const variants = await listTable<VariantRow>(TABLES.variants);
-  const references = await listTable<ReferenceRow>(TABLES.references);
-  const scenes = await listTable<SceneRow>(TABLES.scenes);
-  const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
-  const workspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
-  const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
-  const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
-  const history = await listTable<HistoryEntryRow>(TABLES.history);
-  const systemDesigns = await listTable<SystemDesignRow>(TABLES.systemDesigns);
-
-  const importedProjects = archives.map((archive) =>
-    normalizeProjectRow({ ...archive.project, source: "local" }),
-  );
-  const importedScreens = archives.flatMap((archive) => archive.tables.screens);
-  const importedComponents = archives.flatMap((archive) =>
-    archive.tables.components.map(normalizeComponentRow),
-  );
-  const importedVariants = archives.flatMap((archive) => archive.tables.variants);
-  const importedReferences = archives.flatMap((archive) =>
-    archive.tables.references.map(normalizeReferenceRow),
-  );
-  const importedScenes = archives.flatMap((archive) => archive.tables.scenes);
-  const importedThumbnails = archives.flatMap((archive) => archive.tables.thumbnails);
-  const importedScreenVersions = archives.flatMap((archive) => archive.tables.screenVersions);
-  const importedPlacements = archives.flatMap((archive) => archive.tables.placements);
-  const importedHistory = archives.flatMap((archive) => archive.tables.history);
-  const importedSystemDesigns = archives.flatMap((archive) => archive.tables.systemDesigns);
-
-  const nextProjects = [
-    ...projects.filter((project) => !importedProjectIds.has(project.id)),
-    ...importedProjects,
-  ];
-  const nextScreens = [
-    ...screens.filter((screen) => !importedProjectIds.has(screen.projectId)),
-    ...importedScreens,
-  ];
-  const nextComponents = [
-    ...components.filter((component) => !importedProjectIds.has(component.projectId)),
-    ...importedComponents,
-  ];
-  const nextVariants = [
-    ...variants.filter((variant) => !importedComponentIds.has(variant.componentId)),
-    ...importedVariants,
-  ];
-  const nextReferences = mergeImportedReferences(
-    references,
-    importedReferences,
-    importedProjectIds,
-  );
-  const nextScenes = [
-    ...scenes.filter(
-      (scene) =>
-        !(
-          (scene.ownerType === "screen" && importedScreenIds.has(scene.ownerId)) ||
-          (scene.ownerType === "variant" && importedVariantIds.has(scene.ownerId))
-        ),
-    ),
-    ...importedScenes,
-  ];
-  const nextThumbnails = [
-    ...thumbnails.filter(
-      (thumbnail) =>
-        !(
-          (thumbnail.ownerType === "screen" && importedScreenIds.has(thumbnail.ownerId)) ||
-          (thumbnail.ownerType === "variant" && importedVariantIds.has(thumbnail.ownerId))
-        ),
-    ),
-    ...importedThumbnails,
-  ];
-  const nextScreenVersions = [
-    ...screenVersions.filter((version) => !importedScreenIds.has(version.screenId)),
-    ...importedScreenVersions,
-  ];
-  const nextPlacements = [
-    ...placements.filter(
-      (placement) =>
-        !importedScreenVersionIds.has(placement.screenVersionId) &&
-        !importedComponentIds.has(placement.componentId),
-    ),
-    ...importedPlacements,
-  ];
-  const nextHistory = [
-    ...history.filter(
-      (entry) =>
-        !importedScreenIds.has(entry.targetId) && !importedComponentIds.has(entry.targetId),
-    ),
-    ...importedHistory,
-  ];
-  const nextSystemDesigns = [
-    ...systemDesigns.filter(
-      (design) => !(design.ownerScope === "project" && importedProjectIds.has(design.ownerId)),
-    ),
-    ...importedSystemDesigns,
-  ];
-  const nextWorkspaces = ensureWorkspaceProjectIds(
-    workspaces,
-    nextProjects.map((project) => project.id),
-  );
-
-  await replaceTable<ProjectRow>(TABLES.projects, nextProjects);
-  await replaceTable<ScreenRow>(TABLES.screens, nextScreens);
-  await replaceTable<ComponentRow>(TABLES.components, nextComponents);
-  await replaceTable<VariantRow>(TABLES.variants, nextVariants);
-  await replaceTable<ReferenceRow>(TABLES.references, nextReferences);
-  await replaceTable<SceneRow>(TABLES.scenes, nextScenes);
-  await replaceTable<ThumbnailRow>(TABLES.thumbnails, nextThumbnails);
-  await replaceTable<WorkspaceRow>(TABLES.workspaces, nextWorkspaces);
-  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, nextScreenVersions);
-  await replaceTable<ComponentPlacementRow>(TABLES.placements, nextPlacements);
-  await replaceTable<HistoryEntryRow>(TABLES.history, nextHistory);
-  await replaceTable<SystemDesignRow>(TABLES.systemDesigns, nextSystemDesigns);
-
-  PERSISTED_TABLES.forEach((table) => notify(table));
-  notify(TABLES.workspaces);
-}
-
-function parseArchive(raw: string): FigxArchive | null {
-  try {
-    const parsed = JSON.parse(raw) as Partial<FigxArchive>;
-    if (parsed.format !== "figx" || !parsed.project || !parsed.tables) return null;
-    return {
-      format: "figx",
-      formatVersion: parsed.formatVersion ?? FIGX_FORMAT_VERSION,
-      schemaVersion: parsed.schemaVersion ?? SCHEMA_VERSION,
-      savedAt: parsed.savedAt ?? Date.now(),
-      project: parsed.project,
-      tables: {
-        screens: parsed.tables.screens ?? [],
-        components: parsed.tables.components ?? [],
-        variants: parsed.tables.variants ?? [],
-        references: parsed.tables.references ?? [],
-        scenes: parsed.tables.scenes ?? [],
-        thumbnails: parsed.tables.thumbnails ?? [],
-        screenVersions: parsed.tables.screenVersions ?? [],
-        placements: parsed.tables.placements ?? [],
-        history: parsed.tables.history ?? [],
-        systemDesigns: parsed.tables.systemDesigns ?? [],
-      },
-    };
-  } catch {
-    return null;
-  }
-}
-
-function mergeImportedReferences(
-  current: ReferenceRow[],
-  imported: ReferenceRow[],
-  importedProjectIds: Set<string>,
-): ReferenceRow[] {
-  const withoutImportedProjects = current
-    .map(normalizeReferenceRow)
-    .map((reference) => {
-      const attachments = reference.attachments.filter(
-        (attachment) => !importedProjectIds.has(attachment.projectId),
-      );
-      return normalizeReferenceRow({
-        ...reference,
-        attachments,
-        projectIds: Array.from(new Set(attachments.map((attachment) => attachment.projectId))),
-      });
-    })
-    .filter((reference) => reference.projectIds.length > 0);
-
-  const byId = new Map(withoutImportedProjects.map((reference) => [reference.id, reference]));
-  for (const reference of imported.map(normalizeReferenceRow)) {
-    const existing = byId.get(reference.id);
-    if (!existing) {
-      byId.set(reference.id, reference);
-      continue;
-    }
-    byId.set(reference.id, {
-      ...existing,
-      ...reference,
-      projectIds: Array.from(new Set([...existing.projectIds, ...reference.projectIds])),
-      attachments: mergeAttachments(existing.attachments, reference.attachments),
-    });
-  }
-  return Array.from(byId.values());
-}
-
-function mergeAttachments(
-  left: ReferenceRow["attachments"],
-  right: ReferenceRow["attachments"],
-): ReferenceRow["attachments"] {
-  const byKey = new Map<string, ReferenceRow["attachments"][number]>();
-  for (const attachment of [...left, ...right]) {
-    byKey.set(
-      `${attachment.projectId}:${attachment.screenId ?? ""}:${attachment.componentId ?? ""}`,
-      attachment,
-    );
-  }
-  return Array.from(byKey.values());
-}
-
-function ensureWorkspaceProjectIds(
-  workspaces: WorkspaceRow[],
-  projectIds: string[],
-): WorkspaceRow[] {
-  if (workspaces.length === 0) {
-    const t = Date.now();
-    return [
-      {
-        id: crypto.randomUUID(),
-        name: "workspace",
-        projectIds,
-        createdAt: t,
-        updatedAt: t,
-      },
-    ];
-  }
-  // Only adopt projects that don't already belong to a workspace into the
-  // default (first) one. Projects explicitly assigned to another workspace stay
-  // there — otherwise the default would accumulate every project and break
-  // per-workspace scoping.
-  const assigned = new Set(workspaces.flatMap((w) => w.projectIds));
-  const orphans = projectIds.filter((id) => !assigned.has(id));
-  if (orphans.length === 0) return workspaces;
-  const [first, ...rest] = workspaces;
-  return [
-    {
-      ...first!,
-      projectIds: Array.from(new Set([...first!.projectIds, ...orphans])),
-      updatedAt: Date.now(),
-    },
-    ...rest,
-  ];
-}
-
 /**
  * Explicitly export a single local project to a `.figx` file in the workspace.
- * This is the only path that writes `.figx` now — it runs on user action, never
+ * This is the only path that writes `.figx` — it runs on user action, never
  * automatically. Returns false if the project isn't a local project.
  */
 export async function exportLocalProjectToFigx(projectId: string): Promise<boolean> {

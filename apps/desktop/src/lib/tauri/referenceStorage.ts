@@ -5,10 +5,7 @@ import {
   type ReferenceStackRoot,
   type ReferenceStackSummary,
 } from "@/lib/references/stackTypes";
-import {
-  normalizeReferenceGroups,
-  type ReferenceGroup,
-} from "@/lib/references/groupTypes";
+import type { ReferenceGroup } from "@/lib/references/groupTypes";
 
 // Matches StoredMeta from References.tsx (Omit<ReferenceItem, "url">),
 // with ext required so we know which filename to look up on disk.
@@ -214,38 +211,6 @@ export async function readReferenceStackData(id: string): Promise<ReferenceStack
 
 export async function removeReferenceStack(id: string): Promise<void> {
   await invoke("delete_reference_stack", { id }).catch(() => {});
-}
-
-export async function readRefsMeta(): Promise<StoredRefMeta[]> {
-  try {
-    const raw = await invoke<string>("read_references_meta");
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (x): x is StoredRefMeta =>
-        Boolean(x && typeof x === "object" && "id" in x && "mediaKind" in x),
-    );
-  } catch {
-    return [];
-  }
-}
-
-export async function writeRefsMeta(items: StoredRefMeta[]): Promise<void> {
-  await invoke("write_references_meta", { content: JSON.stringify(items) });
-}
-
-export async function readReferenceGroups(): Promise<ReferenceGroup[]> {
-  try {
-    const raw = await invoke<string>("read_reference_groups");
-    const parsed: unknown = JSON.parse(raw);
-    return normalizeReferenceGroups(parsed);
-  } catch {
-    return [];
-  }
-}
-
-export async function writeReferenceGroups(groups: ReferenceGroup[]): Promise<void> {
-  await invoke("write_reference_groups", { content: JSON.stringify(groups, null, 2) });
 }
 
 export async function refreshReferenceStackSummary(meta: StoredRefMeta): Promise<StoredRefMeta> {
