@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  ChevronLeft, Edit3, ExternalLink, Film, Folder,
+  ChevronLeft, ChevronRight, Edit3, Eye, ExternalLink, Film, Folder,
   Layers, Trash2, Upload, X, Play,
 } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
@@ -92,12 +92,18 @@ export function ReferenceDetailModal({
           group={subject.group}
           references={subject.references}
           looseReferences={looseReferences}
+          groups={groups}
           stackThumbnailUrls={stackThumbnailUrls}
           onClose={onClose}
+          onDelete={onDelete}
+          onDescriptionChange={onDescriptionChange}
+          onTagsChange={onTagsChange}
+          onSourceUrlChange={onSourceUrlChange}
+          onGroupChange={onGroupChange}
+          onExtractFrames={onExtractFrames}
           onUpload={onUpload}
           onEditGroup={onEditGroup}
           onDeleteGroup={onDeleteGroup}
-          onGroupChange={onGroupChange}
         />
       )}
     </div>
@@ -155,13 +161,12 @@ function ItemModal({
   useEffect(() => () => { releaseStackUrls(stackPreview); }, [stackPreview]);
 
   const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
-  const selectedComponent = stackPreview && selectedStackComponentId
-    ? stackPreview.data.components.find((c) => c.id === selectedStackComponentId)
-      ?? stackPreview.data.components.find((c) => c.id === stackPreview.data.primaryComponentId)
-      ?? stackPreview.data.components[0]
-    : null;
-  const stackImageUrl = selectedComponent && stackPreview
-    ? stackPreview.urls[selectedComponent.id] ?? itemUrl
+  const effectiveStackId = selectedStackComponentId
+    ?? stackPreview?.data.primaryComponentId
+    ?? stackPreview?.data.roots?.[0]?.id
+    ?? stackPreview?.data.components[0]?.id;
+  const stackImageUrl = (effectiveStackId && stackPreview?.urls[effectiveStackId])
+    ? stackPreview.urls[effectiveStackId]
     : itemUrl;
   const screenUrl = canStack && stackThumbnailUrls[item.id] ? stackThumbnailUrls[item.id] : itemUrl;
 
@@ -191,7 +196,7 @@ function ItemModal({
               ) : (
                 <img
                   src={stackImageUrl}
-                  alt={selectedComponent?.name ?? "Stack"}
+                  alt={item.name}
                   className="block max-h-full max-w-full rounded-[10px] object-contain"
                   draggable={false}
                 />
@@ -202,7 +207,7 @@ function ItemModal({
               <div className="shrink-0 border-b border-[var(--border)] px-3 py-2.5">
                 <p className="m-0 text-[11.5px] font-semibold text-[var(--text)]">Stack tree</p>
                 <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">
-                  {stackPreview?.data.components.length ?? 0} components
+                  {((stackPreview?.data.roots?.length ?? 0) + (stackPreview?.data.components.length ?? 0))} components
                 </p>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -210,7 +215,7 @@ function ItemModal({
                   <StackTreeRows
                     key={node.component.id}
                     node={node}
-                    selectedId={selectedComponent?.id ?? null}
+                    selectedId={selectedStackComponentId}
                     onSelect={setSelectedStackComponentId}
                   />
                 )) : (
@@ -257,9 +262,9 @@ function ItemModal({
         onSourceUrlChange={onSourceUrlChange}
         onGroupChange={onGroupChange}
         onExtractFrames={() => onExtractFrames(item)}
-        onUpload={onUpload}
-        onEditGroup={onEditGroup}
-        onDeleteGroup={onDeleteGroup}
+        onUpload={() => {}}
+        onEditGroup={() => {}}
+        onDeleteGroup={() => {}}
       />
     </ModalShell>
   );
@@ -271,22 +276,34 @@ function GroupModal({
   group,
   references,
   looseReferences,
+  groups,
   stackThumbnailUrls,
   onClose,
+  onDelete,
+  onDescriptionChange,
+  onTagsChange,
+  onSourceUrlChange,
+  onGroupChange,
+  onExtractFrames,
   onUpload,
   onEditGroup,
   onDeleteGroup,
-  onGroupChange,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   looseReferences: ReferenceItem[];
+  groups: ReferenceGroup[];
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
+  onDelete: (id: string) => void;
+  onDescriptionChange: (id: string, desc: string) => void;
+  onTagsChange: (id: string, tags: string[]) => void;
+  onSourceUrlChange: (id: string, url: string) => void;
+  onGroupChange: (id: string, groupId: string | null) => void;
+  onExtractFrames: (item: ReferenceItem) => void;
   onUpload: () => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
-  onGroupChange: (id: string, groupId: string | null) => void;
 }) {
   type GroupTab = "screens" | "stacks";
   const imageReferences = references.filter((r) => r.mediaKind === "image");
@@ -295,22 +312,52 @@ function GroupModal({
   const [activeTab, setActiveTab] = useState<GroupTab>("screens");
   const [focusedItem, setFocusedItem] = useState<ReferenceItem | null>(null);
   const [addReferenceId, setAddReferenceId] = useState("");
+  const [stackPreview, setStackPreview] = useState<StackPreviewState | null>(null);
+  const [stackLoading, setStackLoading] = useState(false);
+  const [selectedStackComponentId, setSelectedStackComponentId] = useState<string | null>(null);
+  const [stackViewMode, setStackViewMode] = useState<"composite" | "isolated">("composite");
+
   const focusedStackThumb = focusedItem?.stack?.enabled ? stackThumbnailUrls[focusedItem.id] : undefined;
-  const { url: focusedUrl } = useReferenceUrl(focusedItem, {
-    eager: true,
-    enabled: Boolean(focusedItem) && !focusedStackThumb,
-  });
+  const { url: focusedUrl } = useReferenceUrl(focusedItem, { eager: true });
 
   useEffect(() => { setFocusedItem(null); setAddReferenceId(""); }, [group.id]);
+
+  useEffect(() => {
+    setSelectedStackComponentId(null);
+    setStackViewMode("composite");
+    setStackPreview((prev) => { releaseStackUrls(prev); return null; });
+    if (!focusedItem?.stack?.enabled) { setStackLoading(false); return; }
+    let cancelled = false;
+    setStackLoading(true);
+    void loadStackPreview(focusedItem).then((preview) => {
+      if (cancelled) { releaseStackUrls(preview); return; }
+      setStackPreview(preview);
+      setSelectedStackComponentId(preview?.data.primaryComponentId ?? null);
+    }).finally(() => { if (!cancelled) setStackLoading(false); });
+    return () => { cancelled = true; };
+  }, [focusedItem?.id]);
+
+  useEffect(() => () => { releaseStackUrls(stackPreview); }, [stackPreview]);
+
+  const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
+  const effectiveStackId = selectedStackComponentId
+    ?? stackPreview?.data.primaryComponentId
+    ?? stackPreview?.data.roots?.[0]?.id
+    ?? stackPreview?.data.components[0]?.id;
+  const stackImageUrl = (effectiveStackId && stackPreview?.urls[effectiveStackId])
+    ? stackPreview.urls[effectiveStackId]
+    : (focusedStackThumb ?? focusedUrl);
 
   const cover = (group.coverReferenceId
     ? imageReferences.find((r) => r.id === group.coverReferenceId)
     : null) ?? imageReferences[0] ?? null;
-  const builderHref = cover
-    ? `/tools?id=${encodeURIComponent(cover.id)}&groupId=${encodeURIComponent(group.id)}`
+  const builderSource = focusedItem?.mediaKind === "image" ? focusedItem : cover;
+  const builderHref = builderSource
+    ? `/tools?id=${encodeURIComponent(builderSource.id)}&groupId=${encodeURIComponent(group.id)}`
     : null;
 
   const displayedItems = activeTab === "screens" ? references : stackedReferences;
+  const focusedIndex = focusedItem ? displayedItems.findIndex((i) => i.id === focusedItem.id) : -1;
 
   return (
     <ModalShell
@@ -335,13 +382,87 @@ function GroupModal({
               <ChevronLeft size={13} />
               Back
             </button>
-            <div className="flex flex-1 items-center justify-center p-6">
-              <img
-                src={focusedStackThumb ?? focusedUrl}
-                alt={focusedItem.name}
-                className="block max-h-full max-w-full rounded-[10px] object-contain"
-                draggable={false}
-              />
+
+            {!focusedItem.stack?.enabled && (
+              <button
+                type="button"
+                onClick={() => setFocusedItem(displayedItems[(focusedIndex - 1 + displayedItems.length) % displayedItems.length])}
+                className="absolute left-3 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
+              >
+                <ChevronLeft size={15} />
+              </button>
+            )}
+
+            {focusedItem.stack?.enabled && (
+              <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 flex items-center gap-0.5 rounded-[8px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.88)] p-0.5 backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setStackViewMode("composite")}
+                  className={[
+                    "h-7 cursor-pointer rounded-[6px] px-2.5 text-[11.5px] font-medium transition-colors",
+                    stackViewMode === "composite"
+                      ? "bg-[var(--surface)] text-[var(--text)]"
+                      : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                  ].join(" ")}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStackViewMode("isolated")}
+                  className={[
+                    "h-7 cursor-pointer rounded-[6px] px-2.5 text-[11.5px] font-medium transition-colors",
+                    stackViewMode === "isolated"
+                      ? "bg-[var(--surface)] text-[var(--text)]"
+                      : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                  ].join(" ")}
+                >
+                  Solo
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-1 items-center justify-center overflow-hidden p-6">
+              {focusedItem.stack?.enabled ? (
+                stackLoading && !stackPreview ? (
+                  <p className="text-[13px] text-[var(--text-muted)]">Loading stack…</p>
+                ) : stackViewMode === "composite" && stackPreview ? (
+                  <StackCompositeView
+                    data={stackPreview.data}
+                    urls={stackPreview.urls}
+                    selectedId={effectiveStackId ?? null}
+                    onSelect={(id) => { setSelectedStackComponentId(id); }}
+                  />
+                ) : (
+                  <img
+                    src={stackImageUrl ?? focusedStackThumb ?? focusedUrl}
+                    alt={focusedItem.name}
+                    className="block max-h-full max-w-full rounded-[10px] object-contain"
+                    draggable={false}
+                  />
+                )
+              ) : (
+                <img
+                  src={focusedUrl}
+                  alt={focusedItem.name}
+                  className="block max-h-full max-w-full rounded-[10px] object-contain"
+                  draggable={false}
+                />
+              )}
+            </div>
+
+            {!focusedItem.stack?.enabled && (
+              <button
+                type="button"
+                onClick={() => setFocusedItem(displayedItems[(focusedIndex + 1) % displayedItems.length])}
+                className="absolute right-3 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
+              >
+                <ChevronRight size={15} />
+              </button>
+            )}
+
+            <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1 text-[10.5px] tabular-nums text-[var(--text-muted)] backdrop-blur">
+              {focusedIndex + 1} / {displayedItems.length}
             </div>
           </>
         ) : displayedItems.length > 0 ? (
@@ -364,11 +485,6 @@ function GroupModal({
                   >
                     <span className="truncate text-[10.5px] font-medium text-white">{item.name}</span>
                   </div>
-                  {item.stack?.enabled ? (
-                    <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-[4px] border border-[rgba(94,162,255,0.28)] bg-[rgba(24,72,140,0.82)] px-1 py-[2px] text-[9px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
-                      Stack
-                    </span>
-                  ) : null}
                 </button>
               ))}
             </div>
@@ -387,19 +503,26 @@ function GroupModal({
 
       {/* right: tabbed panel */}
       <DetailPanel
-        item={null}
+        key={focusedItem?.id ?? "group"}
+        item={focusedItem}
         group={group}
         groupReferences={references}
-        groups={[]}
+        groups={groups}
         looseReferences={looseReferences}
         stackThumbnailUrls={stackThumbnailUrls}
         builderHref={builderHref}
-        onDelete={() => {}}
-        onDescriptionChange={() => {}}
-        onTagsChange={() => {}}
-        onSourceUrlChange={() => {}}
+        stackTree={stackTree}
+        stackLoading={stackLoading}
+        selectedStackComponentId={selectedStackComponentId}
+        stackPreviewUrls={stackPreview?.urls}
+        onSelectStackComponent={(id) => { setSelectedStackComponentId(id); }}
+        onIsolateStackComponent={(id) => { setSelectedStackComponentId(id); setStackViewMode("isolated"); }}
+        onDelete={() => focusedItem && onDelete(focusedItem.id)}
+        onDescriptionChange={onDescriptionChange}
+        onTagsChange={onTagsChange}
+        onSourceUrlChange={onSourceUrlChange}
         onGroupChange={onGroupChange}
-        onExtractFrames={() => {}}
+        onExtractFrames={() => focusedItem && onExtractFrames(focusedItem)}
         onUpload={onUpload}
         onEditGroup={onEditGroup}
         onDeleteGroup={() => { onDeleteGroup(); onClose(); }}
@@ -640,6 +763,9 @@ function ModalShell({
 function DetailPanel({
   item, group, groupReferences, groups, looseReferences,
   stackThumbnailUrls, builderHref,
+  stackTree = [], stackLoading = false, selectedStackComponentId = null,
+  stackPreviewUrls,
+  onSelectStackComponent, onIsolateStackComponent,
   onDelete, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
   onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
 }: {
@@ -650,6 +776,12 @@ function DetailPanel({
   looseReferences: ReferenceItem[];
   stackThumbnailUrls: Record<string, string>;
   builderHref: string | null;
+  stackTree?: StackTreeNode[];
+  stackLoading?: boolean;
+  selectedStackComponentId?: string | null;
+  stackPreviewUrls?: Record<string, string>;
+  onSelectStackComponent?: (id: string) => void;
+  onIsolateStackComponent?: (id: string) => void;
   onDelete: () => void;
   onDescriptionChange: (id: string, desc: string) => void;
   onTagsChange: (id: string, tags: string[]) => void;
@@ -660,29 +792,46 @@ function DetailPanel({
   onEditGroup: () => void;
   onDeleteGroup: () => void;
 }) {
-  type SideTab = "inspector" | "group";
-  const defaultTab: SideTab = !item && group ? "group" : "inspector";
+  type SideTab = "inspector" | "group" | "stack";
+  const hasStackTab = Boolean(item?.stack?.enabled);
+  const defaultTab: SideTab = hasStackTab ? "stack" : !item && group ? "group" : "inspector";
   const [tab, setTab] = useState<SideTab>(defaultTab);
-
   const hasGroupTab = Boolean(group);
+
+  useEffect(() => {
+    if (hasStackTab && (stackLoading || stackTree.length > 0)) setTab("stack");
+  }, [hasStackTab, stackLoading, stackTree.length]);
+
+  const selectedNode = selectedStackComponentId
+    ? findStackNode(stackTree, selectedStackComponentId)
+    : null;
+  const selectedPreviewUrl = selectedStackComponentId && stackPreviewUrls
+    ? stackPreviewUrls[selectedStackComponentId]
+    : undefined;
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[var(--bg-elev)]">
-      {/* tab bar */}
+      {/* tab bar — order: Group → Stack in stack mode; Inspector → Group in screen mode */}
       <div className="flex shrink-0 items-center gap-0.5 border-b border-[var(--border)] px-2 py-1.5">
-        <TabButton active={tab === "inspector"} onClick={() => setTab("inspector")}>
-          Inspector
-        </TabButton>
-        <TabButton
-          active={tab === "group"}
-          disabled={!hasGroupTab}
-          onClick={() => hasGroupTab && setTab("group")}
-        >
-          Group
-        </TabButton>
+        {!hasStackTab && (
+          <TabButton active={tab === "inspector"} onClick={() => setTab("inspector")}>
+            Inspector
+          </TabButton>
+        )}
+        {hasGroupTab && (
+          <TabButton active={tab === "group"} onClick={() => setTab("group")}>
+            Group
+          </TabButton>
+        )}
+        {hasStackTab && (
+          <TabButton active={tab === "stack"} onClick={() => setTab("stack")}>
+            Stack
+          </TabButton>
+        )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      {/* body */}
+      <div className={`min-h-0 flex-1 ${tab === "stack" ? "flex flex-col overflow-hidden" : "overflow-y-auto p-4"}`}>
         {tab === "inspector" && item ? (
           <ItemDetails
             item={item}
@@ -704,35 +853,132 @@ function DetailPanel({
             onGroupChange={onGroupChange}
           />
         ) : null}
-      </div>
 
-      {/* actions */}
-      <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[var(--border)] p-3">
-        {tab === "inspector" && item ? (
+        {tab === "stack" ? (
           <>
-            {item.mediaKind === "image" && builderHref ? (
-              <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
-            ) : null}
-            {item.mediaKind === "video" ? (
-              <Action icon={<Film size={12} />} label="Extract frames" onClick={onExtractFrames} />
-            ) : null}
-            <Action icon={<Trash2 size={12} />} label="Remove" danger onClick={onDelete} />
-          </>
-        ) : tab === "group" && group ? (
-          <>
-            {builderHref ? (
-              <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
-            ) : (
-              <Action icon={<Layers size={12} />} label="Builder" disabled onClick={() => {}} />
-            )}
-            <Action icon={<Upload size={12} />} label="Add" onClick={onUpload} />
-            <Action icon={<Edit3 size={12} />} label="Edit" onClick={onEditGroup} />
-            <Action icon={<Trash2 size={12} />} label="Delete" danger onClick={onDeleteGroup} />
+            {/* tree — scrollable */}
+            <div className="min-h-0 flex-1 overflow-hidden flex flex-col">
+              <div className="shrink-0 border-b border-[var(--border)] px-3 py-2.5">
+                <p className="m-0 text-[11.5px] font-semibold text-[var(--text)]">Stack tree</p>
+                {stackLoading && stackTree.length === 0 ? (
+                  <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">Loading…</p>
+                ) : (
+                  <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">
+                    {stackTree.length > 0
+                      ? `${countTreeNodes(stackTree)} components`
+                      : "No data"}
+                  </p>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                {stackLoading && stackTree.length === 0 ? (
+                  <p className="px-2 py-3 text-[11.5px] text-[var(--text-faint)]">Loading stack…</p>
+                ) : stackTree.length > 0 ? (
+                  stackTree.map((node) => (
+                    <StackTreeRows
+                      key={node.component.id}
+                      node={node}
+                      selectedId={selectedStackComponentId}
+                      onSelect={(id) => onSelectStackComponent?.(id)}
+                      onIsolate={(id) => onIsolateStackComponent?.(id)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-4 text-[11.5px] text-[var(--text-faint)]">
+                    No stack data found.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* selected component panel */}
+            <div className="shrink-0 border-t border-[var(--border)]">
+              {selectedNode ? (
+                <>
+                  <div className="flex items-start gap-2.5 p-3">
+                    {selectedPreviewUrl && (
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--surface)]">
+                        <img
+                          src={selectedPreviewUrl}
+                          alt={selectedNode.component.name}
+                          className="h-full w-full object-contain"
+                          draggable={false}
+                        />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="m-0 truncate text-[12px] font-semibold leading-snug text-[var(--text)]">
+                        {selectedNode.component.name}
+                      </p>
+                      <p className="m-0 mt-1 text-[10.5px] tabular-nums text-[var(--text-faint)]">
+                        {Math.round(selectedNode.component.box.w)} × {Math.round(selectedNode.component.box.h)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 border-t border-[var(--border)] px-3 py-2.5">
+                    {item?.mediaKind === "image" && builderHref ? (
+                      <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
+                    ) : null}
+                    <Action icon={<Trash2 size={12} />} label="Remove" danger onClick={onDelete} />
+                  </div>
+                </>
+              ) : (
+                <p className="px-3 py-3 text-[11.5px] text-[var(--text-faint)]">No component selected.</p>
+              )}
+            </div>
           </>
         ) : null}
       </div>
+
+      {/* actions footer — only for non-stack tabs */}
+      {tab !== "stack" && (
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[var(--border)] p-3">
+          {tab === "inspector" && item ? (
+            <>
+              {item.mediaKind === "image" && builderHref ? (
+                <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
+              ) : null}
+              {item.mediaKind === "video" ? (
+                <Action icon={<Film size={12} />} label="Extract frames" onClick={onExtractFrames} />
+              ) : null}
+              <Action icon={<Trash2 size={12} />} label="Remove" danger onClick={onDelete} />
+            </>
+          ) : tab === "group" && group ? (
+            <>
+              {builderHref ? (
+                <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
+              ) : (
+                <Action icon={<Layers size={12} />} label="Builder" disabled onClick={() => {}} />
+              )}
+              <Action icon={<Upload size={12} />} label="Add" onClick={onUpload} />
+              <Action icon={<Edit3 size={12} />} label="Edit" onClick={onEditGroup} />
+              <Action icon={<Trash2 size={12} />} label="Delete" danger onClick={onDeleteGroup} />
+            </>
+          ) : null}
+        </div>
+      )}
     </aside>
   );
+}
+
+function findStackNode(nodes: StackTreeNode[], id: string): StackTreeNode | null {
+  for (const node of nodes) {
+    if (node.component.id === id) return node;
+    const found = findStackNode(node.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function countTreeNodes(nodes: StackTreeNode[]): number {
+  let count = 0;
+  const stack = [...nodes];
+  while (stack.length) {
+    const node = stack.pop()!;
+    count++;
+    stack.push(...node.children);
+  }
+  return count;
 }
 
 
@@ -802,35 +1048,120 @@ function ActionLink({ icon, label, to }: { icon: ReactNode; label: string; to: s
 
 // ─── stack helpers ────────────────────────────────────────────────────────────
 
-function StackTreeRows({
-  node, selectedId, onSelect,
+function StackCompositeView({
+  data, urls, selectedId, onSelect,
 }: {
-  node: StackTreeNode; selectedId: string | null; onSelect: (id: string) => void;
+  data: ReferenceStackData;
+  urls: Record<string, string>;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 }) {
-  const active = selectedId === node.component.id;
+  const { w: origW, h: origH } = data.original;
+  const defaultRootId = data.roots?.find((r) => r.isDefault)?.id ?? data.rootComponentId;
+  const bgUrl = defaultRootId ? urls[defaultRootId] : undefined;
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  return (
+    <div className="relative leading-[0]" onClick={() => onSelect(null)}>
+      {bgUrl ? (
+        <img
+          src={bgUrl}
+          alt="original"
+          className="block max-h-[calc(100vh-220px)] max-w-full rounded-[10px]"
+          draggable={false}
+        />
+      ) : (
+        <div
+          className="rounded-[10px] bg-[var(--surface)]"
+          style={{ width: origW, height: origH, maxWidth: "100%", maxHeight: "calc(100vh - 220px)" }}
+        />
+      )}
+      {data.components.map((cut) => {
+        const isSelected = cut.id === selectedId;
+        const isHovered = cut.id === hoveredId;
+        const cutUrl = urls[cut.id];
+        return (
+          <button
+            key={cut.id}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(cut.id); }}
+            onMouseEnter={() => setHoveredId(cut.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            className="absolute cursor-pointer bg-transparent p-0"
+            style={{
+              left: `${(cut.box.x / origW) * 100}%`,
+              top: `${(cut.box.y / origH) * 100}%`,
+              width: `${(cut.box.w / origW) * 100}%`,
+              height: `${(cut.box.h / origH) * 100}%`,
+              boxSizing: "border-box",
+              outline: isSelected
+                ? "2px solid #89C4FF"
+                : isHovered
+                ? "2px solid rgba(137,196,255,0.7)"
+                : "none",
+              outlineOffset: isSelected ? "-2px" : "-1.5px",
+            }}
+          >
+            {cutUrl && (
+              <img
+                src={cutUrl}
+                alt={cut.name}
+                className="block h-full w-full"
+                draggable={false}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StackTreeRows({
+  node, selectedId, onSelect, onIsolate,
+}: {
+  node: StackTreeNode;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onIsolate?: (id: string) => void;
+}) {
+  const id = node.component.id;
+  const active = selectedId === id;
   return (
     <>
-      <button
-        type="button"
-        onClick={() => onSelect(node.component.id)}
+      <div
         className={[
-          "mb-1 flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-[7px] border px-2 py-1.5 text-left transition-colors",
+          "group mb-1 flex min-h-8 w-full items-center rounded-[7px] border transition-colors",
           active
             ? "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
             : "border-transparent bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
         ].join(" ")}
-        style={{ paddingLeft: `${8 + node.depth * 14}px` }}
       >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-55" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[11.5px] font-medium">{node.component.name}</span>
-          <span className="block text-[10px] tabular-nums text-[var(--text-faint)]">
-            {Math.round(node.component.box.w)} × {Math.round(node.component.box.h)}
+        <button
+          type="button"
+          onClick={() => onSelect(id)}
+          className="flex min-h-8 flex-1 cursor-pointer items-center gap-2 bg-transparent py-1.5 text-left"
+          style={{ paddingLeft: `${8 + node.depth * 14}px` }}
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-55" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[11.5px] font-medium">{node.component.name}</span>
+            <span className="block text-[10px] tabular-nums text-[var(--text-faint)]">
+              {Math.round(node.component.box.w)} × {Math.round(node.component.box.h)}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+        <button
+          type="button"
+          title="View in isolation"
+          onClick={() => onIsolate?.(id)}
+          className="mr-1 grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] bg-transparent opacity-0 transition-opacity hover:bg-[var(--surface-hover)] group-hover:opacity-100 text-current"
+        >
+          <Eye size={11} />
+        </button>
+      </div>
       {node.children.map((child) => (
-        <StackTreeRows key={child.component.id} node={child} selectedId={selectedId} onSelect={onSelect} />
+        <StackTreeRows key={child.component.id} node={child} selectedId={selectedId} onSelect={onSelect} onIsolate={onIsolate} />
       ))}
     </>
   );
@@ -856,11 +1187,22 @@ function GroupGridThumb({
 async function loadStackPreview(item: ReferenceItem): Promise<StackPreviewState | null> {
   const data = await readReferenceStackData(item.id);
   if (!data) return null;
-  // Components without their own crop file fall back to the original image; read
-  // it through the shared cache instead of relying on a possibly-empty item.url.
   const baseUrl = (await loadReferenceUrl(item)) ?? "";
   const urls: Record<string, string> = {};
   const ownedUrls: string[] = [];
+
+  // v2: load URLs for roots (stored separately from cuts)
+  if (data.roots && data.roots.length > 0) {
+    for (const root of data.roots) {
+      if (!root.file) { urls[root.id] = baseUrl; continue; }
+      const blob = await loadReferenceStackFile(item.id, root.file, "image/png");
+      if (!blob) { urls[root.id] = baseUrl; continue; }
+      const url = URL.createObjectURL(blob);
+      urls[root.id] = url;
+      ownedUrls.push(url);
+    }
+  }
+
   for (const component of data.components) {
     if (!component.file) { urls[component.id] = baseUrl; continue; }
     const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
@@ -883,6 +1225,7 @@ function buildStackTree(data: ReferenceStackData): StackTreeNode[] {
     const parentId = component.parentId ?? "__root__";
     byParent.set(parentId, [...(byParent.get(parentId) ?? []), component]);
   }
+
   const visit = (component: ReferenceStackItem, depth: number, seen: Set<string>): StackTreeNode => {
     if (seen.has(component.id)) return { component, children: [], depth };
     const next = new Set(seen); next.add(component.id);
@@ -891,6 +1234,24 @@ function buildStackTree(data: ReferenceStackData): StackTreeNode[] {
       .map((c) => visit(c, depth + 1, next));
     return { component, children, depth };
   };
+
+  // v2: roots live in data.roots, not in data.components
+  if (data.roots && data.roots.length > 0) {
+    return data.roots.map((root) => {
+      const synthetic: ReferenceStackItem = {
+        id: root.id,
+        name: root.name,
+        type: data.original.type,
+        box: root.box,
+        file: root.file,
+        parentId: null,
+        createdAt: root.createdAt,
+      };
+      return visit(synthetic, 0, new Set());
+    });
+  }
+
+  // v1 fallback: root may be inlined into data.components
   const root = data.components.find((c) => c.id === data.rootComponentId);
   if (root) return [visit(root, 0, new Set())];
   return (byParent.get("__root__") ?? data.components)

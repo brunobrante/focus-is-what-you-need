@@ -382,10 +382,8 @@ export const ImportModal = forwardRef<ImportModalHandle>(
                   ].join(" ")}
                 >
                   <span
-                    className={[
-                      "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform duration-150",
-                      groupTogether ? "translate-x-[15px]" : "translate-x-[2px]",
-                    ].join(" ")}
+                    className="absolute left-0 top-1/2 h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform duration-150"
+                    style={{ transform: `translate(${groupTogether ? 16 : 2}px, -50%)` }}
                   />
                 </span>
                 Create a group
