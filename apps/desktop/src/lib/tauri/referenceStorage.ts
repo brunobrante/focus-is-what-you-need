@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import {
   stackSummaryFromData,
   type ReferenceStackData,
@@ -6,9 +5,15 @@ import {
   type ReferenceStackSummary,
 } from "@/lib/references/stackTypes";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
+import { blobToExt } from "@/lib/references/mediaTypes";
+import {
+  getReferenceBlobStore,
+  type ExtractedFrame,
+  type StackBatchFile,
+} from "@/lib/references/blobStore";
 
 // Matches StoredMeta from References.tsx (Omit<ReferenceItem, "url">),
-// with ext required so we know which filename to look up on disk.
+// with ext required so we know which filename to look up.
 export type StoredRefMeta = {
   id: string;
   name: string;
@@ -28,76 +33,24 @@ export type StoredRefMeta = {
   stack?: ReferenceStackSummary;
 };
 
-export function blobToExt(blob: Blob): string {
-  const t = blob.type;
-  if (t.includes("png")) return "png";
-  if (t.includes("jpeg") || t.includes("jpg")) return "jpg";
-  if (t.includes("webp")) return "webp";
-  if (t.includes("svg")) return "svg";
-  if (t.includes("gif")) return "gif";
-  if (t.includes("mp4")) return "mp4";
-  if (t.includes("mov") || t.includes("quicktime")) return "mov";
-  if (t.includes("webm")) return "webm";
-  if (t.includes("avi")) return "avi";
-  if (t.includes("mkv")) return "mkv";
-  return "bin";
-}
+// Pure media-type helpers now live in `lib/references/mediaTypes`. Re-exported
+// here so existing importers keep working.
+export { blobToExt, extFromName, mimeFromExt } from "@/lib/references/mediaTypes";
+export type { ExtractedFrame, StackBatchFile } from "@/lib/references/blobStore";
 
-export function extFromName(name: string): string {
-  const dot = name.lastIndexOf(".");
-  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : "bin";
-}
-
-export function mimeFromExt(ext: string): string {
-  const map: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    gif: "image/gif",
-    mp4: "video/mp4",
-    mov: "video/quicktime",
-    webm: "video/webm",
-    avi: "video/x-msvideo",
-    mkv: "video/x-matroska",
-  };
-  return map[ext] ?? "application/octet-stream";
-}
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const comma = result.indexOf(",");
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
-// Saves blob to disk, returns the file extension used.
+// Saves blob to the active blob store, returns the file extension used.
 export async function saveReferenceFile(id: string, blob: Blob): Promise<string> {
   const ext = blobToExt(blob);
-  const dataB64 = await blobToBase64(blob);
-  await invoke("write_reference_file", { id, ext, dataB64 });
+  await getReferenceBlobStore().writeOriginal(id, ext, blob);
   return ext;
 }
 
 export async function loadReferenceFile(id: string, ext: string): Promise<Blob | null> {
-  try {
-    // Command returns raw bytes (ArrayBuffer) — no base64, no main-thread atob().
-    const buffer = await invoke<ArrayBuffer>("read_reference_file", { id, ext });
-    return new Blob([buffer], { type: mimeFromExt(ext) });
-  } catch {
-    return null;
-  }
+  return getReferenceBlobStore().readOriginal(id, ext);
 }
 
 export async function removeReferenceFile(id: string): Promise<void> {
-  await invoke("delete_reference_file", { id }).catch(() => {});
+  await getReferenceBlobStore().deleteOriginal(id);
 }
 
 export async function saveReferenceStackFile(
@@ -105,8 +58,7 @@ export async function saveReferenceStackFile(
   fileName: string,
   blob: Blob,
 ): Promise<void> {
-  const dataB64 = await blobToBase64(blob);
-  await invoke("write_reference_stack_file", { id, fileName, dataB64 });
+  await getReferenceBlobStore().writeStackFile(id, fileName, blob);
 }
 
 export async function loadReferenceStackFile(
@@ -114,49 +66,27 @@ export async function loadReferenceStackFile(
   fileName: string,
   mimeType = "image/png",
 ): Promise<Blob | null> {
-  try {
-    const buffer = await invoke<ArrayBuffer>("read_reference_stack_file", { id, fileName });
-    return new Blob([buffer], { type: mimeType });
-  } catch {
-    return null;
-  }
+  return getReferenceBlobStore().readStackFile(id, fileName, mimeType);
 }
 
 export async function writeReferenceStackData(id: string, data: ReferenceStackData): Promise<void> {
-  await invoke("write_reference_stack_data", { id, content: JSON.stringify(data, null, 2) });
+  await getReferenceBlobStore().writeStackData(id, JSON.stringify(data, null, 2));
 }
 
-export type StackBatchFile = { fileName: string; dataB64: string };
-
-// Writes every crop PNG + data.json in a single IPC call (replaces the per-file loop).
+// Writes every crop PNG + data.json in a single batch (one IDB transaction on
+// web, one IPC call on desktop).
 export async function writeReferenceStackBatch(
   id: string,
   files: StackBatchFile[],
   data: ReferenceStackData,
 ): Promise<void> {
-  await invoke("write_reference_stack_batch", {
-    id,
-    files: files.map((file) => ({ file_name: file.fileName, data_b64: file.dataB64 })),
-    dataJson: JSON.stringify(data, null, 2),
-  });
+  await getReferenceBlobStore().writeStackBatch(id, files, JSON.stringify(data, null, 2));
 }
 
-/* ---------- Video frames (ffmpeg sidecar) ---------- */
-
-export type ExtractedFrame = {
-  file: string;
-  index: number;
-  timestamp_ms: number;
-  w: number;
-  h: number;
-};
+/* ---------- Video frames (ffmpeg, desktop only) ---------- */
 
 export async function ffmpegAvailable(): Promise<boolean> {
-  try {
-    return await invoke<boolean>("ffmpeg_available");
-  } catch {
-    return false;
-  }
+  return getReferenceBlobStore().ffmpegAvailable();
 }
 
 export async function extractVideoFrames(
@@ -164,13 +94,7 @@ export async function extractVideoFrames(
   ext: string,
   options?: { fps?: number; maxFrames?: number; maxWidth?: number },
 ): Promise<ExtractedFrame[]> {
-  return invoke<ExtractedFrame[]>("extract_video_frames", {
-    id,
-    ext,
-    fps: options?.fps ?? 1.5,
-    maxFrames: options?.maxFrames ?? 240,
-    maxWidth: options?.maxWidth ?? 480,
-  });
+  return getReferenceBlobStore().extractVideoFrames(id, ext, options);
 }
 
 export async function extractVideoFrameFull(
@@ -178,30 +102,21 @@ export async function extractVideoFrameFull(
   ext: string,
   timestampMs: number,
 ): Promise<Blob | null> {
-  try {
-    const buffer = await invoke<ArrayBuffer>("extract_video_frame_full", { id, ext, timestampMs });
-    return new Blob([buffer], { type: "image/png" });
-  } catch {
-    return null;
-  }
+  return getReferenceBlobStore().extractVideoFrameFull(id, ext, timestampMs);
 }
 
 export async function loadReferenceFrame(id: string, fileName: string): Promise<Blob | null> {
-  try {
-    const buffer = await invoke<ArrayBuffer>("read_reference_frame", { id, fileName });
-    return new Blob([buffer], { type: "image/jpeg" });
-  } catch {
-    return null;
-  }
+  return getReferenceBlobStore().readFrame(id, fileName);
 }
 
 export async function deleteReferenceFrames(id: string): Promise<void> {
-  await invoke("delete_reference_frames", { id }).catch(() => {});
+  await getReferenceBlobStore().deleteFrames(id);
 }
 
 export async function readReferenceStackData(id: string): Promise<ReferenceStackData | null> {
   try {
-    const raw = await invoke<string>("read_reference_stack_data", { id });
+    const raw = await getReferenceBlobStore().readStackData(id);
+    if (raw == null) return null;
     const parsed: unknown = JSON.parse(raw);
     return normalizeReferenceStackData(parsed, id);
   } catch {
@@ -210,7 +125,7 @@ export async function readReferenceStackData(id: string): Promise<ReferenceStack
 }
 
 export async function removeReferenceStack(id: string): Promise<void> {
-  await invoke("delete_reference_stack", { id }).catch(() => {});
+  await getReferenceBlobStore().deleteStack(id);
 }
 
 export async function refreshReferenceStackSummary(meta: StoredRefMeta): Promise<StoredRefMeta> {
