@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Edit3, Eye, ExternalLink, Film, Folder,
-  Layers, Trash2, Upload, X, Play,
+  Layers, Trash2, Upload, X,
 } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
 import type { ReferenceStackData, ReferenceStackItem } from "@/lib/references/stackTypes";
@@ -11,10 +11,7 @@ import {
   loadReferenceStackFile,
 } from "@/lib/tauri/referenceStorage";
 import { loadReferenceUrl } from "@/lib/references/referenceUrlCache";
-import type {
-  LightboxTab, ReferenceItem,
-  StackPreviewState, StackTreeNode,
-} from "../types";
+import type { ReferenceItem, StackPreviewState, StackTreeNode } from "../types";
 import { useReferenceUrl } from "../hooks/useReferenceUrl";
 import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
 import { DetailList, Section, TagEditor } from "./ui";
@@ -57,6 +54,77 @@ export function ReferenceDetailModal({
   onEditGroup: () => void;
   onDeleteGroup: () => void;
 }) {
+  type MainTab = "screen" | "stack" | "screens" | "stacks";
+
+  const isGroup = subject?.kind === "group";
+
+  // ── tabs ──────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<MainTab>(isGroup ? "screens" : "screen");
+
+  // ── group: focused item ───────────────────────────────────────────────────
+  const [focusedItem, setFocusedItem] = useState<ReferenceItem | null>(null);
+
+  // ── stack state ───────────────────────────────────────────────────────────
+  const [stackPreview, setStackPreview] = useState<StackPreviewState | null>(null);
+  const [stackLoading, setStackLoading] = useState(false);
+  const [selectedStackComponentId, setSelectedStackComponentId] = useState<string | null>(null);
+  const [stackViewMode, setStackViewMode] = useState<"composite" | "isolated">("composite");
+
+  // ── derived ───────────────────────────────────────────────────────────────
+  const group = subject?.kind === "group" ? subject.group : null;
+  const groupReferences = subject?.kind === "group" ? subject.references : [];
+  const imageReferences = groupReferences.filter((r) => r.mediaKind === "image");
+  const stackedReferences = groupReferences.filter((r) => r.stack?.enabled);
+  const hasStacks = stackedReferences.length > 0;
+
+  const currentItem: ReferenceItem | null =
+    subject?.kind === "reference" ? subject.item : focusedItem;
+  const canStack = Boolean(currentItem?.stack?.enabled);
+
+  const displayedItems = activeTab === "screens" ? groupReferences : stackedReferences;
+  const focusedIndex = focusedItem
+    ? displayedItems.findIndex((i) => i.id === focusedItem.id)
+    : -1;
+
+  // Whether the left area shows the stack composite/isolated view:
+  // - reference: only when Stack tab is active
+  // - group: whenever focused item has a stack
+  const showStackView = isGroup ? !!focusedItem && canStack : activeTab === "stack";
+
+  // ── reset on subject change ───────────────────────────────────────────────
+  const subjectKey = subject
+    ? subject.kind === "reference"
+      ? subject.item.id
+      : subject.group.id
+    : null;
+
+  useEffect(() => {
+    setActiveTab(isGroup ? "screens" : "screen");
+    setFocusedItem(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectKey]);
+
+  // ── load stack preview ────────────────────────────────────────────────────
+  useEffect(() => {
+    setSelectedStackComponentId(null);
+    setStackViewMode("composite");
+    setStackPreview((prev) => { releaseStackUrls(prev); return null; });
+    if (!canStack || !currentItem) { setStackLoading(false); return; }
+
+    let cancelled = false;
+    setStackLoading(true);
+    void loadStackPreview(currentItem).then((preview) => {
+      if (cancelled) { releaseStackUrls(preview); return; }
+      setStackPreview(preview);
+      setSelectedStackComponentId(preview?.data.primaryComponentId ?? null);
+    }).finally(() => { if (!cancelled) setStackLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItem?.id]);
+
+  useEffect(() => () => { releaseStackUrls(stackPreview); }, [stackPreview]);
+
+  // ── keyboard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!subject) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -64,7 +132,50 @@ export function ReferenceDetailModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [subject, onClose]);
 
+  // ── URLs — must be before early return (hook rule) ────────────────────────
+  const { url: currentUrl } = useReferenceUrl(currentItem, { eager: true });
+
   if (!subject) return null;
+
+  // ── stack derivation ──────────────────────────────────────────────────────
+  const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
+  const effectiveStackId =
+    selectedStackComponentId ??
+    stackPreview?.data.primaryComponentId ??
+    stackPreview?.data.roots?.[0]?.id ??
+    stackPreview?.data.components[0]?.id;
+  const currentStackThumb =
+    canStack && currentItem ? stackThumbnailUrls[currentItem.id] : undefined;
+  const stackImageUrl =
+    effectiveStackId && stackPreview?.urls[effectiveStackId]
+      ? stackPreview.urls[effectiveStackId]
+      : currentStackThumb ?? currentUrl;
+
+  // ── builder href ──────────────────────────────────────────────────────────
+  const builderSource = isGroup
+    ? (currentItem?.mediaKind === "image" ? currentItem : null) ??
+      (group?.coverReferenceId
+        ? imageReferences.find((r) => r.id === group.coverReferenceId)
+        : undefined) ??
+      imageReferences[0] ??
+      null
+    : subject.item.mediaKind === "image"
+    ? subject.item
+    : null;
+  const builderHref = builderSource
+    ? `/tools?id=${encodeURIComponent(builderSource.id)}${group ? `&groupId=${encodeURIComponent(group.id)}` : ""}`
+    : null;
+
+  // ── tabs config ───────────────────────────────────────────────────────────
+  const tabs = isGroup
+    ? [
+        { id: "screens", label: "Screens" },
+        { id: "stacks", label: "Stacks", disabled: !hasStacks },
+      ]
+    : [
+        { id: "screen", label: "Screen" },
+        { id: "stack", label: "Stack", disabled: !canStack },
+      ];
 
   return (
     <div
@@ -74,464 +185,211 @@ export function ReferenceDetailModal({
       className="fixed inset-0 z-[70] flex items-center justify-center p-6"
       style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}
     >
-      {subject.kind === "reference" ? (
-        <ItemModal
-          item={subject.item}
+      <ModalShell
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(t) => {
+          setActiveTab(t as MainTab);
+          if (isGroup) setFocusedItem(null);
+        }}
+        title={isGroup ? group!.name : subject.item.name}
+        onClose={onClose}
+      >
+        {/* ── left: content area ────────────────────────────────────────────── */}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          {isGroup && !focusedItem ? (
+            /* group gallery */
+            displayedItems.length > 0 ? (
+              <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                <div
+                  className="grid gap-3"
+                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
+                >
+                  {displayedItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFocusedItem(item)}
+                      className="group relative aspect-[4/3] w-full cursor-zoom-in overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-0 transition-[border-color] hover:border-[var(--border-strong)]"
+                    >
+                      <GroupGridThumb item={item} stackThumbnailUrl={stackThumbnailUrls[item.id]} />
+                      <div
+                        className="pointer-events-none absolute inset-0 flex items-end p-2 opacity-0 transition-opacity group-hover:opacity-100"
+                        style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 50%)" }}
+                      >
+                        <span className="truncate text-[10.5px] font-medium text-white">{item.name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <Folder size={32} strokeWidth={1.5} className="text-[var(--text-faint)]" />
+                  <p className="m-0 text-[13px] text-[var(--text-muted)]">
+                    {activeTab === "stacks" ? "No stacks in this group" : "No screens in this group"}
+                  </p>
+                </div>
+              </div>
+            )
+          ) : (
+            /* single item view — reference always; group when item is focused */
+            <>
+              {/* back — group only */}
+              {isGroup && focusedItem && (
+                <button
+                  type="button"
+                  onClick={() => setFocusedItem(null)}
+                  className="absolute left-3 top-3 z-10 flex cursor-pointer items-center gap-1 rounded-[7px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1.5 text-[11.5px] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
+                >
+                  <ChevronLeft size={13} />
+                  Back
+                </button>
+              )}
+
+              {/* All / Solo toggle — only when showing stack view */}
+              {showStackView && (
+                <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 flex items-center gap-0.5 rounded-[8px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.88)] p-0.5 backdrop-blur">
+                  {(["composite", "isolated"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setStackViewMode(mode)}
+                      className={[
+                        "h-7 cursor-pointer rounded-[6px] px-2.5 text-[11.5px] font-medium transition-colors",
+                        stackViewMode === mode
+                          ? "bg-[var(--surface)] text-[var(--text)]"
+                          : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                      ].join(" ")}
+                    >
+                      {mode === "composite" ? "All" : "Solo"}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* prev arrow — group focused non-stack item */}
+              {isGroup && focusedItem && !canStack && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFocusedItem(
+                      displayedItems[(focusedIndex - 1 + displayedItems.length) % displayedItems.length]
+                    )
+                  }
+                  className="absolute left-3 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+              )}
+
+              {/* main preview */}
+              <div className="flex flex-1 items-center justify-center overflow-hidden p-6">
+                {showStackView ? (
+                  stackLoading && !stackPreview ? (
+                    <p className="text-[13px] text-[var(--text-muted)]">Loading stack…</p>
+                  ) : stackViewMode === "composite" && stackPreview ? (
+                    <StackCompositeView
+                      data={stackPreview.data}
+                      urls={stackPreview.urls}
+                      selectedId={effectiveStackId ?? null}
+                      onSelect={setSelectedStackComponentId}
+                    />
+                  ) : (
+                    currentItem && (
+                      <img
+                        src={stackImageUrl ?? currentStackThumb ?? currentUrl}
+                        alt={currentItem.name}
+                        className="block max-h-full max-w-full rounded-[10px] object-contain"
+                        draggable={false}
+                      />
+                    )
+                  )
+                ) : currentItem?.mediaKind === "video" ? (
+                  currentUrl ? (
+                    <video
+                      src={currentUrl}
+                      controls
+                      autoPlay
+                      className="block max-h-full max-w-full rounded-[10px]"
+                    />
+                  ) : (
+                    <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
+                  )
+                ) : (
+                  <img
+                    src={currentStackThumb ?? currentUrl}
+                    alt={currentItem?.name}
+                    className="block max-h-full max-w-full rounded-[10px] object-contain"
+                    draggable={false}
+                  />
+                )}
+              </div>
+
+              {/* next arrow — group focused non-stack item */}
+              {isGroup && focusedItem && !canStack && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFocusedItem(displayedItems[(focusedIndex + 1) % displayedItems.length])
+                  }
+                  className="absolute right-3 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              )}
+
+              {/* position counter — group focused */}
+              {isGroup && focusedItem && (
+                <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1 text-[10.5px] tabular-nums text-[var(--text-muted)] backdrop-blur">
+                  {focusedIndex + 1} / {displayedItems.length}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ── right: detail panel ───────────────────────────────────────────── */}
+        <DetailPanel
+          key={currentItem?.id ?? group?.id ?? "none"}
+          item={currentItem}
+          group={group}
+          groupReferences={groupReferences}
           groups={groups}
+          looseReferences={isGroup ? looseReferences : []}
           stackThumbnailUrls={stackThumbnailUrls}
-          onClose={onClose}
-          onDelete={onDelete}
+          builderHref={builderHref}
+          stackTree={stackTree}
+          stackLoading={stackLoading}
+          selectedStackComponentId={selectedStackComponentId}
+          stackPreviewUrls={stackPreview?.urls}
+          showStackView={showStackView}
+          onSelectStackComponent={setSelectedStackComponentId}
+          onIsolateStackComponent={(id) => {
+            setSelectedStackComponentId(id);
+            setStackViewMode("isolated");
+          }}
+          onDelete={() => {
+            if (currentItem) onDelete(currentItem.id);
+            if (isGroup) setFocusedItem(null);
+            else onClose();
+          }}
           onDescriptionChange={onDescriptionChange}
           onTagsChange={onTagsChange}
           onSourceUrlChange={onSourceUrlChange}
           onGroupChange={onGroupChange}
-          onExtractFrames={onExtractFrames}
-        />
-      ) : (
-        <GroupModal
-          group={subject.group}
-          references={subject.references}
-          looseReferences={looseReferences}
-          groups={groups}
-          stackThumbnailUrls={stackThumbnailUrls}
-          onClose={onClose}
-          onDelete={onDelete}
-          onDescriptionChange={onDescriptionChange}
-          onTagsChange={onTagsChange}
-          onSourceUrlChange={onSourceUrlChange}
-          onGroupChange={onGroupChange}
-          onExtractFrames={onExtractFrames}
+          onExtractFrames={() => { if (currentItem) onExtractFrames(currentItem); }}
           onUpload={onUpload}
           onEditGroup={onEditGroup}
-          onDeleteGroup={onDeleteGroup}
+          onDeleteGroup={() => { onDeleteGroup(); onClose(); }}
         />
-      )}
+      </ModalShell>
     </div>
   );
 }
 
-// ─── item modal ──────────────────────────────────────────────────────────────
-
-function ItemModal({
-  item,
-  groups,
-  stackThumbnailUrls,
-  onClose,
-  onDelete,
-  onDescriptionChange,
-  onTagsChange,
-  onSourceUrlChange,
-  onGroupChange,
-  onExtractFrames,
-}: {
-  item: ReferenceItem;
-  groups: ReferenceGroup[];
-  stackThumbnailUrls: Record<string, string>;
-  onClose: () => void;
-  onDelete: (id: string) => void;
-  onDescriptionChange: (id: string, desc: string) => void;
-  onTagsChange: (id: string, tags: string[]) => void;
-  onSourceUrlChange: (id: string, url: string) => void;
-  onGroupChange: (id: string, groupId: string | null) => void;
-  onExtractFrames: (item: ReferenceItem) => void;
-}) {
-  const canStack = item.mediaKind === "image" && Boolean(item.stack?.enabled);
-  const { url: itemUrl } = useReferenceUrl(item, { eager: true });
-  const [activeTab, setActiveTab] = useState<LightboxTab>("original");
-  const [stackPreview, setStackPreview] = useState<StackPreviewState | null>(null);
-  const [stackLoading, setStackLoading] = useState(false);
-  const [selectedStackComponentId, setSelectedStackComponentId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setActiveTab("original");
-    setSelectedStackComponentId(null);
-    setStackPreview((prev) => { releaseStackUrls(prev); return null; });
-    if (!canStack) { setStackLoading(false); return; }
-
-    let cancelled = false;
-    setStackLoading(true);
-    void loadStackPreview(item).then((preview) => {
-      if (cancelled) { releaseStackUrls(preview); return; }
-      setStackPreview(preview);
-      setSelectedStackComponentId(preview?.data.primaryComponentId ?? null);
-    }).finally(() => { if (!cancelled) setStackLoading(false); });
-    return () => { cancelled = true; };
-  }, [item.id]);
-
-  useEffect(() => () => { releaseStackUrls(stackPreview); }, [stackPreview]);
-
-  const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
-  const effectiveStackId = selectedStackComponentId
-    ?? stackPreview?.data.primaryComponentId
-    ?? stackPreview?.data.roots?.[0]?.id
-    ?? stackPreview?.data.components[0]?.id;
-  const stackImageUrl = (effectiveStackId && stackPreview?.urls[effectiveStackId])
-    ? stackPreview.urls[effectiveStackId]
-    : itemUrl;
-  const screenUrl = canStack && stackThumbnailUrls[item.id] ? stackThumbnailUrls[item.id] : itemUrl;
-
-  const builderHref = item.groupId
-    ? `/tools?id=${encodeURIComponent(item.id)}&groupId=${encodeURIComponent(item.groupId)}`
-    : `/tools?id=${encodeURIComponent(item.id)}`;
-
-  return (
-    <ModalShell
-      tabs={[
-        { id: "original", label: "Screen" },
-        { id: "stack", label: "Stack", disabled: !canStack },
-      ]}
-      activeTab={activeTab}
-      onTabChange={(t) => setActiveTab(t as LightboxTab)}
-      title={item.name}
-      onClose={onClose}
-    >
-      {/* left: preview area */}
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-        {activeTab === "stack" ? (
-          <div className="grid h-full w-full grid-cols-[1fr_260px] overflow-hidden">
-            {/* stack image */}
-            <div className="flex min-h-0 min-w-0 items-center justify-center p-6">
-              {stackLoading && !stackPreview ? (
-                <p className="text-[13px] text-[var(--text-muted)]">Loading stack…</p>
-              ) : (
-                <img
-                  src={stackImageUrl}
-                  alt={item.name}
-                  className="block max-h-full max-w-full rounded-[10px] object-contain"
-                  draggable={false}
-                />
-              )}
-            </div>
-            {/* stack tree */}
-            <aside className="flex min-h-0 flex-col overflow-hidden border-l border-[var(--border)]">
-              <div className="shrink-0 border-b border-[var(--border)] px-3 py-2.5">
-                <p className="m-0 text-[11.5px] font-semibold text-[var(--text)]">Stack tree</p>
-                <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">
-                  {((stackPreview?.data.roots?.length ?? 0) + (stackPreview?.data.components.length ?? 0))} components
-                </p>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                {stackTree.length > 0 ? stackTree.map((node) => (
-                  <StackTreeRows
-                    key={node.component.id}
-                    node={node}
-                    selectedId={selectedStackComponentId}
-                    onSelect={setSelectedStackComponentId}
-                  />
-                )) : (
-                  <div className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-4 text-[11.5px] text-[var(--text-faint)]">
-                    No stack data found.
-                  </div>
-                )}
-              </div>
-            </aside>
-          </div>
-        ) : item.mediaKind === "video" ? (
-          itemUrl ? (
-            <video
-              src={itemUrl}
-              controls
-              autoPlay
-              className="block max-h-full max-w-full rounded-[10px]"
-            />
-          ) : (
-            <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
-          )
-        ) : (
-          <img
-            src={screenUrl}
-            alt={item.name}
-            className="block max-h-full max-w-full rounded-[10px] object-contain"
-            draggable={false}
-          />
-        )}
-      </div>
-
-      {/* right: tabbed panel */}
-      <DetailPanel
-        item={item}
-        group={groups.find((g) => g.id === item.groupId) ?? null}
-        groupReferences={[]}
-        groups={groups}
-        looseReferences={[]}
-        stackThumbnailUrls={stackThumbnailUrls}
-        builderHref={builderHref}
-        onDelete={() => { onDelete(item.id); onClose(); }}
-        onDescriptionChange={onDescriptionChange}
-        onTagsChange={onTagsChange}
-        onSourceUrlChange={onSourceUrlChange}
-        onGroupChange={onGroupChange}
-        onExtractFrames={() => onExtractFrames(item)}
-        onUpload={() => {}}
-        onEditGroup={() => {}}
-        onDeleteGroup={() => {}}
-      />
-    </ModalShell>
-  );
-}
-
-// ─── group modal ──────────────────────────────────────────────────────────────
-
-function GroupModal({
-  group,
-  references,
-  looseReferences,
-  groups,
-  stackThumbnailUrls,
-  onClose,
-  onDelete,
-  onDescriptionChange,
-  onTagsChange,
-  onSourceUrlChange,
-  onGroupChange,
-  onExtractFrames,
-  onUpload,
-  onEditGroup,
-  onDeleteGroup,
-}: {
-  group: ReferenceGroup;
-  references: ReferenceItem[];
-  looseReferences: ReferenceItem[];
-  groups: ReferenceGroup[];
-  stackThumbnailUrls: Record<string, string>;
-  onClose: () => void;
-  onDelete: (id: string) => void;
-  onDescriptionChange: (id: string, desc: string) => void;
-  onTagsChange: (id: string, tags: string[]) => void;
-  onSourceUrlChange: (id: string, url: string) => void;
-  onGroupChange: (id: string, groupId: string | null) => void;
-  onExtractFrames: (item: ReferenceItem) => void;
-  onUpload: () => void;
-  onEditGroup: () => void;
-  onDeleteGroup: () => void;
-}) {
-  type GroupTab = "screens" | "stacks";
-  const imageReferences = references.filter((r) => r.mediaKind === "image");
-  const stackedReferences = references.filter((r) => r.stack?.enabled);
-  const hasStacks = stackedReferences.length > 0;
-  const [activeTab, setActiveTab] = useState<GroupTab>("screens");
-  const [focusedItem, setFocusedItem] = useState<ReferenceItem | null>(null);
-  const [addReferenceId, setAddReferenceId] = useState("");
-  const [stackPreview, setStackPreview] = useState<StackPreviewState | null>(null);
-  const [stackLoading, setStackLoading] = useState(false);
-  const [selectedStackComponentId, setSelectedStackComponentId] = useState<string | null>(null);
-  const [stackViewMode, setStackViewMode] = useState<"composite" | "isolated">("composite");
-
-  const focusedStackThumb = focusedItem?.stack?.enabled ? stackThumbnailUrls[focusedItem.id] : undefined;
-  const { url: focusedUrl } = useReferenceUrl(focusedItem, { eager: true });
-
-  useEffect(() => { setFocusedItem(null); setAddReferenceId(""); }, [group.id]);
-
-  useEffect(() => {
-    setSelectedStackComponentId(null);
-    setStackViewMode("composite");
-    setStackPreview((prev) => { releaseStackUrls(prev); return null; });
-    if (!focusedItem?.stack?.enabled) { setStackLoading(false); return; }
-    let cancelled = false;
-    setStackLoading(true);
-    void loadStackPreview(focusedItem).then((preview) => {
-      if (cancelled) { releaseStackUrls(preview); return; }
-      setStackPreview(preview);
-      setSelectedStackComponentId(preview?.data.primaryComponentId ?? null);
-    }).finally(() => { if (!cancelled) setStackLoading(false); });
-    return () => { cancelled = true; };
-  }, [focusedItem?.id]);
-
-  useEffect(() => () => { releaseStackUrls(stackPreview); }, [stackPreview]);
-
-  const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
-  const effectiveStackId = selectedStackComponentId
-    ?? stackPreview?.data.primaryComponentId
-    ?? stackPreview?.data.roots?.[0]?.id
-    ?? stackPreview?.data.components[0]?.id;
-  const stackImageUrl = (effectiveStackId && stackPreview?.urls[effectiveStackId])
-    ? stackPreview.urls[effectiveStackId]
-    : (focusedStackThumb ?? focusedUrl);
-
-  const cover = (group.coverReferenceId
-    ? imageReferences.find((r) => r.id === group.coverReferenceId)
-    : null) ?? imageReferences[0] ?? null;
-  const builderSource = focusedItem?.mediaKind === "image" ? focusedItem : cover;
-  const builderHref = builderSource
-    ? `/tools?id=${encodeURIComponent(builderSource.id)}&groupId=${encodeURIComponent(group.id)}`
-    : null;
-
-  const displayedItems = activeTab === "screens" ? references : stackedReferences;
-  const focusedIndex = focusedItem ? displayedItems.findIndex((i) => i.id === focusedItem.id) : -1;
-
-  return (
-    <ModalShell
-      tabs={[
-        { id: "screens", label: "Screens" },
-        { id: "stacks", label: "Stacks", disabled: !hasStacks },
-      ]}
-      activeTab={activeTab}
-      onTabChange={(t) => { setActiveTab(t as GroupTab); setFocusedItem(null); }}
-      title={group.name}
-      onClose={onClose}
-    >
-      {/* left: screens / stacks grid */}
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {focusedItem ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setFocusedItem(null)}
-              className="absolute left-3 top-3 z-10 flex cursor-pointer items-center gap-1 rounded-[7px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1.5 text-[11.5px] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
-            >
-              <ChevronLeft size={13} />
-              Back
-            </button>
-
-            {!focusedItem.stack?.enabled && (
-              <button
-                type="button"
-                onClick={() => setFocusedItem(displayedItems[(focusedIndex - 1 + displayedItems.length) % displayedItems.length])}
-                className="absolute left-3 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
-              >
-                <ChevronLeft size={15} />
-              </button>
-            )}
-
-            {focusedItem.stack?.enabled && (
-              <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 flex items-center gap-0.5 rounded-[8px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.88)] p-0.5 backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => setStackViewMode("composite")}
-                  className={[
-                    "h-7 cursor-pointer rounded-[6px] px-2.5 text-[11.5px] font-medium transition-colors",
-                    stackViewMode === "composite"
-                      ? "bg-[var(--surface)] text-[var(--text)]"
-                      : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
-                  ].join(" ")}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStackViewMode("isolated")}
-                  className={[
-                    "h-7 cursor-pointer rounded-[6px] px-2.5 text-[11.5px] font-medium transition-colors",
-                    stackViewMode === "isolated"
-                      ? "bg-[var(--surface)] text-[var(--text)]"
-                      : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
-                  ].join(" ")}
-                >
-                  Solo
-                </button>
-              </div>
-            )}
-
-            <div className="flex flex-1 items-center justify-center overflow-hidden p-6">
-              {focusedItem.stack?.enabled ? (
-                stackLoading && !stackPreview ? (
-                  <p className="text-[13px] text-[var(--text-muted)]">Loading stack…</p>
-                ) : stackViewMode === "composite" && stackPreview ? (
-                  <StackCompositeView
-                    data={stackPreview.data}
-                    urls={stackPreview.urls}
-                    selectedId={effectiveStackId ?? null}
-                    onSelect={(id) => { setSelectedStackComponentId(id); }}
-                  />
-                ) : (
-                  <img
-                    src={stackImageUrl ?? focusedStackThumb ?? focusedUrl}
-                    alt={focusedItem.name}
-                    className="block max-h-full max-w-full rounded-[10px] object-contain"
-                    draggable={false}
-                  />
-                )
-              ) : (
-                <img
-                  src={focusedUrl}
-                  alt={focusedItem.name}
-                  className="block max-h-full max-w-full rounded-[10px] object-contain"
-                  draggable={false}
-                />
-              )}
-            </div>
-
-            {!focusedItem.stack?.enabled && (
-              <button
-                type="button"
-                onClick={() => setFocusedItem(displayedItems[(focusedIndex + 1) % displayedItems.length])}
-                className="absolute right-3 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
-              >
-                <ChevronRight size={15} />
-              </button>
-            )}
-
-            <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1 text-[10.5px] tabular-nums text-[var(--text-muted)] backdrop-blur">
-              {focusedIndex + 1} / {displayedItems.length}
-            </div>
-          </>
-        ) : displayedItems.length > 0 ? (
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <div
-              className="grid gap-3"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
-            >
-              {displayedItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setFocusedItem(item)}
-                  className="group relative aspect-[4/3] w-full cursor-zoom-in overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-0 transition-[border-color] hover:border-[var(--border-strong)]"
-                >
-                  <GroupGridThumb item={item} stackThumbnailUrl={stackThumbnailUrls[item.id]} />
-                  <div
-                    className="pointer-events-none absolute inset-0 flex items-end p-2 opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 50%)" }}
-                  >
-                    <span className="truncate text-[10.5px] font-medium text-white">{item.name}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex flex-col items-center gap-2 text-center">
-              <Folder size={32} strokeWidth={1.5} className="text-[var(--text-faint)]" />
-              <p className="m-0 text-[13px] text-[var(--text-muted)]">
-                {activeTab === "stacks" ? "No stacks in this group" : "No screens in this group"}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* right: tabbed panel */}
-      <DetailPanel
-        key={focusedItem?.id ?? "group"}
-        item={focusedItem}
-        group={group}
-        groupReferences={references}
-        groups={groups}
-        looseReferences={looseReferences}
-        stackThumbnailUrls={stackThumbnailUrls}
-        builderHref={builderHref}
-        stackTree={stackTree}
-        stackLoading={stackLoading}
-        selectedStackComponentId={selectedStackComponentId}
-        stackPreviewUrls={stackPreview?.urls}
-        onSelectStackComponent={(id) => { setSelectedStackComponentId(id); }}
-        onIsolateStackComponent={(id) => { setSelectedStackComponentId(id); setStackViewMode("isolated"); }}
-        onDelete={() => focusedItem && onDelete(focusedItem.id)}
-        onDescriptionChange={onDescriptionChange}
-        onTagsChange={onTagsChange}
-        onSourceUrlChange={onSourceUrlChange}
-        onGroupChange={onGroupChange}
-        onExtractFrames={() => focusedItem && onExtractFrames(focusedItem)}
-        onUpload={onUpload}
-        onEditGroup={onEditGroup}
-        onDeleteGroup={() => { onDeleteGroup(); onClose(); }}
-      />
-    </ModalShell>
-  );
-}
-
-// ─── item details form (right panel, single item) ────────────────────────────
+// ─── item details (right panel) ───────────────────────────────────────────────
 
 function ItemDetails({
   item,
@@ -647,7 +505,7 @@ function ItemDetails({
   );
 }
 
-// ─── group details (right panel, group tab) ───────────────────────────────────
+// ─── group details (right panel) ──────────────────────────────────────────────
 
 function GroupDetails({
   group, references, looseReferences, onGroupChange,
@@ -701,20 +559,14 @@ function GroupDetails({
           ))}
         </select>
       </Section>
-
     </div>
   );
 }
 
-// ─── shared layout pieces ─────────────────────────────────────────────────────
+// ─── shared layout ────────────────────────────────────────────────────────────
 
 function ModalShell({
-  tabs,
-  activeTab,
-  onTabChange,
-  title,
-  onClose,
-  children,
+  tabs, activeTab, onTabChange, title, onClose, children,
 }: {
   tabs: Array<{ id: string; label: string; disabled?: boolean }>;
   activeTab: string;
@@ -725,7 +577,6 @@ function ModalShell({
 }) {
   return (
     <div className="flex h-[min(900px,calc(100vh-48px))] w-[min(1320px,calc(100vw-48px))] flex-col overflow-hidden rounded-[12px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.97)] shadow-[0_18px_80px_rgba(0,0,0,0.55)]">
-      {/* header */}
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-3 py-2">
         <div className="flex items-center gap-1">
           {tabs.map((tab) => (
@@ -751,8 +602,6 @@ function ModalShell({
           </button>
         </div>
       </div>
-
-      {/* body */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {children}
       </div>
@@ -764,7 +613,7 @@ function DetailPanel({
   item, group, groupReferences, groups, looseReferences,
   stackThumbnailUrls, builderHref,
   stackTree = [], stackLoading = false, selectedStackComponentId = null,
-  stackPreviewUrls,
+  stackPreviewUrls, showStackView = false,
   onSelectStackComponent, onIsolateStackComponent,
   onDelete, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
   onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
@@ -780,6 +629,7 @@ function DetailPanel({
   stackLoading?: boolean;
   selectedStackComponentId?: string | null;
   stackPreviewUrls?: Record<string, string>;
+  showStackView?: boolean;
   onSelectStackComponent?: (id: string) => void;
   onIsolateStackComponent?: (id: string) => void;
   onDelete: () => void;
@@ -794,13 +644,28 @@ function DetailPanel({
 }) {
   type SideTab = "inspector" | "group" | "stack";
   const hasStackTab = Boolean(item?.stack?.enabled);
-  const defaultTab: SideTab = hasStackTab ? "stack" : !item && group ? "group" : "inspector";
+  const defaultTab: SideTab = (showStackView && hasStackTab)
+    ? "stack"
+    : !item && group
+    ? "group"
+    : "inspector";
   const [tab, setTab] = useState<SideTab>(defaultTab);
   const hasGroupTab = Boolean(group);
 
+  // Switch to stack tab only when the main view is actively showing the stack
   useEffect(() => {
-    if (hasStackTab && (stackLoading || stackTree.length > 0)) setTab("stack");
-  }, [hasStackTab, stackLoading, stackTree.length]);
+    if (showStackView && hasStackTab && (stackLoading || stackTree.length > 0)) {
+      setTab("stack");
+    }
+  }, [showStackView, hasStackTab, stackLoading, stackTree.length]);
+
+  // Reset to inspector/group when stack view is turned off
+  useEffect(() => {
+    if (!showStackView && hasStackTab) {
+      setTab(!item && group ? "group" : "inspector");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showStackView]);
 
   const selectedNode = selectedStackComponentId
     ? findStackNode(stackTree, selectedStackComponentId)
@@ -811,7 +676,6 @@ function DetailPanel({
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[var(--bg-elev)]">
-      {/* tab bar — order: Group → Stack in stack mode; Inspector → Group in screen mode */}
       <div className="flex shrink-0 items-center gap-0.5 border-b border-[var(--border)] px-2 py-1.5">
         {!hasStackTab && (
           <TabButton active={tab === "inspector"} onClick={() => setTab("inspector")}>
@@ -830,7 +694,6 @@ function DetailPanel({
         )}
       </div>
 
-      {/* body */}
       <div className={`min-h-0 flex-1 ${tab === "stack" ? "flex flex-col overflow-hidden" : "overflow-y-auto p-4"}`}>
         {tab === "inspector" && item ? (
           <ItemDetails
@@ -856,7 +719,6 @@ function DetailPanel({
 
         {tab === "stack" ? (
           <>
-            {/* tree — scrollable */}
             <div className="min-h-0 flex-1 overflow-hidden flex flex-col">
               <div className="shrink-0 border-b border-[var(--border)] px-3 py-2.5">
                 <p className="m-0 text-[11.5px] font-semibold text-[var(--text)]">Stack tree</p>
@@ -864,9 +726,7 @@ function DetailPanel({
                   <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">Loading…</p>
                 ) : (
                   <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">
-                    {stackTree.length > 0
-                      ? `${countTreeNodes(stackTree)} components`
-                      : "No data"}
+                    {stackTree.length > 0 ? `${countTreeNodes(stackTree)} components` : "No data"}
                   </p>
                 )}
               </div>
@@ -891,7 +751,6 @@ function DetailPanel({
               </div>
             </div>
 
-            {/* selected component panel */}
             <div className="shrink-0 border-t border-[var(--border)]">
               {selectedNode ? (
                 <>
@@ -930,7 +789,6 @@ function DetailPanel({
         ) : null}
       </div>
 
-      {/* actions footer — only for non-stack tabs */}
       {tab !== "stack" && (
         <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[var(--border)] p-3">
           {tab === "inspector" && item ? (
@@ -961,6 +819,8 @@ function DetailPanel({
   );
 }
 
+// ─── primitives ───────────────────────────────────────────────────────────────
+
 function findStackNode(nodes: StackTreeNode[], id: string): StackTreeNode | null {
   for (const node of nodes) {
     if (node.component.id === id) return node;
@@ -981,12 +841,8 @@ function countTreeNodes(nodes: StackTreeNode[]): number {
   return count;
 }
 
-
 function TabButton({
-  active,
-  disabled = false,
-  onClick,
-  children,
+  active, disabled = false, onClick, children,
 }: {
   active: boolean;
   disabled?: boolean;
@@ -1191,7 +1047,6 @@ async function loadStackPreview(item: ReferenceItem): Promise<StackPreviewState 
   const urls: Record<string, string> = {};
   const ownedUrls: string[] = [];
 
-  // v2: load URLs for roots (stored separately from cuts)
   if (data.roots && data.roots.length > 0) {
     for (const root of data.roots) {
       if (!root.file) { urls[root.id] = baseUrl; continue; }
@@ -1235,7 +1090,6 @@ function buildStackTree(data: ReferenceStackData): StackTreeNode[] {
     return { component, children, depth };
   };
 
-  // v2: roots live in data.roots, not in data.components
   if (data.roots && data.roots.length > 0) {
     return data.roots.map((root) => {
       const synthetic: ReferenceStackItem = {
@@ -1251,7 +1105,6 @@ function buildStackTree(data: ReferenceStackData): StackTreeNode[] {
     });
   }
 
-  // v1 fallback: root may be inlined into data.components
   const root = data.components.find((c) => c.id === data.rootComponentId);
   if (root) return [visit(root, 0, new Set())];
   return (byParent.get("__root__") ?? data.components)
