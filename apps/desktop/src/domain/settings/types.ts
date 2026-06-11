@@ -144,6 +144,7 @@ export type ProcessingFeatureKey =
   | "realEsrgan"
   | "florence2"
   | "craft"
+  | "dbnet"
   | "lama";
 
 export type ProcessingFeatureState = {
@@ -155,14 +156,21 @@ export type ProcessingFeaturesSettings = {
   realEsrgan: ProcessingFeatureState;
   florence2: ProcessingFeatureState;
   craft: ProcessingFeatureState;
+  dbnet: ProcessingFeatureState;
   lama: ProcessingFeatureState;
 };
+
+// Which text detector the Builder's "Is text?" action runs. Both models are
+// installable and coexist; this picks the active one. DBNet is lighter/faster
+// and is the default.
+export type TextDetectionModelId = "dbnet" | "craft";
 
 export type GlobalSettings = {
   schemaVersion: number;
   canvas: CanvasSettings;
   systemDesign: SystemDesignSettings;
   processingFeatures: ProcessingFeaturesSettings;
+  textDetectionModel: TextDetectionModelId;
 };
 
 export type DeepPartial<T> = T extends Array<infer U>

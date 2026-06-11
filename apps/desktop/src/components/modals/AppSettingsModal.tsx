@@ -13,9 +13,10 @@ import type {
   CanvasKeyCommandId,
   CanvasModifierCommandId,
   GlobalSettings,
+  TextDetectionModelId,
 } from "@/domain/settings/types";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
-import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
+import { putGlobalSettings, setTextDetectionModel } from "@/lib/storage/repos/settings.repo";
 import {
   getWorkspaceConfig,
   setWorkspaceFolder,
@@ -78,11 +79,13 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
       setSaving(true);
       try {
         await setWorkspaceFolder(folderPath);
-        // Processing features install/uninstall persists immediately and lives
-        // outside the draft, so take its latest value rather than the stale draft.
+        // Processing features and the text-detection model persist immediately
+        // and live outside the draft, so take their latest values rather than
+        // the stale draft.
         putGlobalSettings({
           ...settingsDraft,
           processingFeatures: persistedSettings.processingFeatures,
+          textDetectionModel: persistedSettings.textDetectionModel,
         });
         setIsOpen(false);
       } finally {
@@ -237,6 +240,11 @@ function CanvasTab({
 
 function ProcessingFeaturesTab() {
   const features = useProcessingFeatures();
+  const { settings } = useGlobalSettings();
+  const dbnetInstalled = features.dbnet.installed;
+  const craftInstalled = features.craft.installed;
+  // The model picker only matters once a text detector exists to run.
+  const showTextModelSelector = dbnetInstalled || craftInstalled;
   return (
     <div className="px-[22px] py-5 grid gap-6">
       <div>
@@ -279,9 +287,18 @@ function ProcessingFeaturesTab() {
           <ProcessingFeatureRow
             icon={<ScanText size={16} strokeWidth={1.7} />}
             name="Text Detector"
+            model="DBNet-ResNet18"
+            size="~50 MB"
+            description="Detects whether a cut contains text (faster, lighter)"
+            controls={features.dbnet}
+            divider
+          />
+          <ProcessingFeatureRow
+            icon={<ScanText size={16} strokeWidth={1.7} />}
+            name="Text Detector"
             model="CRAFT"
             size="~80 MB"
-            description="Detects whether a cut contains text"
+            description="Alternative text detector — heavier, also detects whether a cut contains text"
             controls={features.craft}
             divider
           />
@@ -293,6 +310,67 @@ function ProcessingFeaturesTab() {
             description="Removes a painted selection from a cut using LaMa inpainting"
             controls={features.lama}
           />
+        </div>
+      </div>
+
+      {showTextModelSelector ? (
+        <TextDetectionModelSelector
+          active={settings.textDetectionModel}
+          dbnetInstalled={dbnetInstalled}
+          craftInstalled={craftInstalled}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Picks which installed text detector the Builder's "Is text?" action runs.
+ * An option is selectable only when its model is installed; choosing one
+ * persists the `textDetectionModel` setting immediately.
+ */
+function TextDetectionModelSelector({
+  active,
+  dbnetInstalled,
+  craftInstalled,
+}: {
+  active: TextDetectionModelId;
+  dbnetInstalled: boolean;
+  craftInstalled: boolean;
+}) {
+  const options: { id: TextDetectionModelId; label: string; installed: boolean }[] = [
+    { id: "dbnet", label: "DBNet", installed: dbnetInstalled },
+    { id: "craft", label: "CRAFT", installed: craftInstalled },
+  ];
+  return (
+    <div>
+      <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+        Text detection model
+      </div>
+      <div className="flex items-center justify-between gap-5 rounded-[12px] border border-[var(--border)] px-4 py-3.5">
+        <p className="m-0 max-w-[420px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+          Which detector the “Is text?” action runs on cuts. Install a model above to enable it.
+        </p>
+        <div className="inline-flex shrink-0 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
+          {options.map((option) => {
+            const selected = active === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={!option.installed}
+                onClick={() => void setTextDetectionModel(option.id)}
+                className={[
+                  "cursor-pointer rounded-[6px] px-3 py-1.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                  selected
+                    ? "bg-[#5b6cff] text-white"
+                    : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                ].join(" ")}
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

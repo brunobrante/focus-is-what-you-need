@@ -1,43 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { bytesToPngDataUrl, runLama, urlToBytes } from "./modelCommands";
 
-export type LamaStatus = "idle" | "masking" | "running" | "done" | "error";
+export type LamaMaskStatus = "idle" | "masking";
 
 export type LamaInpainting = {
-  status: LamaStatus;
-  /** Inpainted result once `status === "done"`; null until then. */
-  resultUrl: string | null;
+  status: LamaMaskStatus;
   /** Overlay canvas the user paints the removal mask onto. */
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   /** Enters mask-drawing mode and activates the brush on `canvasRef`. */
   startMasking: () => void;
-  /** Reads the painted mask, runs LaMa, and lands on `"done"` / `"error"`. */
-  confirmMask: () => void;
-  /** Discards the mask and returns to `"idle"`. */
+  /** Discards the painted mask and returns to `"idle"`. */
   cancel: () => void;
-  /** Clears the result and returns to `"idle"`. */
-  reset: () => void;
+  /**
+   * Reads the painted region and returns a black/white mask PNG (white = remove)
+   * sized to the canvas. Returns null when nothing was painted or there is no
+   * canvas to read. Does not change `status` — the caller drives inference and
+   * decides when to leave masking mode.
+   */
+  readMask: () => Promise<Uint8Array | null>;
 };
 
 // Brush radius in screen pixels. The on-canvas radius is scaled from this so the
-// brush feels the same size regardless of how the canvas is displayed.
+// brush feels the same size regardless of how the canvas is displayed (zoom).
 export const LAMA_BRUSH_RADIUS = 20;
 // Visible paint colour while masking; the actual mask is derived from coverage,
 // not this colour, so the preview can be any semi-transparent tint.
 const LAMA_PAINT_STYLE = "rgba(248, 113, 113, 0.5)";
 
 /**
- * Per-cut LaMa "remove element" state. Drives one cut card's mask-drawing and
- * inference flow: paint over what to remove, confirm to run LaMa, and surface
- * the inpainted result. The mask is a plain overlay `<canvas>` — independent of
- * the main canvas editor.
+ * Mask-drawing state for the LaMa "remove element" tool. It owns only the brush
+ * interaction and mask extraction; the caller runs LaMa and stores the result.
+ * The mask is a plain overlay `<canvas>`, independent of the main canvas editor.
  */
-export function useLamaInpainting(imageUrl: string): LamaInpainting {
-  const [status, setStatus] = useState<LamaStatus>("idle");
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
+export function useLamaInpainting(): LamaInpainting {
+  const [status, setStatus] = useState<LamaMaskStatus>("idle");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // Guards against a stale resolve overwriting a newer run (e.g. cancel mid-run).
-  const runRef = useRef(0);
 
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -46,74 +42,48 @@ export function useLamaInpainting(imageUrl: string): LamaInpainting {
   }, []);
 
   const startMasking = useCallback(() => {
-    runRef.current += 1;
-    setResultUrl(null);
     setStatus("masking");
   }, []);
 
   const cancel = useCallback(() => {
-    runRef.current += 1;
     clearCanvas();
     setStatus("idle");
   }, [clearCanvas]);
 
-  const reset = useCallback(() => {
-    runRef.current += 1;
-    clearCanvas();
-    setResultUrl(null);
-    setStatus("idle");
-  }, [clearCanvas]);
-
-  const confirmMask = useCallback(() => {
+  const readMask = useCallback(async () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) return null;
 
-    const runId = runRef.current + 1;
-    runRef.current = runId;
-    setStatus("running");
-
-    // Derive a clean black/white mask from painted coverage (alpha), so the
-    // visible preview colour never leaks into the mask the model receives.
     const { width, height } = canvas;
     const painted = ctx.getImageData(0, 0, width, height);
+    // Derive a clean black/white mask from painted coverage (alpha), so the
+    // visible preview colour never leaks into the mask the model receives.
     const maskCanvas = document.createElement("canvas");
     maskCanvas.width = width;
     maskCanvas.height = height;
     const maskCtx = maskCanvas.getContext("2d");
-    if (!maskCtx) {
-      setStatus("error");
-      return;
-    }
+    if (!maskCtx) return null;
     const mask = maskCtx.createImageData(width, height);
+    let anyPainted = false;
     for (let i = 0; i < painted.data.length; i += 4) {
       const value = painted.data[i + 3] > 10 ? 255 : 0;
+      if (value === 255) anyPainted = true;
       mask.data[i] = value;
       mask.data[i + 1] = value;
       mask.data[i + 2] = value;
       mask.data[i + 3] = 255;
     }
+    if (!anyPainted) return null;
     maskCtx.putImageData(mask, 0, 0);
 
-    maskCanvas.toBlob((blob) => {
-      void (async () => {
-        try {
-          if (!blob) throw new Error("failed to read mask canvas");
-          const maskBytes = new Uint8Array(await blob.arrayBuffer());
-          const imageBytes = await urlToBytes(imageUrl);
-          const output = await runLama(imageBytes, maskBytes);
-          if (runRef.current !== runId) return;
-          setResultUrl(bytesToPngDataUrl(output));
-          setStatus("done");
-        } catch (error) {
-          if (runRef.current !== runId) return;
-          console.error("LaMa inpainting failed", error);
-          setStatus("error");
-        }
-      })();
-    }, "image/png");
-  }, [imageUrl]);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      maskCanvas.toBlob(resolve, "image/png"),
+    );
+    if (!blob) return null;
+    return new Uint8Array(await blob.arrayBuffer());
+  }, []);
 
   // Brush: paint semi-transparent circles onto the overlay while masking.
   useEffect(() => {
@@ -137,12 +107,16 @@ export function useLamaInpainting(imageUrl: string): LamaInpainting {
     };
 
     const onDown = (event: PointerEvent) => {
+      event.stopPropagation();
       painting = true;
       canvas.setPointerCapture(event.pointerId);
       paint(event);
     };
     const onMove = (event: PointerEvent) => {
-      if (painting) paint(event);
+      if (painting) {
+        event.stopPropagation();
+        paint(event);
+      }
     };
     const onUp = (event: PointerEvent) => {
       painting = false;
@@ -165,5 +139,5 @@ export function useLamaInpainting(imageUrl: string): LamaInpainting {
     };
   }, [status]);
 
-  return { status, resultUrl, canvasRef, startMasking, confirmMask, cancel, reset };
+  return { status, canvasRef, startMasking, cancel, readMask };
 }

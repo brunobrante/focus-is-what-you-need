@@ -17,6 +17,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GeneratorHeader } from "./ui/GeneratorHeader";
@@ -48,15 +49,27 @@ import {
   type ToolsEditorProps,
 } from "./hooks/useToolsEditor";
 import { MIN_TOOL_ZOOM } from "./types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useProcessingFeatures } from "@/lib/models/useProcessingFeatures";
+import { useLamaInpainting } from "@/lib/models/useLamaInpainting";
+import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import {
   bytesToPngDataUrl,
   urlToBytes,
   runBirefnet,
   runRealEsrgan,
+  runLama,
+  resolveActiveTextDetectionModelId,
   type ProcessingFeatureKey,
 } from "@/lib/models/modelCommands";
+
+// A circular brush cursor sized to the LaMa brush (20px radius / 40px diameter).
+const LAMA_BRUSH_CURSOR =
+  "url('data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><circle cx="20" cy="20" r="18" fill="rgba(248,113,113,0.15)" stroke="white" stroke-width="1.5"/></svg>',
+  ) +
+  "') 20 20, crosshair";
 
 export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLocally }: ToolsEditorProps) {
   const {
@@ -163,16 +176,33 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
   const features = useProcessingFeatures();
-  const hasProcessingFeature = features.birefnet.installed || features.realEsrgan.installed;
+  const { settings } = useGlobalSettings();
+  // Active text detector (DBNet/CRAFT), or null when none is installed.
+  const textDetectionModelId = resolveActiveTextDetectionModelId(settings);
+  const hasProcessingFeature =
+    features.birefnet.installed || features.realEsrgan.installed || features.lama.installed;
   // Session-local processed images keyed by component id; not persisted in v1.
   const [processedByCutId, setProcessedByCutId] = useState<Record<string, string>>({});
   const [running, setRunning] = useState<{ id: string; kind: ProcessingFeatureKey } | null>(null);
+  // LaMa "remove element" mask-drawing state. The brush paints onto an overlay
+  // canvas on the stage; Apply runs LaMa and stores the result like the other
+  // processing tools (session-local, revertable).
+  const lama = useLamaInpainting();
+  const masking = lama.status === "masking";
 
   const activeCutId =
     activeSubject.kind === "component" && selectedComponent ? selectedComponent.id : null;
   const displayUrl = (activeCutId && processedByCutId[activeCutId]) || activeSubject.url;
   const runningKind = running && running.id === activeCutId ? running.kind : null;
   const canRevert = Boolean(activeCutId && processedByCutId[activeCutId]);
+
+  // Switching to a different cut (or closing it) abandons any in-progress mask,
+  // so a mask drawn for one cut can never be applied to another.
+  useEffect(() => {
+    lama.cancel();
+    // Only re-run when the open cut changes; `lama.cancel` is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCutId]);
 
   async function runProcessing(kind: ProcessingFeatureKey) {
     if (!selectedComponent || running) return;
@@ -186,6 +216,29 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
       // TODO: persist processed result
     } catch (error) {
       console.error(`Processing (${kind}) failed`, error);
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  // LaMa "remove element": reads the painted mask, runs inpainting on the open
+  // cut, and stores the result (session-local) just like the other processors.
+  async function applyLamaMask() {
+    if (!selectedComponent || running) return;
+    const id = selectedComponent.id;
+    const maskBytes = await lama.readMask();
+    // Nothing painted — keep the user in masking mode to draw a selection.
+    if (!maskBytes) return;
+    const source = processedByCutId[id] ?? activeSubject.url;
+    setRunning({ id, kind: "lama" });
+    lama.cancel();
+    try {
+      const input = await urlToBytes(source);
+      const output = await runLama(input, maskBytes);
+      setProcessedByCutId((prev) => ({ ...prev, [id]: bytesToPngDataUrl(output) }));
+      // TODO: persist inpainting result to ReferenceRow
+    } catch (error) {
+      console.error("LaMa inpainting failed", error);
     } finally {
       setRunning(null);
     }
@@ -319,6 +372,20 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     )}
                   </RailToolButton>
                 ) : null}
+                {features.lama.installed ? (
+                  <RailToolButton
+                    label="Remove element"
+                    active={masking}
+                    disabled={!activeCutId || running !== null}
+                    onClick={() => (masking ? lama.cancel() : lama.startMasking())}
+                  >
+                    {runningKind === "lama" ? (
+                      <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+                    ) : (
+                      <Wand2 size={18} strokeWidth={1.7} />
+                    )}
+                  </RailToolButton>
+                ) : null}
                 <RailToolButton
                   label="Revert to original"
                   disabled={!canRevert || running !== null}
@@ -347,11 +414,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   : "cursor-default",
               ].join(" ")}
               onWheel={handleStageWheel}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handleStagePointerLeave}
-              onPointerCancel={cancelSelection}
+              onPointerDown={masking ? undefined : handlePointerDown}
+              onPointerMove={masking ? undefined : handlePointerMove}
+              onPointerUp={masking ? undefined : handlePointerUp}
+              onPointerLeave={masking ? undefined : handleStagePointerLeave}
+              onPointerCancel={masking ? undefined : cancelSelection}
             >
               <BuilderStackTabs
                 active={viewMode === "stack" ? "stack" : "builder"}
@@ -499,6 +566,15 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                         opacity: autoDetecting ? 0.55 : 1,
                       }}
                     />
+                    {masking ? (
+                      <canvas
+                        ref={lama.canvasRef}
+                        width={Math.max(Math.round(activeSubject.w), 1)}
+                        height={Math.max(Math.round(activeSubject.h), 1)}
+                        className="absolute inset-0 z-30 h-full w-full rounded-[8px]"
+                        style={{ cursor: LAMA_BRUSH_CURSOR, touchAction: "none" }}
+                      />
+                    ) : null}
                   </div>
                   <canvas
                     ref={cropsCanvasRef}
@@ -530,7 +606,35 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 </IconButton>
               </div>
 
-              {currentTool === "draw" ? (
+              {masking ? (
+                <div
+                  data-selection-action
+                  className="absolute bottom-3.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-[10px] border border-[#f8717166] bg-[rgba(20,20,22,0.92)] p-1.5 pl-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
+                >
+                  <Wand2 size={13} strokeWidth={1.8} className="text-[#f87171]" />
+                  <span className="text-[11.5px] text-[var(--text)]">Paint over the element to remove</span>
+                  <span className="h-5 w-px bg-[var(--border)]" />
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={() => void applyLamaMask()}
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white"
+                  >
+                    <Check size={12} strokeWidth={2.2} />
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={() => lama.cancel()}
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11px] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
+
+              {currentTool === "draw" && !masking ? (
                 <div
                   data-selection-action
                   className="absolute bottom-3.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[rgba(20,20,22,0.9)] p-1.5 pl-3 shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-[8px]"
@@ -691,8 +795,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       expandedIds={expandedComponentIds}
                       rootId={rootComponentId}
                       primaryId={activeScopeId}
-                      craftInstalled={features.florence2.installed}
-                      lamaInstalled={features.lama.installed}
+                      textDetectionModelId={textDetectionModelId}
                       onOpen={openTreeComponent}
                       onToggle={toggleComponentExpanded}
                       onHover={setHoveredComponentId}

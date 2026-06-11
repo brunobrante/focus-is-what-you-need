@@ -187,6 +187,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
     realEsrgan: { installed: false },
     florence2: { installed: false },
     craft: { installed: false },
+    dbnet: { installed: false },
     lama: { installed: false },
   },
+  textDetectionModel: "dbnet",
 };

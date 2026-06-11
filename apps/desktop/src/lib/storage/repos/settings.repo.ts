@@ -1,5 +1,10 @@
 import { resolveGlobalSettings } from "@/domain/settings/resolve";
-import type { DeepPartial, GlobalSettings, SettingsRow } from "@/domain/settings/types";
+import type {
+  DeepPartial,
+  GlobalSettings,
+  SettingsRow,
+  TextDetectionModelId,
+} from "@/domain/settings/types";
 import { SETTINGS_SCHEMA_VERSION } from "@/domain/settings/defaults";
 import { now } from "@/lib/storage/ids";
 import { TABLES, getRecordById, putRecord } from "@/lib/storage/store";
@@ -46,6 +51,16 @@ export async function setShareWithProjectsByDefault(
   return updateGlobalSettings((settings) => ({
     ...settings,
     systemDesign: { ...settings.systemDesign, shareWithProjectsByDefault },
+  }));
+}
+
+/** Choose which text detector (DBNet or CRAFT) the Builder runs. */
+export async function setTextDetectionModel(
+  textDetectionModel: TextDetectionModelId,
+): Promise<GlobalSettings> {
+  return updateGlobalSettings((settings) => ({
+    ...settings,
+    textDetectionModel,
   }));
 }
 

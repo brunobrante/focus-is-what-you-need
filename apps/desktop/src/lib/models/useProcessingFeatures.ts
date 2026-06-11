@@ -24,7 +24,14 @@ export type ProcessingFeatureControls = {
 
 export type ProcessingFeatures = Record<ProcessingFeatureKey, ProcessingFeatureControls>;
 
-const KEYS: ProcessingFeatureKey[] = ["birefnet", "realEsrgan", "florence2", "craft", "lama"];
+const KEYS: ProcessingFeatureKey[] = [
+  "birefnet",
+  "realEsrgan",
+  "florence2",
+  "craft",
+  "dbnet",
+  "lama",
+];
 
 type FlagMap = Record<ProcessingFeatureKey, boolean>;
 type NumberMap = Record<ProcessingFeatureKey, number>;
@@ -35,6 +42,7 @@ const NO_FLAGS: FlagMap = {
   realEsrgan: false,
   florence2: false,
   craft: false,
+  dbnet: false,
   lama: false,
 };
 const NO_PROGRESS: NumberMap = {
@@ -42,6 +50,7 @@ const NO_PROGRESS: NumberMap = {
   realEsrgan: 0,
   florence2: 0,
   craft: 0,
+  dbnet: 0,
   lama: 0,
 };
 const NO_FILES: StringMap = {
@@ -49,6 +58,7 @@ const NO_FILES: StringMap = {
   realEsrgan: "",
   florence2: "",
   craft: "",
+  dbnet: "",
   lama: "",
 };
 

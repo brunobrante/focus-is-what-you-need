@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ProcessingFeatureKey } from "@/domain/settings/types";
+import type {
+  GlobalSettings,
+  ProcessingFeatureKey,
+  TextDetectionModelId,
+} from "@/domain/settings/types";
 
 export type { ProcessingFeatureKey } from "@/domain/settings/types";
 
@@ -10,6 +14,7 @@ export const MODEL_ID: Record<ProcessingFeatureKey, string> = {
   realEsrgan: "real-esrgan",
   florence2: "florence2",
   craft: "craft",
+  dbnet: "dbnet",
   lama: "lama",
 };
 
@@ -81,6 +86,34 @@ export function runFlorence2TextCheck(imageBytes: Uint8Array): Promise<boolean> 
 // Runs CRAFT on a cut's image. Returns true when text is detected in the cut.
 export function runCraft(imageBytes: Uint8Array): Promise<boolean> {
   return invoke<boolean>("run_craft", { imageBytes: Array.from(imageBytes) });
+}
+
+// Runs the chosen text detector (DBNet or CRAFT) on a cut's image. The backend
+// dispatches on `modelId`. Returns true when text is detected.
+export function runTextCheck(
+  modelId: TextDetectionModelId,
+  imageBytes: Uint8Array,
+): Promise<boolean> {
+  return invoke<boolean>("run_text_check", {
+    modelId,
+    imageBytes: Array.from(imageBytes),
+  });
+}
+
+// Resolves which text-detection model the Builder should run, honoring the
+// user's `textDetectionModel` choice and falling back to whichever model is
+// actually installed. Returns null when no text detector is installed.
+export function resolveActiveTextDetectionModelId(
+  settings: GlobalSettings,
+): TextDetectionModelId | null {
+  const { processingFeatures: pf, textDetectionModel: preferred } = settings;
+  const dbnetInstalled = pf.dbnet.installed;
+  const craftInstalled = pf.craft.installed;
+  if (preferred === "craft" && craftInstalled) return "craft";
+  if (preferred === "dbnet" && dbnetInstalled) return "dbnet";
+  if (dbnetInstalled) return "dbnet";
+  if (craftInstalled) return "craft";
+  return null;
 }
 
 // Runs LaMa inpainting on a cut. `maskBytes` is a PNG grayscale mask where

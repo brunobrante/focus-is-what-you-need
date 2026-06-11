@@ -976,6 +976,7 @@ pub fn run() {
             models::run_real_esrgan,
             models::run_florence2,
             models::run_florence2_text_check,
+            models::run_text_check,
             models::run_craft,
             models::run_lama,
         ])

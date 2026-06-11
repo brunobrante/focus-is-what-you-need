@@ -30,6 +30,7 @@ const BIREFNET_ID: &str = "birefnet";
 const REAL_ESRGAN_ID: &str = "real-esrgan";
 const FLORENCE2_ID: &str = "florence2";
 const CRAFT_ID: &str = "craft";
+const DBNET_ID: &str = "dbnet";
 const LAMA_ID: &str = "lama";
 const BIREFNET_SIZE: u32 = 1024;
 const PROGRESS_EVENT: &str = "model://progress";
@@ -55,6 +56,16 @@ const CRAFT_MAX_SIDE: u32 = 1280;
 const CRAFT_SIZE_MULTIPLE: u32 = 32;
 // A region score above this anywhere in the map counts as "text detected".
 const CRAFT_TEXT_THRESHOLD: f32 = 0.3;
+
+// DBNet-ResNet18 text detector (OnnxTR export, fp32, ~50 MB). A lighter, faster
+// alternative to CRAFT for the same yes/no "does this cut contain text" answer.
+// Input is a fixed 1024x1024 NCHW image, ImageNet-normalized; output 0 is the
+// [1, 1, 1024, 1024] probability map. Text is present when the peak probability
+// crosses the threshold.
+const DBNET_URL: &str =
+    "https://huggingface.co/felixdittrich92/OnnxTR/resolve/main/db_resnet18-2b7a2512.onnx";
+const DBNET_SIZE: u32 = 1024;
+const DBNET_TEXT_THRESHOLD: f32 = 0.3;
 
 // --- Florence-2 (multi-file package) -------------------------------------
 //
@@ -109,6 +120,7 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
         BIREFNET_ID => Ok(vec![ModelFile { name: "birefnet.onnx", url: BIREFNET_URL }]),
         REAL_ESRGAN_ID => Ok(vec![ModelFile { name: "real-esrgan.onnx", url: REAL_ESRGAN_URL }]),
         CRAFT_ID => Ok(vec![ModelFile { name: "craft.onnx", url: CRAFT_URL }]),
+        DBNET_ID => Ok(vec![ModelFile { name: "dbnet.onnx", url: DBNET_URL }]),
         LAMA_ID => Ok(vec![ModelFile { name: "lama.onnx", url: LAMA_URL }]),
         FLORENCE2_ID => Ok(vec![
             ModelFile { name: FLORENCE2_VISION_FILE, url: FLORENCE2_VISION_URL },
@@ -406,13 +418,74 @@ fn real_esrgan_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>
     encode_png(DynamicImage::ImageRgb8(out))
 }
 
-// --- CRAFT text detection -------------------------------------------------
+// --- text detection (CRAFT / DBNet) ---------------------------------------
+
+/// Yes/no text detection for a cut, dispatched to the chosen model. The active
+/// model id is owned by the frontend (the `textDetectionModel` setting), so the
+/// same command serves whichever text detector the user has selected.
+#[tauri::command]
+pub async fn run_text_check(
+    app: AppHandle,
+    model_id: String,
+    image_bytes: Vec<u8>,
+) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || match model_id.as_str() {
+        DBNET_ID => dbnet_blocking(&app, image_bytes),
+        CRAFT_ID => craft_blocking(&app, image_bytes),
+        other => Err(format!("unknown text-detection model: {other}")),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[tauri::command]
 pub async fn run_craft(app: AppHandle, image_bytes: Vec<u8>) -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(move || craft_blocking(&app, image_bytes))
         .await
         .map_err(|e| e.to_string())?
+}
+
+fn dbnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<bool, String> {
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let rgb = img.to_rgb8();
+
+    // Pre-process: resize to a fixed 1024x1024, ImageNet-normalize, NCHW.
+    let size = DBNET_SIZE;
+    let resized =
+        image::imageops::resize(&rgb, size, size, image::imageops::FilterType::Triangle);
+    let mut input = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
+    for y in 0..size {
+        for x in 0..size {
+            let px = resized.get_pixel(x, y);
+            for c in 0..3 {
+                let value = px[c] as f32 / 255.0;
+                input[[0, c, y as usize, x as usize]] = (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
+            }
+        }
+    }
+
+    let mut session = load_session(app, DBNET_ID)?;
+    let input_name = session.inputs()[0].name().to_string();
+    let tensor = Tensor::from_array(input).map_err(|e| e.to_string())?;
+    let outputs = session
+        .run(ort::inputs![input_name.as_str() => tensor])
+        .map_err(|e| e.to_string())?;
+
+    // Output 0 is the [1, 1, 1024, 1024] probability map. Some exports emit raw
+    // logits instead, so apply a sigmoid only when values fall outside [0, 1].
+    let prob = outputs[0]
+        .try_extract_array::<f32>()
+        .map_err(|e| e.to_string())?;
+    let needs_sigmoid = prob.iter().any(|&v| !(0.0..=1.0).contains(&v));
+    let mut max_prob = f32::MIN;
+    for &raw in prob.iter() {
+        let value = if needs_sigmoid { 1.0 / (1.0 + (-raw).exp()) } else { raw };
+        if value > max_prob {
+            max_prob = value;
+        }
+    }
+
+    Ok(max_prob > DBNET_TEXT_THRESHOLD)
 }
 
 /// Rounds `value` up to the nearest multiple of `multiple`, never returning 0.
