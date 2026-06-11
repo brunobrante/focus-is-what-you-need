@@ -57,13 +57,14 @@ const CRAFT_SIZE_MULTIPLE: u32 = 32;
 // A region score above this anywhere in the map counts as "text detected".
 const CRAFT_TEXT_THRESHOLD: f32 = 0.3;
 
-// DBNet-ResNet18 text detector (OnnxTR export, fp32, ~50 MB). A lighter, faster
-// alternative to CRAFT for the same yes/no "does this cut contain text" answer.
+// DBNet-ResNet34 text detector (OnnxTR export, fp32, ~85 MB). An alternative to
+// CRAFT for the same yes/no "does this cut contain text" answer. (OnnxTR does not
+// publish a public ResNet18 export; ResNet34 is the closest public DBNet model.)
 // Input is a fixed 1024x1024 NCHW image, ImageNet-normalized; output 0 is the
 // [1, 1, 1024, 1024] probability map. Text is present when the peak probability
 // crosses the threshold.
 const DBNET_URL: &str =
-    "https://huggingface.co/felixdittrich92/OnnxTR/resolve/main/db_resnet18-2b7a2512.onnx";
+    "https://huggingface.co/Felix92/onnxtr-db-resnet34/resolve/main/model.onnx";
 const DBNET_SIZE: u32 = 1024;
 const DBNET_TEXT_THRESHOLD: f32 = 0.3;
 

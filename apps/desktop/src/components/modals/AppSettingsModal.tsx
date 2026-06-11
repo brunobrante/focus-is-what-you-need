@@ -287,9 +287,9 @@ function ProcessingFeaturesTab() {
           <ProcessingFeatureRow
             icon={<ScanText size={16} strokeWidth={1.7} />}
             name="Text Detector"
-            model="DBNet-ResNet18"
-            size="~50 MB"
-            description="Detects whether a cut contains text (faster, lighter)"
+            model="DBNet-ResNet34"
+            size="~85 MB"
+            description="Detects whether a cut contains text using DBNet"
             controls={features.dbnet}
             divider
           />

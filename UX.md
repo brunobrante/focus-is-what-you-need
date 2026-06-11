@@ -509,7 +509,7 @@ Features:
 - **Remove Background** — BiRefNet · ~220 MB — "Removes image background from cuts using BiRefNet"
 - **Upscale (4×)** — Real-ESRGAN · ~5 MB — "Increases cut resolution 4× using Real-ESRGAN"
 - **Auto-detect Components** — Florence-2 · ~1.2 GB — "Automatically proposes crop regions from a UI screenshot using Florence-2". A five-file package (vision encoder, token embedder, BART encoder, decoder, tokenizer) downloaded sequentially with per-file progress. Once installed, the **Auto-detect** button appears on the Builder's bottom canvas bar.
-- **Text Detector** — DBNet-ResNet18 · ~50 MB — "Detects whether a cut contains text (faster, lighter)". A single ONNX file. The default text detector. Once installed (alone or with CRAFT), an **Is text?** button appears on each Builder cut item that shows a Yes/No badge.
+- **Text Detector** — DBNet-ResNet34 · ~85 MB — "Detects whether a cut contains text using DBNet". A single ONNX file. The default text detector. Once installed (alone or with CRAFT), an **Is text?** button appears on each Builder cut item that shows a Yes/No badge.
 - **Text Detector** — CRAFT · ~80 MB — "Alternative text detector — heavier, also detects whether a cut contains text". A single ONNX file. An alternative to DBNet for the same Yes/No answer.
 - **Remove Element** — LaMa · ~208 MB — "Removes a painted selection from a cut using LaMa inpainting". A single ONNX file. Once installed, a **Remove element** tool appears in the Builder's left tool rail: it enters a mask-drawing mode on the canvas where the user paints over an element and Apply replaces the open cut with the inpainted result.
 
