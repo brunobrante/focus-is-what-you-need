@@ -169,11 +169,11 @@ export function ReferenceDetailModal({
   // ── tabs config ───────────────────────────────────────────────────────────
   const tabs = isGroup
     ? [
-        { id: "screens", label: "Screens" },
+        { id: "screens", label: "Originals" },
         { id: "stacks", label: "Stacks", disabled: !hasStacks },
       ]
     : [
-        { id: "screen", label: "Screen" },
+        { id: "screen", label: "Original" },
         { id: "stack", label: "Stack", disabled: !canStack },
       ];
 
