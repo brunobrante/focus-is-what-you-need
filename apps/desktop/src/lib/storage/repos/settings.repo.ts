@@ -48,3 +48,17 @@ export async function setShareWithProjectsByDefault(
     systemDesign: { ...settings.systemDesign, shareWithProjectsByDefault },
   }));
 }
+
+/** Flip the installed flag for a processing feature after install/uninstall. */
+export async function setProcessingFeatureInstalled(
+  feature: keyof GlobalSettings["processingFeatures"],
+  installed: boolean,
+): Promise<GlobalSettings> {
+  return updateGlobalSettings((settings) => ({
+    ...settings,
+    processingFeatures: {
+      ...settings.processingFeatures,
+      [feature]: { ...settings.processingFeatures[feature], installed },
+    },
+  }));
+}

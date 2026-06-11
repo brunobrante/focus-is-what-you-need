@@ -1,14 +1,21 @@
 import { Link } from "react-router-dom";
 import {
+  Brush,
   Check,
   ChevronRight,
   Crop,
+  Eraser,
   Image as ImageIcon,
+  Loader2,
+  Maximize2,
   Minus,
   Move,
   Pencil,
   Pipette,
   Plus,
+  RotateCcw,
+  Sparkles,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -41,6 +48,15 @@ import {
   type ToolsEditorProps,
 } from "./hooks/useToolsEditor";
 import { MIN_TOOL_ZOOM } from "./types";
+import { useState } from "react";
+import { useProcessingFeatures } from "@/lib/models/useProcessingFeatures";
+import {
+  bytesToPngDataUrl,
+  urlToBytes,
+  runBirefnet,
+  runRealEsrgan,
+  type ProcessingFeatureKey,
+} from "@/lib/models/modelCommands";
 
 export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLocally }: ToolsEditorProps) {
   const {
@@ -57,11 +73,16 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     selectedComponentId,
     selection,
     selectionLocked,
+    brushSize,
     editingComponentId,
     showCropsOverlay,
     hoveredComponentId,
     imageError,
     uploading,
+    proposedRegions,
+    autoDetecting,
+    applyingProposals,
+    autoDetectMessage,
     pendingConfirmation,
     savingStack,
     stackSaveStatus,
@@ -71,6 +92,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     cropsOverlayAlpha,
 
     // Setters
+    setBrushSize,
     setShowCropsOverlay,
     setHoveredComponentId,
     setImageError,
@@ -126,6 +148,9 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     persistReferenceStack,
     canSaveSelection,
     saveSelection,
+    autoDetect,
+    applyProposedRegions,
+    discardAllProposedRegions,
     uploadImage,
     handleStagePointerLeave,
     handlePointerDown,
@@ -136,6 +161,58 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     setActiveRootId,
     updateComponents,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
+
+  const features = useProcessingFeatures();
+  const hasProcessingFeature = features.birefnet.installed || features.realEsrgan.installed;
+  // Session-local processed images keyed by component id; not persisted in v1.
+  const [processedByCutId, setProcessedByCutId] = useState<Record<string, string>>({});
+  const [running, setRunning] = useState<{ id: string; kind: ProcessingFeatureKey } | null>(null);
+
+  const activeCutId =
+    activeSubject.kind === "component" && selectedComponent ? selectedComponent.id : null;
+  const displayUrl = (activeCutId && processedByCutId[activeCutId]) || activeSubject.url;
+  const runningKind = running && running.id === activeCutId ? running.kind : null;
+  const canRevert = Boolean(activeCutId && processedByCutId[activeCutId]);
+
+  async function runProcessing(kind: ProcessingFeatureKey) {
+    if (!selectedComponent || running) return;
+    const id = selectedComponent.id;
+    const source = processedByCutId[id] ?? activeSubject.url;
+    setRunning({ id, kind });
+    try {
+      const input = await urlToBytes(source);
+      const output = kind === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
+      setProcessedByCutId((prev) => ({ ...prev, [id]: bytesToPngDataUrl(output) }));
+      // TODO: persist processed result
+    } catch (error) {
+      console.error(`Processing (${kind}) failed`, error);
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  // Draw toolbar: commit the drawn region as a cut, optionally post-processed.
+  const [drawAction, setDrawAction] = useState<"crop" | ProcessingFeatureKey | null>(null);
+  async function commitDraw(action: "crop" | ProcessingFeatureKey) {
+    if (!canSaveSelection || drawAction) return;
+    setDrawAction(action);
+    try {
+      await saveSelection(action === "crop" ? undefined : action);
+    } finally {
+      setDrawAction(null);
+    }
+  }
+
+  // Reverts the open component back to its original, unprocessed image.
+  function revertProcessing() {
+    if (!activeCutId) return;
+    setProcessedByCutId((prev) => {
+      if (!(activeCutId in prev)) return prev;
+      const next = { ...prev };
+      delete next[activeCutId];
+      return next;
+    });
+  }
 
   return (
     <TooltipProvider>
@@ -212,6 +289,45 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             <RailToolButton label="Conta-gotas" disabled>
               <Pipette size={18} strokeWidth={1.7} />
             </RailToolButton>
+
+            {hasProcessingFeature ? (
+              <>
+                <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
+                {features.birefnet.installed ? (
+                  <RailToolButton
+                    label="Remove background"
+                    disabled={!activeCutId || running !== null}
+                    onClick={() => void runProcessing("birefnet")}
+                  >
+                    {runningKind === "birefnet" ? (
+                      <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+                    ) : (
+                      <Eraser size={18} strokeWidth={1.7} />
+                    )}
+                  </RailToolButton>
+                ) : null}
+                {features.realEsrgan.installed ? (
+                  <RailToolButton
+                    label="Upscale 4×"
+                    disabled={!activeCutId || running !== null}
+                    onClick={() => void runProcessing("realEsrgan")}
+                  >
+                    {runningKind === "realEsrgan" ? (
+                      <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+                    ) : (
+                      <Maximize2 size={18} strokeWidth={1.7} />
+                    )}
+                  </RailToolButton>
+                ) : null}
+                <RailToolButton
+                  label="Revert to original"
+                  disabled={!canRevert || running !== null}
+                  onClick={revertProcessing}
+                >
+                  <RotateCcw size={18} strokeWidth={1.7} />
+                </RailToolButton>
+              </>
+            ) : null}
           </aside>
 
           <section
@@ -265,7 +381,60 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 onToggle={() => setShowCropsOverlay((value) => !value)}
               />
 
-              {selection ? (
+              {proposedRegions.length > 0 ? (
+                <div
+                  data-selection-action
+                  className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-[10px] border border-[#A78BFA66] bg-[rgba(20,20,22,0.92)] p-1.5 pl-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
+                >
+                  <Sparkles size={13} strokeWidth={1.8} className="text-[#A78BFA]" />
+                  <span className="text-[11.5px] text-[var(--text)]">
+                    {proposedRegions.length} proposed {proposedRegions.length === 1 ? "region" : "regions"}
+                  </span>
+                  <span className="px-0.5 text-[10.5px] text-[var(--text-faint)]">
+                    drag to adjust · × to discard
+                  </span>
+                  <span className="h-5 w-px bg-[var(--border)]" />
+                  <button
+                    type="button"
+                    data-selection-action
+                    disabled={applyingProposals}
+                    onClick={() => void applyProposedRegions()}
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {applyingProposals ? (
+                      <Loader2 size={12} strokeWidth={1.9} className="animate-spin" />
+                    ) : (
+                      <Check size={12} strokeWidth={2.2} />
+                    )}
+                    Apply all
+                  </button>
+                  <button
+                    type="button"
+                    data-selection-action
+                    disabled={applyingProposals}
+                    onClick={discardAllProposedRegions}
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11px] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 size={12} strokeWidth={1.9} />
+                    Discard all
+                  </button>
+                </div>
+              ) : null}
+
+              {autoDetecting ? (
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-[10px] border border-[#A78BFA66] bg-[rgba(20,20,22,0.92)] px-3.5 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[8px]">
+                  <Loader2 size={15} strokeWidth={1.9} className="animate-spin text-[#A78BFA]" />
+                  <span className="text-[12px] text-[var(--text)]">Detecting components…</span>
+                </div>
+              ) : null}
+
+              {autoDetectMessage ? (
+                <div className="pointer-events-none absolute bottom-16 left-1/2 z-30 -translate-x-1/2 rounded-[8px] border border-[var(--border)] bg-[rgba(20,20,22,0.92)] px-3 py-2 text-[12px] text-[var(--text)] shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-[8px]">
+                  {autoDetectMessage}
+                </div>
+              ) : null}
+
+              {selection && currentTool !== "draw" ? (
                 <div
                   data-selection-action
                   className="absolute right-3 top-3 z-30 inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-1"
@@ -315,7 +484,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   >
                     <img
                       ref={imgRef}
-                      src={activeSubject.url}
+                      src={displayUrl}
                       alt={activeSubject.name}
                       crossOrigin="anonymous"
                       draggable={false}
@@ -324,8 +493,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                         bumpPaintVersion();
                       }}
                       onError={() => setImageError(true)}
-                      className="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px]"
-                      style={{ imageRendering: toolZoom > MIN_TOOL_ZOOM ? "pixelated" : "auto" }}
+                      className="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px] transition-opacity"
+                      style={{
+                        imageRendering: toolZoom > MIN_TOOL_ZOOM ? "pixelated" : "auto",
+                        opacity: autoDetecting ? 0.55 : 1,
+                      }}
                     />
                   </div>
                   <canvas
@@ -357,6 +529,77 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   <Plus size={13} />
                 </IconButton>
               </div>
+
+              {currentTool === "draw" ? (
+                <div
+                  data-selection-action
+                  className="absolute bottom-3.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[rgba(20,20,22,0.9)] p-1.5 pl-3 shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-[8px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <Brush size={13} strokeWidth={1.8} className="text-[var(--text-muted)]" />
+                    <input
+                      type="range"
+                      min={1}
+                      max={24}
+                      step={1}
+                      value={brushSize}
+                      aria-label="Brush size"
+                      onChange={(event) => setBrushSize(Number(event.target.value))}
+                      className="h-1.5 w-[110px] cursor-pointer appearance-none rounded-full bg-[var(--border-strong)] accent-[var(--text)]"
+                    />
+                    <span className="w-5 text-center text-[11px] tabular-nums text-[var(--text-muted)]">
+                      {brushSize}
+                    </span>
+                  </div>
+
+                  <span className="h-5 w-px bg-[var(--border)]" />
+
+                  {canSaveSelection ? (
+                    <span className="px-0.5 font-mono text-[10.5px] tabular-nums text-[var(--text-faint)]">
+                      {Math.round(selectionSize.w)} × {Math.round(selectionSize.h)}
+                    </span>
+                  ) : (
+                    <span className="px-0.5 text-[10.5px] text-[var(--text-faint)]">Draw a region</span>
+                  )}
+
+                  <DrawActionButton
+                    label="Crop"
+                    primary
+                    icon={<Crop size={12} strokeWidth={1.9} />}
+                    busy={drawAction === "crop"}
+                    disabled={!canSaveSelection || drawAction !== null}
+                    onClick={() => void commitDraw("crop")}
+                  />
+                  {features.birefnet.installed ? (
+                    <DrawActionButton
+                      label="Remove BG"
+                      icon={<Eraser size={12} strokeWidth={1.9} />}
+                      busy={drawAction === "birefnet"}
+                      disabled={!canSaveSelection || drawAction !== null}
+                      onClick={() => void commitDraw("birefnet")}
+                    />
+                  ) : null}
+                  {features.realEsrgan.installed ? (
+                    <DrawActionButton
+                      label="Upscale"
+                      icon={<Maximize2 size={12} strokeWidth={1.9} />}
+                      busy={drawAction === "realEsrgan"}
+                      disabled={!canSaveSelection || drawAction !== null}
+                      onClick={() => void commitDraw("realEsrgan")}
+                    />
+                  ) : null}
+
+                  <button
+                    type="button"
+                    data-selection-action
+                    disabled={!selection || drawAction !== null}
+                    onClick={cancelSelection}
+                    className="ml-0.5 inline-flex h-7 cursor-pointer items-center rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="sticky bottom-0 z-20 flex min-h-[56px] shrink-0 items-center gap-2.5 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3.5 py-2.5 backdrop-blur-[8px]">
@@ -369,6 +612,19 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   <Upload size={13} strokeWidth={1.8} />
                   {uploading ? "Enviando..." : "Upload"}
                 </ModeButton>
+                {features.florence2.installed ? (
+                  <ModeButton
+                    onClick={() => void autoDetect()}
+                    disabled={!canCrop || autoDetecting}
+                  >
+                    {autoDetecting ? (
+                      <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={13} strokeWidth={1.8} />
+                    )}
+                    {autoDetecting ? "Detecting…" : "Auto-detect"}
+                  </ModeButton>
+                ) : null}
               </div>
 
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
@@ -435,6 +691,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       expandedIds={expandedComponentIds}
                       rootId={rootComponentId}
                       primaryId={activeScopeId}
+                      craftInstalled={features.florence2.installed}
                       onOpen={openTreeComponent}
                       onToggle={toggleComponentExpanded}
                       onHover={setHoveredComponentId}
@@ -482,6 +739,40 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
         />
       ) : null}
     </TooltipProvider>
+  );
+}
+
+function DrawActionButton({
+  label,
+  icon,
+  busy,
+  disabled,
+  primary = false,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  busy: boolean;
+  disabled: boolean;
+  primary?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-selection-action
+      disabled={disabled}
+      onClick={onClick}
+      className={[
+        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border px-2.5 text-[11.5px] font-medium transition-colors duration-[120ms] disabled:cursor-not-allowed disabled:opacity-40",
+        primary
+          ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-white disabled:hover:bg-[var(--accent)]"
+          : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--text)] hover:bg-[var(--surface-hover)]",
+      ].join(" ")}
+    >
+      {busy ? <Loader2 size={12} strokeWidth={1.9} className="animate-spin" /> : icon}
+      {label}
+    </button>
   );
 }
 

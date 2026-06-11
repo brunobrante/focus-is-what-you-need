@@ -403,14 +403,41 @@ AI-assisted image-to-component tool.
 - Crop tool: user draws rectangular regions over the image to mark component boundaries
 - Each region is called a "cut"
 
+**Bottom canvas bar — image-level actions**: "Mostrar original", "Upload", and (when the Florence-2 model is installed) **Auto-detect**:
+- **Auto-detect** runs Florence-2 on the open subject and proposes crop regions automatically. The button shows a spinner and the image dims while it runs (typically 3–8s). Only available when a stack/component is open (croppable).
+- Each proposed region renders as a dashed purple box with its label, corner handles, and a "×" discard badge — visually a staged sibling of a manually drawn crop.
+- Proposals are editable in place: drag the body to move, drag a corner to resize, click "×" to discard one.
+- A toolbar at the top-center of the canvas shows the proposal count with **Apply all** (commits every remaining proposal as a real cut, preserving its label) and **Discard all**.
+- If no components are detected, a toast reads "No components detected — try drawing regions manually".
+- Approved proposals enter the exact same cut pipeline as hand-drawn crops — once applied they are indistinguishable from manual cuts. When the open subject changes, pending proposals are discarded.
+
 **Right panel — Tools and output**:
 - **Builder tab** (default):
   - List of cuts created on the image
-  - Each cut item: thumbnail preview, name, dimensions, delete button
+  - Each cut item: thumbnail preview, name, edit button, delete button
+  - **Is text?** button (only when the CRAFT Text Detector model is installed): runs CRAFT on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
 - **Stack tab**:
   - Shows all cuts from a reference image together
   - Composite layout of all cuts side by side
   - Tree list of cuts with name and dimensions
+
+**Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group:
+- **Remove background** — runs BiRefNet and replaces the open component's canvas image with a transparent-background PNG
+- **Upscale 4×** — runs Real-ESRGAN and replaces the canvas image with the upscaled PNG
+- **Revert to original** — discards the processed result and restores the component's original image (enabled only when a processed result exists)
+- Remove/Upscale show an inline spinner while running; results are session-local per component (not persisted in v1)
+- If neither model is installed, the group does not appear
+
+**Draw toolbar** (centered at the bottom of the canvas, visible whenever the Draw tool is active):
+- **Brush size** slider — controls the freehand stroke thickness (visual guide; the cut is still the bounding box of the drawing)
+- The freehand drawing stays painted on the canvas after you release; it is not committed until you pick an action
+- Shows the bounding-box dimensions once a region is drawn
+- Action buttons, each committing the drawn region as a new cut:
+  - **Crop** — saves the cut as-is (no AI)
+  - **Remove BG** — saves the cut, then runs BiRefNet background removal (only shown when installed)
+  - **Upscale** — saves the cut, then runs Real-ESRGAN 4× (only shown when installed)
+  - **Clear** — discards the current drawing without saving
+- Actions are disabled until a region is drawn; the active one shows a spinner while processing
 
 ---
 
@@ -455,6 +482,35 @@ All modals share a consistent structure.
 
 **ModalHeader**: title + optional subtitle + X close button + optional actions slot
 **ModalBody**: scrollable content area with padding
+
+---
+
+### Settings Modal
+
+Opened from the user menu (TopBar → avatar → Settings). Wide modal with a top tab bar and a sticky footer (Cancel / Save changes).
+
+**Tabs**:
+- **Canvas**: shell and layers-tree toggles
+- **Processing Features**: optional on-device AI models (see below)
+- **Keyboard shortcuts**: rebindable canvas commands
+- **Save location**: workspace base folder and storage details
+
+**Processing Features tab**:
+
+Optional AI models that run locally and are **off by default** — a model only exists after it is explicitly installed here. Each feature is one row:
+
+- Icon + name + model name + download size + one-line description
+- **Not installed**: "Install" button
+- **Installing**: progress bar (0–100%) with a "cancel" action (cancel removes the partial download). Multi-file packages also show which file is downloading (e.g. "Downloading vision_encoder.onnx (1 of 5)…")
+- **Installed**: green "Installed" badge + "Uninstall" button
+
+Features:
+- **Remove Background** — BiRefNet · ~220 MB — "Removes image background from cuts using BiRefNet"
+- **Upscale (4×)** — Real-ESRGAN · ~5 MB — "Increases cut resolution 4× using Real-ESRGAN"
+- **Auto-detect Components** — Florence-2 · ~1.2 GB — "Automatically proposes crop regions from a UI screenshot using Florence-2". A five-file package (vision encoder, token embedder, BART encoder, decoder, tokenizer) downloaded sequentially with per-file progress. Once installed, the **Auto-detect** button appears on the Builder's bottom canvas bar.
+- **Text Detector** — CRAFT · ~80 MB — "Detects whether a cut contains text". A single ONNX file. Once installed, an **Is text?** button appears on each Builder cut item that runs CRAFT and shows a Yes/No badge.
+
+Install/uninstall persist immediately (independent of the modal's Save button). Once installed, the matching action appears on Builder cut items (or, for Florence-2, as the Auto-detect image-level action).
 
 ---
 

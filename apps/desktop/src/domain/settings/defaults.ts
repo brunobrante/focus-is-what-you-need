@@ -182,4 +182,11 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   systemDesign: {
     shareWithProjectsByDefault: true,
   },
+  processingFeatures: {
+    birefnet: { installed: false },
+    realEsrgan: { installed: false },
+    florence2: { installed: false },
+    craft: { installed: false },
+    lama: { installed: false },
+  },
 };

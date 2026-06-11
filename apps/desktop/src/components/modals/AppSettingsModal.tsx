@@ -22,8 +22,14 @@ import {
   pickFolderDialog,
 } from "@/lib/tauri/workspace";
 import { IconClock, IconDatabase, IconFolder, IconShield } from "@/components/icons";
+import { Check, Eraser, Maximize2, ScanText, Sparkles, Wand2 } from "lucide-react";
+import {
+  useProcessingFeatures,
+  type ProcessingFeatureControls,
+} from "@/lib/models/useProcessingFeatures";
+import { FLORENCE2_FILES } from "@/lib/models/modelCommands";
 
-type AppSettingsTab = "canvas" | "shortcuts" | "storage";
+type AppSettingsTab = "canvas" | "processing" | "shortcuts" | "storage";
 
 type RecordingCommand = {
   id: CanvasCommandId;
@@ -72,7 +78,12 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
       setSaving(true);
       try {
         await setWorkspaceFolder(folderPath);
-        putGlobalSettings(settingsDraft);
+        // Processing features install/uninstall persists immediately and lives
+        // outside the draft, so take its latest value rather than the stale draft.
+        putGlobalSettings({
+          ...settingsDraft,
+          processingFeatures: persistedSettings.processingFeatures,
+        });
         setIsOpen(false);
       } finally {
         setSaving(false);
@@ -94,6 +105,7 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
               {(
                 [
                   { id: "canvas", label: "Canvas" },
+                  { id: "processing", label: "Processing Features" },
                   { id: "shortcuts", label: "Keyboard shortcuts" },
                   { id: "storage", label: "Save location" },
                 ] as { id: AppSettingsTab; label: string }[]
@@ -124,6 +136,8 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
           <div className="flex-1 overflow-y-auto">
             {tab === "canvas" ? (
               <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
+            ) : tab === "processing" ? (
+              <ProcessingFeaturesTab />
             ) : tab === "shortcuts" ? (
               <ShortcutsTab
                 settings={settingsDraft}
@@ -216,6 +230,167 @@ function CanvasTab({
             />
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ProcessingFeaturesTab() {
+  const features = useProcessingFeatures();
+  return (
+    <div className="px-[22px] py-5 grid gap-6">
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+          Processing Features
+        </div>
+        <p className="m-0 mb-3 max-w-[560px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+          Optional on-device AI models. They run locally and stay off until you install
+          them. Once installed, their actions appear on cuts in the Builder.
+        </p>
+        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
+          <ProcessingFeatureRow
+            icon={<Eraser size={16} strokeWidth={1.7} />}
+            name="Remove Background"
+            model="BiRefNet"
+            size="~220 MB"
+            description="Removes image background from cuts using BiRefNet"
+            controls={features.birefnet}
+            divider
+          />
+          <ProcessingFeatureRow
+            icon={<Maximize2 size={16} strokeWidth={1.7} />}
+            name="Upscale (4×)"
+            model="Real-ESRGAN"
+            size="~5 MB"
+            description="Increases cut resolution 4× using Real-ESRGAN"
+            controls={features.realEsrgan}
+            divider
+          />
+          <ProcessingFeatureRow
+            icon={<Sparkles size={16} strokeWidth={1.7} />}
+            name="Auto-detect Components"
+            model="Florence-2"
+            size="~1.2 GB"
+            description="Automatically proposes crop regions from a UI screenshot using Florence-2"
+            controls={features.florence2}
+            fileCount={FLORENCE2_FILES.length}
+            divider
+          />
+          <ProcessingFeatureRow
+            icon={<ScanText size={16} strokeWidth={1.7} />}
+            name="Text Detector"
+            model="CRAFT"
+            size="~80 MB"
+            description="Detects whether a cut contains text"
+            controls={features.craft}
+            divider
+          />
+          <ProcessingFeatureRow
+            icon={<Wand2 size={16} strokeWidth={1.7} />}
+            name="Remove Element"
+            model="LaMa"
+            size="~208 MB"
+            description="Removes a painted selection from a cut using LaMa inpainting"
+            controls={features.lama}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProcessingFeatureRow({
+  icon,
+  name,
+  model,
+  size,
+  description,
+  controls,
+  divider = false,
+  fileCount,
+}: {
+  icon: React.ReactNode;
+  name: string;
+  model: string;
+  size: string;
+  description: string;
+  controls: ProcessingFeatureControls;
+  divider?: boolean;
+  /** Number of files in a multi-file package, to show "(1 of N)" while downloading. */
+  fileCount?: number;
+}) {
+  const { installed, installing, progress, currentFile, install, uninstall } = controls;
+  const pct = Math.round(progress * 100);
+  // Only multi-file packages surface a per-file download label.
+  const fileIndex =
+    fileCount && currentFile ? (FLORENCE2_FILES as readonly string[]).indexOf(currentFile) : -1;
+  const fileStatus =
+    fileCount && currentFile && fileIndex >= 0
+      ? `Downloading ${currentFile} (${fileIndex + 1} of ${fileCount})…`
+      : null;
+  return (
+    <div
+      className={[
+        "flex items-center justify-between gap-5 px-4 py-3.5",
+        divider ? "border-b border-[var(--border)]" : "",
+      ].join(" ")}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-[var(--text)]">{name}</span>
+            <span className="text-[11px] text-[var(--text-faint)]">
+              {model} · {size}
+            </span>
+          </div>
+          <p className="m-0 mt-1 max-w-[420px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+            {description}
+          </p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        {installing ? (
+          <div className="flex flex-col items-end gap-1">
+            {fileStatus ? (
+              <span className="text-[10.5px] text-[var(--text-faint)]">{fileStatus}</span>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-[140px] overflow-hidden rounded-full bg-[var(--surface)]">
+                <div
+                  className="h-full rounded-full bg-[#5b6cff] transition-[width] duration-150"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="w-9 text-right text-[11px] tabular-nums text-[var(--text-muted)]">
+                {pct}%
+              </span>
+              <button
+                type="button"
+                onClick={uninstall}
+                className="cursor-pointer text-[11px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
+              >
+                cancel
+              </button>
+            </div>
+          </div>
+        ) : installed ? (
+          <>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] px-2.5 py-1 text-[11px] font-medium text-[#4ade80]">
+              <Check size={12} strokeWidth={2.2} />
+              Installed
+            </span>
+            <button type="button" onClick={uninstall} className="btn btn-ghost">
+              Uninstall
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={install} className="btn btn-primary">
+            Install
+          </button>
+        )}
       </div>
     </div>
   );

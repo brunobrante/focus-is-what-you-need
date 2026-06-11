@@ -5,6 +5,7 @@ import type {
   ActiveSubject,
   CropBox,
   DrawingPath,
+  ProposedRegion,
   SavedComponent,
   ViewMode,
 } from "../types";
@@ -23,7 +24,9 @@ export type BuilderCanvasPainterInput = {
   isHoveringSelection: boolean;
   selectionCrop: CropBox | null;
   selectionMatchesExistingCut: boolean;
+  proposedRegions: ProposedRegion[];
   drawingPath: DrawingPath | null;
+  brushSize: number;
   selectedComponentId: string | null;
   hoveredComponentId: string | null;
   editingComponentId: string | null;
@@ -59,7 +62,9 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
+    proposedRegions,
     drawingPath,
+    brushSize,
     selectedComponentId,
     hoveredComponentId,
     editingComponentId,
@@ -111,6 +116,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       selectionLocked,
       isHoveringSelection,
       drawingPath,
+      brushSize,
       viewMode,
       components,
       stackedComponents,
@@ -121,9 +127,11 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       editingComponentId,
       selectionMatchesExistingCut,
       selectionCrop,
+      proposedRegions,
     });
   }, [
     activeSubject,
+    brushSize,
     components,
     drawingPath,
     editingComponentId,
@@ -137,6 +145,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     selectionCrop,
     selectionLocked,
     selectionMatchesExistingCut,
+    proposedRegions,
     stackedComponents,
     toolPan,
     toolZoom,

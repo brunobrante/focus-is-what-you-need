@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 mod db;
+mod models;
 
 const APP_FOLDER_NAME: &str = "focus-is-what-you-need";
 const DEFAULT_WORKSPACE_NAME: &str = "workspace";
@@ -968,6 +969,15 @@ pub fn run() {
             delete_reference_frames,
             export_figx_project,
             delete_figx_project,
+            models::model_is_installed,
+            models::model_install,
+            models::model_uninstall,
+            models::run_birefnet,
+            models::run_real_esrgan,
+            models::run_florence2,
+            models::run_florence2_text_check,
+            models::run_craft,
+            models::run_lama,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

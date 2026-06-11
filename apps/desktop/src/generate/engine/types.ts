@@ -88,6 +88,18 @@ export type ActiveSubject =
 
 export type DrawingPath = { points: Array<{ x: number; y: number }> };
 
+// A crop region proposed by Florence-2 auto-detect, staged for review before it
+// becomes a real cut. The box lives in the same content/display coordinate space
+// as `selection`, so it reuses every existing crop geometry helper. This is a
+// transient view-time staging value, not a persisted entity — an approved
+// proposal is committed through the exact same path as a hand-drawn crop.
+export type ProposedRegion = {
+  id: string;
+  label: string;
+  box: CropBox;
+  confidence: number;
+};
+
 export const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
 export const CORNER_HANDLES = ["nw", "ne", "se", "sw"] as const;
 export const RADIUS_HANDLES = ["nw", "ne", "se", "sw"] as const;
@@ -127,12 +139,33 @@ export type SelectionInteraction =
       pointerId: number;
       startClient: { x: number; y: number };
       startPan: { x: number; y: number };
+    }
+  | {
+      type: "proposal-move";
+      pointerId: number;
+      id: string;
+      startPoint: { x: number; y: number };
+      startBox: CropBox;
+    }
+  | {
+      type: "proposal-resize";
+      pointerId: number;
+      id: string;
+      handle: ResizeHandle;
+      startPoint: { x: number; y: number };
+      startBox: CropBox;
     };
 
 export type SelectionHit =
   | { kind: "radius"; handle: RadiusHandle }
   | { kind: "resize"; handle: ResizeHandle }
   | { kind: "move" }
+  | null;
+
+export type ProposalHit =
+  | { kind: "discard"; id: string; box: CropBox }
+  | { kind: "resize"; id: string; box: CropBox; handle: ResizeHandle }
+  | { kind: "move"; id: string; box: CropBox }
   | null;
 
 export type PaintOverlayArgs = {
@@ -143,6 +176,8 @@ export type PaintOverlayArgs = {
   selectionLocked: boolean;
   isHoveringSelection: boolean;
   drawingPath: DrawingPath | null;
+  /** Freehand brush width (screen px) for the in-progress drawing stroke. */
+  brushSize: number;
   viewMode: ViewMode;
   components: SavedComponent[];
   stackedComponents: SavedComponent[];
@@ -153,6 +188,8 @@ export type PaintOverlayArgs = {
   editingComponentId: string | null;
   selectionMatchesExistingCut: boolean;
   selectionCrop: CropBox | null;
+  /** Florence-2 proposals staged for review, drawn as dashed editable boxes. */
+  proposedRegions: ProposedRegion[];
 };
 
 export type PaintCropsArgs = {

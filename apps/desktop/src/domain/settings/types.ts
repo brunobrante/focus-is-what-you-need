@@ -136,10 +136,33 @@ export type SystemDesignSettings = {
   shareWithProjectsByDefault: boolean;
 };
 
+// Optional AI processing features. Each is off by default and invisible in the
+// product until its ONNX model is explicitly installed from Settings. The flag
+// is persisted; the model file itself lives on disk under $APP_DATA/models.
+export type ProcessingFeatureKey =
+  | "birefnet"
+  | "realEsrgan"
+  | "florence2"
+  | "craft"
+  | "lama";
+
+export type ProcessingFeatureState = {
+  installed: boolean;
+};
+
+export type ProcessingFeaturesSettings = {
+  birefnet: ProcessingFeatureState;
+  realEsrgan: ProcessingFeatureState;
+  florence2: ProcessingFeatureState;
+  craft: ProcessingFeatureState;
+  lama: ProcessingFeatureState;
+};
+
 export type GlobalSettings = {
   schemaVersion: number;
   canvas: CanvasSettings;
   systemDesign: SystemDesignSettings;
+  processingFeatures: ProcessingFeaturesSettings;
 };
 
 export type DeepPartial<T> = T extends Array<infer U>

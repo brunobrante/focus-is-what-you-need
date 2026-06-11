@@ -18,6 +18,7 @@ import type {
   ActiveSubject,
   ViewMode,
   DrawingPath,
+  ProposedRegion,
   SelectionInteraction,
   EditorTool,
   SidebarTab,
@@ -30,6 +31,7 @@ import {
 } from "../types";
 
 import {
+  clamp,
   clampToolPan,
   intersectCropBoxes,
   cropBoxFromPoints,
@@ -46,6 +48,7 @@ import {
 import {
   selectionHitTest,
   componentHitTest,
+  proposalHitTest,
 } from "../engine/hitTesting";
 import { roundedRectPath } from "../engine/drawing";
 import {
@@ -82,6 +85,14 @@ import {
 import { useBuilderViewport } from "./useBuilderViewport";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { confirmationDialogCopy } from "../ui/ConfirmModal";
+import {
+  bytesToPngDataUrl,
+  runBirefnet,
+  runRealEsrgan,
+  runFlorence2,
+  urlToBytes,
+  type ProcessingFeatureKey,
+} from "@/lib/models/modelCommands";
 
 export type ToolsEditorProps = {
   item: ToolReference;
@@ -106,11 +117,16 @@ export type ToolsEditorState = {
   selectionLocked: boolean;
   drawing: boolean;
   drawingPath: DrawingPath | null;
+  brushSize: number;
   editingComponentId: string | null;
   showCropsOverlay: boolean;
   hoveredComponentId: string | null;
   imageError: boolean;
   uploading: boolean;
+  proposedRegions: ProposedRegion[];
+  autoDetecting: boolean;
+  applyingProposals: boolean;
+  autoDetectMessage: string | null;
   imagePaintVersion: number;
   pendingConfirmation: PendingConfirmation | null;
   savingStack: boolean;
@@ -130,6 +146,7 @@ export type ToolsEditorState = {
   setSelectionLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setDrawing: React.Dispatch<React.SetStateAction<boolean>>;
   setDrawingPath: React.Dispatch<React.SetStateAction<DrawingPath | null>>;
+  setBrushSize: React.Dispatch<React.SetStateAction<number>>;
   setEditingComponentId: React.Dispatch<React.SetStateAction<string | null>>;
   setShowCropsOverlay: React.Dispatch<React.SetStateAction<boolean>>;
   setHoveredComponentId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -212,7 +229,11 @@ export type ToolsEditorState = {
   persistReferenceStack: () => Promise<void>;
   selectionToSubjectCoords: (box: CropBox) => CropBox | null;
   toOriginalCoords: (subjectBox: CropBox) => CropBox;
-  saveSelection: () => Promise<void>;
+  saveSelection: (postProcess?: ProcessingFeatureKey) => Promise<void>;
+  autoDetect: () => Promise<void>;
+  applyProposedRegions: () => Promise<void>;
+  discardProposedRegion: (id: string) => void;
+  discardAllProposedRegions: () => void;
   uploadImage: (file: File | null | undefined) => Promise<void>;
   updateIdleCursorAndHover: (event: PointerEvent<HTMLDivElement>) => void;
   handleStagePointerLeave: () => void;
@@ -240,6 +261,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const [selectionLocked, setSelectionLocked] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [drawingPath, setDrawingPath] = useState<DrawingPath | null>(null);
+  const [brushSize, setBrushSize] = useState(4);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [showCropsOverlay, setShowCropsOverlay] = useState(false);
   const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
@@ -270,6 +292,13 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const [cropsOverlayAlpha, setCropsOverlayAlpha] = useState<number>(
     () => readCropsOverlayAlpha(),
   );
+  // Florence-2 auto-detect: transient proposals staged over the open subject,
+  // plus the running flag and a short-lived status message (toast).
+  const [proposedRegions, setProposedRegions] = useState<ProposedRegion[]>([]);
+  const [autoDetecting, setAutoDetecting] = useState(false);
+  const [applyingProposals, setApplyingProposals] = useState(false);
+  const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null);
+  const autoDetectMessageTimer = useRef<number | null>(null);
 
   // Repaints are coalesced to one per animation frame. N cut images settling
   // asynchronously (plus resize/onload) would otherwise trigger N full canvas
@@ -860,7 +889,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [activeSubject, item.h, item.w],
   );
 
-  const saveSelection = useCallback(async () => {
+  const saveSelection = useCallback(async (postProcess?: ProcessingFeatureKey) => {
     if (!selection || !selectionLocked || !canCrop) return;
     const img = imgRef.current;
     const subjectBox = selectionToSubjectCoords(selection);
@@ -898,6 +927,19 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         dataUrl = await canvasToDataUrl(canvas, "image/png");
       } catch {
         dataUrl = activeSubject.url;
+      }
+    }
+
+    // Optionally run an AI model on the freshly cropped image and bake the
+    // result into the cut. On failure, fall back to the plain crop.
+    if (postProcess) {
+      try {
+        const input = await urlToBytes(dataUrl);
+        const output =
+          postProcess === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
+        dataUrl = bytesToPngDataUrl(output);
+      } catch (error) {
+        console.error(`Draw post-process (${postProcess}) failed`, error);
       }
     }
 
@@ -960,6 +1002,171 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     rootComponent.id,
     selection,
     selectionLocked,
+    selectionToSubjectCoords,
+    toOriginalCoords,
+    updateComponents,
+  ]);
+
+  // --- Florence-2 auto-detect ---------------------------------------------
+
+  const flashAutoDetectMessage = useCallback((message: string) => {
+    setAutoDetectMessage(message);
+    if (autoDetectMessageTimer.current != null) {
+      clearTimeout(autoDetectMessageTimer.current);
+    }
+    autoDetectMessageTimer.current = window.setTimeout(() => {
+      autoDetectMessageTimer.current = null;
+      setAutoDetectMessage(null);
+    }, 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoDetectMessageTimer.current != null) {
+        clearTimeout(autoDetectMessageTimer.current);
+      }
+    };
+  }, []);
+
+  const updateProposalBox = useCallback((id: string, box: CropBox) => {
+    setProposedRegions((current) =>
+      current.map((region) => (region.id === id ? { ...region, box } : region)),
+    );
+  }, []);
+
+  const discardProposedRegion = useCallback((id: string) => {
+    setProposedRegions((current) => current.filter((region) => region.id !== id));
+  }, []);
+
+  const discardAllProposedRegions = useCallback(() => {
+    setProposedRegions([]);
+  }, []);
+
+  // Run Florence-2 on the open subject and stage the result as proposals. Boxes
+  // are mapped into the same content/display space the manual selection uses, so
+  // they render and edit identically.
+  const autoDetect = useCallback(async () => {
+    if (autoDetecting || !canCrop) return;
+    const img = imgRef.current;
+    const cw = img?.clientWidth ?? 0;
+    const ch = img?.clientHeight ?? 0;
+    if (!cw || !ch) {
+      flashAutoDetectMessage("Open a stack before auto-detecting");
+      return;
+    }
+    setAutoDetecting(true);
+    setAutoDetectMessage(null);
+    setProposedRegions([]);
+    try {
+      const bytes = await urlToBytes(activeSubject.url);
+      const regions = await runFlorence2(bytes);
+      if (regions.length === 0) {
+        flashAutoDetectMessage("No components detected — try drawing regions manually");
+        return;
+      }
+      const mapped: ProposedRegion[] = regions.map((region, index) => {
+        const x = clamp(region.x * cw, 0, cw);
+        const y = clamp(region.y * ch, 0, ch);
+        return {
+          id: `fp-${index}-${Math.random().toString(36).slice(2, 7)}`,
+          label: region.label,
+          confidence: region.confidence,
+          box: {
+            x,
+            y,
+            w: clamp(region.w * cw, 1, cw - x),
+            h: clamp(region.h * ch, 1, ch - y),
+          },
+        };
+      });
+      setProposedRegions(mapped);
+    } catch (error) {
+      console.error("[tools] auto-detect failed", error);
+      flashAutoDetectMessage("Auto-detect failed — see console for details");
+    } finally {
+      setAutoDetecting(false);
+    }
+  }, [activeSubject.url, autoDetecting, canCrop, flashAutoDetectMessage]);
+
+  // Commit every staged proposal as a real cut, through the same crop pipeline a
+  // hand-drawn region uses. The proposal's label becomes the cut name.
+  const applyProposedRegions = useCallback(async () => {
+    if (applyingProposals || proposedRegions.length === 0 || !canCrop) return;
+    const img = imgRef.current;
+    const parentId = activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
+    const rootId = activeSubject.rootId ?? activeScopeId;
+    setApplyingProposals(true);
+    try {
+      const created: SavedComponent[] = [];
+      for (const region of proposedRegions) {
+        const subjectBox = selectionToSubjectCoords(region.box);
+        if (!subjectBox) continue;
+        const sourceBox = toOriginalCoords(subjectBox);
+        let dataUrl = activeSubject.url;
+        if (img) {
+          try {
+            await waitForImage(img);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(subjectBox.w));
+            canvas.height = Math.max(1, Math.round(subjectBox.h));
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("Canvas unavailable");
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(
+              img,
+              subjectBox.x,
+              subjectBox.y,
+              subjectBox.w,
+              subjectBox.h,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            );
+            dataUrl = await canvasToDataUrl(canvas, "image/png");
+          } catch {
+            dataUrl = activeSubject.url;
+          }
+        }
+        const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+        const trimmedLabel = region.label?.trim();
+        created.push({
+          id: nextId,
+          name: trimmedLabel ? trimmedLabel : shortComponentName(nextId),
+          box: sourceBox,
+          dataUrl,
+          type: "PNG",
+          createdAt: new Date().toISOString(),
+          parentId,
+          kind: "cut",
+          rootId,
+        });
+      }
+      if (created.length === 0) return;
+      updateComponents((current) => [...created, ...current]);
+      setExpandedComponentIds((current) => {
+        const next = new Set(current);
+        next.add(parentId);
+        for (const component of created) next.add(component.id);
+        return next;
+      });
+      setProposedRegions([]);
+      setSelectedComponentId(created[0].id);
+      setViewMode("component");
+      resetToolViewport();
+      cancelSelection();
+    } finally {
+      setApplyingProposals(false);
+    }
+  }, [
+    activeScopeId,
+    activeSubject,
+    applyingProposals,
+    canCrop,
+    cancelSelection,
+    proposedRegions,
+    resetToolViewport,
+    rootComponent.id,
     selectionToSubjectCoords,
     toOriginalCoords,
     updateComponents,
@@ -1115,6 +1322,13 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     expandComponentPath(selectedComponentId);
   }, [expandComponentPath, selectedComponentId]);
 
+  // Proposals are defined in the open subject's coordinate space, so they are
+  // dropped whenever the subject changes (opening another node, or leaving the
+  // croppable component view).
+  useEffect(() => {
+    setProposedRegions([]);
+  }, [activeSubject.id, viewMode]);
+
   useEffect(() => {
     if ((currentTool !== "crop" && currentTool !== "draw") || canCrop) return;
     setCurrentTool("move");
@@ -1174,7 +1388,9 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
+    proposedRegions,
     drawingPath,
+    brushSize,
     selectedComponentId,
     hoveredComponentId,
     editingComponentId,
@@ -1259,6 +1475,40 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     }
 
     if (!canCrop) return;
+
+    // Staged Florence-2 proposals are editable regardless of the active tool:
+    // click "×" to discard, a corner to resize, or the body to move.
+    if (proposedRegions.length > 0) {
+      const hit = proposalHitTest(point, proposedRegions, toolZoom);
+      if (hit) {
+        event.preventDefault();
+        if (hit.kind === "discard") {
+          discardProposedRegion(hit.id);
+          return;
+        }
+        event.currentTarget.setPointerCapture(event.pointerId);
+        selectionInteractionRef.current =
+          hit.kind === "resize"
+            ? {
+                type: "proposal-resize",
+                pointerId: event.pointerId,
+                id: hit.id,
+                handle: hit.handle,
+                startPoint: point,
+                startBox: hit.box,
+              }
+            : {
+                type: "proposal-move",
+                pointerId: event.pointerId,
+                id: hit.id,
+                startPoint: point,
+                startBox: hit.box,
+              };
+        setDrawing(true);
+        return;
+      }
+    }
+
     if (currentTool !== "crop" && currentTool !== "draw") return;
 
     event.preventDefault();
@@ -1366,6 +1616,25 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       return;
     }
 
+    if (interaction.type === "proposal-resize") {
+      const bounds = imageBounds ?? getVisibleContentBounds(stageViewportRef.current, imgRef.current, toolZoom);
+      if (!bounds) return;
+      updateProposalBox(
+        interaction.id,
+        resizeCropBox(interaction.startBox, interaction.handle, point, bounds),
+      );
+      return;
+    }
+
+    if (interaction.type === "proposal-move") {
+      const bounds = imageBounds ?? getVisibleContentBounds(stageViewportRef.current, imgRef.current, toolZoom);
+      updateProposalBox(
+        interaction.id,
+        moveCropBox(interaction.startBox, interaction.startPoint, point, bounds),
+      );
+      return;
+    }
+
     if (interaction.type === "free-draw") {
       setDrawingPath((current) => {
         if (!current) return { points: [point] };
@@ -1393,13 +1662,19 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     event.currentTarget.releasePointerCapture(event.pointerId);
     setDrawing(false);
     selectionInteractionRef.current = null;
-    if (interaction.type === "pan") return;
+    if (
+      interaction.type === "pan" ||
+      interaction.type === "proposal-move" ||
+      interaction.type === "proposal-resize"
+    ) {
+      return;
+    }
 
     if (interaction.type === "free-draw") {
       const points = drawingPath?.points ?? [];
-      setDrawingPath(null);
       const bounds = boundsFromDrawingPath(points);
       if (!bounds) {
+        setDrawingPath(null);
         setSelection(null);
         setSelectionLocked(false);
         return;
@@ -1407,10 +1682,13 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       const imageBounds = getImageContentBounds(imgRef.current);
       const clipped = imageBounds ? intersectCropBoxes(bounds, imageBounds) : bounds;
       if (!clipped || clipped.w < 8 || clipped.h < 8) {
+        setDrawingPath(null);
         setSelection(null);
         setSelectionLocked(false);
         return;
       }
+      // Keep the freehand stroke painted on the canvas. It stays until an action
+      // is picked from the draw toolbar (which commits) or the user cancels.
       setSelection(clipped);
       setSelectionLocked(true);
       return;
@@ -1458,11 +1736,16 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectionLocked,
     drawing,
     drawingPath,
+    brushSize,
     editingComponentId,
     showCropsOverlay,
     hoveredComponentId,
     imageError,
     uploading,
+    proposedRegions,
+    autoDetecting,
+    applyingProposals,
+    autoDetectMessage,
     imagePaintVersion,
     pendingConfirmation,
     savingStack,
@@ -1482,6 +1765,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     setSelectionLocked,
     setDrawing,
     setDrawingPath,
+    setBrushSize,
     setEditingComponentId,
     setShowCropsOverlay,
     setHoveredComponentId,
@@ -1560,6 +1844,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectionToSubjectCoords,
     toOriginalCoords,
     saveSelection,
+    autoDetect,
+    applyProposedRegions,
+    discardProposedRegion,
+    discardAllProposedRegions,
     uploadImage,
     updateIdleCursorAndHover,
     handleStagePointerLeave,

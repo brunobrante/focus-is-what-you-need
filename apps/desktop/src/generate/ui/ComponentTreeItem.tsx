@@ -1,6 +1,8 @@
-import { ChevronRight, SquarePen, Trash2 } from "lucide-react";
-import type { ComponentProps } from "react";
+import { ChevronRight, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
+import type { ComponentProps, MouseEvent } from "react";
 import type { ComponentTreeNode } from "../engine/types";
+import { useCraftCheck } from "@/lib/models/useCraftCheck";
+import { urlToBytes } from "@/lib/models/modelCommands";
 
 function IconButton({
   danger = false,
@@ -28,6 +30,7 @@ export function ComponentTreeItem({
   expandedIds,
   rootId,
   primaryId,
+  craftInstalled = false,
   onOpen,
   onToggle,
   onHover,
@@ -41,6 +44,8 @@ export function ComponentTreeItem({
   expandedIds: Set<string>;
   rootId: string;
   primaryId: string;
+  /** When the CRAFT model is installed, each card shows an "Is text?" action. */
+  craftInstalled?: boolean;
   onOpen: (id: string) => void;
   onToggle: (id: string) => void;
   onHover: (id: string | null) => void;
@@ -100,6 +105,7 @@ export function ComponentTreeItem({
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-medium text-[var(--text)]">
           {component.name}
         </span>
+        {craftInstalled ? <CraftCheckButton dataUrl={component.dataUrl} /> : null}
         <div className="flex shrink-0">
           <IconButton
             aria-label="Edit crop"
@@ -140,6 +146,7 @@ export function ComponentTreeItem({
               expandedIds={expandedIds}
               rootId={rootId}
               primaryId={primaryId}
+              craftInstalled={craftInstalled}
               onOpen={onOpen}
               onToggle={onToggle}
               onHover={onHover}
@@ -148,6 +155,69 @@ export function ComponentTreeItem({
             />
           ))
         : null}
+    </div>
+  );
+}
+
+/**
+ * Per-card CRAFT text-detection control. Reads the cut's image bytes on demand
+ * and asks the backend whether it contains text, surfacing a Yes/No badge.
+ * Only rendered when the CRAFT model is installed.
+ */
+function CraftCheckButton({ dataUrl }: { dataUrl: string }) {
+  const craft = useCraftCheck();
+  const busy = craft.status === "running";
+
+  const label =
+    craft.status === "running"
+      ? "Checking…"
+      : craft.status === "done"
+        ? "Check again"
+        : craft.status === "error"
+          ? "Retry"
+          : "Is text?";
+
+  async function handleClick(event: MouseEvent) {
+    event.stopPropagation();
+    if (busy) return;
+    // "Check again" / "Retry": clear the previous result, then run a fresh check.
+    craft.reset();
+    try {
+      const bytes = await urlToBytes(dataUrl);
+      craft.check(bytes);
+    } catch (error) {
+      console.error("Failed to read cut image for text detection", error);
+    }
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+      {craft.status === "done" ? (
+        // TODO: persist text detection result to ReferenceRow
+        <span
+          className={[
+            "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
+            craft.isText
+              ? "border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] text-[#4ade80]"
+              : "border-[rgba(248,113,113,0.4)] bg-[rgba(248,113,113,0.12)] text-[#f87171]",
+          ].join(" ")}
+        >
+          {craft.isText ? "Yes" : "No"}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={handleClick}
+        className="inline-flex h-[26px] shrink-0 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-transparent px-1.5 text-[10.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 size={12} strokeWidth={1.8} className="animate-spin" />
+        ) : (
+          <ScanText size={12} strokeWidth={1.8} />
+        )}
+        {label}
+      </button>
     </div>
   );
 }
