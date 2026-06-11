@@ -692,6 +692,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       rootId={rootComponentId}
                       primaryId={activeScopeId}
                       craftInstalled={features.florence2.installed}
+                      lamaInstalled={features.lama.installed}
                       onOpen={openTreeComponent}
                       onToggle={toggleComponentExpanded}
                       onHover={setHoveredComponentId}

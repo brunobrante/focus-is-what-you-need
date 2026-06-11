@@ -416,6 +416,7 @@ AI-assisted image-to-component tool.
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
   - **Is text?** button (only when the CRAFT Text Detector model is installed): runs CRAFT on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
+  - **Remove element** button (only when the LaMa Remove Element model is installed): starts a mask-drawing flow to erase an element from the cut using LaMa inpainting. Clicking it (Wand2 icon) expands a panel under the cut showing the cut image with a paint-on overlay canvas; the brush cursor is a circle showing the brush size, and dragging paints a semi-transparent red mask over what to remove. Two buttons sit below the canvas: **Apply** runs LaMa (showing a spinner over the image while it runs) and **Cancel** discards the mask and collapses the panel. On success the panel collapses and the cut thumbnail shows the inpainted result, with the row button changing to **Undo** (RotateCcw icon) which reverts to the original cut image. On failure the panel stays open showing "Inpainting failed. Try again." with a **Retry** button. The result is session-local and not persisted in v1.
 - **Stack tab**:
   - Shows all cuts from a reference image together
   - Composite layout of all cuts side by side
@@ -509,6 +510,7 @@ Features:
 - **Upscale (4×)** — Real-ESRGAN · ~5 MB — "Increases cut resolution 4× using Real-ESRGAN"
 - **Auto-detect Components** — Florence-2 · ~1.2 GB — "Automatically proposes crop regions from a UI screenshot using Florence-2". A five-file package (vision encoder, token embedder, BART encoder, decoder, tokenizer) downloaded sequentially with per-file progress. Once installed, the **Auto-detect** button appears on the Builder's bottom canvas bar.
 - **Text Detector** — CRAFT · ~80 MB — "Detects whether a cut contains text". A single ONNX file. Once installed, an **Is text?** button appears on each Builder cut item that runs CRAFT and shows a Yes/No badge.
+- **Remove Element** — LaMa · ~208 MB — "Removes a painted selection from a cut using LaMa inpainting". A single ONNX file. Once installed, a **Remove element** button appears on each Builder cut item that opens a mask-drawing flow and replaces the cut with the inpainted result.
 
 Install/uninstall persist immediately (independent of the modal's Save button). Once installed, the matching action appears on Builder cut items (or, for Florence-2, as the Auto-detect image-level action).
 

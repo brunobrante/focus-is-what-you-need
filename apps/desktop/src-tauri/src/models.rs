@@ -572,7 +572,7 @@ fn lama_blocking(
     let outputs = session
         .run(ort::inputs![
             image_name.as_str() => image_tensor,
-            mask_name.as_str() => mask_tensor,
+            mask_name.as_str() => mask_tensor
         ])
         .map_err(|e| e.to_string())?;
 
