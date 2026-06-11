@@ -38,3 +38,13 @@ export async function updateGlobalSettings(
   putGlobalSettings(next);
   return next;
 }
+
+/** Toggle whether new projects inherit the workspace design by default. */
+export async function setShareWithProjectsByDefault(
+  shareWithProjectsByDefault: boolean,
+): Promise<GlobalSettings> {
+  return updateGlobalSettings((settings) => ({
+    ...settings,
+    systemDesign: { ...settings.systemDesign, shareWithProjectsByDefault },
+  }));
+}

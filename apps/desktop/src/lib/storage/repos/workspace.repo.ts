@@ -18,6 +18,14 @@ export async function getDefaultWorkspace(): Promise<WorkspaceRow | null> {
   return rows[0] ?? null;
 }
 
+/** The workspace that owns a given project, or null if the project is loose. */
+export async function getWorkspaceForProject(
+  projectId: string,
+): Promise<WorkspaceRow | null> {
+  const rows = await listWorkspaces();
+  return rows.find((r) => r.projectIds.includes(projectId)) ?? null;
+}
+
 export async function createWorkspace(input: {
   name: string;
   projectIds?: string[];

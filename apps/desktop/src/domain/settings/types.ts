@@ -129,9 +129,17 @@ export type CanvasSettings = {
   shell: CanvasShellSettings;
 };
 
+export type SystemDesignSettings = {
+  // When true, a new project inside a workspace inherits all of that
+  // workspace's design tokens by default. When false, it starts with none
+  // shared. The new-project flow can override this per project.
+  shareWithProjectsByDefault: boolean;
+};
+
 export type GlobalSettings = {
   schemaVersion: number;
   canvas: CanvasSettings;
+  systemDesign: SystemDesignSettings;
 };
 
 export type DeepPartial<T> = T extends Array<infer U>

@@ -179,4 +179,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       },
     },
   },
+  systemDesign: {
+    shareWithProjectsByDefault: true,
+  },
 };

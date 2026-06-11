@@ -17,7 +17,7 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
 | `/canvas` | CanvasPage | Full-screen visual canvas editor |
 | `/references` | References | Reference image library |
-| `/system-design` | SystemDesignPage | Global design tokens management |
+| `/system-design` | SystemDesignPage | Active workspace's design system (tokens shared with its projects) |
 | `/components` | GlobalComponentsPage | Workspace-level global components |
 | `/generate` | Generate | AI builder and content generation |
 
@@ -60,21 +60,31 @@ Main project hub.
 
 ### 2. New Project Page `/new`
 
-Three-step wizard for creating a project.
+Wizard for creating a project. It has **3 or 4 steps**: the design-token sharing
+step appears only when the target workspace has a design system with tokens.
 
-**Progress bar** at the top showing current step out of 3.
+**Progress bar** at the top showing current step out of the total.
 
-**Step 1 — Project type**:
+**Step — Project type**:
 - Three TypeCards side by side: Desktop / Tablet / Mobile
 - Each card shows a device mockup illustration, type label, dimensions (e.g. `1440 × 900`), and a radio button
 - Selected state: highlighted border and background
 
-**Step 2 — Project name**:
+**Step — Project name**:
 - Badge showing the chosen type
 - Text input with placeholder
 - Info pill below the input
 
-**Step 3 — Advanced settings**:
+**Step — Share design tokens** (only when a workspace design with tokens exists):
+- A checkbox for the global setting "Share workspace tokens with new projects by
+  default" (persists immediately, and resets the selection below)
+- "{N} tokens shared" count with **Select all** / **Clear all**
+- A scrollable list grouped by category (Colors, Gradients, Typography, Icons,
+  Spacing, Radius, Images), each with a category select-all checkbox and a
+  per-token checkbox + mini preview. The selection seeds which workspace tokens the
+  new project starts with; the rest are excluded (re-addable later in the System tab).
+
+**Step — Advanced settings**:
 - Drag-and-drop image upload area with dashed border, upload icon, and label "Drag & drop or click"
 - Image preview when a file is loaded
 - Remove image button
@@ -82,6 +92,7 @@ Three-step wizard for creating a project.
 **Footer** (all steps):
 - "Back" button on the left
 - "Next" / "Create" button on the right, disabled when required fields are empty
+- "Save and skip" on the final step
 
 ---
 
@@ -105,12 +116,15 @@ Shows all screens, components, and references inside a project.
 
 **Tab bar**: Screens | Components | References | System
 
-**Each tab contains**:
+**Screens / Components / References tabs each contain**:
 - "Add" button in the top-right corner
 - Search bar
 - Kind/type filter dropdown
 - Responsive card grid
 - EmptyState when no items
+
+**System tab**: the project's design system editor — workspace-shared tokens and
+the project's own tokens shown together — see section 8a.
 
 **ScreenMock** (card):
 - Screen snapshot preview
@@ -148,6 +162,11 @@ Two-column layout for inspecting and editing a screen.
   - Each tab: search bar + kind filter + "New" button + card grid
   - `ComponentSideCard`: snapshot, name, kind, CardMenu
   - `VersionSideCard`: version number, date, active status indicator
+  - **References tab**: a card grid (shared `ReferenceThumbCard`) of references
+    attached to this screen/component. A reference can be either a whole library
+    image **or** a single cropped component from an image's stack — a stack-node
+    card renders just that crop and is titled with the node name. Cards open a
+    lightbox; hover reveals a remove action. "New" opens `AddReferenceModal`.
   - EmptyState per tab
 - **InlineInfoPanel** (expands below the header when Info is clicked):
   - Template dropdown
@@ -186,8 +205,16 @@ Full-screen visual editor with floating UI layers.
 - Search toggle button
 
 **Top-center**:
-- Canvas tabs: Current | Drafts
+- Canvas tabs: Current | Drafts | References (Versions when enabled)
 - Split mode selector: None | Vertical | Grid (icon buttons)
+
+**References window** (a canvas window, like Current/Drafts):
+- Shows references attached to the subject currently open in the canvas (a
+  component takes precedence over its screen) as a gallery of `ReferenceThumbCard`s.
+- Clicking a card opens it enlarged in the lightbox; hover reveals remove.
+- The window's **Add** button opens the standard `AddReferenceModal`, scoped to
+  the current subject, so new references appear here and in the side References tab.
+- Empty state prompts to add the first reference.
 
 **Left panel** (collapsible):
 - Layers / tree panel
@@ -238,56 +265,98 @@ Reference image library for UI research.
 - Responsive grid of image cards
 - Each card: image thumbnail, name, tags, hover actions (View / Delete)
 
-**Stack Viewer** (side panel, opens on card selection):
-- Composite canvas showing the reference image with its cuts overlaid
-- Tree inspector listing each cut with name and dimensions
-- Metadata panel: name, dimensions, date added
+**Reference Detail Modal** (opens on card click — single reference or group):
+- **Original / Originals tab**: a single reference shows its image enlarged. A
+  group shows a gallery of its originals; a group with only one original opens it
+  enlarged directly (no one-cell grid).
+- **Stack / Stacks tab**: one image can hold several independent stacks (roots).
+  When there are multiple stacks the tab shows a card per stack; selecting one
+  renders that stack's composite (its background plus only its own cuts). A single
+  stack renders its composite directly. The composite draws each cut once — the
+  root is never re-painted over the background (fixes the prior duplicated image).
+  - "All / Solo" toggle: composite overlay vs an isolated single cut.
+- **Sidebar**: a tree inspector listing each stack and its cuts (name +
+  dimensions), each selectable/isolatable; plus the metadata panel.
+
+**Add Reference Modal** (`AddReferenceModal`, opened from a screen, component, or
+the canvas references window):
+- A single searchable **tree** of the whole library. Each image row expands into
+  its stack tree: the whole image ("Original") plus each root and its nested cuts,
+  indented by depth.
+- One search box filters across image names, tags, **and** stack-component names;
+  matching images auto-expand.
+- Picking the Original attaches the whole image; picking any node attaches just
+  that cropped component (its crop is baked into the card thumbnail). Already-added
+  items show an "Added" marker.
+- Footer selects the attach target (entire project / specific screen / specific
+  component); it is pre-set to the current subject when opened from a detail page
+  or the canvas.
 
 ---
 
 ### 8. System Design Page `/system-design`
 
-Global design token management.
+Edits the **active workspace's** system design — the company-level design system
+shared with that workspace's projects. Each workspace owns exactly one design,
+created lazily on first visit and persisted (records table / save queue), so all
+edits survive reloads.
 
-**Top section**:
-- Design system name selector dropdown with "Create new" option
-- "Shared with projects" checkbox
-- Libraries list (names + Add button)
-- Icons libraries list (same pattern)
+**Header**: "System Design" title + a line naming the workspace whose tokens are
+being edited. If no workspace exists yet, an empty state asks the user to create
+or select one from the top-left workspace switcher.
 
-**Horizontal tab bar**: Colors | Typography | Icons | Spacing | Radius | Assets
+**Horizontal tab bar (token categories)**: Colors | Gradients | Typography |
+Icons | Spacing | Radius | Images. Only the active category is shown at a time.
 
-**Colors tab**:
-- "Palette" section: grid of color token cards — each shows a color swatch circle, name, hex value, edit/delete actions
-- "Gradients" section: cards showing a gradient preview strip, name, from/to color labels, angle — edit/delete actions
-- "Add" button per section
+**Per category section** (`SectionBlock` with an "Add" action):
+- **Colors** — grid of swatch cards: color block, name, hex value
+- **Gradients** — grid of linear-gradient preview cards with name
+- **Typography** — list of type styles: name, family/weight/size descriptor, live sample
+- **Icons** — grid of glyph/emoji tiles with name
+- **Spacing** — list: token name, proportional bar, px value
+- **Radius** — grid of rounded-corner previews with name + px value
+- **Images** — grid of uploaded image cards (empty state when none)
 
-**Typography tab**:
-- "Type Styles" section: vertical list — name, family/weight/size descriptor, inline text preview
-- "Libraries" section: list of font libraries — preview sample, local/remote badge, source URL
+Token cards reveal edit/delete actions on hover.
 
-**Icons tab**:
-- "Custom Icons" section: grid of glyph/emoji token tiles
-- "Libraries" section: list of icon sets with item count and local/remote badge
+There is no "design system" selector and no libraries/icons name-lists — those
+belonged to the old disconnected manager and were removed. The page edits one
+real, persisted design.
 
-**Spacing tab**:
-- Vertical list of spacing tokens: name, range slider, numeric value, proportional visual bar
+**Add-token modal** (`AddTokenModal`): on the workspace page it shows just the
+create form. On a project (when a workspace exists) it has two tabs — **Create
+new** (the per-category form) and **From workspace** (a list of workspace tokens
+the project previously removed, click to re-add). Editing a token uses
+`EditTokenModal`. Forms per category: color picker + hex; gradient from/to +
+angle; family/weight/size + sample; emoji/glyph; spacing slider; radius with
+"Full / Pill"; image upload.
 
-**Radius tab**:
-- Grid of radius tokens: rounded-corner visual preview, name, value
+---
 
-**Assets tab**:
-- Image upload area (empty state)
+### 8a. Project System tab (project design system)
 
-**Modals from this page**:
-- `ColorModal` — name field + color picker + hex input
-- `GradientModal` — name + from-color + to-color + angle slider
-- `TypeModal` — name + font family + weight + size + preview text
-- `IconModal` — name + emoji/glyph input
-- `SpacingModal` — name + range slider + numeric input
-- `RadiusModal` — name + value + "Full / Pill" checkbox
-- `FontBrowserModal` — browse available font weights with sample text
-- `IconBrowserModal` — grid of icons from Lucide or other libraries
+The **System** tab inside a project (`/project/:id`) edits that project's own
+system design using the same editor and modals as the workspace page. A project's
+design is independent and persisted per project.
+
+**Unified token model** (the core idea — there is no Inherited/Custom switch):
+- The project's own tokens and the tokens shared by its workspace are shown
+  **together** in one list per category. An info bar names the workspace.
+- Each card carries an **origin badge**: `WS` for a workspace (shared) token, or
+  `Local` for a project token. Workspace tokens are not edited here (edit at the
+  workspace level); they can be deleted.
+- **Deleting a token removes it from the project.** A project token is deleted
+  outright; a shared token is excluded from this project only — the deletion
+  persists. It reappears under the add-token modal's **From workspace** tab to be
+  re-added.
+- **Adding** a token creates a project-local token (or re-adds a removed shared one
+  from the From-workspace tab).
+- A project with **no workspace** has no shared tokens and no badges — it just owns
+  its tokens.
+
+A global setting, **"Share workspace tokens with new projects by default"**
+(default on), decides whether a new project starts with all workspace tokens
+shared or none. It is editable in the new-project flow (section 2).
 
 ---
 

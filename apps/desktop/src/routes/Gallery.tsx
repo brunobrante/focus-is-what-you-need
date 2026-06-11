@@ -44,7 +44,6 @@ import {
 import { Snapshot } from "@/components/Snapshot";
 import { Badge } from "@/components/ui/badge";
 import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
-import { fileFormatLabel, readFileAsDataUrl } from "@/lib/utils";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import {
   useActiveVariants,
@@ -60,9 +59,9 @@ import {
 } from "@/lib/storage/repos/references.repo";
 import { deleteScreen } from "@/lib/storage/repos/screens.repo";
 import { updateProject } from "@/lib/storage/repos/projects.repo";
+import { SystemTab } from "@/routes/SystemTab";
 import type {
   ComponentRow,
-  ProjectDesignSystem,
   ProjectRow,
   ReferenceRow,
   ScreenRow,
@@ -74,8 +73,6 @@ import { EmptyMessage } from "@/components/screen/EmptyMessage";
 
 type Tab = "screens" | "components" | "references" | "system";
 type CmpKindFilter = "all" | ComponentKind;
-type SystemAssetKind = "color" | "font" | "icon" | "image";
-type SystemModalState = { kind: SystemAssetKind; assetId?: string };
 type SectionState = { id: string; name: string };
 type SectionPersistedState = {
   sections: SectionState[];
@@ -2672,8 +2669,8 @@ export function ReferencesTab({
           />
         ) : view === "grid" ? (
           <div
-            className="columns-2 gap-3 md:columns-3 xl:columns-4"
-            style={{ columnGap: "12px" }}
+            className="grid gap-x-[18px] gap-y-[22px]"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
           >
             {filtered.map((reference) => (
               <ReferenceProjectCard
@@ -2752,14 +2749,14 @@ function ReferenceProjectCard({
   const labels = referenceLabelSet(attachments, screenById, componentById);
   const primaryLabels = labels.slice(0, 2);
   return (
-    <div className="group mb-3 inline-flex w-full break-inside-avoid flex-col gap-2 align-top">
-      <div className="relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-[border-color] duration-150 group-hover:border-[var(--border-strong)]">
+    <div className="group flex cursor-default flex-col gap-2.5 transition-transform duration-[120ms] hover:-translate-y-0.5">
+      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]">
         {reference.thumbnailUrl ? (
           <>
             <img
               src={reference.thumbnailUrl}
               alt=""
-              className="block h-auto w-full"
+              className="block h-full w-full object-contain"
               draggable={false}
             />
             {/* Gradient overlay with badges */}
@@ -2786,7 +2783,7 @@ function ReferenceProjectCard({
             </div>
           </>
         ) : (
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2.5 text-[var(--text-faint)]">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 text-[var(--text-faint)]">
             <IconImage size={24} strokeWidth={1.3} />
             <span className="px-4 text-center text-[11px] leading-snug">{reference.title}</span>
           </div>
@@ -2803,31 +2800,6 @@ function ReferenceProjectCard({
             },
           ]}
         />
-      </div>
-      <div className="flex min-w-0 flex-col gap-1 px-0.5">
-        <div className="flex min-w-0 items-start gap-2">
-          <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--text)]">
-            {reference.title}
-          </span>
-          {labels.length > 0 ? (
-            <span className="flex-shrink-0 text-[11px] text-[var(--text-faint)]">
-              {labels[0]}{labels.length > 1 ? ` +${labels.length - 1}` : ""}
-            </span>
-          ) : null}
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-          <span className="truncate">{reference.source}</span>
-          {reference.stack?.enabled ? (
-            <span className="rounded-full border border-[rgba(94,162,255,0.28)] bg-[rgba(94,162,255,0.1)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.35px] text-[#82b8ff]">
-              Stack
-            </span>
-          ) : null}
-          {(reference.metadata ?? []).slice(0, 2).map((tag) => (
-            <span key={tag} className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
-              {tag}
-            </span>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -2910,542 +2882,4 @@ function ReferenceBadge({ children }: { children: ReactNode }) {
   );
 }
 
-export function SystemTab({ project }: { project: ProjectRow }) {
-  const [modal, setModal] = useState<SystemModalState | null>(null);
-
-  const patchDesignSystem = async (
-    updater: (designSystem: ProjectDesignSystem) => ProjectDesignSystem,
-  ) => {
-    await updateProject(project.id, {
-      designSystem: updater(project.designSystem),
-    });
-    setModal(null);
-  };
-  const upsertColor = (color: ProjectDesignSystem["colors"][number]) =>
-    patchDesignSystem((designSystem) => ({
-      ...designSystem,
-      colors: upsertById(designSystem.colors, color),
-    }));
-  const upsertFont = (font: ProjectDesignSystem["fonts"][number]) =>
-    patchDesignSystem((designSystem) => ({
-      ...designSystem,
-      fonts: upsertById(designSystem.fonts, font),
-    }));
-  const upsertIcon = (icon: ProjectDesignSystem["icons"][number]) =>
-    patchDesignSystem((designSystem) => ({
-      ...designSystem,
-      icons: upsertById(designSystem.icons, icon),
-    }));
-  const upsertImage = (image: ProjectDesignSystem["images"][number]) =>
-    patchDesignSystem((designSystem) => ({
-      ...designSystem,
-      images: upsertById(designSystem.images, image),
-    }));
-  const deleteSystemAsset = (kind: SystemAssetKind, assetId: string) =>
-    void patchDesignSystem((designSystem) => {
-      if (kind === "color") {
-        return { ...designSystem, colors: designSystem.colors.filter((asset) => asset.id !== assetId) };
-      }
-      if (kind === "font") {
-        return { ...designSystem, fonts: designSystem.fonts.filter((asset) => asset.id !== assetId) };
-      }
-      if (kind === "icon") {
-        return { ...designSystem, icons: designSystem.icons.filter((asset) => asset.id !== assetId) };
-      }
-      return { ...designSystem, images: designSystem.images.filter((asset) => asset.id !== assetId) };
-    });
-  const editingColor = modal?.kind === "color" && modal.assetId
-    ? project.designSystem.colors.find((color) => color.id === modal.assetId)
-    : undefined;
-  const editingFont = modal?.kind === "font" && modal.assetId
-    ? project.designSystem.fonts.find((font) => font.id === modal.assetId)
-    : undefined;
-  const editingIcon = modal?.kind === "icon" && modal.assetId
-    ? project.designSystem.icons.find((icon) => icon.id === modal.assetId)
-    : undefined;
-  const editingImage = modal?.kind === "image" && modal.assetId
-    ? project.designSystem.images.find((image) => image.id === modal.assetId)
-    : undefined;
-
-  return (
-    <>
-      <main className="flex flex-1 flex-col gap-9 px-7 pb-10 pt-5">
-        <SysBlock title="Cores" icon={<IconColorStyles size={13} strokeWidth={1.7} />} actionLabel="New color" onAction={() => setModal({ kind: "color" })}>
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))" }}>
-            {project.designSystem.colors.map((color) => (
-              <div key={color.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
-                <CardMoreMenu
-                  label="More color actions"
-                  items={[
-                    { key: "edit", label: "Edit color", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "color", assetId: color.id }) },
-                    {
-                      key: "delete",
-                      label: "Delete color",
-                      icon: SharedCardMenuIcons.Trash,
-                      destructive: true,
-                      onClick: () => deleteSystemAsset("color", color.id),
-                    },
-                  ]}
-                />
-                <div className="h-[72px]" style={{ background: color.value }} />
-                <div className="flex flex-col gap-0.5 px-3 pb-1.5 pt-3">
-                  <span className="text-[13px] font-medium">{color.name}</span>
-                  <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {color.value}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SysBlock>
-
-        <SysBlock title="Fontes" icon={<IconText size={13} strokeWidth={1.7} />} actionLabel="Add font" onAction={() => setModal({ kind: "font" })}>
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
-            {project.designSystem.fonts.map((font) => (
-              <div key={font.id} className="group relative flex min-h-[168px] flex-col gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-[18px] pb-3.5 pt-[18px] transition-colors hover:border-[var(--border-strong)]">
-                <CardMoreMenu
-                  label="More font actions"
-                  items={[
-                    { key: "edit", label: "Edit font", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "font", assetId: font.id }) },
-                    {
-                      key: "delete",
-                      label: "Delete font",
-                      icon: SharedCardMenuIcons.Trash,
-                      destructive: true,
-                      onClick: () => deleteSystemAsset("font", font.id),
-                    },
-                  ]}
-                />
-                <div className="text-[34px] font-medium leading-[1.05] tracking-[-0.01em] text-[var(--text)]" style={{ fontFamily: font.family }}>
-                  {font.preview}
-                </div>
-                <div className="mt-auto flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-[var(--text)]">{font.name}</span>
-                  <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                    {font.role}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SysBlock>
-
-        <SysBlock title="Icons" icon={<IconGrid size={12} strokeWidth={1.6} />} actionLabel="Add icon" onAction={() => setModal({ kind: "icon" })}>
-          <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}>
-            {project.designSystem.icons.map((icon) => (
-              <div key={icon.id} className="group relative grid aspect-square gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]">
-                <CardMoreMenu
-                  label="More icon actions"
-                  items={[
-                    { key: "edit", label: "Edit icon", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "icon", assetId: icon.id }) },
-                    {
-                      key: "delete",
-                      label: "Delete icon",
-                      icon: SharedCardMenuIcons.Trash,
-                      destructive: true,
-                      onClick: () => deleteSystemAsset("icon", icon.id),
-                    },
-                  ]}
-                />
-                <div className="grid place-items-center">
-                  <SystemGlyph glyph={icon.glyph} />
-                </div>
-                <div className="truncate text-center text-[11px] text-[var(--text-muted)]">{icon.name}</div>
-              </div>
-            ))}
-          </div>
-        </SysBlock>
-
-        <SysBlock title="Images" icon={<IconImage size={13} strokeWidth={1.6} />} actionLabel="Add image" onAction={() => setModal({ kind: "image" })}>
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
-            {project.designSystem.images.map((image) => (
-              <div key={image.id} className="group relative overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors hover:border-[var(--border-strong)]">
-                <CardMoreMenu
-                  label="More image actions"
-                  items={[
-                    { key: "edit", label: "Edit image", icon: <IconFastEdit size={13} strokeWidth={1.6} />, onClick: () => setModal({ kind: "image", assetId: image.id }) },
-                    {
-                      key: "delete",
-                      label: "Delete image",
-                      icon: SharedCardMenuIcons.Trash,
-                      destructive: true,
-                      onClick: () => deleteSystemAsset("image", image.id),
-                    },
-                  ]}
-                />
-                <img src={image.previewUrl} alt="" className="aspect-[4/3] w-full object-cover" />
-                <div className="flex items-center justify-between gap-2 px-2.5 py-2">
-                  <span className="truncate text-[12px] text-[var(--text)]">{image.name}</span>
-                  <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                    {image.format}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SysBlock>
-
-        <SysBlock title="Spacing" icon={<IconDiamond size={10} strokeWidth={2.4} />} actionLabel="Add token" onAction={() => {}}>
-          <div className="flex flex-col divide-y divide-[var(--border)]">
-            {([
-              { name: "xs", value: 4 },
-              { name: "sm", value: 8 },
-              { name: "md", value: 12 },
-              { name: "base", value: 16 },
-              { name: "lg", value: 20 },
-              { name: "xl", value: 24 },
-              { name: "2xl", value: 32 },
-              { name: "3xl", value: 40 },
-              { name: "4xl", value: 48 },
-              { name: "5xl", value: 64 },
-            ] as const).map((s) => (
-              <div key={s.name} className="flex items-center gap-5 py-2.5">
-                <span className="w-12 shrink-0 font-mono text-[12px] text-[var(--text-faint)]">{s.name}</span>
-                <div className="shrink-0 rounded-[2px] bg-[var(--text-muted)]" style={{ width: s.value, height: 10 }} />
-                <span className="font-mono text-[12px] text-[var(--text-muted)]">{s.value}px</span>
-              </div>
-            ))}
-          </div>
-        </SysBlock>
-
-        <SysBlock title="Radius" icon={<IconRectangle size={12} strokeWidth={1.6} />} actionLabel="Add token" onAction={() => {}}>
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
-            {([
-              { name: "none", value: 0 },
-              { name: "sm", value: 4 },
-              { name: "md", value: 8 },
-              { name: "lg", value: 12 },
-              { name: "xl", value: 16 },
-              { name: "2xl", value: 20 },
-              { name: "full", value: 9999 },
-            ] as const).map((r) => (
-              <div key={r.name} className="flex flex-col gap-2.5 rounded-xl border border-[var(--border)] p-3 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface)]">
-                <div
-                  className="h-12 w-full border border-[var(--border-strong)] bg-[var(--surface-hover)]"
-                  style={{ borderRadius: Math.min(r.value, 24) }}
-                />
-                <div>
-                  <div className="text-[12px] font-medium text-[var(--text)]">{r.name}</div>
-                  <div className="font-mono text-[11px] text-[var(--text-faint)]">{r.value === 9999 ? "9999px" : `${r.value}px`}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SysBlock>
-      </main>
-
-      <ColorAssetModal
-        open={modal?.kind === "color"}
-        color={editingColor}
-        onClose={() => setModal(null)}
-        onSave={(color) => void upsertColor(color)}
-      />
-      <FontAssetModal
-        open={modal?.kind === "font"}
-        font={editingFont}
-        onClose={() => setModal(null)}
-        onSave={(font) => void upsertFont(font)}
-      />
-      <IconAssetModal
-        open={modal?.kind === "icon"}
-        icon={editingIcon}
-        onClose={() => setModal(null)}
-        onSave={(icon) => void upsertIcon(icon)}
-      />
-      <ImageAssetModal
-        open={modal?.kind === "image"}
-        image={editingImage}
-        onClose={() => setModal(null)}
-        onSave={(image) => void upsertImage(image)}
-      />
-    </>
-  );
-}
-
-function upsertById<T extends { id: string }>(items: T[], nextItem: T): T[] {
-  const existingIndex = items.findIndex((item) => item.id === nextItem.id);
-  if (existingIndex < 0) return [...items, nextItem];
-  const nextItems = [...items];
-  nextItems[existingIndex] = nextItem;
-  return nextItems;
-}
-
-function SysBlock({
-  title,
-  icon,
-  actionLabel,
-  children,
-  onAction,
-}: {
-  title: string;
-  icon?: ReactNode;
-  actionLabel: string;
-  children: ReactNode;
-  onAction: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3.5">
-      <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
-        <div className="flex items-center gap-2">
-          {icon ? <span className="text-[var(--text-faint)]">{icon}</span> : null}
-          <h2 className="m-0 text-[14px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
-            {title}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={onAction}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-        >
-          <IconPlus size={12} strokeWidth={2} />
-          {actionLabel}
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function ColorAssetModal({
-  open,
-  color,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  color?: ProjectDesignSystem["colors"][number];
-  onClose: () => void;
-  onSave: (color: ProjectDesignSystem["colors"][number]) => void;
-}) {
-  const [name, setName] = useState("");
-  const [value, setValue] = useState("#5EA2FF");
-
-  useEffect(() => {
-    if (!open) return;
-    setName(color?.name ?? "");
-    setValue(color?.value ?? "#5EA2FF");
-  }, [color, open]);
-
-  return (
-    <Modal open={open} onClose={onClose} ariaLabel="New color">
-      <ModalHeader title={color ? "Edit color" : "New color"} subtitle="Set a name and pick the color directly in the palette." onClose={onClose} />
-      <ModalBody>
-        <div className="grid gap-4">
-          <FieldLine label="Nome">
-            <input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" />
-          </FieldLine>
-          <FieldLine label="Cor">
-            <div className="flex items-center gap-3">
-              <input type="color" value={value} onChange={(event) => setValue(event.target.value)} className="h-12 w-20 cursor-pointer rounded-lg border border-[var(--border)] bg-transparent p-1" />
-              <input value={value} onChange={(event) => setValue(event.target.value)} className="h-11 flex-1 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] uppercase text-[var(--text)] outline-none focus:border-[var(--text)]" />
-            </div>
-          </FieldLine>
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
-            <button type="button" onClick={() => onSave({ id: color?.id ?? `color-${Date.now()}`, name: name.trim() || "Custom", value })} className="btn btn-primary">Salvar cor</button>
-          </div>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
-}
-
-function FontAssetModal({
-  open,
-  font,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  font?: ProjectDesignSystem["fonts"][number];
-  onClose: () => void;
-  onSave: (font: ProjectDesignSystem["fonts"][number]) => void;
-}) {
-  const [name, setName] = useState("");
-  const [family, setFamily] = useState("");
-  const [role, setRole] = useState("Body");
-
-  useEffect(() => {
-    if (!open) return;
-    setName(font?.name ?? "");
-    setFamily(font?.family ?? "");
-    setRole(font?.role ?? "Body");
-  }, [font, open]);
-
-  return (
-    <Modal open={open} onClose={onClose} ariaLabel="New font">
-      <ModalHeader title={font ? "Edit font" : "Add font"} subtitle="Register the typeface family and its role within the project." onClose={onClose} />
-      <ModalBody>
-        <div className="grid gap-4">
-          <FieldLine label="Nome"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
-          <FieldLine label="Family"><input value={family} onChange={(event) => setFamily(event.target.value)} placeholder="Ex.: Manrope, sans-serif" className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
-          <FieldLine label="Role">
-            <select value={role} onChange={(event) => setRole(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]">
-              <option>Body</option>
-              <option>Display</option>
-              <option>UI</option>
-              <option>Mono</option>
-            </select>
-          </FieldLine>
-          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-4 text-[28px] text-[var(--text)]" style={{ fontFamily: family || undefined }}>
-            Hierarchy matters
-          </div>
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
-            <button type="button" onClick={() => onSave({ id: font?.id ?? `font-${Date.now()}`, name: name.trim() || "Custom font", family: family.trim() || "inherit", role, preview: font?.preview ?? "Hierarchy matters" })} className="btn btn-primary">Save font</button>
-          </div>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
-}
-
-const SYSTEM_GLYPHS = ["grid", "search", "bell", "gear", "image", "spark"];
-
-function IconAssetModal({
-  open,
-  icon,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  icon?: ProjectDesignSystem["icons"][number];
-  onClose: () => void;
-  onSave: (icon: ProjectDesignSystem["icons"][number]) => void;
-}) {
-  const [name, setName] = useState("");
-  const [glyph, setGlyph] = useState("grid");
-
-  useEffect(() => {
-    if (!open) return;
-    setName(icon?.name ?? "");
-    setGlyph(icon?.glyph ?? "grid");
-  }, [icon, open]);
-
-  return (
-    <Modal open={open} onClose={onClose} ariaLabel="New icon">
-      <ModalHeader title={icon ? "Edit icon" : "Add icon"} subtitle="Choose a glyph and name the asset for the project design system." onClose={onClose} />
-      <ModalBody>
-        <div className="grid gap-4">
-          <FieldLine label="Name"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
-          <FieldLine label="Icon">
-            <div className="grid grid-cols-3 gap-3">
-              {SYSTEM_GLYPHS.map((entry) => (
-                <button
-                  key={entry}
-                  type="button"
-                  onClick={() => setGlyph(entry)}
-                  className={[
-                    "grid aspect-square cursor-pointer place-items-center rounded-[12px] border bg-[var(--bg)] transition-colors",
-                    glyph === entry ? "border-[var(--text)] text-[var(--text)]" : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]",
-                  ].join(" ")}
-                >
-                  <SystemGlyph glyph={entry} />
-                </button>
-              ))}
-            </div>
-          </FieldLine>
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
-            <button type="button" onClick={() => onSave({ id: icon?.id ?? `icon-${Date.now()}`, name: name.trim() || "Custom icon", glyph, family: icon?.family ?? "system" })} className="btn btn-primary">Save icon</button>
-          </div>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
-}
-
-function ImageAssetModal({
-  open,
-  image,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  image?: ProjectDesignSystem["images"][number];
-  onClose: () => void;
-  onSave: (image: ProjectDesignSystem["images"][number]) => void;
-}) {
-  const [name, setName] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
-  const [format, setFormat] = useState("PNG");
-
-  useEffect(() => {
-    if (!open) return;
-    setName(image?.name ?? "");
-    setPreviewUrl(image?.previewUrl ?? "");
-    setFormat(image?.format ?? "PNG");
-  }, [image, open]);
-
-  return (
-    <Modal open={open} onClose={onClose} ariaLabel="New image">
-      <ModalHeader title={image ? "Edit image" : "Add image"} subtitle="Upload an image to add to the project design system." onClose={onClose} />
-      <ModalBody>
-        <div className="grid gap-4">
-          <FieldLine label="Nome"><input value={name} onChange={(event) => setName(event.target.value)} className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3 text-[13px] text-[var(--text)] outline-none focus:border-[var(--text)]" /></FieldLine>
-          <label className="grid min-h-[220px] cursor-pointer place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--bg)] p-4 text-center transition-colors hover:border-[var(--text)]">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                void (async () => {
-                  setPreviewUrl(await readFileAsDataUrl(file));
-                  setFormat(fileFormatLabel(file.name));
-                  if (!name.trim()) setName(file.name.replace(/\.[^.]+$/, ""));
-                })();
-              }}
-            />
-            {previewUrl ? (
-              <img src={previewUrl} alt="" className="max-h-[220px] rounded-[10px] object-contain" />
-            ) : (
-              <div className="max-w-[240px] text-[12px] leading-[1.6] text-[var(--text-muted)]">
-                Click to select an image from your disk.
-              </div>
-            )}
-          </label>
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
-            <button type="button" onClick={() => onSave({ id: image?.id ?? `image-${Date.now()}`, name: name.trim() || "Asset", previewUrl, format })} disabled={!previewUrl} className="btn btn-primary">Save image</button>
-          </div>
-        </div>
-      </ModalBody>
-    </Modal>
-  );
-}
-
-function FieldLine({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-2">
-      <span className="text-[12px] uppercase tracking-[0.4px] text-[var(--text-faint)]">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function SystemGlyph({ glyph }: { glyph: string }) {
-  if (glyph === "search") {
-    return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>;
-  }
-  if (glyph === "bell") {
-    return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" /><path d="M10 21a2 2 0 0 0 4 0" /></svg>;
-  }
-  if (glyph === "gear") {
-    return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 3.5 14 5l2.4-.4.9 2.3 2 1.1-.5 2.4 1.2 2.1-1.8 1.6-.3 2.4-2.4.5-1.7 1.8-2.1-1.2-2.1 1.2-1.7-1.8-2.4-.5-.3-2.4-1.8-1.6 1.2-2.1-.5-2.4 2-1.1.9-2.3L10 5l2-1.5Z" /><circle cx="12" cy="12" r="3" /></svg>;
-  }
-  if (glyph === "image") {
-    return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></svg>;
-  }
-  if (glyph === "spark") {
-    return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="m12 3 1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2L12 3Z" /><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" /></svg>;
-  }
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="7" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /><rect x="13" y="13" width="7" height="7" rx="1" /></svg>;
-}
+export { SystemTab };

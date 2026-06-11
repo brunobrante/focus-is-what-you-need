@@ -1,143 +1,178 @@
+import {
+  createDefaultSystemDesignTokens,
+  emptyExcludedShared,
+  emptySystemDesignTokens,
+} from "@/domain/system-design/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import type {
-  SystemDesignIcon,
-  SystemDesignLibrary,
+  SystemDesignExclusions,
   SystemDesignOwnerScope,
   SystemDesignRow,
 } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
+import {
+  TABLES,
+  getRecordById,
+  listTable,
+  putRecord,
+  removeRecords,
+} from "@/lib/storage/store";
 
 const KEY = TABLES.systemDesigns;
 
-export async function listSystemDesigns(): Promise<SystemDesignRow[]> {
-  return listTable<SystemDesignRow>(KEY);
+/**
+ * Upgrade any persisted row to the current shape.
+ * - Current rows (have `tokens` + `excludedShared`) pass through, backfilled.
+ * - Interim rows (the short-lived per-category `inherit` model) keep workspace
+ *   tokens but drop project-local tokens, which were seed copies that would
+ *   otherwise duplicate the inherited ones.
+ * - Legacy rows (schema ≤ 15, no tokens) reset to a fresh default design while
+ *   keeping their identity and ownership.
+ */
+export function normalizeSystemDesignRow(raw: SystemDesignRow): SystemDesignRow {
+  const candidate = raw as Partial<SystemDesignRow> & { excludedShared?: unknown };
+  const ownerScope = candidate.ownerScope ?? "workspace";
+
+  if (candidate.tokens && candidate.excludedShared) {
+    return {
+      ...(raw as SystemDesignRow),
+      inheritsFromId: candidate.inheritsFromId ?? null,
+      excludedShared: { ...emptyExcludedShared(), ...candidate.excludedShared },
+      tokens: { ...emptySystemDesignTokens(), ...candidate.tokens },
+    };
+  }
+
+  if (candidate.tokens) {
+    // Interim shape: keep workspace tokens, discard project seed copies.
+    return {
+      id: raw.id,
+      name: candidate.name || "Design system",
+      ownerScope,
+      ownerId: candidate.ownerId ?? "",
+      inheritsFromId: candidate.inheritsFromId ?? null,
+      excludedShared: emptyExcludedShared(),
+      tokens:
+        ownerScope === "project"
+          ? emptySystemDesignTokens()
+          : { ...emptySystemDesignTokens(), ...candidate.tokens },
+      createdAt: candidate.createdAt ?? now(),
+      updatedAt: candidate.updatedAt ?? now(),
+    };
+  }
+
+  const t = candidate.createdAt ?? now();
+  return {
+    id: raw.id,
+    name: candidate.name || "Design system",
+    ownerScope,
+    ownerId: candidate.ownerId ?? "",
+    inheritsFromId: null,
+    excludedShared: emptyExcludedShared(),
+    tokens: createDefaultSystemDesignTokens(),
+    createdAt: t,
+    updatedAt: candidate.updatedAt ?? t,
+  };
 }
 
-export async function listSystemDesignsByOwner(
+export async function listSystemDesigns(): Promise<SystemDesignRow[]> {
+  const rows = await listTable<SystemDesignRow>(KEY);
+  return rows.map(normalizeSystemDesignRow);
+}
+
+/** The single design owned by a workspace or project, or null if none yet. */
+export async function getSystemDesignByOwner(
   ownerScope: SystemDesignOwnerScope,
   ownerId: string,
-): Promise<SystemDesignRow[]> {
+): Promise<SystemDesignRow | null> {
   const rows = await listSystemDesigns();
-  return rows
+  const owned = rows
     .filter((row) => row.ownerScope === ownerScope && row.ownerId === ownerId)
     .sort((a, b) => a.createdAt - b.createdAt);
+  return owned[0] ?? null;
 }
 
-export async function getSystemDesign(id: string): Promise<SystemDesignRow | null> {
-  const rows = await listSystemDesigns();
-  return rows.find((row) => row.id === id) ?? null;
-}
-
-export async function createSystemDesign(input: {
-  name: string;
+/**
+ * Return the owner's design, creating it lazily on first access.
+ *
+ * A workspace design starts with the seed tokens. A project design inside a
+ * workspace starts empty (it shows the workspace tokens via inheritance), with
+ * `initialExcludedShared` deciding which workspace tokens are hidden up front. A
+ * project with no workspace gets its own seed tokens.
+ *
+ * Extra rows for the same owner (the old model allowed many) are pruned so each
+ * owner ends up with exactly one design.
+ */
+export async function getOrCreateSystemDesignByOwner(input: {
   ownerScope: SystemDesignOwnerScope;
   ownerId: string;
-  shared?: boolean;
+  name?: string;
+  inheritsFromId?: string | null;
+  initialExcludedShared?: SystemDesignExclusions;
 }): Promise<SystemDesignRow> {
   const rows = await listSystemDesigns();
+  const owned = rows
+    .filter((row) => row.ownerScope === input.ownerScope && row.ownerId === input.ownerId)
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  if (owned.length > 0) {
+    const [primary, ...extras] = owned;
+    if (extras.length > 0) {
+      removeRecords(KEY, extras.map((row) => row.id));
+    }
+    // Keep the parent link fresh for project designs (the project may have
+    // joined or left a workspace since the design was created).
+    if (
+      input.ownerScope === "project" &&
+      input.inheritsFromId !== undefined &&
+      primary!.inheritsFromId !== input.inheritsFromId
+    ) {
+      const next: SystemDesignRow = {
+        ...primary!,
+        inheritsFromId: input.inheritsFromId ?? null,
+        updatedAt: now(),
+      };
+      putRecord(KEY, next);
+      return next;
+    }
+    return primary!;
+  }
+
+  const hasParent =
+    input.ownerScope === "project" && Boolean(input.inheritsFromId);
   const t = now();
   const created: SystemDesignRow = {
     id: newId(),
-    name: input.name.trim() || "Untitled system",
+    name:
+      input.name ??
+      (input.ownerScope === "workspace" ? "Workspace system" : "Project system"),
     ownerScope: input.ownerScope,
     ownerId: input.ownerId,
-    shared: input.shared ?? false,
-    libraries: [],
-    icons: [],
+    inheritsFromId:
+      input.ownerScope === "project" ? input.inheritsFromId ?? null : null,
+    excludedShared: input.initialExcludedShared ?? emptyExcludedShared(),
+    // A project with a workspace shows the inherited tokens, so it owns none
+    // initially; everything else starts from the seed set.
+    tokens: hasParent
+      ? emptySystemDesignTokens()
+      : createDefaultSystemDesignTokens(),
     createdAt: t,
     updatedAt: t,
   };
-  await replaceTable<SystemDesignRow>(KEY, [...rows, created]);
-  notify(KEY);
+  putRecord(KEY, created);
   return created;
 }
 
-async function patchSystemDesign(
-  id: string,
-  patch: (current: SystemDesignRow) => SystemDesignRow,
-): Promise<SystemDesignRow | null> {
-  const rows = await listSystemDesigns();
-  const idx = rows.findIndex((row) => row.id === id);
-  if (idx < 0) return null;
-  const next = { ...patch(rows[idx]!), updatedAt: now() };
-  const nextRows = [...rows];
-  nextRows[idx] = next;
-  await replaceTable<SystemDesignRow>(KEY, nextRows);
-  notify(KEY);
+/** Persist a whole design row (fire-and-forget, optimistic). */
+export function saveSystemDesign(row: SystemDesignRow): SystemDesignRow {
+  const next: SystemDesignRow = { ...row, updatedAt: now() };
+  putRecord(KEY, next);
   return next;
 }
 
-export async function renameSystemDesign(
-  id: string,
-  name: string,
-): Promise<SystemDesignRow | null> {
-  const trimmed = name.trim();
-  if (!trimmed) return getSystemDesign(id);
-  return patchSystemDesign(id, (current) => ({ ...current, name: trimmed }));
+export async function getSystemDesign(id: string): Promise<SystemDesignRow | null> {
+  const raw = await getRecordById<SystemDesignRow>(KEY, id);
+  return raw ? normalizeSystemDesignRow(raw) : null;
 }
 
-export async function setSystemDesignShared(
-  id: string,
-  shared: boolean,
-): Promise<SystemDesignRow | null> {
-  return patchSystemDesign(id, (current) => ({ ...current, shared }));
-}
-
-export async function deleteSystemDesign(id: string): Promise<void> {
-  const rows = await listSystemDesigns();
-  const nextRows = rows.filter((row) => row.id !== id);
-  if (nextRows.length === rows.length) return;
-  await replaceTable<SystemDesignRow>(KEY, nextRows);
-  notify(KEY);
-}
-
-export async function addSystemDesignLibrary(
-  id: string,
-  name: string,
-): Promise<SystemDesignRow | null> {
-  const trimmed = name.trim();
-  if (!trimmed) return getSystemDesign(id);
-  const library: SystemDesignLibrary = { id: newId(), name: trimmed };
-  return patchSystemDesign(id, (current) => ({
-    ...current,
-    libraries: [...current.libraries, library],
-  }));
-}
-
-export async function removeSystemDesignLibrary(
-  id: string,
-  libraryId: string,
-): Promise<SystemDesignRow | null> {
-  return patchSystemDesign(id, (current) => ({
-    ...current,
-    libraries: current.libraries.filter((library) => library.id !== libraryId),
-  }));
-}
-
-export async function addSystemDesignIcon(
-  id: string,
-  name: string,
-): Promise<SystemDesignRow | null> {
-  const trimmed = name.trim();
-  if (!trimmed) return getSystemDesign(id);
-  const icon: SystemDesignIcon = { id: newId(), name: trimmed };
-  return patchSystemDesign(id, (current) => ({
-    ...current,
-    icons: [...current.icons, icon],
-  }));
-}
-
-export async function removeSystemDesignIcon(
-  id: string,
-  iconId: string,
-): Promise<SystemDesignRow | null> {
-  return patchSystemDesign(id, (current) => ({
-    ...current,
-    icons: current.icons.filter((icon) => icon.id !== iconId),
-  }));
-}
-
-export async function bulkInsertSystemDesigns(rows: SystemDesignRow[]): Promise<void> {
-  await replaceTable<SystemDesignRow>(KEY, rows);
-  notify(KEY);
+export function deleteSystemDesign(id: string): void {
+  removeRecords(KEY, [id]);
 }

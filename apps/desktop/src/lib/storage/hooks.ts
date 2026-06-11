@@ -14,7 +14,6 @@ import {
 } from "@/lib/storage/repos/components.repo";
 import { findProjectByName, getProject, listProjects } from "@/lib/storage/repos/projects.repo";
 import { getWorkspace, listWorkspaces } from "@/lib/storage/repos/workspace.repo";
-import { listSystemDesignsByOwner } from "@/lib/storage/repos/systemDesigns.repo";
 import {
   listReferencesByOwner,
   listReferencesByProject,
@@ -36,8 +35,6 @@ import type {
   SceneOwnerType,
   SceneRow,
   ScreenRow,
-  SystemDesignOwnerScope,
-  SystemDesignRow,
   ThumbnailRow,
   VariantRow,
   WorkspaceRow,
@@ -151,19 +148,6 @@ export function useWorkspace(
     async () => (id ? getWorkspace(id) : null),
     null,
     [id ?? ""],
-  );
-}
-
-export function useSystemDesigns(
-  ownerScope: SystemDesignOwnerScope | null | undefined,
-  ownerId: string | null | undefined,
-): State<SystemDesignRow[]> {
-  return useTableQuery<SystemDesignRow[]>(
-    [TABLES.systemDesigns],
-    async () =>
-      ownerScope && ownerId ? listSystemDesignsByOwner(ownerScope, ownerId) : [],
-    [],
-    [ownerScope ?? "", ownerId ?? ""],
   );
 }
 

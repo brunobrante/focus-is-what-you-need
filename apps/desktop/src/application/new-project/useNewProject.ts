@@ -1,16 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ProjectType } from "@/lib/data/types";
 import { createProject } from "@/lib/storage/repos/projects.repo";
-import { addProjectToWorkspace, getDefaultWorkspace } from "@/lib/storage/repos/workspace.repo";
-import { getActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
+import {
+  addProjectToWorkspace,
+  getDefaultWorkspace,
+} from "@/lib/storage/repos/workspace.repo";
+import { getOrCreateSystemDesignByOwner } from "@/lib/storage/repos/systemDesigns.repo";
+import {
+  getActiveWorkspaceId,
+  useActiveWorkspaceId,
+} from "@/lib/storage/activeWorkspace";
+import { useWorkspaces } from "@/lib/storage/hooks";
+import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { setShareWithProjectsByDefault } from "@/lib/storage/repos/settings.repo";
+import { SYSTEM_DESIGN_CATEGORIES } from "@/domain/system-design/defaults";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
+import type {
+  SystemDesignCategory,
+  SystemDesignExclusions,
+  SystemDesignRow,
+  SystemDesignTokens,
+} from "@/lib/storage/schema";
 
-const TOTAL_STEPS = 3;
+export type NewProjectStepId = "type" | "name" | "share" | "advanced";
+
+function allTokenIds(tokens: SystemDesignTokens): string[] {
+  return SYSTEM_DESIGN_CATEGORIES.flatMap((category) =>
+    (tokens[category] as { id: string }[]).map((t) => t.id),
+  );
+}
 
 export interface NewProjectState {
-  step: 1 | 2 | 3;
-  setStep: (step: 1 | 2 | 3) => void;
+  stepId: NewProjectStepId;
+  stepIndex: number;
+  totalSteps: number;
   type: ProjectType | null;
   setType: (type: ProjectType) => void;
   name: string;
@@ -21,14 +45,24 @@ export interface NewProjectState {
   nameRef: React.RefObject<HTMLInputElement | null>;
   canNext: boolean;
   footerHint: string;
-  totalSteps: typeof TOTAL_STEPS;
   next: () => Promise<void>;
   back: () => void;
   finalizeProject: (thumbnail: string | null) => Promise<void>;
+
+  // Sharing step
+  shareStepAvailable: boolean;
+  workspaceName: string | null;
+  workspaceTokens: SystemDesignTokens | null;
+  sharedIds: Set<string>;
+  toggleShareToken: (id: string) => void;
+  setCategoryShared: (category: SystemDesignCategory, shared: boolean) => void;
+  setAllShared: (shared: boolean) => void;
+  shareByDefault: boolean;
+  setShareByDefault: (value: boolean) => void;
 }
 
 export function useNewProject(): NewProjectState {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [stepId, setStepId] = useState<NewProjectStepId>("type");
   const [type, setType] = useState<ProjectType | null>(null);
   const [name, setName] = useState("");
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
@@ -36,12 +70,98 @@ export function useNewProject(): NewProjectState {
   const navigate = useNavigate();
   const nameRef = useRef<HTMLInputElement>(null);
 
+  const [activeWsId] = useActiveWorkspaceId();
+  const { data: workspaces } = useWorkspaces();
+  const { loading: settingsLoading, settings } = useGlobalSettings();
+  const shareByDefault = settings.systemDesign.shareWithProjectsByDefault;
+
+  const [workspace, setWorkspace] = useState<{
+    id: string;
+    design: SystemDesignRow;
+  } | null>(null);
+  const [sharedIds, setSharedIds] = useState<Set<string>>(new Set());
+  const initializedRef = useRef(false);
+
+  // Load the workspace this project will land in, plus its design tokens.
   useEffect(() => {
-    if (step === 2) {
+    let cancelled = false;
+    void (async () => {
+      const fallback = await getDefaultWorkspace();
+      const wsId = activeWsId ?? fallback?.id ?? null;
+      if (!wsId) {
+        if (!cancelled) setWorkspace(null);
+        return;
+      }
+      const design = await getOrCreateSystemDesignByOwner({
+        ownerScope: "workspace",
+        ownerId: wsId,
+      });
+      if (!cancelled) setWorkspace({ id: wsId, design });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWsId]);
+
+  // Seed the per-token selection once the design and the setting are known.
+  useEffect(() => {
+    if (!workspace || settingsLoading || initializedRef.current) return;
+    initializedRef.current = true;
+    const ids = allTokenIds(workspace.design.tokens);
+    setSharedIds(shareByDefault ? new Set(ids) : new Set());
+  }, [workspace, settingsLoading, shareByDefault]);
+
+  const workspaceTokens = workspace?.design.tokens ?? null;
+  const shareStepAvailable = Boolean(
+    workspaceTokens && allTokenIds(workspaceTokens).length > 0,
+  );
+
+  const steps = useMemo<NewProjectStepId[]>(
+    () => ["type", "name", ...(shareStepAvailable ? (["share"] as const) : []), "advanced"],
+    [shareStepAvailable],
+  );
+  const stepIndex = Math.max(0, steps.indexOf(stepId)) + 1;
+  const totalSteps = steps.length;
+
+  useEffect(() => {
+    if (stepId === "share" && !shareStepAvailable) setStepId("name");
+  }, [stepId, shareStepAvailable]);
+
+  useEffect(() => {
+    if (stepId === "name") {
       const t = setTimeout(() => nameRef.current?.focus(), 280);
       return () => clearTimeout(t);
     }
-  }, [step]);
+  }, [stepId]);
+
+  const toggleShareToken = (id: string) =>
+    setSharedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const setCategoryShared = (category: SystemDesignCategory, shared: boolean) =>
+    setSharedIds((prev) => {
+      if (!workspaceTokens) return prev;
+      const next = new Set(prev);
+      for (const token of workspaceTokens[category] as { id: string }[]) {
+        if (shared) next.add(token.id);
+        else next.delete(token.id);
+      }
+      return next;
+    });
+
+  const setAllShared = (shared: boolean) =>
+    setSharedIds(
+      shared && workspaceTokens ? new Set(allTokenIds(workspaceTokens)) : new Set(),
+    );
+
+  const setShareByDefault = (value: boolean) => {
+    void setShareWithProjectsByDefault(value);
+    setAllShared(value);
+  };
 
   const finalizeProject = async (thumbnail: string | null) => {
     if (!name.trim() || !type || creating) return;
@@ -52,12 +172,28 @@ export function useNewProject(): NewProjectState {
         type,
         thumbnailDataUrl: thumbnail,
       });
-      // New projects belong to the workspace they were created in (falling back
-      // to the default workspace), so they show up under the right workspace.
       const workspaceId =
         getActiveWorkspaceId() ?? (await getDefaultWorkspace())?.id ?? null;
       if (workspaceId) {
         await addProjectToWorkspace(workspaceId, project.id);
+        // Eagerly create the project's design with the chosen sharing so the
+        // selection is applied before the System tab lazily creates one.
+        const parent = await getOrCreateSystemDesignByOwner({
+          ownerScope: "workspace",
+          ownerId: workspaceId,
+        });
+        const excludedShared = {} as SystemDesignExclusions;
+        for (const category of SYSTEM_DESIGN_CATEGORIES) {
+          excludedShared[category] = (parent.tokens[category] as { id: string }[])
+            .filter((token) => !sharedIds.has(token.id))
+            .map((token) => token.id);
+        }
+        await getOrCreateSystemDesignByOwner({
+          ownerScope: "project",
+          ownerId: project.id,
+          inheritsFromId: parent.id,
+          initialExcludedShared: excludedShared,
+        });
       }
       navigate(`/project/${encodeURIComponent(project.id)}`);
     } finally {
@@ -65,42 +201,54 @@ export function useNewProject(): NewProjectState {
     }
   };
 
+  const goTo = (target: NewProjectStepId) => setStepId(target);
+  const stepAt = (offset: number): NewProjectStepId | null => {
+    const idx = steps.indexOf(stepId);
+    return steps[idx + offset] ?? null;
+  };
+
   const next = async () => {
-    if (step === 1 && type) {
-      setStep(2);
-      return;
-    }
-    if (step === 2 && name.trim()) {
-      setStep(3);
-      return;
-    }
-    if (step === 3) {
+    if (stepId === "type" && !type) return;
+    if (stepId === "name" && !name.trim()) return;
+    if (stepId === "advanced") {
       await finalizeProject(thumbnailDataUrl);
+      return;
     }
+    const target = stepAt(1);
+    if (target) goTo(target);
   };
 
   const back = () => {
-    if (step === 2) setStep(1);
-    if (step === 3) setStep(2);
+    const target = stepAt(-1);
+    if (target) goTo(target);
   };
 
-  const canNext = (step === 1 ? !!type : step === 2 ? !!name.trim() : true) && !creating;
+  const canNext =
+    (stepId === "type"
+      ? !!type
+      : stepId === "name"
+        ? !!name.trim()
+        : true) && !creating;
+
   const footerHint =
-    step === 1
+    stepId === "type"
       ? type
         ? `formato: ${PROJECT_TYPE_LABEL[type]}`
         : "select a format"
-      : step === 2
+      : stepId === "name"
         ? name.trim()
           ? "configure final details"
           : "informe um nome"
-        : thumbnailDataUrl
-          ? "thumbnail pronta"
-          : "you can skip this step";
+        : stepId === "share"
+          ? "choose what to share"
+          : thumbnailDataUrl
+            ? "thumbnail pronta"
+            : "you can skip this step";
 
   return {
-    step,
-    setStep,
+    stepId,
+    stepIndex,
+    totalSteps,
     type,
     setType,
     name,
@@ -111,9 +259,18 @@ export function useNewProject(): NewProjectState {
     nameRef,
     canNext,
     footerHint,
-    totalSteps: TOTAL_STEPS,
     next,
     back,
     finalizeProject,
+    shareStepAvailable,
+    workspaceName:
+      workspaces.find((w) => w.id === workspace?.id)?.name ?? null,
+    workspaceTokens,
+    sharedIds,
+    toggleShareToken,
+    setCategoryShared,
+    setAllShared,
+    shareByDefault,
+    setShareByDefault,
   };
 }

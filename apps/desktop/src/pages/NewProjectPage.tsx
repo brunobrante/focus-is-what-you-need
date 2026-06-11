@@ -7,10 +7,24 @@ import {
 import type { ProjectType } from "@/lib/data/types";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { useNewProject } from "@/application/new-project/useNewProject";
+import { SYSTEM_DESIGN_CATEGORIES, CATEGORY_LABEL } from "@/domain/system-design/defaults";
+import type {
+  ColorToken,
+  GradientToken,
+  IconToken,
+  ImageToken,
+  RadiusToken,
+  SpacingToken,
+  SystemDesignCategory,
+  SystemDesignTokens,
+  TypeStyleToken,
+} from "@/lib/storage/schema";
 
 export function NewProjectPage() {
   const {
-    step,
+    stepId,
+    stepIndex,
+    totalSteps,
     setType,
     type,
     name,
@@ -21,10 +35,17 @@ export function NewProjectPage() {
     nameRef,
     canNext,
     footerHint,
-    totalSteps,
     next,
     back,
     finalizeProject,
+    workspaceName,
+    workspaceTokens,
+    sharedIds,
+    toggleShareToken,
+    setCategoryShared,
+    setAllShared,
+    shareByDefault,
+    setShareByDefault,
   } = useNewProject();
 
   return (
@@ -35,7 +56,7 @@ export function NewProjectPage() {
             <span className="font-medium text-[var(--text)]">New project</span>
             <span>
               {" "}
-              · step {step} of {totalSteps}
+              · step {stepIndex} of {totalSteps}
             </span>
           </div>
           <Link
@@ -49,14 +70,14 @@ export function NewProjectPage() {
         <div className="h-[3px] overflow-hidden rounded-[2px] bg-[#1A1A1A]">
           <div
             className="h-full rounded-[2px] bg-[var(--text)] transition-[width] duration-[320ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)]"
-            style={{ width: `${(step / totalSteps) * 100}%` }}
+            style={{ width: `${(stepIndex / totalSteps) * 100}%` }}
           />
         </div>
       </header>
 
       <main className="grid flex-1 place-items-center px-6 pb-12 pt-8">
-        {step === 1 && <StepType type={type} onSelect={setType} />}
-        {step === 2 && type && (
+        {stepId === "type" && <StepType type={type} onSelect={setType} />}
+        {stepId === "name" && type && (
           <StepName
             name={name}
             onChange={setName}
@@ -65,7 +86,19 @@ export function NewProjectPage() {
             onEnter={() => canNext && void next()}
           />
         )}
-        {step === 3 && (
+        {stepId === "share" && workspaceTokens && (
+          <StepShare
+            workspaceName={workspaceName}
+            tokens={workspaceTokens}
+            sharedIds={sharedIds}
+            onToggleToken={toggleShareToken}
+            onSetCategory={setCategoryShared}
+            onSetAll={setAllShared}
+            shareByDefault={shareByDefault}
+            onSetShareByDefault={setShareByDefault}
+          />
+        )}
+        {stepId === "advanced" && (
           <StepAdvanced
             thumbnailDataUrl={thumbnailDataUrl}
             onThumbnailChange={setThumbnailDataUrl}
@@ -75,14 +108,14 @@ export function NewProjectPage() {
 
       <footer className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-6 py-3.5">
         <div className="text-[12px] tracking-[0.2px] text-[var(--text-faint)]">
-          <span>Etapa {step}</span> · <span>{footerHint}</span>
+          <span>Etapa {stepIndex}</span> · <span>{footerHint}</span>
         </div>
         <div className="flex gap-2">
-          <button type="button" className="btn btn-ghost" onClick={back} disabled={step === 1}>
+          <button type="button" className="btn btn-ghost" onClick={back} disabled={stepIndex === 1}>
             <IconChevronLeft size={14} strokeWidth={1.8} />
             Voltar
           </button>
-          {step === 3 ? (
+          {stepId === "advanced" ? (
             <button
               type="button"
               className="btn btn-ghost"
@@ -93,7 +126,7 @@ export function NewProjectPage() {
             </button>
           ) : null}
           <button type="button" className="btn btn-primary" onClick={() => void next()} disabled={!canNext}>
-            <span>{creating ? "Creating…" : step === totalSteps ? "Create project" : "Next"}</span>
+            <span>{creating ? "Creating…" : stepId === "advanced" ? "Create project" : "Next"}</span>
             <IconChevronRight size={14} strokeWidth={1.8} />
           </button>
         </div>
@@ -133,6 +166,145 @@ function StepType({
         ))}
       </div>
     </section>
+  );
+}
+
+// ─── Share step ─────────────────────────────────────────────────────────────
+
+function StepShare({
+  workspaceName,
+  tokens,
+  sharedIds,
+  onToggleToken,
+  onSetCategory,
+  onSetAll,
+  shareByDefault,
+  onSetShareByDefault,
+}: {
+  workspaceName: string | null;
+  tokens: SystemDesignTokens;
+  sharedIds: Set<string>;
+  onToggleToken: (id: string) => void;
+  onSetCategory: (category: SystemDesignCategory, shared: boolean) => void;
+  onSetAll: (shared: boolean) => void;
+  shareByDefault: boolean;
+  onSetShareByDefault: (value: boolean) => void;
+}) {
+  const categories = SYSTEM_DESIGN_CATEGORIES.filter(
+    (category) => (tokens[category] as { id: string }[]).length > 0,
+  );
+
+  return (
+    <section className="flex w-full max-w-[760px] flex-col">
+      <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Share design tokens</h1>
+      <p className="m-0 mb-5 text-[14px] leading-[1.5] text-[var(--text-muted)]">
+        Pick which of {workspaceName ? <b className="font-medium text-[var(--text)]">{workspaceName}</b> : "the workspace"}'s
+        tokens this project starts with. You can change this anytime in the project's System tab.
+      </p>
+
+      <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[13px] text-[var(--text)]">
+        <input
+          type="checkbox"
+          checked={shareByDefault}
+          onChange={(e) => onSetShareByDefault(e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-[var(--text)]"
+        />
+        <span>
+          Share workspace tokens with new projects by default
+          <span className="ml-2 text-[12px] text-[var(--text-faint)]">global setting</span>
+        </span>
+      </label>
+
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[12px] text-[var(--text-faint)]">
+          {sharedIds.size} token{sharedIds.size === 1 ? "" : "s"} shared
+        </span>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => onSetAll(true)} className="rounded-md border border-[var(--border)] px-2.5 py-1 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]">
+            Select all
+          </button>
+          <button type="button" onClick={() => onSetAll(false)} className="rounded-md border border-[var(--border)] px-2.5 py-1 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]">
+            Clear all
+          </button>
+        </div>
+      </div>
+
+      <div className="flex max-h-[44vh] flex-col gap-4 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+        {categories.map((category) => {
+          const list = tokens[category] as { id: string }[];
+          const allOn = list.every((t) => sharedIds.has(t.id));
+          return (
+            <div key={category}>
+              <label className="mb-1.5 flex cursor-pointer items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">
+                <input
+                  type="checkbox"
+                  checked={allOn}
+                  onChange={(e) => onSetCategory(category, e.target.checked)}
+                  className="h-3.5 w-3.5 cursor-pointer accent-[var(--text)]"
+                />
+                {CATEGORY_LABEL[category]}
+              </label>
+              <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+                {list.map((token) => (
+                  <label
+                    key={token.id}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--surface-hover)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sharedIds.has(token.id)}
+                      onChange={() => onToggleToken(token.id)}
+                      className="h-3.5 w-3.5 cursor-pointer accent-[var(--text)]"
+                    />
+                    <ShareTokenVisual category={category} token={token} />
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ShareTokenVisual({ category, token }: { category: SystemDesignCategory; token: { id: string } }) {
+  let swatch: React.ReactNode = null;
+  let label = "";
+  if (category === "colors") {
+    const c = token as ColorToken;
+    swatch = <span className="h-5 w-5 shrink-0 rounded border border-white/10" style={{ background: c.value }} />;
+    label = c.name;
+  } else if (category === "gradients") {
+    const g = token as GradientToken;
+    swatch = <span className="h-5 w-5 shrink-0 rounded border border-white/10" style={{ background: `linear-gradient(${g.angle}deg, ${g.from}, ${g.to})` }} />;
+    label = g.name;
+  } else if (category === "typography") {
+    const t = token as TypeStyleToken;
+    swatch = <span className="grid h-5 w-5 shrink-0 place-items-center rounded border border-[var(--border)] text-[11px]" style={{ fontFamily: t.family, fontWeight: t.weight }}>Aa</span>;
+    label = t.name;
+  } else if (category === "icons") {
+    const ic = token as IconToken;
+    swatch = <span className="grid h-5 w-5 shrink-0 place-items-center text-[15px]">{ic.glyph}</span>;
+    label = ic.name;
+  } else if (category === "spacing") {
+    const s = token as SpacingToken;
+    swatch = <span className="grid h-5 w-5 shrink-0 place-items-center"><span className="rounded-[1px] bg-[var(--text-muted)]" style={{ width: Math.min(s.value, 16), height: 5 }} /></span>;
+    label = `${s.name} · ${s.value}px`;
+  } else if (category === "radius") {
+    const r = token as RadiusToken;
+    swatch = <span className="h-5 w-5 shrink-0 border border-[var(--border-strong)] bg-[var(--surface-hover)]" style={{ borderRadius: Math.min(r.value, 10) }} />;
+    label = r.name;
+  } else {
+    const img = token as ImageToken;
+    swatch = <img src={img.previewUrl} alt="" className="h-5 w-5 shrink-0 rounded border border-[var(--border)] object-cover" />;
+    label = img.name;
+  }
+  return (
+    <>
+      {swatch}
+      <span className="truncate text-[12.5px] text-[var(--text)]">{label}</span>
+    </>
   );
 }
 
