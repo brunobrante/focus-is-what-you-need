@@ -182,13 +182,14 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   systemDesign: {
     shareWithProjectsByDefault: true,
   },
-  processingFeatures: {
-    birefnet: { installed: false },
-    realEsrgan: { installed: false },
-    florence2: { installed: false },
-    craft: { installed: false },
-    dbnet: { installed: false },
-    lama: { installed: false },
+  processing: {
+    installedModelIds: [],
+    features: {
+      removeBackground: { enabled: false, activeModelId: null },
+      upscale: { enabled: false, activeModelId: null },
+      autoDetect: { enabled: false, activeModelId: null },
+      textDetection: { enabled: false, activeModelId: null },
+      removeElement: { enabled: false, activeModelId: null },
+    },
   },
-  textDetectionModel: "dbnet",
 };

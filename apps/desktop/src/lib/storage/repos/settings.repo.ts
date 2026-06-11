@@ -2,8 +2,8 @@ import { resolveGlobalSettings } from "@/domain/settings/resolve";
 import type {
   DeepPartial,
   GlobalSettings,
+  ProcessingFeatureKey,
   SettingsRow,
-  TextDetectionModelId,
 } from "@/domain/settings/types";
 import { SETTINGS_SCHEMA_VERSION } from "@/domain/settings/defaults";
 import { now } from "@/lib/storage/ids";
@@ -54,26 +54,52 @@ export async function setShareWithProjectsByDefault(
   }));
 }
 
-/** Choose which text detector (DBNet or CRAFT) the Builder runs. */
-export async function setTextDetectionModel(
-  textDetectionModel: TextDetectionModelId,
-): Promise<GlobalSettings> {
-  return updateGlobalSettings((settings) => ({
-    ...settings,
-    textDetectionModel,
-  }));
-}
-
-/** Flip the installed flag for a processing feature after install/uninstall. */
-export async function setProcessingFeatureInstalled(
-  feature: keyof GlobalSettings["processingFeatures"],
+/** Record (or clear) a catalog model id as downloaded to disk. */
+export async function setModelInstalled(
+  modelId: string,
   installed: boolean,
 ): Promise<GlobalSettings> {
+  return updateGlobalSettings((settings) => {
+    const ids = new Set(settings.processing.installedModelIds);
+    if (installed) ids.add(modelId);
+    else ids.delete(modelId);
+    return {
+      ...settings,
+      processing: { ...settings.processing, installedModelIds: [...ids] },
+    };
+  });
+}
+
+/** Enable or disable a processing feature (only meaningful once installed). */
+export async function setFeatureEnabled(
+  feature: ProcessingFeatureKey,
+  enabled: boolean,
+): Promise<GlobalSettings> {
+  return updateFeature(feature, (f) => ({ ...f, enabled }));
+}
+
+/** Choose which installed model a feature runs. */
+export async function setFeatureActiveModel(
+  feature: ProcessingFeatureKey,
+  activeModelId: string | null,
+): Promise<GlobalSettings> {
+  return updateFeature(feature, (f) => ({ ...f, activeModelId }));
+}
+
+function updateFeature(
+  feature: ProcessingFeatureKey,
+  updater: (
+    f: GlobalSettings["processing"]["features"][ProcessingFeatureKey],
+  ) => GlobalSettings["processing"]["features"][ProcessingFeatureKey],
+): Promise<GlobalSettings> {
   return updateGlobalSettings((settings) => ({
     ...settings,
-    processingFeatures: {
-      ...settings.processingFeatures,
-      [feature]: { ...settings.processingFeatures[feature], installed },
+    processing: {
+      ...settings.processing,
+      features: {
+        ...settings.processing.features,
+        [feature]: updater(settings.processing.features[feature]),
+      },
     },
   }));
 }

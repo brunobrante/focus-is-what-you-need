@@ -52,16 +52,17 @@ import { MIN_TOOL_ZOOM } from "./types";
 import { useEffect, useState } from "react";
 import { useProcessingFeatures } from "@/lib/models/useProcessingFeatures";
 import { useLamaInpainting } from "@/lib/models/useLamaInpainting";
-import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import {
   bytesToPngDataUrl,
   urlToBytes,
   runBirefnet,
   runRealEsrgan,
   runLama,
-  resolveActiveTextDetectionModelId,
-  type ProcessingFeatureKey,
 } from "@/lib/models/modelCommands";
+
+// Which one-shot processor a cut action runs. These are model-level kinds
+// (each maps to a single backend command), distinct from feature keys.
+type ProcessingActionKind = "birefnet" | "realEsrgan" | "lama";
 
 // A circular brush cursor sized to the LaMa brush (20px radius / 40px diameter).
 const LAMA_BRUSH_CURSOR =
@@ -175,15 +176,20 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     updateComponents,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
-  const features = useProcessingFeatures();
-  const { settings } = useGlobalSettings();
-  // Active text detector (DBNet/CRAFT), or null when none is installed.
-  const textDetectionModelId = resolveActiveTextDetectionModelId(settings);
-  const hasProcessingFeature =
-    features.birefnet.installed || features.realEsrgan.installed || features.lama.installed;
+  const { features } = useProcessingFeatures();
+  // A feature is usable in the Builder only when enabled with an installed model.
+  const removeBackgroundOn = features.removeBackground.operational;
+  const upscaleOn = features.upscale.operational;
+  const autoDetectOn = features.autoDetect.operational;
+  const removeElementOn = features.removeElement.operational;
+  // Active text detector (a DBNet variant or CRAFT), or null when not enabled.
+  const textDetectionModelId = features.textDetection.operational
+    ? features.textDetection.activeModelId
+    : null;
+  const hasProcessingFeature = removeBackgroundOn || upscaleOn || removeElementOn;
   // Session-local processed images keyed by component id; not persisted in v1.
   const [processedByCutId, setProcessedByCutId] = useState<Record<string, string>>({});
-  const [running, setRunning] = useState<{ id: string; kind: ProcessingFeatureKey } | null>(null);
+  const [running, setRunning] = useState<{ id: string; kind: ProcessingActionKind } | null>(null);
   // LaMa "remove element" mask-drawing state. The brush paints onto an overlay
   // canvas on the stage; Apply runs LaMa and stores the result like the other
   // processing tools (session-local, revertable).
@@ -204,7 +210,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCutId]);
 
-  async function runProcessing(kind: ProcessingFeatureKey) {
+  async function runProcessing(kind: ProcessingActionKind) {
     if (!selectedComponent || running) return;
     const id = selectedComponent.id;
     const source = processedByCutId[id] ?? activeSubject.url;
@@ -245,8 +251,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   }
 
   // Draw toolbar: commit the drawn region as a cut, optionally post-processed.
-  const [drawAction, setDrawAction] = useState<"crop" | ProcessingFeatureKey | null>(null);
-  async function commitDraw(action: "crop" | ProcessingFeatureKey) {
+  const [drawAction, setDrawAction] = useState<"crop" | ProcessingActionKind | null>(null);
+  async function commitDraw(action: "crop" | ProcessingActionKind) {
     if (!canSaveSelection || drawAction) return;
     setDrawAction(action);
     try {
@@ -346,7 +352,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             {hasProcessingFeature ? (
               <>
                 <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
-                {features.birefnet.installed ? (
+                {removeBackgroundOn ? (
                   <RailToolButton
                     label="Remove background"
                     disabled={!activeCutId || running !== null}
@@ -359,7 +365,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     )}
                   </RailToolButton>
                 ) : null}
-                {features.realEsrgan.installed ? (
+                {upscaleOn ? (
                   <RailToolButton
                     label="Upscale 4×"
                     disabled={!activeCutId || running !== null}
@@ -372,7 +378,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     )}
                   </RailToolButton>
                 ) : null}
-                {features.lama.installed ? (
+                {removeElementOn ? (
                   <RailToolButton
                     label="Remove element"
                     active={masking}
@@ -674,7 +680,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     disabled={!canSaveSelection || drawAction !== null}
                     onClick={() => void commitDraw("crop")}
                   />
-                  {features.birefnet.installed ? (
+                  {removeBackgroundOn ? (
                     <DrawActionButton
                       label="Remove BG"
                       icon={<Eraser size={12} strokeWidth={1.9} />}
@@ -683,7 +689,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       onClick={() => void commitDraw("birefnet")}
                     />
                   ) : null}
-                  {features.realEsrgan.installed ? (
+                  {upscaleOn ? (
                     <DrawActionButton
                       label="Upscale"
                       icon={<Maximize2 size={12} strokeWidth={1.9} />}
@@ -716,7 +722,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   <Upload size={13} strokeWidth={1.8} />
                   {uploading ? "Enviando..." : "Upload"}
                 </ModeButton>
-                {features.florence2.installed ? (
+                {autoDetectOn ? (
                   <ModeButton
                     onClick={() => void autoDetect()}
                     disabled={!canCrop || autoDetecting}

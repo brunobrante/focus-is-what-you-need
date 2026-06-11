@@ -30,7 +30,9 @@ const BIREFNET_ID: &str = "birefnet";
 const REAL_ESRGAN_ID: &str = "real-esrgan";
 const FLORENCE2_ID: &str = "florence2";
 const CRAFT_ID: &str = "craft";
-const DBNET_ID: &str = "dbnet";
+const DBNET_RESNET34_ID: &str = "dbnet-resnet34";
+const DBNET_RESNET50_ID: &str = "dbnet-resnet50";
+const DBNET_MOBILENET_ID: &str = "dbnet-mobilenet-v3-large";
 const LAMA_ID: &str = "lama";
 const BIREFNET_SIZE: u32 = 1024;
 const PROGRESS_EVENT: &str = "model://progress";
@@ -57,14 +59,18 @@ const CRAFT_SIZE_MULTIPLE: u32 = 32;
 // A region score above this anywhere in the map counts as "text detected".
 const CRAFT_TEXT_THRESHOLD: f32 = 0.3;
 
-// DBNet-ResNet34 text detector (OnnxTR export, fp32, ~85 MB). An alternative to
-// CRAFT for the same yes/no "does this cut contain text" answer. (OnnxTR does not
-// publish a public ResNet18 export; ResNet34 is the closest public DBNet model.)
-// Input is a fixed 1024x1024 NCHW image, ImageNet-normalized; output 0 is the
-// [1, 1, 1024, 1024] probability map. Text is present when the peak probability
-// crosses the threshold.
-const DBNET_URL: &str =
+// DBNet text detectors (OnnxTR exports, fp32). Lighter/faster alternatives to
+// CRAFT for the same yes/no "does this cut contain text" answer, offered as three
+// backbones the user can pick from. (OnnxTR publishes no ResNet18 export.) All
+// share one contract: a fixed 1024x1024 NCHW input, ImageNet-normalized; output 0
+// is the [1, 1, 1024, 1024] probability map. Text is present when the peak
+// probability crosses the threshold.
+const DBNET_RESNET34_URL: &str =
     "https://huggingface.co/Felix92/onnxtr-db-resnet34/resolve/main/model.onnx";
+const DBNET_RESNET50_URL: &str =
+    "https://huggingface.co/Felix92/onnxtr-db-resnet50/resolve/main/model.onnx";
+const DBNET_MOBILENET_URL: &str =
+    "https://huggingface.co/Felix92/onnxtr-db-mobilenet-v3-large/resolve/main/model.onnx";
 const DBNET_SIZE: u32 = 1024;
 const DBNET_TEXT_THRESHOLD: f32 = 0.3;
 
@@ -121,7 +127,9 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
         BIREFNET_ID => Ok(vec![ModelFile { name: "birefnet.onnx", url: BIREFNET_URL }]),
         REAL_ESRGAN_ID => Ok(vec![ModelFile { name: "real-esrgan.onnx", url: REAL_ESRGAN_URL }]),
         CRAFT_ID => Ok(vec![ModelFile { name: "craft.onnx", url: CRAFT_URL }]),
-        DBNET_ID => Ok(vec![ModelFile { name: "dbnet.onnx", url: DBNET_URL }]),
+        DBNET_RESNET34_ID => Ok(vec![ModelFile { name: "dbnet-resnet34.onnx", url: DBNET_RESNET34_URL }]),
+        DBNET_RESNET50_ID => Ok(vec![ModelFile { name: "dbnet-resnet50.onnx", url: DBNET_RESNET50_URL }]),
+        DBNET_MOBILENET_ID => Ok(vec![ModelFile { name: "dbnet-mobilenet-v3-large.onnx", url: DBNET_MOBILENET_URL }]),
         LAMA_ID => Ok(vec![ModelFile { name: "lama.onnx", url: LAMA_URL }]),
         FLORENCE2_ID => Ok(vec![
             ModelFile { name: FLORENCE2_VISION_FILE, url: FLORENCE2_VISION_URL },
@@ -430,10 +438,16 @@ pub async fn run_text_check(
     model_id: String,
     image_bytes: Vec<u8>,
 ) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || match model_id.as_str() {
-        DBNET_ID => dbnet_blocking(&app, image_bytes),
-        CRAFT_ID => craft_blocking(&app, image_bytes),
-        other => Err(format!("unknown text-detection model: {other}")),
+    tauri::async_runtime::spawn_blocking(move || {
+        if model_id == CRAFT_ID {
+            craft_blocking(&app, image_bytes)
+        } else if model_id.starts_with("dbnet") {
+            // All DBNet backbones share the same pre/post-processing; the id only
+            // selects which ONNX session to load.
+            dbnet_blocking(&app, &model_id, image_bytes)
+        } else {
+            Err(format!("unknown text-detection model: {model_id}"))
+        }
     })
     .await
     .map_err(|e| e.to_string())?
@@ -446,7 +460,7 @@ pub async fn run_craft(app: AppHandle, image_bytes: Vec<u8>) -> Result<bool, Str
         .map_err(|e| e.to_string())?
 }
 
-fn dbnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<bool, String> {
+fn dbnet_blocking(app: &AppHandle, model_id: &str, image_bytes: Vec<u8>) -> Result<bool, String> {
     let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
     let rgb = img.to_rgb8();
 
@@ -465,7 +479,7 @@ fn dbnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<bool, String>
         }
     }
 
-    let mut session = load_session(app, DBNET_ID)?;
+    let mut session = load_session(app, model_id)?;
     let input_name = session.inputs()[0].name().to_string();
     let tensor = Tensor::from_array(input).map_err(|e| e.to_string())?;
     let outputs = session

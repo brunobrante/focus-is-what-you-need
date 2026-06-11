@@ -136,41 +136,38 @@ export type SystemDesignSettings = {
   shareWithProjectsByDefault: boolean;
 };
 
-// Optional AI processing features. Each is off by default and invisible in the
-// product until its ONNX model is explicitly installed from Settings. The flag
-// is persisted; the model file itself lives on disk under $APP_DATA/models.
+// Optional on-device AI processing. A "feature" is a capability (e.g. Text
+// Detector); a "model" is one downloadable implementation of it. The full
+// feature↔model mapping lives in the code-defined catalog
+// (`@/lib/models/modelCatalog`); settings persist only which models are
+// downloaded and, per feature, whether it is enabled and which model is active.
+// Models live on disk under $APP_DATA/models; nothing is bundled with the app.
 export type ProcessingFeatureKey =
-  | "birefnet"
-  | "realEsrgan"
-  | "florence2"
-  | "craft"
-  | "dbnet"
-  | "lama";
+  | "removeBackground"
+  | "upscale"
+  | "autoDetect"
+  | "textDetection"
+  | "removeElement";
 
-export type ProcessingFeatureState = {
-  installed: boolean;
+export type ProcessingFeatureSettings = {
+  // A feature can only be enabled once at least one of its models is installed.
+  enabled: boolean;
+  // The catalog model id the feature runs. Null falls back to the first
+  // installed model for the feature (see the catalog resolver).
+  activeModelId: string | null;
 };
 
-export type ProcessingFeaturesSettings = {
-  birefnet: ProcessingFeatureState;
-  realEsrgan: ProcessingFeatureState;
-  florence2: ProcessingFeatureState;
-  craft: ProcessingFeatureState;
-  dbnet: ProcessingFeatureState;
-  lama: ProcessingFeatureState;
+export type ProcessingSettings = {
+  // Catalog model ids that have been downloaded to disk.
+  installedModelIds: string[];
+  features: Record<ProcessingFeatureKey, ProcessingFeatureSettings>;
 };
-
-// Which text detector the Builder's "Is text?" action runs. Both models are
-// installable and coexist; this picks the active one. DBNet is lighter/faster
-// and is the default.
-export type TextDetectionModelId = "dbnet" | "craft";
 
 export type GlobalSettings = {
   schemaVersion: number;
   canvas: CanvasSettings;
   systemDesign: SystemDesignSettings;
-  processingFeatures: ProcessingFeaturesSettings;
-  textDetectionModel: TextDetectionModelId;
+  processing: ProcessingSettings;
 };
 
 export type DeepPartial<T> = T extends Array<infer U>

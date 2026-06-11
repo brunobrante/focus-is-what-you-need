@@ -403,7 +403,7 @@ AI-assisted image-to-component tool.
 - Crop tool: user draws rectangular regions over the image to mark component boundaries
 - Each region is called a "cut"
 
-**Bottom canvas bar — image-level actions**: "Mostrar original", "Upload", and (when the Florence-2 model is installed) **Auto-detect**:
+**Bottom canvas bar — image-level actions**: "Mostrar original", "Upload", and (when the Auto-detect Components feature is enabled) **Auto-detect**:
 - **Auto-detect** runs Florence-2 on the open subject and proposes crop regions automatically. The button shows a spinner and the image dims while it runs (typically 3–8s). Only available when a stack/component is open (croppable).
 - Each proposed region renders as a dashed purple box with its label, corner handles, and a "×" discard badge — visually a staged sibling of a manually drawn crop.
 - Proposals are editable in place: drag the body to move, drag a corner to resize, click "×" to discard one.
@@ -415,7 +415,7 @@ AI-assisted image-to-component tool.
 - **Builder tab** (default):
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
-  - **Is text?** button (only when a Text Detector model — DBNet or CRAFT — is installed): runs the active text detector (the **Text detection model** setting, default DBNet) on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
+  - **Is text?** button (only when the Text Detector feature is enabled in Settings): runs the feature's active model (a DBNet variant or CRAFT) on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
 - **Stack tab**:
   - Shows all cuts from a reference image together
   - Composite layout of all cuts side by side
@@ -424,7 +424,7 @@ AI-assisted image-to-component tool.
 **Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group:
 - **Remove background** — runs BiRefNet and replaces the open component's canvas image with a transparent-background PNG
 - **Upscale 4×** — runs Real-ESRGAN and replaces the canvas image with the upscaled PNG
-- **Remove element** (Wand2 icon, only when the LaMa model is installed) — enters a mask-drawing mode on the canvas: an overlay appears over the open cut's image and the cursor becomes a brush circle. Dragging paints a semi-transparent red mask over what to remove (the brush stays aligned to the image at any zoom). A floating **Apply / Cancel** toolbar shows at the bottom-center of the canvas: **Apply** runs LaMa inpainting and replaces the canvas image with the result (the rail button shows a spinner while running); **Cancel** (or clicking the rail button again) discards the mask and exits. Crop/Draw selection is suspended while masking.
+- **Remove element** (Wand2 icon, only when the Remove Element feature is enabled) — enters a mask-drawing mode on the canvas: an overlay appears over the open cut's image and the cursor becomes a brush circle. Dragging paints a semi-transparent red mask over what to remove (the brush stays aligned to the image at any zoom). A floating **Apply / Cancel** toolbar shows at the bottom-center of the canvas: **Apply** runs LaMa inpainting and replaces the canvas image with the result (the rail button shows a spinner while running); **Cancel** (or clicking the rail button again) discards the mask and exits. Crop/Draw selection is suspended while masking.
 - **Revert to original** — discards the processed result and restores the component's original image (enabled only when a processed result exists; also reverts a LaMa removal)
 - Remove background / Upscale / Remove element show an inline spinner while running; results are session-local per component (not persisted in v1)
 - The group requires a cut to be open (Remove background, Upscale, and Remove element are disabled otherwise); if no model is installed, the group does not appear
@@ -498,24 +498,25 @@ Opened from the user menu (TopBar → avatar → Settings). Wide modal with a to
 
 **Processing Features tab**:
 
-Optional AI models that run locally and are **off by default** — a model only exists after it is explicitly installed here. Each feature is one row:
+Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (downloadable implementations). A feature can have several models; **Text Detector** has four, every other feature has one. The tab has three stacked sections:
 
-- Icon + name + model name + download size + one-line description
-- **Not installed**: "Install" button
-- **Installing**: progress bar (0–100%) with a "cancel" action (cancel removes the partial download). Multi-file packages also show which file is downloading (e.g. "Downloading vision_encoder.onnx (1 of 5)…")
-- **Installed**: green "Installed" badge + "Uninstall" button
+**1. Installed models** — grouped by feature. Each feature shows its name + icon, then the list of its installed models (label + size), or "No models installed." The model that the feature runs is tagged with a blue **Active** pill. Each installed model has an **Uninstall** action.
 
-Features:
-- **Remove Background** — BiRefNet · ~220 MB — "Removes image background from cuts using BiRefNet"
-- **Upscale (4×)** — Real-ESRGAN · ~5 MB — "Increases cut resolution 4× using Real-ESRGAN"
-- **Auto-detect Components** — Florence-2 · ~1.2 GB — "Automatically proposes crop regions from a UI screenshot using Florence-2". A five-file package (vision encoder, token embedder, BART encoder, decoder, tokenizer) downloaded sequentially with per-file progress. Once installed, the **Auto-detect** button appears on the Builder's bottom canvas bar.
-- **Text Detector** — DBNet-ResNet34 · ~85 MB — "Detects whether a cut contains text using DBNet". A single ONNX file. The default text detector. Once installed (alone or with CRAFT), an **Is text?** button appears on each Builder cut item that shows a Yes/No badge.
-- **Text Detector** — CRAFT · ~80 MB — "Alternative text detector — heavier, also detects whether a cut contains text". A single ONNX file. An alternative to DBNet for the same Yes/No answer.
-- **Remove Element** — LaMa · ~208 MB — "Removes a painted selection from a cut using LaMa inpainting". A single ONNX file. Once installed, a **Remove element** tool appears in the Builder's left tool rail: it enters a mask-drawing mode on the canvas where the user paints over an element and Apply replaces the open cut with the inpainted result.
+**2. Features** — one row per feature with a name, description, and an enable/disable **switch**. The switch is disabled (and the row reads "Install a model to enable") until at least one of the feature's models is installed. Enabling a feature is what makes its action appear in the Builder; disabling hides the action even if a model is installed. Uninstalling a feature's last model auto-disables it.
 
-**Text detection model** selector (appears below the features list only when DBNet and/or CRAFT is installed): a small segmented control (**DBNet** | **CRAFT**) that chooses which detector the Builder's **Is text?** action runs. An option is selectable only when its model is installed; the selection persists immediately (independent of the modal's Save button). The active model defaults to DBNet, falling back to whichever model is installed if the chosen one isn't.
+**3. Available models for download** — a collapsible section (toggle row with a chevron). Expanded, it shows a **select box** listing every catalog model grouped by feature (with "(installed)" suffixes), the selected model's description, and a context action:
+- **Not installed**: **Download** button → progress bar (0–100%) with a "cancel" action; multi-file packages (Florence-2) also show which file is downloading ("Downloading vision_encoder.onnx (1 of 5)…").
+- **Installed but not active**: **Use this model** button (sets it as the feature's active model) + **Uninstall**.
+- **Installed and active**: green **Active** badge + **Uninstall**.
 
-Install/uninstall persist immediately (independent of the modal's Save button). Once installed, the matching action appears on Builder cut items (or, for Florence-2, as the Auto-detect image-level action).
+The active model per feature is chosen here (via Download → auto-active on first install, or **Use this model**), not in the installed list. All install / enable / active-model changes persist immediately, independent of the modal's Save button.
+
+Catalog:
+- **Remove Background** — BiRefNet (~220 MB)
+- **Upscale (4×)** — Real-ESRGAN (~5 MB)
+- **Auto-detect Components** — Florence-2 (~1.2 GB, five-file package). When enabled, the **Auto-detect** button appears on the Builder's bottom canvas bar.
+- **Text Detector** — DBNet-MobileNetV3 (~15 MB), DBNet-ResNet34 (~85 MB), DBNet-ResNet50 (~96 MB), CRAFT (~80 MB). When enabled, the **Is text?** button appears on each Builder cut item and runs the active model.
+- **Remove Element** — LaMa (~208 MB). When enabled, the **Remove element** tool appears in the Builder's left tool rail.
 
 ---
 

@@ -1,32 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import type {
-  GlobalSettings,
-  ProcessingFeatureKey,
-  TextDetectionModelId,
-} from "@/domain/settings/types";
-
-export type { ProcessingFeatureKey } from "@/domain/settings/types";
-
-// Maps a settings feature key to the backend model id, which selects the
-// model package on disk ($APP_DATA/models/...) and its source urls.
-export const MODEL_ID: Record<ProcessingFeatureKey, string> = {
-  birefnet: "birefnet",
-  realEsrgan: "real-esrgan",
-  florence2: "florence2",
-  craft: "craft",
-  dbnet: "dbnet",
-  lama: "lama",
-};
-
-// Florence-2 is a multi-file package downloaded sequentially, in this order.
-// Used by the install UI to show which file is in flight ("1 of 5").
-export const FLORENCE2_FILES = [
-  "vision_encoder.onnx",
-  "embed_tokens.onnx",
-  "encoder_model.onnx",
-  "decoder_model_merged.onnx",
-  "tokenizer.json",
-] as const;
 
 // Payload streamed during a download via the `model://progress` event. The
 // per-file fields only matter for multi-file packages; single-file models
@@ -78,42 +50,16 @@ export function runFlorence2(imageBytes: Uint8Array): Promise<DetectedRegion[]> 
   return invoke<DetectedRegion[]>("run_florence2", { imageBytes: Array.from(imageBytes) });
 }
 
-// Runs Florence-2 OCR on a cut's image. Returns true when text is detected.
-export function runFlorence2TextCheck(imageBytes: Uint8Array): Promise<boolean> {
-  return invoke<boolean>("run_florence2_text_check", { imageBytes: Array.from(imageBytes) });
-}
-
-// Runs CRAFT on a cut's image. Returns true when text is detected in the cut.
-export function runCraft(imageBytes: Uint8Array): Promise<boolean> {
-  return invoke<boolean>("run_craft", { imageBytes: Array.from(imageBytes) });
-}
-
-// Runs the chosen text detector (DBNet or CRAFT) on a cut's image. The backend
-// dispatches on `modelId`. Returns true when text is detected.
+// Runs the active text detector (a DBNet variant or CRAFT) on a cut's image.
+// The backend dispatches on `modelId`. Returns true when text is detected.
 export function runTextCheck(
-  modelId: TextDetectionModelId,
+  modelId: string,
   imageBytes: Uint8Array,
 ): Promise<boolean> {
   return invoke<boolean>("run_text_check", {
     modelId,
     imageBytes: Array.from(imageBytes),
   });
-}
-
-// Resolves which text-detection model the Builder should run, honoring the
-// user's `textDetectionModel` choice and falling back to whichever model is
-// actually installed. Returns null when no text detector is installed.
-export function resolveActiveTextDetectionModelId(
-  settings: GlobalSettings,
-): TextDetectionModelId | null {
-  const { processingFeatures: pf, textDetectionModel: preferred } = settings;
-  const dbnetInstalled = pf.dbnet.installed;
-  const craftInstalled = pf.craft.installed;
-  if (preferred === "craft" && craftInstalled) return "craft";
-  if (preferred === "dbnet" && dbnetInstalled) return "dbnet";
-  if (dbnetInstalled) return "dbnet";
-  if (craftInstalled) return "craft";
-  return null;
 }
 
 // Runs LaMa inpainting on a cut. `maskBytes` is a PNG grayscale mask where

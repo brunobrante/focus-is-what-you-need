@@ -13,22 +13,22 @@ import type {
   CanvasKeyCommandId,
   CanvasModifierCommandId,
   GlobalSettings,
-  TextDetectionModelId,
+  ProcessingFeatureKey,
 } from "@/domain/settings/types";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
-import { putGlobalSettings, setTextDetectionModel } from "@/lib/storage/repos/settings.repo";
+import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import {
   getWorkspaceConfig,
   setWorkspaceFolder,
   pickFolderDialog,
 } from "@/lib/tauri/workspace";
 import { IconClock, IconDatabase, IconFolder, IconShield } from "@/components/icons";
-import { Check, Eraser, Maximize2, ScanText, Sparkles, Wand2 } from "lucide-react";
+import { Check, ChevronRight, Eraser, Maximize2, ScanText, Sparkles, Wand2 } from "lucide-react";
 import {
   useProcessingFeatures,
-  type ProcessingFeatureControls,
+  type ModelControls,
 } from "@/lib/models/useProcessingFeatures";
-import { FLORENCE2_FILES } from "@/lib/models/modelCommands";
+import { FEATURES, MODEL_CATALOG, modelsForFeature } from "@/lib/models/modelCatalog";
 
 type AppSettingsTab = "canvas" | "processing" | "shortcuts" | "storage";
 
@@ -79,13 +79,11 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
       setSaving(true);
       try {
         await setWorkspaceFolder(folderPath);
-        // Processing features and the text-detection model persist immediately
-        // and live outside the draft, so take their latest values rather than
-        // the stale draft.
+        // Processing install/enable/active state persists immediately and lives
+        // outside the draft, so take its latest value rather than the stale draft.
         putGlobalSettings({
           ...settingsDraft,
-          processingFeatures: persistedSettings.processingFeatures,
-          textDetectionModel: persistedSettings.textDetectionModel,
+          processing: persistedSettings.processing,
         });
         setIsOpen(false);
       } finally {
@@ -238,238 +236,240 @@ function CanvasTab({
   );
 }
 
+const FEATURE_ICON: Record<ProcessingFeatureKey, React.ReactNode> = {
+  removeBackground: <Eraser size={16} strokeWidth={1.7} />,
+  upscale: <Maximize2 size={16} strokeWidth={1.7} />,
+  autoDetect: <Sparkles size={16} strokeWidth={1.7} />,
+  textDetection: <ScanText size={16} strokeWidth={1.7} />,
+  removeElement: <Wand2 size={16} strokeWidth={1.7} />,
+};
+
 function ProcessingFeaturesTab() {
-  const features = useProcessingFeatures();
-  const { settings } = useGlobalSettings();
-  const dbnetInstalled = features.dbnet.installed;
-  const craftInstalled = features.craft.installed;
-  // The model picker only matters once a text detector exists to run.
-  const showTextModelSelector = dbnetInstalled || craftInstalled;
+  const { features, models } = useProcessingFeatures();
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [selectedModelId, setSelectedModelId] = useState<string>(MODEL_CATALOG[0].modelId);
+  const selected = models[selectedModelId];
+
   return (
     <div className="px-[22px] py-5 grid gap-6">
+      {/* Section A — installed models grouped by feature */}
       <div>
         <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
-          Processing Features
+          Installed models
         </div>
         <p className="m-0 mb-3 max-w-[560px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
-          Optional on-device AI models. They run locally and stay off until you install
-          them. Once installed, their actions appear on cuts in the Builder.
+          Optional on-device AI models, grouped by the feature they power. They run
+          locally and stay off until you install one below.
         </p>
         <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
-          <ProcessingFeatureRow
-            icon={<Eraser size={16} strokeWidth={1.7} />}
-            name="Remove Background"
-            model="BiRefNet"
-            size="~220 MB"
-            description="Removes image background from cuts using BiRefNet"
-            controls={features.birefnet}
-            divider
-          />
-          <ProcessingFeatureRow
-            icon={<Maximize2 size={16} strokeWidth={1.7} />}
-            name="Upscale (4×)"
-            model="Real-ESRGAN"
-            size="~5 MB"
-            description="Increases cut resolution 4× using Real-ESRGAN"
-            controls={features.realEsrgan}
-            divider
-          />
-          <ProcessingFeatureRow
-            icon={<Sparkles size={16} strokeWidth={1.7} />}
-            name="Auto-detect Components"
-            model="Florence-2"
-            size="~1.2 GB"
-            description="Automatically proposes crop regions from a UI screenshot using Florence-2"
-            controls={features.florence2}
-            fileCount={FLORENCE2_FILES.length}
-            divider
-          />
-          <ProcessingFeatureRow
-            icon={<ScanText size={16} strokeWidth={1.7} />}
-            name="Text Detector"
-            model="DBNet-ResNet34"
-            size="~85 MB"
-            description="Detects whether a cut contains text using DBNet"
-            controls={features.dbnet}
-            divider
-          />
-          <ProcessingFeatureRow
-            icon={<ScanText size={16} strokeWidth={1.7} />}
-            name="Text Detector"
-            model="CRAFT"
-            size="~80 MB"
-            description="Alternative text detector — heavier, also detects whether a cut contains text"
-            controls={features.craft}
-            divider
-          />
-          <ProcessingFeatureRow
-            icon={<Wand2 size={16} strokeWidth={1.7} />}
-            name="Remove Element"
-            model="LaMa"
-            size="~208 MB"
-            description="Removes a painted selection from a cut using LaMa inpainting"
-            controls={features.lama}
-          />
-        </div>
-      </div>
-
-      {showTextModelSelector ? (
-        <TextDetectionModelSelector
-          active={settings.textDetectionModel}
-          dbnetInstalled={dbnetInstalled}
-          craftInstalled={craftInstalled}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * Picks which installed text detector the Builder's "Is text?" action runs.
- * An option is selectable only when its model is installed; choosing one
- * persists the `textDetectionModel` setting immediately.
- */
-function TextDetectionModelSelector({
-  active,
-  dbnetInstalled,
-  craftInstalled,
-}: {
-  active: TextDetectionModelId;
-  dbnetInstalled: boolean;
-  craftInstalled: boolean;
-}) {
-  const options: { id: TextDetectionModelId; label: string; installed: boolean }[] = [
-    { id: "dbnet", label: "DBNet", installed: dbnetInstalled },
-    { id: "craft", label: "CRAFT", installed: craftInstalled },
-  ];
-  return (
-    <div>
-      <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
-        Text detection model
-      </div>
-      <div className="flex items-center justify-between gap-5 rounded-[12px] border border-[var(--border)] px-4 py-3.5">
-        <p className="m-0 max-w-[420px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
-          Which detector the “Is text?” action runs on cuts. Install a model above to enable it.
-        </p>
-        <div className="inline-flex shrink-0 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
-          {options.map((option) => {
-            const selected = active === option.id;
+          {FEATURES.map((feature, index) => {
+            const control = features[feature.key];
             return (
-              <button
-                key={option.id}
-                type="button"
-                disabled={!option.installed}
-                onClick={() => void setTextDetectionModel(option.id)}
+              <div
+                key={feature.key}
                 className={[
-                  "cursor-pointer rounded-[6px] px-3 py-1.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                  selected
-                    ? "bg-[#5b6cff] text-white"
-                    : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                  "px-4 py-3.5",
+                  index < FEATURES.length - 1 ? "border-b border-[var(--border)]" : "",
                 ].join(" ")}
               >
-                {option.label}
-              </button>
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
+                    {FEATURE_ICON[feature.key]}
+                  </div>
+                  <span className="text-[13px] text-[var(--text)]">{feature.name}</span>
+                </div>
+                {control.installedModels.length === 0 ? (
+                  <p className="m-0 mt-2 pl-[38px] text-[12px] text-[var(--text-faint)]">
+                    No models installed.
+                  </p>
+                ) : (
+                  <div className="mt-2 grid gap-1.5 pl-[38px]">
+                    {control.installedModels.map((m) => (
+                      <InstalledModelRow key={m.modelId} model={models[m.modelId]} />
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       </div>
+
+      {/* Section B — enable/disable switch per feature */}
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+          Features
+        </div>
+        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
+          {FEATURES.map((feature, index) => {
+            const control = features[feature.key];
+            return (
+              <div
+                key={feature.key}
+                className={[
+                  "flex items-center justify-between gap-5 px-4 py-3",
+                  index < FEATURES.length - 1 ? "border-b border-[var(--border)]" : "",
+                ].join(" ")}
+              >
+                <div>
+                  <div className="text-[13px] text-[var(--text)]">{feature.name}</div>
+                  <p className="m-0 mt-1 max-w-[460px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                    {feature.description}
+                    {!control.canEnable ? (
+                      <span className="text-[var(--text-faint)]"> · Install a model to enable.</span>
+                    ) : null}
+                  </p>
+                </div>
+                <Switch
+                  checked={control.enabled}
+                  disabled={!control.canEnable}
+                  ariaLabel={`Enable ${feature.name}`}
+                  onChange={(checked) => control.setEnabled(checked)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section C — download catalog */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowCatalog((v) => !v)}
+          className="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium hover:text-[var(--text-muted)]"
+        >
+          <ChevronRight
+            size={13}
+            strokeWidth={2}
+            className={showCatalog ? "rotate-90 transition-transform" : "transition-transform"}
+          />
+          Available models for download
+        </button>
+        {showCatalog ? (
+          <div className="mt-2 rounded-[12px] border border-[var(--border)] p-4">
+            <div className="flex items-center gap-3">
+              <select
+                value={selectedModelId}
+                onChange={(event) => setSelectedModelId(event.target.value)}
+                className="h-9 flex-1 rounded-[8px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[13px] text-[var(--text)]"
+              >
+                {FEATURES.map((feature) => (
+                  <optgroup key={feature.key} label={feature.name}>
+                    {modelsForFeature(feature.key).map((m) => (
+                      <option key={m.modelId} value={m.modelId}>
+                        {m.label} · {m.size}
+                        {models[m.modelId].installed ? " (installed)" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            {selected ? (
+              <>
+                <p className="m-0 mt-2.5 text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                  {selected.description}
+                </p>
+                <div className="mt-3">
+                  <CatalogModelActions model={selected} />
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function ProcessingFeatureRow({
-  icon,
-  name,
-  model,
-  size,
-  description,
-  controls,
-  divider = false,
-  fileCount,
-}: {
-  icon: React.ReactNode;
-  name: string;
-  model: string;
-  size: string;
-  description: string;
-  controls: ProcessingFeatureControls;
-  divider?: boolean;
-  /** Number of files in a multi-file package, to show "(1 of N)" while downloading. */
-  fileCount?: number;
-}) {
-  const { installed, installing, progress, currentFile, install, uninstall } = controls;
-  const pct = Math.round(progress * 100);
-  // Only multi-file packages surface a per-file download label.
-  const fileIndex =
-    fileCount && currentFile ? (FLORENCE2_FILES as readonly string[]).indexOf(currentFile) : -1;
-  const fileStatus =
-    fileCount && currentFile && fileIndex >= 0
-      ? `Downloading ${currentFile} (${fileIndex + 1} of ${fileCount})…`
-      : null;
+/** A single installed model under its feature, with active state + uninstall. */
+function InstalledModelRow({ model }: { model: ModelControls }) {
   return (
-    <div
-      className={[
-        "flex items-center justify-between gap-5 px-4 py-3.5",
-        divider ? "border-b border-[var(--border)]" : "",
-      ].join(" ")}
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] text-[var(--text)]">{name}</span>
-            <span className="text-[11px] text-[var(--text-faint)]">
-              {model} · {size}
-            </span>
-          </div>
-          <p className="m-0 mt-1 max-w-[420px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
-            {description}
-          </p>
-        </div>
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-[12.5px] text-[var(--text)] truncate">{model.label}</span>
+        <span className="text-[11px] text-[var(--text-faint)]">{model.size}</span>
+        {model.active ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(91,108,255,0.45)] bg-[rgba(91,108,255,0.14)] px-2 py-0.5 text-[10px] font-semibold text-[#8899ff]">
+            Active
+          </span>
+        ) : null}
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2">
-        {installing ? (
-          <div className="flex flex-col items-end gap-1">
-            {fileStatus ? (
-              <span className="text-[10.5px] text-[var(--text-faint)]">{fileStatus}</span>
-            ) : null}
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-[140px] overflow-hidden rounded-full bg-[var(--surface)]">
-                <div
-                  className="h-full rounded-full bg-[#5b6cff] transition-[width] duration-150"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="w-9 text-right text-[11px] tabular-nums text-[var(--text-muted)]">
-                {pct}%
-              </span>
-              <button
-                type="button"
-                onClick={uninstall}
-                className="cursor-pointer text-[11px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
-              >
-                cancel
-              </button>
-            </div>
+      <button
+        type="button"
+        onClick={model.uninstall}
+        className="cursor-pointer text-[11px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
+      >
+        Uninstall
+      </button>
+    </div>
+  );
+}
+
+/** Download / activate / uninstall controls for the selected catalog model. */
+function CatalogModelActions({ model }: { model: ModelControls }) {
+  const pct = Math.round(model.progress * 100);
+  const fileIndex =
+    model.files && model.currentFile
+      ? (model.files as readonly string[]).indexOf(model.currentFile)
+      : -1;
+  const fileStatus =
+    model.files && model.currentFile && fileIndex >= 0
+      ? `Downloading ${model.currentFile} (${fileIndex + 1} of ${model.files.length})…`
+      : null;
+
+  if (model.installing) {
+    return (
+      <div className="flex flex-col gap-1">
+        {fileStatus ? (
+          <span className="text-[10.5px] text-[var(--text-faint)]">{fileStatus}</span>
+        ) : null}
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface)]">
+            <div
+              className="h-full rounded-full bg-[#5b6cff] transition-[width] duration-150"
+              style={{ width: `${pct}%` }}
+            />
           </div>
-        ) : installed ? (
-          <>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] px-2.5 py-1 text-[11px] font-medium text-[#4ade80]">
-              <Check size={12} strokeWidth={2.2} />
-              Installed
-            </span>
-            <button type="button" onClick={uninstall} className="btn btn-ghost">
-              Uninstall
-            </button>
-          </>
-        ) : (
-          <button type="button" onClick={install} className="btn btn-primary">
-            Install
+          <span className="w-9 text-right text-[11px] tabular-nums text-[var(--text-muted)]">
+            {pct}%
+          </span>
+          <button
+            type="button"
+            onClick={model.uninstall}
+            className="cursor-pointer text-[11px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
+          >
+            cancel
           </button>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  if (!model.installed) {
+    return (
+      <button type="button" onClick={model.install} className="btn btn-primary">
+        Download
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {model.active ? (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] px-2.5 py-1 text-[11px] font-medium text-[#4ade80]">
+          <Check size={12} strokeWidth={2.2} />
+          Active
+        </span>
+      ) : (
+        <button type="button" onClick={model.setActive} className="btn btn-primary">
+          Use this model
+        </button>
+      )}
+      <button type="button" onClick={model.uninstall} className="btn btn-ghost">
+        Uninstall
+      </button>
     </div>
   );
 }
@@ -677,17 +677,25 @@ function Switch({
   checked,
   ariaLabel,
   onChange,
+  disabled = false,
 }: {
   checked: boolean;
   ariaLabel: string;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <label className="inline-flex shrink-0 cursor-pointer items-center">
+    <label
+      className={[
+        "inline-flex shrink-0 items-center",
+        disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer",
+      ].join(" ")}
+    >
       <input
         type="checkbox"
         className="sr-only"
         checked={checked}
+        disabled={disabled}
         aria-label={ariaLabel}
         onChange={(event) => onChange(event.target.checked)}
       />

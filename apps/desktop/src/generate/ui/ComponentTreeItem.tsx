@@ -1,7 +1,6 @@
 import { ChevronRight, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
 import type { ComponentProps, MouseEvent } from "react";
 import type { ComponentTreeNode } from "../engine/types";
-import type { TextDetectionModelId } from "@/domain/settings/types";
 import { useCraftCheck } from "@/lib/models/useCraftCheck";
 import { urlToBytes } from "@/lib/models/modelCommands";
 
@@ -46,7 +45,7 @@ export function ComponentTreeItem({
   rootId: string;
   primaryId: string;
   /** Active text detector; when set, each card shows an "Is text?" action. */
-  textDetectionModelId?: TextDetectionModelId | null;
+  textDetectionModelId?: string | null;
   onOpen: (id: string) => void;
   onToggle: (id: string) => void;
   onHover: (id: string | null) => void;
@@ -172,7 +171,7 @@ function CraftCheckButton({
   modelId,
 }: {
   dataUrl: string;
-  modelId: TextDetectionModelId;
+  modelId: string;
 }) {
   const craft = useCraftCheck(modelId);
   const busy = craft.status === "running";

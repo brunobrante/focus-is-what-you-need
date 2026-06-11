@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from "react";
-import type { TextDetectionModelId } from "@/domain/settings/types";
 import { runTextCheck } from "./modelCommands";
 
 export type CraftStatus = "idle" | "running" | "done" | "error";
@@ -20,7 +19,7 @@ export type CraftCheck = {
  * `check()` runs the model and flips `isText` on completion, landing on
  * `"error"` if inference fails.
  */
-export function useCraftCheck(modelId: TextDetectionModelId): CraftCheck {
+export function useCraftCheck(modelId: string): CraftCheck {
   const [status, setStatus] = useState<CraftStatus>("idle");
   const [isText, setIsText] = useState<boolean | null>(null);
   // Guards against a stale resolve overwriting a newer run (e.g. "Check again").
