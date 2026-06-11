@@ -6,11 +6,13 @@ import {
 } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
 import type { ReferenceStackData, ReferenceStackItem } from "@/lib/references/stackTypes";
+import { stackRootIds } from "@/lib/references/stackTypes";
 import {
   readReferenceStackData,
   loadReferenceStackFile,
 } from "@/lib/tauri/referenceStorage";
 import { loadReferenceUrl } from "@/lib/references/referenceUrlCache";
+import { ReferenceThumbCard } from "@/components/references/ReferenceThumbCard";
 import type { ReferenceItem, StackPreviewState, StackTreeNode } from "../types";
 import { useReferenceUrl } from "../hooks/useReferenceUrl";
 import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
@@ -69,6 +71,9 @@ export function ReferenceDetailModal({
   const [stackLoading, setStackLoading] = useState(false);
   const [selectedStackComponentId, setSelectedStackComponentId] = useState<string | null>(null);
   const [stackViewMode, setStackViewMode] = useState<"composite" | "isolated">("composite");
+  // When a reference has more than one stack (root), the Stack tab first shows a
+  // gallery of stack cards; selecting one focuses it for composite rendering.
+  const [focusedRootId, setFocusedRootId] = useState<string | null>(null);
 
   // ── derived ───────────────────────────────────────────────────────────────
   const group = subject?.kind === "group" ? subject.group : null;
@@ -104,10 +109,19 @@ export function ReferenceDetailModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectKey]);
 
+  // A single-item gallery (one original, or one stack) opens straight into the
+  // enlarged view rather than showing a pointless one-cell grid.
+  useEffect(() => {
+    if (!isGroup || focusedItem) return;
+    if (displayedItems.length === 1) setFocusedItem(displayedItems[0] ?? null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGroup, activeTab, displayedItems.length, focusedItem]);
+
   // ── load stack preview ────────────────────────────────────────────────────
   useEffect(() => {
     setSelectedStackComponentId(null);
     setStackViewMode("composite");
+    setFocusedRootId(null);
     setStackPreview((prev) => { releaseStackUrls(prev); return null; });
     if (!canStack || !currentItem) { setStackLoading(false); return; }
 
@@ -139,6 +153,13 @@ export function ReferenceDetailModal({
 
   // ── stack derivation ──────────────────────────────────────────────────────
   const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
+  // Each root = one stack. The Stack tab shows a card per stack when there are
+  // several; with a single stack it renders the composite directly.
+  const stackRoots = stackPreview ? listStackRoots(stackPreview.data) : [];
+  const hasMultipleStacks = stackRoots.length > 1;
+  // Only scope the composite to a root when a stack is explicitly focused (which
+  // only happens for multi-root v2 stacks, whose cuts carry rootId). A single
+  // stack stays unscoped so legacy cuts (rootId === null) still render.
   const effectiveStackId =
     selectedStackComponentId ??
     stackPreview?.data.primaryComponentId ??
@@ -236,8 +257,8 @@ export function ReferenceDetailModal({
           ) : (
             /* single item view — reference always; group when item is focused */
             <>
-              {/* back — group only */}
-              {isGroup && focusedItem && (
+              {/* back — group only, and only when there is a gallery to return to */}
+              {isGroup && focusedItem && displayedItems.length > 1 && (
                 <button
                   type="button"
                   onClick={() => setFocusedItem(null)}
@@ -248,8 +269,20 @@ export function ReferenceDetailModal({
                 </button>
               )}
 
-              {/* All / Solo toggle — only when showing stack view */}
-              {showStackView && (
+              {/* Back to stacks — when a single stack is focused out of several */}
+              {showStackView && hasMultipleStacks && focusedRootId && (
+                <button
+                  type="button"
+                  onClick={() => { setFocusedRootId(null); setSelectedStackComponentId(null); }}
+                  className="absolute left-3 top-3 z-10 flex cursor-pointer items-center gap-1 rounded-[7px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1.5 text-[11.5px] text-[var(--text)] backdrop-blur hover:bg-[var(--surface-hover)]"
+                >
+                  <ChevronLeft size={13} />
+                  Stacks
+                </button>
+              )}
+
+              {/* All / Solo toggle — only when an individual stack is shown */}
+              {showStackView && !(hasMultipleStacks && !focusedRootId) && (
                 <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 flex items-center gap-0.5 rounded-[8px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.88)] p-0.5 backdrop-blur">
                   {(["composite", "isolated"] as const).map((mode) => (
                     <button
@@ -270,7 +303,7 @@ export function ReferenceDetailModal({
               )}
 
               {/* prev arrow — group focused non-stack item */}
-              {isGroup && focusedItem && !canStack && (
+              {isGroup && focusedItem && !canStack && displayedItems.length > 1 && (
                 <button
                   type="button"
                   onClick={() =>
@@ -289,12 +322,19 @@ export function ReferenceDetailModal({
                 {showStackView ? (
                   stackLoading && !stackPreview ? (
                     <p className="text-[13px] text-[var(--text-muted)]">Loading stack…</p>
+                  ) : hasMultipleStacks && !focusedRootId && stackPreview ? (
+                    <StackRootsGallery
+                      roots={stackRoots}
+                      urls={stackPreview.urls}
+                      onOpen={(id) => { setFocusedRootId(id); setSelectedStackComponentId(null); }}
+                    />
                   ) : stackViewMode === "composite" && stackPreview ? (
                     <StackCompositeView
                       data={stackPreview.data}
                       urls={stackPreview.urls}
                       selectedId={effectiveStackId ?? null}
                       onSelect={setSelectedStackComponentId}
+                      rootId={focusedRootId}
                     />
                   ) : (
                     currentItem && (
@@ -328,7 +368,7 @@ export function ReferenceDetailModal({
               </div>
 
               {/* next arrow — group focused non-stack item */}
-              {isGroup && focusedItem && !canStack && (
+              {isGroup && focusedItem && !canStack && displayedItems.length > 1 && (
                 <button
                   type="button"
                   onClick={() =>
@@ -341,7 +381,7 @@ export function ReferenceDetailModal({
               )}
 
               {/* position counter — group focused */}
-              {isGroup && focusedItem && (
+              {isGroup && focusedItem && displayedItems.length > 1 && (
                 <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[var(--border-strong)] bg-[rgba(14,14,15,0.85)] px-2.5 py-1 text-[10.5px] tabular-nums text-[var(--text-muted)] backdrop-blur">
                   {focusedIndex + 1} / {displayedItems.length}
                 </div>
@@ -905,17 +945,35 @@ function ActionLink({ icon, label, to }: { icon: ReactNode; label: string; to: s
 // ─── stack helpers ────────────────────────────────────────────────────────────
 
 function StackCompositeView({
-  data, urls, selectedId, onSelect,
+  data, urls, selectedId, onSelect, rootId = null,
 }: {
   data: ReferenceStackData;
   urls: Record<string, string>;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  // When set, render only this root: its image as the background and only the
+  // cuts that belong to it. When null, use the default root / original.
+  rootId?: string | null;
 }) {
-  const { w: origW, h: origH } = data.original;
-  const defaultRootId = data.roots?.find((r) => r.isDefault)?.id ?? data.rootComponentId;
+  const rootIds = stackRootIds(data);
+  const scopedRoot = rootId ? data.roots?.find((r) => r.id === rootId) : undefined;
+  const defaultRootId = rootId ?? data.roots?.find((r) => r.isDefault)?.id ?? data.rootComponentId;
   const bgUrl = defaultRootId ? urls[defaultRootId] : undefined;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // The projection frame: when scoped to a trimmed root, cut boxes (stored in
+  // original-image space) are positioned relative to that root's box; otherwise
+  // relative to the full original.
+  const frame = scopedRoot
+    ? { x: scopedRoot.box.x, y: scopedRoot.box.y, w: scopedRoot.box.w, h: scopedRoot.box.h }
+    : { x: 0, y: 0, w: data.original.w, h: data.original.h };
+
+  // Root entries also live in `data.components`; skip them so the original is not
+  // painted twice (background + a full-size overlay = the "two stacked images"
+  // bug). When scoped to a root, keep only that root's cuts.
+  const overlayCuts = data.components.filter(
+    (cut) => !rootIds.has(cut.id) && (rootId ? cut.rootId === rootId : true),
+  );
 
   return (
     <div className="relative leading-[0]" onClick={() => onSelect(null)}>
@@ -929,10 +987,10 @@ function StackCompositeView({
       ) : (
         <div
           className="rounded-[10px] bg-[var(--surface)]"
-          style={{ width: origW, height: origH, maxWidth: "100%", maxHeight: "calc(100vh - 220px)" }}
+          style={{ width: frame.w, height: frame.h, maxWidth: "100%", maxHeight: "calc(100vh - 220px)" }}
         />
       )}
-      {data.components.map((cut) => {
+      {overlayCuts.map((cut) => {
         const isSelected = cut.id === selectedId;
         const isHovered = cut.id === hoveredId;
         const cutUrl = urls[cut.id];
@@ -945,10 +1003,10 @@ function StackCompositeView({
             onMouseLeave={() => setHoveredId(null)}
             className="absolute cursor-pointer bg-transparent p-0"
             style={{
-              left: `${(cut.box.x / origW) * 100}%`,
-              top: `${(cut.box.y / origH) * 100}%`,
-              width: `${(cut.box.w / origW) * 100}%`,
-              height: `${(cut.box.h / origH) * 100}%`,
+              left: `${((cut.box.x - frame.x) / frame.w) * 100}%`,
+              top: `${((cut.box.y - frame.y) / frame.h) * 100}%`,
+              width: `${(cut.box.w / frame.w) * 100}%`,
+              height: `${(cut.box.h / frame.h) * 100}%`,
               boxSizing: "border-box",
               outline: isSelected
                 ? "2px solid #89C4FF"
@@ -969,6 +1027,46 @@ function StackCompositeView({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+type StackRootEntry = { id: string; name: string };
+
+function listStackRoots(data: ReferenceStackData): StackRootEntry[] {
+  if (data.roots && data.roots.length > 0) {
+    return data.roots.map((root) => ({ id: root.id, name: root.name }));
+  }
+  if (data.rootComponentId) {
+    const root = data.components.find((c) => c.id === data.rootComponentId);
+    return [{ id: data.rootComponentId, name: root?.name || data.original.name || "Stack" }];
+  }
+  return [];
+}
+
+function StackRootsGallery({
+  roots, urls, onOpen,
+}: {
+  roots: StackRootEntry[];
+  urls: Record<string, string>;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="min-h-0 max-h-full w-full overflow-y-auto">
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}
+      >
+        {roots.map((root) => (
+          <ReferenceThumbCard
+            key={root.id}
+            thumbnailUrl={urls[root.id]}
+            title={root.name}
+            badge="Stack"
+            onClick={() => onOpen(root.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

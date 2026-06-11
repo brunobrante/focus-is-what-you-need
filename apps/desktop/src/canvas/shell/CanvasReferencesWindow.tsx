@@ -1,0 +1,180 @@
+import { useRef, useState } from "react";
+import { ChevronLeft, Plus, Trash2 } from "lucide-react";
+import { IconImage } from "@/components/icons";
+import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
+import { useReferences } from "@/lib/storage/hooks";
+import {
+  createOrAttachReference,
+  removeReferenceFromOwner,
+} from "@/lib/storage/repos/references.repo";
+import { ReferenceThumbCard } from "@/components/references/ReferenceThumbCard";
+import {
+  AddReferenceModal,
+  type AddReferenceModalHandle,
+} from "@/components/modals/AddReferenceModal";
+
+// The current canvas subject: the screen or component being edited. The
+// references window shows references attached to exactly this subject, and Add
+// attaches new ones to it.
+export type CanvasReferencesContext = {
+  projectId: string;
+  ownerType: "screen" | "component";
+  ownerId: string;
+  defaultScreenId?: string;
+  defaultComponentId?: string;
+  screens: ScreenRow[];
+  components: ComponentRow[];
+};
+
+export function CanvasReferencesWindow({
+  active,
+  showActiveBorder,
+  context,
+  onClick,
+}: {
+  active: boolean;
+  showActiveBorder: boolean;
+  context: CanvasReferencesContext;
+  onClick?: () => void;
+}) {
+  const { data: references } = useReferences(context.ownerType, context.ownerId);
+  const addRef = useRef<AddReferenceModalHandle>(null);
+  // Clicking a card enlarges that reference inline (within the canvas), not in a
+  // modal. Resolve by id so it survives list changes; falls back to the gallery
+  // when the selected reference is removed.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = selectedId ? references.find((r) => r.id === selectedId) ?? null : null;
+
+  const removeOne = (id: string) =>
+    void removeReferenceFromOwner(id, context.ownerType, context.ownerId);
+
+  const stop = (event: React.MouseEvent) => event.stopPropagation();
+
+  return (
+    <div
+      className="relative flex flex-1 flex-col overflow-hidden rounded-xl border text-left transition-all duration-150"
+      style={{
+        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
+        backgroundColor: "#141615",
+        boxShadow:
+          active && showActiveBorder
+            ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
+            : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
+      }}
+      onClick={onClick}
+    >
+      {/* Toolbar */}
+      <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5" onClick={stop}>
+        {selected ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#303030] bg-[#1B1B1B]/95 pl-2 pr-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222]"
+            >
+              <ChevronLeft size={14} strokeWidth={2} />
+              Back
+            </button>
+            <span className="inline-flex h-8 max-w-[220px] items-center truncate rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
+              {selected.title}
+            </span>
+            <button
+              type="button"
+              aria-label="Remove reference"
+              onClick={() => {
+                removeOne(selected.id);
+                setSelectedId(null);
+              }}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[rgba(255,80,80,0.45)] hover:bg-[rgba(255,80,80,0.12)] hover:text-[#ff8a8a]"
+            >
+              <Trash2 size={14} strokeWidth={1.8} />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="inline-flex h-8 items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
+              References
+            </span>
+            <button
+              type="button"
+              aria-label="Add reference"
+              onClick={() => addRef.current?.open()}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222] hover:text-[#E2E2E2]"
+            >
+              <Plus size={14} strokeWidth={2} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Body */}
+      {selected ? (
+        /* Enlarged reference — shown directly inside the canvas */
+        <div className="absolute inset-0 flex items-center justify-center p-6 pt-16" onClick={stop}>
+          {selected.thumbnailUrl ? (
+            <img
+              src={selected.thumbnailUrl}
+              alt={selected.title}
+              className="max-h-full max-w-full rounded-lg object-contain shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+              draggable={false}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-[#888]">
+              <IconImage size={28} strokeWidth={1.4} />
+              <span className="text-[12px]">No preview</span>
+            </div>
+          )}
+        </div>
+      ) : references.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
+              <IconImage size={17} strokeWidth={1.6} />
+            </span>
+            <span className="text-[13px] font-semibold text-[#E6E6E6]">No references yet</span>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                addRef.current?.open();
+              }}
+              className="mt-1 rounded-lg border border-[#303030] bg-[#1B1B1B] px-3 py-1.5 text-[11.5px] font-medium text-[#D8D8D8] transition-colors hover:border-[#3A3A3A] hover:bg-[#222]"
+            >
+              Add a reference
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-14" onClick={stop}>
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
+          >
+            {references.map((reference) => (
+              <ReferenceThumbCard
+                key={reference.id}
+                thumbnailUrl={reference.thumbnailUrl}
+                title={reference.title}
+                subtitle={reference.stackNodeId ? reference.stackNodeName ?? reference.source : reference.source}
+                badge={!reference.stackNodeId && reference.stack?.enabled ? "Stack" : undefined}
+                onClick={() => setSelectedId(reference.id)}
+                onRemove={() => removeOne(reference.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <AddReferenceModal
+        ref={addRef}
+        projectId={context.projectId}
+        screens={context.screens}
+        components={context.components}
+        existingReferences={references}
+        defaultScreenId={context.defaultScreenId}
+        defaultComponentId={context.defaultComponentId}
+        onAdd={(input) => createOrAttachReference(input)}
+      />
+    </div>
+  );
+}

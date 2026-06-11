@@ -137,10 +137,19 @@ the project's own tokens shown together — see section 8a.
 - Component name + kind badge
 - On hover: CardMenu with actions
 
+**References tab card** (`ReferenceProjectCard`):
+- 4:3 image preview only (no caption beneath); on hover, an **open** (eye) button
+  appears top-left and the `···` remove menu top-right
+- The open button launches `ReferencesModal` — the same lightbox used by the
+  screen/component detail References tab — opened at that card's position, with
+  prev/next navigation across the filtered references
+
 **Modals triggered from this page**:
 - `NewScreenModal` — form with name field and template selector
 - `NewComponentModal` — form with name field and kind selector
 - `ProjectPreviewModal` — full-screen preview of project screens
+- `AddReferenceModal` — searchable stack tree for attaching references
+- `ReferencesModal` — lightbox preview of a project reference (opened from a card)
 - `ConfirmActionModal` — confirmation dialog with Cancel / Delete buttons
 
 ---
@@ -211,7 +220,9 @@ Full-screen visual editor with floating UI layers.
 **References window** (a canvas window, like Current/Drafts):
 - Shows references attached to the subject currently open in the canvas (a
   component takes precedence over its screen) as a gallery of `ReferenceThumbCard`s.
-- Clicking a card opens it enlarged in the lightbox; hover reveals remove.
+- Clicking a card enlarges that reference **inline within the canvas window**
+  (not a modal) — the image fills the window; a **Back** control returns to the
+  gallery and a trash control removes it. Card hover also reveals remove.
 - The window's **Add** button opens the standard `AddReferenceModal`, scoped to
   the current subject, so new references appear here and in the side References tab.
 - Empty state prompts to add the first reference.

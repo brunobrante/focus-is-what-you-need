@@ -49,10 +49,23 @@ export async function createOrAttachReference(input: {
   metadata?: string[];
   thumbnailUrl?: string | null;
   stack?: ReferenceRow["stack"];
+  sourceReferenceId?: string;
+  stackNodeId?: string | null;
+  stackNodeName?: string;
   attachment: ReferenceAttachment;
 }): Promise<ReferenceRow> {
   const rows = await listReferences();
-  const idx = input.id ? rows.findIndex((reference) => reference.id === input.id) : -1;
+  // Each (image, stack-node) pair is its own card. Whole-image references keep
+  // id = library image id (back-compat); node references get a composite id so
+  // the original and any number of cuts coexist as distinct cards.
+  const rowId =
+    input.id ??
+    (input.sourceReferenceId
+      ? input.stackNodeId
+        ? `${input.sourceReferenceId}::${input.stackNodeId}`
+        : input.sourceReferenceId
+      : undefined);
+  const idx = rowId ? rows.findIndex((reference) => reference.id === rowId) : -1;
   const nextAttachment = input.attachment;
 
   if (idx >= 0) {
@@ -78,6 +91,9 @@ export async function createOrAttachReference(input: {
       metadata: input.metadata ?? current.metadata,
       thumbnailUrl: input.thumbnailUrl ?? current.thumbnailUrl,
       stack: input.stack ?? current.stack,
+      sourceReferenceId: input.sourceReferenceId ?? current.sourceReferenceId,
+      stackNodeId: input.stackNodeId ?? current.stackNodeId,
+      stackNodeName: input.stackNodeName ?? current.stackNodeName,
       attachments,
       projectIds: Array.from(new Set([nextAttachment.projectId, ...attachments.map((attachment) => attachment.projectId)])),
     });
@@ -89,7 +105,7 @@ export async function createOrAttachReference(input: {
   }
 
   const created = normalizeReferenceRow({
-    id: input.id ?? newId(),
+    id: rowId ?? newId(),
     title: input.title,
     source: input.source,
     origin: input.origin,
@@ -101,6 +117,9 @@ export async function createOrAttachReference(input: {
     metadata: input.metadata ?? [],
     thumbnailUrl: input.thumbnailUrl ?? null,
     stack: input.stack,
+    sourceReferenceId: input.sourceReferenceId,
+    stackNodeId: input.stackNodeId,
+    stackNodeName: input.stackNodeName,
     projectIds: [nextAttachment.projectId],
     attachments: [nextAttachment],
     createdAt: now(),

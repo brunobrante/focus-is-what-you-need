@@ -78,7 +78,7 @@ export function stackSummaryFromData(
   };
 }
 
-function stackRootIds(data: ReferenceStackData): Set<string> {
+export function stackRootIds(data: ReferenceStackData): Set<string> {
   if (data.roots && data.roots.length > 0) {
     return new Set(data.roots.map((root) => root.id));
   }

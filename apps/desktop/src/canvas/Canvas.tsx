@@ -6,6 +6,7 @@ import { Tree, TreeToggle, type ProjectTreeNode } from "@/canvas/shell/Tree";
 import { FloatingToggle } from "@/canvas/shell/GalleryPanel";
 import { SearchPalette, SearchToggle } from "@/canvas/shell/SearchPalette";
 import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
+import type { CanvasReferencesContext } from "@/canvas/shell/CanvasReferencesWindow";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { DEFAULT_SHELL_BACKGROUND, moveElementBefore, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
@@ -111,6 +112,8 @@ function CanvasPageContent() {
   const [canvasExpanded, setCanvasExpanded] = useState(false);
   const [canvasFeatures, setCanvasFeatures] = useState<CanvasFeatureFlags>(() => ({
     ...DEFAULT_CANVAS_FEATURES,
+    // The references window is now a real, wired surface — make it reachable.
+    references: true,
   }));
   const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
   const [shellBackVisibility, setShellBackVisibility] = useState<ShellControlVisibility>("show");
@@ -408,6 +411,34 @@ function CanvasPageContent() {
       return { ...current, [feature]: enabled };
     });
   }, []);
+  // The references window shows references attached to the subject currently
+  // open in the canvas (a component takes precedence over its screen). Null when
+  // there is no concrete subject (e.g. a detached scene).
+  const referencesContext = useMemo<CanvasReferencesContext | null>(() => {
+    if (!projectId) return null;
+    if (component) {
+      return {
+        projectId,
+        ownerType: "component",
+        ownerId: component.id,
+        defaultComponentId: component.id,
+        screens: projectScreens,
+        components: projectComponents,
+      };
+    }
+    if (screen) {
+      return {
+        projectId,
+        ownerType: "screen",
+        ownerId: screen.id,
+        defaultScreenId: screen.id,
+        screens: projectScreens,
+        components: projectComponents,
+      };
+    }
+    return null;
+  }, [projectId, component, screen, projectScreens, projectComponents]);
+
   const splitActive = split !== "none";
   const selectedSubjectSize = component
     ? currentDocument.canvas
@@ -434,6 +465,7 @@ function CanvasPageContent() {
         projectType={projectType}
         parentTarget={parentProjectNode}
         isComponent={!!component}
+        referencesContext={referencesContext}
         componentOriginPosition={componentOriginPosition}
         shellDeviceVisibility={shellDeviceVisibility}
         shellBackVisibility={shellBackVisibility}

@@ -25,6 +25,10 @@ import {
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
 import {
+  ReferencesModal,
+  type ReferencesModalHandle,
+} from "@/components/modals/ReferencesModal";
+import {
   NewScreenModal,
   type NewScreenModalHandle,
 } from "@/components/modals/NewScreenModal";
@@ -2558,6 +2562,7 @@ export function ReferencesTab({
   references: ReferenceRow[];
 }) {
   const modalRef = useRef<AddReferenceModalHandle>(null);
+  const referencesModalRef = useRef<ReferencesModalHandle>(null);
   const [query, setQuery] = useState("");
   const [originFilter, setOriginFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all");
@@ -2672,13 +2677,14 @@ export function ReferencesTab({
             className="grid gap-x-[18px] gap-y-[22px]"
             style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
           >
-            {filtered.map((reference) => (
+            {filtered.map((reference, index) => (
               <ReferenceProjectCard
                 key={reference.id}
                 reference={reference}
                 attachments={projectAttachments(reference)}
                 screenById={screenById}
                 componentById={componentById}
+                onOpen={() => referencesModalRef.current?.open(index)}
                 onRemove={() => project && void removeReferenceFromProject(reference.id, project.id)}
               />
             ))}
@@ -2709,6 +2715,11 @@ export function ReferencesTab({
           await createOrAttachReference(input);
         }}
       />
+      <ReferencesModal
+        ref={referencesModalRef}
+        references={filtered}
+        onRemove={(reference) => project && void removeReferenceFromProject(reference.id, project.id)}
+      />
     </>
   );
 }
@@ -2738,12 +2749,14 @@ function ReferenceProjectCard({
   attachments,
   screenById,
   componentById,
+  onOpen,
   onRemove,
 }: {
   reference: ReferenceRow;
   attachments: ReferenceRow["attachments"];
   screenById: Map<string, ScreenRow>;
   componentById: Map<string, ComponentRow>;
+  onOpen?: () => void;
   onRemove: () => void;
 }) {
   const labels = referenceLabelSet(attachments, screenById, componentById);
@@ -2751,6 +2764,16 @@ function ReferenceProjectCard({
   return (
     <div className="group flex cursor-default flex-col gap-2.5 transition-transform duration-[120ms] hover:-translate-y-0.5">
       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]">
+        {onOpen ? (
+          <button
+            type="button"
+            aria-label="Open reference"
+            onClick={onOpen}
+            className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-white/15 bg-black/70 text-white/80 opacity-0 backdrop-blur transition-[opacity,background-color,color] duration-150 hover:bg-black/90 hover:text-white group-hover:opacity-100"
+          >
+            <IconEye size={13} strokeWidth={1.7} />
+          </button>
+        ) : null}
         {reference.thumbnailUrl ? (
           <>
             <img

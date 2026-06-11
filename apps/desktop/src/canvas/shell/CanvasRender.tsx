@@ -23,6 +23,7 @@ import {
   type SplitMode,
 } from "@/canvas/canvasUtils";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
+import { CanvasReferencesWindow, type CanvasReferencesContext } from "./CanvasReferencesWindow";
 import { CanvasStage } from "../stage/CanvasStage";
 import type { CanvasToolId } from "@/canvas/tools";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -57,30 +58,6 @@ const VERSION_MENU_ITEMS = [
   { id: "v1", name: "Version 1", description: "Initial canvas", meta: "Last week" },
 ];
 
-const REFERENCE_MENU_ITEMS = [
-  {
-    id: "ref-checkout",
-    name: "Checkout reference",
-    description: "Mobile purchase flow",
-    accent: "#0D99FF",
-    palette: ["#F6F8FB", "#172033", "#0D99FF"],
-  },
-  {
-    id: "ref-list",
-    name: "Product list",
-    description: "Cards and filters",
-    accent: "#49B66E",
-    palette: ["#F7FAF6", "#263326", "#49B66E"],
-  },
-  {
-    id: "ref-profile",
-    name: "Profile screen",
-    description: "Settings reference",
-    accent: "#D58C2A",
-    palette: ["#FBF7EF", "#30261C", "#D58C2A"],
-  },
-];
-
 export type ZoomSetter = (next: number | ((zoom: number) => number)) => void;
 type CanvasParentTarget = {
   name: string;
@@ -102,6 +79,7 @@ export function CanvasRender({
   projectType = "desktop",
   parentTarget,
   isComponent = false,
+  referencesContext = null,
   componentOriginPosition = null,
   shellDeviceVisibility = "show",
   shellBackVisibility = "show",
@@ -129,6 +107,7 @@ export function CanvasRender({
   projectType?: ProjectType;
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
+  referencesContext?: CanvasReferencesContext | null;
   componentOriginPosition?: { x: number; y: number } | null;
   shellDeviceVisibility?: ShellControlVisibility;
   shellBackVisibility?: ShellControlVisibility;
@@ -222,6 +201,17 @@ export function CanvasRender({
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
           onOpenSelectedComponentShortcut={undefined}
+        />
+      );
+    }
+
+    if (windowType === "references" && referencesContext) {
+      return (
+        <CanvasReferencesWindow
+          active={active}
+          showActiveBorder={showActiveBorder}
+          context={referencesContext}
+          onClick={() => onActiveCanvasChange?.(windowType)}
         />
       );
     }
@@ -378,10 +368,11 @@ function CanvasPlaceholderSurface({
   );
 }
 
+// Controls for the Versions placeholder window. References has its own real
+// window (CanvasReferencesWindow) and no longer routes through here.
 function FeaturePlaceholderControls({ windowType }: { windowType: CanvasFeatureWindowType }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState(VERSION_MENU_ITEMS[0]?.id ?? "");
-  const [selectedReferenceId, setSelectedReferenceId] = useState(REFERENCE_MENU_ITEMS[0]?.id ?? "");
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -401,12 +392,9 @@ function FeaturePlaceholderControls({ windowType }: { windowType: CanvasFeatureW
     };
   }, [menuOpen]);
 
-  if (windowType === "drafts") return null;
+  if (windowType !== "versions") return null;
 
-  const references = windowType === "references";
   const selectedVersion = VERSION_MENU_ITEMS.find((item) => item.id === selectedVersionId) ?? VERSION_MENU_ITEMS[0];
-  const selectedReference = REFERENCE_MENU_ITEMS.find((item) => item.id === selectedReferenceId) ?? REFERENCE_MENU_ITEMS[0];
-  const selectedLabel = references ? selectedReference?.name : selectedVersion?.name;
 
   return (
     <div
@@ -422,7 +410,7 @@ function FeaturePlaceholderControls({ windowType }: { windowType: CanvasFeatureW
         aria-expanded={menuOpen}
         className="inline-flex h-8 max-w-[220px] items-center gap-2 rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222]"
       >
-        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <span className="min-w-0 truncate">{selectedVersion?.name}</span>
         <ChevronDown
           size={13}
           strokeWidth={2}
@@ -433,30 +421,20 @@ function FeaturePlaceholderControls({ windowType }: { windowType: CanvasFeatureW
 
       <button
         type="button"
-        aria-label={`Add ${references ? "reference" : "version"}`}
+        aria-label="Add version"
         className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222] hover:text-[#E2E2E2]"
       >
         <Plus size={14} strokeWidth={2} />
       </button>
 
       {menuOpen ? (
-        references ? (
-          <ReferenceDropdownMenu
-            selectedId={selectedReferenceId}
-            onSelect={(id) => {
-              setSelectedReferenceId(id);
-              setMenuOpen(false);
-            }}
-          />
-        ) : (
-          <VersionDropdownMenu
-            selectedId={selectedVersionId}
-            onSelect={(id) => {
-              setSelectedVersionId(id);
-              setMenuOpen(false);
-            }}
-          />
-        )
+        <VersionDropdownMenu
+          selectedId={selectedVersionId}
+          onSelect={(id) => {
+            setSelectedVersionId(id);
+            setMenuOpen(false);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -504,64 +482,6 @@ function VersionDropdownMenu({
     </div>
   );
 }
-
-function ReferenceDropdownMenu({
-  selectedId,
-  onSelect,
-}: {
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="absolute left-0 top-[calc(100%+6px)] w-[330px] overflow-hidden rounded-xl border border-[#2E2E2E] bg-[#171717] p-2 shadow-[0_14px_34px_rgba(0,0,0,0.55)]">
-      <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#666]">
-        Available references
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {REFERENCE_MENU_ITEMS.map((item) => {
-          const selected = selectedId === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className={[
-                "flex min-h-[72px] w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors duration-100",
-                selected ? "border-[#0D99FF]/45 bg-[#223241]" : "border-[#272727] bg-[#1B1B1B] hover:border-[#363636] hover:bg-[#212121]",
-              ].join(" ")}
-            >
-              <ReferencePreview palette={item.palette} accent={item.accent} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-semibold text-[#E4E4E4]">{item.name}</span>
-                <span className="mt-1 block truncate text-[10.5px] text-[#777]">{item.description}</span>
-                <span className="mt-2 inline-flex h-4 items-center rounded border border-[#303030] px-1.5 text-[9px] font-medium uppercase tracking-[0.06em] text-[#686868]">
-                  Reference
-                </span>
-              </span>
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ background: selected ? item.accent : "#3A3A3A" }}
-              />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ReferencePreview({ palette, accent }: { palette: string[]; accent: string }) {
-  return (
-    <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md border border-[#303030] bg-[#101010]">
-      <span className="absolute inset-0" style={{ background: palette[0] }} />
-      <span className="absolute left-2 top-2 h-1.5 w-8 rounded-full" style={{ background: palette[1] }} />
-      <span className="absolute left-2 top-5 h-2.5 w-12 rounded" style={{ background: accent, opacity: 0.9 }} />
-      <span className="absolute bottom-2 left-2 h-2 w-5 rounded" style={{ background: palette[1], opacity: 0.35 }} />
-      <span className="absolute bottom-2 right-2 h-2 w-5 rounded" style={{ background: palette[2], opacity: 0.7 }} />
-    </span>
-  );
-}
-
 
 function CanvasSurface({
   active,
