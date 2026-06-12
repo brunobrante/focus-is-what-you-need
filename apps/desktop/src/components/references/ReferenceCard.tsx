@@ -272,6 +272,7 @@ type CardShellProps = {
   topLeftAction?: ReactNode;
   onRemove?: () => void;
   cardSlot?: ReactNode;
+  footer?: ReactNode;
   onClick?: () => void;
   onDoubleClick?: () => void;
 };
@@ -293,6 +294,7 @@ function CardShell({
   topLeftAction,
   onRemove,
   cardSlot,
+  footer,
   onClick,
   onDoubleClick,
 }: CardShellProps) {
@@ -365,7 +367,7 @@ function CardShell({
   );
 
   return (
-    <div className="group relative w-full text-left align-top">
+    <div className={["group relative w-full text-left align-top", footer ? "flex flex-col" : ""].join(" ")}>
       {stackedLayers ? (
         <>
           <div className="pointer-events-none absolute inset-0 translate-x-[10px] translate-y-[10px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.7 }} />
@@ -388,6 +390,8 @@ function CardShell({
           {innerCard}
         </div>
       )}
+
+      {footer ? <div>{footer}</div> : null}
 
       {onRemove ? (
         <button
