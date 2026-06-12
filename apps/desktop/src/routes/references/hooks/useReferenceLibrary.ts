@@ -411,6 +411,14 @@ export function useReferenceLibrary() {
     );
   }, []);
 
+  const updateName = useCallback((id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setLibrary((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, name: trimmed } : item)),
+    );
+  }, []);
+
   const updateDescription = useCallback((id: string, description: string) => {
     setLibrary((prev) =>
       prev.map((item) =>
@@ -504,6 +512,7 @@ export function useReferenceLibrary() {
     addItemsAsGroup,
     createFrameGroup,
     removeItem,
+    updateName,
     updateDescription,
     updateTags,
     updateSourceUrl,

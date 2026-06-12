@@ -32,6 +32,7 @@ export function ReferenceDetailModal({
   stackThumbnailUrls,
   onClose,
   onDelete,
+  onNameChange,
   onDescriptionChange,
   onTagsChange,
   onSourceUrlChange,
@@ -47,6 +48,7 @@ export function ReferenceDetailModal({
   stackThumbnailUrls: Record<string, string>;
   onClose: () => void;
   onDelete: (id: string) => void;
+  onNameChange: (id: string, name: string) => void;
   onDescriptionChange: (id: string, desc: string) => void;
   onTagsChange: (id: string, tags: string[]) => void;
   onSourceUrlChange: (id: string, url: string) => void;
@@ -85,6 +87,13 @@ export function ReferenceDetailModal({
   const currentItem: ReferenceItem | null =
     subject?.kind === "reference" ? subject.item : focusedItem;
   const canStack = Boolean(currentItem?.stack?.enabled);
+  // A single image split into multiple screens is itself a group. It is not a
+  // ReferenceGroup row, so it gets a Group tab backed by the image directly —
+  // mirroring how a real multi-image group exposes Inspector + Group.
+  const isImageGroup =
+    !isGroup &&
+    currentItem?.mediaKind === "image" &&
+    (currentItem?.stack?.rootCount ?? 1) > 1;
 
   const displayedItems = activeTab === "screens" ? groupReferences : stackedReferences;
   const focusedIndex = focusedItem
@@ -130,7 +139,11 @@ export function ReferenceDetailModal({
     void loadStackPreview(currentItem).then((preview) => {
       if (cancelled) { releaseStackUrls(preview); return; }
       setStackPreview(preview);
-      setSelectedStackComponentId(preview?.data.primaryComponentId ?? null);
+      // Multi-screen references open into a screen gallery: keep the side panel
+      // empty until the user opens a specific screen. Single-screen references
+      // pre-select their primary component so the stack shows immediately.
+      const rootCount = preview?.data.roots?.length ?? (preview?.data.rootComponentId ? 1 : 0);
+      setSelectedStackComponentId(rootCount > 1 ? null : preview?.data.primaryComponentId ?? null);
     }).finally(() => { if (!cancelled) setStackLoading(false); });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,19 +165,42 @@ export function ReferenceDetailModal({
   if (!subject) return null;
 
   // ── stack derivation ──────────────────────────────────────────────────────
-  const stackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
-  // Each root = one stack. The Stack tab shows a card per stack when there are
-  // several; with a single stack it renders the composite directly.
+  const fullStackTree = stackPreview ? buildStackTree(stackPreview.data) : [];
+  // Each root = one screen. The Screens tab shows a card per screen when there
+  // are several; with a single screen it renders the composite directly.
   const stackRoots = stackPreview ? listStackRoots(stackPreview.data) : [];
   const hasMultipleStacks = stackRoots.length > 1;
+  // The side panel only shows a stack tree once a screen is in focus. With many
+  // screens and none opened, it stays empty (awaiting a screen selection); a
+  // single screen shows its tree directly.
+  const awaitingScreenSelection = hasMultipleStacks && !focusedRootId;
+  const stackTree = focusedRootId
+    ? fullStackTree.filter((node) => node.component.id === focusedRootId)
+    : hasMultipleStacks
+    ? []
+    : fullStackTree;
   // Only scope the composite to a root when a stack is explicitly focused (which
   // only happens for multi-root v2 stacks, whose cuts carry rootId). A single
   // stack stays unscoped so legacy cuts (rootId === null) still render.
+  // With a screen focused but no cut selected, fall back to that screen's own
+  // image — not the primary/first root, which would show the wrong screen.
   const effectiveStackId =
     selectedStackComponentId ??
+    focusedRootId ??
     stackPreview?.data.primaryComponentId ??
     stackPreview?.data.roots?.[0]?.id ??
     stackPreview?.data.components[0]?.id;
+  // Cuts contained by the screen currently in view. The All/Solo toggle only
+  // makes sense when a screen actually holds children (more than its own root).
+  const scopedCutCount = stackPreview
+    ? (() => {
+        const rootIdSet = stackRootIds(stackPreview.data);
+        return stackPreview.data.components.filter(
+          (cut) =>
+            !rootIdSet.has(cut.id) && (focusedRootId ? cut.rootId === focusedRootId : true),
+        ).length;
+      })()
+    : 0;
   const currentStackThumb =
     canStack && currentItem ? stackThumbnailUrls[currentItem.id] : undefined;
   const stackImageUrl =
@@ -191,11 +227,11 @@ export function ReferenceDetailModal({
   const tabs = isGroup
     ? [
         { id: "screens", label: "Originals" },
-        { id: "stacks", label: "Stacks", disabled: !hasStacks },
+        { id: "stacks", label: "Screens", disabled: !hasStacks },
       ]
     : [
         { id: "screen", label: "Original" },
-        { id: "stack", label: "Stack", disabled: !canStack },
+        { id: "stack", label: "Screens", disabled: !canStack },
       ];
 
   return (
@@ -281,8 +317,8 @@ export function ReferenceDetailModal({
                 </button>
               )}
 
-              {/* All / Solo toggle — only when an individual stack is shown */}
-              {showStackView && !(hasMultipleStacks && !focusedRootId) && (
+              {/* All / Solo toggle — only when the shown screen holds cuts */}
+              {showStackView && !(hasMultipleStacks && !focusedRootId) && scopedCutCount > 0 && (
                 <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 flex items-center gap-0.5 rounded-[8px] border border-[var(--border-strong)] bg-[rgba(14,14,15,0.88)] p-0.5 backdrop-blur">
                   {(["composite", "isolated"] as const).map((mode) => (
                     <button
@@ -317,8 +353,13 @@ export function ReferenceDetailModal({
                 </button>
               )}
 
-              {/* main preview */}
-              <div className="flex flex-1 items-center justify-center overflow-hidden p-6">
+              {/* main preview — the screens gallery sits at the top, not centered */}
+              <div
+                className={[
+                  "flex flex-1 justify-center overflow-hidden p-6",
+                  showStackView && hasMultipleStacks && !focusedRootId ? "items-start" : "items-center",
+                ].join(" ")}
+              >
                 {showStackView ? (
                   stackLoading && !stackPreview ? (
                     <p className="text-[13px] text-[var(--text-muted)]">Loading stack…</p>
@@ -328,7 +369,7 @@ export function ReferenceDetailModal({
                       urls={stackPreview.urls}
                       onOpen={(id) => { setFocusedRootId(id); setSelectedStackComponentId(null); }}
                     />
-                  ) : stackViewMode === "composite" && stackPreview ? (
+                  ) : (stackViewMode === "composite" || scopedCutCount === 0) && stackPreview ? (
                     <StackCompositeView
                       data={stackPreview.data}
                       urls={stackPreview.urls}
@@ -358,8 +399,10 @@ export function ReferenceDetailModal({
                     <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
                   )
                 ) : (
+                  // Original tab: always the true source image, never the stack
+                  // composite (which is the first screen, not the original).
                   <img
-                    src={currentStackThumb ?? currentUrl}
+                    src={currentUrl ?? currentStackThumb}
                     alt={currentItem?.name}
                     className="block max-h-full max-w-full rounded-[10px] object-contain"
                     draggable={false}
@@ -395,6 +438,7 @@ export function ReferenceDetailModal({
           key={currentItem?.id ?? group?.id ?? "none"}
           item={currentItem}
           group={group}
+          imageGroup={isImageGroup}
           groupReferences={groupReferences}
           groups={groups}
           looseReferences={isGroup ? looseReferences : []}
@@ -405,6 +449,7 @@ export function ReferenceDetailModal({
           selectedStackComponentId={selectedStackComponentId}
           stackPreviewUrls={stackPreview?.urls}
           showStackView={showStackView}
+          awaitingScreenSelection={awaitingScreenSelection}
           onSelectStackComponent={setSelectedStackComponentId}
           onIsolateStackComponent={(id) => {
             setSelectedStackComponentId(id);
@@ -415,6 +460,7 @@ export function ReferenceDetailModal({
             if (isGroup) setFocusedItem(null);
             else onClose();
           }}
+          onNameChange={onNameChange}
           onDescriptionChange={onDescriptionChange}
           onTagsChange={onTagsChange}
           onSourceUrlChange={onSourceUrlChange}
@@ -603,6 +649,62 @@ function GroupDetails({
   );
 }
 
+// ─── image-as-group details (right panel) ─────────────────────────────────────
+
+// A single image split into multiple screens has no ReferenceGroup row, so its
+// "group" is the image itself: editing the group name edits the image name.
+function ImageGroupDetails({
+  item,
+  onNameChange,
+}: {
+  item: ReferenceItem;
+  onNameChange: (id: string, name: string) => void;
+}) {
+  const [nameDraft, setNameDraft] = useState(item.name);
+  const prevIdRef = useRef(item.id);
+  const screenCount = item.stack?.rootCount ?? 1;
+
+  useEffect(() => {
+    if (prevIdRef.current === item.id) return;
+    prevIdRef.current = item.id;
+    setNameDraft(item.name);
+  }, [item.id, item.name]);
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <Section title="Group name">
+        <input
+          type="text"
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => onNameChange(item.id, nameDraft)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { setNameDraft(item.name); e.currentTarget.blur(); }
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          placeholder="Group name"
+          className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-[13px] font-medium text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
+        />
+      </Section>
+
+      <Section title="Details">
+        <DetailList
+          items={[
+            ["Screens", String(screenCount)],
+            ["Format", item.type],
+            ...(item.w && item.h ? [["Dimensions", `${item.w} × ${item.h}`] as [string, string]] : []),
+            ["Size", formatSize(item.size || 0)],
+            ...(item.stack?.enabled
+              ? [["Stack", `${item.stack.itemCount} ${item.stack.itemCount === 1 ? "component" : "components"}`] as [string, string]]
+              : []),
+            ["Added", formatDateTime(item.added)],
+          ]}
+        />
+      </Section>
+    </div>
+  );
+}
+
 // ─── shared layout ────────────────────────────────────────────────────────────
 
 function ModalShell({
@@ -650,16 +752,17 @@ function ModalShell({
 }
 
 function DetailPanel({
-  item, group, groupReferences, groups, looseReferences,
+  item, group, imageGroup = false, groupReferences, groups, looseReferences,
   stackThumbnailUrls, builderHref,
   stackTree = [], stackLoading = false, selectedStackComponentId = null,
-  stackPreviewUrls, showStackView = false,
+  stackPreviewUrls, showStackView = false, awaitingScreenSelection = false,
   onSelectStackComponent, onIsolateStackComponent,
-  onDelete, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
+  onDelete, onNameChange, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
   onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
 }: {
   item: ReferenceItem | null;
   group: ReferenceGroup | null;
+  imageGroup?: boolean;
   groupReferences: ReferenceItem[];
   groups: ReferenceGroup[];
   looseReferences: ReferenceItem[];
@@ -670,9 +773,11 @@ function DetailPanel({
   selectedStackComponentId?: string | null;
   stackPreviewUrls?: Record<string, string>;
   showStackView?: boolean;
+  awaitingScreenSelection?: boolean;
   onSelectStackComponent?: (id: string) => void;
   onIsolateStackComponent?: (id: string) => void;
   onDelete: () => void;
+  onNameChange: (id: string, name: string) => void;
   onDescriptionChange: (id: string, desc: string) => void;
   onTagsChange: (id: string, tags: string[]) => void;
   onSourceUrlChange: (id: string, url: string) => void;
@@ -682,29 +787,20 @@ function DetailPanel({
   onEditGroup: () => void;
   onDeleteGroup: () => void;
 }) {
-  type SideTab = "inspector" | "group" | "stack";
-  const hasStackTab = Boolean(item?.stack?.enabled);
-  const defaultTab: SideTab = (showStackView && hasStackTab)
-    ? "stack"
-    : !item && group
-    ? "group"
-    : "inspector";
+  // There is no separate Stack tab. The Inspector is a context-sensitive view of
+  // whatever is selected: the image's data for the original, and the stack tree
+  // when a screen/stack is being viewed.
+  type SideTab = "inspector" | "group";
+  const hasStack = Boolean(item?.stack?.enabled);
+  const defaultTab: SideTab = !item && group ? "group" : "inspector";
   const [tab, setTab] = useState<SideTab>(defaultTab);
-  const hasGroupTab = Boolean(group);
+  const hasGroupTab = Boolean(group) || imageGroup;
+  const inspectorShowsStack = showStackView && hasStack;
+  const showingStackTree = tab === "inspector" && inspectorShowsStack;
 
-  // Switch to stack tab only when the main view is actively showing the stack
+  // Opening a screen always surfaces it in the Inspector, never the Group tab.
   useEffect(() => {
-    if (showStackView && hasStackTab && (stackLoading || stackTree.length > 0)) {
-      setTab("stack");
-    }
-  }, [showStackView, hasStackTab, stackLoading, stackTree.length]);
-
-  // Reset to inspector/group when stack view is turned off
-  useEffect(() => {
-    if (!showStackView && hasStackTab) {
-      setTab(!item && group ? "group" : "inspector");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (showStackView) setTab("inspector");
   }, [showStackView]);
 
   const selectedNode = selectedStackComponentId
@@ -717,47 +813,18 @@ function DetailPanel({
   return (
     <aside className="flex w-[280px] shrink-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[var(--bg-elev)]">
       <div className="flex shrink-0 items-center gap-0.5 border-b border-[var(--border)] px-2 py-1.5">
-        {!hasStackTab && (
-          <TabButton active={tab === "inspector"} onClick={() => setTab("inspector")}>
-            Inspector
-          </TabButton>
-        )}
+        <TabButton active={tab === "inspector"} onClick={() => setTab("inspector")}>
+          Inspector
+        </TabButton>
         {hasGroupTab && (
           <TabButton active={tab === "group"} onClick={() => setTab("group")}>
             Group
           </TabButton>
         )}
-        {hasStackTab && (
-          <TabButton active={tab === "stack"} onClick={() => setTab("stack")}>
-            Stack
-          </TabButton>
-        )}
       </div>
 
-      <div className={`min-h-0 flex-1 ${tab === "stack" ? "flex flex-col overflow-hidden" : "overflow-y-auto p-4"}`}>
-        {tab === "inspector" && item ? (
-          <ItemDetails
-            item={item}
-            groups={groups}
-            onDescriptionChange={onDescriptionChange}
-            onTagsChange={onTagsChange}
-            onSourceUrlChange={onSourceUrlChange}
-            onGroupChange={onGroupChange}
-          />
-        ) : tab === "inspector" && !item ? (
-          <p className="text-[12px] text-[var(--text-faint)]">No item selected.</p>
-        ) : null}
-
-        {tab === "group" && group ? (
-          <GroupDetails
-            group={group}
-            references={groupReferences}
-            looseReferences={looseReferences}
-            onGroupChange={onGroupChange}
-          />
-        ) : null}
-
-        {tab === "stack" ? (
+      <div className={`min-h-0 flex-1 ${showingStackTree ? "flex flex-col overflow-hidden" : "overflow-y-auto p-4"}`}>
+        {tab === "inspector" && inspectorShowsStack ? (
           <>
             <div className="min-h-0 flex-1 overflow-hidden flex flex-col">
               <div className="shrink-0 border-b border-[var(--border)] px-3 py-2.5">
@@ -766,12 +833,20 @@ function DetailPanel({
                   <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">Loading…</p>
                 ) : (
                   <p className="m-0 mt-0.5 text-[10.5px] text-[var(--text-faint)]">
-                    {stackTree.length > 0 ? `${countTreeNodes(stackTree)} components` : "No data"}
+                    {awaitingScreenSelection
+                      ? "Select a screen"
+                      : stackTree.length > 0
+                      ? `${countTreeNodes(stackTree)} components`
+                      : "No data"}
                   </p>
                 )}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                {stackLoading && stackTree.length === 0 ? (
+                {awaitingScreenSelection ? (
+                  <div className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-4 text-[11.5px] text-[var(--text-faint)]">
+                    Select a screen to view its stack.
+                  </div>
+                ) : stackLoading && stackTree.length === 0 ? (
                   <p className="px-2 py-3 text-[11.5px] text-[var(--text-faint)]">Loading stack…</p>
                 ) : stackTree.length > 0 ? (
                   stackTree.map((node) => (
@@ -826,10 +901,30 @@ function DetailPanel({
               )}
             </div>
           </>
+        ) : tab === "inspector" && item ? (
+          <ItemDetails
+            item={item}
+            groups={groups}
+            onDescriptionChange={onDescriptionChange}
+            onTagsChange={onTagsChange}
+            onSourceUrlChange={onSourceUrlChange}
+            onGroupChange={onGroupChange}
+          />
+        ) : tab === "inspector" ? (
+          <p className="text-[12px] text-[var(--text-faint)]">No item selected.</p>
+        ) : tab === "group" && group ? (
+          <GroupDetails
+            group={group}
+            references={groupReferences}
+            looseReferences={looseReferences}
+            onGroupChange={onGroupChange}
+          />
+        ) : tab === "group" && imageGroup && item ? (
+          <ImageGroupDetails item={item} onNameChange={onNameChange} />
         ) : null}
       </div>
 
-      {tab !== "stack" && (
+      {!showingStackTree && (
         <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[var(--border)] p-3">
           {tab === "inspector" && item ? (
             <>
@@ -851,6 +946,13 @@ function DetailPanel({
               <Action icon={<Upload size={12} />} label="Add" onClick={onUpload} />
               <Action icon={<Edit3 size={12} />} label="Edit" onClick={onEditGroup} />
               <Action icon={<Trash2 size={12} />} label="Delete" danger onClick={onDeleteGroup} />
+            </>
+          ) : tab === "group" && imageGroup && item ? (
+            <>
+              {builderHref ? (
+                <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
+              ) : null}
+              <Action icon={<Trash2 size={12} />} label="Remove" danger onClick={onDelete} />
             </>
           ) : null}
         </div>
@@ -1132,7 +1234,7 @@ function GroupGridThumb({
   return (
     <div
       ref={setRef}
-      className="h-full w-full bg-cover bg-center bg-no-repeat bg-[var(--surface)]"
+      className="h-full w-full bg-contain bg-center bg-no-repeat bg-[var(--surface)]"
       style={thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined}
     />
   );

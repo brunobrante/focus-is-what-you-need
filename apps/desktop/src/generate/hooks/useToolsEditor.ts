@@ -623,7 +623,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     const id = newRootComponentId();
     const newRoot: SavedComponent = {
       id,
-      name: "New stack",
+      name: "New screen",
       box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
       dataUrl: item.url,
       type: item.type || "IMG",

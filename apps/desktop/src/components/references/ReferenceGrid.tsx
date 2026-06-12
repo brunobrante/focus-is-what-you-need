@@ -134,7 +134,7 @@ function GroupCard({
       >
         {thumbnailUrl ? (
           <div
-            className="h-full w-full bg-cover bg-center bg-no-repeat bg-[var(--surface)]"
+            className="h-full w-full bg-contain bg-center bg-no-repeat bg-[var(--surface)]"
             style={{ backgroundImage: `url('${thumbnailUrl}')` }}
           />
         ) : firstImage ? (
@@ -192,6 +192,10 @@ function ReferenceCard({
   const stackThumb = item.stack?.enabled ? stackThumbnailUrl : undefined;
   const { url, setRef } = useReferenceUrl(item, { enabled: !stackThumb });
   const thumbnailUrl = stackThumb ?? url;
+  // A single image can hold several screens (its stack roots). When it does, it
+  // is shown with the same stacked "group" treatment as a multi-image group.
+  const screenCount = item.stack?.rootCount ?? 1;
+  const isMultiScreen = item.mediaKind === "image" && screenCount > 1;
 
   return (
     <button
@@ -199,8 +203,14 @@ function ReferenceCard({
       type="button"
       onClick={onSelect}
       onDoubleClick={onDoubleClick}
-      className="group aspect-[4/3] w-full cursor-zoom-in border-0 bg-transparent p-0 text-left text-inherit"
+      className="group relative aspect-[4/3] w-full cursor-zoom-in border-0 bg-transparent p-0 text-left text-inherit"
     >
+      {isMultiScreen ? (
+        <>
+          <div className="pointer-events-none absolute inset-0 translate-x-[10px] translate-y-[10px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.7 }} />
+          <div className="pointer-events-none absolute inset-0 translate-x-[5px] translate-y-[5px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.85 }} />
+        </>
+      ) : null}
       <div
         className={[
           "relative h-full w-full overflow-hidden rounded-[10px] border bg-[var(--surface)] transition-[border-color,box-shadow] duration-150",
@@ -229,18 +239,22 @@ function ReferenceCard({
           </div>
         ) : (
           <div
-            className="h-full w-full bg-cover bg-center bg-no-repeat bg-[var(--surface)]"
+            className="h-full w-full bg-contain bg-center bg-no-repeat bg-[var(--surface)]"
             style={thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined}
           />
         )}
 
-        {item.mediaKind === "image" ? (
+        {isMultiScreen ? (
+          <span className="pointer-events-none absolute left-2 top-2 rounded-[4px] border border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.72)] px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
+            Group
+          </span>
+        ) : item.mediaKind === "image" ? (
           <span className="pointer-events-none absolute left-2 top-2 rounded-[4px] border border-[var(--border-strong)] bg-[rgba(20,20,20,0.85)] px-1.5 py-[3px] text-[9.5px] uppercase tracking-[0.4px] text-[var(--text)] backdrop-blur">
             {item.type}
           </span>
         ) : null}
 
-        {item.stack?.enabled ? (
+        {!isMultiScreen && item.stack?.enabled ? (
           <span className="pointer-events-none absolute right-2 top-2 rounded-[4px] border border-[rgba(94,162,255,0.28)] bg-[rgba(24,72,140,0.82)] px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.4px] text-white backdrop-blur">
             Stack
           </span>
@@ -258,12 +272,18 @@ function ReferenceCard({
         >
           <div className="flex w-full flex-col gap-0.5 text-[11.5px] leading-[1.35] text-white">
             <span className="line-clamp-2 font-medium">{item.name}</span>
-            <span className="flex items-center gap-2 text-[10.5px] tabular-nums text-white/70">
-              {item.w && item.h ? <span>{item.w} × {item.h}</span> : null}
-              {item.w && item.h && <span>·</span>}
-              <span>{item.size || 0} KB</span>
-              {item.duration ? <><span>·</span><span>{item.duration}s</span></> : null}
-            </span>
+            {isMultiScreen ? (
+              <span className="text-[10.5px] tabular-nums text-white/70">
+                {screenCount} screens
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 text-[10.5px] tabular-nums text-white/70">
+                {item.w && item.h ? <span>{item.w} × {item.h}</span> : null}
+                {item.w && item.h && <span>·</span>}
+                <span>{item.size || 0} KB</span>
+                {item.duration ? <><span>·</span><span>{item.duration}s</span></> : null}
+              </span>
+            )}
           </div>
         </div>
       </div>

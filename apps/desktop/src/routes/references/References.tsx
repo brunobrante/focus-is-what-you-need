@@ -184,6 +184,7 @@ export function References() {
         stackThumbnailUrls={lib.stackThumbnailUrls}
         onClose={() => lib.setSelectedSubject(null)}
         onDelete={(id) => lib.removeItem(id)}
+        onNameChange={lib.updateName}
         onDescriptionChange={lib.updateDescription}
         onTagsChange={lib.updateTags}
         onSourceUrlChange={lib.updateSourceUrl}

@@ -275,19 +275,44 @@ Reference image library for UI research.
 - Header: title, total count, "Add reference" button
 - Responsive grid of image cards
 - Each card: image thumbnail, name, tags, hover actions (View / Delete)
+- **Group treatment**: a card is shown with stacked layers + a "Group" badge and a
+  "N screens" count whenever it represents more than one screen — either a
+  multi-image group **or** a single image that holds multiple screens (its stack
+  roots). A single-screen image keeps the plain card with its format/Stack badges.
 
 **Reference Detail Modal** (opens on card click — single reference or group):
-- **Original / Originals tab**: a single reference shows its image enlarged. A
-  group shows a gallery of its originals; a group with only one original opens it
-  enlarged directly (no one-cell grid).
-- **Stack / Stacks tab**: one image can hold several independent stacks (roots).
-  When there are multiple stacks the tab shows a card per stack; selecting one
-  renders that stack's composite (its background plus only its own cuts). A single
-  stack renders its composite directly. The composite draws each cut once — the
-  root is never re-painted over the background (fixes the prior duplicated image).
-  - "All / Solo" toggle: composite overlay vs an isolated single cut.
-- **Sidebar**: a tree inspector listing each stack and its cuts (name +
-  dimensions), each selectable/isolatable; plus the metadata panel.
+- **Original / Originals tab**: always shows the true source image (never the
+  stack composite). A single reference shows its image enlarged. A group shows a
+  gallery of its originals; a group with only one original opens it enlarged
+  directly (no one-cell grid).
+- **Screens tab** (labelled "Screens"; for a single reference the second tab is
+  also "Screens"): one image can hold several screens (roots). When there are
+  multiple screens the tab shows a card per screen; selecting one renders that
+  screen's composite (its background plus only its own cuts). A single screen
+  renders its composite directly. The composite draws each cut once — the root is
+  never re-painted over the background (fixes the prior duplicated image).
+  - "All / Solo" toggle (composite overlay vs an isolated single cut) appears only
+    when the screen in view actually holds cuts; a screen with just its root shows
+    its image directly with no toggle. Solo with no cut selected falls back to the
+    focused screen's own image (not another screen).
+  - The Screens tab is enabled only when screens-with-stacks exist.
+- **Sidebar tabs**: just **Inspector** (always) and **Group** (when applicable).
+  There is no separate Stack tab — the Inspector is context-sensitive and changes
+  with what is being viewed:
+  - Viewing the **original** → the image's data (name, description, source URL,
+    tags, group membership, details).
+  - Viewing a **screen** (a stack) → that screen's **stack tree** (each cut's name
+    + dimensions, selectable/isolatable), with the selected cut's preview and
+    Builder/Remove actions beneath. With multiple screens and none opened, it
+    prompts "Select a screen to view its stack". Opening a screen always brings
+    the Inspector forward.
+  - **Group** appears whenever the subject is a group — a real multi-image group
+    (group details + Add/Edit/Delete) **or** a single image split into multiple
+    screens (image-as-group: an **editable group name** plus details — Screens
+    count, format, dimensions, size, stack — and Builder/Remove). Mirrors the
+    two-image group: Inspector = what's being viewed, Group = group editing.
+- **Card thumbnails** (grid + group gallery) render `contain`, so the whole image
+  is visible (letterboxed if needed) rather than cropped to fill.
 
 **Add Reference Modal** (`AddReferenceModal`, opened from a screen, component, or
 the canvas references window):
@@ -395,8 +420,15 @@ Workspace-level shared component library.
 
 AI-assisted image-to-component tool.
 
+**Screens, images and groups**: one imported image is one **screen**. A single
+image can hold several screens (its roots) — "New screen" copies the original as
+a fresh root, and "Become root" turns a cut into the whole screen. Multiple
+images form a **group**; in a group the originals are addressed positionally
+(Original 1, Original 2, …). A **stack** is only what a screen contains — it is
+not a separate entity and has no name of its own.
+
 **Header**:
-- Left: sidebar toggle + Wand icon + "Builder" label
+- Left: Wand icon + "Builder" label
 - Center: **Builder / Stack / Gallery** tab switcher
 - Right: close button
 
@@ -409,6 +441,12 @@ AI-assisted image-to-component tool.
 - Each region is called a "cut"
 
 **Bottom canvas bar — image-level actions**: "Mostrar original", "Upload", and (when the Auto-detect Components feature is enabled) **Auto-detect**:
+- **Mostrar original** toggles a clean view of the imported original image (no cut
+  overlays, tool rail dimmed). When the workspace holds several originals (a group:
+  Original 1, Original 2, …) it becomes a slideshow — left/right arrows and an
+  "Original N · i / total" counter flip between them. Clicking it again returns to
+  the editor. The right-panel **Originals** list (below) drives the same view —
+  clicking an original opens it here; the active one is highlighted.
 - **Auto-detect** runs Florence-2 on the open subject and proposes crop regions automatically. The button shows a spinner and the image dims while it runs (typically 3–8s). Only available when a stack/component is open (croppable).
 - Each proposed region renders as a dashed purple box with its label, corner handles, and a "×" discard badge — visually a staged sibling of a manually drawn crop.
 - Proposals are editable in place: drag the body to move, drag a corner to resize, click "×" to discard one.
@@ -417,6 +455,14 @@ AI-assisted image-to-component tool.
 - Approved proposals enter the exact same cut pipeline as hand-drawn crops — once applied they are indistinguishable from manual cuts. When the open subject changes, pending proposals are discarded.
 
 **Right panel — Tools and output**:
+- **Screens panel** (top of the Componentes tab): a single unified list replacing
+  the former left group navigator + "Stacks" switcher. It shows the open image's
+  screens (its roots, selectable); when the image belongs to a group, the group's
+  other images under "Other images" (each navigable); and an **Originals** section
+  listing the imported source image(s) — clicking one opens it in the clean
+  "Mostrar original" view (active original highlighted). "New" creates a new screen
+  from the original; "Add image" uploads another image into the workspace. The
+  panel stays visible while viewing originals, so you can flip between them.
 - **Builder tab** (default):
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
