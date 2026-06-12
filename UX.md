@@ -316,17 +316,18 @@ Reference image library for UI research.
 
 **Add Reference Modal** (`AddReferenceModal`, opened from a screen, component, or
 the canvas references window):
-- A single searchable **tree** of the whole library. An image row is a **group
-  header** (not itself addable when it has a stack) that expands into its
-  **screens** (roots) and **stack components** (cuts), indented by depth — screens
-  show an image icon and a "Screen · W × H" subtitle, stacks a layers icon. The raw
-  whole-image original is never offered as an addable item: every uploaded image is
-  a screen, so you attach screens or stacks, not the group/original. The implicit
-  full-image screen surfaces only when an image has no explicit sub-screens (then
-  the whole image *is* the single screen). A plain image with no stack is itself a
-  single addable screen.
-- One search box filters across image names, tags, **and** stack-component names;
-  matching images auto-expand.
+- A single searchable **tree** whose top-level rows are **screens**, not images.
+  Every uploaded image contributes its screens directly: an image with explicit
+  sub-screens lists each one (the raw original is never shown); an image with no
+  sub-screens contributes one screen (the whole image); a plain image is itself one
+  screen. Each screen row shows its own cover thumbnail and a "Screen · W × H"
+  subtitle, and is addable. Stack data for every stacked image is loaded when the
+  modal opens so its screens appear immediately.
+- A screen that has **stack components** (cuts) gets a chevron toggle; expanding it
+  reveals those cuts nested beneath it (layers icon, indented by depth), each
+  individually addable. The count badge on a screen is its number of cuts.
+- One search box filters across image names, tags, screen names, **and**
+  stack-component names; matching screens auto-expand.
 - Picking a screen attaches that screen; picking a stack attaches just that cropped
   component (its crop is baked into the card thumbnail). Already-added items show an
   "Added" marker.
