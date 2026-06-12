@@ -62,6 +62,12 @@ export function runTextCheck(
   });
 }
 
+export function runFlorence2TextCheck(imageBytes: Uint8Array): Promise<boolean> {
+  return invoke<boolean>("run_florence2_text_check", {
+    imageBytes: Array.from(imageBytes),
+  });
+}
+
 // Runs LaMa inpainting on a cut. `maskBytes` is a PNG grayscale mask where
 // white marks the region to remove; returns the inpainted PNG at the cut's
 // original resolution.
@@ -74,6 +80,15 @@ export async function runLama(
     maskBytes: Array.from(maskBytes),
   });
   return new Uint8Array(out);
+}
+
+// One quantized color bucket and the number of pixels that fell into it.
+export type ColorEntry = { r: number; g: number; b: number; count: number };
+
+// Extracts all colors from an image, quantized to 4-bit per channel (16 levels
+// per channel). Returns entries sorted by count descending.
+export async function extractColors(imageBytes: Uint8Array): Promise<ColorEntry[]> {
+  return invoke<ColorEntry[]>("extract_colors", { imageBytes: Array.from(imageBytes) });
 }
 
 // --- image <-> bytes helpers ----------------------------------------------

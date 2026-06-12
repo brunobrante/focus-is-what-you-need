@@ -979,6 +979,7 @@ pub fn run() {
             models::run_text_check,
             models::run_craft,
             models::run_lama,
+            models::extract_colors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

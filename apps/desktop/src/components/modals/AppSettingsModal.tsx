@@ -29,6 +29,7 @@ import {
   Download,
   Eraser,
   Maximize2,
+  Palette,
   ScanText,
   Sparkles,
   Trash2,
@@ -253,6 +254,7 @@ const FEATURE_ICON: Record<ProcessingFeatureKey, React.ReactNode> = {
   autoDetect: <Sparkles size={16} strokeWidth={1.7} />,
   textDetection: <ScanText size={16} strokeWidth={1.7} />,
   removeElement: <Wand2 size={16} strokeWidth={1.7} />,
+  colorDetector: <Palette size={16} strokeWidth={1.7} />,
 };
 
 function ProcessingFeaturesTab() {
@@ -286,19 +288,23 @@ function ProcessingFeaturesTab() {
               className={index < FEATURES.length - 1 ? "border-b border-[var(--border)]" : ""}
             >
               <div className="flex items-center gap-2.5 px-4 py-3">
-                <button
-                  type="button"
-                  aria-label={open ? `Collapse ${feature.name}` : `Expand ${feature.name}`}
-                  aria-expanded={open}
-                  onClick={() => toggle(feature.key)}
-                  className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-                >
-                  <ChevronRight
-                    size={14}
-                    strokeWidth={2}
-                    className={open ? "rotate-90 transition-transform" : "transition-transform"}
-                  />
-                </button>
+                {feature.modelFree ? (
+                  <span className="h-6 w-6 shrink-0" />
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={open ? `Collapse ${feature.name}` : `Expand ${feature.name}`}
+                    aria-expanded={open}
+                    onClick={() => toggle(feature.key)}
+                    className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+                  >
+                    <ChevronRight
+                      size={14}
+                      strokeWidth={2}
+                      className={open ? "rotate-90 transition-transform" : "transition-transform"}
+                    />
+                  </button>
+                )}
                 <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
                   {FEATURE_ICON[feature.key]}
                 </div>
@@ -318,7 +324,7 @@ function ProcessingFeaturesTab() {
                   onChange={(checked) => control.setEnabled(checked)}
                 />
               </div>
-              {open ? (
+              {open && !feature.modelFree ? (
                 <div className="border-t border-[var(--border)] bg-[var(--bg)] py-1 pl-[58px] pr-3">
                   {modelsForFeature(feature.key).map((m) => (
                     <ModelListRow key={m.modelId} model={models[m.modelId]} />

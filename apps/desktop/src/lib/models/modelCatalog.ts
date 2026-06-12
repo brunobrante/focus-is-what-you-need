@@ -28,6 +28,8 @@ export type FeatureMeta = {
   name: string;
   /** What the feature does, shown next to its enable switch. */
   description: string;
+  /** True when the feature needs no downloadable model (runs built-in logic). */
+  modelFree?: boolean;
 };
 
 // Florence-2 ships as five files downloaded sequentially, in this order. Used by
@@ -65,6 +67,12 @@ export const FEATURES: FeatureMeta[] = [
     key: "removeElement",
     name: "Remove Element",
     description: "Removes a painted selection from a cut via inpainting.",
+  },
+  {
+    key: "colorDetector",
+    name: "Color Detector",
+    description: "Extracts all colors from a cut. No model required — runs built-in.",
+    modelFree: true,
   },
 ];
 

@@ -62,11 +62,13 @@ export function BuilderStackTabs({
   stackDisabled,
   onBuilder,
   onStack,
+  onGallery,
 }: {
-  active: "builder" | "stack";
+  active: "builder" | "stack" | "gallery";
   stackDisabled: boolean;
   onBuilder: () => void;
   onStack: () => void;
+  onGallery: () => void;
 }) {
   return (
     <div
@@ -78,6 +80,9 @@ export function BuilderStackTabs({
       </FloatingTabButton>
       <FloatingTabButton active={active === "stack"} disabled={stackDisabled} onClick={onStack}>
         Stack
+      </FloatingTabButton>
+      <FloatingTabButton active={active === "gallery"} onClick={onGallery}>
+        Gallery
       </FloatingTabButton>
     </div>
   );

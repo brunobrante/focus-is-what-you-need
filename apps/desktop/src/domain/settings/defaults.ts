@@ -190,6 +190,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       autoDetect: { enabled: false, activeModelId: null },
       textDetection: { enabled: false, activeModelId: null },
       removeElement: { enabled: false, activeModelId: null },
+      colorDetector: { enabled: false, activeModelId: null },
     },
   },
 };

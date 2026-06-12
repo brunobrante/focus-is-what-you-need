@@ -59,7 +59,7 @@ export type ComponentTreeNode = {
   depth: number;
 };
 
-export type ViewMode = "original" | "stack" | "component";
+export type ViewMode = "original" | "stack" | "component" | "gallery";
 
 export type ActiveSubject =
   | {

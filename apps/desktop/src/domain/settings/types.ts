@@ -147,7 +147,8 @@ export type ProcessingFeatureKey =
   | "upscale"
   | "autoDetect"
   | "textDetection"
-  | "removeElement";
+  | "removeElement"
+  | "colorDetector";
 
 export type ProcessingFeatureSettings = {
   // A feature can only be enabled once at least one of its models is installed.

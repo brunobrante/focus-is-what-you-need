@@ -577,6 +577,36 @@ fn craft_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<bool, String>
     Ok(max_region > CRAFT_TEXT_THRESHOLD)
 }
 
+// --- Color detector (model-free) ------------------------------------------
+
+#[derive(Serialize)]
+pub struct ColorEntry {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub count: u32,
+}
+
+/// Extracts all colors from an image, quantized to 4 bits per channel (16
+/// levels per channel, ~4096 possible buckets). Returns entries sorted by
+/// pixel count descending so the dominant color is first.
+#[tauri::command]
+pub fn extract_colors(image_bytes: Vec<u8>) -> Result<Vec<ColorEntry>, String> {
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let rgb = img.to_rgb8();
+    let mut counts: HashMap<(u8, u8, u8), u32> = HashMap::new();
+    for px in rgb.pixels() {
+        let key = (px[0] & 0xF0, px[1] & 0xF0, px[2] & 0xF0);
+        *counts.entry(key).or_insert(0) += 1;
+    }
+    let mut entries: Vec<ColorEntry> = counts
+        .into_iter()
+        .map(|((r, g, b), count)| ColorEntry { r, g, b, count })
+        .collect();
+    entries.sort_by(|a, b| b.count.cmp(&a.count));
+    Ok(entries)
+}
+
 // --- LaMa inpainting (remove element) -------------------------------------
 
 #[tauri::command]

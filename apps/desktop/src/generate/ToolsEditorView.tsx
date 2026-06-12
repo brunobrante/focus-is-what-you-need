@@ -43,6 +43,7 @@ import {
 import { ConfirmActionModal } from "./ui/ConfirmModal";
 import { ReferenceGroupNavigator } from "./ui/ReferenceGroupNavigator";
 import { RootSwitcher } from "./ui/RootSwitcher";
+import { GallerySlider } from "./ui/GallerySlider";
 
 import {
   useToolsEditor,
@@ -151,6 +152,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     openOriginal,
     openBuilderMode,
     openStackMode,
+    openGalleryMode,
     openComponent,
     selectRoot,
     beginRootCreation,
@@ -175,6 +177,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     setActiveRootId,
     updateComponents,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
+
+  const [groupNavCollapsed, setGroupNavCollapsed] = useState(false);
 
   const { features } = useProcessingFeatures();
   // A feature is usable in the Builder only when enabled with an installed model.
@@ -306,7 +310,9 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
           className="grid min-h-0 flex-1"
           style={{
             gridTemplateColumns: showGroupNavigator
-              ? "220px 56px minmax(0,1fr) 340px"
+              ? groupNavCollapsed
+                ? "40px 56px minmax(0,1fr) 340px"
+                : "220px 56px minmax(0,1fr) 340px"
               : "56px minmax(0,1fr) 340px",
           }}
         >
@@ -314,6 +320,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             <ReferenceGroupNavigator
               group={groupContext}
               activeReferenceId={item.id}
+              collapsed={groupNavCollapsed}
+              onToggleCollapse={() => setGroupNavCollapsed((v) => !v)}
             />
           ) : null}
 
@@ -344,11 +352,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             >
               <Pencil size={18} strokeWidth={1.7} />
             </RailToolButton>
-            <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
-            <RailToolButton label="Conta-gotas" disabled>
-              <Pipette size={18} strokeWidth={1.7} />
-            </RailToolButton>
-
             {hasProcessingFeature ? (
               <>
                 <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
@@ -427,11 +430,20 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               onPointerCancel={masking ? undefined : cancelSelection}
             >
               <BuilderStackTabs
-                active={viewMode === "stack" ? "stack" : "builder"}
+                active={viewMode === "stack" ? "stack" : viewMode === "gallery" ? "gallery" : "builder"}
                 stackDisabled={stackedComponents.length === 0}
                 onBuilder={openBuilderMode}
                 onStack={openStackMode}
+                onGallery={openGalleryMode}
               />
+
+              {viewMode === "gallery" ? (
+                <GallerySlider
+                  cuts={scopedComponents}
+                  showColors={features.colorDetector.operational}
+                  showText={features.textDetection.operational}
+                />
+              ) : null}
 
               <ElementInfoCard
                 name={headerSubject.name || "—"}
@@ -449,10 +461,12 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 }}
               />
 
-              <CropsOverlayToggle
-                active={showCropsOverlay}
-                onToggle={() => setShowCropsOverlay((value) => !value)}
-              />
+              {viewMode !== "gallery" ? (
+                <CropsOverlayToggle
+                  active={showCropsOverlay}
+                  onToggle={() => setShowCropsOverlay((value) => !value)}
+                />
+              ) : null}
 
               {proposedRegions.length > 0 ? (
                 <div

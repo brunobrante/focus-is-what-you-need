@@ -216,6 +216,7 @@ export type ToolsEditorState = {
   openOriginal: () => void;
   openBuilderMode: () => void;
   openStackMode: () => void;
+  openGalleryMode: () => void;
   openComponent: (id: string) => void;
   selectRoot: (id: string) => void;
   beginRootCreation: () => void;
@@ -581,6 +582,11 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     resetToolViewport();
     setViewMode("stack");
   }, [cancelSelection, resetToolViewport, stackedComponents.length]);
+
+  const openGalleryMode = useCallback(() => {
+    cancelSelection();
+    setViewMode("gallery");
+  }, [cancelSelection]);
 
   // Opening any node (root or cut) shows it as the editable subject and scopes the
   // tree to its owning root. A root opens as its own croppable subject.
@@ -1830,6 +1836,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     openOriginal,
     openBuilderMode,
     openStackMode,
+    openGalleryMode,
     openComponent,
     selectRoot,
     beginRootCreation,

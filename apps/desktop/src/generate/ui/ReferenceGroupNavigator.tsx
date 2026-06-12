@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FolderOpen, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderOpen, Image as ImageIcon } from "lucide-react";
 
 import { extFromName, loadReferenceFile } from "@/lib/tauri/referenceStorage";
 import type { ToolReferenceGroupContext } from "../types";
@@ -9,10 +9,29 @@ import { blobToObjectUrl } from "../engine/image";
 export function ReferenceGroupNavigator({
   group,
   activeReferenceId,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   group: ToolReferenceGroupContext;
   activeReferenceId: string;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
+  if (collapsed) {
+    return (
+      <aside className="flex min-h-0 flex-col items-center border-r border-[var(--border)] bg-[var(--bg-elev)] pt-3">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title="Expand group panel"
+          className="grid h-8 w-8 cursor-pointer place-items-center rounded-[8px] border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+        >
+          <ChevronRight size={15} strokeWidth={2} />
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--bg-elev)]">
       <div className="shrink-0 border-b border-[var(--border)] px-3 py-3">
@@ -20,7 +39,7 @@ export function ReferenceGroupNavigator({
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
             <FolderOpen size={14} strokeWidth={1.8} />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="m-0 truncate text-[12.5px] font-semibold text-[var(--text)]">
               {group.name}
             </h2>
@@ -28,6 +47,14 @@ export function ReferenceGroupNavigator({
               {group.references.length} {group.references.length === 1 ? "screen" : "screens"}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title="Collapse group panel"
+            className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-[7px] border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+          >
+            <ChevronLeft size={14} strokeWidth={2} />
+          </button>
         </div>
       </div>
 

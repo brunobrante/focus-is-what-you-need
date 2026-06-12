@@ -9,6 +9,7 @@ import {
 import type { ProcessingFeatureKey } from "@/domain/settings/types";
 import {
   FEATURE_KEYS,
+  FEATURES,
   MODEL_CATALOG,
   catalogEntry,
   modelsForFeature,
@@ -173,12 +174,13 @@ export function useProcessingFeatures(): ProcessingState {
   }, [settings, installedSet]);
 
   const features = FEATURE_KEYS.reduce((acc, key) => {
+    const meta = FEATURES.find((f) => f.key === key);
     const installedModels = modelsForFeature(key).filter((m) => installedSet.has(m.modelId));
     const activeModelId = resolveActiveModelId(
       installedModels,
       persisted.features[key].activeModelId,
     );
-    const canEnable = installedModels.length > 0;
+    const canEnable = meta?.modelFree ? true : installedModels.length > 0;
     const enabled = persisted.features[key].enabled && canEnable;
     acc[key] = {
       key,
@@ -186,7 +188,7 @@ export function useProcessingFeatures(): ProcessingState {
       installedModels,
       activeModelId,
       canEnable,
-      operational: enabled && activeModelId !== null,
+      operational: enabled && (meta?.modelFree ? true : activeModelId !== null),
       setEnabled: (next: boolean) => {
         if (next && !canEnable) return;
         void setFeatureEnabled(key, next);
