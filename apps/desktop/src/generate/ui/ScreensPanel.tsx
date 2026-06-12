@@ -6,7 +6,6 @@ import { extFromName, loadReferenceFile } from "@/lib/tauri/referenceStorage";
 import { blobToObjectUrl } from "../engine/image";
 import type { SavedComponent, ToolReferenceGroupContext } from "../engine/types";
 
-// Minimal shape a thumbnail / original row needs.
 type ImageRef = { id: string; name: string; ext?: string; url?: string };
 
 // The unified Screens panel. One image is one screen; an image can hold several
@@ -24,9 +23,6 @@ export function ScreensPanel({
   onNewScreen,
   onUpload,
   uploading = false,
-  originals = [],
-  onShowOriginal,
-  showingOriginalId = null,
 }: {
   group: ToolReferenceGroupContext | null;
   activeReferenceId: string;
@@ -37,9 +33,6 @@ export function ScreensPanel({
   onNewScreen: () => void;
   onUpload?: () => void;
   uploading?: boolean;
-  originals?: ImageRef[];
-  onShowOriginal?: (id: string) => void;
-  showingOriginalId?: string | null;
 }) {
   const references = group?.references ?? [];
   const isGroup = references.length > 1;
@@ -149,42 +142,6 @@ export function ScreensPanel({
           </>
         ) : null}
 
-        {/* Originals — view the imported source image(s), clean. */}
-        {originals.length > 0 && onShowOriginal ? (
-          <>
-            <div className="mt-1 px-1 text-[9.5px] font-semibold uppercase tracking-[0.4px] text-[var(--text-faint)]">
-              {originals.length > 1 ? "Originals" : "Original"}
-            </div>
-            {originals.map((original, index) => {
-              const active = showingOriginalId === original.id;
-              const label = originals.length > 1 ? `Original ${index + 1}` : "Original";
-              return (
-                <button
-                  key={original.id}
-                  type="button"
-                  onClick={() => onShowOriginal(original.id)}
-                  title={original.name}
-                  className={[
-                    "flex min-w-0 items-center gap-2 rounded-[9px] border p-1.5 text-left transition-colors",
-                    active
-                      ? "border-[var(--text)] bg-[var(--surface)]"
-                      : "border-transparent bg-transparent hover:border-[var(--border)] hover:bg-[rgba(255,255,255,0.02)]",
-                  ].join(" ")}
-                >
-                  <ScreenImageThumbnail reference={original} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-medium text-[var(--text)]">
-                      {label}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[10.5px] text-[var(--text-faint)]">
-                      {original.name}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </>
-        ) : null}
       </div>
 
       {onUpload ? (

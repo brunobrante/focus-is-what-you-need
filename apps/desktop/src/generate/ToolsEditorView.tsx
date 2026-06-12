@@ -37,8 +37,8 @@ import {
   SidebarConfigPanel,
 } from "./ui/BuilderSidebar";
 import { ConfirmActionModal } from "./ui/ConfirmModal";
-import { ScreensPanel } from "./ui/ScreensPanel";
-import { OriginalSlideshow, type OriginalSlide } from "./ui/OriginalSlideshow";
+import { ReferenceGroupNavigator } from "./ui/ReferenceGroupNavigator";
+import { RootSwitcher } from "./ui/RootSwitcher";
 import { GallerySlider } from "./ui/GallerySlider";
 
 import {
@@ -140,6 +140,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     canCrop,
     selectionSize,
     confirmationCopy,
+    showGroupNavigator,
     rootComponentId,
 
     // Handlers
@@ -178,27 +179,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     selectStackComponent,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
+  const [groupNavCollapsed, setGroupNavCollapsed] = useState(false);
   const [cleanOriginal, setCleanOriginal] = useState(false);
-  // Which original the clean view is focused on. Driven by the sidebar's
-  // Originals list; null falls back to the open image.
-  const [originalFocusId, setOriginalFocusId] = useState<string | null>(null);
-
-  // The original image(s). A group exposes every imported original (Original 1,
-  // Original 2, …) as a slideshow; a lone image is a single-slide show. The open
-  // image keeps its already-decoded url so its slide shows instantly.
-  const originals = useMemo<OriginalSlide[]>(() => {
-    if (groupContext && groupContext.references.length > 0) {
-      return groupContext.references.map((reference) =>
-        reference.id === item.id ? { ...reference, url: reference.url ?? item.url } : reference,
-      );
-    }
-    return [{ id: item.id, name: item.name, url: item.url }];
-  }, [groupContext, item.id, item.name, item.url]);
-
-  const showOriginal = (id: string) => {
-    setOriginalFocusId(id);
-    setCleanOriginal(true);
-  };
 
   const { features } = useProcessingFeatures();
   // A feature is usable in the Builder only when enabled with an installed model.
@@ -315,12 +297,25 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     });
   }
 
+  const showSidebar = showGroupNavigator && !!groupContext && !groupNavCollapsed;
+
   return (
     <TooltipProvider>
       <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+        {showSidebar ? (
+          <ReferenceGroupNavigator
+            group={groupContext!}
+            activeReferenceId={item.id}
+            onToggleCollapse={() => setGroupNavCollapsed(true)}
+            onUpload={() => fileInputRef.current?.click()}
+            uploading={uploading}
+          />
+        ) : null}
+
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <GeneratorHeader
-          showGroupNavToggle={false}
+          showGroupNavToggle={showGroupNavigator && !!groupContext && groupNavCollapsed}
+          onGroupNavToggle={() => setGroupNavCollapsed(false)}
           tabActive={viewMode === "stack" ? "stack" : viewMode === "gallery" ? "gallery" : "builder"}
           stackDisabled={stackedComponents.length === 0}
           onBuilder={openBuilderMode}
@@ -572,8 +567,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     Volte para <Link className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline" to="/references">References</Link>.
                   </p>
                 </div>
-              ) : cleanOriginal ? (
-                <OriginalSlideshow references={originals} initialId={originalFocusId ?? item.id} />
               ) : viewMode === "stack" && imageStack ? (
                 <div
                   className="relative inline-block overflow-visible rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
@@ -796,7 +789,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
                 {!canCrop ? (
                   <span>
-                    Open a screen from the panel to crop inside it. Click any component to{" "}
+                    Open a stack from the switcher to crop inside it. Click any component to{" "}
                     <b className="text-[var(--text-muted)]">Become root</b>.
                   </span>
                 ) : editingComponentId ? (
@@ -824,23 +817,31 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
           </section>
 
           <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--bg)]">
+            {cleanOriginal ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] text-[var(--text-faint)]">
+                  <ImageIcon size={18} strokeWidth={1.5} />
+                </span>
+                <p className="m-0 text-[12.5px] leading-relaxed text-[var(--text-faint)]">
+                  Viewing the original image.<br />Click <span className="font-medium text-[var(--text-muted)]">Mostrar original</span> again to return.
+                </p>
+              </div>
+            ) : (
+            <>
             <SidebarTabs active={sidebarTab} onChange={setSidebarTab} />
 
             {sidebarTab === "components" ? (
               <>
-                <ScreensPanel
-                  group={groupContext}
-                  activeReferenceId={item.id}
+                <RootSwitcher
                   roots={roots}
                   activeRootId={activeScopeId}
                   cutCountByRoot={cutCountByRoot}
-                  onSelectRoot={selectRoot}
-                  onNewScreen={beginRootCreation}
-                  onUpload={() => fileInputRef.current?.click()}
-                  uploading={uploading}
-                  originals={originals}
-                  onShowOriginal={showOriginal}
-                  showingOriginalId={cleanOriginal ? originalFocusId ?? item.id : null}
+                  onSelect={selectRoot}
+                  onNewRoot={beginRootCreation}
+                  creating={false}
+                  activeReferenceId={item.id}
+                  groupReferences={groupContext?.references ?? []}
+                  groupId={groupContext?.id}
                 />
 
                 <SidebarComponentsHeader
@@ -897,6 +898,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 cropsOverlayAlpha={cropsOverlayAlpha}
                 onChangeCropsOverlayAlpha={setCropsOverlayAlpha}
               />
+            )}
+            </>
             )}
           </aside>
         </div>
