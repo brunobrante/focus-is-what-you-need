@@ -34,8 +34,25 @@ const DBNET_RESNET34_ID: &str = "dbnet-resnet34";
 const DBNET_RESNET50_ID: &str = "dbnet-resnet50";
 const DBNET_MOBILENET_ID: &str = "dbnet-mobilenet-v3-large";
 const LAMA_ID: &str = "lama";
+const OMNIPARSER_ID: &str = "omniparser-icon-detect";
 const BIREFNET_SIZE: u32 = 1024;
 const PROGRESS_EVENT: &str = "model://progress";
+
+// OmniParser icon detector: a single YOLOv8 ONNX (~58 MB) that proposes UI
+// icon/element bounding boxes from a screenshot. Pre-processing per its
+// preprocessor_config.json: rescale 1/255, no ImageNet normalization, letterbox
+// to a 640 square. Output 0 is the YOLOv8 head [1, 5, N] (cx, cy, w, h, score in
+// 640-input pixel space); we threshold, un-letterbox, normalize, then NMS.
+const OMNIPARSER_URL: &str =
+    "https://huggingface.co/onnx-community/OmniParser-icon_detect/resolve/main/onnx/model.onnx";
+const OMNIPARSER_SIZE: u32 = 640;
+// The icon detector emits low confidences; keep the floor permissive and rely on
+// NMS + the detection cap to control noise.
+const OMNIPARSER_SCORE_THRESHOLD: f32 = 0.05;
+const OMNIPARSER_IOU_THRESHOLD: f32 = 0.45;
+const OMNIPARSER_MAX_DETECTIONS: usize = 200;
+// Neutral gray pad used when letterboxing to a square (standard YOLO value).
+const OMNIPARSER_PAD: u8 = 114;
 
 // LaMa inpainting: a single fp32 ONNX file (~208 MB). It removes a painted
 // selection from a cut by reconstructing the masked region from its surroundings.
@@ -131,6 +148,10 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
         DBNET_RESNET50_ID => Ok(vec![ModelFile { name: "dbnet-resnet50.onnx", url: DBNET_RESNET50_URL }]),
         DBNET_MOBILENET_ID => Ok(vec![ModelFile { name: "dbnet-mobilenet-v3-large.onnx", url: DBNET_MOBILENET_URL }]),
         LAMA_ID => Ok(vec![ModelFile { name: "lama.onnx", url: LAMA_URL }]),
+        OMNIPARSER_ID => Ok(vec![ModelFile {
+            name: "omniparser-icon-detect.onnx",
+            url: OMNIPARSER_URL,
+        }]),
         FLORENCE2_ID => Ok(vec![
             ModelFile { name: FLORENCE2_VISION_FILE, url: FLORENCE2_VISION_URL },
             ModelFile { name: FLORENCE2_EMBED_FILE, url: FLORENCE2_EMBED_URL },
@@ -764,14 +785,23 @@ pub struct DetectedRegion {
     pub confidence: f32,
 }
 
+/// Crop-region proposals for a screenshot, dispatched to the chosen auto-detect
+/// model. The active model id is owned by the frontend (the `autoDetect` feature's
+/// active model), so the same command serves whichever detector the user picked.
+/// Returns regions with normalized (0.0–1.0) coordinates.
 #[tauri::command]
-pub async fn run_florence2(
+pub async fn run_auto_detect(
     app: AppHandle,
+    model_id: String,
     image_bytes: Vec<u8>,
 ) -> Result<Vec<DetectedRegion>, String> {
-    tauri::async_runtime::spawn_blocking(move || florence2_blocking(&app, image_bytes))
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || match model_id.as_str() {
+        OMNIPARSER_ID => omniparser_blocking(&app, image_bytes),
+        FLORENCE2_ID => florence2_blocking(&app, image_bytes),
+        other => Err(format!("unknown auto-detect model: {other}")),
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -782,6 +812,143 @@ pub async fn run_florence2_text_check(
     tauri::async_runtime::spawn_blocking(move || florence2_text_check_blocking(&app, image_bytes))
         .await
         .map_err(|e| e.to_string())?
+}
+
+// --- OmniParser icon detector (YOLOv8) ------------------------------------
+
+fn omniparser_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<DetectedRegion>, String> {
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let (orig_w, orig_h) = img.dimensions();
+    if orig_w == 0 || orig_h == 0 {
+        return Ok(Vec::new());
+    }
+    let rgb = img.to_rgb8();
+
+    // Letterbox into a SIZE x SIZE square, preserving aspect with gray padding.
+    let size = OMNIPARSER_SIZE;
+    let scale = (size as f32 / orig_w as f32).min(size as f32 / orig_h as f32);
+    let new_w = ((orig_w as f32 * scale).round() as u32).clamp(1, size);
+    let new_h = ((orig_h as f32 * scale).round() as u32).clamp(1, size);
+    let pad_x = (size - new_w) / 2;
+    let pad_y = (size - new_h) / 2;
+    let resized =
+        image::imageops::resize(&rgb, new_w, new_h, image::imageops::FilterType::Triangle);
+
+    // Rescale 1/255, no ImageNet normalization. Fill with the (rescaled) pad
+    // color, then overlay the resized image at its offset.
+    let pad_value = OMNIPARSER_PAD as f32 / 255.0;
+    let mut input = Array4::<f32>::from_elem((1, 3, size as usize, size as usize), pad_value);
+    for y in 0..new_h {
+        for x in 0..new_w {
+            let px = resized.get_pixel(x, y);
+            for c in 0..3 {
+                input[[0, c, (y + pad_y) as usize, (x + pad_x) as usize]] = px[c] as f32 / 255.0;
+            }
+        }
+    }
+
+    let mut session = load_session(app, OMNIPARSER_ID)?;
+    let input_name = session.inputs()[0].name().to_string();
+    let tensor = Tensor::from_array(input).map_err(|e| e.to_string())?;
+    let outputs = session
+        .run(ort::inputs![input_name.as_str() => tensor])
+        .map_err(|e| e.to_string())?;
+
+    // Output 0 is the YOLOv8 head: [1, 5, N] (or [1, N, 5]); 5 = cx, cy, w, h,
+    // score for the single "icon" class, in 640-input pixel space.
+    let out = outputs[0]
+        .try_extract_array::<f32>()
+        .map_err(|e| e.to_string())?;
+    let shape = out.shape().to_vec();
+    if shape.len() != 3 || shape[0] != 1 {
+        return Err(format!("unexpected OmniParser output shape: {shape:?}"));
+    }
+    let (attr_first, attr, anchors) = if shape[1] == 5 {
+        (true, shape[1], shape[2])
+    } else if shape[2] == 5 {
+        (false, shape[2], shape[1])
+    } else {
+        return Err(format!("unexpected OmniParser output shape: {shape:?}"));
+    };
+    let data: Vec<f32> = out.iter().copied().collect();
+    let at = |a: usize, n: usize| -> f32 {
+        if attr_first {
+            data[a * anchors + n]
+        } else {
+            data[n * attr + a]
+        }
+    };
+
+    let inv_scale = 1.0 / scale;
+    let mut candidates: Vec<DetectedRegion> = Vec::new();
+    for n in 0..anchors {
+        let score = at(4, n);
+        if score <= OMNIPARSER_SCORE_THRESHOLD {
+            continue;
+        }
+        let cx = at(0, n);
+        let cy = at(1, n);
+        let bw = at(2, n);
+        let bh = at(3, n);
+        // 640-space center box → xyxy → drop letterbox padding → original pixels.
+        let x0 = (((cx - bw / 2.0) - pad_x as f32) * inv_scale).clamp(0.0, orig_w as f32);
+        let y0 = (((cy - bh / 2.0) - pad_y as f32) * inv_scale).clamp(0.0, orig_h as f32);
+        let x1 = (((cx + bw / 2.0) - pad_x as f32) * inv_scale).clamp(0.0, orig_w as f32);
+        let y1 = (((cy + bh / 2.0) - pad_y as f32) * inv_scale).clamp(0.0, orig_h as f32);
+        let w = x1 - x0;
+        let h = y1 - y0;
+        if w < 1.0 || h < 1.0 {
+            continue;
+        }
+        candidates.push(DetectedRegion {
+            label: String::new(),
+            x: x0 / orig_w as f32,
+            y: y0 / orig_h as f32,
+            w: w / orig_w as f32,
+            h: h / orig_h as f32,
+            confidence: score,
+        });
+    }
+
+    Ok(nms(candidates, OMNIPARSER_IOU_THRESHOLD, OMNIPARSER_MAX_DETECTIONS))
+}
+
+/// Intersection-over-union of two normalized regions.
+fn iou(a: &DetectedRegion, b: &DetectedRegion) -> f32 {
+    let ix1 = a.x.max(b.x);
+    let iy1 = a.y.max(b.y);
+    let ix2 = (a.x + a.w).min(b.x + b.w);
+    let iy2 = (a.y + a.h).min(b.y + b.h);
+    let iw = (ix2 - ix1).max(0.0);
+    let ih = (iy2 - iy1).max(0.0);
+    let inter = iw * ih;
+    let union = a.w * a.h + b.w * b.h - inter;
+    if union <= 0.0 {
+        0.0
+    } else {
+        inter / union
+    }
+}
+
+/// Greedy non-max suppression: keep the highest-confidence boxes, dropping any
+/// that overlap an already-kept box beyond `iou_threshold`. Caps the output.
+fn nms(mut boxes: Vec<DetectedRegion>, iou_threshold: f32, max_out: usize) -> Vec<DetectedRegion> {
+    boxes.sort_by(|a, b| {
+        b.confidence
+            .partial_cmp(&a.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let mut kept: Vec<DetectedRegion> = Vec::new();
+    for cand in boxes {
+        if kept.len() >= max_out {
+            break;
+        }
+        if kept.iter().any(|k| iou(k, &cand) > iou_threshold) {
+            continue;
+        }
+        kept.push(cand);
+    }
+    kept
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

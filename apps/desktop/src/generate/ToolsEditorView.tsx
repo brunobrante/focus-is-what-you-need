@@ -13,7 +13,6 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
-  Trash2,
   Wand2,
   X,
 } from "lucide-react";
@@ -93,9 +92,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     showCropsOverlay,
     hoveredComponentId,
     imageError,
-    proposedRegions,
     autoDetecting,
-    applyingProposals,
     autoDetectMessage,
     pendingConfirmation,
     savingStack,
@@ -164,8 +161,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     canSaveSelection,
     saveSelection,
     autoDetect,
-    applyProposedRegions,
-    discardAllProposedRegions,
     uploadImage,
     handleStagePointerLeave,
     handlePointerDown,
@@ -185,6 +180,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   const removeBackgroundOn = features.removeBackground.operational;
   const upscaleOn = features.upscale.operational;
   const autoDetectOn = features.autoDetect.operational;
+  // Active auto-detect model (OmniParser or Florence-2), or null when not enabled.
+  const autoDetectModelId = autoDetectOn ? features.autoDetect.activeModelId : null;
   const removeElementOn = features.removeElement.operational;
   // Active text detector (a DBNet variant or CRAFT), or null when not enabled.
   const textDetectionModelId = features.textDetection.operational
@@ -457,46 +454,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 />
               ) : null}
 
-              {proposedRegions.length > 0 ? (
-                <div
-                  data-selection-action
-                  className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-[10px] border border-[#A78BFA66] bg-[rgba(20,20,22,0.92)] p-1.5 pl-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[8px]"
-                >
-                  <Sparkles size={13} strokeWidth={1.8} className="text-[#A78BFA]" />
-                  <span className="text-[11.5px] text-[var(--text)]">
-                    {proposedRegions.length} proposed {proposedRegions.length === 1 ? "region" : "regions"}
-                  </span>
-                  <span className="px-0.5 text-[10.5px] text-[var(--text-faint)]">
-                    drag to adjust · × to discard
-                  </span>
-                  <span className="h-5 w-px bg-[var(--border)]" />
-                  <button
-                    type="button"
-                    data-selection-action
-                    disabled={applyingProposals}
-                    onClick={() => void applyProposedRegions()}
-                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {applyingProposals ? (
-                      <Loader2 size={12} strokeWidth={1.9} className="animate-spin" />
-                    ) : (
-                      <Check size={12} strokeWidth={2.2} />
-                    )}
-                    Apply all
-                  </button>
-                  <button
-                    type="button"
-                    data-selection-action
-                    disabled={applyingProposals}
-                    onClick={discardAllProposedRegions}
-                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11px] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 size={12} strokeWidth={1.9} />
-                    Discard all
-                  </button>
-                </div>
-              ) : null}
-
               {autoDetecting ? (
                 <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-[10px] border border-[#A78BFA66] bg-[rgba(20,20,22,0.92)] px-3.5 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[8px]">
                   <Loader2 size={15} strokeWidth={1.9} className="animate-spin text-[#A78BFA]" />
@@ -766,7 +723,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               <div className="inline-flex shrink-0 items-center gap-1.5">
                 {autoDetectOn ? (
                   <ModeButton
-                    onClick={() => void autoDetect()}
+                    onClick={() => void autoDetect(autoDetectModelId)}
                     disabled={!canCrop || autoDetecting}
                   >
                     {autoDetecting ? (

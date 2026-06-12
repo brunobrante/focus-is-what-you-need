@@ -3,8 +3,6 @@ import type {
   ActiveSubject,
   SavedComponent,
   SelectionHit,
-  ProposedRegion,
-  ProposalHit,
 } from "./types";
 import { CORNER_HANDLES, RADIUS_HANDLES, HANDLE_HIT_AREA } from "./types";
 import { MIN_TOOL_ZOOM } from "../types";
@@ -56,50 +54,6 @@ export function selectionHitTest(
     point.y <= selection.y + selection.h
   ) {
     return { kind: "move" };
-  }
-  return null;
-}
-
-// Hit-test the staged Florence-2 proposals (content-space boxes). Topmost wins.
-// The discard "×" badge sits at each box's top-right corner and is checked first,
-// then corner resize handles, then the body for a move.
-export function proposalHitTest(
-  point: { x: number; y: number },
-  proposals: ProposedRegion[],
-  zoom: number,
-): ProposalHit {
-  if (proposals.length === 0) return null;
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const discardHit = (HANDLE_HIT_AREA / 2) / safeZoom;
-  const resizeHit = (HANDLE_HIT_AREA / 2) / safeZoom;
-
-  for (let i = proposals.length - 1; i >= 0; i--) {
-    const { box } = proposals[i];
-    const bx = box.x + box.w;
-    const by = box.y;
-    if (Math.abs(point.x - bx) <= discardHit && Math.abs(point.y - by) <= discardHit) {
-      return { kind: "discard", id: proposals[i].id, box };
-    }
-  }
-  for (let i = proposals.length - 1; i >= 0; i--) {
-    const { box } = proposals[i];
-    for (const handle of CORNER_HANDLES) {
-      const center = resizeHandleCenter(handle, box);
-      if (Math.abs(point.x - center.x) <= resizeHit && Math.abs(point.y - center.y) <= resizeHit) {
-        return { kind: "resize", id: proposals[i].id, box, handle };
-      }
-    }
-  }
-  for (let i = proposals.length - 1; i >= 0; i--) {
-    const { box } = proposals[i];
-    if (
-      point.x >= box.x &&
-      point.x <= box.x + box.w &&
-      point.y >= box.y &&
-      point.y <= box.y + box.h
-    ) {
-      return { kind: "move", id: proposals[i].id, box };
-    }
   }
   return null;
 }

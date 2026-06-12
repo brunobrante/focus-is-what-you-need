@@ -13,8 +13,9 @@ export type ModelProgressEvent = {
 
 export const MODEL_PROGRESS_EVENT = "model://progress";
 
-// A region proposed by Florence-2. Coordinates are normalized (0.0–1.0)
-// relative to the image; the caller scales them to pixel space.
+// A crop region proposed by an auto-detect model (OmniParser or Florence-2).
+// Coordinates are normalized (0.0–1.0) relative to the image; the caller scales
+// them to pixel space.
 export type DetectedRegion = {
   label: string;
   x: number;
@@ -46,8 +47,16 @@ export async function runRealEsrgan(imageBytes: Uint8Array): Promise<Uint8Array>
   return new Uint8Array(out);
 }
 
-export function runFlorence2(imageBytes: Uint8Array): Promise<DetectedRegion[]> {
-  return invoke<DetectedRegion[]>("run_florence2", { imageBytes: Array.from(imageBytes) });
+// Runs the active auto-detect model (OmniParser or Florence-2) on a screenshot.
+// The backend dispatches on `modelId`. Returns proposed crop regions.
+export function runAutoDetect(
+  modelId: string,
+  imageBytes: Uint8Array,
+): Promise<DetectedRegion[]> {
+  return invoke<DetectedRegion[]>("run_auto_detect", {
+    modelId,
+    imageBytes: Array.from(imageBytes),
+  });
 }
 
 // Runs the active text detector (a DBNet variant or CRAFT) on a cut's image.

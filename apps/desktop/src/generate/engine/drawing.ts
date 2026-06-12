@@ -130,35 +130,6 @@ export function drawCircleHandle(
   ctx.stroke();
 }
 
-// A small circular "×" badge at a box corner, used to discard a proposal.
-export function drawDiscardBadge(
-  ctx: CanvasRenderingContext2D,
-  anchorX: number,
-  anchorY: number,
-  zoom: number,
-) {
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const scale = 1 / safeZoom;
-  ctx.save();
-  ctx.translate(anchorX, anchorY);
-  ctx.scale(scale, scale);
-  const radius = 8;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fillStyle = "#A78BFA";
-  ctx.fill();
-  ctx.strokeStyle = "#FFFFFF";
-  ctx.lineWidth = 1.5;
-  const arm = 3.2;
-  ctx.beginPath();
-  ctx.moveTo(-arm, -arm);
-  ctx.lineTo(arm, arm);
-  ctx.moveTo(arm, -arm);
-  ctx.lineTo(-arm, arm);
-  ctx.stroke();
-  ctx.restore();
-}
-
 export function drawSquareHandle(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -296,7 +267,6 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     editingComponentId,
     selectionMatchesExistingCut,
     selectionCrop,
-    proposedRegions,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
@@ -391,33 +361,6 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
           drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#89C4FF", "#FFFFFF", stroke);
         }
       }
-    }
-  }
-
-  // Florence-2 proposals: dashed purple boxes with a label, corner handles, and
-  // a discard "×" — visually a sibling of the manual selection, but staged.
-  if (proposedRegions && proposedRegions.length > 0) {
-    for (const region of proposedRegions) {
-      const { box } = region;
-      const bw = Math.max(0, box.w);
-      const bh = Math.max(0, box.h);
-      ctx.fillStyle = "rgba(167,139,250,0.08)";
-      ctx.fillRect(box.x, box.y, bw, bh);
-      ctx.save();
-      ctx.setLineDash([6 * stroke, 4 * stroke]);
-      ctx.lineWidth = 2 * stroke;
-      ctx.strokeStyle = "#A78BFA";
-      ctx.strokeRect(box.x, box.y, bw, bh);
-      ctx.restore();
-
-      drawLabelBadge(ctx, region.label || "Region", box.x, box.y - 4 * stroke, toolZoom);
-
-      const handleSize = HANDLE_DOT_SIZE / safeZoom;
-      for (const handle of CORNER_HANDLES) {
-        const center = resizeHandleCenter(handle, box);
-        drawSquareHandle(ctx, center.x, center.y, handleSize, "#A78BFA", "#FFFFFF", stroke);
-      }
-      drawDiscardBadge(ctx, box.x + bw, box.y, toolZoom);
     }
   }
 

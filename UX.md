@@ -460,12 +460,10 @@ appears in the top-right of the canvas; the right panel stays fully populated
 again, or the canvas ×, returns to the editor.
 
 **Bottom canvas bar — image-level actions**: (when the Auto-detect Components feature is enabled) **Auto-detect**:
-- **Auto-detect** runs Florence-2 on the open subject and proposes crop regions automatically. The button shows a spinner and the image dims while it runs (typically 3–8s). Only available when a stack/component is open (croppable).
-- Each proposed region renders as a dashed purple box with its label, corner handles, and a "×" discard badge — visually a staged sibling of a manually drawn crop.
-- Proposals are editable in place: drag the body to move, drag a corner to resize, click "×" to discard one.
-- A toolbar at the top-center of the canvas shows the proposal count with **Apply all** (commits every remaining proposal as a real cut, preserving its label) and **Discard all**.
-- If no components are detected, a toast reads "No components detected — try drawing regions manually".
-- Approved proposals enter the exact same cut pipeline as hand-drawn crops — once applied they are indistinguishable from manual cuts. When the open subject changes, pending proposals are discarded.
+- **Auto-detect** runs the active auto-detect model on the open subject and turns every detected region **directly into a saved cut** — no review or "Apply" step. The button shows a spinner and the image dims while it runs. Only available when a stack/component is open (croppable).
+- The model is switchable in Settings → Processing → Auto-detect Components. **OmniParser (icon detect)** (~58 MB, YOLOv8, the default) is purpose-built for UI screenshots and proposes icon/element regions; **Florence-2** (~1.2 GB) proposes region-captioned crops and labels each cut with its caption. Whichever model is active is the one Auto-detect runs.
+- Detected regions are mapped into the open subject's coordinate space and obey the same bounds as a hand-drawn crop. Each becomes a normal cut in the stack, selected and opened on completion, and is editable afterward exactly like any manual cut (move/resize handles, rename, delete).
+- If no model is installed/enabled, a toast reads "Install an auto-detect model in Settings first". If nothing is detected, a toast reads "No components detected — try drawing regions manually".
 
 **Right panel — Tools and output**:
 - **Screens panel** (top of the Componentes tab): the single source for screen
@@ -597,7 +595,7 @@ All install / enable / active-model changes persist immediately, independent of 
 Catalog:
 - **Remove Background** — BiRefNet (~220 MB)
 - **Upscale (4×)** — Real-ESRGAN (~5 MB)
-- **Auto-detect Components** — Florence-2 (~1.2 GB, five-file package). When enabled, the **Auto-detect** button appears on the Builder's bottom canvas bar.
+- **Auto-detect Components** — OmniParser (icon detect) (~58 MB, default) and Florence-2 (~1.2 GB, five-file package). Multiple models; the active one is selectable like the Text Detector. When enabled, the **Auto-detect** button appears on the Builder's bottom canvas bar and runs the active model.
 - **Text Detector** — DBNet-MobileNetV3 (~15 MB), DBNet-ResNet34 (~85 MB), DBNet-ResNet50 (~96 MB), CRAFT (~80 MB). When enabled, the **Is text?** button appears on each Builder cut item and runs the active model.
 - **Remove Element** — LaMa (~208 MB). When enabled, the **Remove element** tool appears in the Builder's left tool rail.
 

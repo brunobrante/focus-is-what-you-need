@@ -99,6 +99,13 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     description: "4× super-resolution (realesr-general-x4v3).",
   },
   {
+    modelId: "omniparser-icon-detect",
+    feature: "autoDetect",
+    label: "OmniParser (icon detect)",
+    size: "~58 MB",
+    description: "Detects UI icons and elements as crop regions. Fast; built for screenshots.",
+  },
+  {
     modelId: "florence2",
     feature: "autoDetect",
     label: "Florence-2",
