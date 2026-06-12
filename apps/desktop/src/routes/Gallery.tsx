@@ -62,6 +62,7 @@ import {
   removeReferenceFromProject,
 } from "@/lib/storage/repos/references.repo";
 import { deleteScreen } from "@/lib/storage/repos/screens.repo";
+import { useReferenceRowImage } from "@/lib/references/useReferenceRowImage";
 import { updateProject } from "@/lib/storage/repos/projects.repo";
 import { SystemTab } from "@/routes/SystemTab";
 import type {
@@ -2761,6 +2762,7 @@ function ReferenceProjectCard({
 }) {
   const labels = referenceLabelSet(attachments, screenById, componentById);
   const primaryLabels = labels.slice(0, 2);
+  const imageUrl = useReferenceRowImage(reference);
   return (
     <div className="group flex cursor-default flex-col gap-2.5 transition-transform duration-[120ms] hover:-translate-y-0.5">
       <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]">
@@ -2774,10 +2776,10 @@ function ReferenceProjectCard({
             <IconEye size={13} strokeWidth={1.7} />
           </button>
         ) : null}
-        {reference.thumbnailUrl ? (
+        {imageUrl ? (
           <>
             <img
-              src={reference.thumbnailUrl}
+              src={imageUrl}
               alt=""
               className="block h-full w-full object-contain"
               draggable={false}
@@ -2842,6 +2844,7 @@ function ReferenceProjectRow({
   onRemove: () => void;
 }) {
   const labels = referenceLabelSet(attachments, screenById, componentById);
+  const imageUrl = useReferenceRowImage(reference);
   return (
     <div className="group relative grid gap-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3 transition-colors hover:border-[var(--border-strong)] md:grid-cols-[180px_1fr_auto]">
       <CardMoreMenu
@@ -2857,9 +2860,9 @@ function ReferenceProjectRow({
         ]}
       />
       <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--bg)]">
-        {reference.thumbnailUrl ? (
+        {imageUrl ? (
           <img
-            src={reference.thumbnailUrl}
+            src={imageUrl}
             alt=""
             className="aspect-[16/10] h-full w-full object-cover"
             draggable={false}

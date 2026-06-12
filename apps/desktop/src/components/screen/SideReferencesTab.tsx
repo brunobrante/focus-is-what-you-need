@@ -1,6 +1,6 @@
 import type { ReferenceRow } from "@/lib/storage/schema";
 import { IconImage, IconPlus } from "@/components/icons";
-import { ReferenceThumbCard } from "@/components/references/ReferenceThumbCard";
+import { ReferenceRowCard } from "@/components/references/ReferenceRowCard";
 import { EmptyMessage } from "./EmptyMessage";
 
 export function SideReferencesTab({
@@ -34,12 +34,9 @@ export function SideReferencesTab({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(164px, 1fr))" }}
       >
         {references.map((r, i) => (
-          <ReferenceThumbCard
+          <ReferenceRowCard
             key={r.id}
-            thumbnailUrl={r.thumbnailUrl}
-            title={r.title}
-            subtitle={r.stackNodeId ? r.stackNodeName ?? r.source : r.source}
-            badge={!r.stackNodeId && r.stack?.enabled ? "Stack" : undefined}
+            reference={r}
             onClick={() => onOpen(i)}
             onRemove={onRemove ? () => onRemove(r) : undefined}
           />

@@ -7,7 +7,8 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { ReferenceThumbCard } from "@/components/references/ReferenceThumbCard";
+import { ReferenceRowCard } from "@/components/references/ReferenceRowCard";
+import { CanvasReferenceInspector } from "@/canvas/shell/CanvasReferenceInspector";
 import {
   AddReferenceModal,
   type AddReferenceModalHandle,
@@ -109,21 +110,9 @@ export function CanvasReferencesWindow({
 
       {/* Body */}
       {selected ? (
-        /* Enlarged reference — shown directly inside the canvas */
-        <div className="absolute inset-0 flex items-center justify-center p-6 pt-16" onClick={stop}>
-          {selected.thumbnailUrl ? (
-            <img
-              src={selected.thumbnailUrl}
-              alt={selected.title}
-              className="max-h-full max-w-full rounded-lg object-contain shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
-              draggable={false}
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-[#888]">
-              <IconImage size={28} strokeWidth={1.4} />
-              <span className="text-[12px]">No preview</span>
-            </div>
-          )}
+        /* Inspector — image (zoom) or stack (tree + selection), inside the canvas */
+        <div className="absolute inset-0" onClick={stop}>
+          <CanvasReferenceInspector reference={selected} />
         </div>
       ) : references.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -151,12 +140,9 @@ export function CanvasReferencesWindow({
             style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
           >
             {references.map((reference) => (
-              <ReferenceThumbCard
+              <ReferenceRowCard
                 key={reference.id}
-                thumbnailUrl={reference.thumbnailUrl}
-                title={reference.title}
-                subtitle={reference.stackNodeId ? reference.stackNodeName ?? reference.source : reference.source}
-                badge={!reference.stackNodeId && reference.stack?.enabled ? "Stack" : undefined}
+                reference={reference}
                 onClick={() => setSelectedId(reference.id)}
                 onRemove={() => removeOne(reference.id)}
               />
