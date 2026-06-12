@@ -23,12 +23,23 @@ import {
   pickFolderDialog,
 } from "@/lib/tauri/workspace";
 import { IconClock, IconDatabase, IconFolder, IconShield } from "@/components/icons";
-import { Check, ChevronRight, Eraser, Maximize2, ScanText, Sparkles, Wand2 } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Download,
+  Eraser,
+  Maximize2,
+  ScanText,
+  Sparkles,
+  Trash2,
+  Wand2,
+  X,
+} from "lucide-react";
 import {
   useProcessingFeatures,
   type ModelControls,
 } from "@/lib/models/useProcessingFeatures";
-import { FEATURES, MODEL_CATALOG, modelsForFeature } from "@/lib/models/modelCatalog";
+import { FEATURES, modelsForFeature } from "@/lib/models/modelCatalog";
 
 type AppSettingsTab = "canvas" | "processing" | "shortcuts" | "storage";
 
@@ -246,74 +257,54 @@ const FEATURE_ICON: Record<ProcessingFeatureKey, React.ReactNode> = {
 
 function ProcessingFeaturesTab() {
   const { features, models } = useProcessingFeatures();
-  const [showCatalog, setShowCatalog] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState<string>(MODEL_CATALOG[0].modelId);
-  const selected = models[selectedModelId];
+  const [expanded, setExpanded] = useState<Set<ProcessingFeatureKey>>(() => new Set());
+
+  const toggle = (key: ProcessingFeatureKey) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   return (
-    <div className="px-[22px] py-5 grid gap-6">
-      {/* Section A — installed models grouped by feature */}
-      <div>
-        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
-          Installed models
-        </div>
-        <p className="m-0 mb-3 max-w-[560px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
-          Optional on-device AI models, grouped by the feature they power. They run
-          locally and stay off until you install one below.
-        </p>
-        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
-          {FEATURES.map((feature, index) => {
-            const control = features[feature.key];
-            return (
-              <div
-                key={feature.key}
-                className={[
-                  "px-4 py-3.5",
-                  index < FEATURES.length - 1 ? "border-b border-[var(--border)]" : "",
-                ].join(" ")}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
-                    {FEATURE_ICON[feature.key]}
-                  </div>
-                  <span className="text-[13px] text-[var(--text)]">{feature.name}</span>
-                </div>
-                {control.installedModels.length === 0 ? (
-                  <p className="m-0 mt-2 pl-[38px] text-[12px] text-[var(--text-faint)]">
-                    No models installed.
-                  </p>
-                ) : (
-                  <div className="mt-2 grid gap-1.5 pl-[38px]">
-                    {control.installedModels.map((m) => (
-                      <InstalledModelRow key={m.modelId} model={models[m.modelId]} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+    <div className="px-[22px] py-5">
+      <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+        Processing Features
       </div>
-
-      {/* Section B — enable/disable switch per feature */}
-      <div>
-        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
-          Features
-        </div>
-        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
-          {FEATURES.map((feature, index) => {
-            const control = features[feature.key];
-            return (
-              <div
-                key={feature.key}
-                className={[
-                  "flex items-center justify-between gap-5 px-4 py-3",
-                  index < FEATURES.length - 1 ? "border-b border-[var(--border)]" : "",
-                ].join(" ")}
-              >
-                <div>
+      <p className="m-0 mb-3 max-w-[560px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+        Optional on-device AI models that run locally. Toggle a feature on to use it in
+        the Builder, and expand it to download models and pick which one it runs.
+      </p>
+      <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
+        {FEATURES.map((feature, index) => {
+          const control = features[feature.key];
+          const open = expanded.has(feature.key);
+          return (
+            <div
+              key={feature.key}
+              className={index < FEATURES.length - 1 ? "border-b border-[var(--border)]" : ""}
+            >
+              <div className="flex items-center gap-2.5 px-4 py-3">
+                <button
+                  type="button"
+                  aria-label={open ? `Collapse ${feature.name}` : `Expand ${feature.name}`}
+                  aria-expanded={open}
+                  onClick={() => toggle(feature.key)}
+                  className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+                >
+                  <ChevronRight
+                    size={14}
+                    strokeWidth={2}
+                    className={open ? "rotate-90 transition-transform" : "transition-transform"}
+                  />
+                </button>
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
+                  {FEATURE_ICON[feature.key]}
+                </div>
+                <div className="min-w-0 flex-1">
                   <div className="text-[13px] text-[var(--text)]">{feature.name}</div>
-                  <p className="m-0 mt-1 max-w-[460px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                  <p className="m-0 mt-0.5 max-w-[420px] text-[12px] leading-[1.45] text-[var(--text-muted)]">
                     {feature.description}
                     {!control.canEnable ? (
                       <span className="text-[var(--text-faint)]"> · Install a model to enable.</span>
@@ -327,149 +318,88 @@ function ProcessingFeaturesTab() {
                   onChange={(checked) => control.setEnabled(checked)}
                 />
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Section C — download catalog */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowCatalog((v) => !v)}
-          className="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium hover:text-[var(--text-muted)]"
-        >
-          <ChevronRight
-            size={13}
-            strokeWidth={2}
-            className={showCatalog ? "rotate-90 transition-transform" : "transition-transform"}
-          />
-          Available models for download
-        </button>
-        {showCatalog ? (
-          <div className="mt-2 rounded-[12px] border border-[var(--border)] p-4">
-            <div className="flex items-center gap-3">
-              <select
-                value={selectedModelId}
-                onChange={(event) => setSelectedModelId(event.target.value)}
-                className="h-9 flex-1 rounded-[8px] border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[13px] text-[var(--text)]"
-              >
-                {FEATURES.map((feature) => (
-                  <optgroup key={feature.key} label={feature.name}>
-                    {modelsForFeature(feature.key).map((m) => (
-                      <option key={m.modelId} value={m.modelId}>
-                        {m.label} · {m.size}
-                        {models[m.modelId].installed ? " (installed)" : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-            {selected ? (
-              <>
-                <p className="m-0 mt-2.5 text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
-                  {selected.description}
-                </p>
-                <div className="mt-3">
-                  <CatalogModelActions model={selected} />
+              {open ? (
+                <div className="border-t border-[var(--border)] bg-[var(--bg)] py-1 pl-[58px] pr-3">
+                  {modelsForFeature(feature.key).map((m) => (
+                    <ModelListRow key={m.modelId} model={models[m.modelId]} />
+                  ))}
                 </div>
-              </>
-            ) : null}
-          </div>
-        ) : null}
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-/** A single installed model under its feature, with active state + uninstall. */
-function InstalledModelRow({ model }: { model: ModelControls }) {
+/**
+ * One model under an expanded feature: a select checkbox (the active model) on
+ * the left, then download / delete actions on the right. While downloading, the
+ * actions are replaced by a progress percentage and a cancel button.
+ */
+function ModelListRow({ model }: { model: ModelControls }) {
+  const pct = Math.round(model.progress * 100);
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="text-[12.5px] text-[var(--text)] truncate">{model.label}</span>
-        <span className="text-[11px] text-[var(--text-faint)]">{model.size}</span>
-        {model.active ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-[rgba(91,108,255,0.45)] bg-[rgba(91,108,255,0.14)] px-2 py-0.5 text-[10px] font-semibold text-[#8899ff]">
-            Active
-          </span>
-        ) : null}
-      </div>
+    <div className="flex items-center gap-2.5 py-1.5">
       <button
         type="button"
-        onClick={model.uninstall}
-        className="cursor-pointer text-[11px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
+        role="checkbox"
+        aria-checked={model.active}
+        aria-label={`Use ${model.label}`}
+        disabled={!model.installed}
+        onClick={model.setActive}
+        className={[
+          "grid h-[16px] w-[16px] shrink-0 place-items-center rounded-[4px] border transition-colors",
+          !model.installed
+            ? "cursor-not-allowed border-[var(--border)] bg-[var(--surface)] opacity-40"
+            : model.active
+              ? "cursor-pointer border-[#5b6cff] bg-[#5b6cff] text-white"
+              : "cursor-pointer border-[var(--border-strong)] bg-[var(--surface)] text-transparent hover:border-[var(--text-faint)]",
+        ].join(" ")}
       >
-        Uninstall
+        {model.active ? <Check size={11} strokeWidth={2.6} /> : null}
       </button>
-    </div>
-  );
-}
 
-/** Download / activate / uninstall controls for the selected catalog model. */
-function CatalogModelActions({ model }: { model: ModelControls }) {
-  const pct = Math.round(model.progress * 100);
-  const fileIndex =
-    model.files && model.currentFile
-      ? (model.files as readonly string[]).indexOf(model.currentFile)
-      : -1;
-  const fileStatus =
-    model.files && model.currentFile && fileIndex >= 0
-      ? `Downloading ${model.currentFile} (${fileIndex + 1} of ${model.files.length})…`
-      : null;
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="truncate text-[12.5px] text-[var(--text)]">{model.label}</span>
+        <span className="shrink-0 text-[11px] text-[var(--text-faint)]">{model.size}</span>
+      </div>
 
-  if (model.installing) {
-    return (
-      <div className="flex flex-col gap-1">
-        {fileStatus ? (
-          <span className="text-[10.5px] text-[var(--text-faint)]">{fileStatus}</span>
-        ) : null}
+      {model.installing ? (
         <div className="flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface)]">
-            <div
-              className="h-full rounded-full bg-[#5b6cff] transition-[width] duration-150"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <span className="w-9 text-right text-[11px] tabular-nums text-[var(--text-muted)]">
-            {pct}%
-          </span>
+          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{pct}%</span>
           <button
             type="button"
+            aria-label={`Cancel ${model.label} download`}
             onClick={model.uninstall}
-            className="cursor-pointer text-[11px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)]"
+            className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-[6px] text-[var(--text-faint)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
-            cancel
+            <X size={13} strokeWidth={1.9} />
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (!model.installed) {
-    return (
-      <button type="button" onClick={model.install} className="btn btn-primary">
-        Download
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {model.active ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] px-2.5 py-1 text-[11px] font-medium text-[#4ade80]">
-          <Check size={12} strokeWidth={2.2} />
-          Active
-        </span>
       ) : (
-        <button type="button" onClick={model.setActive} className="btn btn-primary">
-          Use this model
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            aria-label={`Download ${model.label}`}
+            disabled={model.installed}
+            onClick={model.install}
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--text-muted)] cursor-pointer"
+          >
+            <Download size={13} strokeWidth={1.9} />
+          </button>
+          <button
+            type="button"
+            aria-label={`Delete ${model.label}`}
+            disabled={!model.installed}
+            onClick={model.uninstall}
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[#ff8a8a] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--text-muted)] cursor-pointer"
+          >
+            <Trash2 size={13} strokeWidth={1.9} />
+          </button>
+        </div>
       )}
-      <button type="button" onClick={model.uninstall} className="btn btn-ghost">
-        Uninstall
-      </button>
     </div>
   );
 }

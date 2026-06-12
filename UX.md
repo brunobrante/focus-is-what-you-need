@@ -498,18 +498,18 @@ Opened from the user menu (TopBar → avatar → Settings). Wide modal with a to
 
 **Processing Features tab**:
 
-Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (downloadable implementations). A feature can have several models; **Text Detector** has four, every other feature has one. The tab has three stacked sections:
+Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (downloadable implementations). A feature can have several models; **Text Detector** has four, every other feature has one.
 
-**1. Installed models** — grouped by feature. Each feature shows its name + icon, then the list of its installed models (label + size), or "No models installed." The model that the feature runs is tagged with a blue **Active** pill. Each installed model has an **Uninstall** action.
+A single list with one **accordion row per feature**. Each row shows:
+- a chevron **expand/collapse toggle** and the feature's icon + name + description on the left;
+- an enable/disable **switch** on the right, aligned with the feature. The switch is disabled (and the row reads "Install a model to enable") until at least one of the feature's models is installed. Enabling a feature is what makes its action appear in the Builder; disabling hides the action even if a model is installed. Uninstalling a feature's last model auto-disables it.
 
-**2. Features** — one row per feature with a name, description, and an enable/disable **switch**. The switch is disabled (and the row reads "Install a model to enable") until at least one of the feature's models is installed. Enabling a feature is what makes its action appear in the Builder; disabling hides the action even if a model is installed. Uninstalling a feature's last model auto-disables it.
+Expanding a row reveals the **list of models for that feature**, one per line:
+- a **checkbox on the left** that selects the active model the feature runs (single-select, like a radio; checkable only once the model is installed; first install auto-selects);
+- the model label + size;
+- **download** and **delete** icon buttons on the right (download enabled when not installed, delete enabled when installed). While downloading, these are replaced by a progress percentage and a cancel (×) button; multi-file packages (Florence-2) download sequentially.
 
-**3. Available models for download** — a collapsible section (toggle row with a chevron). Expanded, it shows a **select box** listing every catalog model grouped by feature (with "(installed)" suffixes), the selected model's description, and a context action:
-- **Not installed**: **Download** button → progress bar (0–100%) with a "cancel" action; multi-file packages (Florence-2) also show which file is downloading ("Downloading vision_encoder.onnx (1 of 5)…").
-- **Installed but not active**: **Use this model** button (sets it as the feature's active model) + **Uninstall**.
-- **Installed and active**: green **Active** badge + **Uninstall**.
-
-The active model per feature is chosen here (via Download → auto-active on first install, or **Use this model**), not in the installed list. All install / enable / active-model changes persist immediately, independent of the modal's Save button.
+All install / enable / active-model changes persist immediately, independent of the modal's Save button.
 
 Catalog:
 - **Remove Background** — BiRefNet (~220 MB)
