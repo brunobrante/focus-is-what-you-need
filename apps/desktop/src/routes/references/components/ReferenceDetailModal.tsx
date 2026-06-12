@@ -227,7 +227,7 @@ export function ReferenceDetailModal({
   const tabs = isGroup
     ? [
         { id: "screens", label: "Originals" },
-        { id: "stacks", label: "Screens", disabled: !hasStacks },
+        { id: "stacks", label: "Screens" },
       ]
     : [
         { id: "screen", label: "Original" },
