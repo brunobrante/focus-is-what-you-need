@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, RotateCcw, Save } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Image as ImageIcon, RotateCcw, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import type { SidebarTab } from "../types";
 import { CROPS_OVERLAY_PRESETS } from "../types";
@@ -51,6 +51,8 @@ export function SidebarComponentsHeader({
   rootName,
   scopedCount,
   showReset,
+  showingOriginal,
+  onToggleOriginal,
   onExpandAll,
   onCollapseAll,
   onReset,
@@ -58,6 +60,8 @@ export function SidebarComponentsHeader({
   rootName: string;
   scopedCount: number;
   showReset: boolean;
+  showingOriginal: boolean;
+  onToggleOriginal: () => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
   onReset: () => void;
@@ -76,6 +80,20 @@ export function SidebarComponentsHeader({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          type="button"
+          aria-label="Show original"
+          title={showingOriginal ? "Close original" : "Show the original image"}
+          onClick={onToggleOriginal}
+          className={[
+            "grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border transition-colors",
+            showingOriginal
+              ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]"
+              : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+          ].join(" ")}
+        >
+          <ImageIcon size={13} strokeWidth={1.8} />
+        </button>
         <button
           type="button"
           aria-label="Expand all"

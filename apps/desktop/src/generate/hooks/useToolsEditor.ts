@@ -22,6 +22,7 @@ import type {
   SelectionInteraction,
   EditorTool,
   SidebarTab,
+  NewScreenSource,
 } from "../types";
 import {
   MIN_TOOL_ZOOM,
@@ -219,7 +220,8 @@ export type ToolsEditorState = {
   openGalleryMode: () => void;
   openComponent: (id: string) => void;
   selectRoot: (id: string) => void;
-  beginRootCreation: () => void;
+  setPrimaryRoot: (id: string) => void;
+  beginRootCreation: (source?: NewScreenSource) => void;
   promoteToRoot: (id: string) => void;
   startEditComponent: (id: string) => void;
   resetActiveStack: () => void;
@@ -616,17 +618,38 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [openComponent],
   );
 
-  // "+ New" creates a brand-new, independent root seeded with the original image.
-  // The original is only a starting point: each root is its own workspace and can
-  // later be narrowed to a section via "Become root".
-  const beginRootCreation = useCallback(() => {
+  // Mark a root as the reference's main screen (the one shown on the card front).
+  // Exactly one root may be primary, so flagging one clears the others.
+  const setPrimaryRoot = useCallback(
+    (id: string) => {
+      updateComponents((current) =>
+        current.map((entry) =>
+          entry.parentId == null ? { ...entry, isPrimaryRoot: entry.id === id } : entry,
+        ),
+      );
+    },
+    [updateComponents],
+  );
+
+  // "+ New" creates a brand-new, independent root seeded with an original image.
+  // The source defaults to this reference's original, but the switcher may pass a
+  // different original to copy from. The original is only a starting point: each
+  // root is its own workspace and can later be narrowed via "Become root".
+  const beginRootCreation = useCallback((source?: NewScreenSource) => {
+    const src: NewScreenSource = source ?? {
+      url: item.url,
+      w: item.w,
+      h: item.h,
+      type: item.type,
+      name: item.name,
+    };
     const id = newRootComponentId();
     const newRoot: SavedComponent = {
       id,
       name: "New screen",
-      box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
-      dataUrl: item.url,
-      type: item.type || "IMG",
+      box: { x: 0, y: 0, w: src.w || 0, h: src.h || 0 },
+      dataUrl: src.url,
+      type: src.type || "IMG",
       createdAt: new Date().toISOString(),
       parentId: null,
       kind: "root",
@@ -645,7 +668,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     setViewMode("component");
     setCurrentTool("crop");
     resetToolViewport();
-  }, [cancelSelection, item.h, item.type, item.url, item.w, resetToolViewport, updateComponents]);
+  }, [cancelSelection, item.h, item.name, item.type, item.url, item.w, resetToolViewport, updateComponents]);
 
   // "Become root" redefines the currently open root *in place* to be the selected
   // section: the section's pixels/bounds replace the root's, its own children move
@@ -1839,6 +1862,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     openGalleryMode,
     openComponent,
     selectRoot,
+    setPrimaryRoot,
     beginRootCreation,
     promoteToRoot,
     startEditComponent,

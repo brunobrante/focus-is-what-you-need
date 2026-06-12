@@ -34,13 +34,18 @@ export async function loadStackThumbnailUrl(referenceId: string): Promise<string
   const data = await readReferenceStackData(referenceId);
   if (!data) return null;
 
-  // The card represents the image by the root of its first stack. A non-default
-  // stack stores its root pixels in a file; the default stack's root is the
-  // original image itself (and legacy data without a roots list behaves the same).
-  const firstRoot = data.roots?.[0] ?? null;
+  // The card front shows the reference's main screen — the primary root chosen in
+  // the Builder (`primaryComponentId`). It falls back to the first root when none
+  // is set. A non-default screen stores its pixels in a file; the default screen's
+  // pixels are the original image itself (legacy data without roots behaves the same).
+  const roots = data.roots ?? [];
+  const mainRoot =
+    (data.primaryComponentId ? roots.find((root) => root.id === data.primaryComponentId) : null) ??
+    roots[0] ??
+    null;
 
-  if (firstRoot?.file) {
-    const blob = await loadReferenceStackFile(referenceId, firstRoot.file, "image/png");
+  if (mainRoot?.file) {
+    const blob = await loadReferenceStackFile(referenceId, mainRoot.file, "image/png");
     if (blob) return URL.createObjectURL(blob);
   }
 

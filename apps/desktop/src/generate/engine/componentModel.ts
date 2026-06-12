@@ -275,6 +275,10 @@ export function referenceStackDataFromComponents(input: {
   const defaultRootId = input.rootComponentId;
   const roots = input.components.filter((component) => component.parentId == null);
   const cuts = input.components.filter((component) => component.parentId != null);
+  // The user-chosen main screen wins; otherwise fall back to the caller's value
+  // (the default root). Persisted as `primaryComponentId` so the card front and
+  // the lightbox both open on it.
+  const primaryComponentId = roots.find((root) => root.isPrimaryRoot)?.id ?? input.primaryComponentId;
 
   return {
     version: 2,
@@ -300,7 +304,7 @@ export function referenceStackDataFromComponents(input: {
     }),
     // Legacy single-root fields kept for v1 readers.
     rootComponentId: defaultRootId,
-    primaryComponentId: input.primaryComponentId,
+    primaryComponentId,
     components: cuts.map((component) => ({
       id: component.id,
       name: component.name,
@@ -408,6 +412,7 @@ export async function readReferenceStackComponents(item: ToolReference): Promise
 
   const [rootItems, cutItems] = await Promise.all([
     mapWithConcurrency(rootsData, REFERENCE_STACK_IO_CONCURRENCY, async (root): Promise<SavedComponent> => {
+      const isPrimaryRoot = root.id === data.primaryComponentId;
       if (root.isDefault || !root.file) {
         return {
           id: root.id,
@@ -420,6 +425,7 @@ export async function readReferenceStackComponents(item: ToolReference): Promise
           kind: "root",
           rootId: root.id,
           isDefaultRoot: true,
+          isPrimaryRoot,
         };
       }
       const blob = await loadReferenceStackFile(item.id, root.file, "image/png");
@@ -434,6 +440,7 @@ export async function readReferenceStackComponents(item: ToolReference): Promise
         kind: "root",
         rootId: root.id,
         isDefaultRoot: false,
+        isPrimaryRoot,
       };
     }),
     mapWithConcurrency(

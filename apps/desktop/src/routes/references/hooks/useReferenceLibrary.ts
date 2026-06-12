@@ -52,6 +52,14 @@ import {
 } from "../lib/utils";
 import type { FramePickerVideo } from "../../import/VideoFramePicker";
 
+// A stable signature of the stack state a cached cover was baked from. Drifts when
+// the main screen (`primaryComponentId`) or the stack itself (`updatedAt`) changes.
+function stackThumbVersion(item: ReferenceItem | undefined): string {
+  const stack = item?.stack;
+  if (!stack) return "";
+  return `${stack.updatedAt ?? ""}~${stack.primaryComponentId ?? ""}`;
+}
+
 async function loadLibrary(): Promise<{ items: ReferenceItem[]; groups: ReferenceGroup[] }> {
   await ensureWorkspaceFolders().catch(() => {});
   const { metas, groups } = await loadReferenceLibrary();
@@ -96,6 +104,10 @@ export function useReferenceLibrary() {
   groupsRef.current = groups;
   const stackThumbnailUrlsRef = useRef<Record<string, string>>({});
   stackThumbnailUrlsRef.current = stackThumbnailUrls;
+  // The stack identity baked into each cached thumbnail. When a reference's stack
+  // changes (e.g. the Builder picks a new main screen), this version drifts and the
+  // card thumbnail is regenerated instead of serving the stale cover.
+  const stackThumbVersionRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     void loadLibrary().then(({ items, groups: storedGroups }) => {
@@ -154,7 +166,13 @@ export function useReferenceLibrary() {
 
     const missing = Array.from(candidateIds).filter((id) => {
       const item = referencesById.get(id);
-      return Boolean(item?.mediaKind === "image" && item.stack?.enabled && !stackThumbnailUrls[id]);
+      if (!(item?.mediaKind === "image" && item.stack?.enabled)) return false;
+      // Reload when there is no cached cover yet, or when the cached cover was baked
+      // from an older stack version (a different main screen or a later edit).
+      return (
+        !stackThumbnailUrls[id] ||
+        stackThumbVersionRef.current[id] !== stackThumbVersion(item)
+      );
     });
     if (missing.length === 0) return;
 
@@ -169,8 +187,10 @@ export function useReferenceLibrary() {
         setStackThumbnailUrls((current) => {
           const next = { ...current };
           for (const [id, url] of entries) {
-            if (next[id]) { URL.revokeObjectURL(url); continue; }
+            // Replace a stale cover; revoke the old object URL to avoid a leak.
+            if (next[id] && next[id] !== url) URL.revokeObjectURL(next[id]);
             next[id] = url;
+            stackThumbVersionRef.current[id] = stackThumbVersion(referencesById.get(id));
           }
           return next;
         });

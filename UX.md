@@ -316,14 +316,20 @@ Reference image library for UI research.
 
 **Add Reference Modal** (`AddReferenceModal`, opened from a screen, component, or
 the canvas references window):
-- A single searchable **tree** of the whole library. Each image row expands into
-  its stack tree: the whole image ("Original") plus each root and its nested cuts,
-  indented by depth.
+- A single searchable **tree** of the whole library. An image row is a **group
+  header** (not itself addable when it has a stack) that expands into its
+  **screens** (roots) and **stack components** (cuts), indented by depth — screens
+  show an image icon and a "Screen · W × H" subtitle, stacks a layers icon. The raw
+  whole-image original is never offered as an addable item: every uploaded image is
+  a screen, so you attach screens or stacks, not the group/original. The implicit
+  full-image screen surfaces only when an image has no explicit sub-screens (then
+  the whole image *is* the single screen). A plain image with no stack is itself a
+  single addable screen.
 - One search box filters across image names, tags, **and** stack-component names;
   matching images auto-expand.
-- Picking the Original attaches the whole image; picking any node attaches just
-  that cropped component (its crop is baked into the card thumbnail). Already-added
-  items show an "Added" marker.
+- Picking a screen attaches that screen; picking a stack attaches just that cropped
+  component (its crop is baked into the card thumbnail). Already-added items show an
+  "Added" marker.
 - Footer selects the attach target (entire project / specific screen / specific
   component); it is pre-set to the current subject when opened from a detail page
   or the canvas.
@@ -440,13 +446,14 @@ not a separate entity and has no name of its own.
 - Crop tool: user draws rectangular regions over the image to mark component boundaries
 - Each region is called a "cut"
 
-**Bottom canvas bar — image-level actions**: "Mostrar original", "Upload", and (when the Auto-detect Components feature is enabled) **Auto-detect**:
-- **Mostrar original** toggles a clean view of the imported original image (no cut
-  overlays, tool rail dimmed). When the workspace holds several originals (a group:
-  Original 1, Original 2, …) it becomes a slideshow — left/right arrows and an
-  "Original N · i / total" counter flip between them. Clicking it again returns to
-  the editor. The right-panel **Originals** list (below) drives the same view —
-  clicking an original opens it here; the active one is highlighted.
+**Show original (clean view)**: an image icon button in the **Componentes** header
+(right panel) toggles a clean view of the open subject (no cut overlays, tool rail
+dimmed). While active, the header icon is highlighted and a **close (×) button**
+appears in the top-right of the canvas; the right panel stays fully populated
+(screens, component tree) so you can keep navigating. Clicking the header icon
+again, or the canvas ×, returns to the editor.
+
+**Bottom canvas bar — image-level actions**: (when the Auto-detect Components feature is enabled) **Auto-detect**:
 - **Auto-detect** runs Florence-2 on the open subject and proposes crop regions automatically. The button shows a spinner and the image dims while it runs (typically 3–8s). Only available when a stack/component is open (croppable).
 - Each proposed region renders as a dashed purple box with its label, corner handles, and a "×" discard badge — visually a staged sibling of a manually drawn crop.
 - Proposals are editable in place: drag the body to move, drag a corner to resize, click "×" to discard one.
@@ -455,14 +462,22 @@ not a separate entity and has no name of its own.
 - Approved proposals enter the exact same cut pipeline as hand-drawn crops — once applied they are indistinguishable from manual cuts. When the open subject changes, pending proposals are discarded.
 
 **Right panel — Tools and output**:
-- **Screens panel** (top of the Componentes tab): a single unified list replacing
-  the former left group navigator + "Stacks" switcher. It shows the open image's
-  screens (its roots, selectable); when the image belongs to a group, the group's
-  other images under "Other images" (each navigable); and an **Originals** section
-  listing the imported source image(s) — clicking one opens it in the clean
-  "Mostrar original" view (active original highlighted). "New" creates a new screen
-  from the original; "Add image" uploads another image into the workspace. The
-  panel stays visible while viewing originals, so you can flip between them.
+- **Screens panel** (top of the Componentes tab): the single source for screen
+  navigation — there is no separate left group navigator. It shows the open image's
+  screens (its roots, selectable; clicking one shows that screen's stack/components
+  below); when the image belongs to a group, the group's other images render as
+  navigation cards that open that image in the Builder.
+  - **New** creates a new screen by copying an original. With a single original it
+    creates directly; with multiple originals (a group) it opens a small **"Copy
+    from original"** picker — each entry shows the original's thumbnail, name, and
+    dimensions (the current one tagged "· current") — and the chosen original seeds
+    the new screen's root. A click-away backdrop closes the picker.
+  - **Main screen** — each screen card has a star button (top-right of the
+    thumbnail, visible on hover, filled gold when set). Clicking it marks that
+    screen as the reference's **main** screen; exactly one screen can be main. The
+    main screen is what shows on the **front of the reference card** in the gallery
+    and is pre-selected when the stack is opened. Defaults to the full-image screen
+    until changed. Save persists the choice.
 - **Builder tab** (default):
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button

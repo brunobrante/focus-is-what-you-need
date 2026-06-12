@@ -31,6 +31,16 @@ export type ToolReferenceGroupItem = {
   url?: string;
 };
 
+// A source "original" a new screen can be copied from in the Builder. Usually a
+// reference's full image; the new root is seeded from this url and dimensions.
+export type NewScreenSource = {
+  url: string;
+  w: number;
+  h: number;
+  type: string;
+  name?: string;
+};
+
 export type ComponentKind = "root" | "cut";
 
 export type SavedComponent = {
@@ -49,6 +59,9 @@ export type SavedComponent = {
   rootId?: string | null;
   // The implicit full-image root created for every reference (back-compat).
   isDefaultRoot?: boolean;
+  // The "main" screen of the reference: the one shown on the front of the card.
+  // At most one root carries this; it is persisted as the stack's primary id.
+  isPrimaryRoot?: boolean;
 };
 
 export type PendingConfirmation = { type: "reset" };

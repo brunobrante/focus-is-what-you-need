@@ -72,9 +72,12 @@ function defaultAttachMode(input: { defaultScreenId?: string; defaultComponentId
 
 /* ---------- Tree building ---------- */
 
-// Flattens an image's stack into an indented, selectable list: Original first,
-// then each root and its nested cuts. The default root's cuts hang directly
-// under Original (it *is* the original), so the tree stays shallow.
+// Flattens an image's stack into an indented, selectable list of **screens**
+// (roots) and **stack components** (cuts). The raw original is never emitted —
+// every uploaded image is a screen, so the addable nodes are its screens and the
+// stacks inside them, not the whole-image original. The implicit full-image
+// default root surfaces as a screen only when it is the sole screen (no explicit
+// sub-screens); otherwise it is the group container and only its cuts surface.
 function buildPickNodes(data: ReferenceStackData, fallbackName: string): PickNode[] {
   const rootIds = stackRootIds(data);
   const cuts = data.components.filter((c) => !rootIds.has(c.id));
@@ -84,18 +87,7 @@ function buildPickNodes(data: ReferenceStackData, fallbackName: string): PickNod
     byParent.set(parent, [...(byParent.get(parent) ?? []), cut]);
   }
 
-  const out: PickNode[] = [
-    {
-      key: "__original__",
-      stackNodeId: null,
-      name: fallbackName,
-      depth: 0,
-      file: null,
-      kind: "original",
-      w: data.original.w,
-      h: data.original.h,
-    },
-  ];
+  const out: PickNode[] = [];
 
   const visitCuts = (parentId: string, depth: number, seen: Set<string>) => {
     for (const cut of byParent.get(parentId) ?? []) {
@@ -132,21 +124,27 @@ function buildPickNodes(data: ReferenceStackData, fallbackName: string): PickNod
         ]
       : [];
 
+  // The full-image default root is a screen on its own only when there are no
+  // explicit sub-screens; with sub-screens it is the group, so we don't re-offer
+  // the whole image — only the screens cut from it.
+  const hasExplicitScreens = roots.some((root) => !root.isDefault);
+
   for (const root of roots) {
-    if (root.isDefault) {
-      visitCuts(root.id, 1, new Set());
+    if (root.isDefault && hasExplicitScreens) {
+      // Folded group root: surface its cuts as top-level stack components.
+      visitCuts(root.id, 0, new Set());
     } else {
       out.push({
         key: root.id,
         stackNodeId: root.id,
-        name: root.name,
-        depth: 1,
+        name: root.isDefault ? fallbackName : root.name,
+        depth: 0,
         file: root.file,
         kind: "root",
         w: root.box.w,
         h: root.box.h,
       });
-      visitCuts(root.id, 2, new Set());
+      visitCuts(root.id, 1, new Set());
     }
   }
   return out;
@@ -502,7 +500,9 @@ function ImageRow({
 }) {
   const expandable = Boolean(item.stack?.enabled) && item.mediaKind === "image";
   const childNodes = nodes.filter((n) => n.kind !== "original");
-  const original = nodes.find((n) => n.kind === "original")!;
+  // A stacked image is a group container: you add its screens/stacks, not the
+  // whole image. A plain (non-stacked) image is itself a single screen.
+  const headerNode = expandable ? null : nodes.find((n) => n.kind === "original") ?? null;
   const visibleChildren = query
     ? childNodes.filter((n) => n.name.toLowerCase().includes(query))
     : childNodes;
@@ -527,8 +527,8 @@ function ImageRow({
 
         <button
           type="button"
-          onClick={() => onPick(original)}
-          disabled={!attachmentReady || submittingId != null}
+          onClick={() => (expandable ? onToggle() : headerNode && onPick(headerNode))}
+          disabled={!expandable && (!attachmentReady || submittingId != null || !headerNode)}
           title={item.name}
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[9px] py-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -555,10 +555,14 @@ function ImageRow({
               ) : null}
             </div>
             <span className="mt-0.5 block text-[10.5px] tabular-nums text-[var(--text-faint)]">
-              Whole image{item.w && item.h ? ` · ${item.w} × ${item.h}` : ""}
+              {/* A non-expandable image is itself a single screen; a stacked image
+                  is a group container whose screens/stacks live below. */}
+              {!expandable && item.mediaKind === "image" ? "Screen · " : ""}
+              {item.w && item.h ? `${item.w} × ${item.h}` : ""}
+              {expandable ? " · expand for screens" : ""}
             </span>
           </div>
-          <PickHint linked={linked} busy={submittingId === item.id} />
+          {expandable ? null : <PickHint linked={linked} busy={submittingId === item.id} />}
         </button>
       </div>
 
@@ -575,12 +579,12 @@ function ImageRow({
                 style={{ paddingLeft: `${36 + node.depth * 16}px` }}
               >
                 <span className="grid h-5 w-5 shrink-0 place-items-center rounded-[5px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)]">
-                  <IconLayers size={10} strokeWidth={1.8} />
+                  {node.kind === "root" ? <IconImage size={10} strokeWidth={1.8} /> : <IconLayers size={10} strokeWidth={1.8} />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-medium text-[var(--text)]">{node.name}</span>
                   <span className="block text-[10px] tabular-nums text-[var(--text-faint)]">
-                    {Math.round(node.w)} × {Math.round(node.h)}
+                    {node.kind === "root" ? "Screen · " : ""}{Math.round(node.w)} × {Math.round(node.h)}
                   </span>
                 </span>
                 <PickHint linked={existingIds.has(id)} busy={submittingId === id} />

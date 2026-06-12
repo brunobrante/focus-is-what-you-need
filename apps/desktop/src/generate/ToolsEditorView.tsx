@@ -15,6 +15,7 @@ import {
   Sparkles,
   Trash2,
   Wand2,
+  X,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GeneratorHeader } from "./ui/GeneratorHeader";
@@ -37,7 +38,6 @@ import {
   SidebarConfigPanel,
 } from "./ui/BuilderSidebar";
 import { ConfirmActionModal } from "./ui/ConfirmModal";
-import { ReferenceGroupNavigator } from "./ui/ReferenceGroupNavigator";
 import { RootSwitcher } from "./ui/RootSwitcher";
 import { GallerySlider } from "./ui/GallerySlider";
 
@@ -93,7 +93,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     showCropsOverlay,
     hoveredComponentId,
     imageError,
-    uploading,
     proposedRegions,
     autoDetecting,
     applyingProposals,
@@ -140,7 +139,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     canCrop,
     selectionSize,
     confirmationCopy,
-    showGroupNavigator,
     rootComponentId,
 
     // Handlers
@@ -155,6 +153,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     openGalleryMode,
     openComponent,
     selectRoot,
+    setPrimaryRoot,
     beginRootCreation,
     promoteToRoot,
     startEditComponent,
@@ -179,7 +178,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     selectStackComponent,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
-  const [groupNavCollapsed, setGroupNavCollapsed] = useState(false);
   const [cleanOriginal, setCleanOriginal] = useState(false);
 
   const { features } = useProcessingFeatures();
@@ -297,25 +295,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     });
   }
 
-  const showSidebar = showGroupNavigator && !!groupContext && !groupNavCollapsed;
-
   return (
     <TooltipProvider>
       <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
-        {showSidebar ? (
-          <ReferenceGroupNavigator
-            group={groupContext!}
-            activeReferenceId={item.id}
-            onToggleCollapse={() => setGroupNavCollapsed(true)}
-            onUpload={() => fileInputRef.current?.click()}
-            uploading={uploading}
-          />
-        ) : null}
-
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <GeneratorHeader
-          showGroupNavToggle={showGroupNavigator && !!groupContext && groupNavCollapsed}
-          onGroupNavToggle={() => setGroupNavCollapsed(false)}
           tabActive={viewMode === "stack" ? "stack" : viewMode === "gallery" ? "gallery" : "builder"}
           stackDisabled={stackedComponents.length === 0}
           onBuilder={openBuilderMode}
@@ -559,6 +543,19 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               </>
               )}
 
+              {cleanOriginal ? (
+                <button
+                  type="button"
+                  data-selection-action
+                  onClick={() => setCleanOriginal(false)}
+                  aria-label="Close original"
+                  title="Close original"
+                  className="absolute right-3 top-3 z-30 grid h-8 w-8 cursor-pointer place-items-center rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
+                >
+                  <X size={14} strokeWidth={2} />
+                </button>
+              ) : null}
+
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
                   <ImageIcon size={24} strokeWidth={1.6} />
@@ -567,7 +564,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     Volte para <Link className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline" to="/references">References</Link>.
                   </p>
                 </div>
-              ) : viewMode === "stack" && imageStack ? (
+              ) : viewMode === "stack" && imageStack && !cleanOriginal ? (
                 <div
                   className="relative inline-block overflow-visible rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
                   style={{
@@ -604,8 +601,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   >
                     <img
                       ref={imgRef}
-                      src={displayUrl}
-                      alt={activeSubject.name}
+                      src={cleanOriginal ? item.url : displayUrl}
+                      alt={cleanOriginal ? item.name : activeSubject.name}
                       crossOrigin="anonymous"
                       draggable={false}
                       onLoad={() => {
@@ -767,10 +764,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
 
             <div className="sticky bottom-0 z-20 flex min-h-[56px] shrink-0 items-center gap-2.5 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3.5 py-2.5 backdrop-blur-[8px]">
               <div className="inline-flex shrink-0 items-center gap-1.5">
-                <ModeButton active={cleanOriginal} onClick={() => setCleanOriginal((v) => !v)}>
-                  <ImageIcon size={13} strokeWidth={1.8} />
-                  Mostrar original
-                </ModeButton>
                 {autoDetectOn ? (
                   <ModeButton
                     onClick={() => void autoDetect()}
@@ -817,17 +810,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
           </section>
 
           <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--bg)]">
-            {cleanOriginal ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] text-[var(--text-faint)]">
-                  <ImageIcon size={18} strokeWidth={1.5} />
-                </span>
-                <p className="m-0 text-[12.5px] leading-relaxed text-[var(--text-faint)]">
-                  Viewing the original image.<br />Click <span className="font-medium text-[var(--text-muted)]">Mostrar original</span> again to return.
-                </p>
-              </div>
-            ) : (
-            <>
             <SidebarTabs active={sidebarTab} onChange={setSidebarTab} />
 
             {sidebarTab === "components" ? (
@@ -835,8 +817,10 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 <RootSwitcher
                   roots={roots}
                   activeRootId={activeScopeId}
+                  primaryRootId={roots.find((r) => r.isPrimaryRoot)?.id ?? rootComponentId}
                   cutCountByRoot={cutCountByRoot}
                   onSelect={selectRoot}
+                  onSetPrimary={setPrimaryRoot}
                   onNewRoot={beginRootCreation}
                   creating={false}
                   activeReferenceId={item.id}
@@ -848,6 +832,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   rootName={activeRoot.isDefaultRoot ? "Full image" : activeRoot.name}
                   scopedCount={scopedComponents.length}
                   showReset={scopedComponents.length > 1 || !activeRoot.isDefaultRoot}
+                  showingOriginal={cleanOriginal}
+                  onToggleOriginal={() => setCleanOriginal((v) => !v)}
                   onExpandAll={expandAllComponents}
                   onCollapseAll={collapseAllComponents}
                   onReset={requestResetConfirmation}
@@ -898,8 +884,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 cropsOverlayAlpha={cropsOverlayAlpha}
                 onChangeCropsOverlayAlpha={setCropsOverlayAlpha}
               />
-            )}
-            </>
             )}
           </aside>
         </div>
