@@ -231,7 +231,7 @@ export function ReferenceDetailModal({
       ]
     : [
         { id: "screen", label: "Original" },
-        { id: "stack", label: "Screens", disabled: !canStack },
+        { id: "stack", label: "Screens" },
       ];
 
   return (
