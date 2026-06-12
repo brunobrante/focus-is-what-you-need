@@ -73,7 +73,7 @@ export function BuilderStackTabs({
   return (
     <div
       data-selection-action
-      className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-[8px]"
+      className="flex items-center gap-1 rounded-[10px] border border-[var(--border)] p-1"
     >
       <FloatingTabButton active={active === "builder"} onClick={onBuilder}>
         Builder

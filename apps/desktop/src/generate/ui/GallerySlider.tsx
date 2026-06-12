@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, LayoutGrid, Palette, Type } from "lucide-react";
 import type { SavedComponent } from "../engine/types";
+import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import {
   extractColors,
   runFlorence2TextCheck,
@@ -96,16 +97,10 @@ export function GallerySlider({
       <div className={["flex max-h-full max-w-full flex-col items-center gap-3 px-16", showColors || showText ? "pb-24" : ""].join(" ")}>
         <div
           key={current.id}
-          className="animate-in fade-in zoom-in-95 duration-150 rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
+          className="animate-in fade-in zoom-in-95 duration-150 overflow-hidden rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
           style={{ maxWidth: "100%", maxHeight: "calc(100% - 56px)" }}
         >
-          <img
-            src={current.dataUrl}
-            alt={current.name}
-            draggable={false}
-            className="block rounded-[8px]"
-            style={{ maxWidth: "100%", maxHeight: "60vh", objectFit: "contain" }}
-          />
+          <SceneCanvasViewer source="snapshot" url={current.dataUrl} />
         </div>
 
         <div className="flex items-center gap-3">

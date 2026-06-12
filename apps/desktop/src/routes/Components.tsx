@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Snapshot } from "@/components/Snapshot";
+import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import { IconChevronLeft, IconCompare, IconFastEdit, IconHistory, IconOpenCanvas, IconSearch } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { AddCard } from "@/components/screen/AddCard";
@@ -271,15 +271,7 @@ export function Components() {
           } : undefined}
         >
           {screen ? (
-            <Snapshot
-              kind="screen"
-              ownerType="screen"
-              ownerId={screen.id}
-              variant={screen.variant}
-              type={type}
-              emptyMode="preview"
-              display="natural"
-            />
+            <SceneCanvasViewer source="stored" ownerType="screen" ownerId={screen.id} kind="screen" />
           ) : (
             <PreviewMockImage tpl={activeTpl} type={type} allowMock={canUseFactoryMocks} />
           )}

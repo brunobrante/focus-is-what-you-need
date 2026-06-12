@@ -7,6 +7,16 @@ import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
 import { htmlCanvasDocumentFromJSON, type HtmlCanvasDocument, type HtmlCanvasNode } from "@/lib/canvas/htmlScene";
+import {
+  SceneCanvasInspector,
+  findSceneNode,
+  flattenSceneTree,
+  updateNodeInScene,
+  type Scene,
+  type SceneNode,
+  type SceneSize,
+  type NodeKind,
+} from "@/components/screen/SceneCanvasInspector";
 
 export type FastEditConfig =
   | {
@@ -29,36 +39,6 @@ export interface FastEditModalHandle {
   close: () => void;
 }
 
-type SceneSize = { w: number; h: number; radius: number; label: string };
-type NodeKind = "frame" | "surface" | "text" | "badge" | "button" | "media";
-
-type Node = {
-  id: string;
-  name: string;
-  kind: NodeKind;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  text: string;
-  background: string;
-  textColor: string;
-  borderColor: string;
-  borderWidth: number;
-  radius: number;
-  fontSize: number;
-  fontWeight: number;
-  children: Node[];
-};
-
-type Draft = Partial<Pick<Node, "text" | "background" | "textColor" | "borderColor" | "borderWidth" | "radius">>;
-
-type Scene = {
-  label: string;
-  size: SceneSize;
-  root: Node;
-};
-
 export const FastEditModal = forwardRef<FastEditModalHandle>(
   function FastEditModal(_, ref) {
     const [isOpen, setIsOpen] = useState(false);
@@ -66,8 +46,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
 
     const [scene, setScene] = useState<Scene | null>(null);
     const [selectedId, setSelectedId] = useState("");
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
-    const [drafts, setDrafts] = useState<Record<string, Draft>>({});
     const [pickerOpen, setPickerOpen] = useState(false);
     const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
     const pickerTriggerRef = useRef<HTMLButtonElement>(null);
@@ -103,8 +81,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     useEffect(() => {
       if (!isOpen || !scene) return;
       setSelectedId(scene.root.id);
-      setHoveredId(null);
-      setDrafts({});
       setPickerOpen(false);
       setZoomIdx(ZOOM_DEFAULT_IDX);
     }, [isOpen, scene?.root.id]);
@@ -123,24 +99,15 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
       return () => document.removeEventListener("mousedown", handler);
     }, [pickerOpen]);
 
-    const treeOptions = useMemo(() => (scene ? flattenTree(scene.root) : []), [scene]);
-    const selectedNode = scene ? (findNode(scene.root, selectedId) ?? scene.root) : null;
-    const selectedDraft = selectedNode ? (drafts[selectedNode.id] ?? {}) : {};
-    const allNodes = scene ? treeOptions.filter(({ node }) => node.id !== scene.root.id) : [];
-    const hoveredNode = hoveredId ? (allNodes.find(({ node }) => node.id === hoveredId)?.node ?? null) : null;
-    const selectedSceneNode = scene && selectedId !== scene.root.id
-      ? (allNodes.find(({ node }) => node.id === selectedId)?.node ?? null)
-      : null;
+    const treeOptions = useMemo(() => (scene ? flattenSceneTree(scene.root) : []), [scene]);
+    const selectedNode = scene ? (findSceneNode(scene.root, selectedId) ?? scene.root) : null;
+
+    const updateSelected = (patch: Partial<SceneNode>) => {
+      if (!selectedNode) return;
+      setScene((prev) => (prev ? updateNodeInScene(prev, selectedNode.id, patch) : prev));
+    };
 
     const z = ZOOM_STEPS[zoomIdx] ?? 1;
-
-    const updateSelectedDraft = (patch: Draft) => {
-      if (!selectedNode) return;
-      setDrafts((prev) => ({
-        ...prev,
-        [selectedNode.id]: { ...(prev[selectedNode.id] ?? {}), ...patch },
-      }));
-    };
 
     if (!config) return null;
 
@@ -216,41 +183,11 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div style={{ position: "relative", width: scene.size.w, height: scene.size.h, flexShrink: 0, transform: `scale(${z})`, transformOrigin: "center", transition: "transform 150ms" }}>
-                  <FastEditScene
+                  <SceneCanvasInspector
                     scene={scene}
                     selectedId={selectedNode.id}
-                    drafts={drafts}
                     onSelect={setSelectedId}
-                    onHover={setHoveredId}
                   />
-                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 500 }}>
-                    {hoveredNode && hoveredId !== selectedId && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: hoveredNode.x,
-                          top: hoveredNode.y,
-                          width: hoveredNode.w,
-                          height: hoveredNode.h,
-                          outline: "2px solid rgba(251,146,60,0.85)",
-                          outlineOffset: "-1px",
-                        }}
-                      />
-                    )}
-                    {selectedSceneNode && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: selectedSceneNode.x,
-                          top: selectedSceneNode.y,
-                          width: selectedSceneNode.w,
-                          height: selectedSceneNode.h,
-                          outline: "2px solid #1F7AE0",
-                          outlineOffset: "-1px",
-                        }}
-                      />
-                    )}
-                  </div>
                 </div>
               </div>
               <ZoomControls
@@ -267,29 +204,29 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                   <Section title="Texto">
                     <Field label="Content">
                       <input
-                        value={selectedDraft.text ?? selectedNode.text}
-                        onChange={(event) => updateSelectedDraft({ text: event.target.value })}
+                        value={selectedNode.text}
+                        onChange={(e) => updateSelected({ text: e.target.value })}
                         className="h-9 w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--border-strong)]"
                       />
                     </Field>
                     <Field label="Text color">
                       <ColorInput
-                        value={selectedDraft.textColor ?? selectedNode.textColor}
-                        onChange={(value) => updateSelectedDraft({ textColor: value })}
+                        value={selectedNode.textColor}
+                        onChange={(v) => updateSelected({ textColor: v })}
                       />
                     </Field>
                   </Section>
                   <Section title="Surface">
                     <Field label="Fundo">
                       <ColorInput
-                        value={selectedDraft.background ?? selectedNode.background}
-                        onChange={(value) => updateSelectedDraft({ background: value })}
+                        value={selectedNode.background}
+                        onChange={(v) => updateSelected({ background: v })}
                       />
                     </Field>
                     <Field label="Borda">
                       <ColorInput
-                        value={selectedDraft.borderColor ?? selectedNode.borderColor}
-                        onChange={(value) => updateSelectedDraft({ borderColor: value })}
+                        value={selectedNode.borderColor}
+                        onChange={(v) => updateSelected({ borderColor: v })}
                       />
                     </Field>
                     <Field label="Espessura">
@@ -297,8 +234,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                         min={0}
                         max={4}
                         step={1}
-                        value={selectedDraft.borderWidth ?? selectedNode.borderWidth}
-                        onChange={(value) => updateSelectedDraft({ borderWidth: value })}
+                        value={selectedNode.borderWidth}
+                        onChange={(v) => updateSelected({ borderWidth: v })}
                         format={(v) => `${v}px`}
                       />
                     </Field>
@@ -307,8 +244,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                         min={0}
                         max={64}
                         step={1}
-                        value={selectedDraft.radius ?? selectedNode.radius}
-                        onChange={(value) => updateSelectedDraft({ radius: value })}
+                        value={selectedNode.radius}
+                        onChange={(v) => updateSelected({ radius: v })}
                         format={(v) => `${v}px`}
                       />
                     </Field>
@@ -326,7 +263,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                 <div className="mb-3 mt-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
                   {selectedNode.w} × {selectedNode.h} px
                 </div>
-                <NodePreview node={selectedNode} draft={selectedDraft} />
+                <NodePreview node={selectedNode} />
               </div>
             </aside>
           </div>
@@ -350,107 +287,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     );
   },
 );
-
-function FastEditScene({
-  scene,
-  selectedId,
-  drafts,
-  onSelect,
-  onHover,
-}: {
-  scene: Scene;
-  selectedId: string;
-  drafts: Record<string, Draft>;
-  onSelect: (id: string) => void;
-  onHover: (id: string | null) => void;
-}) {
-  const nodes = useMemo(
-    () => flattenTree(scene.root).filter(({ node }) => node.id !== scene.root.id),
-    [scene.root],
-  );
-
-  return (
-    <div
-      className="relative overflow-hidden border border-[rgba(255,255,255,0.1)] shadow-[0_32px_80px_rgba(0,0,0,0.55)]"
-      style={{ width: scene.size.w, height: scene.size.h, background: scene.root.background, cursor: "crosshair", borderRadius: scene.size.radius }}
-      onClick={() => { onSelect(scene.root.id); onHover(null); }}
-    >
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 60%)" }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{ borderRadius: scene.root.radius, border: `${scene.root.borderWidth}px solid ${scene.root.borderColor}` }}
-      />
-      <div className="absolute inset-0">
-        {nodes.map(({ node, depth }) => (
-          <SceneNode
-            key={node.id}
-            node={node}
-            depth={depth}
-            draft={drafts[node.id] ?? {}}
-            onSelect={onSelect}
-            onHover={onHover}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SceneNode({
-  node,
-  depth,
-  draft,
-  onSelect,
-  onHover,
-}: {
-  node: Node;
-  depth: number;
-  draft: Draft;
-  onSelect: (id: string) => void;
-  onHover: (id: string | null) => void;
-}) {
-  const background = draft.background ?? node.background;
-  const textColor = draft.textColor ?? node.textColor;
-  const borderColor = draft.borderColor ?? node.borderColor;
-  const borderWidth = draft.borderWidth ?? node.borderWidth;
-  const radius = draft.radius ?? node.radius;
-  const text = draft.text ?? node.text;
-
-  return (
-    <button
-      type="button"
-      onClick={(event) => { event.stopPropagation(); onSelect(node.id); }}
-      onMouseEnter={(event) => { event.stopPropagation(); onHover(node.id); }}
-      onMouseLeave={() => onHover(null)}
-      className="absolute overflow-hidden border text-left"
-      style={{
-        left: node.x,
-        top: node.y,
-        width: node.w,
-        height: node.h,
-        borderColor,
-        borderWidth,
-        borderRadius: radius,
-        background,
-        color: textColor,
-        cursor: "crosshair",
-        zIndex: 10 + depth,
-      }}
-    >
-      {text ? (
-        <div
-          className="absolute bottom-2 left-2.5 right-2.5 truncate leading-[1.2]"
-          style={{ fontSize: node.fontSize, fontWeight: node.fontWeight, color: textColor }}
-        >
-          {text}
-        </div>
-      ) : null}
-    </button>
-  );
-}
 
 function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
   const nodeMap = new Map(doc.nodes.map((n) => [n.id, n]));
@@ -482,7 +318,7 @@ function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
 
   const subjectAbs = absPos(subject.id);
 
-  function convert(node: HtmlCanvasNode, absX: number, absY: number, isRoot: boolean): Node {
+  function convert(node: HtmlCanvasNode, absX: number, absY: number, isRoot: boolean): SceneNode {
     const htmlChildren = (childrenMap.get(node.id) ?? []).filter((n) => n.visible !== false);
     const children = htmlChildren.map((child) =>
       convert(child, absX + child.bounds.x, absY + child.bounds.y, false)
@@ -527,26 +363,11 @@ function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
   return { label: subject.name, size, root: rootNode };
 }
 
-function flattenTree(node: Node, depth = 0): Array<{ node: Node; depth: number }> {
-  const out: Array<{ node: Node; depth: number }> = [{ node, depth }];
-  for (const child of node.children) out.push(...flattenTree(child, depth + 1));
-  return out;
-}
-
-function findNode(node: Node, id: string): Node | null {
-  if (node.id === id) return node;
-  for (const child of node.children) {
-    const found = findNode(child, id);
-    if (found) return found;
-  }
-  return null;
-}
-
 const LayerPickerDropdown = forwardRef<
   HTMLDivElement,
   {
     triggerRef: React.RefObject<HTMLButtonElement | null>;
-    treeOptions: Array<{ node: Node; depth: number }>;
+    treeOptions: Array<{ node: SceneNode; depth: number }>;
     selectedId: string;
     onSelect: (id: string) => void;
   }
@@ -588,7 +409,7 @@ function LayerRow({
   active,
   onSelect,
 }: {
-  node: Node;
+  node: SceneNode;
   depth: number;
   active: boolean;
   onSelect: (id: string) => void;
@@ -689,14 +510,7 @@ function NodeKindIcon({ kind, hasChildren }: { kind: NodeKind; hasChildren: bool
   }
 }
 
-function NodePreview({ node, draft }: { node: Node; draft: Draft }) {
-  const background = draft.background ?? node.background;
-  const textColor = draft.textColor ?? node.textColor;
-  const borderColor = draft.borderColor ?? node.borderColor;
-  const borderWidth = draft.borderWidth ?? node.borderWidth;
-  const radius = draft.radius ?? node.radius;
-  const text = draft.text ?? node.text;
-
+function NodePreview({ node }: { node: SceneNode }) {
   const pad = 14;
   const maxW = 300;
   const maxH = 110;
@@ -704,7 +518,7 @@ function NodePreview({ node, draft }: { node: Node; draft: Draft }) {
   const displayW = Math.round(node.w * scale);
   const displayH = Math.round(node.h * scale);
 
-  const isTransparent = background === "transparent" || background === "rgba(0,0,0,0)";
+  const isTransparent = node.background === "transparent" || node.background === "rgba(0,0,0,0)";
 
   return (
     <div
@@ -720,16 +534,16 @@ function NodePreview({ node, draft }: { node: Node; draft: Draft }) {
         style={{
           width: displayW,
           height: displayH,
-          background,
-          border: `${Math.max(borderWidth * scale, borderWidth > 0 ? 0.5 : 0)}px solid ${borderColor}`,
-          borderRadius: radius * scale,
-          color: textColor,
+          background: node.background,
+          border: `${Math.max(node.borderWidth * scale, node.borderWidth > 0 ? 0.5 : 0)}px solid ${node.borderColor}`,
+          borderRadius: node.radius * scale,
+          color: node.textColor,
           position: "relative",
           overflow: "hidden",
           flexShrink: 0,
         }}
       >
-        {text ? (
+        {node.text ? (
           <div
             style={{
               position: "absolute",
@@ -738,14 +552,14 @@ function NodePreview({ node, draft }: { node: Node; draft: Draft }) {
               right: Math.round(8 * scale),
               fontSize: Math.round(node.fontSize * scale),
               fontWeight: node.fontWeight,
-              color: textColor,
+              color: node.textColor,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               lineHeight: 1.2,
             }}
           >
-            {text}
+            {node.text}
           </div>
         ) : null}
       </div>
@@ -794,7 +608,7 @@ function SliderWithValue({
         max={max}
         step={step}
         value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onChange={(e) => onChange(Number(e.target.value))}
         className="h-7 flex-1 cursor-pointer accent-[var(--blue)]"
       />
       <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-[var(--text-muted)]">
@@ -815,13 +629,13 @@ function ColorInput({ value, onChange }: { value: string; onChange: (value: stri
         <input
           type="color"
           value={normalized}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           className="absolute inset-0 cursor-pointer opacity-0"
         />
       </label>
       <input
         value={normalized.toUpperCase().replace("#", "")}
-        onChange={(event) => onChange(`#${event.target.value.replace(/[^0-9a-f]/gi, "").slice(0, 6)}`)}
+        onChange={(e) => onChange(`#${e.target.value.replace(/[^0-9a-f]/gi, "").slice(0, 6)}`)}
         className="min-w-0 flex-1 border-0 bg-transparent text-[13px] text-[var(--text)] outline-none"
         spellCheck={false}
       />

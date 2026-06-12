@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Snapshot } from "@/components/Snapshot";
+import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import {
   IconFastEdit,
   IconChevronLeft,
@@ -116,7 +116,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
           } : undefined}
         >
           {screen ? (
-            <Snapshot kind="screen" ownerType="screen" ownerId={screen.id} variant={screen.variant} type={type} emptyMode="preview" display="natural" />
+            <SceneCanvasViewer source="stored" ownerType="screen" ownerId={screen.id} kind="screen" />
           ) : (
             <PreviewMockImage tpl={activeTpl} type={type} allowMock={canUseFactoryMocks} />
           )}

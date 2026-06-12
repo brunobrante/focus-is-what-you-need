@@ -26,7 +26,6 @@ import { ElementInfoCard } from "./ui/ElementInfoCard";
 import { ModeButton } from "./ui/ModeButton";
 import {
   RailToolButton,
-  BuilderStackTabs,
   CropsOverlayToggle,
   IconButton,
   Key,
@@ -47,7 +46,11 @@ import {
   type ToolsEditorProps,
 } from "./hooks/useToolsEditor";
 import { MIN_TOOL_ZOOM } from "./types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  SceneCanvasInspector,
+  type ImageStack,
+} from "@/components/screen/SceneCanvasInspector";
 import { useProcessingFeatures } from "@/lib/models/useProcessingFeatures";
 import { useLamaInpainting } from "@/lib/models/useLamaInpainting";
 import {
@@ -173,6 +176,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     toggleComponentExpanded,
     setActiveRootId,
     updateComponents,
+    selectStackComponent,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
   const [groupNavCollapsed, setGroupNavCollapsed] = useState(false);
@@ -202,6 +206,24 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     activeSubject.kind === "component" && selectedComponent ? selectedComponent.id : null;
   const displayUrl = (activeCutId && processedByCutId[activeCutId]) || activeSubject.url;
   const runningKind = running && running.id === activeCutId ? running.kind : null;
+
+  const imageStack = useMemo<ImageStack | null>(() => {
+    if (viewMode !== "stack") return null;
+    return {
+      w: activeSubject.w,
+      h: activeSubject.h,
+      backgroundUrl: activeSubject.url,
+      layers: stackedComponents.map((comp) => ({
+        id: comp.id,
+        name: comp.name,
+        dataUrl: comp.dataUrl,
+        x: comp.box.x - activeSubject.originBox.x,
+        y: comp.box.y - activeSubject.originBox.y,
+        w: comp.box.w,
+        h: comp.box.h,
+      })),
+    };
+  }, [viewMode, activeSubject, stackedComponents]);
   const canRevert = Boolean(activeCutId && processedByCutId[activeCutId]);
 
   // Switching to a different cut (or closing it) abandons any in-progress mask,
@@ -294,6 +316,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
         <GeneratorHeader
           showGroupNavToggle={showGroupNavigator && !!groupContext && groupNavCollapsed}
           onGroupNavToggle={() => setGroupNavCollapsed(false)}
+          tabActive={viewMode === "stack" ? "stack" : viewMode === "gallery" ? "gallery" : "builder"}
+          stackDisabled={stackedComponents.length === 0}
+          onBuilder={openBuilderMode}
+          onStack={openStackMode}
+          onGallery={openGalleryMode}
         />
         <input
           ref={fileInputRef}
@@ -417,14 +444,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             >
               {!cleanOriginal && (
               <>
-              <BuilderStackTabs
-                active={viewMode === "stack" ? "stack" : viewMode === "gallery" ? "gallery" : "builder"}
-                stackDisabled={stackedComponents.length === 0}
-                onBuilder={openBuilderMode}
-                onStack={openStackMode}
-                onGallery={openGalleryMode}
-              />
-
               {viewMode === "gallery" ? (
                 <GallerySlider
                   cuts={scopedComponents}
@@ -550,6 +569,32 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     Volte para <Link className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline" to="/references">References</Link>.
                   </p>
                 </div>
+              ) : viewMode === "stack" && imageStack ? (
+                <div
+                  className="relative inline-block overflow-visible rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
+                  style={{
+                    transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
+                    transformOrigin: "center center",
+                  }}
+                >
+                  <SceneCanvasInspector
+                    source="stack"
+                    stack={imageStack}
+                    selectedId={selectedComponentId}
+                    onSelect={selectStackComponent}
+                    backgroundClassName="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px]"
+                  />
+                  {/* Hidden img keeps imgRef valid for mode transitions */}
+                  <img
+                    ref={imgRef}
+                    src={displayUrl}
+                    className="sr-only"
+                    crossOrigin="anonymous"
+                    draggable={false}
+                    onLoad={() => { setImageError(false); bumpPaintVersion(); }}
+                    onError={() => setImageError(true)}
+                  />
+                </div>
               ) : (
                 <>
                   <div
@@ -591,7 +636,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       <canvas
                         ref={cropsCanvasRef}
                         className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-                        style={{ mixBlendMode: viewMode === "stack" ? "normal" : "screen" }}
+                        style={{ mixBlendMode: "screen" }}
                       />
                       <canvas
                         ref={overlayCanvasRef}

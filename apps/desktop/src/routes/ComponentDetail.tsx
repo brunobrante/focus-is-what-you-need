@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Snapshot } from "@/components/Snapshot";
+import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import { IconFastEdit, IconHistory, IconOpenCanvas, IconSearch } from "@/components/icons";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
@@ -218,19 +218,9 @@ export function ComponentDetail() {
           onFastEdit={() => fastEditRef.current?.open({ mode: "component", component, variant: activeVariant ?? null, type, canvasHref })}
           canvasHref={canvasHref}
         >
-          <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
-            {activeVariant ? (
-              <Snapshot
-                kind="component"
-                ownerType="variant"
-                ownerId={activeVariant.id}
-                seedKey={activeVariant.seedKey}
-                type={type}
-                emptyMode="preview"
-                display="natural"
-              />
-            ) : null}
-          </div>
+          {activeVariant ? (
+            <SceneCanvasViewer source="stored" ownerType="variant" ownerId={activeVariant.id} kind="component" />
+          ) : null}
         </PreviewShell>
 
         <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
