@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import {
   Brush,
   Check,
-  ChevronRight,
   Crop,
   Eraser,
   Image as ImageIcon,
@@ -11,12 +10,10 @@ import {
   Minus,
   Move,
   Pencil,
-  Pipette,
   Plus,
   RotateCcw,
   Sparkles,
   Trash2,
-  Upload,
   Wand2,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -179,6 +176,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
   const [groupNavCollapsed, setGroupNavCollapsed] = useState(false);
+  const [cleanOriginal, setCleanOriginal] = useState(false);
 
   const { features } = useProcessingFeatures();
   // A feature is usable in the Builder only when enabled with an installed model.
@@ -277,26 +275,25 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     });
   }
 
+  const showSidebar = showGroupNavigator && !!groupContext && !groupNavCollapsed;
+
   return (
     <TooltipProvider>
-      <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+      <div className="flex h-screen min-h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+        {showSidebar ? (
+          <ReferenceGroupNavigator
+            group={groupContext!}
+            activeReferenceId={item.id}
+            onToggleCollapse={() => setGroupNavCollapsed(true)}
+            onUpload={() => fileInputRef.current?.click()}
+            uploading={uploading}
+          />
+        ) : null}
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <GeneratorHeader
-          breadcrumb={
-            <div className="inline-flex min-w-0 items-center gap-2 text-[12.5px]">
-              <ChevronRight size={10} strokeWidth={1.8} className="text-[var(--text-faint)]" />
-              {groupContext ? (
-                <>
-                  <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-muted)]">
-                    {groupContext.name}
-                  </span>
-                  <ChevronRight size={10} strokeWidth={1.8} className="text-[var(--text-faint)]" />
-                </>
-              ) : null}
-              <span className="max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap">
-                {item.name || "Untitled"}
-              </span>
-            </div>
-          }
+          showGroupNavToggle={showGroupNavigator && !!groupContext && groupNavCollapsed}
+          onGroupNavToggle={() => setGroupNavCollapsed(false)}
         />
         <input
           ref={fileInputRef}
@@ -309,23 +306,12 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
         <div
           className="grid min-h-0 flex-1"
           style={{
-            gridTemplateColumns: showGroupNavigator
-              ? groupNavCollapsed
-                ? "40px 56px minmax(0,1fr) 340px"
-                : "220px 56px minmax(0,1fr) 340px"
-              : "56px minmax(0,1fr) 340px",
+            gridTemplateColumns: "56px minmax(0,1fr) 340px",
           }}
         >
-          {showGroupNavigator && groupContext ? (
-            <ReferenceGroupNavigator
-              group={groupContext}
-              activeReferenceId={item.id}
-              collapsed={groupNavCollapsed}
-              onToggleCollapse={() => setGroupNavCollapsed((v) => !v)}
-            />
-          ) : null}
+          {null /* group navigator is now a full-height sidebar outside the grid */}
 
-          <aside className="flex flex-col items-center gap-1 border-r border-[var(--border)] bg-[var(--bg)] px-2 py-3">
+          <aside className={["flex flex-col items-center gap-1 border-r border-[var(--border)] bg-[var(--bg)] px-2 py-3", cleanOriginal ? "pointer-events-none [&_button]:!border-transparent [&_button]:!bg-transparent [&_button]:!text-[var(--text-muted)] [&_button]:!opacity-40" : ""].join(" ")}>
             <RailToolButton
               active={currentTool === "move"}
               label="Mover"
@@ -429,6 +415,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               onPointerLeave={masking ? undefined : handleStagePointerLeave}
               onPointerCancel={masking ? undefined : cancelSelection}
             >
+              {!cleanOriginal && (
+              <>
               <BuilderStackTabs
                 active={viewMode === "stack" ? "stack" : viewMode === "gallery" ? "gallery" : "builder"}
                 stackDisabled={stackedComponents.length === 0}
@@ -551,6 +539,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   ) : null}
                 </div>
               ) : null}
+              </>
+              )}
 
               {imageError ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
@@ -596,18 +586,23 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       />
                     ) : null}
                   </div>
-                  <canvas
-                    ref={cropsCanvasRef}
-                    className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-                    style={{ mixBlendMode: viewMode === "stack" ? "normal" : "screen" }}
-                  />
-                  <canvas
-                    ref={overlayCanvasRef}
-                    className="pointer-events-none absolute inset-0 z-20 h-full w-full"
-                  />
+                  {!cleanOriginal && (
+                    <>
+                      <canvas
+                        ref={cropsCanvasRef}
+                        className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+                        style={{ mixBlendMode: viewMode === "stack" ? "normal" : "screen" }}
+                      />
+                      <canvas
+                        ref={overlayCanvasRef}
+                        className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+                      />
+                    </>
+                  )}
                 </>
               )}
 
+              {!cleanOriginal && (<>
               <div
                 data-selection-action
                 className="absolute bottom-3.5 left-3.5 flex items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[rgba(20,20,22,0.85)] p-1 text-[11.5px] tabular-nums text-[var(--text-muted)] backdrop-blur-[6px]"
@@ -724,17 +719,14 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   </button>
                 </div>
               ) : null}
+              </>)}
             </div>
 
             <div className="sticky bottom-0 z-20 flex min-h-[56px] shrink-0 items-center gap-2.5 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3.5 py-2.5 backdrop-blur-[8px]">
               <div className="inline-flex shrink-0 items-center gap-1.5">
-                <ModeButton active={viewMode === "original"} onClick={openOriginal}>
+                <ModeButton active={cleanOriginal} onClick={() => setCleanOriginal((v) => !v)}>
                   <ImageIcon size={13} strokeWidth={1.8} />
                   Mostrar original
-                </ModeButton>
-                <ModeButton onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                  <Upload size={13} strokeWidth={1.8} />
-                  {uploading ? "Enviando..." : "Upload"}
                 </ModeButton>
                 {autoDetectOn ? (
                   <ModeButton
@@ -782,6 +774,17 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
           </section>
 
           <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--bg)]">
+            {cleanOriginal ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] text-[var(--text-faint)]">
+                  <ImageIcon size={18} strokeWidth={1.5} />
+                </span>
+                <p className="m-0 text-[12.5px] leading-relaxed text-[var(--text-faint)]">
+                  Viewing the original image.<br />Click <span className="font-medium text-[var(--text-muted)]">Mostrar original</span> again to return.
+                </p>
+              </div>
+            ) : (
+            <>
             <SidebarTabs active={sidebarTab} onChange={setSidebarTab} />
 
             {sidebarTab === "components" ? (
@@ -850,8 +853,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 onChangeCropsOverlayAlpha={setCropsOverlayAlpha}
               />
             )}
+            </>
+            )}
           </aside>
         </div>
+        </div>{/* end main column */}
       </div>
       {confirmationCopy ? (
         <ConfirmActionModal

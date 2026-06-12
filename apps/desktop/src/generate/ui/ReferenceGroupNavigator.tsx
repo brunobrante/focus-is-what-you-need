@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, FolderOpen, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, FolderOpen, Image as ImageIcon, Loader2, Upload } from "lucide-react";
 
 import { extFromName, loadReferenceFile } from "@/lib/tauri/referenceStorage";
 import type { ToolReferenceGroupContext } from "../types";
@@ -9,31 +9,18 @@ import { blobToObjectUrl } from "../engine/image";
 export function ReferenceGroupNavigator({
   group,
   activeReferenceId,
-  collapsed = false,
   onToggleCollapse,
+  onUpload,
+  uploading = false,
 }: {
   group: ToolReferenceGroupContext;
   activeReferenceId: string;
-  collapsed?: boolean;
   onToggleCollapse?: () => void;
+  onUpload?: () => void;
+  uploading?: boolean;
 }) {
-  if (collapsed) {
-    return (
-      <aside className="flex min-h-0 flex-col items-center border-r border-[var(--border)] bg-[var(--bg-elev)] pt-3">
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          title="Expand group panel"
-          className="grid h-8 w-8 cursor-pointer place-items-center rounded-[8px] border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
-        >
-          <ChevronRight size={15} strokeWidth={2} />
-        </button>
-      </aside>
-    );
-  }
-
   return (
-    <aside className="flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--bg-elev)]">
+    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--bg-elev)]">
       <div className="shrink-0 border-b border-[var(--border)] px-3 py-3">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
@@ -81,17 +68,30 @@ export function ReferenceGroupNavigator({
                   <span className="mt-0.5 block text-[10.5px] tabular-nums text-[var(--text-faint)]">
                     {reference.w} x {reference.h}
                   </span>
-                  {active ? (
-                    <span className="mt-1 inline-flex rounded-[4px] border border-[var(--border)] px-1.5 py-[2px] text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-muted)]">
-                      Open
-                    </span>
-                  ) : null}
                 </span>
               </Link>
             );
           })}
         </div>
       </div>
+
+      {onUpload ? (
+        <div className="shrink-0 border-t border-[var(--border)] p-2.5">
+          <button
+            type="button"
+            onClick={onUpload}
+            disabled={uploading}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] py-2 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+            ) : (
+              <Upload size={13} strokeWidth={1.8} />
+            )}
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

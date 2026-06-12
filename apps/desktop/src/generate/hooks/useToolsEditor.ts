@@ -1378,7 +1378,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const confirmationCopy = pendingConfirmation
     ? confirmationDialogCopy(pendingConfirmation)
     : null;
-  const showGroupNavigator = Boolean(groupContext && groupContext.references.length > 1);
+  const showGroupNavigator = Boolean(groupContext && groupContext.references.length >= 1);
 
   const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
     imgRef,

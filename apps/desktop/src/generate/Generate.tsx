@@ -160,7 +160,15 @@ async function readToolReferenceGroupContext(
     (meta?.groupId ? groups.find((entry) => entry.id === meta.groupId) : null) ??
     groups.find((entry) => entry.referenceIds.includes(referenceId));
 
-  if (!group) return null;
+  if (!group) {
+    const entry = meta;
+    if (!entry || entry.mediaKind !== "image") return null;
+    return {
+      id: referenceId,
+      name: entry.name,
+      references: [{ id: entry.id, name: entry.name, type: entry.type, w: Number(entry.w || 0), h: Number(entry.h || 0), ext: entry.ext }],
+    };
+  }
   const orderedIds = group.referenceIds.includes(referenceId)
     ? group.referenceIds
     : [referenceId, ...group.referenceIds];
