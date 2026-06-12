@@ -7,7 +7,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { ReferenceRowCard } from "@/components/references/ReferenceRowCard";
+import { ReferenceCard } from "@/components/references/ReferenceCard";
 import { CanvasReferenceInspector } from "@/canvas/shell/CanvasReferenceInspector";
 import {
   AddReferenceModal,
@@ -140,8 +140,9 @@ export function CanvasReferencesWindow({
             style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
           >
             {references.map((reference) => (
-              <ReferenceRowCard
+              <ReferenceCard
                 key={reference.id}
+                kind="row"
                 reference={reference}
                 onClick={() => setSelectedId(reference.id)}
                 onRemove={() => removeOne(reference.id)}

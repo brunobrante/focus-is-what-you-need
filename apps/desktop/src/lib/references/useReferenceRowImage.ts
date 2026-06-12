@@ -1,32 +1,37 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReferenceRow } from "@/lib/storage/schema";
 import { extFromName, loadReferenceFile } from "@/lib/tauri/referenceStorage";
 import { listReferenceLibraryMeta } from "@/lib/storage/repos/referenceLibrary.repo";
 
 /**
- * Resolves the image URL to render for a reference card.
+ * Resolves the image URL for a reference row, with lazy loading via IntersectionObserver.
  *
- * A card's baked `thumbnailUrl` is a data URL, but `bakeOriginalThumbnail` skips
- * originals larger than 1MB (to keep multi-MB base64 out of the structured rows),
- * so a large whole-image reference has no baked thumbnail. When that happens we
- * load the original binary from the reference blob store — adapter-aware
- * (IndexedDB on web, disk via Tauri) and uncapped.
+ * Returns a `{ url, setRef }` pair. Attach `setRef` to the card's root element so
+ * the blob is only loaded once the card scrolls into view (300px margin). When
+ * `setRef` is never called the hook falls back to loading immediately, preserving
+ * the old eager behaviour for inspectors and modals.
  *
- * The blob may not live under the row's own id: a project reference points at the
- * library image it derives from via `sourceReferenceId`, and legacy/divergent
- * rows can have a broken self-referential link. So we try the row's ids first,
- * then recover through the reference library catalog (by id, then by filename).
- *
- * Returns the baked thumbnail immediately when present; otherwise null until the
- * blob resolves. The owned object URL is revoked on change/unmount.
+ * A card's baked `thumbnailUrl` is a data URL and resolves synchronously.
+ * Large originals (>1MB) have no baked thumbnail — those load from the blob store.
  */
-export function useReferenceRowImage(reference: ReferenceRow): string | null {
-  const baked = reference.thumbnailUrl ?? null;
-  const { id, sourceReferenceId, title } = reference;
+export function useReferenceRowImage(
+  reference: ReferenceRow | null,
+  options: { eager?: boolean } = {},
+): { url: string | null; setRef: (el: Element | null) => void } {
+  const baked = reference?.thumbnailUrl ?? null;
+  const id = reference?.id ?? "";
+  const sourceReferenceId = reference?.sourceReferenceId;
+  const title = reference?.title ?? "";
+  const { eager = false } = options;
 
   const [resolved, setResolved] = useState<string | null>(baked);
+  const elementRef = useRef<Element | null>(null);
 
   useEffect(() => {
+    if (!id) {
+      setResolved(null);
+      return;
+    }
     if (baked) {
       setResolved(baked);
       return;
@@ -34,19 +39,58 @@ export function useReferenceRowImage(reference: ReferenceRow): string | null {
     let cancelled = false;
     let objectUrl: string | null = null;
     setResolved(null);
-    void (async () => {
-      const blob = await loadReferenceRowBlob({ id, sourceReferenceId, title });
-      if (cancelled || !blob) return;
-      objectUrl = URL.createObjectURL(blob);
-      setResolved(objectUrl);
-    })();
+
+    const start = () => {
+      void (async () => {
+        const blob = await loadReferenceRowBlob({ id, sourceReferenceId, title });
+        if (cancelled || !blob) return;
+        objectUrl = URL.createObjectURL(blob);
+        setResolved(objectUrl);
+      })();
+    };
+
+    if (eager || typeof IntersectionObserver === "undefined") {
+      start();
+      return () => {
+        cancelled = true;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    }
+
+    const element = elementRef.current;
+    if (!element) {
+      start();
+      return () => {
+        cancelled = true;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            observer.disconnect();
+            start();
+            break;
+          }
+        }
+      },
+      { rootMargin: "300px" },
+    );
+    observer.observe(element);
     return () => {
       cancelled = true;
+      observer.disconnect();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [baked, id, sourceReferenceId, title]);
+  }, [baked, id, sourceReferenceId, title, eager]);
 
-  return resolved;
+  const setRef = useCallback((element: Element | null) => {
+    elementRef.current = element;
+  }, []);
+
+  return { url: resolved, setRef };
 }
 
 async function loadReferenceRowBlob(reference: {
@@ -56,8 +100,6 @@ async function loadReferenceRowBlob(reference: {
 }): Promise<Blob | null> {
   const ext = extFromName(reference.title);
 
-  // The blob is usually keyed by the library id (sourceReferenceId), falling back
-  // to the row id for whole-image references that share it.
   const directIds = [reference.sourceReferenceId, reference.id].filter(
     (value): value is string => Boolean(value),
   );
@@ -66,9 +108,6 @@ async function loadReferenceRowBlob(reference: {
     if (blob) return blob;
   }
 
-  // Recover an orphaned reference whose binary lives under a library entry with a
-  // different id (legacy data, or a row imported in another environment): match
-  // the catalog by id, then by filename.
   const metas = await listReferenceLibraryMeta().catch(() => []);
   const match =
     metas.find((meta) => meta.id === reference.sourceReferenceId) ??

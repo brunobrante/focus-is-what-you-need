@@ -1,6 +1,6 @@
 import type { ReferenceRow } from "@/lib/storage/schema";
 import { IconImage, IconPlus } from "@/components/icons";
-import { ReferenceRowCard } from "@/components/references/ReferenceRowCard";
+import { ReferenceCard } from "@/components/references/ReferenceCard";
 import { EmptyMessage } from "./EmptyMessage";
 
 export function SideReferencesTab({
@@ -34,8 +34,9 @@ export function SideReferencesTab({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(164px, 1fr))" }}
       >
         {references.map((r, i) => (
-          <ReferenceRowCard
+          <ReferenceCard
             key={r.id}
+            kind="row"
             reference={r}
             onClick={() => onOpen(i)}
             onRemove={onRemove ? () => onRemove(r) : undefined}

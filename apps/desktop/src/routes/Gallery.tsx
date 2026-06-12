@@ -75,6 +75,7 @@ import type {
 import { IconChevronDown, IconClose, IconColorStyles, IconDiamond, IconEye, IconFastEdit, IconFolder, IconGlobe, IconGrid, IconImage, IconListView, IconOpenCanvas, IconPencil, IconPhone, IconPlay, IconPlus, IconRectangle, IconScreen, IconSearch, IconText, IconChevronLeft, IconWindow } from "@/components/icons";
 import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
+import { ReferenceCard } from "@/components/references/ReferenceCard";
 
 type Tab = "screens" | "components" | "references" | "system";
 type CmpKindFilter = "all" | ComponentKind;
@@ -2760,73 +2761,16 @@ function ReferenceProjectCard({
   onOpen?: () => void;
   onRemove: () => void;
 }) {
-  const labels = referenceLabelSet(attachments, screenById, componentById);
-  const primaryLabels = labels.slice(0, 2);
-  const imageUrl = useReferenceRowImage(reference);
   return (
-    <div className="group flex cursor-default flex-col gap-2.5 transition-transform duration-[120ms] hover:-translate-y-0.5">
-      <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]">
-        {onOpen ? (
-          <button
-            type="button"
-            aria-label="Open reference"
-            onClick={onOpen}
-            className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-white/15 bg-black/70 text-white/80 opacity-0 backdrop-blur transition-[opacity,background-color,color] duration-150 hover:bg-black/90 hover:text-white group-hover:opacity-100"
-          >
-            <IconEye size={13} strokeWidth={1.7} />
-          </button>
-        ) : null}
-        {imageUrl ? (
-          <>
-            <img
-              src={imageUrl}
-              alt=""
-              className="block h-full w-full object-contain"
-              draggable={false}
-            />
-            {/* Gradient overlay with badges */}
-            <div
-              className="pointer-events-none absolute inset-0 flex flex-col justify-between p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-              style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.7) 100%)" }}
-            >
-              <div className="flex flex-wrap gap-1.5">
-                <ReferenceBadge>{reference.visibility === "external" ? "External" : "Local"}</ReferenceBadge>
-                {reference.stack?.enabled ? <ReferenceBadge>Stack</ReferenceBadge> : null}
-                {primaryLabels.map((label) => (
-                  <ReferenceBadge key={label}>{label}</ReferenceBadge>
-                ))}
-                {labels.length > primaryLabels.length ? (
-                  <ReferenceBadge>{`+${labels.length - primaryLabels.length}`}</ReferenceBadge>
-                ) : null}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="line-clamp-1 text-[11.5px] font-medium text-white">{reference.title}</span>
-                {(reference.metadata ?? []).slice(0, 3).map((tag) => (
-                  <span key={tag} className="hidden" />
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 text-[var(--text-faint)]">
-            <IconImage size={24} strokeWidth={1.3} />
-            <span className="px-4 text-center text-[11px] leading-snug">{reference.title}</span>
-          </div>
-        )}
-        <CardMoreMenu
-          label="More reference actions"
-          items={[
-            {
-              key: "delete",
-              label: "Remove from project",
-              icon: SharedCardMenuIcons.Trash,
-              destructive: true,
-              onClick: onRemove,
-            },
-          ]}
-        />
-      </div>
-    </div>
+    <ReferenceCard
+      kind="project"
+      reference={reference}
+      attachments={attachments}
+      screenById={screenById}
+      componentById={componentById}
+      onOpen={onOpen}
+      onRemove={onRemove}
+    />
   );
 }
 
@@ -2844,7 +2788,7 @@ function ReferenceProjectRow({
   onRemove: () => void;
 }) {
   const labels = referenceLabelSet(attachments, screenById, componentById);
-  const imageUrl = useReferenceRowImage(reference);
+  const { url: imageUrl } = useReferenceRowImage(reference);
   return (
     <div className="group relative grid gap-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3 transition-colors hover:border-[var(--border-strong)] md:grid-cols-[180px_1fr_auto]">
       <CardMoreMenu

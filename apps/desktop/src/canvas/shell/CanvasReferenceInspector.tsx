@@ -40,7 +40,7 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
   // Plain-image background: baked thumbnail when present, else the blob-store
   // original (adapter-aware, uncapped). Unused for stacks (they load their graph).
-  const imageUrl = useReferenceRowImage(reference);
+  const { url: imageUrl } = useReferenceRowImage(reference, { eager: true });
 
   useEffect(() => {
     setZoomIdx(ZOOM_DEFAULT_IDX);

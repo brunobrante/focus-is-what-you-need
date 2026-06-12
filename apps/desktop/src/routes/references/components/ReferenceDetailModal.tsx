@@ -12,7 +12,7 @@ import {
   loadReferenceStackFile,
 } from "@/lib/tauri/referenceStorage";
 import { loadReferenceUrl } from "@/lib/references/referenceUrlCache";
-import { ReferenceThumbCard } from "@/components/references/ReferenceThumbCard";
+import { ReferenceCard } from "@/components/references/ReferenceCard";
 import type { ReferenceItem, StackPreviewState, StackTreeNode } from "../types";
 import { useReferenceUrl } from "../hooks/useReferenceUrl";
 import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
@@ -1160,8 +1160,9 @@ function StackRootsGallery({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}
       >
         {roots.map((root) => (
-          <ReferenceThumbCard
+          <ReferenceCard
             key={root.id}
+            kind="stack-root"
             thumbnailUrl={urls[root.id]}
             title={root.name}
             badge="Stack"
