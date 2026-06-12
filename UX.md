@@ -395,6 +395,11 @@ Workspace-level shared component library.
 
 AI-assisted image-to-component tool.
 
+**Header**:
+- Left: sidebar toggle + Wand icon + "Builder" label
+- Center: **Builder / Stack / Gallery** tab switcher
+- Right: close button
+
 **Two-panel horizontal layout**:
 
 **Left panel — Reference image area**:
@@ -417,9 +422,15 @@ AI-assisted image-to-component tool.
   - Each cut item: thumbnail preview, name, edit button, delete button
   - **Is text?** button (only when the Text Detector feature is enabled in Settings): runs the feature's active model (a DBNet variant or CRAFT) on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
 - **Stack tab**:
-  - Shows all cuts from a reference image together
-  - Composite layout of all cuts side by side
-  - Tree list of cuts with name and dimensions
+  - Shows all cuts from a reference image layered over the original at their exact positions
+  - Clicking a cut selects it (blue outline); hovering shows an orange highlight
+  - Selected cut name is shown below the canvas
+  - Tree list of cuts with name and dimensions in the right panel
+- **Gallery tab**:
+  - Carousel view of individual cuts, one at a time
+  - Left/right arrows and dot indicators for navigation (arrow keys also work)
+  - Cut name and position counter (e.g. "2 / 5") shown below the image
+  - Bottom action bar (when Color Detector or Text Detector features are enabled): **Colors** and/or **Text** buttons run analysis on the current cut
 
 **Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group:
 - **Remove background** — runs BiRefNet and replaces the open component's canvas image with a transparent-background PNG
@@ -524,6 +535,12 @@ Catalog:
 
 Container for screen or component previews with controls.
 
+**Content area**: rendered by `SceneCanvasViewer`, which supports four source modes:
+- `stored` — loads and displays the saved thumbnail for a screen or component variant
+- `snapshot` — displays a provided image URL directly
+- `stack` — renders an image stack (background + cuts at their original positions)
+- `scene` — renders a DOM schema as absolutely-positioned elements
+
 **Controls** (floating over the preview area):
 - Zoom in `+`, reset, zoom out `−`
 - Device selector dropdown: iPhone 15 / XR / SE
@@ -532,6 +549,18 @@ Container for screen or component previews with controls.
 - "Open in Canvas" button
 
 **Background**: grid pattern
+
+---
+
+### FastEditModal
+
+Modal for quick in-place editing of a screen or component's scene schema.
+
+**Layout**: two-column panel
+- Left: `SceneCanvasInspector` rendering the scene — clicking a node selects it (blue outline); hovering shows an orange highlight
+- Right: sidebar showing the selected node's properties (name, background, text color, font size, etc.)
+
+**Behavior**: sidebar edits update the scene immediately and the canvas re-renders in real time. No draft system — all edits are applied directly to the scene state held by the modal.
 
 ---
 
