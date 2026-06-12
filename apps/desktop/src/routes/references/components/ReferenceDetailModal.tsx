@@ -263,20 +263,15 @@ export function ReferenceDetailModal({
                   style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
                 >
                   {displayedItems.map((item) => (
-                    <button
+                    <ReferenceCard
                       key={item.id}
-                      type="button"
-                      onClick={() => setFocusedItem(item)}
-                      className="group relative aspect-[4/3] w-full cursor-zoom-in overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-0 transition-[border-color] hover:border-[var(--border-strong)]"
-                    >
-                      <GroupGridThumb item={item} stackThumbnailUrl={stackThumbnailUrls[item.id]} />
-                      <div
-                        className="pointer-events-none absolute inset-0 flex items-end p-2 opacity-0 transition-opacity group-hover:opacity-100"
-                        style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 50%)" }}
-                      >
-                        <span className="truncate text-[10.5px] font-medium text-white">{item.name}</span>
-                      </div>
-                    </button>
+                      kind="reference"
+                      item={item}
+                      stackThumbnailUrl={stackThumbnailUrls[item.id]}
+                      selected={false}
+                      onSelect={() => setFocusedItem(item)}
+                      onDoubleClick={() => setFocusedItem(item)}
+                    />
                   ))}
                 </div>
               </div>
@@ -1224,22 +1219,6 @@ function StackTreeRows({
   );
 }
 
-function GroupGridThumb({
-  item, stackThumbnailUrl,
-}: {
-  item: ReferenceItem; stackThumbnailUrl?: string;
-}) {
-  const stackThumb = item.stack?.enabled ? stackThumbnailUrl : undefined;
-  const { url, setRef } = useReferenceUrl(item, { enabled: !stackThumb });
-  const thumbnailUrl = stackThumb ?? url;
-  return (
-    <div
-      ref={setRef}
-      className="h-full w-full bg-contain bg-center bg-no-repeat bg-[var(--surface)]"
-      style={thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined}
-    />
-  );
-}
 
 async function loadStackPreview(item: ReferenceItem): Promise<StackPreviewState | null> {
   const data = await readReferenceStackData(item.id);
