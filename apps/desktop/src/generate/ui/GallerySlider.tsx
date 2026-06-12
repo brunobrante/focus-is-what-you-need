@@ -103,31 +103,6 @@ export function GallerySlider({
           <SceneCanvasViewer source="snapshot" url={current.dataUrl} />
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-[13px] font-medium text-[var(--text)]">{current.name}</span>
-          <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
-            {index + 1} / {cuts.length}
-          </span>
-        </div>
-
-        {cuts.length <= 20 ? (
-          <div className="flex items-center gap-1">
-            {cuts.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={`Go to cut ${i + 1}`}
-                onClick={() => go(i)}
-                className={[
-                  "h-1.5 rounded-full transition-all duration-[120ms] cursor-pointer",
-                  i === index
-                    ? "w-4 bg-[var(--text)]"
-                    : "w-1.5 bg-[var(--border-strong)] hover:bg-[var(--text-faint)]",
-                ].join(" ")}
-              />
-            ))}
-          </div>
-        ) : null}
       </div>
 
       {/* Bottom action bar */}

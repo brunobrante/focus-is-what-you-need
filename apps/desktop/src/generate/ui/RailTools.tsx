@@ -105,7 +105,7 @@ function FloatingTabButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "h-8 min-w-[86px] cursor-pointer rounded-[8px] border px-4 text-[14px] font-medium transition-colors duration-[120ms]",
+        "h-7 min-w-[64px] cursor-pointer rounded-[7px] border px-3 text-[12px] font-medium transition-colors duration-[120ms]",
         active
           ? "border-transparent bg-[var(--surface-hover)] text-[var(--text)]"
           : "border-transparent bg-transparent text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text)]",
