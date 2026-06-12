@@ -95,7 +95,7 @@ export function ReferenceDetailModal({
     currentItem?.mediaKind === "image" &&
     (currentItem?.stack?.rootCount ?? 1) > 1;
 
-  const displayedItems = activeTab === "screens" ? groupReferences : stackedReferences;
+  const displayedItems = activeTab === "screens" || activeTab === "stacks" ? groupReferences : stackedReferences;
   const focusedIndex = focusedItem
     ? displayedItems.findIndex((i) => i.id === focusedItem.id)
     : -1;
