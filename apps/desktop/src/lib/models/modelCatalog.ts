@@ -74,6 +74,11 @@ export const FEATURES: FeatureMeta[] = [
     description: "Extracts all colors from a cut. No model required — runs built-in.",
     modelFree: true,
   },
+  {
+    key: "fontDetection",
+    name: "Font Detector",
+    description: "Identifies the Google Font family used in a cut.",
+  },
 ];
 
 export const FEATURE_KEYS: ProcessingFeatureKey[] = FEATURES.map((f) => f.key);
@@ -135,6 +140,14 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     label: "LaMa",
     size: "~208 MB",
     description: "Inpainting to erase a painted selection.",
+  },
+  {
+    modelId: "font-classify",
+    feature: "fontDetection",
+    label: "font-classify (EfficientNet-B3)",
+    size: "~64 MB",
+    description: "Identifies Google Font families from images. ~3,000 fonts.",
+    files: ["model.onnx", "fonts_mapping.yaml", "model_config.yaml"],
   },
 ];
 

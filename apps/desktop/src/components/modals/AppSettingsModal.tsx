@@ -33,6 +33,7 @@ import {
   ScanText,
   Sparkles,
   Trash2,
+  Type,
   Wand2,
   X,
 } from "lucide-react";
@@ -255,6 +256,7 @@ const FEATURE_ICON: Record<ProcessingFeatureKey, React.ReactNode> = {
   textDetection: <ScanText size={16} strokeWidth={1.7} />,
   removeElement: <Wand2 size={16} strokeWidth={1.7} />,
   colorDetector: <Palette size={16} strokeWidth={1.7} />,
+  fontDetection: <Type size={16} strokeWidth={1.7} />,
 };
 
 function ProcessingFeaturesTab() {
