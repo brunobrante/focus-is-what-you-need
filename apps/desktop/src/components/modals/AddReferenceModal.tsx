@@ -642,7 +642,7 @@ function ScreenThumb({
   return (
     <div className="h-11 w-11 shrink-0 overflow-hidden rounded-[8px] border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.04)]">
       {url ? (
-        <img src={url} alt="" draggable={false} className="h-full w-full object-cover" />
+        <img src={url} alt="" draggable={false} className="h-full w-full object-contain" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-[var(--text-faint)]">
           {item.mediaKind === "video" ? <IconVideo size={16} strokeWidth={1.5} /> : <IconImage size={16} strokeWidth={1.5} />}
