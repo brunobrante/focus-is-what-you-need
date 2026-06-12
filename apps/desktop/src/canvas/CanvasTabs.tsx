@@ -144,11 +144,11 @@ export function CanvasTabs({
 
         {menuOpen ? (
           <div
-            className="absolute left-0 top-[calc(100%+6px)] z-[30] w-[336px] overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] p-2 text-[#F2F2F2]"
+            className="absolute left-0 top-[calc(100%+6px)] z-[30] w-[240px] overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] p-2 text-[#F2F2F2]"
             style={{ boxShadow: "0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03) inset" }}
           >
             <MenuSection title="Layout">
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-2 gap-1">
                 {(["none", "vertical", "horizontal", "grid"] as const).map((mode) => {
                   const disabled =
                     mode === "none"
@@ -255,7 +255,7 @@ function FeatureToggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex h-8 w-full items-center justify-between rounded-md border border-[#2C2C2C] bg-[#202020] px-2.5 text-left text-[11.5px] font-medium text-[#CFCFCF] transition-colors duration-100 hover:bg-[#282828]"
+      className="flex h-7 w-full items-center justify-between rounded-md border border-[#2C2C2C] bg-[#202020] px-2.5 text-left text-[11px] font-medium text-[#CFCFCF] transition-colors duration-100 hover:bg-[#282828]"
     >
       <span>{label}</span>
       <span
@@ -294,7 +294,7 @@ function SplitPanePicker({
         value={value}
         onChange={(event) => onChange(event.target.value as CanvasWindowType)}
         aria-label={`Split pane ${index + 1}`}
-        className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent pl-2 pr-1 text-[10.5px] font-medium text-[#CFCFCF] outline-none"
+        className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent pl-2 pr-3 text-[10.5px] font-medium text-[#CFCFCF] outline-none"
       >
         {enabledTabs.map((tab) => (
           <option

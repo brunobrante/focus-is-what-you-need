@@ -8,7 +8,7 @@ import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 import type { ProjectType } from "@/lib/data/types";
 
 export type SplitMode = "none" | "vertical" | "horizontal" | "grid";
-export type CanvasWindowType = "current" | "drafts" | "references" | "versions";
+export type CanvasWindowType = "current" | "drafts" | "references" | "versions" | "preview";
 export type CanvasFeatureWindowType = Exclude<CanvasWindowType, "current">;
 export type CanvasFeatureFlags = Record<CanvasFeatureWindowType, boolean>;
 export type CanvasSplitWindows = CanvasWindowType[];
@@ -20,12 +20,14 @@ export const CANVAS_WINDOW_ORDER: readonly CanvasWindowType[] = [
   "versions",
   "drafts",
   "references",
+  "preview",
 ];
 
 export const CANVAS_FEATURE_WINDOW_ORDER: readonly CanvasFeatureWindowType[] = [
   "versions",
   "drafts",
   "references",
+  "preview",
 ];
 
 export const CANVAS_WINDOW_LABELS: Record<CanvasWindowType, string> = {
@@ -33,12 +35,14 @@ export const CANVAS_WINDOW_LABELS: Record<CanvasWindowType, string> = {
   drafts: "Drafts",
   references: "References",
   versions: "Versions",
+  preview: "Preview",
 };
 
 export const DEFAULT_CANVAS_FEATURES: CanvasFeatureFlags = {
   drafts: true,
   references: false,
   versions: false,
+  preview: false,
 };
 
 export const LAYOUT_LABELS: Record<SplitMode, string> = {

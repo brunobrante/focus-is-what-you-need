@@ -480,7 +480,7 @@ function CanvasPageContent() {
         onOpenSelectedComponentShortcut={openSelectedComponentInCanvas}
       />
 
-      <div className="fixed left-1/2 top-3 z-[5] -translate-x-1/2">
+      <div className="fixed left-1/2 top-3 z-[12] -translate-x-1/2">
         <CanvasTabs
           activeTab={activeTab}
           enabledTabs={enabledCanvasTabs}

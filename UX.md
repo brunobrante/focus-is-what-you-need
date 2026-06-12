@@ -214,8 +214,13 @@ Full-screen visual editor with floating UI layers.
 - Search toggle button
 
 **Top-center**:
-- Canvas tabs: Current | Drafts | References (Versions when enabled)
+- Canvas tabs: Current | Drafts | References (Versions, Preview when enabled)
 - Split mode selector: None | Vertical | Grid (icon buttons)
+
+**Preview window** (a canvas window, like Current/Drafts):
+- Placeholder window showing "Real-time preview of changes" centered text.
+- Enabled via the Features toggle in the canvas options menu (disabled by default).
+- Reserved for future real-time preview functionality.
 
 **References window** (a canvas window, like Current/Drafts):
 - Shows references attached to the subject currently open in the canvas (a
