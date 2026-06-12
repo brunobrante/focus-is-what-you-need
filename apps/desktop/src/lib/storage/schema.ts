@@ -18,6 +18,7 @@ export type ProjectRow = {
   name: string;
   type: ProjectType;
   source?: "mock" | "local";
+  icon: string | null;
   thumbnailDataUrl: string | null;
   description: string | null;
   previewScreenId: string | null;

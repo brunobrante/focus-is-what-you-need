@@ -69,7 +69,7 @@ export async function updateProject(
   patch: Partial<
     Pick<
       ProjectRow,
-      "name" | "thumbnailDataUrl" | "description" | "previewScreenId" | "designSystem"
+      "name" | "icon" | "thumbnailDataUrl" | "description" | "previewScreenId" | "designSystem"
     >
   >,
 ): Promise<ProjectRow | null> {

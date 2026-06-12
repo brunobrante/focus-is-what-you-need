@@ -44,6 +44,7 @@ export function normalizeProjectRow(row: ProjectRow): ProjectRow {
   return {
     ...row,
     source: row.source ?? "local",
+    icon: row.icon ?? null,
     thumbnailDataUrl: row.thumbnailDataUrl ?? null,
     description: row.description ?? null,
     previewScreenId: row.previewScreenId ?? null,

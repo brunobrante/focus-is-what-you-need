@@ -80,7 +80,7 @@ export function GalleryPage() {
         onEdit={() => setEditOpen((v) => !v)}
         editOpen={editOpen}
       />
-      {editOpen && project && (
+      {editOpen && project ? (
         <ProjectEditPanel
           project={project}
           screens={screens}
@@ -90,56 +90,58 @@ export function GalleryPage() {
             setEditOpen(false);
           }}
         />
-      )}
+      ) : (
+        <>
+          <Tabs
+            tab={tab}
+            onChange={setTab}
+            screensCount={screens.length}
+            componentsCount={components.length}
+            referencesCount={references.length}
+          />
 
-      <Tabs
-        tab={tab}
-        onChange={setTab}
-        screensCount={screens.length}
-        componentsCount={components.length}
-        referencesCount={references.length}
-      />
-
-      {tab === "screens" && (
-        <ScreensTab
-          screens={screens}
-          type={type}
-          projectId={project?.id ?? projectId}
-          onNewScreen={openNewScreen}
-          sections={screenSections}
-          sectionById={screenSectionById}
-          onSectionsChange={setScreenSections}
-          onSectionByIdChange={setScreenSectionById}
-          onRequestDelete={setPendingScreenDelete}
-        />
+          {tab === "screens" && (
+            <ScreensTab
+              screens={screens}
+              type={type}
+              projectId={project?.id ?? projectId}
+              onNewScreen={openNewScreen}
+              sections={screenSections}
+              sectionById={screenSectionById}
+              onSectionsChange={setScreenSections}
+              onSectionByIdChange={setScreenSectionById}
+              onRequestDelete={setPendingScreenDelete}
+            />
+          )}
+          {tab === "components" && (
+            <ComponentsTab
+              components={components}
+              activeVariants={activeVariants}
+              screens={screens}
+              filter={cmpFilter}
+              onFilterChange={setCmpFilter}
+              projectId={project?.id ?? projectId}
+              type={type}
+              onNewComponent={openNewProjectComponent}
+              canCreate={Boolean(project)}
+              sections={componentSections}
+              sectionById={componentSectionById}
+              onSectionsChange={setComponentSections}
+              onSectionByIdChange={setComponentSectionById}
+              onRequestDelete={setPendingComponentDelete}
+            />
+          )}
+          {tab === "references" && (
+            <ReferencesTab
+              project={project}
+              screens={screens}
+              components={components}
+              references={references}
+            />
+          )}
+          {tab === "system" && project ? <SystemTab project={project} /> : null}
+        </>
       )}
-      {tab === "components" && (
-        <ComponentsTab
-          components={components}
-          activeVariants={activeVariants}
-          screens={screens}
-          filter={cmpFilter}
-          onFilterChange={setCmpFilter}
-          projectId={project?.id ?? projectId}
-          type={type}
-          onNewComponent={openNewProjectComponent}
-          canCreate={Boolean(project)}
-          sections={componentSections}
-          sectionById={componentSectionById}
-          onSectionsChange={setComponentSections}
-          onSectionByIdChange={setComponentSectionById}
-          onRequestDelete={setPendingComponentDelete}
-        />
-      )}
-      {tab === "references" && (
-        <ReferencesTab
-          project={project}
-          screens={screens}
-          components={components}
-          references={references}
-        />
-      )}
-      {tab === "system" && project ? <SystemTab project={project} /> : null}
 
       <NewScreenModal
         ref={newScreenRef}
