@@ -503,9 +503,14 @@ Opened from the user menu (TopBar → avatar → Settings). Wide modal with a to
 
 **Tabs**:
 - **Canvas**: shell and layers-tree toggles
+- **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
 - **Keyboard shortcuts**: rebindable canvas commands
 - **Save location**: workspace base folder and storage details
+
+**Project thumbnails tab**:
+
+A single **Auto-generate project thumbnails** switch (on by default). When on, each project's card thumbnail is composed automatically from its **first screen's snapshot**: the snapshot is laid inside a device mockup (iPhone for mobile, tablet for tablet, browser window for desktop) that is pushed off the right edge and below the bottom so only a portion (~40%) shows, with the project name displayed large to the left. The mockup and layout are built from HTML/CSS and emitted as a single SVG data URL into `ProjectRow.thumbnailDataUrl`, so it renders in the project card like any other thumbnail. A thumbnail is only produced once the first screen has a snapshot — projects with no snapshot are left with the default frame mockup. Thumbnails refresh automatically when the first screen's snapshot changes. The toggle persists immediately (independent of the Save button), and turning it on backfills every eligible existing project at once.
 
 **Processing Features tab**:
 

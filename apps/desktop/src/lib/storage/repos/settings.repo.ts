@@ -54,6 +54,16 @@ export async function setShareWithProjectsByDefault(
   }));
 }
 
+/** Toggle automatic regeneration of project card thumbnails. */
+export async function setAutoGenerateProjectThumbnails(
+  autoGenerate: boolean,
+): Promise<GlobalSettings> {
+  return updateGlobalSettings((settings) => ({
+    ...settings,
+    projectThumbnails: { ...settings.projectThumbnails, autoGenerate },
+  }));
+}
+
 /** Record (or clear) a catalog model id as downloaded to disk. */
 export async function setModelInstalled(
   modelId: string,

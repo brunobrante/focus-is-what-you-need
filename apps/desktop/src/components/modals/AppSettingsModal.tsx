@@ -16,7 +16,11 @@ import type {
   ProcessingFeatureKey,
 } from "@/domain/settings/types";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
-import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
+import {
+  putGlobalSettings,
+  setAutoGenerateProjectThumbnails,
+} from "@/lib/storage/repos/settings.repo";
+import { regenerateAllProjectThumbnails } from "@/application/thumbnails/projectThumbnail";
 import {
   getWorkspaceConfig,
   setWorkspaceFolder,
@@ -43,7 +47,7 @@ import {
 } from "@/lib/models/useProcessingFeatures";
 import { FEATURES, modelsForFeature } from "@/lib/models/modelCatalog";
 
-type AppSettingsTab = "canvas" | "processing" | "shortcuts" | "storage";
+type AppSettingsTab = "canvas" | "projects" | "processing" | "shortcuts" | "storage";
 
 type RecordingCommand = {
   id: CanvasCommandId;
@@ -92,11 +96,12 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
       setSaving(true);
       try {
         await setWorkspaceFolder(folderPath);
-        // Processing install/enable/active state persists immediately and lives
-        // outside the draft, so take its latest value rather than the stale draft.
+        // Processing and project-thumbnail toggles persist immediately and live
+        // outside the draft, so take their latest value rather than the stale draft.
         putGlobalSettings({
           ...settingsDraft,
           processing: persistedSettings.processing,
+          projectThumbnails: persistedSettings.projectThumbnails,
         });
         setIsOpen(false);
       } finally {
@@ -119,6 +124,7 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
               {(
                 [
                   { id: "canvas", label: "Canvas" },
+                  { id: "projects", label: "Project thumbnails" },
                   { id: "processing", label: "Processing Features" },
                   { id: "shortcuts", label: "Keyboard shortcuts" },
                   { id: "storage", label: "Save location" },
@@ -150,6 +156,8 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
           <div className="flex-1 overflow-y-auto">
             {tab === "canvas" ? (
               <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
+            ) : tab === "projects" ? (
+              <ProjectThumbnailsTab />
             ) : tab === "processing" ? (
               <ProcessingFeaturesTab />
             ) : tab === "shortcuts" ? (
@@ -241,6 +249,47 @@ function CanvasTab({
               onChange={(checked) =>
                 onSettingsChange(updateTreeAutoRevealSelection(settings, checked))
               }
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectThumbnailsTab() {
+  // Lives outside the draft (like Processing): the toggle persists immediately
+  // and turning it on backfills existing projects from their snapshots.
+  const { settings } = useGlobalSettings();
+  const autoGenerate = settings.projectThumbnails.autoGenerate;
+
+  const handleToggle = (checked: boolean) => {
+    void setAutoGenerateProjectThumbnails(checked).then(() => {
+      if (checked) void regenerateAllProjectThumbnails();
+    });
+  };
+
+  return (
+    <div className="px-[22px] py-5 grid gap-6">
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+          Project thumbnails
+        </div>
+        <div className="rounded-[12px] border border-[var(--border)] overflow-hidden">
+          <div className="flex items-center justify-between gap-5 px-4 py-3">
+            <div>
+              <div className="text-[13px] text-[var(--text)]">Auto-generate project thumbnails</div>
+              <p className="m-0 mt-1 max-w-[520px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                Build each project card from its first screen's snapshot, wrapping it in a
+                device mockup with the project name. Thumbnails refresh when the screen
+                changes, and only projects whose first screen already has a snapshot are
+                generated.
+              </p>
+            </div>
+            <Switch
+              checked={autoGenerate}
+              ariaLabel="Auto-generate project thumbnails"
+              onChange={handleToggle}
             />
           </div>
         </div>

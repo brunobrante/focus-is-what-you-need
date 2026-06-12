@@ -165,11 +165,19 @@ export type ProcessingSettings = {
   features: Record<ProcessingFeatureKey, ProcessingFeatureSettings>;
 };
 
+export type ProjectThumbnailSettings = {
+  // When true, a project's card thumbnail is regenerated automatically from the
+  // first screen's snapshot whenever that snapshot changes. A thumbnail is only
+  // produced once a snapshot exists; with no snapshot nothing is generated.
+  autoGenerate: boolean;
+};
+
 export type GlobalSettings = {
   schemaVersion: number;
   canvas: CanvasSettings;
   systemDesign: SystemDesignSettings;
   processing: ProcessingSettings;
+  projectThumbnails: ProjectThumbnailSettings;
 };
 
 export type DeepPartial<T> = T extends Array<infer U>

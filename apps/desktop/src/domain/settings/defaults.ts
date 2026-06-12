@@ -194,4 +194,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       fontDetection: { enabled: false, activeModelId: null },
     },
   },
+  projectThumbnails: {
+    autoGenerate: true,
+  },
 };
