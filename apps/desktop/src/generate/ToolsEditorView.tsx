@@ -590,7 +590,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       <canvas
                         ref={cropsCanvasRef}
                         className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-                        style={{ mixBlendMode: "screen" }}
                       />
                       <canvas
                         ref={overlayCanvasRef}

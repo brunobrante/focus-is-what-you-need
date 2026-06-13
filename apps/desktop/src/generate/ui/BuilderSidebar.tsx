@@ -178,8 +178,8 @@ export function SidebarConfigPanel({
             Crop overlay color
           </h4>
           <p className="m-0 mt-1 text-[10.5px] leading-[1.4] text-[var(--text-faint)]">
-            Base color applied over already cropped areas. The screen blend is
-            preserved — lighter colors appear more.
+            Base color painted over already cropped areas. At full opacity it
+            becomes a solid block.
           </p>
         </div>
 
