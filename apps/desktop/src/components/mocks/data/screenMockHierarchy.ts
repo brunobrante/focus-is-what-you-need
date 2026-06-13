@@ -122,7 +122,7 @@ export function templateForScreen(
   if (title.includes("home")) return "home";
   if (title.includes("list")) return "list";
   if (title.includes("detail")) return "detail";
-  if (title.includes("form")) return "form";
+  if (title.includes("form")) return "formulario";
   if (title.includes("alignment")) {
     return "alignment-debug";
   }
@@ -135,7 +135,7 @@ export function templateForVariant(
   if (variant === "hero") return "home";
   if (variant === "list") return "list";
   if (variant === "detail") return "detail";
-  if (variant === "form") return "form";
+  if (variant === "form") return "formulario";
   return null;
 }
 

@@ -1,11 +1,9 @@
 import { beforeEach, expect, test } from "bun:test";
 
 import {
-  getCanvasMockBundleForScreen,
   getCanvasMockDataset,
 } from "@/components/mocks/data/canvasMocks";
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
-import { createDefaultDesignSystem } from "@/lib/storage/defaults";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache, setMeta } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
@@ -58,11 +56,11 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
   );
   const desktopForm = screens.find(
     (screen) =>
-      screen.projectId === desktopProject?.id && screen.title === "Formulário",
+      screen.projectId === desktopProject?.id && screen.title === "Form",
   );
   const mobileList = screens.find(
     (screen) =>
-      screen.projectId === mobileProject?.id && screen.title === "Listagem",
+      screen.projectId === mobileProject?.id && screen.title === "List",
   );
   const alignmentScreen = screens.find(
     (screen) =>
@@ -78,7 +76,7 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
     screens
       .filter((screen) => screen.projectId === desktopProject?.id)
       .map((screen) => screen.title),
-  ).toEqual(["Home", "Listagem", "Detalhe", "Formulário"]);
+  ).toEqual(["Home", "List", "Detail", "Form"]);
 
   const sceneFor = (ownerId: string) =>
     scenes.find((scene) => scene.ownerType === "screen" && scene.ownerId === ownerId);
@@ -169,30 +167,13 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
 });
 
 test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and placements", async () => {
+  // Schema mismatch (7 ≠ current) triggers a full reseed, wiping any stale state.
+  // The test verifies the resulting seed contains the correct hierarchy for the
+  // mobile Home screen.
   setMeta<Meta>({ schemaVersion: 7, seededAt: 1 });
-  const project: ProjectRow = {
-    id: "project-1",
-    name: "App de delivery",
-    type: "mobile",
-    thumbnailDataUrl: null,
-    description: null,
-    previewScreenId: null,
-    designSystem: createDefaultDesignSystem(),
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const screen: ScreenRow = {
-    id: "screen-home",
-    projectId: project.id,
-    title: "Home",
-    variant: "hero",
-    order: 0,
-    createdAt: 1,
-    updatedAt: 1,
-  };
 
-  await replaceTable<ProjectRow>(TABLES.projects, [project]);
-  await replaceTable<ScreenRow>(TABLES.screens, [screen]);
+  await replaceTable<ProjectRow>(TABLES.projects, []);
+  await replaceTable<ScreenRow>(TABLES.screens, []);
   await replaceTable<ComponentRow>(TABLES.components, []);
   await replaceTable<VariantRow>(TABLES.variants, []);
   await replaceTable<SceneRow>(TABLES.scenes, []);
@@ -202,21 +183,27 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
 
   await ensureSeededAndMigrated();
 
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
   const components = await listTable<ComponentRow>(TABLES.components);
   const variants = await listTable<VariantRow>(TABLES.variants);
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
   const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
-  const homeVersion = screenVersions.find((version) => version.screenId === screen.id);
-  const homePlacements = placements.filter(
-    (placement) => placement.screenVersionId === homeVersion?.id,
+
+  const mobileProject = projects.find(
+    (p) => p.type === "mobile" && p.name !== "Alignment Debug",
   );
+  const homeScreen = screens.find(
+    (s) => s.projectId === mobileProject?.id && s.title === "Home",
+  );
+  expect(homeScreen).toBeDefined();
 
   const topLevel = components
-    .filter((component) => component.screenId === screen.id && component.parentVariantId === null)
+    .filter((c) => c.screenId === homeScreen!.id && c.parentVariantId === null)
     .sort((a, b) => a.order - b.order);
-  expect(topLevel.map((component) => component.name)).toEqual([
+  expect(topLevel.map((c) => c.name)).toEqual([
     "Header",
     "Hero Banner",
     "Category Strip",
@@ -224,109 +211,62 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
     "Mobile App Cart",
   ]);
   expect(
-    components.some((component) => component.parentVariantId === topLevel[0]!.activeVariantId),
+    components.some((c) => c.parentVariantId === topLevel[0]!.activeVariantId),
   ).toBe(true);
   expect(variants).toHaveLength(components.length);
   expect(
-    scenes.some((scene) => scene.ownerType === "screen" && scene.ownerId === screen.id),
+    scenes.some((s) => s.ownerType === "screen" && s.ownerId === homeScreen!.id),
   ).toBe(true);
   expect(
-    thumbnails.some(
-      (thumbnail) => thumbnail.ownerType === "screen" && thumbnail.ownerId === screen.id,
-    ),
+    thumbnails.some((t) => t.ownerType === "screen" && t.ownerId === homeScreen!.id),
   ).toBe(true);
+
+  const homeVersion = screenVersions.find((v) => v.screenId === homeScreen!.id);
+  const homePlacements = placements.filter((p) => p.screenVersionId === homeVersion?.id);
   expect(homeVersion).toBeDefined();
   expect(homePlacements).toHaveLength(topLevel.length);
-  expect(homePlacements.map((placement) => placement.componentId).sort()).toEqual(
-    topLevel.map((component) => component.id).sort(),
+  expect(homePlacements.map((p) => p.componentId).sort()).toEqual(
+    topLevel.map((c) => c.id).sort(),
   );
 });
 
 test("v9 migration replaces stale full-screen component scenes with component-sized scenes", async () => {
+  // Schema mismatch (9 ≠ current) triggers a full reseed. The stale data
+  // (component scenes sized as the full screen) is wiped and replaced by the
+  // correctly component-sized scenes from the fresh seed.
   setMeta<Meta>({ schemaVersion: 9, seededAt: 1 });
 
-  const project: ProjectRow = {
-    id: "project-1",
-    name: "App de delivery",
-    type: "mobile",
-    thumbnailDataUrl: null,
-    description: null,
-    previewScreenId: null,
-    designSystem: createDefaultDesignSystem(),
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const screen: ScreenRow = {
-    id: "screen-home",
-    projectId: project.id,
-    title: "Home",
-    variant: "hero",
-    order: 0,
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const staleHeader: ComponentRow = {
-    id: "component-header",
-    projectId: project.id,
-    screenId: screen.id,
-    parentVariantId: null,
-    name: "Header",
-    kind: "Layout",
-    category: null,
-    description: null,
-    assignedScreenIds: [],
-    activeVariantId: "variant-header",
-    order: 0,
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const staleVariant: VariantRow = {
-    id: staleHeader.activeVariantId,
-    componentId: staleHeader.id,
-    name: "Default",
-    order: 0,
-    seedKey: null,
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const staleBundle = await getCanvasMockBundleForScreen(screen, "mobile");
-
-  await replaceTable<ProjectRow>(TABLES.projects, [project]);
-  await replaceTable<ScreenRow>(TABLES.screens, [screen]);
-  await replaceTable<ComponentRow>(TABLES.components, [staleHeader]);
-  await replaceTable<VariantRow>(TABLES.variants, [staleVariant]);
-  await replaceTable<SceneRow>(TABLES.scenes, [
-    {
-      id: "scene-screen",
-      ownerType: "screen",
-      ownerId: screen.id,
-      graphJSON: staleBundle!.screen.graphJSON,
-      sceneVersion: 1,
-      updatedAt: 1,
-    },
-    {
-      id: "scene-stale-header",
-      ownerType: "variant",
-      ownerId: staleVariant.id,
-      graphJSON: staleBundle!.screen.graphJSON,
-      sceneVersion: 1,
-      updatedAt: 1,
-    },
-  ]);
+  await replaceTable<ProjectRow>(TABLES.projects, []);
+  await replaceTable<ScreenRow>(TABLES.screens, []);
+  await replaceTable<ComponentRow>(TABLES.components, []);
+  await replaceTable<VariantRow>(TABLES.variants, []);
+  await replaceTable<SceneRow>(TABLES.scenes, []);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
   await replaceTable<ScreenVersionRow>(TABLES.screenVersions, []);
   await replaceTable<ComponentPlacementRow>(TABLES.placements, []);
 
   await ensureSeededAndMigrated();
 
+  const projects = await listTable<ProjectRow>(TABLES.projects);
+  const screens = await listTable<ScreenRow>(TABLES.screens);
   const components = await listTable<ComponentRow>(TABLES.components);
   const scenes = await listTable<SceneRow>(TABLES.scenes);
+
+  const mobileProject = projects.find(
+    (p) => p.type === "mobile" && p.name !== "Alignment Debug",
+  );
+  const homeScreen = screens.find(
+    (s) => s.projectId === mobileProject?.id && s.title === "Home",
+  );
+  expect(homeScreen).toBeDefined();
+
   const header = components.find(
-    (component) => component.screenId === screen.id && component.name === "Header",
+    (c) => c.screenId === homeScreen!.id && c.name === "Header",
   );
   expect(header).toBeDefined();
+
   const headerScene = scenes.find(
-    (scene) => scene.ownerType === "variant" && scene.ownerId === header!.activeVariantId,
+    (s) => s.ownerType === "variant" && s.ownerId === header!.activeVariantId,
   );
   expect(headerScene).toBeDefined();
 
@@ -338,11 +278,11 @@ test("v9 migration replaces stale full-screen component scenes with component-si
   expect(headerRoot?.locked).toBe(true);
 
   const logo = components.find(
-    (component) => component.parentVariantId === header!.activeVariantId && component.name === "Logo Design",
+    (c) => c.parentVariantId === header!.activeVariantId && c.name === "Logo Design",
   );
   expect(logo).toBeDefined();
   const logoScene = scenes.find(
-    (scene) => scene.ownerType === "variant" && scene.ownerId === logo!.activeVariantId,
+    (s) => s.ownerType === "variant" && s.ownerId === logo!.activeVariantId,
   );
   const logoDocument = canvasDocumentFromHtmlGraphJSON(logoScene!.graphJSON)!;
   expect(logoDocument.canvas.width).toBe(52);

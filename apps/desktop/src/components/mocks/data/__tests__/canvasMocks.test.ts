@@ -34,9 +34,9 @@ test("canvas mock dataset exposes seeded screen scenes per project type", async 
     "mock-tablet-list",
   ]);
   expect(mocks["mock-mobile-home"].graphJSON).toContain("Home");
-  expect(mocks["mock-mobile-list"].graphJSON).toContain("Listagem");
-  expect(mocks["mock-mobile-detail"].graphJSON).toContain("Detalhe");
-  expect(mocks["mock-tablet-formulario"].graphJSON).toContain("Formulário");
+  expect(mocks["mock-mobile-list"].graphJSON).toContain("List");
+  expect(mocks["mock-mobile-detail"].graphJSON).toContain("Detail");
+  expect(mocks["mock-tablet-formulario"].graphJSON).toContain("Form");
   expect(mocks["mock-mobile-alignment-debug"].graphJSON).toContain("Red Alignment Box");
   expect(mocks["mock-mobile-home"].graphJSON).not.toEqual(
     mocks["mock-desktop-home"].graphJSON,
@@ -49,15 +49,15 @@ test("screen and template lookups resolve seeded screens and still skip profile"
     "mobile",
   );
   const list = await getCanvasMockForScreen(
-    { title: "Listagem", variant: "list" },
+    { title: "List", variant: "list" },
     "mobile",
   );
   const detail = await getCanvasMockForScreen(
-    { title: "Detalhe", variant: "detail" },
+    { title: "Detail", variant: "detail" },
     "desktop",
   );
   const form = await getCanvasMockForScreen({
-    title: "Formulário",
+    title: "Form",
     variant: "form",
   }, "desktop");
   const alignment = await getCanvasMockForScreen(

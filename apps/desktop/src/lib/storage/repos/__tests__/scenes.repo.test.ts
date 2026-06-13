@@ -119,9 +119,9 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   ]);
 
   const editedHeader = htmlCanvasDocumentFromJSON(header.canvas.graphJSON)!;
-  const titleNode = editedHeader.nodes.find((node) => node.text === "Resumo operacional");
+  const titleNode = editedHeader.nodes.find((node) => node.text === "Operational Summary");
   expect(titleNode).toBeDefined();
-  titleNode!.text = "Resumo conectado";
+  titleNode!.text = "Updated Summary";
   const editedHeaderGraphJSON = serializeHtmlCanvasDocument(editedHeader);
 
   await upsertScene({
@@ -135,14 +135,14 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   const screenScene = scenes.find(
     (scene) => scene.ownerType === "screen" && scene.ownerId === "screen-home",
   );
-  expect(screenScene?.graphJSON).toContain("Resumo conectado");
+  expect(screenScene?.graphJSON).toContain("Updated Summary");
 
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const screenThumbnail = thumbnails.find(
     (thumbnail) => thumbnail.ownerType === "screen" && thumbnail.ownerId === "screen-home",
   );
   expect(screenThumbnail?.dataUrl).toStartWith("data:image/svg+xml;utf8,");
-  expect(decodeURIComponent(screenThumbnail!.dataUrl)).toContain("Resumo conectado");
+  expect(decodeURIComponent(screenThumbnail!.dataUrl)).toContain("Updated Summary");
 });
 
 test("upsertScene propagates connected nested component snapshots through every parent", async () => {
