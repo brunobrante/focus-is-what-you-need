@@ -977,6 +977,7 @@ pub fn run() {
             models::run_auto_detect,
             models::run_florence2_text_check,
             models::run_text_check,
+            models::run_font_detect,
             models::run_craft,
             models::run_lama,
             models::extract_colors,

@@ -121,8 +121,14 @@ export function useProcessingFeatures(): ProcessingState {
       if (event.payload.id !== modelId) return;
       const { downloaded_bytes, total_bytes, file_index, file_name } = event.payload;
       const fileRatio = total_bytes > 0 ? downloaded_bytes / total_bytes : 0;
-      // Multi-file packages fold per-file progress into one overall bar.
-      const overall = entry.files ? florence2Overall(file_index, fileRatio) : fileRatio;
+      // Multi-file packages fold per-file progress into one overall bar. Florence-2
+      // weights its files by their very uneven sizes; other multi-file packages use
+      // an even per-file split.
+      const overall = entry.files
+        ? modelId === "florence2"
+          ? florence2Overall(file_index, fileRatio)
+          : (file_index + fileRatio) / entry.files.length
+        : fileRatio;
       setProgress((prev) => ({ ...prev, [modelId]: Math.min(1, Math.max(0, overall)) }));
       if (file_name) setCurrentFile((prev) => ({ ...prev, [modelId]: file_name }));
     });

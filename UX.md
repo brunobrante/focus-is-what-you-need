@@ -495,7 +495,7 @@ again, or the canvas ×, returns to the editor.
   - Carousel view of individual cuts, one at a time
   - Left/right arrows and dot indicators for navigation (arrow keys also work)
   - Cut name and position counter (e.g. "2 / 5") shown below the image
-  - Bottom action bar (when Color Detector or Text Detector features are enabled): **Colors** and/or **Text** buttons run analysis on the current cut
+  - Bottom action bar (when Color Detector, Text Detector, or Font Detector features are enabled): **Colors**, **Text**, and/or **Font** buttons run analysis on the current cut. **Font** runs the EfficientNet-B3 font-classify model and lists the top font-family guesses with confidences (e.g. "Roboto-Regular 87%"). Results are display-only and reset when the cut changes.
 
 **Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group:
 - **Remove background** — runs BiRefNet and replaces the open component's canvas image with a transparent-background PNG
@@ -579,7 +579,7 @@ A single **Auto-generate project thumbnails** switch (on by default). When on, e
 
 **Processing Features tab**:
 
-Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (downloadable implementations). A feature can have several models; **Text Detector** has four, every other feature has one.
+Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (downloadable implementations). A feature can have several models; **Text Detector** has four and **Auto-detect Components** has two, every other feature has one.
 
 A single list with one **accordion row per feature**. Each row shows:
 - a chevron **expand/collapse toggle** and the feature's icon + name + description on the left;
@@ -588,7 +588,7 @@ A single list with one **accordion row per feature**. Each row shows:
 Expanding a row reveals the **list of models for that feature**, one per line:
 - a **checkbox on the left** that selects the active model the feature runs (single-select, like a radio; checkable only once the model is installed; first install auto-selects);
 - the model label + size;
-- **download** and **delete** icon buttons on the right (download enabled when not installed, delete enabled when installed). While downloading, these are replaced by a progress percentage and a cancel (×) button; multi-file packages (Florence-2) download sequentially.
+- **download** and **delete** icon buttons on the right (download enabled when not installed, delete enabled when installed). While downloading, these are replaced by a progress percentage and a cancel (×) button; multi-file packages (Florence-2, font-classify) download sequentially.
 
 All install / enable / active-model changes persist immediately, independent of the modal's Save button.
 
@@ -598,6 +598,8 @@ Catalog:
 - **Auto-detect Components** — OmniParser (icon detect) (~58 MB, default) and Florence-2 (~1.2 GB, five-file package). Multiple models; the active one is selectable like the Text Detector. When enabled, the **Auto-detect** button appears on the Builder's bottom canvas bar and runs the active model.
 - **Text Detector** — DBNet-MobileNetV3 (~15 MB), DBNet-ResNet34 (~85 MB), DBNet-ResNet50 (~96 MB), CRAFT (~80 MB). When enabled, the **Is text?** button appears on each Builder cut item and runs the active model.
 - **Remove Element** — LaMa (~208 MB). When enabled, the **Remove element** tool appears in the Builder's left tool rail.
+- **Font Detector** — font-classify (EfficientNet-B3, ~64 MB, three-file package: model + two YAML sidecars). When enabled, the **Font** button appears in the Builder's Gallery action bar and identifies the cut's font family.
+- **Color Detector** — model-free (runs built-in). When enabled, the **Colors** button appears in the Builder's Gallery action bar.
 
 ---
 

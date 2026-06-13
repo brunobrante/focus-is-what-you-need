@@ -428,6 +428,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   cuts={scopedComponents}
                   showColors={features.colorDetector.operational}
                   showText={features.textDetection.operational}
+                  showFont={features.fontDetection.operational}
                 />
               ) : null}
 
@@ -539,7 +540,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   {/* Hidden img keeps imgRef valid for mode transitions */}
                   <img
                     ref={imgRef}
-                    src={displayUrl}
+                    src={displayUrl || undefined}
                     className="sr-only"
                     crossOrigin="anonymous"
                     draggable={false}
@@ -558,7 +559,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   >
                     <img
                       ref={imgRef}
-                      src={cleanOriginal ? item.url : displayUrl}
+                      src={(cleanOriginal ? item.url : displayUrl) || undefined}
                       alt={cleanOriginal ? item.name : activeSubject.name}
                       crossOrigin="anonymous"
                       draggable={false}

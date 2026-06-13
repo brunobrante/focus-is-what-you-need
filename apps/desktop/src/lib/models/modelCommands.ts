@@ -77,6 +77,17 @@ export function runFlorence2TextCheck(imageBytes: Uint8Array): Promise<boolean> 
   });
 }
 
+// One predicted font family and its softmax probability (0–1).
+export type FontPrediction = { name: string; confidence: number };
+
+// Runs the font detector (EfficientNet-B3) on a cut's image. Returns the top
+// font-family guesses, most confident first.
+export function runFontDetect(imageBytes: Uint8Array): Promise<FontPrediction[]> {
+  return invoke<FontPrediction[]>("run_font_detect", {
+    imageBytes: Array.from(imageBytes),
+  });
+}
+
 // Runs LaMa inpainting on a cut. `maskBytes` is a PNG grayscale mask where
 // white marks the region to remove; returns the inpainted PNG at the cut's
 // original resolution.

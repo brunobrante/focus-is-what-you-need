@@ -35,8 +35,29 @@ const DBNET_RESNET50_ID: &str = "dbnet-resnet50";
 const DBNET_MOBILENET_ID: &str = "dbnet-mobilenet-v3-large";
 const LAMA_ID: &str = "lama";
 const OMNIPARSER_ID: &str = "omniparser-icon-detect";
+const FONT_CLASSIFY_ID: &str = "font-classify";
 const BIREFNET_SIZE: u32 = 1024;
 const PROGRESS_EVENT: &str = "model://progress";
+
+// Font detector (Storia AI font-classify, EfficientNet-B3, ~64 MB). A multi-file
+// package: the ONNX model plus two YAML sidecars stored together under
+// `$APP_DATA/models/font-classify/`. `model_config.yaml` carries the input `size`
+// and the ordered `classnames` (3,473 font names); inference letterboxes the cut
+// to that square with WHITE padding (the training `ResizeWithPad`), ImageNet-
+// normalizes, runs the net, then softmax + argmax over the class list. The
+// predicted class name (e.g. "Roboto-Regular") is the font.
+const FONT_CLASSIFY_MODEL_FILE: &str = "model.onnx";
+const FONT_CLASSIFY_MAPPING_FILE: &str = "fonts_mapping.yaml";
+const FONT_CLASSIFY_CONFIG_FILE: &str = "model_config.yaml";
+const FONT_CLASSIFY_MODEL_URL: &str =
+    "https://huggingface.co/storia/font-classify-onnx/resolve/main/model.onnx";
+const FONT_CLASSIFY_MAPPING_URL: &str =
+    "https://huggingface.co/storia/font-classify-onnx/resolve/main/fonts_mapping.yaml";
+const FONT_CLASSIFY_CONFIG_URL: &str =
+    "https://huggingface.co/storia/font-classify-onnx/resolve/main/model_config.yaml";
+// ResizeWithPad pads with white; matches the model's training pre-processing.
+const FONT_CLASSIFY_PAD: u8 = 255;
+const FONT_CLASSIFY_TOP_K: usize = 3;
 
 // OmniParser icon detector: a single YOLOv8 ONNX (~58 MB) that proposes UI
 // icon/element bounding boxes from a screenshot. Pre-processing per its
@@ -94,8 +115,9 @@ const DBNET_TEXT_THRESHOLD: f32 = 0.3;
 // --- Florence-2 (multi-file package) -------------------------------------
 //
 // Florence-2 ships as three files rather than one ONNX. They are stored
-// together under `$APP_DATA/models/florence2/` and downloaded sequentially.
-const FLORENCE2_DIR: &str = "florence2";
+// together under `$APP_DATA/models/florence2/` (the per-package subfolder that
+// `model_storage_dir` allocates for any multi-file model) and downloaded
+// sequentially.
 const FLORENCE2_VISION_FILE: &str = "vision_encoder.onnx";
 const FLORENCE2_EMBED_FILE: &str = "embed_tokens.onnx";
 const FLORENCE2_ENCODER_FILE: &str = "encoder_model.onnx";
@@ -152,6 +174,11 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
             name: "omniparser-icon-detect.onnx",
             url: OMNIPARSER_URL,
         }]),
+        FONT_CLASSIFY_ID => Ok(vec![
+            ModelFile { name: FONT_CLASSIFY_MODEL_FILE, url: FONT_CLASSIFY_MODEL_URL },
+            ModelFile { name: FONT_CLASSIFY_MAPPING_FILE, url: FONT_CLASSIFY_MAPPING_URL },
+            ModelFile { name: FONT_CLASSIFY_CONFIG_FILE, url: FONT_CLASSIFY_CONFIG_URL },
+        ]),
         FLORENCE2_ID => Ok(vec![
             ModelFile { name: FLORENCE2_VISION_FILE, url: FLORENCE2_VISION_URL },
             ModelFile { name: FLORENCE2_EMBED_FILE, url: FLORENCE2_EMBED_URL },
@@ -164,10 +191,12 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
 }
 
 /// Where a model's files live. Single-file models sit directly in `models/`
-/// (e.g. `models/birefnet.onnx`); Florence-2 gets its own `models/florence2/`.
+/// (e.g. `models/birefnet.onnx`); multi-file packages get their own subfolder
+/// named by id (e.g. `models/florence2/`, `models/font-classify/`).
 fn model_storage_dir(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
     let base = models_dir(app)?;
-    Ok(if id == FLORENCE2_ID { base.join(FLORENCE2_DIR) } else { base })
+    let multi_file = model_file_specs(id).map(|specs| specs.len() > 1).unwrap_or(false);
+    Ok(if multi_file { base.join(id) } else { base })
 }
 
 // --- paths ----------------------------------------------------------------
@@ -288,14 +317,15 @@ async fn download_file(
 #[tauri::command]
 pub fn model_uninstall(app: AppHandle, id: &str) -> Result<(), String> {
     let dir = model_storage_dir(&app, id)?;
-    if id == FLORENCE2_ID {
-        // Multi-file package: drop the whole folder (also cancels a download).
+    let specs = model_file_specs(id)?;
+    if specs.len() > 1 {
+        // Multi-file package (its own folder): drop the whole folder, which also
+        // cancels an in-flight download.
         if dir.exists() {
             fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
         }
         return Ok(());
     }
-    let specs = model_file_specs(id)?;
     for file in specs {
         let final_path = dir.join(file.name);
         if final_path.exists() {
@@ -949,6 +979,160 @@ fn nms(mut boxes: Vec<DetectedRegion>, iou_threshold: f32, max_out: usize) -> Ve
         kept.push(cand);
     }
     kept
+}
+
+// --- Font detector (EfficientNet-B3) --------------------------------------
+
+/// One predicted font and its softmax probability.
+#[derive(Clone, Serialize)]
+pub struct FontPrediction {
+    pub name: String,
+    pub confidence: f32,
+}
+
+#[tauri::command]
+pub async fn run_font_detect(
+    app: AppHandle,
+    image_bytes: Vec<u8>,
+) -> Result<Vec<FontPrediction>, String> {
+    tauri::async_runtime::spawn_blocking(move || font_detect_blocking(&app, image_bytes))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+struct FontConfig {
+    size: u32,
+    classnames: Vec<String>,
+}
+
+/// Parses the font model's `model_config.yaml`. The file is a flat document with
+/// a `classnames:` block list (3,473 unquoted names, some containing `[`/`]`/`,`)
+/// and a trailing `size:` scalar — simple and fixed, so a line scanner is enough
+/// and avoids pulling in a YAML dependency.
+fn parse_font_config(text: &str) -> Result<FontConfig, String> {
+    let mut size: Option<u32> = None;
+    let mut classnames: Vec<String> = Vec::new();
+    let mut in_classnames = false;
+    for line in text.lines() {
+        if in_classnames {
+            if let Some(rest) = line.strip_prefix("- ") {
+                classnames.push(rest.trim().to_string());
+                continue;
+            }
+            in_classnames = false;
+        }
+        let trimmed = line.trim_start();
+        if trimmed == "classnames:" {
+            in_classnames = true;
+        } else if let Some(rest) = trimmed.strip_prefix("size:") {
+            size = rest.trim().parse::<u32>().ok();
+        }
+    }
+    let size = size.filter(|&s| s > 0).ok_or("font config missing size")?;
+    if classnames.is_empty() {
+        return Err("font config has no classnames".to_string());
+    }
+    Ok(FontConfig { size, classnames })
+}
+
+fn load_font_session(app: &AppHandle) -> Result<Session, String> {
+    let path = model_storage_dir(app, FONT_CLASSIFY_ID)?.join(FONT_CLASSIFY_MODEL_FILE);
+    if !path.exists() {
+        return Err("model \"font-classify\" is not installed".to_string());
+    }
+    Session::builder()
+        .map_err(|e| e.to_string())?
+        .commit_from_file(&path)
+        .map_err(|e| e.to_string())
+}
+
+fn font_detect_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<FontPrediction>, String> {
+    let dir = model_storage_dir(app, FONT_CLASSIFY_ID)?;
+    let config_text = fs::read_to_string(dir.join(FONT_CLASSIFY_CONFIG_FILE))
+        .map_err(|e| format!("failed to read font model config: {e}"))?;
+    let config = parse_font_config(&config_text)?;
+    let size = config.size;
+
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let mut rgb = img.to_rgb8();
+    // CutMax(1024): training crops to the top-left 1024 square if larger. Cuts are
+    // usually small, so this is normally a no-op.
+    let (w0, h0) = rgb.dimensions();
+    if w0 > 1024 || h0 > 1024 {
+        rgb = image::imageops::crop(&mut rgb, 0, 0, w0.min(1024), h0.min(1024)).to_image();
+    }
+    let (ow, oh) = rgb.dimensions();
+    if ow == 0 || oh == 0 {
+        return Err("empty image".to_string());
+    }
+
+    // ResizeWithPad: letterbox to size x size, centered, WHITE padding.
+    let scale = (size as f32 / ow as f32).min(size as f32 / oh as f32);
+    let nw = ((ow as f32 * scale).round() as u32).clamp(1, size);
+    let nh = ((oh as f32 * scale).round() as u32).clamp(1, size);
+    let pad_x = (size - nw) / 2;
+    let pad_y = (size - nh) / 2;
+    let resized = image::imageops::resize(&rgb, nw, nh, image::imageops::FilterType::Triangle);
+
+    // Pre-fill with the normalized white pad, then overlay the resized cut.
+    let mut input = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
+    let pad = FONT_CLASSIFY_PAD as f32 / 255.0;
+    for c in 0..3 {
+        let normalized_pad = (pad - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
+        for y in 0..size as usize {
+            for x in 0..size as usize {
+                input[[0, c, y, x]] = normalized_pad;
+            }
+        }
+    }
+    for y in 0..nh {
+        for x in 0..nw {
+            let px = resized.get_pixel(x, y);
+            for c in 0..3 {
+                let value = px[c] as f32 / 255.0;
+                input[[0, c, (y + pad_y) as usize, (x + pad_x) as usize]] =
+                    (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
+            }
+        }
+    }
+
+    let mut session = load_font_session(app)?;
+    let input_name = session.inputs()[0].name().to_string();
+    let tensor = Tensor::from_array(input).map_err(|e| e.to_string())?;
+    let outputs = session
+        .run(ort::inputs![input_name.as_str() => tensor])
+        .map_err(|e| e.to_string())?;
+
+    // Output 0 is [1, num_classes] logits → softmax → top-K class names.
+    let logits: Vec<f32> = outputs[0]
+        .try_extract_array::<f32>()
+        .map_err(|e| e.to_string())?
+        .iter()
+        .copied()
+        .collect();
+    let n = logits.len().min(config.classnames.len());
+    if n == 0 {
+        return Err("font model produced no logits".to_string());
+    }
+    let max = logits[..n].iter().copied().fold(f32::MIN, f32::max);
+    let exps: Vec<f32> = logits[..n].iter().map(|&v| (v - max).exp()).collect();
+    let sum: f32 = exps.iter().sum();
+
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| {
+        logits[b]
+            .partial_cmp(&logits[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let predictions = order
+        .into_iter()
+        .take(FONT_CLASSIFY_TOP_K)
+        .map(|i| FontPrediction {
+            name: config.classnames[i].clone(),
+            confidence: if sum > 0.0 { exps[i] / sum } else { 0.0 },
+        })
+        .collect();
+    Ok(predictions)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
