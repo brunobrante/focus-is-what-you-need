@@ -486,6 +486,7 @@ again, or the canvas ×, returns to the editor.
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
   - **Is text?** button (only when the Text Detector feature is enabled in Settings): runs the feature's active model (a DBNet variant or CRAFT) on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
+  - **Font?** button (only when the Font Detector feature is enabled in Settings): runs the EfficientNet-B3 font classifier on that cut's image to recognize the **font family**. Idle shows "Font?" with a Baseline icon; while running it shows a spinner and is disabled; on completion it shows the recognized font as a purple pill — the top font name plus its confidence (e.g. "Roboto-Regular 87%"), with the full top-3 guesses in the pill's tooltip — and the button becomes "Detect again"; on failure it shows "Retry". The result is display-only and not persisted in v1.
 - **Stack tab**:
   - Shows all cuts from a reference image layered over the original at their exact positions
   - Clicking a cut selects it (blue outline); hovering shows an orange highlight

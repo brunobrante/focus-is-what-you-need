@@ -809,6 +809,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       rootId={rootComponentId}
                       primaryId={activeScopeId}
                       textDetectionModelId={textDetectionModelId}
+                      fontDetectionEnabled={features.fontDetection.operational}
                       onOpen={openTreeComponent}
                       onToggle={toggleComponentExpanded}
                       onHover={setHoveredComponentId}

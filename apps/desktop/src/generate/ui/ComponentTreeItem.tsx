@@ -1,7 +1,8 @@
-import { ChevronRight, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
+import { Baseline, ChevronRight, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
 import type { ComponentProps, MouseEvent } from "react";
 import type { ComponentTreeNode } from "../engine/types";
 import { useCraftCheck } from "@/lib/models/useCraftCheck";
+import { useFontDetect } from "@/lib/models/useFontDetect";
 import { urlToBytes } from "@/lib/models/modelCommands";
 
 function IconButton({
@@ -31,6 +32,7 @@ export function ComponentTreeItem({
   rootId,
   primaryId,
   textDetectionModelId = null,
+  fontDetectionEnabled = false,
   onOpen,
   onToggle,
   onHover,
@@ -46,6 +48,8 @@ export function ComponentTreeItem({
   primaryId: string;
   /** Active text detector; when set, each card shows an "Is text?" action. */
   textDetectionModelId?: string | null;
+  /** When true, each card shows a "Font?" action that recognizes the font. */
+  fontDetectionEnabled?: boolean;
   onOpen: (id: string) => void;
   onToggle: (id: string) => void;
   onHover: (id: string | null) => void;
@@ -108,6 +112,7 @@ export function ComponentTreeItem({
         {textDetectionModelId ? (
           <CraftCheckButton dataUrl={component.dataUrl} modelId={textDetectionModelId} />
         ) : null}
+        {fontDetectionEnabled ? <FontCheckButton dataUrl={component.dataUrl} /> : null}
         <div className="flex shrink-0">
           <IconButton
             aria-label="Edit crop"
@@ -149,6 +154,7 @@ export function ComponentTreeItem({
               rootId={rootId}
               primaryId={primaryId}
               textDetectionModelId={textDetectionModelId}
+              fontDetectionEnabled={fontDetectionEnabled}
               onOpen={onOpen}
               onToggle={onToggle}
               onHover={onHover}
@@ -223,6 +229,79 @@ function CraftCheckButton({
           <Loader2 size={12} strokeWidth={1.8} className="animate-spin" />
         ) : (
           <ScanText size={12} strokeWidth={1.8} />
+        )}
+        {label}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Per-card font-recognition control. Reads the cut's image bytes on demand and
+ * runs the EfficientNet-B3 font classifier, surfacing the recognized font family
+ * (top guess, with the full top-3 in the tooltip). Only rendered when the Font
+ * Detector feature is enabled.
+ */
+function FontCheckButton({ dataUrl }: { dataUrl: string }) {
+  const font = useFontDetect();
+  const busy = font.status === "running";
+  const top = font.predictions?.[0] ?? null;
+
+  const label =
+    font.status === "running"
+      ? "Detecting…"
+      : font.status === "done"
+        ? "Detect again"
+        : font.status === "error"
+          ? "Retry"
+          : "Font?";
+
+  const allGuesses = font.predictions
+    ?.map((p) => `${p.name} ${Math.round(p.confidence * 100)}%`)
+    .join("  ·  ");
+
+  async function handleClick(event: MouseEvent) {
+    event.stopPropagation();
+    if (busy) return;
+    // "Detect again" / "Retry": clear the previous result, then run fresh.
+    font.reset();
+    try {
+      const bytes = await urlToBytes(dataUrl);
+      font.detect(bytes);
+    } catch (error) {
+      console.error("Failed to read cut image for font detection", error);
+    }
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+      {font.status === "done" ? (
+        top ? (
+          <span
+            title={allGuesses}
+            className="inline-flex max-w-[128px] items-center gap-1 rounded-full border border-[rgba(167,139,250,0.4)] bg-[rgba(167,139,250,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[#A78BFA]"
+          >
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">{top.name}</span>
+            <span className="shrink-0 text-[9px] font-medium opacity-70">
+              {Math.round(top.confidence * 100)}%
+            </span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-faint)]">
+            No font
+          </span>
+        )
+      ) : null}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={handleClick}
+        className="inline-flex h-[26px] shrink-0 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-transparent px-1.5 text-[10.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 size={12} strokeWidth={1.8} className="animate-spin" />
+        ) : (
+          <Baseline size={12} strokeWidth={1.8} />
         )}
         {label}
       </button>
