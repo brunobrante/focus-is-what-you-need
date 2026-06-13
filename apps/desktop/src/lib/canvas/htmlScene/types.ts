@@ -63,6 +63,16 @@ export type HtmlCanvasStyle = {
   overflow: "visible" | "hidden";
 };
 
+/**
+ * A link from an instance node to the master component it mirrors. When set, the
+ * node stores no children of its own — the master's subtree is expanded read-only
+ * at render time (see resolveInstances). `variantId` pins the master version shown.
+ */
+export type HtmlCanvasInstanceRef = {
+  componentId: string;
+  variantId: string;
+};
+
 export type HtmlCanvasNode = {
   id: string;
   parentId: string | null;
@@ -79,6 +89,8 @@ export type HtmlCanvasNode = {
   appearance: "rect" | "ellipse" | "line";
   visible: boolean;
   locked: boolean;
+  // Non-null only on linked instance nodes. Plain content nodes leave this null.
+  instanceOf: HtmlCanvasInstanceRef | null;
 };
 
 export type HtmlCanvasDocument = {

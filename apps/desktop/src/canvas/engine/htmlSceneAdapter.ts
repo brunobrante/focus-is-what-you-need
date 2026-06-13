@@ -1,15 +1,18 @@
 import {
   HTML_CANVAS_FORMAT,
   HTML_CANVAS_VERSION,
+  buildMasterResolver,
   getHtmlCanvasChildren,
   htmlCanvasDocumentFromJSON,
   normalizeHtmlCanvasDocument,
+  resolveInstances,
   serializeHtmlCanvasDocument,
   type HtmlCanvasDocument,
   type HtmlCanvasNode,
   type HtmlCanvasNodeKind,
   type HtmlCanvasStyle,
   type HtmlCanvasTag,
+  type MasterResolver,
 } from "@/lib/canvas/htmlScene";
 import { DEFAULT_SHELL_BACKGROUND } from "./actions";
 import type {
@@ -19,8 +22,12 @@ import type {
   ElementType,
 } from "./types";
 
+export { buildMasterResolver };
+
 type HtmlSceneAdapterOptions = {
   promoteSubjectRoot?: boolean;
+  // When provided, linked instance nodes are expanded read-only at load time.
+  resolveMaster?: MasterResolver;
 };
 
 export function canvasDocumentFromHtmlGraphJSON(
@@ -36,7 +43,10 @@ export function canvasDocumentFromHtmlDocument(
   htmlDocument: HtmlCanvasDocument,
   options: HtmlSceneAdapterOptions = {},
 ): CanvasDocument {
-  const document = normalizeHtmlCanvasDocument(htmlDocument);
+  const normalized = normalizeHtmlCanvasDocument(htmlDocument);
+  const document = options.resolveMaster
+    ? resolveInstances(normalized, options.resolveMaster)
+    : normalized;
   const root = document.nodes.find((node) => node.id === document.rootId);
   const promotedSubject = options.promoteSubjectRoot
     ? getSubjectWrapperChild(document, root)
@@ -66,6 +76,7 @@ export function canvasDocumentFromHtmlDocument(
       src: node.imageUrl ?? undefined,
       locked: node.locked,
       visible: node.visible,
+      instanceOf: node.instanceOf ?? null,
     };
   }
 
@@ -153,7 +164,9 @@ export function htmlCanvasDocumentFromCanvasDocument(
       const element = document.elements[id];
       if (!element) return;
       nodes.push(htmlNodeFromElement(element, parentId, order, previousNodes.get(id)));
-      pushChildren(element.children, element.id);
+      // A linked instance stores no children — its master subtree is inlined only
+      // for display (see resolveInstances) and must never be persisted back.
+      if (!element.instanceOf) pushChildren(element.children, element.id);
     });
   };
 
@@ -192,7 +205,7 @@ function htmlCanvasDocumentFromPromotedSubject(
       const element = document.elements[id];
       if (!element) return;
       nodes.push(htmlNodeFromElement(element, parentId, order, previousNodes.get(id)));
-      pushChildren(element.children, element.id);
+      if (!element.instanceOf) pushChildren(element.children, element.id);
     });
   };
 
@@ -315,6 +328,7 @@ function htmlRootNodeFromCanvas(
     appearance: "rect",
     visible: true,
     locked: false,
+    instanceOf: null,
   };
 }
 
@@ -347,6 +361,7 @@ function htmlNodeFromElement(
     appearance: previous?.appearance ?? "rect",
     visible: element.visible !== false,
     locked: element.locked === true,
+    instanceOf: element.instanceOf ?? previous?.instanceOf ?? null,
   };
 }
 
@@ -445,6 +460,8 @@ function styleFromElement(
 }
 
 function htmlKindFromElement(element: ElementNode): HtmlCanvasNodeKind {
+  // A linked instance is always a component node, even though it stores no children.
+  if (element.instanceOf) return "component";
   if (element.type === "text") return "text";
   if (element.type === "image") return "image";
   if (element.type === "icon") return "icon";

@@ -3,7 +3,13 @@ import { normalizeReferenceRow } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
+  listTopLevelByScreen,
 } from "@/lib/storage/repos/components.repo";
+import {
+  getSceneByOwner,
+  linkifyChildComponentsInGraph,
+  upsertScene,
+} from "@/lib/storage/repos/scenes.repo";
 import type {
   ComponentRow,
   ReferenceRow,
@@ -70,6 +76,55 @@ export async function createScreen(input: {
   };
   await replaceTable<ScreenRow>(KEY, [...rows, created]);
   notify(KEY);
+  return created;
+}
+
+/**
+ * Creates a new version of a screen as a sibling screen in the same project.
+ *
+ *  - "linked": the frame and non-component content are copied, but every top-level
+ *    child component is collapsed into a linked instance pointing at the original
+ *    child master. Editing a master then reflects in this version too.
+ *  - "copy": the scene graph is duplicated verbatim (fully independent).
+ *
+ * The new screen appears alongside the original in the project; version grouping
+ * UI can be layered on later via a dedicated field.
+ */
+export async function createScreenVersion(input: {
+  screenId: string;
+  mode: "copy" | "linked";
+}): Promise<ScreenRow | null> {
+  const source = await getScreen(input.screenId);
+  if (!source) return null;
+
+  const created = await createScreen({
+    projectId: source.projectId,
+    title: `${source.title} (${input.mode === "linked" ? "linked" : "copy"})`,
+    variant: source.variant,
+  });
+
+  const sourceScene = await getSceneByOwner("screen", input.screenId);
+  if (sourceScene) {
+    let graphJSON = sourceScene.graphJSON;
+    if (input.mode === "linked") {
+      const children = await listTopLevelByScreen(source.projectId, input.screenId);
+      const linked = linkifyChildComponentsInGraph(
+        graphJSON,
+        children.map((c) => ({
+          id: c.id,
+          activeVariantId: c.activeVariantId,
+          sourceNodeId: c.sourceNodeId ?? null,
+          name: c.name,
+        })),
+      );
+      if (linked) graphJSON = linked;
+    }
+    await upsertScene(
+      { ownerType: "screen", ownerId: created.id, graphJSON },
+      { propagate: false },
+    );
+  }
+
   return created;
 }
 

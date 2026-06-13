@@ -38,6 +38,7 @@ export function ScreensTab({
   onSectionsChange,
   onSectionByIdChange,
   onRequestDelete,
+  onRequestVersion,
 }: {
   screens: ScreenRow[];
   type: ProjectType;
@@ -48,6 +49,7 @@ export function ScreensTab({
   onSectionsChange: Dispatch<SetStateAction<SectionState[]>>;
   onSectionByIdChange: Dispatch<SetStateAction<Record<string, string | null>>>;
   onRequestDelete: (screen: ScreenRow) => void;
+  onRequestVersion: (screen: ScreenRow) => void;
 }) {
   const [createSectionRequest, setCreateSectionRequest] = useState(0);
   const [query, setQuery] = useState("");
@@ -97,6 +99,7 @@ export function ScreensTab({
           onSectionsChange={onSectionsChange}
           onSectionByIdChange={onSectionByIdChange}
           onRequestDelete={onRequestDelete}
+          onRequestVersion={onRequestVersion}
           createSectionRequest={createSectionRequest}
         />
       </main>
@@ -208,6 +211,7 @@ function ScreensGrid({
   onSectionsChange,
   onSectionByIdChange,
   onRequestDelete,
+  onRequestVersion,
   createSectionRequest,
 }: {
   screens: ScreenRow[];
@@ -219,6 +223,7 @@ function ScreensGrid({
   onSectionsChange: Dispatch<SetStateAction<SectionState[]>>;
   onSectionByIdChange: Dispatch<SetStateAction<Record<string, string | null>>>;
   onRequestDelete: (screen: ScreenRow) => void;
+  onRequestVersion: (screen: ScreenRow) => void;
   createSectionRequest?: number;
 }) {
   if (screens.length === 0) {
@@ -251,6 +256,7 @@ function ScreensGrid({
           type={type}
           projectId={projectId}
           onRequestDelete={onRequestDelete}
+          onRequestVersion={onRequestVersion}
           onRequestAssignSection={helpers.onRequestAssignSection}
         />
       )}
@@ -264,12 +270,14 @@ function ScreenCard({
   type,
   projectId,
   onRequestDelete,
+  onRequestVersion,
   onRequestAssignSection,
 }: {
   screen: ScreenRow;
   type: ProjectType;
   projectId: string;
   onRequestDelete: (screen: ScreenRow) => void;
+  onRequestVersion: (screen: ScreenRow) => void;
   onRequestAssignSection: () => void;
 }) {
   const navigate = useNavigate();
@@ -299,6 +307,12 @@ function ScreenCard({
               label: "Mais",
               icon: SharedCardMenuIcons.More,
               menuItems: [
+                {
+                  key: "version",
+                  label: "New version",
+                  icon: SharedCardMenuIcons.MoveTo,
+                  onClick: () => onRequestVersion(screen),
+                },
                 {
                   key: "section",
                   label: "Add to section",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Toolbar } from "@/canvas/shell/Toolbar";
 import { Inspector } from "@/canvas/shell/Inspector";
 import { Tree, TreeToggle, type ProjectTreeNode } from "@/canvas/shell/Tree";
@@ -9,8 +9,10 @@ import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { CanvasReferencesContext } from "@/canvas/shell/CanvasReferencesWindow";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
-import { DEFAULT_SHELL_BACKGROUND, moveElementBefore, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
-import { canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
+import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementBefore, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
+import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
+import { peekTable, TABLES } from "@/lib/storage/store";
+import type { SceneRow } from "@/lib/storage/schema";
 import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
@@ -65,6 +67,7 @@ export function CanvasPage() {
 }
 
 function CanvasPageContent() {
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const projectIdParam = params.get("project") || params.get("projectId") || "";
   const legacyProjectName = params.get("name") || "";
@@ -72,6 +75,9 @@ function CanvasPageContent() {
   const screenParam = params.get("screen") || "";
   const variantParam = params.get("variant") || "";
   const componentParam = params.get("component") || "";
+  // Return context for "Go to component": "variant:<id>" or "screen:<id>" of the
+  // canvas the user came from, so Back returns there instead of the master's parent.
+  const fromParam = params.get("from") || "";
   const legacyElementName = params.get("element") || "";
 
   const {
@@ -225,13 +231,25 @@ function CanvasPageContent() {
     );
   }, [inheritParentBackground, component, parentScene?.graphJSON]);
 
+  // Linked instance nodes are expanded read-only at canvas seed time. The scenes
+  // table is hydrated by the time the current scene loads (currentReady gates the
+  // editor), so a synchronous cache peek sees every master variant scene.
+  const resolveMaster = useMemo(
+    () => buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)),
+    // Rebuilt whenever the current scene's graph changes — which is also when the
+    // scenes table has just hydrated/updated.
+    [resolvedSceneGraphJSON],
+  );
+
   const currentDocument = useMemo(() => {
     const doc =
-      canvasDocumentFromHtmlGraphJSON(resolvedSceneGraphJSON, { promoteSubjectRoot: true }) ??
-      createBlankDocumentForProjectType(projectType);
+      canvasDocumentFromHtmlGraphJSON(resolvedSceneGraphJSON, {
+        promoteSubjectRoot: true,
+        resolveMaster,
+      }) ?? createBlankDocumentForProjectType(projectType);
     return { ...doc, shellBackground: effectiveShellBackground };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground]);
+  }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground, resolveMaster]);
 
   useEffect(() => {
     const editor = getEditor();
@@ -366,6 +384,33 @@ function CanvasPageContent() {
         ? `/project/${encodeURIComponent(projectId)}`
         : "/";
 
+  const navigateToOwnerToken = useCallback(
+    (token: string): boolean => {
+      const sep = token.indexOf(":");
+      const kind = sep >= 0 ? token.slice(0, sep) : "";
+      const id = sep >= 0 ? token.slice(sep + 1) : "";
+      if (!id) return false;
+      if (kind === "variant") {
+        navigate(`/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&variant=${encodeURIComponent(id)}`);
+        return true;
+      }
+      if (kind === "screen") {
+        navigate(`/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&screen=${encodeURIComponent(id)}`);
+        return true;
+      }
+      return false;
+    },
+    [navigate, projectId, projectType],
+  );
+
+  // Back honors the "from" return context first (set when arriving via Go to
+  // component), then falls back to the structural parent.
+  const handleBackToParent = useCallback(() => {
+    void flushPendingSave();
+    if (fromParam && navigateToOwnerToken(fromParam)) return;
+    if (parentProjectNode) openProjectNodeCanvas(parentProjectNode);
+  }, [flushPendingSave, fromParam, navigateToOwnerToken, parentProjectNode, openProjectNodeCanvas]);
+
   useEffect(() => {
     if (!enabledCanvasTabs.includes(activeTab)) setActiveTab("current");
     if (!enabledCanvasTabs.includes(treeTab)) setTreeTab("current");
@@ -474,7 +519,7 @@ function CanvasPageContent() {
         onCurrentDocumentChange={handleCurrentDocumentChange}
         onActiveCanvasChange={changeCanvasTab}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}
-        onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
+        onBackToParent={handleBackToParent}
         settings={settings}
         onCanvasToolShortcut={handleToolChange}
         onOpenSelectedComponentShortcut={openSelectedComponentInCanvas}
@@ -560,6 +605,26 @@ function CanvasPageContent() {
         onToggleCanvasActive={(active) => { getEditor()?.dispatch({ type: "setCanvasStageActive", active }); }}
         canOpenNodeCanvas={canOpenCanvasNode}
         onOpenNodeCanvas={openCanvasForNode}
+        onGoToInstance={(variantId) => {
+          void flushPendingSave();
+          const origin = variantParam
+            ? `variant:${variantParam}`
+            : screenParam
+              ? `screen:${screenParam}`
+              : "";
+          const fromQuery = origin ? `&from=${encodeURIComponent(origin)}` : "";
+          navigate(
+            `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&variant=${encodeURIComponent(variantId)}${fromQuery}`,
+          );
+        }}
+        onDetachNode={(nodeId) => {
+          const editor = getEditor();
+          if (!editor) return;
+          editor.dispatch({
+            type: "commitDocument",
+            document: detachInstance(editor.state.document, nodeId),
+          });
+        }}
         onOpenProjectNode={openProjectNodeCanvas}
         activeTab={treeTab}
         enabledTabs={enabledCanvasTabs}
@@ -611,7 +676,7 @@ function CanvasPageContent() {
           zoomLimits={activeZoomLimits}
           projectType={projectType}
           parentTarget={parentProjectNode}
-          onBackToParent={() => { if (parentProjectNode) openProjectNodeCanvas(parentProjectNode); }}
+          onBackToParent={handleBackToParent}
           onCanvasExpandedChange={setCanvasExpanded}
           config={toolbarConfig}
           onBadgeClick={() => {

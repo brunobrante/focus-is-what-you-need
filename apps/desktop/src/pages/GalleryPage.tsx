@@ -7,7 +7,9 @@ import {
   NewComponentModal,
 } from "@/components/modals/NewComponentModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
+import { createScreenVersion } from "@/lib/storage/repos/screens.repo";
 import { useGallery } from "@/application/gallery/useGallery";
 
 import {
@@ -26,6 +28,7 @@ export function GalleryPage() {
   const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : "";
 
   const previewRef = useRef<ProjectPreviewModalHandle>(null);
+  const versionScreenRef = useRef<VersionModeModalHandle>(null);
   const [editOpen, setEditOpen] = useState(false);
 
   const {
@@ -111,6 +114,15 @@ export function GalleryPage() {
               onSectionsChange={setScreenSections}
               onSectionByIdChange={setScreenSectionById}
               onRequestDelete={setPendingScreenDelete}
+              onRequestVersion={(screen) => {
+                versionScreenRef.current?.open({
+                  title: `New version of "${screen.title}"`,
+                  message: "How should child components behave in the new version?",
+                  onSelect: (mode) => {
+                    void createScreenVersion({ screenId: screen.id, mode });
+                  },
+                });
+              }}
             />
           )}
           {tab === "components" && (
@@ -155,6 +167,7 @@ export function GalleryPage() {
         onCreated={handleComponentCreated}
       />
       <ProjectPreviewModal ref={previewRef} />
+      <VersionModeModal ref={versionScreenRef} />
       <ConfirmActionModal
         open={Boolean(pendingScreenDelete)}
         title="Delete screen"

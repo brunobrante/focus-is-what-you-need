@@ -63,3 +63,28 @@ export function setElementVisible(document: CanvasDocument, id: string, visible:
   if (next.elements[id]) next.elements[id].visible = visible;
   return next;
 }
+
+/**
+ * Breaks a linked instance: clears `instanceOf` and unlocks the inlined master
+ * content so it becomes editable own content. Because the resolved subtree is
+ * already present in the in-memory document, simply dropping the link and
+ * unlocking the descendants is enough — on save it persists as a deep copy
+ * (the adapter only skips children of nodes that still carry `instanceOf`).
+ */
+export function detachInstance(document: CanvasDocument, id: string): CanvasDocument {
+  const node = document.elements[id];
+  if (!node || !node.instanceOf) return document;
+  const next = cloneDocument(document);
+  const target = next.elements[id];
+  if (!target) return document;
+  target.instanceOf = null;
+  const stack = [...target.children];
+  while (stack.length > 0) {
+    const childId = stack.pop()!;
+    const child = next.elements[childId];
+    if (!child) continue;
+    child.locked = false;
+    stack.push(...child.children);
+  }
+  return next;
+}

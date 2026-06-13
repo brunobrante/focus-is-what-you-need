@@ -4,6 +4,7 @@ export type {
   HtmlCanvasBounds,
   HtmlCanvasStyle,
   HtmlCanvasNode,
+  HtmlCanvasInstanceRef,
   HtmlCanvasDocument,
   SubjectRootOptions,
   HtmlCanvasLayerMove,
@@ -34,3 +35,5 @@ export {
 
 export { htmlCanvasDocumentFromMockTree } from "./htmlScene/mockTree";
 export { svgForHtmlCanvasDocument } from "./htmlScene/svgRenderer";
+export { resolveInstances, stripResolvedInstanceChildren, buildMasterResolver } from "./htmlScene/resolveInstances";
+export type { MasterResolver } from "./htmlScene/resolveInstances";

@@ -93,6 +93,8 @@ type Props = {
   onToggleCanvasActive?: (active: boolean) => void;
   canOpenNodeCanvas?: (nodeId: string) => boolean;
   onOpenNodeCanvas?: (nodeId: string) => void;
+  onGoToInstance?: (variantId: string) => void;
+  onDetachNode?: (nodeId: string) => void;
   onOpenProjectNode?: (node: ProjectTreeNode) => void;
   activeTab?: CanvasWindowType;
   enabledTabs?: readonly CanvasWindowType[];
@@ -120,6 +122,8 @@ export function Tree({
   onToggleCanvasActive,
   canOpenNodeCanvas,
   onOpenNodeCanvas,
+  onGoToInstance,
+  onDetachNode,
   onOpenProjectNode,
   activeTab = "current",
   projectType,
@@ -322,6 +326,8 @@ export function Tree({
                   onToggleLocked={onToggleLocked}
                   canOpenNodeCanvas={canOpenNodeCanvas}
                   onOpenNodeCanvas={onOpenNodeCanvas}
+                  onGoToInstance={onGoToInstance}
+                  onDetachNode={onDetachNode}
                   showFocusButton={isDraftMode}
                   onFocusNode={focusNode}
                   onContextMenuNode={(nodeId, x, y) => {

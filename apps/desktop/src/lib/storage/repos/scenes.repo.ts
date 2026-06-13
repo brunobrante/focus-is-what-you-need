@@ -275,6 +275,50 @@ function replaceComponentSubtreeInGraph(
   });
 }
 
+/**
+ * Collapses each given child component's node subtree into a bare linked instance
+ * node — `instanceOf` set, all descendants removed. Used by the "Linked" version
+ * mode so a new variant references the original child masters instead of deep-copying
+ * their content. Returns the original JSON unchanged when no child node is matched.
+ */
+export function linkifyChildComponentsInGraph(
+  graphJSON: string,
+  children: ReadonlyArray<{
+    id: string;
+    activeVariantId: string;
+    sourceNodeId: string | null;
+    name: string;
+  }>,
+): string | null {
+  const doc = htmlCanvasDocumentFromJSON(graphJSON);
+  if (!doc) return null;
+
+  const removed = new Set<string>();
+  const instanceByNodeId = new Map<string, { componentId: string; variantId: string }>();
+
+  for (const child of children) {
+    const target =
+      (child.sourceNodeId ? doc.nodes.find((n) => n.id === child.sourceNodeId) : null) ??
+      doc.nodes.find(
+        (n) => n.id !== doc.rootId && normalizeName(n.name) === normalizeName(child.name),
+      );
+    if (!target || target.id === doc.rootId) continue;
+    for (const id of collectDescendantIds(doc.nodes, target.id)) removed.add(id);
+    instanceByNodeId.set(target.id, { componentId: child.id, variantId: child.activeVariantId });
+  }
+
+  if (instanceByNodeId.size === 0) return graphJSON;
+
+  const nextNodes = doc.nodes
+    .filter((n) => !removed.has(n.id))
+    .map((n) => {
+      const ref = instanceByNodeId.get(n.id);
+      return ref ? { ...n, instanceOf: ref } : n;
+    });
+
+  return serializeHtmlCanvasDocument({ ...doc, nodes: nextNodes, updatedAt: Date.now() });
+}
+
 function removeComponentSubtreeInGraph(
   parentGraphJSON: string,
   component: ComponentRow,

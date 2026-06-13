@@ -76,6 +76,7 @@ export function normalizeNode(node: HtmlCanvasNode, fallbackOrder: number): Html
     appearance: node.appearance ?? "rect",
     visible: node.visible ?? true,
     locked: node.locked ?? false,
+    instanceOf: node.instanceOf ?? null,
   };
 }
 
@@ -146,6 +147,7 @@ export function makeNode(input: {
       : "rect",
     visible: true,
     locked: input.props.locked === true,
+    instanceOf: null,
   };
 }
 
@@ -171,6 +173,7 @@ export function makeCanvasWrapperNode(input: {
     appearance: "rect",
     visible: true,
     locked: false,
+    instanceOf: null,
   };
 }
 

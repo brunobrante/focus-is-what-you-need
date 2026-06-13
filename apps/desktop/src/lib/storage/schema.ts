@@ -473,12 +473,6 @@ export type BaseNodeDef = {
   id: string;
   name: string;
   children: CanvasNode[];
-  componentRef?: {
-    componentId: string;
-    versionId: string;
-    overrides: NodeOverride;
-  };
-  referencedBy: string[];
 };
 
 export type DivNode = BaseNodeDef & { type: "div"; props: DivProps };

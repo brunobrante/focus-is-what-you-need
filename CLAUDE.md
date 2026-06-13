@@ -25,6 +25,15 @@ Do not skip this step. `UX.md` is the living specification and must stay in sync
 
 ---
 
+## Versioning Model
+
+The master / instance / detach versioning model (linked component instances, "Linked or
+Copy" version creation, detach, and master-deletion handling) is specified in
+[`Versioning.md`](./Versioning.md). Read it before touching variant creation, the layers
+tree's component rows, instance rendering/resolution, or screen/component version flows.
+
+---
+
 ## Branching Rule
 
 This project is in active local development and has not reached production.

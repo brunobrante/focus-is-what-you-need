@@ -483,6 +483,10 @@ again, or the canvas ×, returns to the editor.
   screens (its roots, selectable; clicking one shows that screen's stack/components
   below); when the image belongs to a group, the group's other images render as
   navigation cards that open that image in the Builder.
+  - **Tab persistence on screen switch**: switching to another screen keeps the
+    currently active tab when it still applies. From the **Stack** tab, selecting a
+    screen that has a stack (one or more cuts) stays on Stack; selecting a screen
+    with no cuts falls back to Builder, since there is no stack to show.
   - **New** creates a new screen by copying an original. With a single original it
     creates directly; with multiple originals (a group) it opens a small **"Copy
     from original"** picker — each entry shows the original's thumbnail, name, and
@@ -494,6 +498,13 @@ again, or the canvas ×, returns to the editor.
     main screen is what shows on the **front of the reference card** in the gallery
     and is pre-selected when the stack is opened. Defaults to the full-image screen
     until changed. Save persists the choice.
+  - **Delete screen** — each screen card has a trash button (top-left of the
+    thumbnail, visible on hover, turns red on hover). Clicking it opens a
+    confirmation dialog ("Delete screen") that names the screen and its cut count;
+    confirming permanently removes that screen and all its cuts. If the deleted
+    screen was the open one, the editor switches to another remaining screen; when
+    none are left, it returns to the original full image and the Screens panel
+    shows the empty "No screens yet" state.
 - **Builder tab** (default):
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
@@ -705,6 +716,29 @@ Dropdown-based filter control.
 ### Confirmation
 - Destructive actions (delete, reset) always show a `ConfirmActionModal` before executing
 - Confirmation button is styled to signal danger
+
+---
+
+## Versioning & Linked Component Instances
+
+See [`Versioning.md`](./Versioning.md) for the full model. UX surface:
+
+**Creating a version** — a `VersionModeModal` ("Linked or Copy") appears before a new
+version is created:
+- Component versions: triggered by **New variant** in the Component detail Variants tab.
+- Screen versions: triggered by **New version** in a screen card's `···` More menu (Gallery
+  Screens tab). The new version appears as a sibling screen titled "… (linked)" / "… (copy)".
+- **Linked**: child components become read-only instances of the originals — editing a
+  master updates every version. **Copy**: a fully independent duplicate.
+
+**Linked instances in the canvas**:
+- Selecting an instance shows a **purple** outline (vs blue for editable content).
+- An instance's contents are **read-only**: clicking inside selects the instance as a whole.
+- In the layers tree, an instance row is **purple** and exposes two actions:
+  - **Go to component** (link icon) — opens the master variant in the canvas for editing.
+  - **Detach** (broken-link icon) — breaks the link, turning the instance into editable
+    own content.
+- The tree shows an instance as a single row; its inlined master content is not expanded.
 
 ### Empty states
 - Every list, grid, and tab has a dedicated empty state

@@ -50,6 +50,15 @@ export type ElementSizing = {
   height?: ElementSizingMode;
 };
 
+/**
+ * Link from an instance element to the master component it mirrors. Mirrors
+ * HtmlCanvasInstanceRef on the storage node; carried verbatim through the adapter.
+ */
+export type ElementInstanceRef = {
+  componentId: string;
+  variantId: string;
+};
+
 export type ElementNode = {
   id: string;
   type: ElementType;
@@ -67,6 +76,8 @@ export type ElementNode = {
   src?: string;
   locked?: boolean;
   visible?: boolean;
+  // Non-null only on linked instance elements (see ElementInstanceRef).
+  instanceOf?: ElementInstanceRef | null;
 };
 
 export type CanvasProperties = {

@@ -802,3 +802,25 @@ export function IconCirclePlus({ size = 13, className, strokeWidth = 1.7 }: Icon
     </svg>
   )
 }
+
+// ── Linked instance icons ────────────────────────────────────────────────────
+
+export function IconLink({ size = 12, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 1 0-5.66-5.66l-1.5 1.5" />
+      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 1 0 5.66 5.66l1.5-1.5" />
+    </svg>
+  )
+}
+
+export function IconUnlink({ size = 12, className, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9.5 14.5 5 19" />
+      <path d="M14.5 9.5 19 5" />
+      <path d="M7 10 4.5 12.5a4 4 0 0 0 5.66 5.66L12 16.3" />
+      <path d="M17 14l2.5-2.5a4 4 0 0 0-5.66-5.66L12 7.7" />
+    </svg>
+  )
+}

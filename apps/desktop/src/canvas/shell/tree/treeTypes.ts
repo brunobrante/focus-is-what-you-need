@@ -7,6 +7,10 @@ export type Node = {
   visible?: boolean;
   locked?: boolean;
   children?: Node[];
+  // True when this node is a linked component instance (rendered purple, read-only).
+  linked?: boolean;
+  // The master variant this instance points at — used by "go to component".
+  instanceVariantId?: string;
 };
 
 export type DeviceType = "mobile" | "tablet" | "desktop";

@@ -150,17 +150,26 @@ export function treeFromCanvasDocument(
     };
   }
 
-  const build = (node: ElementNode): Node => ({
-    id: node.id,
-    name: node.name,
-    type: nodeTypeFromElement(node.type, node.children.length > 0),
-    visible: node.visible,
-    locked: node.locked,
-    children: node.children
-      .map((childId) => document.elements[childId])
-      .filter((child): child is ElementNode => Boolean(child))
-      .map(build),
-  });
+  const build = (node: ElementNode): Node => {
+    const linked = Boolean(node.instanceOf);
+    return {
+      id: node.id,
+      name: node.name,
+      type: nodeTypeFromElement(node.type, node.children.length > 0),
+      visible: node.visible,
+      locked: node.locked,
+      linked,
+      instanceVariantId: node.instanceOf?.variantId,
+      // A linked instance shows as a single row — its inlined master content
+      // (read-only) is not expanded into the layers tree.
+      children: linked
+        ? []
+        : node.children
+            .map((childId) => document.elements[childId])
+            .filter((child): child is ElementNode => Boolean(child))
+            .map(build),
+    };
+  };
 
   return {
     root: {

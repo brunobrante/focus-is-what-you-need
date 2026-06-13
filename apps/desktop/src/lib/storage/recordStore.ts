@@ -69,6 +69,16 @@ export async function getRecordById<T>(
   return (bucket(table).get(id) as T | undefined) ?? null;
 }
 
+/**
+ * Synchronous cache-only read. Returns whatever rows are already hydrated for the
+ * table without awaiting; an un-hydrated table yields an empty array. Use only where
+ * the table is known to be hydrated already (e.g. instance resolution at canvas seed,
+ * which runs after the current scene has loaded). Never use it as the primary loader.
+ */
+export function peekTable<T>(table: TableKey): T[] {
+  return Array.from(bucket(table).values()) as T[];
+}
+
 /** Synchronous single-row upsert: cache write + enqueue + notify, no await. */
 export function putRecord<T extends Row>(table: TableKey, row: T): void {
   bucket(table).set(row.id, row);

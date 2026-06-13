@@ -4,6 +4,7 @@ import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import { IconFastEdit, IconHistory, IconOpenCanvas, IconSearch } from "@/components/icons";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { AddCard } from "@/components/screen/AddCard";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
@@ -82,6 +83,7 @@ export function ComponentDetail() {
   const addRefModalRef = useRef<AddReferenceModalHandle>(null);
   const fastEditRef = useRef<FastEditModalHandle>(null);
   const confirmRef = useRef<ConfirmActionModalHandle>(null);
+  const versionModeRef = useRef<VersionModeModalHandle>(null);
 
   const filteredChildren = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -129,19 +131,28 @@ export function ComponentDetail() {
     ? `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`
     : `/project/${encodeURIComponent(projectId)}`;
 
-  const addVariant = async () => {
+  const addVariant = () => {
     if (!component || !activeVariant || creatingVariant) return;
-    setCreatingVariant(true);
-    try {
-      const created = await duplicateVariant({
-        componentId: component.id,
-        sourceVariantId: activeVariant.id,
-        name: `Variant ${variants.length + 1}`,
-      });
-      await setActiveVariant(component.id, created.id);
-    } finally {
-      setCreatingVariant(false);
-    }
+    const sourceComponent = component;
+    const sourceVariant = activeVariant;
+    versionModeRef.current?.open({
+      title: "New version",
+      message: "How should child components behave in the new version?",
+      onSelect: async (mode) => {
+        setCreatingVariant(true);
+        try {
+          const created = await duplicateVariant({
+            componentId: sourceComponent.id,
+            sourceVariantId: sourceVariant.id,
+            name: `Variant ${variants.length + 1}`,
+            mode,
+          });
+          await setActiveVariant(sourceComponent.id, created.id);
+        } finally {
+          setCreatingVariant(false);
+        }
+      },
+    });
   };
 
   const removeLinkedReference = (referenceId: string) => {
@@ -387,6 +398,7 @@ export function ComponentDetail() {
         }}
       />
       <ConfirmActionModal ref={confirmRef} />
+      <VersionModeModal ref={versionModeRef} />
       <AddReferenceModal
         ref={addRefModalRef}
         projectId={project?.id ?? null}

@@ -1,14 +1,23 @@
 import {
+  buildMasterResolver,
   htmlCanvasDocumentFromJSON,
+  resolveInstances,
   svgForHtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
+import { peekTable } from "@/lib/storage/recordStore";
+import { TABLES } from "@/lib/storage/storeKeys";
+import type { SceneRow } from "@/lib/storage/schema";
 
 const SVG_DATA_URL_PREFIX = "data:image/svg+xml;utf8,";
 
 export function snapshotDataUrlFromGraphJSON(graphJSON: string): string | null {
-  const document = htmlCanvasDocumentFromJSON(graphJSON);
-  if (!document) return null;
-  if (!hasSnapshotContent(document)) return null;
+  const parsed = htmlCanvasDocumentFromJSON(graphJSON);
+  if (!parsed) return null;
+  if (!hasSnapshotContent(parsed)) return null;
+
+  // Expand linked instances read-only so the thumbnail shows the master content,
+  // never an empty placeholder. Masters come from the synchronous scene cache.
+  const document = resolveInstances(parsed, buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)));
 
   const svg = svgForHtmlCanvasDocument(document);
   if (!svg) return null;

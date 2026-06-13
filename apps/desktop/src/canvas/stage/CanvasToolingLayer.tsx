@@ -23,6 +23,7 @@ import {
   type ViewportTransform,
   GROUP_FILL,
   HOVER_COLOR,
+  INSTANCE_SELECTION_COLOR,
   RADIUS_MIN_ELEMENT_SCREEN,
   SELECTION_COLOR,
   canvasRectToViewport,
@@ -407,8 +408,12 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           ? unionRects(selectedViewportRects)
           : null;
       const groupBox = groupRect ? rectToToolingBox(groupRect) : null;
-      const renderedSelectedBoxes =
-        !props.canvasStageActive && !isDragging ? selectedViewportBoxes : [];
+      const renderedSelected =
+        !props.canvasStageActive && !isDragging
+          ? visibleSelectedIds
+              .map((id) => ({ id, box: resolveBox(id) }))
+              .filter((entry): entry is { id: string; box: ToolingBox } => entry.box !== null)
+          : [];
 
       const canvasRect = props.canvasStageActive
         ? canvasRectToViewport(
@@ -468,7 +473,11 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           ? [{ rect: canvasBox?.rect ?? null, corners: canvasBox?.corners, color: SELECTION_COLOR }]
           : [
               { rect: groupBox?.rect ?? null, corners: groupBox?.corners, color: SELECTION_COLOR, fill: GROUP_FILL },
-              ...renderedSelectedBoxes.map((box) => ({ rect: box.rect, corners: box.corners, color: SELECTION_COLOR })),
+              ...renderedSelected.map(({ id, box }) => ({
+                rect: box.rect,
+                corners: box.corners,
+                color: doc.elements[id]?.instanceOf ? INSTANCE_SELECTION_COLOR : SELECTION_COLOR,
+              })),
               { rect: hoverBox?.rect ?? hoverRect, corners: hoverBox?.corners, color: HOVER_COLOR },
             ],
         resizeBox: props.canvasStageActive

@@ -2,7 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
-import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLock, IconOpenCanvas, IconUnlock } from "@/components/icons";
+import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLink, IconLock, IconOpenCanvas, IconUnlink, IconUnlock } from "@/components/icons";
 
 export function TreeRow({
   node,
@@ -19,6 +19,8 @@ export function TreeRow({
   showFocusButton,
   onFocusNode,
   onContextMenuNode,
+  onGoToInstance,
+  onDetachNode,
 }: {
   node: Node;
   depth: number;
@@ -34,6 +36,10 @@ export function TreeRow({
   showFocusButton?: boolean;
   onFocusNode?: (nodeId: string) => void;
   onContextMenuNode?: (nodeId: string, x: number, y: number) => void;
+  // Linked instance actions. onGoToInstance opens the master variant; onDetachNode
+  // breaks the link, turning the instance into editable own content.
+  onGoToInstance?: (variantId: string) => void;
+  onDetachNode?: (nodeId: string) => void;
 }) {
   const {
     attributes,
@@ -50,8 +56,15 @@ export function TreeRow({
   const locked = node.locked === true;
   const canOpenCanvas = Boolean(onOpenNodeCanvas && (canOpenNodeCanvas?.(node.id) ?? false));
   const canFocus = Boolean(showFocusButton && onFocusNode);
+  const isLinked = node.linked === true;
 
-  const baseColor = isSelected ? "#FFFFFF" : "#CFCFCF";
+  const baseColor = isLinked
+    ? isSelected
+      ? "#D9C9FF"
+      : "#B69CFF"
+    : isSelected
+      ? "#FFFFFF"
+      : "#CFCFCF";
 
   return (
     <>
@@ -157,6 +170,36 @@ export function TreeRow({
             <IconOpenCanvas size={12} strokeWidth={1.8} />
           </button>
         ) : null}
+        {isLinked && onGoToInstance && node.instanceVariantId ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGoToInstance(node.instanceVariantId!);
+            }}
+            aria-label="Go to component"
+            title="Go to component"
+            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#B69CFF] hover:bg-[#2A2A2A] hover:text-[#D9C9FF]"
+            style={{ opacity: 0.85 }}
+          >
+            <IconLink size={12} strokeWidth={1.8} />
+          </button>
+        ) : null}
+        {isLinked && onDetachNode ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDetachNode(node.id);
+            }}
+            aria-label="Detach instance"
+            title="Detach instance"
+            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#B69CFF] hover:bg-[#2A2A2A] hover:text-[#D9C9FF]"
+            style={{ opacity: 0.85 }}
+          >
+            <IconUnlink size={12} strokeWidth={1.8} />
+          </button>
+        ) : null}
         {onToggleLocked ? (
           <button
             type="button"
@@ -212,6 +255,8 @@ export function TreeRow({
               showFocusButton={showFocusButton}
               onFocusNode={onFocusNode}
               onContextMenuNode={onContextMenuNode}
+              onGoToInstance={onGoToInstance}
+              onDetachNode={onDetachNode}
             />
           ))
         : null}

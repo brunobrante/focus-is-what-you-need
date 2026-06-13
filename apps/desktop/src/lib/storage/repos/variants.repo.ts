@@ -1,6 +1,7 @@
 import type { ComponentVariant } from "@/lib/data/types";
 import { newId, now } from "@/lib/storage/ids";
-import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { listChildrenOfVariant } from "@/lib/storage/repos/components.repo";
+import { getSceneByOwner, linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import type { VariantRow } from "@/lib/storage/schema";
 import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
@@ -68,16 +69,21 @@ export async function createVariant(input: {
 }
 
 /**
- * Create a new variant that is a copy of an existing one — the "save current as
- * a new version" flow. The source variant's scene graph is duplicated verbatim
- * into the new variant's own scene. Node ids are scene-scoped, so a verbatim
- * copy is safe for a sibling variant (no parent placement to reconcile). Child
- * component rows nested under the source variant are NOT deep-cloned (follow-up).
+ * Create a new variant that is a version of an existing one — the "save current as
+ * a new version" flow. Two modes:
+ *
+ *  - "copy" (default): the source scene graph is duplicated verbatim. Node ids are
+ *    scene-scoped, so a verbatim copy is safe for a sibling variant.
+ *  - "linked": the frame and non-component content are copied, but every child
+ *    component is collapsed into a linked instance pointing at the original child
+ *    master (see linkifyChildComponentsInGraph). Editing a master then reflects in
+ *    this version too.
  */
 export async function duplicateVariant(input: {
   componentId: string;
   sourceVariantId: string;
   name: string;
+  mode?: "copy" | "linked";
 }): Promise<VariantRow> {
   const created = await createVariant({
     componentId: input.componentId,
@@ -85,12 +91,22 @@ export async function duplicateVariant(input: {
   });
   const sourceScene = await getSceneByOwner("variant", input.sourceVariantId);
   if (sourceScene) {
+    let graphJSON = sourceScene.graphJSON;
+    if (input.mode === "linked") {
+      const children = await listChildrenOfVariant(input.sourceVariantId);
+      const linked = linkifyChildComponentsInGraph(
+        graphJSON,
+        children.map((c) => ({
+          id: c.id,
+          activeVariantId: c.activeVariantId,
+          sourceNodeId: c.sourceNodeId ?? null,
+          name: c.name,
+        })),
+      );
+      if (linked) graphJSON = linked;
+    }
     await upsertScene(
-      {
-        ownerType: "variant",
-        ownerId: created.id,
-        graphJSON: sourceScene.graphJSON,
-      },
+      { ownerType: "variant", ownerId: created.id, graphJSON },
       { propagate: false },
     );
   }

@@ -15,6 +15,8 @@ import type { ToolingBoxCommand } from "./toolingRenderAdapter";
 export type { ViewportTransform } from "@/canvas/engine/viewport";
 
 export const SELECTION_COLOR = "#0d99ff";
+// Linked instances select in purple to distinguish them from editable content.
+export const INSTANCE_SELECTION_COLOR = "#9b6dff";
 export const HOVER_COLOR = "rgba(13, 153, 255, 0.55)";
 export const GROUP_FILL = "rgba(13, 153, 255, 0.06)";
 const GUIDE_COLOR = "#ff2ca8";
