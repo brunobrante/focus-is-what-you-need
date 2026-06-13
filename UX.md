@@ -261,6 +261,18 @@ Full-screen visual editor with floating UI layers.
 - Zoom controls: `−` | percentage display | `+`
 - Back-to-parent control (visible when editing inside a component)
 
+**Canvas zoom & pan model:**
+- Minimum zoom is `1x` (100%); maximum is `25x` for screens/components (`250x` in the freeform draft canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel (which zooms toward the cursor).
+- Panning and zooming clamp to the **navigable region**: by default the edited subject, but when the screen simulator is on it grows to include the whole device frame (see below).
+- **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device.
+- **Once zoomed in past 100%** (the region overflowing) panning gains over-scroll: the camera can travel until **any edge of the region reaches the viewport center** (≈ half the scaled region in each direction). Panning stops there — the region can never be pushed entirely past center into one half. Pan via space-drag or two-finger/wheel scroll.
+- On window resize (or when the overlay/alignment changes) the camera re-centers on the **navigable region's center**.
+
+**Screen simulator** (bottom-left of the canvas, visible only when editing a component):
+- A toggle button (phone/monitor icon) overlays a translucent **device frame** around the component as a visual guide, and expands the navigable region to the device so the whole device can be scrolled into view (the component itself still renders 1:1). Enabling it **frames the device** — fit and centered at ~100% zoom, exactly like opening the screen; disabling it refits the component. A chevron opens an alignment menu:
+  - **Centralizado (center)** — the device frame is drawn symmetrically around the component, and the camera centers on it (component stays centered).
+  - **Local original (origin)** — the device frame is placed so the component sits at its **real position on the device**. The **device** centers itself in the viewport, so the component sits off-center where it actually lives; you zoom and scroll across the device to reach it.
+
 **Actions panel** (expands above the toolbar):
 - Search bar
 - Filter tabs: All | Assets | Plugins

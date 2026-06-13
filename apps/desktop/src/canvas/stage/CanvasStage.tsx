@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { CSSProperties } from "react";
 import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
 import { useEditor, useHoverStore } from "@/canvas/engine/store";
-import type { CanvasDocument, Point } from "@/canvas/engine/types";
+import type { CanvasDocument, Point, Rect } from "@/canvas/engine/types";
 import type { CanvasToolId } from "@/canvas/tools";
 import { isInsertTool } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -101,23 +101,34 @@ export function CanvasStage({
     [state.document.canvas.height, state.document.canvas.width],
   );
 
-  // The camera focus point drives re-centering on resize and overlay changes
-  // (handled in useViewportControls). The device overlay is a purely visual
-  // guide, so:
-  //  - "center" alignment keeps the component centered (the device is drawn
-  //    symmetrically around it), so the focus stays the component center.
-  //  - "origin" alignment centers the DEVICE overlay itself; the component then
-  //    sits at its real offset inside that centered device.
-  const viewportFocusPoint = useMemo<Point | null>(() => {
-    if (!screenOverlay) return null;
-    if (screenOverlay.alignment === "origin" && screenOverlay.originPosition) {
-      return {
-        x: screenOverlay.width / 2 - screenOverlay.originPosition.x,
-        y: screenOverlay.height / 2 - screenOverlay.originPosition.y,
-      };
-    }
-    return { x: canvasSize.width / 2, y: canvasSize.height / 2 };
-  }, [screenOverlay, canvasSize.width, canvasSize.height]);
+  // The navigable region is what the camera can pan/zoom across: the edited
+  // component by default, or the union of the component and its device overlay
+  // when the overlay is on. With the overlay on, the device frame extends beyond
+  // the component, so the navigable region grows to the device — that is what
+  // makes the whole device scrollable while the component itself is rendered 1:1.
+  const overlayRect = useMemo<Rect | null>(
+    () => (!draftMode && screenOverlay ? screenOverlayRectInCanvas(screenOverlay, canvasSize) : null),
+    [draftMode, screenOverlay, canvasSize.width, canvasSize.height],
+  );
+  // The region the camera may pan/zoom across. It is null when there is no device
+  // overlay — the camera then falls back to the component bounds everywhere — and
+  // the union of the component and the device frame when the simulator is on. A
+  // non-null value is therefore exactly the signal "the overlay is active".
+  const navigableBounds = useMemo<Rect | null>(() => {
+    if (!overlayRect) return null;
+    return unionRect({ x: 0, y: 0, width: canvasSize.width, height: canvasSize.height }, overlayRect);
+  }, [overlayRect, canvasSize.width, canvasSize.height]);
+
+  // The camera focus point drives re-centering/reframing (handled in
+  // useViewportControls). It centers the navigable region, so:
+  //  - with no overlay it is the component center (component stays centered);
+  //  - in "origin" alignment the navigable region is the device, so the DEVICE
+  //    centers itself and the component sits off-center at its real device
+  //    position — you then zoom/scroll across the device to reach it.
+  const viewportFocusPoint = useMemo<Point>(() => {
+    const region = navigableBounds ?? { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height };
+    return { x: region.x + region.width / 2, y: region.y + region.height / 2 };
+  }, [navigableBounds, canvasSize.width, canvasSize.height]);
 
   const {
     textEdit,
@@ -161,6 +172,7 @@ export function CanvasStage({
     viewportInitializedSubjectRef,
     settings,
     viewportFocusPoint,
+    navigableBounds,
   });
 
   // Focus request from the canvas tree: move the camera to frame a node without
@@ -279,6 +291,7 @@ export function CanvasStage({
     syncTextSelection,
     scheduleCanvasAlignmentLog,
     settings,
+    navigableBounds,
   });
 
   const affectedElementIds = useMemo(
@@ -367,15 +380,10 @@ export function CanvasStage({
         className={`stage-space${draftMode ? " stage-space--draft" : ""}`}
         style={stageSpaceStyle}
       >
-        {!draftMode && screenOverlay ? (
+        {screenOverlay && overlayRect ? (
           <ScreenBoundsOverlay
-            screenWidth={screenOverlay.width}
-            screenHeight={screenOverlay.height}
+            rect={overlayRect}
             borderRadius={screenOverlay.borderRadius}
-            alignment={screenOverlay.alignment}
-            originPosition={screenOverlay.originPosition}
-            canvasWidth={stageWidth}
-            canvasHeight={stageHeight}
             renderScale={renderScale}
           />
         ) : null}
@@ -477,40 +485,54 @@ export function CanvasStage({
   );
 }
 
+// The device overlay's bounds in canvas space (same units as the component):
+//  - "center": the device is drawn symmetrically around the component;
+//  - "origin": the device is placed so the component sits at its real position
+//    on the device (i.e. the device's top-left is `-originPosition`).
+// This is the single source of truth for where the device sits — reused both to
+// draw the overlay and to compute the navigable region the camera pans across.
+export function screenOverlayRectInCanvas(overlay: ScreenOverlay, canvasSize: { width: number; height: number }): Rect {
+  if (overlay.alignment === "origin") {
+    return {
+      x: -(overlay.originPosition?.x ?? 0),
+      y: -(overlay.originPosition?.y ?? 0),
+      width: overlay.width,
+      height: overlay.height,
+    };
+  }
+  return {
+    x: (canvasSize.width - overlay.width) / 2,
+    y: (canvasSize.height - overlay.height) / 2,
+    width: overlay.width,
+    height: overlay.height,
+  };
+}
+
+function unionRect(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  const width = Math.max(a.x + a.width, b.x + b.width) - x;
+  const height = Math.max(a.y + a.height, b.y + b.height) - y;
+  return { x, y, width, height };
+}
+
 function ScreenBoundsOverlay({
-  screenWidth,
-  screenHeight,
+  rect,
   borderRadius,
-  alignment,
-  originPosition,
-  canvasWidth,
-  canvasHeight,
   renderScale,
 }: {
-  screenWidth: number;
-  screenHeight: number;
+  rect: Rect;
   borderRadius: number;
-  alignment: "center" | "origin";
-  originPosition: { x: number; y: number } | null;
-  canvasWidth: number;
-  canvasHeight: number;
   renderScale: number;
 }) {
-  const left = alignment === "center"
-    ? ((canvasWidth - screenWidth) / 2) * renderScale
-    : -(originPosition?.x ?? 0) * renderScale;
-  const top = alignment === "center"
-    ? ((canvasHeight - screenHeight) / 2) * renderScale
-    : -(originPosition?.y ?? 0) * renderScale;
-
   return (
     <div
       style={{
         position: "absolute",
-        left,
-        top,
-        width: screenWidth * renderScale,
-        height: screenHeight * renderScale,
+        left: rect.x * renderScale,
+        top: rect.y * renderScale,
+        width: rect.width * renderScale,
+        height: rect.height * renderScale,
         borderRadius: borderRadius * renderScale,
         background: "rgba(255,255,255,0.03)",
         border: "1px solid rgba(255,255,255,0.07)",

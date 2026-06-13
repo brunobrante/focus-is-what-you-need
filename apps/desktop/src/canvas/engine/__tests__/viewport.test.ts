@@ -14,6 +14,7 @@ import {
   clampViewportState,
   createViewportTransform,
   getCanvasDisplayScale,
+  getFitZoomForRegion,
   getInitialZoomForCanvas,
   getInitialZoomForSubjectSize,
   screenDeltaToWorldDelta,
@@ -75,6 +76,99 @@ test("clamps zoomed component viewports to the subject bounds", () => {
   expect(viewport.zoom).toBe(4);
   expect(viewport.offsetX).toBeGreaterThan(24);
   expect(viewport.offsetY).toBeGreaterThan(24);
+});
+
+test("lets a zoomed-in frame over-scroll until any edge reaches the viewport center", () => {
+  // An ~800px frame that fits the viewport at 1x; zoom in so it overflows.
+  const container = { width: 900, height: 900 };
+  const canvas = { width: 390, height: 800 };
+  const zoom = 1.2;
+  const displayZoom = zoom; // displayScale is 1: the frame fits the padded width.
+  const scaledHeight = canvas.height * displayZoom; // 960 > padded 852 → overflow.
+
+  // Pan up as far as possible: the top edge (docY 0) must reach the center line.
+  const pannedUp = clampViewportState({ zoom, offsetX: 0, offsetY: 9999 }, container, canvas);
+  expect(pannedUp.offsetY).toBeCloseTo(container.height / 2); // top edge at center
+  // ...and far beyond the old edge-to-padding stop (24px).
+  expect(pannedUp.offsetY).toBeGreaterThan(100);
+
+  // Pan down as far as possible: the bottom edge must reach the center line.
+  const pannedDown = clampViewportState({ zoom, offsetX: 0, offsetY: -9999 }, container, canvas);
+  expect(pannedDown.offsetY + scaledHeight).toBeCloseTo(container.height / 2); // bottom edge at center
+
+  // The frame can never be pushed entirely past the center into one half.
+  expect(pannedUp.offsetY).toBeLessThanOrEqual(container.height / 2 + 1e-6);
+});
+
+test("scrolls across the whole device overlay to reach a component placed on it", () => {
+  // A small header component placed at (24, 60) on a 390x844 phone. With the
+  // device overlay in "origin" alignment the navigable region is the device,
+  // which extends far beyond the component.
+  const container = { width: 900, height: 900 };
+  const canvas = { width: 342, height: 72 };
+  const device = { x: -24, y: -60, width: 390, height: 844 };
+  const zoom = 2;
+  const dz = zoom; // displayScale is 1 (the component fits the padded width).
+
+  // The device's top edge can be panned to the viewport center...
+  const top = clampViewportState({ zoom, offsetX: 0, offsetY: 99999 }, container, canvas, false, "frame", device);
+  expect(top.offsetY + device.y * dz).toBeCloseTo(container.height / 2);
+  // ...and its bottom edge too.
+  const bottom = clampViewportState({ zoom, offsetX: 0, offsetY: -99999 }, container, canvas, false, "frame", device);
+  expect(bottom.offsetY + (device.y + device.height) * dz).toBeCloseTo(container.height / 2);
+
+  // The component (element) center is reachable somewhere within that range.
+  const offsetToCenterElement = container.height / 2 - (canvas.height / 2) * dz;
+  expect(offsetToCenterElement).toBeGreaterThanOrEqual(bottom.offsetY - 1e-6);
+  expect(offsetToCenterElement).toBeLessThanOrEqual(top.offsetY + 1e-6);
+
+  // Without the device bounds the component is locked centered — the rest of the
+  // device is simply unreachable. The device bounds are what unlock the scroll.
+  const lockedToComponent = clampViewportState({ zoom, offsetX: 0, offsetY: 99999 }, container, canvas, false, "frame");
+  expect(lockedToComponent.offsetY).toBeCloseTo(offsetToCenterElement);
+});
+
+test("re-centers the device overlay at 100% and only allows scroll once zoomed in", () => {
+  const container = { width: 1000, height: 640 }; // shorter than the 844 device
+  const canvas = { width: 342, height: 72 };
+  const device = { x: -24, y: -386, width: 390, height: 844 };
+
+  // At minimum zoom the device snaps to centered regardless of the requested pan
+  // (no scroll slack) — zooming back out to 100% always re-centers.
+  const up = clampViewportState({ zoom: MIN_ZOOM, offsetX: 0, offsetY: 99999 }, container, canvas, false, "frame", device);
+  const down = clampViewportState({ zoom: MIN_ZOOM, offsetX: 0, offsetY: -99999 }, container, canvas, false, "frame", device);
+  expect(up.offsetY).toBeCloseTo(down.offsetY);
+  const deviceCenterY = device.y + device.height / 2;
+  expect(up.offsetY + deviceCenterY * MIN_ZOOM).toBeCloseTo(container.height / 2);
+
+  // Once zoomed in, the same device is free to scroll (the two extremes differ).
+  const zUp = clampViewportState({ zoom: 2, offsetX: 0, offsetY: 99999 }, container, canvas, false, "frame", device);
+  const zDown = clampViewportState({ zoom: 2, offsetX: 0, offsetY: -99999 }, container, canvas, false, "frame", device);
+  expect(Math.abs(zUp.offsetY - zDown.offsetY)).toBeGreaterThan(1);
+
+  // Scroll unlocks *immediately* above 100% — centering is only exactly at the
+  // floor, not a band around it — so a small zoom-in doesn't snap back to center.
+  const aUp = clampViewportState({ zoom: 1.001, offsetX: 0, offsetY: 99999 }, container, canvas, false, "frame", device);
+  const aDown = clampViewportState({ zoom: 1.001, offsetX: 0, offsetY: -99999 }, container, canvas, false, "frame", device);
+  expect(Math.abs(aUp.offsetY - aDown.offsetY)).toBeGreaterThan(1);
+});
+
+test("frames the device overlay fully visible at ~100% in a normal viewport", () => {
+  const component = { width: 342, height: 72 };
+  const device = { width: 390, height: 844 };
+
+  // A roomy editor viewport: the phone-sized device fits at 1x (100%), so the
+  // screen simulator shows the device fully, exactly like opening the screen.
+  const roomy = { width: 1400, height: 900 };
+  const zoom = getFitZoomForRegion(roomy, device, component);
+  expect(zoom).toBe(MIN_ZOOM);
+  const displayScale = getCanvasDisplayScale(roomy, component); // component is 1:1 here
+  expect(device.height * zoom * displayScale).toBeLessThanOrEqual(roomy.height - 48);
+
+  // A viewport shorter than the device can't fit it without dropping below 1x,
+  // so the fit clamps up to MIN_ZOOM (the device overflows and is panned).
+  const short = { width: 1000, height: 640 };
+  expect(getFitZoomForRegion(short, device, component)).toBe(MIN_ZOOM);
 });
 
 test("allows manual zoom beyond 1000 percent", () => {

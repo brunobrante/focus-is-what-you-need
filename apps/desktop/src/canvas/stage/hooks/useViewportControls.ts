@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { MutableRefObject, WheelEvent as ReactWheelEvent } from "react";
-import type { EditorState, Point } from "@/canvas/engine/types";
+import type { EditorState, Point, Rect } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import { clamp } from "@/canvas/engine/geometry";
@@ -10,6 +10,7 @@ import {
   clampViewportState,
   createViewportTransform,
   getCanvasDisplayScale,
+  getFitZoomForRegion,
   getInitialZoomForCanvas,
   getInitialZoomForSubjectSize,
   getViewportZoomLimits,
@@ -36,6 +37,11 @@ type Params = {
   // resized or this target changes (e.g. the device overlay center in "origin"
   // mode). When null, the subject's own center is used.
   viewportFocusPoint?: Point | null;
+  // The region the camera may pan/zoom across, in canvas space: the component
+  // plus its device overlay when the screen simulator is on, or null when it is
+  // off (the camera then falls back to the component bounds everywhere). Offsets
+  // are clamped against this so the whole device can be scrolled into view.
+  navigableBounds?: Rect | null;
 };
 
 export function useViewportControls({
@@ -49,6 +55,7 @@ export function useViewportControls({
   viewportInitializedSubjectRef,
   settings = DEFAULT_GLOBAL_SETTINGS,
   viewportFocusPoint = null,
+  navigableBounds,
 }: Params) {
   useEffect(() => {
     const el = viewportRef.current;
@@ -122,15 +129,25 @@ export function useViewportControls({
     viewportSubjectKey,
   ]);
 
-  // Re-center the camera (keeping the user's current zoom) whenever the viewport
-  // is resized — by the browser window or the Tauri shell — or whenever the
-  // focus target changes (e.g. the device overlay center in "origin" mode). The
+  // Re-frame the camera whenever the viewport is resized — by the browser window
+  // or the Tauri shell — or whenever the navigable region changes (its center
+  // moves, or it grows/shrinks because the screen simulator was toggled). The
   // init effect above is gated by a subject key that ignores viewport size and
-  // focus, so it would otherwise early-return and leave content drifted.
+  // the overlay, so it would otherwise early-return and leave content drifted.
   const focusX = viewportFocusPoint?.x ?? null;
   const focusY = viewportFocusPoint?.y ?? null;
+  const navWidth = navigableBounds?.width ?? null;
+  const navHeight = navigableBounds?.height ?? null;
   const recenterRef = useRef<
-    { subjectKey: string; width: number; height: number; focusX: number | null; focusY: number | null } | null
+    {
+      subjectKey: string;
+      width: number;
+      height: number;
+      focusX: number | null;
+      focusY: number | null;
+      navWidth: number | null;
+      navHeight: number | null;
+    } | null
   >(null);
   useLayoutEffect(() => {
     const canvasSize = getCanvasSize(state.document);
@@ -147,13 +164,21 @@ export function useViewportControls({
       height: viewportSize.height,
       focusX,
       focusY,
+      navWidth,
+      navHeight,
     };
     // First time we see this subject (right after init centered it) — record the
-    // baseline and do nothing, so we only react to genuine resizes/focus changes.
+    // baseline and do nothing, so we only react to genuine resizes/region changes.
     if (!prev || prev.subjectKey !== subjectKey) return;
     const sizeChanged = prev.width !== viewportSize.width || prev.height !== viewportSize.height;
     const focusChanged = prev.focusX !== focusX || prev.focusY !== focusY;
-    if (!sizeChanged && !focusChanged) return;
+    const navResized = prev.navWidth !== navWidth || prev.navHeight !== navHeight;
+    if (!sizeChanged && !focusChanged && !navResized) return;
+
+    const focus =
+      focusX !== null && focusY !== null
+        ? { x: focusX, y: focusY }
+        : { x: canvasSize.width / 2, y: canvasSize.height / 2 };
 
     let next;
     if (state.viewportMode === "draft") {
@@ -166,11 +191,18 @@ export function useViewportControls({
         offsetX: state.offsetX + (viewportSize.width - prev.width) / 2,
         offsetY: state.offsetY + (viewportSize.height - prev.height) / 2,
       };
+    } else if (navResized) {
+      // The navigable region changed size — the screen simulator was toggled.
+      // Frame it like opening a screen and center it: when the simulator is on (a
+      // region is present) fit the whole device so it shows at ~100%; when it is
+      // off, refit the component with its normal opening zoom. Plain
+      // resizes/recenters (below) keep the user's current zoom.
+      const zoom =
+        navWidth !== null && navHeight !== null
+          ? getFitZoomForRegion(viewportSize, { width: navWidth, height: navHeight }, canvasSize, state.viewportMode)
+          : getInitialZoomForCanvas(viewportSize, canvasSize, state.viewportMode);
+      next = centerViewportOnPoint(zoom, viewportSize, canvasSize, focus, state.viewportMode);
     } else {
-      const focus =
-        focusX !== null && focusY !== null
-          ? { x: focusX, y: focusY }
-          : { x: canvasSize.width / 2, y: canvasSize.height / 2 };
       next = centerViewportOnPoint(state.zoom, viewportSize, canvasSize, focus, state.viewportMode);
     }
 
@@ -181,6 +213,8 @@ export function useViewportControls({
     dispatch,
     focusX,
     focusY,
+    navWidth,
+    navHeight,
     state.document.canvas.height,
     state.document.canvas.width,
     state.offsetX,
@@ -220,11 +254,16 @@ export function useViewportControls({
         canvasHeight: canvasSize.height,
       });
       const cursorCanvas = viewportPointToCanvas(cursor, currentTransform);
+      // Anchor the zoom under the cursor, clamped to the navigable region so you
+      // can zoom into any part of it (the whole device when the simulator is on),
+      // not just the component — otherwise zooming over the device area snaps the
+      // anchor to the component edge and the view lurches toward center.
+      const anchorBounds = navigableBounds ?? { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height };
       const clampedCursorCanvas = state.viewportMode === "draft"
         ? cursorCanvas
         : {
-            x: clamp(cursorCanvas.x, 0, canvasSize.width),
-            y: clamp(cursorCanvas.y, 0, canvasSize.height),
+            x: clamp(cursorCanvas.x, anchorBounds.x, anchorBounds.x + anchorBounds.width),
+            y: clamp(cursorCanvas.y, anchorBounds.y, anchorBounds.y + anchorBounds.height),
           };
       const nextBaseTransform = createViewportTransform({
         displayZoom: nextDisplayZoom,
@@ -240,7 +279,7 @@ export function useViewportControls({
       nextViewport = { zoom: state.zoom, offsetX: state.offsetX - event.deltaX, offsetY: state.offsetY - event.deltaY };
     }
 
-    const clampedViewport = clampViewportState(nextViewport, containerSize, canvasSize, false, state.viewportMode);
+    const clampedViewport = clampViewportState(nextViewport, containerSize, canvasSize, false, state.viewportMode, navigableBounds);
     if (viewportChanged(clampedViewport, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
       dispatch({ type: "setViewport", zoom: clampedViewport.zoom, offsetX: clampedViewport.offsetX, offsetY: clampedViewport.offsetY });
     }

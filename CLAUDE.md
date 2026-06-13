@@ -285,7 +285,16 @@ Zoom must respect that model:
 
 - the minimum user zoom is `1x` (`100%`)
 - users must not be able to zoom out below `1x`
-- zooming and panning must stay clamped to the opened subject's bounds
+- zooming and panning must stay clamped to the opened subject's bounds (or, with
+  the screen simulator on, the larger navigable region that includes the device
+  frame), following two rules:
+  - at the minimum zoom (`1x`) the region is always centered with no scroll slack,
+    whether it fits or overflows — so zooming back out to `1x` always re-centers.
+  - once zoomed in past `1x` and the region overflows, panning may over-scroll
+    until any edge of the region reaches the viewport center — about half the
+    scaled region of slack in each direction — so the top/bottom/left/right can be
+    brought into centered view. The region can never be panned entirely past
+    center into one half.
 - the maximum user zoom is `25x` (`2500%`)
 
 Opening a full screen should start at `1x` user zoom.

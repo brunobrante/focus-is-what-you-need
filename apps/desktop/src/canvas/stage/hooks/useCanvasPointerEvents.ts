@@ -69,6 +69,10 @@ type Params = {
   syncTextSelection: (start: number, end: number, anchor?: number) => void;
   scheduleCanvasAlignmentLog: (input: CanvasAlignmentLogInput) => void;
   settings?: GlobalSettings;
+  // The region the camera may pan across: the component + device overlay when the
+  // screen simulator is on, or null when off. Threaded to the pan handler so
+  // space/middle-drag panning can reach the whole device, not just the component.
+  navigableBounds?: Rect | null;
 };
 
 export type CanvasPointerEventsResult = {
@@ -103,6 +107,7 @@ export function useCanvasPointerEvents({
   syncTextSelection,
   scheduleCanvasAlignmentLog,
   settings = DEFAULT_GLOBAL_SETTINGS,
+  navigableBounds,
 }: Params): CanvasPointerEventsResult {
   const dropTargetRef = useRef<CanvasDropTarget | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
@@ -317,7 +322,7 @@ export function useCanvasPointerEvents({
     }
 
     if (interaction.pointerId !== event.pointerId) return;
-    if (interaction.type === "pan") { handlePanMove(interaction, event, state.document, getCurrentViewportSize, dispatch); return; }
+    if (interaction.type === "pan") { handlePanMove(interaction, event, state.document, getCurrentViewportSize, dispatch, navigableBounds); return; }
 
     const point = getCanvasPoint(event);
     if (!point) return;

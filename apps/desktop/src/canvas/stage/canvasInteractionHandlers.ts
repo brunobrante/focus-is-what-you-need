@@ -87,13 +87,14 @@ export function handlePanMove(
   document: CanvasDocument,
   getCurrentViewportSize: () => Size,
   dispatch: Dispatch,
+  navigableBounds?: Rect | null,
 ): void {
   const raw = {
     zoom: interaction.zoom,
     offsetX: interaction.startOffsetX + event.clientX - interaction.startScreenPoint.x,
     offsetY: interaction.startOffsetY + event.clientY - interaction.startScreenPoint.y,
   };
-  const next = clampViewportState(raw, getCurrentViewportSize(), getCanvasSize(document), false, interaction.viewportMode);
+  const next = clampViewportState(raw, getCurrentViewportSize(), getCanvasSize(document), false, interaction.viewportMode, navigableBounds);
   interaction.moved =
     interaction.moved ||
     Math.hypot(event.clientX - interaction.startScreenPoint.x, event.clientY - interaction.startScreenPoint.y) > 0.5;

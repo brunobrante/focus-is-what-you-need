@@ -127,44 +127,103 @@ export function getInitialZoomForSubjectSize(
   return quantizeZoom(subjectZoom, "frame");
 }
 
+// Clamp one axis of the camera offset so the navigable region stays reachable.
+// `rectStart`/`rectLength` describe the navigable region on this axis in canvas
+// space — the edited component by default, or a larger region (e.g. the device
+// overlay that extends beyond the component) when one is supplied. `displayZoom`
+// maps canvas units to screen pixels, so the region's near edge lands at
+// `rectStart * displayZoom` when the offset is 0.
+//
+//   - When the region fits the viewport it is centered (or, while the canvas is
+//     being freely positioned, kept within the padding gutter).
+//   - Once the region overflows, the offset is free to travel until either edge
+//     of the region reaches the viewport center — half the scaled region of
+//     over-scroll in each direction. This is what lets you scroll the very
+//     top/bottom (or left/right) of a frame — or the whole device overlay — into
+//     comfortable, centered view. The centered position is the midpoint of this
+//     range, which strictly contains the old edge-to-padding bounds.
+function clampAxisOffset(
+  rawOffset: number,
+  containerLength: number,
+  rectStart: number,
+  rectLength: number,
+  displayZoom: number,
+  preserveOffset: boolean,
+  centerOnly: boolean,
+): number {
+  const scaled = rectLength * displayZoom;
+  const startScreen = rectStart * displayZoom;
+  const padded = Math.max(0, containerLength - STAGE_VIEWPORT_PADDING * 2);
+  const centered = containerLength / 2 - startScreen - scaled / 2;
+  if (scaled <= padded) {
+    if (preserveOffset) {
+      return clamp(
+        rawOffset,
+        STAGE_VIEWPORT_PADDING - startScreen,
+        containerLength - STAGE_VIEWPORT_PADDING - startScreen - scaled,
+      );
+    }
+    return centered;
+  }
+  // Overflowing. At the minimum zoom the region snaps to centered (symmetric
+  // overflow) — matching how a screen sits at 100% — so zooming back out to 100%
+  // always re-centers and there is no scroll slack. Once zoomed in past 100% the
+  // offset is free to travel until either edge reaches the viewport center.
+  if (centerOnly) return centered;
+  return clamp(rawOffset, containerLength / 2 - startScreen - scaled, containerLength / 2 - startScreen);
+}
+
+// User zoom that fits an arbitrary region (e.g. the whole device overlay) into
+// the viewport and centers it, given that the projection's display scale is
+// still derived from the component canvas — not the region. This is what frames
+// the device when the screen simulator is enabled: the device shows fully
+// visible at ~100% zoom, exactly like opening the screen, while the component
+// remains the 1:1 projection subject. In a viewport smaller than the device the
+// fit would fall below 1x, so it clamps up to MIN_ZOOM (the device then overflows
+// and is panned, matching how an oversized screen behaves).
+export function getFitZoomForRegion(
+  containerSize: Size,
+  regionSize: Size,
+  canvasSize: Size,
+  mode: ViewportMode = "frame",
+): number {
+  const displayScale = getCanvasDisplayScale(containerSize, canvasSize, mode);
+  const availableWidth = Math.max(1, containerSize.width - STAGE_VIEWPORT_PADDING * 2);
+  const availableHeight = Math.max(1, containerSize.height - STAGE_VIEWPORT_PADDING * 2);
+  const fitDisplayZoom =
+    Math.min(
+      availableWidth / Math.max(1, regionSize.width),
+      availableHeight / Math.max(1, regionSize.height),
+    ) * AUTO_ZOOM_FILL_RATIO;
+  return quantizeZoom(fitDisplayZoom / Math.max(displayScale, 0.0001), mode);
+}
+
 export function clampViewportState(
   viewport: ViewportState,
   containerSize: Size,
   canvasSize: Size,
   preserveSmallCanvasOffset = false,
   mode: ViewportMode = "frame",
+  navigableBounds?: Rect | null,
 ): ViewportState {
   // `zoom` is the user-facing zoom. `displayScale` is an internal fit scale used
   // so oversized subjects can still fit in the editor while the UI remains at
-  // 100% and zoom-out stays disabled.
+  // 100% and zoom-out stays disabled. Offsets are clamped against the navigable
+  // region — the component by default, or a larger region (the component plus its
+  // device overlay) when supplied — while `displayScale` always derives from the
+  // component so "1x" stays 1:1 for the edited component and the device frame
+  // simply overflows and is panned into view.
   const limits = getViewportZoomLimits(mode);
   const zoom = clamp(viewport.zoom, limits.min, limits.max);
   const displayScale = getCanvasDisplayScale(containerSize, canvasSize, mode);
   const displayZoom = zoom * displayScale;
-  const scaledWidth = canvasSize.width * displayZoom;
-  const scaledHeight = canvasSize.height * displayZoom;
-  const paddedWidth = Math.max(0, containerSize.width - STAGE_VIEWPORT_PADDING * 2);
-  const paddedHeight = Math.max(0, containerSize.height - STAGE_VIEWPORT_PADDING * 2);
-  const offsetX =
-    scaledWidth <= paddedWidth
-      ? preserveSmallCanvasOffset
-        ? clamp(viewport.offsetX, STAGE_VIEWPORT_PADDING, containerSize.width - scaledWidth - STAGE_VIEWPORT_PADDING)
-        : STAGE_VIEWPORT_PADDING + (paddedWidth - scaledWidth) / 2
-      : clamp(
-          viewport.offsetX,
-          containerSize.width - scaledWidth - STAGE_VIEWPORT_PADDING,
-          STAGE_VIEWPORT_PADDING,
-        );
-  const offsetY =
-    scaledHeight <= paddedHeight
-      ? preserveSmallCanvasOffset
-        ? clamp(viewport.offsetY, STAGE_VIEWPORT_PADDING, containerSize.height - scaledHeight - STAGE_VIEWPORT_PADDING)
-        : STAGE_VIEWPORT_PADDING + (paddedHeight - scaledHeight) / 2
-      : clamp(
-          viewport.offsetY,
-          containerSize.height - scaledHeight - STAGE_VIEWPORT_PADDING,
-          STAGE_VIEWPORT_PADDING,
-        );
+  const bounds = navigableBounds ?? { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height };
+  // Centering at the floor means *exactly* the minimum zoom (zoom-out clamps to
+  // it), not a band around it — otherwise small zoom-in steps just above 100%
+  // would keep snapping back to centered instead of anchoring under the cursor.
+  const atMinZoom = zoom <= limits.min + 1e-6;
+  const offsetX = clampAxisOffset(viewport.offsetX, containerSize.width, bounds.x, bounds.width, displayZoom, preserveSmallCanvasOffset, atMinZoom);
+  const offsetY = clampAxisOffset(viewport.offsetY, containerSize.height, bounds.y, bounds.height, displayZoom, preserveSmallCanvasOffset, atMinZoom);
   return { zoom, offsetX, offsetY };
 }
 
