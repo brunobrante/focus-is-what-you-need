@@ -36,7 +36,8 @@ export function PreviewShell({
   next,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const zoomCtl = useStepZoom(stageRef, { keyboard: true });
+  const contentRef = useRef<HTMLDivElement>(null);
+  const zoomCtl = useStepZoom(stageRef, { keyboard: true, contentRef });
   const [paneHover, setPaneHover] = useState(false);
   const [deviceActive, setDeviceActive] = useState(false);
   const [deviceId, setDeviceId] = useState(DEVICE_OPTIONS[0]?.id ?? "iphone-15");
@@ -44,7 +45,6 @@ export function PreviewShell({
   const [deviceMenuPos, setDeviceMenuPos] = useState<{ top: number; left: number } | null>(null);
   const deviceTriggerRef = useRef<HTMLButtonElement>(null);
   const deviceMenuRef = useRef<HTMLDivElement>(null);
-  const z = zoomCtl.zoom;
   const isZoomed = zoomCtl.index !== ZOOM_DEFAULT_IDX;
   const overlayHidden = isZoomed && !paneHover;
   const overlayClass = [
@@ -88,37 +88,26 @@ export function PreviewShell({
   return (
     <div
       ref={stageRef}
+      {...zoomCtl.panHandlers}
       onMouseEnter={() => setPaneHover(true)}
       onMouseLeave={() => setPaneHover(false)}
       className="relative flex flex-1 items-center justify-center overflow-hidden"
       style={{
         background:
           "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0) 0 0/22px 22px, var(--surface)",
+        cursor: zoomCtl.isPanning ? "grabbing" : zoomCtl.canPan ? "grab" : "default",
       }}
     >
-      <div
-        className={[
-          "absolute inset-0 flex items-center justify-center px-16 py-20",
-          isZoomed ? "overflow-auto" : "overflow-hidden",
-        ].join(" ")}
-      >
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-16 py-20">
         <div
-          className={[
-            "flex min-h-0 min-w-0 items-center justify-center",
-            isZoomed ? "min-h-full min-w-full p-24" : "max-h-[72%] max-w-full",
-          ].join(" ")}
+          ref={contentRef}
+          className="pointer-events-auto flex min-h-0 min-w-0 origin-center items-center justify-center max-h-full max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[72vh] [&_img]:max-w-full [&_img]:object-contain"
+          style={{
+            transform: zoomCtl.transform,
+            transition: zoomCtl.isPanning ? "none" : "transform 180ms",
+          }}
         >
-          <div
-            className={[
-              "flex min-h-0 min-w-0 origin-center items-center justify-center transition-transform duration-[180ms] [&_img]:object-contain",
-              isZoomed
-                ? "[&_img]:max-h-none [&_img]:max-w-none"
-                : "max-h-full max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[72vh] [&_img]:max-w-full",
-            ].join(" ")}
-            style={{ transform: `scale(${z})` }}
-          >
-            {children}
-          </div>
+          {children}
         </div>
       </div>
 

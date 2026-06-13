@@ -1,14 +1,22 @@
 import { clamp, intersectBox, boxFromPoints, boundsOfPoints } from "@/domain/canvas/geometry";
+import { clampPanToCenter } from "@/domain/zoom";
 import type { CropBox, ActiveSubject, ResizeHandle, RadiusHandle } from "./types";
 import { RADIUS_HANDLE_MIN_INSET } from "./types";
 import { MIN_TOOL_ZOOM, SELECTION_MIN_SIZE } from "../types";
 
 export { clamp };
 
+// Per-side gutter kept before a fitting axis unlocks panning (the old code baked
+// this in as a 64px total inset on the viewport).
+const TOOL_PAN_PADDING = 32;
+
 export function intersectCropBoxes(a: CropBox, b: CropBox): CropBox | null {
   return intersectBox(a, b);
 }
 
+// Edge-to-center over-scroll, shared with the canvas and the snapshot viewers
+// (see clampPanToCenter): once zoomed past 1x the image can be panned until any
+// edge reaches the viewport center, never past it.
 export function clampToolPan(
   pan: { x: number; y: number },
   zoom: number,
@@ -16,16 +24,13 @@ export function clampToolPan(
   content: HTMLElement | null,
 ) {
   if (zoom <= MIN_TOOL_ZOOM || !viewport || !content) return { x: 0, y: 0 };
-  const viewportWidth = Math.max(1, viewport.clientWidth - 64);
-  const viewportHeight = Math.max(1, viewport.clientHeight - 64);
-  const scaledWidth = content.clientWidth * zoom;
-  const scaledHeight = content.clientHeight * zoom;
-  const maxX = Math.max(0, (scaledWidth - viewportWidth) / 2);
-  const maxY = Math.max(0, (scaledHeight - viewportHeight) / 2);
-  return {
-    x: clamp(pan.x, -maxX, maxX),
-    y: clamp(pan.y, -maxY, maxY),
-  };
+  return clampPanToCenter(
+    pan,
+    { width: content.clientWidth, height: content.clientHeight },
+    { width: viewport.clientWidth, height: viewport.clientHeight },
+    zoom,
+    TOOL_PAN_PADDING,
+  );
 }
 
 export function maxCropRadius(box: CropBox) {

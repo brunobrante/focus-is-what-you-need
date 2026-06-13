@@ -39,3 +39,48 @@ export function zoomToCursorOffset(
     y: cursor.y * (1 - ratio) + offset.y * ratio,
   };
 }
+
+type Size = { width: number; height: number };
+type Pan = { x: number; y: number };
+
+function clampPanAxis(pan: number, contentLength: number, viewportLength: number, zoom: number, padding: number): number {
+  const scaled = contentLength * zoom;
+  const available = Math.max(1, viewportLength - padding * 2);
+  // Fits the viewport → always centered (no slack), matching the canvas at its
+  // minimum zoom: zooming back out re-centers.
+  if (scaled <= available) return 0;
+  // Overflowing → free to travel until either edge reaches the viewport center:
+  // half the scaled content of over-scroll per direction, never pushed entirely
+  // past center into one half.
+  const max = scaled / 2;
+  return Math.min(max, Math.max(-max, pan));
+}
+
+/**
+ * Edge-to-center pan clamp for a center-origin projection — the model the Builder
+ * stage and the snapshot viewers use, where the content is centered in the
+ * viewport and `pan` offsets it from that center (`screen = viewportCenter + pan
+ * + world * zoom`). This is the center-origin counterpart of the canvas camera's
+ * `clampAxisOffset` (canvas/engine/viewport.ts), so all four surfaces share the
+ * same "scroll any edge to the middle, locking at the middle" feel.
+ *
+ * Per axis:
+ *   - when the scaled content fits the viewport it snaps centered (`pan` 0);
+ *   - when it overflows, `pan` is free to travel `±scaled/2` so either edge can
+ *     be brought to the viewport center, and never past it into one half.
+ *
+ * `padding` (per side) shrinks the fit test so a barely-overflowing axis keeps a
+ * small gutter before it unlocks panning.
+ */
+export function clampPanToCenter(
+  pan: Pan,
+  contentSize: Size,
+  viewportSize: Size,
+  zoom: number,
+  padding = 0,
+): Pan {
+  return {
+    x: clampPanAxis(pan.x, contentSize.width, viewportSize.width, zoom, padding),
+    y: clampPanAxis(pan.y, contentSize.height, viewportSize.height, zoom, padding),
+  };
+}

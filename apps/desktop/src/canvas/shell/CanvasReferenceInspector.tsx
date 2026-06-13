@@ -39,8 +39,9 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
   const [loading, setLoading] = useState(isStack);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   // Wheel-only here (keyboard off): the canvas owns the global Cmd± shortcuts.
-  const zoomCtl = useStepZoom(stageRef);
+  const zoomCtl = useStepZoom(stageRef, { contentRef });
   // Plain-image background: baked thumbnail when present, else the blob-store
   // original (adapter-aware, uncapped). Unused for stacks (they load their graph).
   const { url: imageUrl } = useReferenceRowImage(reference, { eager: true });
@@ -128,7 +129,6 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
 
   const selectedNode = selectedId && tree.length ? findStackNode(tree, selectedId) : null;
   const selectedUrl = selectedId && preview ? preview.urls[selectedId] : undefined;
-  const z = zoomCtl.zoom;
 
   return (
     <div className="absolute inset-0 flex">
@@ -167,11 +167,22 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
       ) : null}
 
       {/* Stage — the zoomable SceneCanvasInspector */}
-      <div ref={stageRef} className="relative min-w-0 flex-1">
-        <div className="absolute inset-0 flex items-center justify-center overflow-auto p-6 pt-16 pb-32">
+      <div
+        ref={stageRef}
+        {...zoomCtl.panHandlers}
+        className="relative min-w-0 flex-1"
+        style={{ cursor: zoomCtl.isPanning ? "grabbing" : zoomCtl.canPan ? "grab" : "default" }}
+      >
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 pt-16 pb-32">
           {imageStack ? (
             <div
-              style={{ transform: `scale(${z})`, transformOrigin: "center", transition: "transform 120ms" }}
+              ref={contentRef}
+              className="pointer-events-auto"
+              style={{
+                transform: zoomCtl.transform,
+                transformOrigin: "center",
+                transition: zoomCtl.isPanning ? "none" : "transform 120ms",
+              }}
             >
               <SceneCanvasInspector
                 source="stack"

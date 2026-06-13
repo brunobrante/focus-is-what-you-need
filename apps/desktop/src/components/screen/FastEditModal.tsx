@@ -49,7 +49,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const [selectedId, setSelectedId] = useState("");
     const [pickerOpen, setPickerOpen] = useState(false);
     const stageRef = useRef<HTMLDivElement>(null);
-    const zoomCtl = useStepZoom(stageRef, { keyboard: true, enabled: isOpen });
+    const contentRef = useRef<HTMLDivElement>(null);
+    const zoomCtl = useStepZoom(stageRef, { keyboard: true, enabled: isOpen, contentRef });
     const pickerTriggerRef = useRef<HTMLButtonElement>(null);
     const pickerDropRef = useRef<HTMLDivElement>(null);
 
@@ -109,8 +110,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
       setScene((prev) => (prev ? updateNodeInScene(prev, selectedNode.id, patch) : prev));
     };
 
-    const z = zoomCtl.zoom;
-
     if (!config) return null;
 
     return (
@@ -152,10 +151,12 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
           <div className="grid h-full min-h-[640px] grid-cols-[minmax(0,1fr)_360px]">
             <div
               ref={stageRef}
+              {...zoomCtl.panHandlers}
               className="relative min-h-0 overflow-hidden border-r border-[var(--border)]"
               style={{
                 background:
                   "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.038) 1px, transparent 0) 0 0/24px 24px, #0b0d10",
+                cursor: zoomCtl.isPanning ? "grabbing" : zoomCtl.canPan ? "grab" : "default",
               }}
             >
               <div className="absolute left-4 top-4 z-[10] flex items-center gap-2">
@@ -184,8 +185,20 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                   />
                 </button>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div style={{ position: "relative", width: scene.size.w, height: scene.size.h, flexShrink: 0, transform: `scale(${z})`, transformOrigin: "center", transition: "transform 150ms" }}>
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div
+                  ref={contentRef}
+                  className="pointer-events-auto"
+                  style={{
+                    position: "relative",
+                    width: scene.size.w,
+                    height: scene.size.h,
+                    flexShrink: 0,
+                    transform: zoomCtl.transform,
+                    transformOrigin: "center",
+                    transition: zoomCtl.isPanning ? "none" : "transform 150ms",
+                  }}
+                >
                   <SceneCanvasInspector
                     scene={scene}
                     selectedId={selectedNode.id}
