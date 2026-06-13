@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>focus — logo options v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E101A; --panel:#151929; --ink:#E9E6DC; --dim:#8B91A8; --faint:#4D5577;
+    --amber:#FFC23D; --coral:#FF6A45; --paper:#F6F4EC; --line:rgba(255,255,255,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Instrument Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.55}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 32px}
+
+  header{padding:28px 0;border-bottom:1px solid var(--line)}
+  header .wrap{display:flex;justify-content:space-between;align-items:baseline}
+  .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+
+  .intro{padding:72px 0 56px}
+  .intro h1{font-size:clamp(34px,5vw,52px);font-weight:700;letter-spacing:-.03em;line-height:1.05;max-width:18ch}
+  .intro h1 em{font-style:normal;color:var(--amber)}
+  .intro p{margin-top:18px;font-size:17px;color:var(--dim);max-width:62ch}
+
+  .option{padding:64px 0;border-top:1px solid var(--line)}
+  .opt-grid{display:grid;grid-template-columns:320px 1fr;gap:56px;align-items:start}
+  .opt-mark svg{width:100%;height:auto;display:block;border-radius:24px}
+  .opt-minis{margin-top:16px;display:flex;gap:14px;align-items:flex-end}
+  .opt-minis svg{display:block;border-radius:8px}
+  .opt-minis span{font-size:11px;color:var(--dim)}
+  .kicker{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .opt-body h2{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:8px 0 14px;font-variant:none;text-transform:none;color:var(--ink)}
+  .opt-body h2 .cn{color:var(--dim);font-weight:400}
+  .opt-body p{font-size:16px;color:var(--dim);max-width:58ch;margin-bottom:14px}
+  .opt-body p b{color:var(--ink);font-weight:600}
+  .meta{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
+  .chip{font-size:12.5px;padding:7px 13px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
+  .chip.hot{border-color:rgba(255,166,69,.35);color:var(--amber)}
+
+  .lineup{padding:64px 0;border-top:1px solid var(--line)}
+  .lineup h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:32px}
+  .strip{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+  .strip .cell{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .strip svg{width:100%;max-width:120px;height:auto;border-radius:14px}
+  .strip span{font-size:12px;color:var(--dim);text-align:center}
+  .verdict{margin-top:36px;font-size:16px;color:var(--dim);max-width:72ch}
+  .verdict b{color:var(--ink)}
+
+  footer{padding:40px 0 72px;border-top:1px solid var(--line);color:var(--dim);font-size:14px}
+
+  @media(max-width:860px){
+    .opt-grid{grid-template-columns:1fr;gap:32px}
+    .opt-mark{max-width:280px}
+    .strip{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="tag">Logo options · v2</span>
+    <span class="tag mono">focus-is-what-you-need</span>
+  </div>
+</header>
+
+<div class="wrap intro">
+  <h1>Four new directions, <em>one rule</em>: the focused thing is the only thing that's lit.</h1>
+  <p>v1 told the story through extraction — a child leaving its parent's grid. These four keep the same palette and product rule but attack the metaphor from different angles: optics, depth, stage, and the math itself. All are built on the same geometry system, so any of them can absorb details from the others.</p>
+</div>
+
+<!-- shared defs -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B2036"/><stop offset="1" stop-color="#11131F"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFC23D"/><stop offset="1" stop-color="#FF6A45"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF8A3D" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#FF8A3D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC23D" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#FFC23D" stop-opacity=".04"/>
+    </linearGradient>
+    <filter id="blur4"><feGaussianBlur stdDeviation="4"/></filter>
+    <filter id="blur2"><feGaussianBlur stdDeviation="1.8"/></filter>
+
+    <!-- ===== OPTION A: IRIS (pinwheel aperture) ===== -->
+    <g id="opt-iris">
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="3"/>
+      <circle cx="128" cy="128" r="74" fill="url(#glow)"/>
+      <g stroke="#4D5577" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M64 84 H164"/>
+        <path d="M172 64 V164"/>
+        <path d="M192 172 H92"/>
+        <path d="M84 192 V92"/>
+      </g>
+      <rect x="100" y="100" width="56" height="56" rx="12" fill="url(#hot)"/>
+    </g>
+
+    <!-- ===== OPTION B: DEPTH OF FIELD ===== -->
+    <g id="opt-dof">
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="3"/>
+      <rect x="48" y="48" width="88" height="88" rx="20" fill="#39405F" opacity=".4" filter="url(#blur4)"/>
+      <rect x="76" y="76" width="88" height="88" rx="20" fill="#4A527A" opacity=".6" filter="url(#blur2)"/>
+      <circle cx="152" cy="152" r="78" fill="url(#glow)"/>
+      <rect x="108" y="108" width="88" height="88" rx="20" fill="url(#hot)"/>
+      <rect x="98" y="98" width="108" height="108" rx="26" fill="none" stroke="#F2EFE6" stroke-width="5"/>
+    </g>
+
+    <!-- ===== OPTION C: SPOTLIGHT ===== -->
+    <g id="opt-spot">
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="3"/>
+      <path d="M156 34 L172 34 L210 168 L118 168 Z" fill="url(#beam)"/>
+      <rect x="150" y="24" width="28" height="12" rx="6" fill="#F2EFE6"/>
+      <rect x="36" y="168" width="40" height="40" rx="10" fill="#3A4160"/>
+      <rect x="88" y="168" width="40" height="40" rx="10" fill="#3A4160"/>
+      <rect x="140" y="156" width="48" height="52" rx="12" fill="url(#hot)"/>
+      <rect x="200" y="168" width="40" height="40" rx="10" fill="#3A4160"/>
+    </g>
+
+    <!-- ===== OPTION D: SOFTMAX RETICLE ===== -->
+    <g id="opt-reticle">
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="3"/>
+      <circle cx="128" cy="128" r="62" fill="url(#glow)"/>
+      <circle cx="128" cy="128" r="64" fill="none" stroke="#3A4160" stroke-width="2.5"/>
+      <!-- attention distribution as tick lengths, peak at 45° -->
+      <g stroke="#4D5577" stroke-width="7" stroke-linecap="round">
+        <path d="M208 128 L222 128"/>
+        <path d="M128 208 L128 222"/>
+        <path d="M97.4 201.9 L93.6 211.1"/>
+        <path d="M71.4 184.6 L65.8 190.2"/>
+        <path d="M54.1 158.6 L47.6 161.3"/>
+        <path d="M48 128 L41 128"/>
+        <path d="M54.1 97.4 L47.6 94.7"/>
+        <path d="M71.4 71.4 L66.5 66.5"/>
+        <path d="M97.4 54.1 L94.7 47.6"/>
+        <path d="M128 48 L128 40"/>
+        <path d="M158.6 54.1 L161.7 46.7"/>
+        <path d="M184.6 71.4 L191.6 64.4"/>
+        <path d="M201.9 97.4 L213 92.8"/>
+      </g>
+      <g stroke-linecap="round" fill="none">
+        <path d="M201.9 158.6 L222.2 167" stroke="#FFA53D" stroke-width="7" opacity=".7"/>
+        <path d="M184.6 184.6 L205.8 205.8" stroke="#FF6A45" stroke-width="8"/>
+        <path d="M158.6 201.9 L167 222.2" stroke="#FFA53D" stroke-width="7" opacity=".7"/>
+      </g>
+      <rect x="102" y="102" width="52" height="52" rx="12" fill="url(#hot)"/>
+    </g>
+
+    <!-- v1 simplified for the lineup -->
+    <g id="opt-v1">
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="3"/>
+      <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+            fill="none" stroke="#4D5577" stroke-width="8" stroke-linecap="round"/>
+      <rect x="56" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <rect x="96" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <rect x="56" y="96" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <circle cx="112" cy="112" r="2.5" fill="#FFA53D" opacity=".3"/>
+      <circle cx="122" cy="122" r="3.5" fill="#FFA53D" opacity=".55"/>
+      <circle cx="131" cy="131" r="4.5" fill="#FFA53D" opacity=".85"/>
+      <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+    </g>
+  </defs>
+</svg>
+
+<!-- ============ OPTION A ============ -->
+<section class="option">
+  <div class="wrap opt-grid">
+    <div class="opt-mark">
+      <svg viewBox="0 0 256 256"><use href="#opt-iris"/></svg>
+      <div class="opt-minis">
+        <svg width="48" height="48" viewBox="0 0 256 256"><use href="#opt-iris"/></svg>
+        <svg width="24" height="24" viewBox="0 0 256 256"><use href="#opt-iris"/></svg>
+        <span class="mono">48 / 24 px</span>
+      </div>
+    </div>
+    <div class="opt-body">
+      <span class="kicker">Option A</span>
+      <h2>Iris <span class="cn">— the aperture</span></h2>
+      <p>Four heavy blades in pinwheel rotation form a camera aperture, and the opening it leaves is not a circle — it's a <b>component</b>. The metaphor is pure optics: an iris exists to admit exactly one subject and exclude everything else, which is your no-free-canvas rule stated mechanically.</p>
+      <p>The pinwheel overshoot (each blade extends past its neighbor) gives it rotational energy, implying the aperture can open and close — a gift for motion design: blades rotate apart on app launch, revealing the component.</p>
+      <div class="meta">
+        <span class="chip hot">Strongest at tiny sizes</span>
+        <span class="chip">Most abstract — needs the brand to teach the meaning</span>
+        <span class="chip">Best animation potential</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPTION B ============ -->
+<section class="option">
+  <div class="wrap opt-grid">
+    <div class="opt-mark">
+      <svg viewBox="0 0 256 256"><use href="#opt-dof"/></svg>
+      <div class="opt-minis">
+        <svg width="48" height="48" viewBox="0 0 256 256"><use href="#opt-dof"/></svg>
+        <svg width="24" height="24" viewBox="0 0 256 256"><use href="#opt-dof"/></svg>
+        <span class="mono">48 / 24 px</span>
+      </div>
+    </div>
+    <div class="opt-body">
+      <span class="kicker">Option B</span>
+      <h2>Depth <span class="cn">— shallow depth of field</span></h2>
+      <p>Three components stacked along the z-axis, and the two behind are <b>genuinely out of focus</b> — real gaussian blur, not just lower opacity. Almost no logo dares to use actual blur as a structural element, which is precisely what makes this one hard to imitate: copy it without the blur and it collapses into a generic card stack.</p>
+      <p>The front component is sharp, warm, and wears a continuous focus ring instead of brackets — closer to a camera's AF confirmation than a selection UI. It reads as photography first, software second.</p>
+      <div class="meta">
+        <span class="chip hot">Most technically distinctive</span>
+        <span class="chip">Blur needs care in print / flat exports</span>
+        <span class="chip">Calm, premium feel</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPTION C ============ -->
+<section class="option">
+  <div class="wrap opt-grid">
+    <div class="opt-mark">
+      <svg viewBox="0 0 256 256"><use href="#opt-spot"/></svg>
+      <div class="opt-minis">
+        <svg width="48" height="48" viewBox="0 0 256 256"><use href="#opt-spot"/></svg>
+        <svg width="24" height="24" viewBox="0 0 256 256"><use href="#opt-spot"/></svg>
+        <span class="mono">48 / 24 px</span>
+      </div>
+    </div>
+    <div class="opt-body">
+      <span class="kicker">Option C</span>
+      <h2>Spotlight <span class="cn">— one on stage</span></h2>
+      <p>A row of identical components waits in the dark; a beam from above picks one, and it <b>steps forward</b> — slightly taller, slightly raised, fully lit. This is the most narrative of the four: it's literally your editing flow as a stage direction. Select a component, the rest of the world dims.</p>
+      <p>The lamp at the top is the deliberate oddity — a tiny piece of stagecraft hardware in an otherwise geometric mark. It's the detail an imitator would "clean up", and removing it kills the story.</p>
+      <div class="meta">
+        <span class="chip hot">Clearest story at first glance</span>
+        <span class="chip">Horizontal composition — wide lockups love it, square icons less so</span>
+        <span class="chip">Warmest personality</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPTION D ============ -->
+<section class="option">
+  <div class="wrap opt-grid">
+    <div class="opt-mark">
+      <svg viewBox="0 0 256 256"><use href="#opt-reticle"/></svg>
+      <div class="opt-minis">
+        <svg width="48" height="48" viewBox="0 0 256 256"><use href="#opt-reticle"/></svg>
+        <svg width="24" height="24" viewBox="0 0 256 256"><use href="#opt-reticle"/></svg>
+        <span class="mono">48 / 24 px</span>
+      </div>
+    </div>
+    <div class="opt-body">
+      <span class="kicker">Option D</span>
+      <h2>Reticle <span class="cn">— softmax made visible</span></h2>
+      <p>A focusing reticle where the tick marks are not decoration: their lengths plot an <b>attention distribution</b>. One direction dominates — long, warm, near 1.0 — and the weights decay around the ring exactly like softmax output. The component sits dead center, locked.</p>
+      <p>This is the deepest cut of the "Attention Is All You Need" reference in the whole set. To anyone else it's a beautiful asymmetric reticle; to anyone who's read the paper, the mark is a graph. Copying it superficially produces a symmetric crosshair — and symmetric is exactly what this isn't.</p>
+      <div class="meta">
+        <span class="chip hot">Strongest paper reference</span>
+        <span class="chip">Most "instrument-like" — technical, precise</span>
+        <span class="chip">Asymmetry is the protected detail</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LINEUP ============ -->
+<section class="lineup">
+  <div class="wrap">
+    <h2>Side by side</h2>
+    <div class="strip">
+      <div class="cell"><svg viewBox="0 0 256 256"><use href="#opt-v1"/></svg><span>v1 · Extraction</span></div>
+      <div class="cell"><svg viewBox="0 0 256 256"><use href="#opt-iris"/></svg><span>A · Iris</span></div>
+      <div class="cell"><svg viewBox="0 0 256 256"><use href="#opt-dof"/></svg><span>B · Depth</span></div>
+      <div class="cell"><svg viewBox="0 0 256 256"><use href="#opt-spot"/></svg><span>C · Spotlight</span></div>
+      <div class="cell"><svg viewBox="0 0 256 256"><use href="#opt-reticle"/></svg><span>D · Reticle</span></div>
+    </div>
+    <p class="verdict"><b>An honest read:</b> Iris wins on scalability and motion, Depth wins on craft and uniqueness of technique, Spotlight wins on immediate storytelling, Reticle wins on conceptual depth and the paper homage. If the product's soul is "organization and componentization", v1 and Spotlight say it loudest; if it's "precision instrument for focused work", Iris and Reticle say it best. A strong hybrid also exists: the Iris blades opening to reveal v1's focused component — aperture as the app-launch animation, extraction as the static mark.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap mono">palette unchanged — #11131F · #4D5577 · #F2EFE6 · #FFC23D → #FF6A45</div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>focus — logo proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E101A; --bg-2:#13162400; --panel:#151929;
+    --ink:#E9E6DC; --dim:#8B91A8; --faint:#4D5577;
+    --amber:#FFC23D; --coral:#FF6A45; --paper:#F6F4EC; --line:rgba(255,255,255,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Instrument Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.55;
+  }
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 32px}
+
+  header{padding:28px 0;border-bottom:1px solid var(--line)}
+  header .wrap{display:flex;justify-content:space-between;align-items:baseline}
+  .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+
+  /* hero */
+  .hero{padding:88px 0 72px;display:grid;grid-template-columns:340px 1fr;gap:64px;align-items:center}
+  .hero-mark svg{width:100%;height:auto;display:block;filter:drop-shadow(0 24px 60px rgba(255,122,61,.12))}
+  .hero h1{font-size:clamp(40px,6vw,64px);font-weight:700;letter-spacing:-.035em;line-height:1.02}
+  .hero h1 .rest{color:var(--faint);font-weight:400}
+  .pkg{margin-top:14px;font-size:14px;color:var(--dim)}
+  .pkg b{color:var(--amber);font-weight:500}
+  .thesis{margin-top:28px;font-size:19px;color:var(--ink);max-width:46ch}
+  .thesis em{color:var(--amber);font-style:normal}
+  .sub{margin-top:12px;font-size:15px;color:var(--dim);max-width:52ch}
+
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:36px}
+
+  /* anatomy */
+  .anatomy{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px}
+  .card .glyph{height:84px;margin-bottom:18px}
+  .card h3{font-size:16px;font-weight:600;margin-bottom:8px}
+  .card h3 .n{color:var(--faint);font-weight:400;margin-right:8px}
+  .card p{font-size:14.5px;color:var(--dim)}
+
+  /* variants */
+  .variants{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .swatch{border-radius:16px;border:1px solid var(--line);padding:40px;display:flex;align-items:center;justify-content:center;min-height:280px;position:relative}
+  .swatch .label{position:absolute;top:16px;left:20px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .swatch.dark{background:#0B0D15}
+  .swatch.light{background:var(--paper)}
+  .swatch.light .label{color:#9a958a}
+  .swatch svg{width:180px;height:180px}
+
+  .sizes{margin-top:20px;border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:36px 40px;display:flex;align-items:flex-end;gap:48px}
+  .sizes .s{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .sizes .s span{font-size:11px;color:var(--dim)}
+  .sizes svg{display:block}
+
+  /* wordmark */
+  .lockups{display:flex;flex-direction:column;gap:20px}
+  .lockup{border-radius:16px;border:1px solid var(--line);padding:48px 40px;display:flex;align-items:center;gap:20px}
+  .lockup.dark{background:#0B0D15}
+  .lockup.light{background:var(--paper);color:#1C1F2B}
+  .lockup .wm{font-size:44px;font-weight:700;letter-spacing:-.04em;line-height:1}
+  .lockup .wm .rest{font-weight:400;opacity:.35}
+  .lockup svg{width:56px;height:56px;flex:none}
+  .lockup .full{margin-left:auto;font-size:13px;opacity:.5}
+
+  footer{padding:48px 0 72px;border-top:1px solid var(--line);color:var(--dim);font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+
+  @media(max-width:860px){
+    .hero{grid-template-columns:1fr;gap:40px;padding:56px 0}
+    .hero-mark{max-width:280px}
+    .anatomy,.variants{grid-template-columns:1fr}
+    .sizes{gap:28px;flex-wrap:wrap}
+    .lockup{flex-wrap:wrap}
+    .lockup .full{margin-left:0;width:100%}
+  }
+  @media(prefers-reduced-motion:no-preference){
+    .hero-mark{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+    @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="tag">Logo proposal · v1</span>
+    <span class="tag mono">focus-is-what-you-need</span>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<div class="wrap hero">
+  <div class="hero-mark">
+    <!-- PRIMARY MARK -->
+    <svg viewBox="0 0 256 256" role="img" aria-label="focus logo mark">
+      <defs>
+        <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1B2036"/><stop offset="1" stop-color="#11131F"/>
+        </linearGradient>
+        <linearGradient id="hot" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFC23D"/><stop offset="1" stop-color="#FF6A45"/>
+        </linearGradient>
+        <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stop-color="#FF8A3D" stop-opacity="0.28"/>
+          <stop offset="1" stop-color="#FF8A3D" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="1" y="1" width="254" height="254" rx="55" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="2"/>
+      <circle cx="188" cy="188" r="76" fill="url(#glow)"/>
+      <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+            fill="none" stroke="#4D5577" stroke-width="8" stroke-linecap="round"/>
+      <rect x="56" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <rect x="96" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <rect x="56" y="96" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <circle cx="112" cy="112" r="2.5" fill="#FFA53D" opacity=".3"/>
+      <circle cx="122" cy="122" r="3.5" fill="#FFA53D" opacity=".55"/>
+      <circle cx="131" cy="131" r="4.5" fill="#FFA53D" opacity=".85"/>
+      <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 220 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+    </svg>
+  </div>
+  <div>
+    <h1>focus<span class="rest">·is·what·you·need</span></h1>
+    <p class="pkg mono">working name → <b>focus-is-what-you-need</b> <span style="opacity:.5">// after "Attention Is All You Need"</span></p>
+    <p class="thesis">No infinite canvas. One component leaves the structure, gets pulled into the viewfinder, and becomes <em>the only thing that's lit</em>.</p>
+    <p class="sub">The mark tells the product's whole story in one frame: an organized parent, docked siblings, an open slot, and the extracted child under focus brackets.</p>
+  </div>
+</div>
+
+<!-- ============ ANATOMY ============ -->
+<section>
+  <div class="wrap">
+    <h2>Anatomy — why it's hard to copy</h2>
+    <div class="anatomy">
+      <div class="card">
+        <svg class="glyph" viewBox="0 0 120 90">
+          <path d="M84 50 L84 26 Q84 14 72 14 L28 14 Q16 14 16 26 L16 64 Q16 76 28 76 L60 76" fill="none" stroke="#4D5577" stroke-width="6" stroke-linecap="round"/>
+          <rect x="27" y="25" width="20" height="20" rx="5" fill="#3A4160"/>
+          <rect x="52" y="25" width="20" height="20" rx="5" fill="#3A4160"/>
+          <rect x="27" y="50" width="20" height="20" rx="5" fill="#3A4160"/>
+        </svg>
+        <h3><span class="n">01</span>The structure</h3>
+        <p>A parent component with its children docked in a grid — the anti-canvas. One corner of the frame is deliberately open: a slot is empty because its component is out being edited. The broken outline is the signature detail; generic "grid" logos never sacrifice the frame.</p>
+      </div>
+      <div class="card">
+        <svg class="glyph" viewBox="0 0 120 90">
+          <circle cx="28" cy="62" r="3" fill="#FFA53D" opacity=".3"/>
+          <circle cx="46" cy="51" r="4.5" fill="#FFA53D" opacity=".5"/>
+          <circle cx="66" cy="39" r="6" fill="#FFA53D" opacity=".7"/>
+          <circle cx="89" cy="26" r="8" fill="#FFA53D" opacity=".95"/>
+        </svg>
+        <h3><span class="n">02</span>The attention ramp</h3>
+        <p>Three dots escape through the open corner, growing in size and opacity — attention weights ramping toward 1.0. It's the quiet nod to "Attention Is All You Need": softmax made visible. Decorative to most eyes, a wink to anyone who's read the paper.</p>
+      </div>
+      <div class="card">
+        <svg class="glyph" viewBox="0 0 120 90">
+          <rect x="42" y="27" width="36" height="36" rx="9" fill="url(#hot)"/>
+          <g fill="none" stroke="#F2EFE6" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M32 38 L32 31 Q32 23 40 23 L47 23"/>
+            <path d="M73 23 L80 23 Q88 23 88 31 L88 38"/>
+            <path d="M88 52 L88 59 Q88 67 80 67 L73 67"/>
+            <path d="M47 67 L40 67 Q32 67 32 59 L32 52"/>
+          </g>
+        </svg>
+        <h3><span class="n">03</span>The focused component</h3>
+        <p>The extracted child sits inside viewfinder brackets — the universal symbol for "locked focus" — and carries the only warm color in the system. The palette itself encodes the product rule: everything cool and dim except what you're working on.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VARIANTS ============ -->
+<section>
+  <div class="wrap">
+    <h2>Variants</h2>
+    <div class="variants">
+      <div class="swatch dark">
+        <span class="label">Primary · on dark</span>
+        <svg viewBox="0 0 256 256">
+          <circle cx="188" cy="188" r="76" fill="url(#glow)"/>
+          <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+                fill="none" stroke="#4D5577" stroke-width="8" stroke-linecap="round"/>
+          <rect x="56" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+          <rect x="96" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+          <rect x="56" y="96" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+          <circle cx="112" cy="112" r="2.5" fill="#FFA53D" opacity=".3"/>
+          <circle cx="122" cy="122" r="3.5" fill="#FFA53D" opacity=".55"/>
+          <circle cx="131" cy="131" r="4.5" fill="#FFA53D" opacity=".85"/>
+          <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+          <g fill="none" stroke="#F2EFE6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+            <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+            <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+            <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+          </g>
+        </svg>
+      </div>
+      <div class="swatch light">
+        <span class="label">Monochrome · on paper</span>
+        <svg viewBox="0 0 256 256">
+          <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+                fill="none" stroke="#1C1F2B" stroke-opacity=".4" stroke-width="8" stroke-linecap="round"/>
+          <rect x="56" y="56" width="32" height="32" rx="8" fill="#1C1F2B" opacity=".14"/>
+          <rect x="96" y="56" width="32" height="32" rx="8" fill="#1C1F2B" opacity=".14"/>
+          <rect x="56" y="96" width="32" height="32" rx="8" fill="#1C1F2B" opacity=".14"/>
+          <circle cx="112" cy="112" r="2.5" fill="#1C1F2B" opacity=".3"/>
+          <circle cx="122" cy="122" r="3.5" fill="#1C1F2B" opacity=".55"/>
+          <circle cx="131" cy="131" r="4.5" fill="#1C1F2B" opacity=".85"/>
+          <rect x="152" y="152" width="64" height="64" rx="14" fill="#1C1F2B"/>
+          <g fill="none" stroke="#1C1F2B" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+            <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+            <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+            <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+            <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="sizes">
+      <div class="s">
+        <svg width="96" height="96" viewBox="0 0 256 256"><use href="#minimark"/></svg>
+        <span class="mono">96 px</span>
+      </div>
+      <div class="s">
+        <svg width="48" height="48" viewBox="0 0 256 256"><use href="#minimark"/></svg>
+        <span class="mono">48 px</span>
+      </div>
+      <div class="s">
+        <svg width="24" height="24" viewBox="0 0 256 256"><use href="#minimark"/></svg>
+        <span class="mono">24 px</span>
+      </div>
+      <div class="s" style="margin-left:auto;max-width:34ch;align-items:flex-start">
+        <span style="font-size:13.5px;color:var(--dim);line-height:1.5">At favicon scale the inner detail merges into texture, but the read survives: dim open frame, lit square, brackets.</span>
+      </div>
+    </div>
+
+    <!-- reusable simplified mark for small sizes -->
+    <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <g id="minimark">
+          <rect width="256" height="256" rx="56" fill="#1B2036"/>
+          <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".07" stroke-width="4"/>
+          <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+                fill="none" stroke="#4D5577" stroke-width="10" stroke-linecap="round"/>
+          <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+          <g fill="none" stroke="#F2EFE6" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+            <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+            <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+            <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+          </g>
+        </g>
+      </defs>
+    </svg>
+  </div>
+</section>
+
+<!-- ============ WORDMARK ============ -->
+<section>
+  <div class="wrap">
+    <h2>Lockups</h2>
+    <div class="lockups">
+      <div class="lockup dark">
+        <svg viewBox="0 0 256 256"><use href="#minimark"/></svg>
+        <div class="wm">focus<span class="rest">.</span></div>
+        <span class="full mono">focus-is-what-you-need@0.1.0</span>
+      </div>
+      <div class="lockup light">
+        <svg viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#1C1F2B"/>
+          <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+                fill="none" stroke="#6B7290" stroke-width="10" stroke-linecap="round"/>
+          <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+          <g fill="none" stroke="#F6F4EC" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+            <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+            <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+            <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+          </g>
+        </svg>
+        <div class="wm">focus<span class="rest">.</span></div>
+        <span class="full mono">while the real name doesn't land, the dot holds the spot</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Palette — <span class="mono">#11131F · #4D5577 · #F2EFE6 · #FFC23D → #FF6A45</span></span>
+    <span>Type — Instrument Sans (wordmark) · IBM Plex Mono (utility)</span>
+  </div>
+</footer>
+
+</body>
+</html>

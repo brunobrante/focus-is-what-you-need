@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>focus — Iris & Extraction variations · v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E101A; --panel:#151929; --ink:#E9E6DC; --dim:#8B91A8; --faint:#4D5577;
+    --amber:#FFC23D; --coral:#FF6A45; --paper:#F6F4EC; --line:rgba(255,255,255,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Instrument Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.55}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 32px}
+
+  header{padding:28px 0;border-bottom:1px solid var(--line)}
+  header .wrap{display:flex;justify-content:space-between;align-items:baseline}
+  .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+
+  .intro{padding:64px 0 48px}
+  .intro h1{font-size:clamp(32px,4.6vw,48px);font-weight:700;letter-spacing:-.03em;line-height:1.08;max-width:24ch}
+  .intro h1 em{font-style:normal;color:var(--amber)}
+  .intro p{margin-top:16px;font-size:16.5px;color:var(--dim);max-width:64ch}
+
+  section{padding:56px 0;border-top:1px solid var(--line)}
+  h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:8px}
+  .sec-note{font-size:15px;color:var(--faint);margin-bottom:32px;max-width:64ch}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:16px}
+  .card svg{width:100%;height:auto;border-radius:18px}
+  .card h3{font-size:15.5px;font-weight:600}
+  .card h3 .id{color:var(--faint);font-weight:400;margin-right:8px;font-size:13px}
+  .card p{font-size:13.5px;color:var(--dim)}
+  .card.fav{border-color:rgba(255,166,69,.4)}
+  .card.fav h3::after{content:"★";color:var(--amber);margin-left:8px;font-size:13px}
+
+  .hyb{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .hyb .card{flex-direction:row;align-items:center;gap:24px}
+  .hyb .card svg{width:190px;flex:none}
+
+  .sizes{margin-top:24px;border-radius:18px;border:1px solid var(--line);background:var(--panel);padding:32px 36px;display:flex;gap:56px;align-items:flex-end;flex-wrap:wrap}
+  .sz{display:flex;flex-direction:column;gap:12px;align-items:center}
+  .sz .row{display:flex;gap:14px;align-items:flex-end}
+  .sz svg{display:block;border-radius:6px}
+  .sz span{font-size:11px;color:var(--dim)}
+
+  .verdict{margin-top:32px;font-size:16px;color:var(--dim);max-width:74ch}
+  .verdict b{color:var(--ink)}
+
+  footer{padding:40px 0 72px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+
+  @media(max-width:860px){
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .hyb{grid-template-columns:1fr}
+  }
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="tag">Variations · v3</span>
+    <span class="tag mono">iris × extraction</span>
+  </div>
+</header>
+
+<div class="wrap intro">
+  <h1>Iris and Extraction, <em>pushed in every direction</em> they can bend.</h1>
+  <p>Two families from the two strongest marks. Iris variations explore the aperture's states — open, closed, rotated, wireframed. Extraction variations explore composition and reduction — vertical, glyph-only, monoline. At the end, the two ideas merge.</p>
+</div>
+
+<!-- ================= SHARED DEFS ================= -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B2036"/><stop offset="1" stop-color="#11131F"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFC23D"/><stop offset="1" stop-color="#FF6A45"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF8A3D" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#FF8A3D" stop-opacity="0"/>
+    </radialGradient>
+
+    <g id="darktile">
+      <rect width="256" height="256" rx="56" fill="url(#tile)"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#FFF" stroke-opacity=".06" stroke-width="3"/>
+    </g>
+    <g id="papertile">
+      <rect width="256" height="256" rx="56" fill="#F6F4EC"/>
+      <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#000" stroke-opacity=".08" stroke-width="3"/>
+    </g>
+
+    <!-- ========== IRIS FAMILY ========== -->
+
+    <!-- A1 base -->
+    <g id="iris-base">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="74" fill="url(#glow)"/>
+      <g stroke="#4D5577" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M64 84 H164"/><path d="M172 64 V164"/>
+        <path d="M192 172 H92"/><path d="M84 192 V92"/>
+      </g>
+      <rect x="100" y="100" width="56" height="56" rx="12" fill="url(#hot)"/>
+    </g>
+
+    <!-- A2 open -->
+    <g id="iris-open">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="84" fill="url(#glow)"/>
+      <g stroke="#4D5577" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M64 72 H164"/><path d="M184 64 V164"/>
+        <path d="M192 184 H92"/><path d="M72 192 V92"/>
+      </g>
+      <rect x="96" y="96" width="64" height="64" rx="14" fill="url(#hot)"/>
+    </g>
+
+    <!-- A3 closed -->
+    <g id="iris-closed">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="56" fill="url(#glow)"/>
+      <g stroke="#4D5577" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M76 96 H156"/><path d="M160 76 V156"/>
+        <path d="M180 160 H100"/><path d="M96 180 V100"/>
+      </g>
+      <rect x="114" y="114" width="28" height="28" rx="7" fill="url(#hot)"/>
+    </g>
+
+    <!-- A4 diamond -->
+    <g id="iris-diamond">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="74" fill="url(#glow)"/>
+      <g transform="rotate(45 128 128)">
+        <g stroke="#4D5577" stroke-width="22" stroke-linecap="round" fill="none">
+          <path d="M68 86 H160"/><path d="M170 68 V160"/>
+          <path d="M188 170 H96"/><path d="M86 188 V96"/>
+        </g>
+        <rect x="102" y="102" width="52" height="52" rx="12" fill="url(#hot)"/>
+      </g>
+    </g>
+
+    <!-- A5 wireframe -->
+    <g id="iris-wire">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="74" fill="url(#glow)"/>
+      <g stroke="#F2EFE6" stroke-width="10" stroke-linecap="round" fill="none">
+        <path d="M64 84 H164"/><path d="M172 64 V164"/>
+        <path d="M192 172 H92"/><path d="M84 192 V92"/>
+      </g>
+      <rect x="102" y="102" width="52" height="52" rx="12" fill="url(#hot)"/>
+    </g>
+
+    <!-- A6 mono paper -->
+    <g id="iris-paper">
+      <use href="#papertile"/>
+      <g stroke="#1C1F2B" stroke-opacity=".42" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M64 84 H164"/><path d="M172 64 V164"/>
+        <path d="M192 172 H92"/><path d="M84 192 V92"/>
+      </g>
+      <rect x="100" y="100" width="56" height="56" rx="12" fill="#1C1F2B"/>
+    </g>
+
+    <!-- ========== EXTRACTION FAMILY ========== -->
+
+    <!-- B1 base (v1) -->
+    <g id="ext-base">
+      <use href="#darktile"/>
+      <circle cx="188" cy="188" r="76" fill="url(#glow)"/>
+      <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+            fill="none" stroke="#4D5577" stroke-width="8" stroke-linecap="round"/>
+      <rect x="56" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <rect x="96" y="56" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <rect x="56" y="96" width="32" height="32" rx="8" fill="#3A4160" opacity=".85"/>
+      <circle cx="112" cy="112" r="2.5" fill="#FFA53D" opacity=".3"/>
+      <circle cx="122" cy="122" r="3.5" fill="#FFA53D" opacity=".55"/>
+      <circle cx="131" cy="131" r="4.5" fill="#FFA53D" opacity=".85"/>
+      <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+    </g>
+
+    <!-- B2 stacked (vertical) -->
+    <g id="ext-stack">
+      <use href="#darktile"/>
+      <circle cx="128" cy="184" r="70" fill="url(#glow)"/>
+      <path d="M112 116 L94 116 Q76 116 76 98 L76 54 Q76 36 94 36 L162 36 Q180 36 180 54 L180 98 Q180 116 162 116 L144 116"
+            fill="none" stroke="#4D5577" stroke-width="8" stroke-linecap="round"/>
+      <rect x="88" y="50" width="24" height="24" rx="6" fill="#3A4160" opacity=".85"/>
+      <rect x="116" y="50" width="24" height="24" rx="6" fill="#3A4160" opacity=".85"/>
+      <rect x="144" y="50" width="24" height="24" rx="6" fill="#3A4160" opacity=".85"/>
+      <rect x="88" y="80" width="24" height="24" rx="6" fill="#3A4160" opacity=".85"/>
+      <rect x="144" y="80" width="24" height="24" rx="6" fill="#3A4160" opacity=".85"/>
+      <circle cx="128" cy="122" r="2.5" fill="#FFA53D" opacity=".3"/>
+      <circle cx="128" cy="133" r="3.5" fill="#FFA53D" opacity=".55"/>
+      <circle cx="128" cy="144" r="4.5" fill="#FFA53D" opacity=".85"/>
+      <rect x="96" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M84 162 L84 152 Q84 140 96 140 L106 140"/>
+        <path d="M150 140 L160 140 Q172 140 172 152 L172 162"/>
+        <path d="M172 206 L172 216 Q172 228 160 228 L150 228"/>
+        <path d="M106 228 L96 228 Q84 228 84 216 L84 206"/>
+      </g>
+    </g>
+
+    <!-- B3 glyph (reduced) -->
+    <g id="ext-glyph">
+      <use href="#darktile"/>
+      <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+            fill="none" stroke="#4D5577" stroke-width="11" stroke-linecap="round"/>
+      <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+    </g>
+
+    <!-- B4 monoline -->
+    <g id="ext-line">
+      <use href="#darktile"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"/>
+        <rect x="60" y="60" width="26" height="26" rx="7"/>
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+      <rect x="156" y="156" width="56" height="56" rx="13" fill="#F2EFE6"/>
+    </g>
+
+    <!-- B5 light tile -->
+    <g id="ext-light">
+      <use href="#papertile"/>
+      <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+            fill="none" stroke="#A8AEC4" stroke-width="8" stroke-linecap="round"/>
+      <rect x="56" y="56" width="32" height="32" rx="8" fill="#DDE0E9"/>
+      <rect x="96" y="56" width="32" height="32" rx="8" fill="#DDE0E9"/>
+      <rect x="56" y="96" width="32" height="32" rx="8" fill="#DDE0E9"/>
+      <circle cx="112" cy="112" r="2.5" fill="#FF8A3D" opacity=".4"/>
+      <circle cx="122" cy="122" r="3.5" fill="#FF8A3D" opacity=".65"/>
+      <circle cx="131" cy="131" r="4.5" fill="#FF8A3D" opacity=".9"/>
+      <rect x="152" y="152" width="64" height="64" rx="14" fill="url(#hot)"/>
+      <g fill="none" stroke="#1C1F2B" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+    </g>
+
+    <!-- B6 mono paper -->
+    <g id="ext-paper">
+      <use href="#papertile"/>
+      <path d="M144 104 L144 60 Q144 40 124 40 L60 40 Q40 40 40 60 L40 124 Q40 144 60 144 L104 144"
+            fill="none" stroke="#1C1F2B" stroke-opacity=".4" stroke-width="8" stroke-linecap="round"/>
+      <rect x="56" y="56" width="32" height="32" rx="8" fill="#1C1F2B" opacity=".14"/>
+      <rect x="96" y="56" width="32" height="32" rx="8" fill="#1C1F2B" opacity=".14"/>
+      <rect x="56" y="96" width="32" height="32" rx="8" fill="#1C1F2B" opacity=".14"/>
+      <circle cx="112" cy="112" r="2.5" fill="#1C1F2B" opacity=".3"/>
+      <circle cx="122" cy="122" r="3.5" fill="#1C1F2B" opacity=".55"/>
+      <circle cx="131" cy="131" r="4.5" fill="#1C1F2B" opacity=".85"/>
+      <rect x="152" y="152" width="64" height="64" rx="14" fill="#1C1F2B"/>
+      <g fill="none" stroke="#1C1F2B" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".9">
+        <path d="M136 158 L136 148 Q136 136 148 136 L158 136"/>
+        <path d="M210 136 L220 136 Q232 136 232 148 L232 158"/>
+        <path d="M232 210 L232 220 Q232 232 222 232 L210 232"/>
+        <path d="M158 232 L148 232 Q136 232 136 220 L136 210"/>
+      </g>
+    </g>
+
+    <!-- ========== HYBRIDS ========== -->
+
+    <!-- H1 iris + brackets -->
+    <g id="hyb-bracket">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="74" fill="url(#glow)"/>
+      <g stroke="#4D5577" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M64 84 H164"/><path d="M172 64 V164"/>
+        <path d="M192 172 H92"/><path d="M84 192 V92"/>
+      </g>
+      <rect x="108" y="108" width="40" height="40" rx="10" fill="url(#hot)"/>
+      <g fill="none" stroke="#F2EFE6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M98 110 L98 104 Q98 98 104 98 L110 98"/>
+        <path d="M146 98 L152 98 Q158 98 158 104 L158 110"/>
+        <path d="M158 146 L158 152 Q158 158 152 158 L146 158"/>
+        <path d="M110 158 L104 158 Q98 158 98 152 L98 146"/>
+      </g>
+    </g>
+
+    <!-- H2 iris + attention trail -->
+    <g id="hyb-trail">
+      <use href="#darktile"/>
+      <circle cx="128" cy="128" r="74" fill="url(#glow)"/>
+      <circle cx="42" cy="42" r="2.5" fill="#FFA53D" opacity=".3"/>
+      <circle cx="57" cy="57" r="3.5" fill="#FFA53D" opacity=".55"/>
+      <circle cx="72" cy="72" r="4.5" fill="#FFA53D" opacity=".85"/>
+      <g stroke="#4D5577" stroke-width="24" stroke-linecap="round" fill="none">
+        <path d="M64 84 H164"/><path d="M172 64 V164"/>
+        <path d="M192 172 H92"/><path d="M84 192 V92"/>
+      </g>
+      <rect x="100" y="100" width="56" height="56" rx="12" fill="url(#hot)"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- ================= IRIS FAMILY ================= -->
+<section>
+  <div class="wrap">
+    <h2>Family 1 · Iris</h2>
+    <p class="sec-note">The aperture has states, and each state is a usable asset: closed for loading, base for the icon, open for the moment a component enters edit mode. The blades never form a closed square — the pinwheel gaps are the family's protected detail.</p>
+    <div class="grid">
+      <div class="card fav">
+        <svg viewBox="0 0 256 256"><use href="#iris-base"/></svg>
+        <div><h3><span class="id">A1</span>Base</h3><p>The reference state. Blade overshoot gives it rotation; the opening is component-shaped, not circular.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#iris-open"/></svg>
+        <div><h3><span class="id">A2</span>Open</h3><p>Blades pulled back, component at full size. The "editing now" state — end frame of the launch animation.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#iris-closed"/></svg>
+        <div><h3><span class="id">A3</span>Closed</h3><p>Nearly shut, a sliver of warmth inside. Loading state, notification badge, or the "nothing selected" empty state.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#iris-diamond"/></svg>
+        <div><h3><span class="id">A4</span>Diamond</h3><p>The same geometry rotated 45°. More dynamic, more "tool-like" — reads almost as a shutter mid-spin.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#iris-wire"/></svg>
+        <div><h3><span class="id">A5</span>Wireframe</h3><p>Blades reduced to thin off-white strokes. The light-touch version for watermarks, footers, and UI chrome.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#iris-paper"/></svg>
+        <div><h3><span class="id">A6</span>Mono / paper</h3><p>One ink, two opacities. Survives print, laser engraving, and a fax machine, if you ever meet one.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EXTRACTION FAMILY ================= -->
+<section>
+  <div class="wrap">
+    <h2>Family 2 · Extraction (the original "focus" mark)</h2>
+    <p class="sec-note">The v1 story — parent, empty slot, extracted child under brackets — recomposed for different containers. The open corner and the three-dot attention ramp stay constant; everything else flexes.</p>
+    <div class="grid">
+      <div class="card fav">
+        <svg viewBox="0 0 256 256"><use href="#ext-base"/></svg>
+        <div><h3><span class="id">B1</span>Base</h3><p>The original diagonal composition. Still the fullest telling of the story.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#ext-stack"/></svg>
+        <div><h3><span class="id">B2</span>Stacked</h3><p>Vertical recomposition: the child drops out of the parent's bottom edge, through the open gap, straight into focus. Centered and symmetric — calmer than the diagonal.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#ext-glyph"/></svg>
+        <div><h3><span class="id">B3</span>Glyph</h3><p>Cells and dots removed, strokes thickened. The favicon and small-size workhorse: open frame, lit square, brackets.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#ext-line"/></svg>
+        <div><h3><span class="id">B4</span>Monoline</h3><p>Single stroke weight, single color, one solid fill. Built for embroidery, stickers, and merch where gradients die.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#ext-light"/></svg>
+        <div><h3><span class="id">B5</span>Light tile</h3><p>The light-mode app icon. Structure fades toward the background; the child keeps the only saturated color on the tile.</p></div>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#ext-paper"/></svg>
+        <div><h3><span class="id">B6</span>Mono / paper</h3><p>Ink-only counterpart of B1, matched to A6 so both families share a print system.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HYBRIDS ================= -->
+<section>
+  <div class="wrap">
+    <h2>Hybrids · Iris × Extraction</h2>
+    <p class="sec-note">The two stories are compatible: extraction explains <i>where the component comes from</i>, the iris explains <i>what happens when it arrives</i>.</p>
+    <div class="hyb">
+      <div class="card">
+        <svg viewBox="0 0 256 256"><use href="#hyb-bracket"/></svg>
+        <div><h3><span class="id">H1</span>Iris + brackets</h3><p>Extraction's viewfinder brackets live inside the aperture, hugging the component. Two layers of focus — optical and UI — in one mark. The densest option, best at large sizes.</p></div>
+      </div>
+      <div class="card fav">
+        <svg viewBox="0 0 256 256"><use href="#hyb-trail"/></svg>
+        <div><h3><span class="id">H2</span>Iris + trail</h3><p>The three attention dots slip in through the pinwheel's corner gap — the component arriving into the aperture. Keeps Iris's clean silhouette, inherits Extraction's softmax wink, and the corner gap suddenly has a job. The strongest merge.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FINALISTS ================= -->
+<section>
+  <div class="wrap">
+    <h2>Finalists at size</h2>
+    <div class="sizes">
+      <div class="sz"><div class="row">
+        <svg width="72" height="72" viewBox="0 0 256 256"><use href="#iris-base"/></svg>
+        <svg width="40" height="40" viewBox="0 0 256 256"><use href="#iris-base"/></svg>
+        <svg width="20" height="20" viewBox="0 0 256 256"><use href="#iris-base"/></svg>
+      </div><span class="mono">A1 · iris base</span></div>
+      <div class="sz"><div class="row">
+        <svg width="72" height="72" viewBox="0 0 256 256"><use href="#hyb-trail"/></svg>
+        <svg width="40" height="40" viewBox="0 0 256 256"><use href="#hyb-trail"/></svg>
+        <svg width="20" height="20" viewBox="0 0 256 256"><use href="#hyb-trail"/></svg>
+      </div><span class="mono">H2 · iris + trail</span></div>
+      <div class="sz"><div class="row">
+        <svg width="72" height="72" viewBox="0 0 256 256"><use href="#ext-glyph"/></svg>
+        <svg width="40" height="40" viewBox="0 0 256 256"><use href="#ext-glyph"/></svg>
+        <svg width="20" height="20" viewBox="0 0 256 256"><use href="#ext-glyph"/></svg>
+      </div><span class="mono">B3 · glyph</span></div>
+      <div class="sz"><div class="row">
+        <svg width="72" height="72" viewBox="0 0 256 256"><use href="#ext-stack"/></svg>
+        <svg width="40" height="40" viewBox="0 0 256 256"><use href="#ext-stack"/></svg>
+        <svg width="20" height="20" viewBox="0 0 256 256"><use href="#ext-stack"/></svg>
+      </div><span class="mono">B2 · stacked</span></div>
+    </div>
+    <p class="verdict"><b>Recommendation:</b> run a two-mark system. <b>H2 (Iris + trail)</b> as the brand mark and app icon — cleanest silhouette, survives 20 px, carries both metaphors. <b>B1/B2 (Extraction)</b> as the expressive mark for marketing, empty states, and onboarding, where its fuller story has room to breathe. A6 and B6 cover print as one ink system. The launch animation writes itself: dots travel in, blades open, brackets snap.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap mono">palette — #11131F · #4D5577 · #F2EFE6 · #FFC23D → #FF6A45 · paper #F6F4EC</div>
+</footer>
+
+</body>
+</html>
