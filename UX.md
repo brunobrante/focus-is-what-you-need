@@ -23,6 +23,43 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 
 ---
 
+## Global Search / Command Palette
+
+A single app-wide search surface (VSCode-style) available on every route, owned
+by a top-level `SearchProvider` via React Context. It is mounted once and floats
+above all pages.
+
+**Opening**:
+- `⌘⇧P` (or `Ctrl+Shift+P`) opens it in **command mode** (input prefilled with `>`).
+- `⌘K` / `⌘P` (or `Ctrl+K` / `Ctrl+P`) opens it in **default search mode**.
+- The canvas top-left **search toggle button** opens it in default search mode.
+
+**Two modes share one input box**:
+- **Search mode** (default): finds entities — canvas elements, screens,
+  components, references, and projects.
+- **Command mode** (input starts with `>`): finds functions and settings
+  (navigation commands, canvas tools, etc.). Typing `>` switches modes live;
+  deleting it returns to search mode.
+
+**Location-aware prioritization** — results are boosted by the current scope:
+- On the **canvas**: the current scene's elements rank first, then the project's
+  screens/components, then projects.
+- In a **project**: that project's screens, components, and references rank
+  first, then projects.
+- In the **workspace**: projects rank first.
+
+**Commands** (`>` mode) come from a declarative registry
+(`src/domain/search/commandPalette.ts`) plus context-specific commands
+contributed at runtime (e.g. canvas tool selection while editing). Navigation
+commands jump to Workspace, Canvas, References, System Design, Components,
+Builder, and New Project.
+
+**Interaction**: `↑`/`↓` navigate, `↵` runs the highlighted item and closes the
+palette, `Esc` or a backdrop click dismisses it. Each result shows an icon and a
+kind badge (Element, Screen, Component, Reference, Project, Command).
+
+---
+
 ## Pages
 
 ### 1. Landing Page `/`
@@ -211,7 +248,7 @@ Full-screen visual editor with floating UI layers.
 
 **Top-left**:
 - Back button with breadcrumb: Project > Screen or Component name
-- Search toggle button
+- Search toggle button — opens the [global search / command palette](#global-search--command-palette)
 
 **Top-center**:
 - Canvas tabs: Current | Drafts | References (Versions, Preview when enabled)

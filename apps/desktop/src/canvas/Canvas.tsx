@@ -4,7 +4,7 @@ import { Toolbar } from "@/canvas/shell/Toolbar";
 import { Inspector } from "@/canvas/shell/Inspector";
 import { Tree, TreeToggle, type ProjectTreeNode } from "@/canvas/shell/Tree";
 import { FloatingToggle } from "@/canvas/shell/GalleryPanel";
-import { SearchPalette, SearchToggle } from "@/canvas/shell/SearchPalette";
+import { SearchToggle } from "@/canvas/shell/SearchPalette";
 import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { CanvasReferencesContext } from "@/canvas/shell/CanvasReferencesWindow";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
@@ -17,6 +17,9 @@ import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { useSearch, useSearchSource } from "@/application/search/SearchProvider";
+import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
+import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
@@ -107,9 +110,9 @@ function CanvasPageContent() {
     legacyElementName,
   });
 
+  const { open: openSearch } = useSearch();
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [treeOpen, setTreeOpen] = useState(true);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
   const [activeTab, setActiveTab] = useState<CanvasWindowType>("current");
   const [treeTab, setTreeTab] = useState<CanvasWindowType>("current");
@@ -351,6 +354,53 @@ function CanvasPageContent() {
     [getEditor],
   );
 
+  // Canvas elements feed the global search in default mode. Read live from the
+  // editor bridge at call time so the result list always reflects the open scene.
+  useSearchSource(
+    "canvas:elements",
+    () => {
+      const editor = getEditor();
+      if (!editor) return [];
+      return Object.values(editor.state.document.elements).map<SearchItem>((el) => ({
+        id: `canvas-element:${el.id}`,
+        kind: "element",
+        scope: "canvas",
+        name: el.name || el.type,
+        subtitle: `Element · ${el.type}`,
+        run: () => {
+          const ed = getEditor();
+          if (!ed) return;
+          ed.dispatch({ type: "setCanvasStageActive", active: false });
+          ed.dispatch({ type: "setSelected", selectedIds: [el.id] });
+        },
+      }));
+    },
+    [getEditor],
+  );
+
+  // Canvas tools feed the ">" command mode while editing.
+  useSearchSource(
+    "canvas:tools",
+    () =>
+      (CANVAS_COMMAND_GROUPS.find((g) => g.label === "Tools")?.commands ?? []).flatMap<SearchItem>(
+        (cmd) =>
+          cmd.type === "key" && cmd.toolbarToolId
+            ? [
+                {
+                  id: `canvas-tool:${cmd.id}`,
+                  kind: "command",
+                  mode: "command",
+                  scope: "canvas",
+                  name: cmd.label,
+                  subtitle: "Canvas tool",
+                  run: () => handleToolChange(cmd.toolbarToolId as CanvasToolId),
+                },
+              ]
+            : [],
+      ),
+    [handleToolChange],
+  );
+
   const openSelectedComponentInCanvas = useCallback((): boolean => {
     const editor = getEditor();
     const selectedId = editor?.state.selectedIds.length === 1 ? editor.state.selectedIds[0] : null;
@@ -571,7 +621,7 @@ function CanvasPageContent() {
           </span>
         )}
         <span className="h-3.5 w-px bg-[var(--border)]" />
-        <SearchToggle onClick={() => setSearchOpen(true)} />
+        <SearchToggle onClick={openSearch} />
       </div>
 
       <Tree
@@ -686,7 +736,6 @@ function CanvasPageContent() {
         />
       </div>
 
-      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

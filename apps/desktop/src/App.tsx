@@ -10,6 +10,7 @@ import { SystemDesignPage } from "@/pages/SystemDesignPage";
 import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
+import { SearchProvider } from "@/application/search/SearchProvider";
 
 export default function App() {
   useEffect(() => {
@@ -19,7 +20,8 @@ export default function App() {
   }, []);
 
   return (
-    <Routes>
+    <SearchProvider>
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/new" element={<NewProjectPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />
@@ -32,6 +34,7 @@ export default function App() {
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />
       <Route path="*" element={<LandingPage />} />
-    </Routes>
+      </Routes>
+    </SearchProvider>
   );
 }
