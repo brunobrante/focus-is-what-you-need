@@ -64,7 +64,9 @@ export type SavedComponent = {
   isPrimaryRoot?: boolean;
 };
 
-export type PendingConfirmation = { type: "reset" };
+export type PendingConfirmation =
+  | { type: "reset" }
+  | { type: "delete-root"; rootId: string; name: string; cutCount: number };
 
 export type ComponentTreeNode = {
   component: SavedComponent;

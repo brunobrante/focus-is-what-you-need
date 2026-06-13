@@ -217,6 +217,7 @@ export type ToolsEditorState = {
   openComponent: (id: string) => void;
   selectRoot: (id: string) => void;
   setPrimaryRoot: (id: string) => void;
+  requestRootDeletion: (id: string) => void;
   beginRootCreation: (source?: NewScreenSource) => void;
   promoteToRoot: (id: string) => void;
   startEditComponent: (id: string) => void;
@@ -601,12 +602,19 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [cancelSelection, components, expandComponentPath, resetToolViewport, rootComponentId],
   );
 
-  // Select a root from the switcher and open it for editing.
+  // Select a root from the switcher and open it for editing. Opening a root
+  // normally drops to the Builder view, but if the user was on the Stack tab we
+  // keep them there — as long as the target screen actually has a stack. A
+  // screen with no cuts has no stack to show, so it falls back to Builder.
   const selectRoot = useCallback(
     (id: string) => {
+      const keepStack = viewMode === "stack" && (cutCountByRoot.get(id) ?? 0) > 0;
       openComponent(id);
+      if (keepStack) {
+        setViewMode("stack");
+      }
     },
-    [openComponent],
+    [openComponent, viewMode, cutCountByRoot],
   );
 
   // Mark a root as the reference's main screen (the one shown on the card front).
@@ -815,15 +823,56 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [openComponent, selectStackComponent, viewMode],
   );
 
+  // Delete a screen (root) and its entire crop subtree. If the deleted screen is
+  // the one currently open, fall back to another remaining screen; when none are
+  // left, return to the original full image (the Screens panel goes empty).
+  const removeRoot = useCallback(
+    (id: string) => {
+      const removedIds = componentSubtreeIds(components, id);
+      const wasActive = removedIds.has(activeScopeId);
+      const nextRoot = wasActive ? roots.find((root) => !removedIds.has(root.id)) : undefined;
+      updateComponents((current) =>
+        current.filter((entry) => !removedIds.has(entry.id)),
+      );
+      if (!wasActive) return;
+      if (nextRoot) {
+        openComponent(nextRoot.id);
+      } else {
+        setActiveRootId(rootComponentId);
+        openOriginal();
+      }
+    },
+    [activeScopeId, components, openComponent, openOriginal, roots, rootComponentId, updateComponents],
+  );
+
+  const requestRootDeletion = useCallback(
+    (id: string) => {
+      const root = components.find((entry) => entry.id === id);
+      if (!root) return;
+      setPendingConfirmation({
+        type: "delete-root",
+        rootId: id,
+        name: root.isDefaultRoot ? "Full image" : root.name,
+        cutCount: cutCountByRoot.get(id) ?? 0,
+      });
+    },
+    [components, cutCountByRoot],
+  );
+
   const requestResetConfirmation = useCallback(() => {
     setPendingConfirmation({ type: "reset" });
   }, []);
 
   const confirmPendingAction = useCallback(() => {
     if (!pendingConfirmation) return;
+    const action = pendingConfirmation;
     setPendingConfirmation(null);
+    if (action.type === "delete-root") {
+      removeRoot(action.rootId);
+      return;
+    }
     resetActiveStack();
-  }, [pendingConfirmation, resetActiveStack]);
+  }, [pendingConfirmation, removeRoot, resetActiveStack]);
 
   const persistReferenceStack = useCallback(async () => {
     if (savingStack) return;
@@ -1762,6 +1811,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     openComponent,
     selectRoot,
     setPrimaryRoot,
+    requestRootDeletion,
     beginRootCreation,
     promoteToRoot,
     startEditComponent,

@@ -151,6 +151,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     openComponent,
     selectRoot,
     setPrimaryRoot,
+    requestRootDeletion,
     beginRootCreation,
     promoteToRoot,
     startEditComponent,
@@ -779,6 +780,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   cutCountByRoot={cutCountByRoot}
                   onSelect={selectRoot}
                   onSetPrimary={setPrimaryRoot}
+                  onDelete={requestRootDeletion}
                   onNewRoot={beginRootCreation}
                   creating={false}
                   activeReferenceId={item.id}

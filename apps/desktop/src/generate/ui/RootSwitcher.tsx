@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Plus, SquareDashed, Star } from "lucide-react";
+import { ChevronRight, Plus, SquareDashed, Star, Trash2 } from "lucide-react";
 import { extFromName, loadReferenceFile } from "@/lib/tauri/referenceStorage";
 import { blobToDataUrl, blobToObjectUrl } from "../engine/image";
 import type {
@@ -17,6 +17,7 @@ export function RootSwitcher({
   cutCountByRoot,
   onSelect,
   onSetPrimary,
+  onDelete,
   onNewRoot,
   creating,
   groupReferences = [],
@@ -29,6 +30,7 @@ export function RootSwitcher({
   cutCountByRoot: Map<string, number>;
   onSelect: (id: string) => void;
   onSetPrimary: (id: string) => void;
+  onDelete: (id: string) => void;
   onNewRoot: (source?: NewScreenSource) => void;
   creating: boolean;
   groupReferences?: ToolReferenceGroupItem[];
@@ -184,6 +186,7 @@ export function RootSwitcher({
                       count={cutCountByRoot.get(root.id) ?? 0}
                       onSelect={onSelect}
                       onSetPrimary={onSetPrimary}
+                      onDelete={onDelete}
                     />
                   ));
                 }
@@ -214,6 +217,7 @@ export function RootSwitcher({
                   count={cutCountByRoot.get(root.id) ?? 0}
                   onSelect={onSelect}
                   onSetPrimary={onSetPrimary}
+                  onDelete={onDelete}
                 />
               ))}
 
@@ -236,6 +240,7 @@ function RootCard({
   count,
   onSelect,
   onSetPrimary,
+  onDelete,
 }: {
   root: SavedComponent;
   isActive: boolean;
@@ -243,6 +248,7 @@ function RootCard({
   count: number;
   onSelect: (id: string) => void;
   onSetPrimary: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const label = root.isDefaultRoot ? "Full image" : root.name;
   return (
@@ -290,6 +296,20 @@ function RootCard({
         ].join(" ")}
       >
         <Star size={11} strokeWidth={1.8} fill={isPrimary ? "currentColor" : "none"} />
+      </button>
+
+      {/* Delete this screen and its crops. Revealed on hover. */}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete(root.id);
+        }}
+        aria-label="Delete screen"
+        title="Delete screen"
+        className="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full border border-[var(--border-strong)] bg-[rgba(0,0,0,0.55)] text-[var(--text-muted)] opacity-0 backdrop-blur-[2px] transition-all duration-[120ms] hover:border-[#F2555A] hover:text-[#F2555A] group-hover:opacity-100"
+      >
+        <Trash2 size={11} strokeWidth={1.8} />
       </button>
     </div>
   );

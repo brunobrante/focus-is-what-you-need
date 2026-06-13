@@ -39,7 +39,18 @@ export function ConfirmActionModal({
   );
 }
 
-export function confirmationDialogCopy(_action: PendingConfirmation) {
+export function confirmationDialogCopy(action: PendingConfirmation) {
+  if (action.type === "delete-root") {
+    const cutsNote =
+      action.cutCount > 0
+        ? ` and its ${action.cutCount} ${action.cutCount === 1 ? "cut" : "cuts"}`
+        : "";
+    return {
+      title: "Delete screen",
+      description: `This permanently deletes "${action.name}"${cutsNote}. This can't be undone.`,
+      confirmLabel: "Delete screen",
+    };
+  }
   return {
     title: "Reset stack",
     description:
