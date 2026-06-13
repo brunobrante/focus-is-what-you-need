@@ -5,13 +5,13 @@ import {
   Crop,
   Eraser,
   Image as ImageIcon,
+  Layers,
   Loader2,
   Maximize2,
   Minus,
   Move,
   Pencil,
   Plus,
-  RotateCcw,
   Sparkles,
   Wand2,
   X,
@@ -39,6 +39,7 @@ import {
 import { ConfirmActionModal } from "./ui/ConfirmModal";
 import { RootSwitcher } from "./ui/RootSwitcher";
 import { GallerySlider } from "./ui/GallerySlider";
+import { VariantsPanel } from "./ui/VariantsPanel";
 
 import {
   useToolsEditor,
@@ -161,6 +162,9 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     persistReferenceStack,
     canSaveSelection,
     saveSelection,
+    addCutVariant,
+    setCutVariant,
+    removeCutVariant,
     autoDetect,
     uploadImage,
     handleStagePointerLeave,
@@ -189,18 +193,23 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     ? features.textDetection.activeModelId
     : null;
   const hasProcessingFeature = removeBackgroundOn || upscaleOn || removeElementOn;
-  // Session-local processed images keyed by component id; not persisted in v1.
-  const [processedByCutId, setProcessedByCutId] = useState<Record<string, string>>({});
   const [running, setRunning] = useState<{ id: string; kind: ProcessingActionKind } | null>(null);
   // LaMa "remove element" mask-drawing state. The brush paints onto an overlay
-  // canvas on the stage; Apply runs LaMa and stores the result like the other
-  // processing tools (session-local, revertable).
+  // canvas on the stage; Apply runs LaMa and stores the result as a new variant.
   const lama = useLamaInpainting();
   const masking = lama.status === "masking";
 
+  // Which cut's variants panel is open in the sidebar (replaces the tree). Null
+  // shows the normal component tree.
+  const [variantsPanelCutId, setVariantsPanelCutId] = useState<string | null>(null);
+  const variantsPanelCut = variantsPanelCutId
+    ? components.find((component) => component.id === variantsPanelCutId) ?? null
+    : null;
+
   const activeCutId =
     activeSubject.kind === "component" && selectedComponent ? selectedComponent.id : null;
-  const displayUrl = (activeCutId && processedByCutId[activeCutId]) || activeSubject.url;
+  // The open cut already renders its active variant through `activeSubject.url`.
+  const displayUrl = activeSubject.url;
   const runningKind = running && running.id === activeCutId ? running.kind : null;
 
   const imageStack = useMemo<ImageStack | null>(() => {
@@ -220,7 +229,12 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
       })),
     };
   }, [viewMode, activeSubject, stackedComponents]);
-  const canRevert = Boolean(activeCutId && processedByCutId[activeCutId]);
+  // Close the variants panel if its cut is gone (deleted or stack reset).
+  useEffect(() => {
+    if (variantsPanelCutId && !components.some((component) => component.id === variantsPanelCutId)) {
+      setVariantsPanelCutId(null);
+    }
+  }, [components, variantsPanelCutId]);
 
   // Switching to a different cut (or closing it) abandons any in-progress mask,
   // so a mask drawn for one cut can never be applied to another.
@@ -233,13 +247,14 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   async function runProcessing(kind: ProcessingActionKind) {
     if (!selectedComponent || running) return;
     const id = selectedComponent.id;
-    const source = processedByCutId[id] ?? activeSubject.url;
+    // Chain onto the currently shown variant so edits stack (e.g. upscale then
+    // background-remove); the result becomes a new variant and the new main.
+    const source = activeSubject.url;
     setRunning({ id, kind });
     try {
       const input = await urlToBytes(source);
       const output = kind === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
-      setProcessedByCutId((prev) => ({ ...prev, [id]: bytesToPngDataUrl(output) }));
-      // TODO: persist processed result
+      addCutVariant(id, { tool: kind, dataUrl: bytesToPngDataUrl(output) });
     } catch (error) {
       console.error(`Processing (${kind}) failed`, error);
     } finally {
@@ -255,14 +270,13 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     const maskBytes = await lama.readMask();
     // Nothing painted — keep the user in masking mode to draw a selection.
     if (!maskBytes) return;
-    const source = processedByCutId[id] ?? activeSubject.url;
+    const source = activeSubject.url;
     setRunning({ id, kind: "lama" });
     lama.cancel();
     try {
       const input = await urlToBytes(source);
       const output = await runLama(input, maskBytes);
-      setProcessedByCutId((prev) => ({ ...prev, [id]: bytesToPngDataUrl(output) }));
-      // TODO: persist inpainting result to ReferenceRow
+      addCutVariant(id, { tool: "lama", dataUrl: bytesToPngDataUrl(output) });
     } catch (error) {
       console.error("LaMa inpainting failed", error);
     } finally {
@@ -280,17 +294,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     } finally {
       setDrawAction(null);
     }
-  }
-
-  // Reverts the open component back to its original, unprocessed image.
-  function revertProcessing() {
-    if (!activeCutId) return;
-    setProcessedByCutId((prev) => {
-      if (!(activeCutId in prev)) return prev;
-      const next = { ...prev };
-      delete next[activeCutId];
-      return next;
-    });
   }
 
   return (
@@ -389,11 +392,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   </RailToolButton>
                 ) : null}
                 <RailToolButton
-                  label="Revert to original"
-                  disabled={!canRevert || running !== null}
-                  onClick={revertProcessing}
+                  label="Variants"
+                  disabled={!activeCutId || (selectedComponent?.variants?.length ?? 0) <= 1}
+                  onClick={() => activeCutId && setVariantsPanelCutId(activeCutId)}
                 >
-                  <RotateCcw size={18} strokeWidth={1.7} />
+                  <Layers size={18} strokeWidth={1.7} />
                 </RailToolButton>
               </>
             ) : null}
@@ -787,49 +790,61 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   groupId={groupContext?.id}
                 />
 
-                <SidebarComponentsHeader
-                  rootName={activeRoot.isDefaultRoot ? "Full image" : activeRoot.name}
-                  scopedCount={scopedComponents.length}
-                  showReset={scopedComponents.length > 1 || !activeRoot.isDefaultRoot}
-                  showingOriginal={cleanOriginal}
-                  onToggleOriginal={() => setCleanOriginal((v) => !v)}
-                  onExpandAll={expandAllComponents}
-                  onCollapseAll={collapseAllComponents}
-                  onReset={requestResetConfirmation}
-                />
-
-                <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-3">
-                  {componentTree.map((node) => (
-                    <ComponentTreeItem
-                      key={node.component.id}
-                      node={node}
-                      activeId={viewMode === "component" || viewMode === "stack" ? selectedComponentId : null}
-                      hoveredId={hoveredComponentId}
-                      editingId={editingComponentId}
-                      expandedIds={expandedComponentIds}
-                      rootId={rootComponentId}
-                      primaryId={activeScopeId}
-                      textDetectionModelId={textDetectionModelId}
-                      fontDetectionEnabled={features.fontDetection.operational}
-                      onOpen={openTreeComponent}
-                      onToggle={toggleComponentExpanded}
-                      onHover={setHoveredComponentId}
-                      onEdit={startEditComponent}
-                      onRemove={(id) => {
-                        const removedIds = componentSubtreeIds(components, id);
-                        updateComponents((current) =>
-                          current.filter((entry) => !removedIds.has(entry.id)),
-                        );
-                        if (removedIds.has(activeScopeId)) {
-                          setActiveRootId(rootComponentId);
-                          openOriginal();
-                        } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
-                          openOriginal();
-                        }
-                      }}
+                {variantsPanelCut ? (
+                  <VariantsPanel
+                    cut={variantsPanelCut}
+                    onBack={() => setVariantsPanelCutId(null)}
+                    onSetMain={(variantId) => setCutVariant(variantsPanelCut.id, variantId)}
+                    onRemove={(variantId) => removeCutVariant(variantsPanelCut.id, variantId)}
+                  />
+                ) : (
+                  <>
+                    <SidebarComponentsHeader
+                      rootName={activeRoot.isDefaultRoot ? "Full image" : activeRoot.name}
+                      scopedCount={scopedComponents.length}
+                      showReset={scopedComponents.length > 1 || !activeRoot.isDefaultRoot}
+                      showingOriginal={cleanOriginal}
+                      onToggleOriginal={() => setCleanOriginal((v) => !v)}
+                      onExpandAll={expandAllComponents}
+                      onCollapseAll={collapseAllComponents}
+                      onReset={requestResetConfirmation}
                     />
-                  ))}
-                </div>
+
+                    <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-3">
+                      {componentTree.map((node) => (
+                        <ComponentTreeItem
+                          key={node.component.id}
+                          node={node}
+                          activeId={viewMode === "component" || viewMode === "stack" ? selectedComponentId : null}
+                          hoveredId={hoveredComponentId}
+                          editingId={editingComponentId}
+                          expandedIds={expandedComponentIds}
+                          rootId={rootComponentId}
+                          primaryId={activeScopeId}
+                          textDetectionModelId={textDetectionModelId}
+                          fontDetectionEnabled={features.fontDetection.operational}
+                          onOpen={openTreeComponent}
+                          onToggle={toggleComponentExpanded}
+                          onHover={setHoveredComponentId}
+                          onEdit={startEditComponent}
+                          onOpenVariants={setVariantsPanelCutId}
+                          onRemove={(id) => {
+                            const removedIds = componentSubtreeIds(components, id);
+                            updateComponents((current) =>
+                              current.filter((entry) => !removedIds.has(entry.id)),
+                            );
+                            if (removedIds.has(activeScopeId)) {
+                              setActiveRootId(rootComponentId);
+                              openOriginal();
+                            } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
+                              openOriginal();
+                            }
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <SidebarSaveButton
                   saving={savingStack}

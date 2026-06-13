@@ -508,6 +508,7 @@ again, or the canvas ×, returns to the editor.
 - **Builder tab** (default):
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
+  - **Variants** button (Layers icon + count, only when the cut owns more than one variant): opens the **Variants panel** for that cut (see below). A cut gains variants when a non-crop AI tool (Remove background, Upscale, Remove element) runs on it; the plain crop is always kept as the "Original" variant.
   - **Is text?** button (only when the Text Detector feature is enabled in Settings): runs the feature's active model (a DBNet variant or CRAFT) on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
   - **Font?** button (only when the Font Detector feature is enabled in Settings): runs the EfficientNet-B3 font classifier on that cut's image to recognize the **font family**. Idle shows "Font?" with a Baseline icon; while running it shows a spinner and is disabled; on completion it shows the recognized font as a purple pill — the top font name plus its confidence (e.g. "Roboto-Regular 87%"), with the full top-3 guesses in the pill's tooltip — and the button becomes "Detect again"; on failure it shows "Retry". The result is display-only and not persisted in v1.
 - **Stack tab**:
@@ -520,13 +521,19 @@ again, or the canvas ×, returns to the editor.
   - Left/right arrows and dot indicators for navigation (arrow keys also work)
   - Cut name and position counter (e.g. "2 / 5") shown below the image
   - Bottom action bar (when Color Detector, Text Detector, or Font Detector features are enabled): **Colors**, **Text**, and/or **Font** buttons run analysis on the current cut. **Font** runs the EfficientNet-B3 font-classify model and lists the top font-family guesses with confidences (e.g. "Roboto-Regular 87%"). Results are display-only and reset when the cut changes.
+- **Variants panel** (replaces the component tree in the right sidebar when opened from a cut's Variants button or the rail's Variants button; the root switcher above stays visible):
+  - Header: a **Back to tree** button (ChevronLeft) that returns to the tree, the cut's thumbnail and name, and a variant count
+  - One row per variant: a "main" check indicator, thumbnail, the tool label (**Original**, **Background removed**, **Upscaled**, **Element removed**), and a delete button
+  - Clicking a non-main row makes that variant the **main** one — the cut everywhere (tree thumbnail, canvas, Stack, Gallery, snapshot) switches to it
+  - Delete is disabled for the **Original** and for the current **main** variant; deleting any other variant removes it. Selecting **Original** as main reverts the cut to the plain crop.
 
-**Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group:
-- **Remove background** — runs BiRefNet and replaces the open component's canvas image with a transparent-background PNG
-- **Upscale 4×** — runs Real-ESRGAN and replaces the canvas image with the upscaled PNG
-- **Remove element** (Wand2 icon, only when the Remove Element feature is enabled) — enters a mask-drawing mode on the canvas: an overlay appears over the open cut's image and the cursor becomes a brush circle. Dragging paints a semi-transparent red mask over what to remove (the brush stays aligned to the image at any zoom). A floating **Apply / Cancel** toolbar shows at the bottom-center of the canvas: **Apply** runs LaMa inpainting and replaces the canvas image with the result (the rail button shows a spinner while running); **Cancel** (or clicking the rail button again) discards the mask and exits. Crop/Draw selection is suspended while masking.
-- **Revert to original** — discards the processed result and restores the component's original image (enabled only when a processed result exists; also reverts a LaMa removal)
-- Remove background / Upscale / Remove element show an inline spinner while running; results are session-local per component (not persisted in v1)
+**Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group. Non-crop tools do not overwrite the cut — each run adds a **variant** and makes it the main one, keeping the plain crop available as **Original**:
+- **Remove background** — runs BiRefNet and adds a transparent-background PNG variant
+- **Upscale 4×** — runs Real-ESRGAN and adds an upscaled PNG variant
+- **Remove element** (Wand2 icon, only when the Remove Element feature is enabled) — enters a mask-drawing mode on the canvas: an overlay appears over the open cut's image and the cursor becomes a brush circle. Dragging paints a semi-transparent red mask over what to remove (the brush stays aligned to the image at any zoom). A floating **Apply / Cancel** toolbar shows at the bottom-center of the canvas: **Apply** runs LaMa inpainting and adds the result as a variant (the rail button shows a spinner while running); **Cancel** (or clicking the rail button again) discards the mask and exits. Crop/Draw selection is suspended while masking.
+- Each non-crop tool chains onto the currently shown (main) variant, so edits stack (e.g. Upscale then Remove background).
+- **Variants** (Layers icon) — opens the Variants panel for the open cut; enabled only when that cut owns more than one variant.
+- Remove background / Upscale / Remove element show an inline spinner while running; results are stored as variants and persisted with the stack (one PNG per variant) on **Save**.
 - The group requires a cut to be open (Remove background, Upscale, and Remove element are disabled otherwise); if no model is installed, the group does not appear
 
 **Draw toolbar** (centered at the bottom of the canvas, visible whenever the Draw tool is active):
@@ -534,9 +541,9 @@ again, or the canvas ×, returns to the editor.
 - The freehand drawing stays painted on the canvas after you release; it is not committed until you pick an action
 - Shows the bounding-box dimensions once a region is drawn
 - Action buttons, each committing the drawn region as a new cut:
-  - **Crop** — saves the cut as-is (no AI)
-  - **Remove BG** — saves the cut, then runs BiRefNet background removal (only shown when installed)
-  - **Upscale** — saves the cut, then runs Real-ESRGAN 4× (only shown when installed)
+  - **Crop** — saves the cut as-is (no AI), a single Original variant
+  - **Remove BG** — saves the cut with two variants: the plain crop (Original) and a BiRefNet background-removed variant set as main (only shown when installed)
+  - **Upscale** — saves the cut with two variants: the plain crop (Original) and a Real-ESRGAN 4× variant set as main (only shown when installed)
   - **Clear** — discards the current drawing without saving
 - Actions are disabled until a region is drawn; the active one shows a spinner while processing
 

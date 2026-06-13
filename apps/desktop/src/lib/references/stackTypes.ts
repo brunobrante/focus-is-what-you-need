@@ -6,6 +6,15 @@ export type ReferenceStackBox = {
   r?: number;
 };
 
+// One non-crop edit variant of a cut, persisted as its own PNG file. The tool
+// string mirrors the in-memory `CutVariantTool` ("original" | "birefnet" | …).
+export type CutVariantRecord = {
+  id: string;
+  tool: string;
+  file: string;
+  createdAt: string;
+};
+
 export type ReferenceStackItem = {
   id: string;
   name: string;
@@ -16,6 +25,11 @@ export type ReferenceStackItem = {
   createdAt: string;
   // v2: owning root id (which stack this cut belongs to).
   rootId?: string | null;
+  // Non-crop edit history. Absent on cuts written before the variant model; such
+  // cuts read back as a single "original" variant sourced from `file`.
+  variants?: CutVariantRecord[];
+  // Which variant is the main one. The cut's top-level `file` points at it too.
+  activeVariantId?: string;
 };
 
 // v2: an independent root within a single reference. One image/video can hold many.

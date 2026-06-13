@@ -10,6 +10,8 @@ export type {
   ToolReferenceGroupContext,
   ToolReferenceGroupItem,
   NewScreenSource,
+  CutVariant,
+  CutVariantTool,
   SavedComponent,
   PendingConfirmation,
   ComponentTreeNode,

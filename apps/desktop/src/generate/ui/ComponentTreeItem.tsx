@@ -1,4 +1,4 @@
-import { Baseline, ChevronRight, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
+import { Baseline, ChevronRight, Layers, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
 import type { ComponentProps, MouseEvent } from "react";
 import type { ComponentTreeNode } from "../engine/types";
 import { useCraftCheck } from "@/lib/models/useCraftCheck";
@@ -38,6 +38,7 @@ export function ComponentTreeItem({
   onHover,
   onRemove,
   onEdit,
+  onOpenVariants,
 }: {
   node: ComponentTreeNode;
   activeId: string | null;
@@ -55,6 +56,8 @@ export function ComponentTreeItem({
   onHover: (id: string | null) => void;
   onRemove: (id: string) => void;
   onEdit: (id: string) => void;
+  /** Opens the variants panel for a cut that owns more than one variant. */
+  onOpenVariants: (id: string) => void;
 }) {
   const { component, children, depth } = node;
   const active = activeId === component.id;
@@ -66,6 +69,8 @@ export function ComponentTreeItem({
   const canEdit = !isRoot;
   const hasChildren = children.length > 0;
   const expanded = expandedIds.has(component.id);
+  const variantCount = component.variants?.length ?? 0;
+  const hasVariants = variantCount > 1;
 
   return (
     <div className="flex flex-col gap-1">
@@ -113,6 +118,21 @@ export function ComponentTreeItem({
           <CraftCheckButton dataUrl={component.dataUrl} modelId={textDetectionModelId} />
         ) : null}
         {fontDetectionEnabled ? <FontCheckButton dataUrl={component.dataUrl} /> : null}
+        {hasVariants ? (
+          <button
+            type="button"
+            aria-label="Variants"
+            title={`${variantCount} variants`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenVariants(component.id);
+            }}
+            className="flex h-[26px] shrink-0 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-transparent px-1.5 text-[10.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+          >
+            <Layers size={12} strokeWidth={1.8} />
+            <span className="tabular-nums">{variantCount}</span>
+          </button>
+        ) : null}
         <div className="flex shrink-0">
           <IconButton
             aria-label="Edit crop"
@@ -160,6 +180,7 @@ export function ComponentTreeItem({
               onHover={onHover}
               onRemove={onRemove}
               onEdit={onEdit}
+              onOpenVariants={onOpenVariants}
             />
           ))
         : null}

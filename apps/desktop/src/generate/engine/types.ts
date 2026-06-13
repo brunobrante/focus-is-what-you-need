@@ -43,6 +43,21 @@ export type NewScreenSource = {
 
 export type ComponentKind = "root" | "cut";
 
+// A non-crop image edit applied to a cut. "original" is the plain crop; every
+// other tool produces an alternative image while keeping the original around.
+export type CutVariantTool = "original" | "birefnet" | "realEsrgan" | "lama";
+
+// One alternative image for a cut, produced by a non-crop AI tool. A cut owns a
+// list of these; exactly one (`activeVariantId`) is the "main" and its `dataUrl`
+// is mirrored onto the cut's own `dataUrl` so the rest of the app renders it
+// without knowing about variants.
+export type CutVariant = {
+  id: string;
+  tool: CutVariantTool;
+  dataUrl: string;
+  createdAt: string;
+};
+
 export type SavedComponent = {
   id: string;
   name: string;
@@ -62,6 +77,11 @@ export type SavedComponent = {
   // The "main" screen of the reference: the one shown on the front of the card.
   // At most one root carries this; it is persisted as the stack's primary id.
   isPrimaryRoot?: boolean;
+  // Non-crop edit history for a cut. Absent => a legacy single-variant cut whose
+  // only image is `dataUrl`. When present, `dataUrl` mirrors the active variant.
+  variants?: CutVariant[];
+  // Which variant is the "main". Defaults to the "original" variant when unset.
+  activeVariantId?: string;
 };
 
 export type PendingConfirmation =

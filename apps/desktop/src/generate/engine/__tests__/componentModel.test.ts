@@ -166,3 +166,32 @@ test("referenceStackDataFromComponents emits roots and cuts as a v2 stack", () =
   expect(data.components[0]).toMatchObject({ rootId: "root-rA", parentId: "root-rA" });
   expect(data.components[0]?.file).toBeTruthy();
 });
+
+test("referenceStackDataFromComponents emits cut variants and points file at the active one", () => {
+  const rootId = sourceRootComponentId(reference.id);
+  const cutWithVariants: SavedComponent = {
+    ...component("cut-v", { x: 10, y: 10, w: 100, h: 50 }),
+    variants: [
+      { id: "v-original", tool: "original", dataUrl: "data:image/png;base64,AA==", createdAt: "2026-01-01T00:00:00.000Z" },
+      { id: "v-nobg", tool: "birefnet", dataUrl: "data:image/png;base64,BB==", createdAt: "2026-01-02T00:00:00.000Z" },
+    ],
+    activeVariantId: "v-nobg",
+  };
+  const components = ensureRootComponent([cutWithVariants], reference);
+
+  const data = referenceStackDataFromComponents({
+    item: reference,
+    components,
+    rootComponentId: rootId,
+    primaryComponentId: rootId,
+  });
+
+  const record = data.components.find((entry) => entry.id === "cut-v");
+  expect(record?.activeVariantId).toBe("v-nobg");
+  expect(record?.variants?.map((variant) => variant.tool)).toEqual(["original", "birefnet"]);
+  // Each variant gets its own file, and the cut's legacy `file` is the active one.
+  const activeFile = record?.variants?.find((variant) => variant.id === "v-nobg")?.file;
+  expect(activeFile).toBeTruthy();
+  expect(record?.file).toBe(activeFile);
+  expect(record?.variants?.[0].file).not.toBe(record?.variants?.[1].file);
+});

@@ -66,6 +66,13 @@ import {
   componentAncestorIds,
 } from "../engine/componentTree";
 import {
+  addVariant,
+  setActiveVariant as setActiveVariantOn,
+  removeVariant as removeVariantFrom,
+  setOriginalVariantImage,
+} from "../engine/variants";
+import type { CutVariantTool } from "../types";
+import {
   readSavedComponents,
   writeSavedComponents,
   writeDraftComponents,
@@ -230,6 +237,9 @@ export type ToolsEditorState = {
   selectionToSubjectCoords: (box: CropBox) => CropBox | null;
   toOriginalCoords: (subjectBox: CropBox) => CropBox;
   saveSelection: (postProcess?: ProcessingFeatureKey) => Promise<void>;
+  addCutVariant: (cutId: string, input: { tool: CutVariantTool; dataUrl: string }) => void;
+  setCutVariant: (cutId: string, variantId: string) => void;
+  removeCutVariant: (cutId: string, variantId: string) => void;
   autoDetect: (modelId: string | null) => Promise<void>;
   uploadImage: (file: File | null | undefined) => Promise<void>;
   updateIdleCursorAndHover: (event: PointerEvent<HTMLDivElement>) => void;
@@ -999,14 +1009,17 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       }
     }
 
-    // Optionally run an AI model on the freshly cropped image and bake the
-    // result into the cut. On failure, fall back to the plain crop.
+    // Optionally run an AI model on the freshly cropped image. Its output is
+    // kept as a separate variant (and made the main one) so the plain crop
+    // ("original") stays available to switch back to. On failure, we just keep
+    // the plain crop with no extra variant.
+    let processed: { tool: CutVariantTool; dataUrl: string } | null = null;
     if (postProcess) {
       try {
         const input = await urlToBytes(dataUrl);
         const output =
           postProcess === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
-        dataUrl = bytesToPngDataUrl(output);
+        processed = { tool: postProcess as CutVariantTool, dataUrl: bytesToPngDataUrl(output) };
       } catch (error) {
         console.error(`Draw post-process (${postProcess}) failed`, error);
       }
@@ -1015,11 +1028,14 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     if (editingComponentId) {
       const editedId = editingComponentId;
       updateComponents((current) =>
-        current.map((entry) =>
-          entry.id === editedId
-            ? { ...entry, box: sourceBox, dataUrl, type: entry.type || "PNG" }
-            : entry,
-        ),
+        current.map((entry) => {
+          if (entry.id !== editedId) return entry;
+          // Re-cropping replaces the "original" variant's pixels; existing AI
+          // variants are preserved. A post-processed re-crop appends a variant.
+          let next = setOriginalVariantImage({ ...entry, box: sourceBox }, dataUrl);
+          if (processed) next = addVariant(next, { ...processed, createdAt: new Date().toISOString() });
+          return next;
+        }),
       );
       setEditingComponentId(null);
       setExpandedComponentIds((current) => {
@@ -1037,20 +1053,21 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
     const parentId = activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
     const rootId = activeSubject.rootId ?? activeScopeId;
-    updateComponents((current) => [
-      {
-        id: nextId,
-        name: shortComponentName(nextId),
-        box: sourceBox,
-        dataUrl,
-        type: "PNG",
-        createdAt: new Date().toISOString(),
-        parentId,
-        kind: "cut",
-        rootId,
-      },
-      ...current,
-    ]);
+    const createdAt = new Date().toISOString();
+    let cut: SavedComponent = {
+      id: nextId,
+      name: shortComponentName(nextId),
+      box: sourceBox,
+      dataUrl,
+      type: "PNG",
+      createdAt,
+      parentId,
+      kind: "cut",
+      rootId,
+    };
+    // Seeds both the "original" (plain crop) and the processed variant in one go.
+    if (processed) cut = addVariant(cut, { ...processed, createdAt });
+    updateComponents((current) => [cut, ...current]);
     setExpandedComponentIds((current) => {
       const next = new Set(current);
       next.add(parentId);
@@ -1075,6 +1092,44 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     toOriginalCoords,
     updateComponents,
   ]);
+
+  // --- Cut variants (non-crop AI edits) -----------------------------------
+
+  // Appends an AI-edited image as a new variant of `cutId` and makes it the
+  // main one. The cut's "original" (plain crop) is kept and stays selectable.
+  const addCutVariant = useCallback(
+    (cutId: string, input: { tool: CutVariantTool; dataUrl: string }) => {
+      const createdAt = new Date().toISOString();
+      updateComponents((current) =>
+        current.map((entry) =>
+          entry.id === cutId && entry.parentId != null
+            ? addVariant(entry, { ...input, createdAt })
+            : entry,
+        ),
+      );
+    },
+    [updateComponents],
+  );
+
+  // Switches which stored variant of `cutId` is the main one.
+  const setCutVariant = useCallback(
+    (cutId: string, variantId: string) => {
+      updateComponents((current) =>
+        current.map((entry) => (entry.id === cutId ? setActiveVariantOn(entry, variantId) : entry)),
+      );
+    },
+    [updateComponents],
+  );
+
+  // Deletes a non-original variant; if it was the main one, falls back to original.
+  const removeCutVariant = useCallback(
+    (cutId: string, variantId: string) => {
+      updateComponents((current) =>
+        current.map((entry) => (entry.id === cutId ? removeVariantFrom(entry, variantId) : entry)),
+      );
+    },
+    [updateComponents],
+  );
 
   // --- Auto-detect (switchable model) -------------------------------------
 
@@ -1824,6 +1879,9 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectionToSubjectCoords,
     toOriginalCoords,
     saveSelection,
+    addCutVariant,
+    setCutVariant,
+    removeCutVariant,
     autoDetect,
     uploadImage,
     updateIdleCursorAndHover,

@@ -1,8 +1,9 @@
-import type { SavedComponent, ToolReference, CropBox } from "./types";
+import type { SavedComponent, ToolReference, CropBox, CutVariant, CutVariantTool } from "./types";
 import { CUT_MATCH_IOU_THRESHOLD, HIERARCHY_MIN_AREA_DELTA } from "../types";
 import { intersectCropBoxes } from "./geometry";
 import { clamp } from "./geometry";
 import { blobToDataUrl, dataUrlToBlob, safeStackFileName } from "./image";
+import { cutVariants, resolveActiveVariantId, ORIGINAL_VARIANT_ID } from "./variants";
 import {
   extFromName,
   loadReferenceStackFile,
@@ -21,6 +22,11 @@ import {
 } from "@/lib/references/stackTypes";
 
 const REFERENCE_STACK_IO_CONCURRENCY = 3;
+
+// On-disk PNG name for a single variant of a cut, e.g. `c-abcd__v-1234.png`.
+function variantStackFileName(cutId: string, variantId: string): string {
+  return safeStackFileName(`${cutId}__${variantId}`);
+}
 
 export function sourceRootComponentId(sourceId: string) {
   return `root-${sourceId}`;
@@ -305,16 +311,31 @@ export function referenceStackDataFromComponents(input: {
     // Legacy single-root fields kept for v1 readers.
     rootComponentId: defaultRootId,
     primaryComponentId,
-    components: cuts.map((component) => ({
-      id: component.id,
-      name: component.name,
-      type: component.type || "PNG",
-      box: component.box,
-      file: safeStackFileName(component.id),
-      parentId: component.parentId ?? component.rootId ?? defaultRootId,
-      rootId: component.rootId ?? defaultRootId,
-      createdAt: component.createdAt || updatedAt,
-    })),
+    components: cuts.map((component) => {
+      const variants = cutVariants(component);
+      const activeId = resolveActiveVariantId(component);
+      const variantRecords = variants.map((variant) => ({
+        id: variant.id,
+        tool: variant.tool,
+        file: variantStackFileName(component.id, variant.id),
+        createdAt: variant.createdAt || component.createdAt || updatedAt,
+      }));
+      const activeRecord = variantRecords.find((record) => record.id === activeId) ?? variantRecords[0];
+      return {
+        id: component.id,
+        name: component.name,
+        type: component.type || "PNG",
+        box: component.box,
+        // Legacy field: points at the active variant's file so older readers and
+        // the rest of the app that reads `file` still get the main image.
+        file: activeRecord ? activeRecord.file : safeStackFileName(component.id),
+        parentId: component.parentId ?? component.rootId ?? defaultRootId,
+        rootId: component.rootId ?? defaultRootId,
+        createdAt: component.createdAt || updatedAt,
+        variants: variantRecords,
+        activeVariantId: activeId,
+      };
+    }),
     updatedAt,
   };
 }
@@ -343,13 +364,24 @@ export async function writeReferenceStackFromComponents(input: {
   primaryComponentId: string;
 }): Promise<ReferenceStackData | null> {
   const components = ensureRootComponent(input.components, input.item);
-  // Persist a PNG for every cut and every non-default root (the default root's
-  // pixels are the original image, so it needs no file).
-  const filesToWrite = components.filter(
-    (component) => component.parentId != null || !component.isDefaultRoot,
-  );
+  // Persist one PNG per cut variant and one PNG per non-default root (the default
+  // root's pixels are the original image, so it needs no file).
+  const fileSources: Array<{ fileName: string; dataUrl: string }> = [];
+  for (const component of components) {
+    if (component.parentId == null) {
+      if (component.isDefaultRoot) continue;
+      fileSources.push({ fileName: safeStackFileName(component.id), dataUrl: component.dataUrl });
+    } else {
+      for (const variant of cutVariants(component)) {
+        fileSources.push({
+          fileName: variantStackFileName(component.id, variant.id),
+          dataUrl: variant.dataUrl,
+        });
+      }
+    }
+  }
 
-  if (filesToWrite.length === 0) {
+  if (fileSources.length === 0) {
     await removeReferenceStack(input.item.id);
     await updateReferenceStackMeta(input.item.id, null);
     return null;
@@ -358,11 +390,11 @@ export async function writeReferenceStackFromComponents(input: {
   const data = referenceStackDataFromComponents({ ...input, components });
 
   const files = await mapWithConcurrency(
-    filesToWrite,
+    fileSources,
     REFERENCE_STACK_IO_CONCURRENCY,
-    async (component) => ({
-      fileName: safeStackFileName(component.id),
-      dataB64: await dataUrlToBase64(component.dataUrl),
+    async (source) => ({
+      fileName: source.fileName,
+      dataB64: await dataUrlToBase64(source.dataUrl),
     }),
   );
 
@@ -447,19 +479,54 @@ export async function readReferenceStackComponents(item: ToolReference): Promise
       cutRecords,
       REFERENCE_STACK_IO_CONCURRENCY,
       async (component): Promise<SavedComponent | null> => {
-        if (!component.file) return null;
-        const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
-        if (!blob) return null;
+        // Migration: cuts written before the variant model carry no `variants`,
+        // so synthesise a single "original" variant from the legacy `file`.
+        const variantRecords =
+          component.variants && component.variants.length > 0
+            ? component.variants
+            : component.file
+              ? [
+                  {
+                    id: ORIGINAL_VARIANT_ID,
+                    tool: "original",
+                    file: component.file,
+                    createdAt: component.createdAt,
+                  },
+                ]
+              : [];
+        if (variantRecords.length === 0) return null;
+        const loaded = await Promise.all(
+          variantRecords.map(async (record): Promise<CutVariant | null> => {
+            const blob = await loadReferenceStackFile(item.id, record.file, "image/png");
+            return blob
+              ? {
+                  id: record.id,
+                  tool: record.tool as CutVariantTool,
+                  dataUrl: await blobToDataUrl(blob),
+                  createdAt: record.createdAt,
+                }
+              : null;
+          }),
+        );
+        const variants = loaded.filter((variant): variant is CutVariant => variant != null);
+        if (variants.length === 0) return null;
+        const activeId =
+          component.activeVariantId && variants.some((v) => v.id === component.activeVariantId)
+            ? component.activeVariantId
+            : (variants.find((v) => v.tool === "original") ?? variants[0]).id;
+        const active = variants.find((v) => v.id === activeId) ?? variants[0];
         return {
           id: component.id,
           name: component.name,
           box: component.box,
-          dataUrl: await blobToDataUrl(blob),
+          dataUrl: active.dataUrl,
           type: component.type || "PNG",
           createdAt: component.createdAt,
           parentId: component.parentId,
           rootId: component.rootId ?? defaultRootId,
           kind: "cut",
+          variants,
+          activeVariantId: activeId,
         };
       },
     ),
