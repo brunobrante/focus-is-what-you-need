@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Modal, ModalBody } from "@/components/modals/Modal";
-import { ZoomControls, ZOOM_STEPS, ZOOM_DEFAULT_IDX } from "@/components/screen/ZoomControls";
+import { ZoomControls } from "@/components/screen/ZoomControls";
+import { useStepZoom } from "@/components/screen/useStepZoom";
 import { IconChevronDown, IconClose, IconOpenCanvas, IconSpinner } from "@/components/icons";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
@@ -47,7 +48,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const [scene, setScene] = useState<Scene | null>(null);
     const [selectedId, setSelectedId] = useState("");
     const [pickerOpen, setPickerOpen] = useState(false);
-    const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
+    const stageRef = useRef<HTMLDivElement>(null);
+    const zoomCtl = useStepZoom(stageRef, { keyboard: true, enabled: isOpen });
     const pickerTriggerRef = useRef<HTMLButtonElement>(null);
     const pickerDropRef = useRef<HTMLDivElement>(null);
 
@@ -82,7 +84,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
       if (!isOpen || !scene) return;
       setSelectedId(scene.root.id);
       setPickerOpen(false);
-      setZoomIdx(ZOOM_DEFAULT_IDX);
+      zoomCtl.reset();
     }, [isOpen, scene?.root.id]);
 
     useEffect(() => {
@@ -107,7 +109,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
       setScene((prev) => (prev ? updateNodeInScene(prev, selectedNode.id, patch) : prev));
     };
 
-    const z = ZOOM_STEPS[zoomIdx] ?? 1;
+    const z = zoomCtl.zoom;
 
     if (!config) return null;
 
@@ -149,6 +151,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
           <>
           <div className="grid h-full min-h-[640px] grid-cols-[minmax(0,1fr)_360px]">
             <div
+              ref={stageRef}
               className="relative min-h-0 overflow-hidden border-r border-[var(--border)]"
               style={{
                 background:
@@ -191,10 +194,10 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                 </div>
               </div>
               <ZoomControls
-                index={zoomIdx}
-                onZoomIn={() => setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
-                onZoomOut={() => setZoomIdx((i) => Math.max(i - 1, 0))}
-                onReset={() => setZoomIdx(ZOOM_DEFAULT_IDX)}
+                index={zoomCtl.index}
+                onZoomIn={zoomCtl.zoomIn}
+                onZoomOut={zoomCtl.zoomOut}
+                onReset={zoomCtl.reset}
               />
             </div>
 

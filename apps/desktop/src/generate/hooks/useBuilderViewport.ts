@@ -6,10 +6,26 @@ import {
   type WheelEvent,
 } from "react";
 
+import { zoomToCursorOffset } from "@/domain/zoom";
 import { clamp, clampToolPan } from "../engine/geometry";
 import { MIN_TOOL_ZOOM, MAX_TOOL_ZOOM } from "../types";
 
 export type ToolPan = { x: number; y: number };
+
+// The cursor position relative to the stage centre — the anchor space for the
+// stage's `transform-origin: center` translate+scale, where `screen = pan +
+// world * zoom`. Returns the centre (no offset) when the viewport is unavailable.
+function cursorOffsetFromCenter(
+  event: WheelEvent<HTMLDivElement>,
+  viewport: HTMLDivElement | null,
+): ToolPan {
+  if (!viewport) return { x: 0, y: 0 };
+  const rect = viewport.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left - rect.width / 2,
+    y: event.clientY - rect.top - rect.height / 2,
+  };
+}
 
 /**
  * Owns the Builder stage viewport: user zoom (`toolZoom`) and pan offset
@@ -35,14 +51,18 @@ export function useBuilderViewport({
     setToolPan({ x: 0, y: 0 });
   }, []);
 
-  const changeToolZoom = useCallback((direction: 1 | -1) => {
+  const changeToolZoom = useCallback((direction: 1 | -1, anchor?: ToolPan) => {
     setToolZoom((current) => {
       if (direction < 0 && current <= MIN_TOOL_ZOOM) return MIN_TOOL_ZOOM;
       const multiplier = direction > 0 ? 1.14 : 1 / 1.14;
-      const next = clamp(current * multiplier, MIN_TOOL_ZOOM, MAX_TOOL_ZOOM);
-      const rounded = Number(next.toFixed(2));
-      setToolPan((pan) => clampToolPan(pan, rounded, stageViewportRef.current, imgRef.current));
-      return rounded;
+      const next = Number(clamp(current * multiplier, MIN_TOOL_ZOOM, MAX_TOOL_ZOOM).toFixed(2));
+      setToolPan((pan) => {
+        // Anchor the zoom under the cursor (wheel) so the point stays put; with no
+        // anchor (the +/- buttons) the pan is kept, i.e. zoom about the centre.
+        const anchored = anchor ? zoomToCursorOffset(anchor, pan, current, next) : pan;
+        return clampToolPan(anchored, next, stageViewportRef.current, imgRef.current);
+      });
+      return next;
     });
   }, [imgRef, stageViewportRef]);
 
@@ -52,10 +72,11 @@ export function useBuilderViewport({
       event.preventDefault();
 
       if (event.ctrlKey || event.metaKey || event.altKey || toolZoom <= MIN_TOOL_ZOOM) {
+        const anchor = cursorOffsetFromCenter(event, stageViewportRef.current);
         if (event.deltaY < 0) {
-          changeToolZoom(1);
+          changeToolZoom(1, anchor);
         } else if (toolZoom > MIN_TOOL_ZOOM) {
-          changeToolZoom(-1);
+          changeToolZoom(-1, anchor);
         }
         return;
       }

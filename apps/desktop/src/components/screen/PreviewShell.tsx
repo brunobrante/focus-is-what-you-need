@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { NavTooltip } from "./NavTooltip";
-import { ZOOM_DEFAULT_IDX, ZOOM_STEPS, ZoomControls } from "./ZoomControls";
+import { ZOOM_DEFAULT_IDX, ZoomControls } from "./ZoomControls";
+import { useStepZoom } from "./useStepZoom";
 import { IconChevronDown, IconChevronLeft, IconChevronRight, IconFastEdit, IconOpenCanvas } from "@/components/icons";
 
 type NeighborScreen = { name: string; details?: string[]; href?: string; screenId?: string };
@@ -34,7 +35,8 @@ export function PreviewShell({
   prev,
   next,
 }: Props) {
-  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const zoomCtl = useStepZoom(stageRef, { keyboard: true });
   const [paneHover, setPaneHover] = useState(false);
   const [deviceActive, setDeviceActive] = useState(false);
   const [deviceId, setDeviceId] = useState(DEVICE_OPTIONS[0]?.id ?? "iphone-15");
@@ -42,8 +44,8 @@ export function PreviewShell({
   const [deviceMenuPos, setDeviceMenuPos] = useState<{ top: number; left: number } | null>(null);
   const deviceTriggerRef = useRef<HTMLButtonElement>(null);
   const deviceMenuRef = useRef<HTMLDivElement>(null);
-  const z = ZOOM_STEPS[zoomIdx] ?? 1;
-  const isZoomed = zoomIdx !== ZOOM_DEFAULT_IDX;
+  const z = zoomCtl.zoom;
+  const isZoomed = zoomCtl.index !== ZOOM_DEFAULT_IDX;
   const overlayHidden = isZoomed && !paneHover;
   const overlayClass = [
     "transition-opacity duration-[180ms]",
@@ -85,6 +87,7 @@ export function PreviewShell({
 
   return (
     <div
+      ref={stageRef}
       onMouseEnter={() => setPaneHover(true)}
       onMouseLeave={() => setPaneHover(false)}
       className="relative flex flex-1 items-center justify-center overflow-hidden"
@@ -264,10 +267,10 @@ export function PreviewShell({
 
       {/* zoom controls (always visible) */}
       <ZoomControls
-        index={zoomIdx}
-        onZoomIn={() => setZoomIdx((i) => Math.min(ZOOM_STEPS.length - 1, i + 1))}
-        onZoomOut={() => setZoomIdx((i) => Math.max(0, i - 1))}
-        onReset={() => setZoomIdx(ZOOM_DEFAULT_IDX)}
+        index={zoomCtl.index}
+        onZoomIn={zoomCtl.zoomIn}
+        onZoomOut={zoomCtl.zoomOut}
+        onReset={zoomCtl.reset}
       />
     </div>
   );

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { IconImage } from "@/components/icons";
-import { ZoomControls, ZOOM_STEPS, ZOOM_DEFAULT_IDX } from "@/components/screen/ZoomControls";
+import { ZoomControls } from "@/components/screen/ZoomControls";
+import { useStepZoom } from "@/components/screen/useStepZoom";
 import {
   SceneCanvasInspector,
   type ImageStack,
@@ -37,13 +38,15 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
   const [preview, setPreview] = useState<StackPreviewState | null>(null);
   const [loading, setLoading] = useState(isStack);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT_IDX);
+  const stageRef = useRef<HTMLDivElement>(null);
+  // Wheel-only here (keyboard off): the canvas owns the global Cmd± shortcuts.
+  const zoomCtl = useStepZoom(stageRef);
   // Plain-image background: baked thumbnail when present, else the blob-store
   // original (adapter-aware, uncapped). Unused for stacks (they load their graph).
   const { url: imageUrl } = useReferenceRowImage(reference, { eager: true });
 
   useEffect(() => {
-    setZoomIdx(ZOOM_DEFAULT_IDX);
+    zoomCtl.reset();
   }, [reference.id]);
 
   // Load the stack graph (cuts + per-cut object URLs) only for stack cards.
@@ -125,7 +128,7 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
 
   const selectedNode = selectedId && tree.length ? findStackNode(tree, selectedId) : null;
   const selectedUrl = selectedId && preview ? preview.urls[selectedId] : undefined;
-  const z = ZOOM_STEPS[zoomIdx] ?? 1;
+  const z = zoomCtl.zoom;
 
   return (
     <div className="absolute inset-0 flex">
@@ -164,7 +167,7 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
       ) : null}
 
       {/* Stage — the zoomable SceneCanvasInspector */}
-      <div className="relative min-w-0 flex-1">
+      <div ref={stageRef} className="relative min-w-0 flex-1">
         <div className="absolute inset-0 flex items-center justify-center overflow-auto p-6 pt-16 pb-32">
           {imageStack ? (
             <div
@@ -221,10 +224,10 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
 
         {imageStack ? (
           <ZoomControls
-            index={zoomIdx}
-            onZoomIn={() => setZoomIdx((i) => Math.min(i + 1, ZOOM_STEPS.length - 1))}
-            onZoomOut={() => setZoomIdx((i) => Math.max(i - 1, 0))}
-            onReset={() => setZoomIdx(ZOOM_DEFAULT_IDX)}
+            index={zoomCtl.index}
+            onZoomIn={zoomCtl.zoomIn}
+            onZoomOut={zoomCtl.zoomOut}
+            onReset={zoomCtl.reset}
           />
         ) : null}
       </div>

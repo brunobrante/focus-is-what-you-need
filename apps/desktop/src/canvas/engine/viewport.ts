@@ -1,3 +1,4 @@
+import { USER_MAX_ZOOM, USER_MIN_ZOOM } from "@/domain/zoom";
 import { clamp } from "./geometry";
 import type { Point, Rect, Size, ViewportMatrix, ViewportMode } from "./types";
 
@@ -17,8 +18,8 @@ export type ViewportTransform = ViewportTransformInput & {
   cssTransform: string;
 };
 
-export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 25;
+export const MIN_ZOOM = USER_MIN_ZOOM;
+export const MAX_ZOOM = USER_MAX_ZOOM;
 export const DRAFT_MAX_ZOOM = 250;
 export const ZOOM_STEP = 0.25;
 export const VIEWPORT_EPSILON = 0.01;

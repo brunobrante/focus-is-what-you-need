@@ -1,3 +1,5 @@
+import { USER_MAX_ZOOM, USER_MIN_ZOOM } from "@/domain/zoom";
+
 export type SidebarTab = "components" | "config";
 export type EditorTool = "move" | "crop" | "draw";
 
@@ -42,8 +44,8 @@ export {
 } from "./engine/storage";
 
 export const SELECTION_MIN_SIZE = 8;
-export const MIN_TOOL_ZOOM = 1;
-export const MAX_TOOL_ZOOM = 25;
+export const MIN_TOOL_ZOOM = USER_MIN_ZOOM;
+export const MAX_TOOL_ZOOM = USER_MAX_ZOOM;
 export const CUT_MATCH_IOU_THRESHOLD = 0.88;
 export const HIERARCHY_MIN_AREA_DELTA = 16;
 export const CROPS_OVERLAY_ALPHA = 0.22;

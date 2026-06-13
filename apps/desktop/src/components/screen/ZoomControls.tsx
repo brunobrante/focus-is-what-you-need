@@ -1,6 +1,9 @@
 import { IconExpand, IconMinus, IconPlus } from "@/components/icons";
+import { USER_MAX_ZOOM, USER_MIN_ZOOM } from "@/domain/zoom";
 
-export const ZOOM_STEPS = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.5, 15.0, 20.0, 25.0];
+// Discrete zoom stops for the snapshot viewers. The endpoints are pinned to the
+// shared user-facing range so the viewers can never drift from the canvas/Builder.
+export const ZOOM_STEPS = [USER_MIN_ZOOM, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.5, 15.0, 20.0, USER_MAX_ZOOM];
 export const ZOOM_DEFAULT_IDX = 0;
 
 type Props = {
