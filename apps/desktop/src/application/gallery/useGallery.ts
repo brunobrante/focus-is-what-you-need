@@ -14,7 +14,7 @@ import {
   useReferencesByProject,
   useScreens,
 } from "@/lib/storage/hooks";
-import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
+import { deleteComponentTree, type InstanceDeleteStrategy } from "@/lib/storage/repos/components.repo";
 import { deleteScreen } from "@/lib/storage/repos/screens.repo";
 import type { NewScreenModalHandle } from "@/components/modals/NewScreenModal";
 import type { NewComponentModalHandle } from "@/components/modals/NewComponentModal";
@@ -130,8 +130,8 @@ export interface GalleryState {
   handleScreenCreated: (screen: ScreenRow) => void;
   handleComponentCreated: (result: { component: ComponentRow }) => void;
   handleSettingsSaved: (updatedProject: ProjectRow) => void;
-  handleConfirmDeleteScreen: () => Promise<void>;
-  handleConfirmDeleteComponent: () => Promise<void>;
+  handleConfirmDeleteScreen: (strategy?: InstanceDeleteStrategy) => Promise<void>;
+  handleConfirmDeleteComponent: (strategy?: InstanceDeleteStrategy) => Promise<void>;
 }
 
 export function useGallery(projectId: string): GalleryState {
@@ -179,15 +179,21 @@ export function useGallery(projectId: string): GalleryState {
     navigate(`/project/${encodeURIComponent(updatedProject.id)}`, { replace: true });
   };
 
-  const handleConfirmDeleteScreen = async () => {
+  const handleConfirmDeleteScreen = async (strategy?: InstanceDeleteStrategy) => {
     if (!pendingScreenDelete) return;
-    await deleteScreen(pendingScreenDelete.id);
+    await deleteScreen(
+      pendingScreenDelete.id,
+      strategy ? { instanceStrategy: strategy } : undefined,
+    );
     setPendingScreenDelete(null);
   };
 
-  const handleConfirmDeleteComponent = async () => {
+  const handleConfirmDeleteComponent = async (strategy?: InstanceDeleteStrategy) => {
     if (!pendingComponentDelete) return;
-    await deleteComponentTree(pendingComponentDelete.id);
+    await deleteComponentTree(
+      pendingComponentDelete.id,
+      strategy ? { instanceStrategy: strategy } : undefined,
+    );
     setPendingComponentDelete(null);
   };
 

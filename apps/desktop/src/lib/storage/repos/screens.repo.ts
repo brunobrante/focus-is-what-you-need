@@ -4,10 +4,14 @@ import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
   listTopLevelByScreen,
+  type InstanceDeleteStrategy,
 } from "@/lib/storage/repos/components.repo";
 import {
+  countInstanceUsages,
+  detachInstancesOfComponents,
   getSceneByOwner,
   linkifyChildComponentsInGraph,
+  removeInstancesOfComponents,
   upsertScene,
 } from "@/lib/storage/repos/scenes.repo";
 import type {
@@ -149,7 +153,29 @@ export async function updateScreen(
   return next;
 }
 
-export async function deleteScreen(screenId: string): Promise<void> {
+/** Collects all component ids owned (transitively) by a screen. */
+async function screenComponentIds(screenId: string): Promise<Set<string>> {
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const topLevelIds = components
+    .filter((c) => c.screenId === screenId && c.parentVariantId === null)
+    .map((c) => c.id);
+  const ids = new Set<string>();
+  for (const id of topLevelIds) {
+    collectComponentTreeIds(id, components, variants).forEach((childId) => ids.add(childId));
+  }
+  return ids;
+}
+
+/** Number of linked instances elsewhere that reference any of this screen's components. */
+export async function countScreenInstanceUsages(screenId: string): Promise<number> {
+  return countInstanceUsages(await screenComponentIds(screenId));
+}
+
+export async function deleteScreen(
+  screenId: string,
+  opts?: { instanceStrategy?: InstanceDeleteStrategy },
+): Promise<void> {
   const screens = await listScreens();
   const screen = screens.find((r) => r.id === screenId);
   if (!screen) return;
@@ -168,6 +194,13 @@ export async function deleteScreen(screenId: string): Promise<void> {
   const variantIds = new Set(
     variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
   );
+
+  // Resolve linked instances of this screen's components before they disappear.
+  if (opts?.instanceStrategy === "detach") {
+    await detachInstancesOfComponents(componentIds);
+  } else if (opts?.instanceStrategy === "cascade") {
+    await removeInstancesOfComponents(componentIds);
+  }
 
   await replaceTable<ScreenRow>(
     KEY,

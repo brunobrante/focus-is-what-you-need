@@ -319,6 +319,168 @@ export function linkifyChildComponentsInGraph(
   return serializeHtmlCanvasDocument({ ...doc, nodes: nextNodes, updatedAt: Date.now() });
 }
 
+/**
+ * Permanently materializes linked instances of the given master components into
+ * their parent scene: each matching instance node is replaced by a deep copy of the
+ * master subject subtree (fresh ids, unlocked, link cleared). Nested instances inside
+ * the master are preserved as bare instance nodes so their links survive. This is the
+ * storage-level "detach" used when a master is about to be deleted.
+ */
+export function materializeInstancesInGraph(
+  graphJSON: string,
+  shouldMaterialize: (componentId: string) => boolean,
+  getMasterGraph: (variantId: string) => string | null,
+): string | null {
+  const doc = htmlCanvasDocumentFromJSON(graphJSON);
+  if (!doc) return null;
+  const targets = doc.nodes.filter(
+    (n) => n.instanceOf && shouldMaterialize(n.instanceOf.componentId),
+  );
+  if (targets.length === 0) return null;
+
+  let nodes = doc.nodes;
+  const usedIds = new Set(nodes.map((n) => n.id));
+
+  for (const target of targets) {
+    const ref = target.instanceOf!;
+    const masterGraph = getMasterGraph(ref.variantId);
+    const master = masterGraph ? htmlCanvasDocumentFromJSON(masterGraph) : null;
+    const subject = master ? subjectNodeForDocument(master) : null;
+    if (!master || !subject) {
+      // No master to inline — just drop the link so it becomes plain content.
+      nodes = nodes.map((n) => (n.id === target.id ? { ...n, instanceOf: null } : n));
+      continue;
+    }
+
+    const childByParent = groupNodesByParent(master.nodes);
+    const idMap = new Map<string, string>([[subject.id, target.id]]);
+    const merged: HtmlCanvasNode = {
+      ...subject,
+      id: target.id,
+      parentId: target.parentId,
+      order: target.order,
+      name: target.name,
+      cssId: target.cssId,
+      className: target.className,
+      tag: target.tag,
+      bounds: { ...target.bounds },
+      visible: target.visible,
+      locked: false,
+      instanceOf: null,
+    };
+
+    const appended: HtmlCanvasNode[] = [];
+    const appendChildren = (sourceParentId: string, fallbackParentId: string): void => {
+      for (const childNode of childByParent.get(sourceParentId) ?? []) {
+        const nextId = uniqueNodeId(`${target.id}~${childNode.id}`, usedIds);
+        usedIds.add(nextId);
+        idMap.set(childNode.id, nextId);
+        const nextParentId = idMap.get(childNode.parentId ?? "") ?? fallbackParentId;
+        appended.push({ ...childNode, id: nextId, parentId: nextParentId, locked: false });
+        // Preserve nested links: a nested instance stays a bare instance node.
+        if (!childNode.instanceOf) appendChildren(childNode.id, nextId);
+      }
+    };
+    appendChildren(subject.id, target.id);
+
+    nodes = nodes.map((n) => (n.id === target.id ? merged : n)).concat(appended);
+  }
+
+  return serializeHtmlCanvasDocument({ ...doc, nodes, updatedAt: Date.now() });
+}
+
+/**
+ * Removes instance nodes of the given master components from a scene (cascade delete).
+ */
+export function removeInstancesInGraph(
+  graphJSON: string,
+  shouldRemove: (componentId: string) => boolean,
+): string | null {
+  const doc = htmlCanvasDocumentFromJSON(graphJSON);
+  if (!doc) return null;
+  const removed = new Set(
+    doc.nodes
+      .filter((n) => n.instanceOf && shouldRemove(n.instanceOf.componentId))
+      .map((n) => n.id),
+  );
+  if (removed.size === 0) return null;
+  for (const id of [...removed]) {
+    for (const d of collectDescendantIds(doc.nodes, id)) removed.add(d);
+  }
+  return serializeHtmlCanvasDocument({
+    ...doc,
+    nodes: doc.nodes.filter((n) => !removed.has(n.id)),
+    updatedAt: Date.now(),
+  });
+}
+
+export type InstanceUsage = {
+  ownerType: SceneOwnerType;
+  ownerId: string;
+  count: number;
+};
+
+/** Reverse index: scenes that contain instances of the given master components. */
+export async function listInstanceUsages(
+  componentIds: Set<string>,
+): Promise<InstanceUsage[]> {
+  if (componentIds.size === 0) return [];
+  const scenes = await listScenes();
+  const usages: InstanceUsage[] = [];
+  for (const scene of scenes) {
+    const doc = htmlCanvasDocumentFromJSON(scene.graphJSON);
+    if (!doc) continue;
+    const count = doc.nodes.filter(
+      (n) => n.instanceOf && componentIds.has(n.instanceOf.componentId),
+    ).length;
+    if (count > 0) usages.push({ ownerType: scene.ownerType, ownerId: scene.ownerId, count });
+  }
+  return usages;
+}
+
+export async function countInstanceUsages(componentIds: Set<string>): Promise<number> {
+  const usages = await listInstanceUsages(componentIds);
+  return usages.reduce((sum, u) => sum + u.count, 0);
+}
+
+/** Detach-all: materialize every instance of the given masters into own content. */
+export async function detachInstancesOfComponents(componentIds: Set<string>): Promise<void> {
+  if (componentIds.size === 0) return;
+  const scenes = await listScenes();
+  const masterGraphByVariant = new Map<string, string>();
+  for (const s of scenes) {
+    if (s.ownerType === "variant") masterGraphByVariant.set(s.ownerId, s.graphJSON);
+  }
+  for (const scene of scenes) {
+    const next = materializeInstancesInGraph(
+      scene.graphJSON,
+      (cid) => componentIds.has(cid),
+      (vid) => masterGraphByVariant.get(vid) ?? null,
+    );
+    if (next) {
+      await upsertScene(
+        { ownerType: scene.ownerType, ownerId: scene.ownerId, graphJSON: next },
+        { propagate: false },
+      );
+    }
+  }
+}
+
+/** Cascade: remove every instance of the given masters from all scenes. */
+export async function removeInstancesOfComponents(componentIds: Set<string>): Promise<void> {
+  if (componentIds.size === 0) return;
+  const scenes = await listScenes();
+  for (const scene of scenes) {
+    const next = removeInstancesInGraph(scene.graphJSON, (cid) => componentIds.has(cid));
+    if (next) {
+      await upsertScene(
+        { ownerType: scene.ownerType, ownerId: scene.ownerId, graphJSON: next },
+        { propagate: false },
+      );
+    }
+  }
+}
+
 function removeComponentSubtreeInGraph(
   parentGraphJSON: string,
   component: ComponentRow,

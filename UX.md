@@ -740,6 +740,14 @@ version is created:
     own content.
 - The tree shows an instance as a single row; its inlined master content is not expanded.
 
+**Deleting a linked master** — when a screen or component being deleted still has linked
+instances elsewhere, an `InstanceDeleteModal` replaces the plain delete confirm. It shows
+how many places use it and offers two paths:
+- **Detach instances, then delete** — each instance becomes an independent copy in place
+  (nothing lost elsewhere).
+- **Delete everywhere (cascade)** — removes the master and every instance of it.
+When there are no linked instances, the normal `ConfirmActionModal` is shown instead.
+
 ### Empty states
 - Every list, grid, and tab has a dedicated empty state
 - EmptyState always includes: icon, title, short description, CTA button

@@ -221,16 +221,19 @@ regressions):
   locked).
 - **Phase 2** — purple instance rows + "Go to component" and "Detach" buttons in the layers tree.
 - **Phase 4** — `detachInstance` engine action (clears `instanceOf`, unlocks inlined content).
+- **Phase 3** — back-to-origin navigation: "Go to component" carries a `from` context so
+  Back returns to the version the user came from, not the master's structural parent.
 - **Phase 5** — "Linked or Copy" `VersionModeModal`; `duplicateVariant({ mode })` for component versions.
 - **Phase 6** — `createScreenVersion({ mode })` + a "New version" action on the screen card menu.
+- **Phase 7** — reverse index (`listInstanceUsages` / `countInstanceUsages`) +
+  `InstanceDeleteModal`: deleting a master that has instances offers **detach-all**
+  (`materializeInstancesInGraph` → independent copies) or **cascade**
+  (`removeInstancesInGraph` → delete everywhere), wired into `deleteScreen` /
+  `deleteComponentTree` via an `instanceStrategy` option (with unit tests).
 
-Remaining:
-
-- **Phase 3** — back-to-origin navigation (`from` context so Back returns to the version
-  you came from, not the master's structural parent).
-- **Phase 7** — master-deletion dialog (reverse index + detach-all vs cascade). Until this
-  lands, deleting a master that still has instances leaves them unresolved (they render
-  empty); avoid deleting linked masters in the interim.
+All eight phases are complete. Remaining polish (optional): exact "used in <names>" listing
+in the delete dialog (currently shows a count), per-instance overrides, and a screen
+version-group switcher UI.
 
 ## 12. Implementation Plan
 

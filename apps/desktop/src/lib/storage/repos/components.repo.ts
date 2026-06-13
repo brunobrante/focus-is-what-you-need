@@ -5,7 +5,14 @@ import {
   normalizeReferenceRow,
 } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
-import { removeComponentSubtreeFromParentScene } from "@/lib/storage/repos/scenes.repo";
+import {
+  countInstanceUsages,
+  detachInstancesOfComponents,
+  removeComponentSubtreeFromParentScene,
+  removeInstancesOfComponents,
+} from "@/lib/storage/repos/scenes.repo";
+
+export type InstanceDeleteStrategy = "detach" | "cascade";
 import type {
   ComponentRow,
   ReferenceRow,
@@ -301,11 +308,29 @@ export async function setActiveVariant(
   return next;
 }
 
-export async function deleteComponentTree(componentId: string): Promise<void> {
+/** Number of linked instances elsewhere that reference this component or its subtree. */
+export async function countComponentInstanceUsages(componentId: string): Promise<number> {
+  const components = await listTable<ComponentRow>(KEY);
+  const variants = await listTable<VariantRow>(VARIANTS_KEY);
+  return countInstanceUsages(collectComponentTreeIds(componentId, components, variants));
+}
+
+export async function deleteComponentTree(
+  componentId: string,
+  opts?: { instanceStrategy?: InstanceDeleteStrategy },
+): Promise<void> {
   const components = await listTable<ComponentRow>(KEY);
   const variants = await listTable<VariantRow>(VARIANTS_KEY);
   const componentIds = collectComponentTreeIds(componentId, components, variants);
   if (componentIds.size === 0) return;
+
+  // Resolve linked instances before the masters disappear: "detach" materializes
+  // them into own content; "cascade" removes them everywhere.
+  if (opts?.instanceStrategy === "detach") {
+    await detachInstancesOfComponents(componentIds);
+  } else if (opts?.instanceStrategy === "cascade") {
+    await removeInstancesOfComponents(componentIds);
+  }
 
   await removeComponentSubtreeFromParentScene(componentId);
 

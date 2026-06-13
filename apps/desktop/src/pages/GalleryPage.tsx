@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   NewScreenModal,
@@ -8,8 +8,10 @@ import {
 } from "@/components/modals/NewComponentModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
+import { InstanceDeleteModal } from "@/components/modals/InstanceDeleteModal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
-import { createScreenVersion } from "@/lib/storage/repos/screens.repo";
+import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/repos/screens.repo";
+import { countComponentInstanceUsages } from "@/lib/storage/repos/components.repo";
 import { useGallery } from "@/application/gallery/useGallery";
 
 import {
@@ -67,6 +69,39 @@ export function GalleryPage() {
     handleConfirmDeleteScreen,
     handleConfirmDeleteComponent,
   } = useGallery(projectId);
+
+  // Linked-instance usage counts for the master being deleted — drive whether the
+  // delete shows the detach-all/cascade choice or a plain confirm.
+  const [screenDeleteUsage, setScreenDeleteUsage] = useState(0);
+  const [componentDeleteUsage, setComponentDeleteUsage] = useState(0);
+
+  useEffect(() => {
+    if (!pendingScreenDelete) {
+      setScreenDeleteUsage(0);
+      return;
+    }
+    let cancelled = false;
+    void countScreenInstanceUsages(pendingScreenDelete.id).then((n) => {
+      if (!cancelled) setScreenDeleteUsage(n);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingScreenDelete]);
+
+  useEffect(() => {
+    if (!pendingComponentDelete) {
+      setComponentDeleteUsage(0);
+      return;
+    }
+    let cancelled = false;
+    void countComponentInstanceUsages(pendingComponentDelete.id).then((n) => {
+      if (!cancelled) setComponentDeleteUsage(n);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingComponentDelete]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]" data-type={type}>
@@ -168,28 +203,50 @@ export function GalleryPage() {
       />
       <ProjectPreviewModal ref={previewRef} />
       <VersionModeModal ref={versionScreenRef} />
-      <ConfirmActionModal
-        open={Boolean(pendingScreenDelete)}
-        title="Delete screen"
-        message={
-          pendingScreenDelete
-            ? `Screen "${pendingScreenDelete.title}" will be removed along with its components.`
-            : ""
-        }
-        onClose={() => setPendingScreenDelete(null)}
-        onConfirm={handleConfirmDeleteScreen}
-      />
-      <ConfirmActionModal
-        open={Boolean(pendingComponentDelete)}
-        title="Delete component"
-        message={
-          pendingComponentDelete
-            ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
-            : ""
-        }
-        onClose={() => setPendingComponentDelete(null)}
-        onConfirm={handleConfirmDeleteComponent}
-      />
+      {pendingScreenDelete && screenDeleteUsage > 0 ? (
+        <InstanceDeleteModal
+          open
+          entityName={pendingScreenDelete.title}
+          usageCount={screenDeleteUsage}
+          onCancel={() => setPendingScreenDelete(null)}
+          onDetachAll={() => void handleConfirmDeleteScreen("detach")}
+          onCascade={() => void handleConfirmDeleteScreen("cascade")}
+        />
+      ) : (
+        <ConfirmActionModal
+          open={Boolean(pendingScreenDelete)}
+          title="Delete screen"
+          message={
+            pendingScreenDelete
+              ? `Screen "${pendingScreenDelete.title}" will be removed along with its components.`
+              : ""
+          }
+          onClose={() => setPendingScreenDelete(null)}
+          onConfirm={handleConfirmDeleteScreen}
+        />
+      )}
+      {pendingComponentDelete && componentDeleteUsage > 0 ? (
+        <InstanceDeleteModal
+          open
+          entityName={pendingComponentDelete.name}
+          usageCount={componentDeleteUsage}
+          onCancel={() => setPendingComponentDelete(null)}
+          onDetachAll={() => void handleConfirmDeleteComponent("detach")}
+          onCascade={() => void handleConfirmDeleteComponent("cascade")}
+        />
+      ) : (
+        <ConfirmActionModal
+          open={Boolean(pendingComponentDelete)}
+          title="Delete component"
+          message={
+            pendingComponentDelete
+              ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
+              : ""
+          }
+          onClose={() => setPendingComponentDelete(null)}
+          onConfirm={handleConfirmDeleteComponent}
+        />
+      )}
     </div>
   );
 }
