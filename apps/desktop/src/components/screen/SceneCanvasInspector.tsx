@@ -257,6 +257,19 @@ function StackRenderer({
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  // Stacking must follow the spatial hierarchy: a larger (parent) cut fully
+  // covers its smaller (child) cuts, so children have to sit on top to stay
+  // hoverable/clickable. Rank by area descending — the largest cut gets the
+  // lowest z-index, the smallest the highest. Selection only changes the
+  // outline; it must never bump z-index above a contained child, otherwise a
+  // selected parent swallows all pointer events for its children.
+  const zIndexById = useMemo(() => {
+    const ranked = [...stack.layers].sort((a, b) => b.w * b.h - a.w * a.h);
+    const map = new Map<string, number>();
+    ranked.forEach((layer, index) => map.set(layer.id, index + 1));
+    return map;
+  }, [stack.layers]);
+
   return (
     <div className="relative inline-block">
       <img
@@ -291,7 +304,7 @@ function StackRenderer({
                   ? "2px solid rgba(251,146,60,0.85)"
                   : "none",
               outlineOffset: "-1px",
-              zIndex: isSelected ? 10 : 1,
+              zIndex: zIndexById.get(layer.id) ?? 1,
             }}
           >
             <img
