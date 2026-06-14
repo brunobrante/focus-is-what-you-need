@@ -31,14 +31,19 @@ import { CANVAS_WINDOW_LABELS, type CanvasWindowType } from "@/canvas/canvasUtil
 import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
 import {
   ancestorIdsForNodeIds,
+  collectOpenableIds,
   documentTreeShapeEqual,
+  filterTree,
   findNode,
   initiallyOpen,
+  isLayerFilterActive,
+  openToDepth,
   structureKey,
   treeFromCanvasDocument,
   visibleNodeIds,
 } from "./tree/treeHelpers";
 import { BackFooter } from "./tree/BackFooter";
+import { LayersFooter, type ExpandMode } from "./tree/LayersFooter";
 import { CurrentSceneTreeRow } from "./tree/CurrentSceneTreeRow";
 import { PickerNode } from "./tree/PickerNode";
 import { TreeRow } from "./tree/TreeRow";
@@ -145,6 +150,55 @@ export function Tree({
   const [openSet, setOpenSet] = useState<Set<string>>(() => initiallyOpen(tree.root));
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
 
+  // Layers footer: text + type filtering and the 3-state expand/collapse control.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [kindFilters, setKindFilters] = useState<Set<string>>(() => new Set());
+  const [expandMode, setExpandMode] = useState<ExpandMode>("second");
+
+  const filterActive = isLayerFilterActive({ query: searchQuery, kinds: kindFilters });
+  // A filtered view is a flat list of matches — the hierarchy is discarded, so there
+  // are no expandable rows and the open-set machinery does not apply.
+  const filtered = useMemo(
+    () => (filterActive ? filterTree(tree.root, { query: searchQuery, kinds: kindFilters }) : null),
+    [filterActive, searchQuery, kindFilters, tree.root],
+  );
+  const displayRoot = filtered ? filtered.root : tree.root;
+
+  const EMPTY_OPEN_SET = useMemo(() => new Set<string>(), []);
+  const noopSetOpenSet = useCallback((_: Set<string>) => {}, []);
+  const rowsOpenSet = filtered ? EMPTY_OPEN_SET : openSet;
+  const rowsSetOpenSet = filtered ? noopSetOpenSet : setOpenSet;
+
+  const cycleExpand = useCallback(() => {
+    const order: ExpandMode[] = ["all", "second", "collapsed"];
+    const next = order[(order.indexOf(expandMode) + 1) % order.length];
+    setExpandMode(next);
+    const set =
+      next === "all"
+        ? collectOpenableIds(tree.root)
+        : next === "second"
+          ? openToDepth(tree.root, 1)
+          : new Set<string>();
+    setOpenSet(set);
+  }, [tree.root, expandMode]);
+
+  const removeKindFilter = useCallback((kind: string) => {
+    setKindFilters((prev) => {
+      const next = new Set(prev);
+      next.delete(kind);
+      return next;
+    });
+  }, []);
+
+  const toggleKindFilter = useCallback((kind: string) => {
+    setKindFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  }, []);
+
   const pickerTree = projectTree ?? [];
   const selectedIds =
     selectedNodeIds ??
@@ -156,8 +210,8 @@ export function Tree({
   const selectedIdsKey = JSON.stringify(selectedIds);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIdsKey]);
   const visibleLayerIds = useMemo(
-    () => visibleNodeIds(tree.root, openSet),
-    [openSet, tree.root],
+    () => visibleNodeIds(displayRoot, rowsOpenSet),
+    [displayRoot, rowsOpenSet],
   );
   const layerTreeRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
@@ -312,33 +366,49 @@ export function Tree({
             strategy={verticalListSortingStrategy}
           >
             <div ref={layerTreeRef} role="tree" className="flex-1 overflow-y-auto pb-3 pt-1">
-              {(tree.root.children || []).map((c) => (
-                <TreeRow
-                  key={c.id}
-                  node={c}
-                  depth={0}
-                  openSet={openSet}
-                  setOpenSet={setOpenSet}
-                  selectedIds={selectedIdSet}
-                  setSelectedId={selectLayer}
-                  sortable={Boolean(onReorderNode)}
-                  onToggleVisible={onToggleVisible}
-                  onToggleLocked={onToggleLocked}
-                  canOpenNodeCanvas={canOpenNodeCanvas}
-                  onOpenNodeCanvas={onOpenNodeCanvas}
-                  onGoToInstance={onGoToInstance}
-                  onDetachNode={onDetachNode}
-                  showFocusButton={isDraftMode}
-                  onFocusNode={focusNode}
-                  onContextMenuNode={(nodeId, x, y) => {
-                    setContextMenu({ x, y, targetId: nodeId });
-                  }}
-                />
-              ))}
+              {displayRoot.children && displayRoot.children.length > 0 ? (
+                displayRoot.children.map((c) => (
+                  <TreeRow
+                    key={c.id}
+                    node={c}
+                    depth={0}
+                    openSet={rowsOpenSet}
+                    setOpenSet={rowsSetOpenSet}
+                    selectedIds={selectedIdSet}
+                    setSelectedId={selectLayer}
+                    sortable={Boolean(onReorderNode) && !filterActive}
+                    onToggleVisible={onToggleVisible}
+                    onToggleLocked={onToggleLocked}
+                    canOpenNodeCanvas={canOpenNodeCanvas}
+                    onOpenNodeCanvas={onOpenNodeCanvas}
+                    onGoToInstance={onGoToInstance}
+                    onDetachNode={onDetachNode}
+                    showFocusButton={isDraftMode}
+                    onFocusNode={focusNode}
+                    onContextMenuNode={(nodeId, x, y) => {
+                      setContextMenu({ x, y, targetId: nodeId });
+                    }}
+                  />
+                ))
+              ) : filterActive ? (
+                <div className="px-4 py-6 text-center text-[12px] text-[#6B6B6B]">
+                  Nenhuma camada encontrada.
+                </div>
+              ) : null}
             </div>
           </SortableContext>
         </DndContext>
       </>
+
+      <LayersFooter
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        kinds={kindFilters}
+        onToggleKind={toggleKindFilter}
+        onRemoveKind={removeKindFilter}
+        expandMode={expandMode}
+        onCycleExpand={cycleExpand}
+      />
 
       <BackFooter
         parentNode={parentNode}

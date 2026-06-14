@@ -110,6 +110,111 @@ export function structureKey(node: Node): string {
   return `${node.id}(${(node.children ?? []).map(structureKey).join(",")})`;
 }
 
+/** Every node id (excluding the root) that has children — i.e. is collapsible/expandable. */
+export function collectOpenableIds(root: Node): Set<string> {
+  const set = new Set<string>();
+  const walk = (node: Node) => {
+    if ((node.children ?? []).length === 0) return;
+    set.add(node.id);
+    node.children!.forEach(walk);
+  };
+  (root.children ?? []).forEach(walk);
+  return set;
+}
+
+/**
+ * Open every collapsible node down to (but not including) `maxDepth` nesting levels.
+ * `maxDepth = 2` opens the top-level components and their direct children — i.e.
+ * "expand to the second component level".
+ */
+export function openToDepth(root: Node, maxDepth: number): Set<string> {
+  const set = new Set<string>();
+  const walk = (node: Node, depth: number) => {
+    if ((node.children ?? []).length === 0) return;
+    if (depth < maxDepth) set.add(node.id);
+    node.children!.forEach((c) => walk(c, depth + 1));
+  };
+  (root.children ?? []).forEach((c) => walk(c, 0));
+  return set;
+}
+
+/** Filter option values used by the layers footer; matched against a node's type. */
+export const LAYER_FILTER_KINDS: { value: string; label: string }[] = [
+  { value: "component", label: "Componente" },
+  { value: "div", label: "Div" },
+  { value: "text", label: "Texto" },
+  { value: "image", label: "Imagem" },
+  { value: "icon", label: "Ícone" },
+  { value: "shape", label: "Forma" },
+];
+
+export function nodeMatchesKind(type: NodeType, kind: string): boolean {
+  switch (kind) {
+    case "component":
+      return type === "component" || type === "frame";
+    case "div":
+      return type === "rect";
+    case "text":
+      return type === "text";
+    case "image":
+      return type === "image";
+    case "icon":
+      return type === "icon";
+    case "shape":
+      return (
+        type === "ellipse" ||
+        type === "line" ||
+        type === "arrow" ||
+        type === "polygon" ||
+        type === "star" ||
+        type === "pen"
+      );
+    default:
+      return false;
+  }
+}
+
+export type LayerFilter = {
+  query: string;
+  kinds: ReadonlySet<string>;
+};
+
+export function isLayerFilterActive(filter: LayerFilter): boolean {
+  return filter.query.trim().length > 0 || filter.kinds.size > 0;
+}
+
+function nodeMatchesFilter(node: Node, query: string, kinds: ReadonlySet<string>): boolean {
+  const textOk = query.length === 0 || node.name.toLowerCase().includes(query);
+  const kindOk =
+    kinds.size === 0 || [...kinds].some((kind) => nodeMatchesKind(node.type, kind));
+  return textOk && kindOk;
+}
+
+/**
+ * Flatten the tree to a flat list of every node that matches the filter, in
+ * depth-first order. The hierarchy is intentionally discarded — a match never keeps
+ * its parent or children, so filtering by e.g. "image" yields just the images as
+ * sibling leaf rows. Returns a synthetic root whose children are the flat matches.
+ */
+export function filterTree(
+  root: Node,
+  filter: LayerFilter,
+): { root: Node; matchCount: number } {
+  const query = filter.query.trim().toLowerCase();
+  const matches: Node[] = [];
+
+  const walk = (node: Node) => {
+    if (nodeMatchesFilter(node, query, filter.kinds)) {
+      // Strip children so the match renders as a standalone leaf row (no nesting).
+      matches.push({ ...node, children: [] });
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+
+  for (const child of root.children ?? []) walk(child);
+  return { root: { ...root, children: matches }, matchCount: matches.length };
+}
+
 export function visibleNodeIds(root: Node, openSet: Set<string>): string[] {
   const ids: string[] = [];
   const walk = (node: Node) => {

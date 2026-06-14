@@ -274,6 +274,20 @@ Full-screen visual editor with floating UI layers.
 - Hierarchical list of nodes, each with: type icon, node name
 - Per-item controls: visibility toggle (eye icon), lock toggle (padlock icon), drag handle for reordering
 - Indentation reflects nesting depth
+- **Footer** (filter bar, above the back-to-parent row):
+  - **Search input** — filters layers by name. While any filter is active the tree
+    collapses into a **flat list** of every matching node (depth-first order), with
+    the parent/child hierarchy discarded — each match is a standalone leaf row.
+  - **Expand button** — a single button that cycles three states: expand the whole
+    tree → expand to the first hierarchy level (parent → direct children only) →
+    close the tree. Tooltip/icon reflect the next action.
+  - **Filter button** — opens a small floating menu (upward) with type chips
+    (Componente, Div, Texto, Imagem, Ícone, Forma); selecting chips filters the
+    tree by node type and shows a count badge on the button.
+  - **Active-filter tags** — above the controls, each active filter (the search
+    text and every selected type) shows as a removable chip with an `×`.
+  - While a filter is active, reordering (drag) is disabled and an empty state
+    ("Nenhuma camada encontrada") shows when nothing matches.
 
 **Right panel** (collapsible):
 - Inspector panel
