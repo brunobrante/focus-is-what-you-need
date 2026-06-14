@@ -13,6 +13,7 @@ import {
 } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
+import { Snapshot } from "@/components/Snapshot";
 import { AddCard } from "@/components/screen/AddCard";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
