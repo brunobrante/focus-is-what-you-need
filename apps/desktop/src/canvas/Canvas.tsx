@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Toolbar } from "@/canvas/shell/Toolbar";
+import { CanvasToolbarNotice } from "@/canvas/shell/CanvasToolbarNotice";
 import { Inspector } from "@/canvas/shell/Inspector";
 import { Tree, TreeToggle, type ProjectTreeNode } from "@/canvas/shell/Tree";
 import { FloatingToggle } from "@/canvas/shell/GalleryPanel";
@@ -497,6 +498,7 @@ function CanvasPageContent() {
       if (tool === "wrapper" && editor && editor.state.selectedIds.length > 0) {
         const { document: next, wrapperId } = wrapElements(editor.state.document, editor.state.selectedIds);
         editor.dispatch({ type: "commitDocument", document: next, selectedIds: wrapperId ? [wrapperId] : [] });
+        if (wrapperId) editor.noticeStore.show("Wrapper added");
         return true;
       }
       setActiveTool(tool);
@@ -916,6 +918,7 @@ function CanvasPageContent() {
       </div>
 
       <div className="fixed bottom-6 left-1/2 z-[10] -translate-x-1/2 flex items-end gap-2">
+        <CanvasToolbarNotice />
         <Toolbar
           activeTool={toolbarActiveTool}
           onToolChange={handleToolChange}

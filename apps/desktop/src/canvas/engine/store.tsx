@@ -12,6 +12,7 @@ import type { CanvasDocument, EditorState, SnapGuide, Tool, ViewportMode } from 
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
+import { createNoticeStore, type CanvasNotice, type NoticeStore } from "./noticeStore";
 import { CANVAS_DOCUMENT_SAVED_EVENT, CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
 import { getInitialZoomForSubjectSize, getViewportZoomLimits } from "./viewport";
 
@@ -46,6 +47,7 @@ type EditorContextValue = {
   state: EditorState;
   dispatch: Dispatch<EditorAction>;
   hoverStore: HoverStore;
+  noticeStore: NoticeStore;
 };
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -394,6 +396,10 @@ export function EditorProvider({
   if (hoverStoreRef.current === null) hoverStoreRef.current = createHoverStore();
   const hoverStore = hoverStoreRef.current;
 
+  const noticeStoreRef = useRef<NoticeStore | null>(null);
+  if (noticeStoreRef.current === null) noticeStoreRef.current = createNoticeStore();
+  const noticeStore = noticeStoreRef.current;
+
   useEffect(() => {
     hydratedRef.current = !persistStorage;
     if (!persistStorage) return;
@@ -448,7 +454,10 @@ export function EditorProvider({
     };
   }, [onDocumentChange, persistStorage, state.document, state.transientChangedIds, storageKey]);
 
-  const value = useMemo(() => ({ state, dispatch, hoverStore }), [hoverStore, state]);
+  const value = useMemo(
+    () => ({ state, dispatch, hoverStore, noticeStore }),
+    [hoverStore, noticeStore, state],
+  );
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }
 
@@ -466,5 +475,14 @@ export function useHoverStore(): HoverStore {
 
 export function useHoveredId(): string | null {
   const store = useHoverStore();
+  return useSyncExternalStore(store.subscribe, store.get, store.get);
+}
+
+export function useNoticeStore(): NoticeStore {
+  return useEditor().noticeStore;
+}
+
+export function useCanvasNotice(): CanvasNotice | null {
+  const store = useNoticeStore();
   return useSyncExternalStore(store.subscribe, store.get, store.get);
 }

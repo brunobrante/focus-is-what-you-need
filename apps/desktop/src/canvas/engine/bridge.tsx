@@ -7,12 +7,16 @@ import {
 } from "react";
 import type { Dispatch, ReactNode } from "react";
 import { useEditor } from "./store";
+import type { NoticeStore } from "./noticeStore";
 import type { EditorState } from "./types";
 
 export type EditorBridgeValue = {
   sourceId: string;
   state: EditorState;
   dispatch: Dispatch<Parameters<ReturnType<typeof useEditor>["dispatch"]>[0]>;
+  // Transient toolbar-notice store (e.g. "Wrapper added"). Lives on the editor,
+  // surfaced here so the toolbar — rendered outside EditorProvider — can read it.
+  noticeStore: NoticeStore;
 };
 
 type Listener = () => void;
