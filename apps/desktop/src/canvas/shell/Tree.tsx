@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
   type DragEndEvent,
   type DragMoveEvent,
+  type DragStartEvent,
+  type Modifier,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { getEventCoordinates } from "@dnd-kit/utilities";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -48,6 +52,7 @@ import { LayersFooter, type ExpandMode } from "./tree/LayersFooter";
 import { CurrentSceneTreeRow } from "./tree/CurrentSceneTreeRow";
 import { PickerNode } from "./tree/PickerNode";
 import { TreeRow } from "./tree/TreeRow";
+import { TypeIcon } from "./tree/TypeIcon";
 import { IconClose, IconLayers } from "@/components/icons";
 
 export type { ProjectTreeNode };
@@ -61,6 +66,20 @@ type TreeContextMenuState = {
 type TreeContextMenuItem =
   | { type: "action"; label: string; shortcut?: string; disabled?: boolean; action: () => void }
   | { type: "separator" };
+
+// The drag source row is full panel width, so dnd-kit's default overlay placement
+// (top-left of the source rect) leaves the small ghost chip far to the left of the
+// cursor. This pins the chip's top-left just below-right of the pointer instead.
+const snapOverlayToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (!draggingNodeRect || !activatorEvent) return transform;
+  const coords = getEventCoordinates(activatorEvent);
+  if (!coords) return transform;
+  return {
+    ...transform,
+    x: transform.x + coords.x - draggingNodeRect.left + 12,
+    y: transform.y + coords.y - draggingNodeRect.top + 8,
+  };
+};
 
 const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 const modLabel = isMac ? "⌘" : "Ctrl+";
@@ -274,6 +293,9 @@ export function Tree({
   const [dropTarget, setDropTarget] = useState<{ overId: string; mode: DropMode } | null>(
     null,
   );
+  // The row currently being dragged — used to render the compact DragOverlay ghost.
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const activeDragNode = activeDragId ? findNode(displayRoot, activeDragId) : null;
 
   const resolveDropTarget = (
     event: DragMoveEvent | DragEndEvent,
@@ -293,6 +315,10 @@ export function Tree({
     return { overId, mode };
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  };
+
   const handleDragMove = (event: DragMoveEvent) => {
     setDropTarget(resolveDropTarget(event));
   };
@@ -300,6 +326,7 @@ export function Tree({
   const handleDragEnd = (event: DragEndEvent) => {
     const target = dropTarget ?? resolveDropTarget(event);
     setDropTarget(null);
+    setActiveDragId(null);
     const activeId = String(event.active.id);
     if (!target || target.overId === activeId) return;
     if (onMoveNode) {
@@ -307,6 +334,11 @@ export function Tree({
     } else if (onReorderNode && target.mode !== "inside") {
       onReorderNode(activeId, target.overId);
     }
+  };
+
+  const handleDragCancel = () => {
+    setDropTarget(null);
+    setActiveDragId(null);
   };
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -398,9 +430,10 @@ export function Tree({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setDropTarget(null)}
+          onDragCancel={handleDragCancel}
         >
           <SortableContext
             items={visibleLayerIds}
@@ -420,6 +453,7 @@ export function Tree({
                     sortable={Boolean(onMoveNode || onReorderNode) && !filterActive}
                     dropTargetId={dropTarget?.overId ?? null}
                     dropMode={dropTarget?.mode}
+                    dragActive={activeDragId != null}
                     onToggleVisible={onToggleVisible}
                     onToggleLocked={onToggleLocked}
                     canOpenNodeCanvas={canOpenNodeCanvas}
@@ -440,6 +474,23 @@ export function Tree({
               ) : null}
             </div>
           </SortableContext>
+          <DragOverlay dropAnimation={null} modifiers={[snapOverlayToCursor]}>
+            {activeDragNode ? (
+              <div className="pointer-events-none inline-flex max-w-[240px] items-center gap-1.5 rounded-md border border-[#3A3A3A] bg-[#1E1E1E] py-1 pl-1.5 pr-2.5 text-[12px] text-[#F2F2F2] shadow-[0_8px_24px_rgba(0,0,0,0.45)]">
+                <span
+                  className="grid w-[18px] shrink-0 place-items-center"
+                  style={{ color: activeDragNode.linked ? "#8638E5" : "#9A9A9A" }}
+                >
+                  <TypeIcon
+                    type={activeDragNode.type}
+                    hasChildren={(activeDragNode.children || []).length > 0}
+                    linked={activeDragNode.linked}
+                  />
+                </span>
+                <span className="truncate">{activeDragNode.name}</span>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </>
 

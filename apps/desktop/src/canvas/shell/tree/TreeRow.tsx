@@ -1,5 +1,4 @@
 import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import type { DropMode, Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
 import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLink, IconLock, IconOpenCanvas, IconUnlink, IconUnlock } from "@/components/icons";
@@ -23,6 +22,7 @@ export function TreeRow({
   onDetachNode,
   dropTargetId,
   dropMode,
+  dragActive,
 }: {
   node: Node;
   depth: number;
@@ -35,6 +35,9 @@ export function TreeRow({
   // before/after insertion line or an "inside" nesting highlight per `dropMode`.
   dropTargetId?: string | null;
   dropMode?: DropMode;
+  // True while any row in the tree is being dragged. Suppresses the imperative hover
+  // background so it can't stomp the drop-target highlight.
+  dragActive?: boolean;
   onToggleVisible?: (nodeId: string, visible: boolean) => void;
   onToggleLocked?: (nodeId: string, locked: boolean) => void;
   canOpenNodeCanvas?: (nodeId: string) => boolean;
@@ -51,8 +54,6 @@ export function TreeRow({
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
     isDragging,
   } = useSortable({ id: node.id, disabled: !sortable });
   const hasChildren = (node.children || []).length > 0;
@@ -98,9 +99,11 @@ export function TreeRow({
           onContextMenuNode?.(node.id, e.clientX, e.clientY);
         }}
         onMouseEnter={(e) => {
+          if (dragActive) return;
           if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.035)";
         }}
         onMouseLeave={(e) => {
+          if (dragActive) return;
           if (!isSelected) e.currentTarget.style.background = "transparent";
         }}
         className="relative flex h-[30px] select-none items-center gap-1.5 pr-2.5 text-[13px]"
@@ -114,10 +117,9 @@ export function TreeRow({
               : "transparent",
           boxShadow: dropInside ? "inset 0 0 0 1.5px #B69CFF" : undefined,
           cursor: "default",
-          transform: CSS.Transform.toString(transform),
-          transition,
-          opacity: isDragging ? 0.55 : 1,
-          zIndex: isDragging ? 2 : undefined,
+          // The dragged row stays put (dimmed) — a DragOverlay ghost follows the
+          // cursor instead, so the tree never reflows mid-drag.
+          opacity: isDragging ? 0.4 : 1,
         }}
       >
         {dropBefore ? (
@@ -287,6 +289,7 @@ export function TreeRow({
               onDetachNode={onDetachNode}
               dropTargetId={dropTargetId}
               dropMode={dropMode}
+              dragActive={dragActive}
             />
           ))
         : null}
