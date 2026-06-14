@@ -85,6 +85,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     // State
     currentTool,
     viewMode,
+    editorReady,
     selectedComponentId,
     selection,
     selectionLocked,
@@ -422,7 +423,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               onPointerLeave={masking ? undefined : handleStagePointerLeave}
               onPointerCancel={masking ? undefined : cancelSelection}
             >
-              {!cleanOriginal && (
+              {!cleanOriginal && editorReady && (
               <>
               {viewMode === "gallery" ? (
                 <GallerySlider
@@ -523,6 +524,12 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   <p className="m-0 text-[13px]">
                     Volte para <Link className="border-b border-[var(--border-strong)] text-[var(--text)] no-underline" to="/references">References</Link>.
                   </p>
+                </div>
+              ) : !editorReady && !cleanOriginal ? (
+                // Opening subject not resolved yet — keep the bare stage so the raw
+                // original image never flashes before the main screen lands.
+                <div className="flex flex-1 items-center justify-center text-[var(--text-faint)]">
+                  <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
                 </div>
               ) : viewMode === "stack" && imageStack && !cleanOriginal ? (
                 <div

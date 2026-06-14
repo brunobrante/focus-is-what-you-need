@@ -96,6 +96,8 @@ export type ToolsEditorState = {
   // State
   currentTool: EditorTool;
   viewMode: ViewMode;
+  /** False until the opening subject is resolved; the stage hides the image so the raw original never flashes. */
+  editorReady: boolean;
   selectedComponentId: string | null;
   selection: CropBox | null;
   selectionLocked: boolean;
@@ -242,6 +244,11 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const [currentTool, setCurrentTool] = useState<EditorTool>("move");
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  // The componentKey for which the editor has resolved its opening subject. Until
+  // this matches the current key, the opening screen is still being resolved (the
+  // saved stack may load asynchronously), so the stage must not paint the raw
+  // original image — otherwise it flashes before the main screen replaces it.
+  const [initializedKey, setInitializedKey] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imagePaintVersion, setImagePaintVersion] = useState(0);
@@ -1210,6 +1217,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       cancelSelection();
       setCurrentTool("move");
       setStackSaveStatus(null);
+      // The opening subject is now resolved — the stage may paint it.
+      setInitializedKey(componentKey);
     };
 
     const hasDraft = hasDraftComponents(componentKey);
@@ -1305,6 +1314,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
     currentTool,
     viewMode,
+    editorReady: initializedKey === componentKey,
     selectedComponentId,
     selection,
     selectionLocked,

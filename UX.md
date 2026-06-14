@@ -662,7 +662,9 @@ again, or the canvas ×, returns to the editor.
     screen** as the editable subject in the Builder tab (ready to crop). A fresh
     image with no stack opens its default full-image screen. The standalone
     original-image overview is still reachable via the sidebar "show original"
-    toggle, but it is no longer the landing view.
+    toggle, but it is no longer the landing view. While the saved stack is still
+    resolving (it may load asynchronously), the stage shows a brief spinner rather
+    than the raw original — so the original never flashes before the main screen.
   - **Delete screen** — each screen card has a trash button (top-left of the
     thumbnail, visible on hover, turns red on hover). Clicking it opens a
     confirmation dialog ("Delete screen") that names the screen and its cut count;
