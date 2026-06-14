@@ -130,9 +130,9 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
             <div>
               <div className="flex items-center gap-2">
                 <EditableTitle value={screen?.title ?? screenName} label="Edit screen name" onSave={handleScreenTitleSave} />
-                {screenVersionLabel(screen) ? (
+                {screen && !isMainScreenVersion(screen) && screenVersionLabel(screen) ? (
                   <span className="mb-1.5">
-                    <VersionTagBadge tag={screenVersionLabel(screen)!} isMain={isMainScreenVersion(screen)} />
+                    <VersionTagBadge tag={screenVersionLabel(screen)!} isMain={false} />
                   </span>
                 ) : null}
               </div>
@@ -342,9 +342,9 @@ function ComponentContent({ componentId }: { componentId: string }) {
             <div>
               <div className="flex items-center gap-2">
                 <EditableTitle value={component.name} label="Edit component name" onSave={handleRename} />
-                {variantCount > 0 && activeVariant ? (
+                {activeVariant && !isMainVariant(activeVariant) ? (
                   <span className="mb-1.5">
-                    <VersionTagBadge tag={variantVersionLabel(activeVariant)} isMain={isMainVariant(activeVariant)} />
+                    <VersionTagBadge tag={variantVersionLabel(activeVariant)} isMain={false} />
                   </span>
                 ) : null}
               </div>

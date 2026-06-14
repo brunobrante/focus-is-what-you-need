@@ -493,6 +493,8 @@ export function buildProjectTree(screens: ScreenRow[], components: ComponentRow[
   };
 
   return [...screens]
+    // Versions belong to their screen, not the project — keep them out of the tree.
+    .filter((screen) => !(screen.versionGroupId && (screen.versionIndex ?? 1) > 1))
     .sort((a, b) => a.order - b.order)
     .map((screen) => ({
       id: screen.id,

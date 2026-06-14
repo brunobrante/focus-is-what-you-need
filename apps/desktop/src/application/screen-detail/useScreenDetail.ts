@@ -13,7 +13,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { createScreenVersion, deleteScreen, isMainScreenVersion, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, deleteScreen, isMainScreenVersion, isVersionScreen, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -194,19 +194,21 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     `/project/${encodeURIComponent(project?.id ?? projectId)}/screen/${encodeURIComponent(id)}`;
 
   const { prevScreen, nextScreen } = useMemo(() => {
-    const idx = screens.findIndex((s) => s.id === screen?.id);
-    const hasMultipleScreens = screens.length > 1;
+    // Prev/next steps between project-level screens only — never into versions.
+    const projectScreens = screens.filter((s) => !isVersionScreen(s));
+    const idx = projectScreens.findIndex((s) => s.id === screen?.id);
+    const hasMultipleScreens = projectScreens.length > 1;
     if (idx < 0 || !hasMultipleScreens) {
       return {
         prevScreen: null,
         nextScreen: null,
       };
     }
-    const prevIdx = (idx - 1 + screens.length) % screens.length;
-    const nextIdx = (idx + 1) % screens.length;
+    const prevIdx = (idx - 1 + projectScreens.length) % projectScreens.length;
+    const nextIdx = (idx + 1) % projectScreens.length;
     return {
-      prevScreen: screens[prevIdx] ?? null,
-      nextScreen: screens[nextIdx] ?? null,
+      prevScreen: projectScreens[prevIdx] ?? null,
+      nextScreen: projectScreens[nextIdx] ?? null,
     };
   }, [screen?.id, screens]);
 

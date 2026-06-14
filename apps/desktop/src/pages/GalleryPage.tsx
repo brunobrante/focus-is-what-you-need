@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   NewScreenModal,
@@ -10,7 +10,7 @@ import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { InstanceDeleteModal } from "@/components/modals/InstanceDeleteModal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
-import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/repos/screens.repo";
+import { countScreenInstanceUsages, createScreenVersion, isVersionScreen } from "@/lib/storage/repos/screens.repo";
 import { countComponentInstanceUsages } from "@/lib/storage/repos/components.repo";
 import { useGallery } from "@/application/gallery/useGallery";
 
@@ -70,6 +70,10 @@ export function GalleryPage() {
     handleConfirmDeleteComponent,
   } = useGallery(projectId);
 
+  // Versions belong to their screen, not the project — show only main/standalone
+  // screens at the project level (versions live in the screen's Versions tab).
+  const projectScreens = useMemo(() => screens.filter((s) => !isVersionScreen(s)), [screens]);
+
   // Linked-instance usage counts for the master being deleted — drive whether the
   // delete shows the detach-all/cascade choice or a plain confirm.
   const [screenDeleteUsage, setScreenDeleteUsage] = useState(0);
@@ -111,17 +115,17 @@ export function GalleryPage() {
 
       <ProjectOverview
         project={project}
-        screensCount={screens.length}
+        screensCount={projectScreens.length}
         componentsCount={components.length}
         referencesCount={references.length}
-        onPreview={screens.length > 0 && project ? () => previewRef.current?.open(project, screens) : null}
+        onPreview={projectScreens.length > 0 && project ? () => previewRef.current?.open(project, projectScreens) : null}
         onEdit={() => setEditOpen((v) => !v)}
         editOpen={editOpen}
       />
       {editOpen && project ? (
         <ProjectEditPanel
           project={project}
-          screens={screens}
+          screens={projectScreens}
           onClose={() => setEditOpen(false)}
           onSaved={(updated) => {
             handleSettingsSaved(updated);
@@ -133,14 +137,14 @@ export function GalleryPage() {
           <Tabs
             tab={tab}
             onChange={setTab}
-            screensCount={screens.length}
+            screensCount={projectScreens.length}
             componentsCount={components.length}
             referencesCount={references.length}
           />
 
           {tab === "screens" && (
             <ScreensTab
-              screens={screens}
+              screens={projectScreens}
               type={type}
               projectId={project?.id ?? projectId}
               onNewScreen={openNewScreen}
@@ -164,7 +168,7 @@ export function GalleryPage() {
             <ComponentsTab
               components={components}
               activeVariants={activeVariants}
-              screens={screens}
+              screens={projectScreens}
               filter={cmpFilter}
               onFilterChange={setCmpFilter}
               projectId={project?.id ?? projectId}
@@ -181,7 +185,7 @@ export function GalleryPage() {
           {tab === "references" && (
             <ReferencesTab
               project={project}
-              screens={screens}
+              screens={projectScreens}
               components={components}
               references={references}
             />
@@ -198,7 +202,7 @@ export function GalleryPage() {
       <NewComponentModal
         ref={newComponentRef}
         projectId={project?.id ?? null}
-        screens={screens}
+        screens={projectScreens}
         onCreated={handleComponentCreated}
       />
       <ProjectPreviewModal ref={previewRef} />

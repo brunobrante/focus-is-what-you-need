@@ -73,6 +73,14 @@ export function isMainScreenVersion(screen: ScreenRow | null | undefined): boole
   return Boolean(screen?.versionGroupId) && (screen?.versionIndex ?? 1) <= 1;
 }
 
+/**
+ * Whether the screen is a non-main version (V1, V2…). Versions belong to their screen,
+ * not to the project, so they are hidden from project-level screen lists and trees.
+ */
+export function isVersionScreen(screen: ScreenRow | null | undefined): boolean {
+  return Boolean(screen?.versionGroupId) && (screen?.versionIndex ?? 1) > 1;
+}
+
 export async function findScreenByTitle(
   projectId: string,
   title: string,
