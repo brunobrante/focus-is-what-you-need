@@ -292,7 +292,9 @@ Full-screen visual editor with floating UI layers.
 **Layers-tree header (Versions window)**: when the focused window is Versions, the
 header row shows the subject title + size **plus the selected version's tag** (e.g.
 `V1`), and the header dropdown switches the **version** shown in the Versions window
-(the subject's real versions) instead of switching project screens.
+(the subject's real versions) instead of switching project screens. The dropdown also
+ends with a **New version** action (shown below the list, or in place of it when there
+are none) that opens the Linked/Copy modal and creates a version of the current subject.
 
 **Left panel** (collapsible):
 - Layers / tree panel

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Toolbar } from "@/canvas/shell/Toolbar";
 import { Inspector } from "@/canvas/shell/Inspector";
@@ -25,7 +25,9 @@ import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
 import { useAllVariants, useScene, useScreenVariants, useVariant, useVariants } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
-import { variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { createScreenVersion } from "@/lib/storage/repos/screens.repo";
+import { duplicateVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
 import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
@@ -350,6 +352,33 @@ function CanvasPageContent() {
     setActiveTab("versions");
     setTreeTab("versions");
   }, [versionVariantParam]);
+
+  // "Add version" from the Versions window: create a new version of the current subject
+  // (Linked/Copy chosen via the modal) and focus the Versions window. The new version
+  // appears in the dropdown; when it is the subject's first version it auto-shows.
+  const versionModeRef = useRef<VersionModeModalHandle>(null);
+  const handleAddVersion = useCallback(() => {
+    if (!component && !screen) return;
+    versionModeRef.current?.open({
+      onSelect: async (mode) => {
+        if (component) {
+          const mainId =
+            subjectVariants.find((v) => v.order <= 0)?.id ?? component.activeVariantId;
+          await duplicateVariant({
+            ownerKind: "component",
+            ownerId: component.id,
+            sourceVariantId: mainId,
+            name: `Variant ${subjectVariants.length + 1}`,
+            mode,
+          });
+        } else if (screen) {
+          await createScreenVersion({ screenId: screen.id, mode });
+        }
+        setActiveTab("versions");
+        setTreeTab("versions");
+      },
+    });
+  }, [component, screen, subjectVariants]);
 
   useEffect(() => {
     const editor = getEditor();
@@ -816,6 +845,7 @@ function CanvasPageContent() {
         versionOptions={versionsVariants}
         selectedVersionId={selectedVersionId}
         onSelectVersion={setSelectedVersionId}
+        onAddVersion={handleAddVersion}
       />
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 
@@ -869,6 +899,7 @@ function CanvasPageContent() {
         />
       </div>
 
+      <VersionModeModal ref={versionModeRef} />
     </div>
   );
 }

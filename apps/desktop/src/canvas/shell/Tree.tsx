@@ -137,6 +137,7 @@ type Props = {
   versionOptions?: ReadonlyArray<{ id: string; label: string }>;
   selectedVersionId?: string | null;
   onSelectVersion?: (variantId: string) => void;
+  onAddVersion?: () => void;
 };
 
 export function Tree({
@@ -168,6 +169,7 @@ export function Tree({
   versionOptions = [],
   selectedVersionId = null,
   onSelectVersion,
+  onAddVersion,
 }: Props) {
   const bridgeDocument = useEditorBridge(
     (value) => value?.state.document ?? null,
@@ -540,41 +542,58 @@ export function Tree({
       >
         <div className="overflow-y-auto p-1.5" style={{ maxHeight: 320 }}>
           {isVersionsWindow ? (
-            versionOptions.length > 0 ? (
-              versionOptions.map((option) => {
-                const isSelected = option.id === selectedVersionId;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      setPickerOpen(false);
-                      onSelectVersion?.(option.id);
-                    }}
-                    className={[
-                      "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
-                      isSelected ? "bg-[#2A2233]" : "hover:bg-[#222]",
-                    ].join(" ")}
-                  >
-                    <span
-                      className="grid h-6 min-w-6 shrink-0 place-items-center rounded-md border px-1 text-[10px] font-semibold uppercase"
-                      style={{
-                        borderColor: isSelected ? "rgba(134,56,229,0.55)" : "#303030",
-                        color: isSelected ? "#C4A1F2" : "#8A8A8A",
-                        background: isSelected ? "rgba(134,56,229,0.16)" : "#1D1D1D",
+            <>
+              {versionOptions.length > 0 ? (
+                versionOptions.map((option) => {
+                  const isSelected = option.id === selectedVersionId;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        setPickerOpen(false);
+                        onSelectVersion?.(option.id);
                       }}
+                      className={[
+                        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
+                        isSelected ? "bg-[#2A2233]" : "hover:bg-[#222]",
+                      ].join(" ")}
                     >
-                      {option.label}
-                    </span>
-                    <span className="block truncate text-[12px] font-medium text-[#E2E2E2]">
-                      {option.label}
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="px-4 py-6 text-[12px] text-[#6B6B6B]">No versions yet.</div>
-            )
+                      <span
+                        className="grid h-6 min-w-6 shrink-0 place-items-center rounded-md border px-1 text-[10px] font-semibold uppercase"
+                        style={{
+                          borderColor: isSelected ? "rgba(134,56,229,0.55)" : "#303030",
+                          color: isSelected ? "#C4A1F2" : "#8A8A8A",
+                          background: isSelected ? "rgba(134,56,229,0.16)" : "#1D1D1D",
+                        }}
+                      >
+                        {option.label}
+                      </span>
+                      <span className="block truncate text-[12px] font-medium text-[#E2E2E2]">
+                        {option.label}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-2.5 py-3 text-[12px] text-[#6B6B6B]">No versions yet.</div>
+              )}
+              {onAddVersion ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickerOpen(false);
+                    onAddVersion();
+                  }}
+                  className="mt-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-[#A6A6A6] transition-colors duration-100 hover:bg-[#222] hover:text-[#E2E2E2]"
+                >
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-dashed border-[#3A3A3A] text-[13px] leading-none text-[#8A8A8A]">
+                    +
+                  </span>
+                  New version
+                </button>
+              ) : null}
+            </>
           ) : pickerTree.length > 0 ? (
             pickerTree.map((screen) => (
               <PickerNode
