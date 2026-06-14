@@ -251,15 +251,31 @@ Full-screen visual editor with floating UI layers.
 - Search toggle button — opens the [global search / command palette](#global-search--command-palette)
 
 **Top-center**:
-- Canvas tabs: Current | Drafts | References (Versions, Preview when enabled)
+- Canvas tabs: Current | Drafts | References (Versions when enabled)
 - Split mode selector: None | Vertical | Grid (icon buttons)
 - The Current tab always renders the opened screen/component itself; a screen
   **version** is never rendered in Current — it opens in the Versions window.
+- **Preview is not a nav tab and not a Features toggle** — it is launched from the
+  Preview button above the Inspector (see below). It still appears as a selectable /
+  addable pane in the split ("Panels") menu once it is open.
 
-**Preview window** (a canvas window, like Current/Drafts):
-- Placeholder window showing "Real-time preview of changes" centered text.
-- Enabled via the Features toggle in the canvas options menu (disabled by default).
-- Reserved for future real-time preview functionality.
+**Preview window** (a special, view-only window):
+- Launched by the **Preview button** (play icon) in the bar above the Inspector,
+  not from the canvas tabs or the Features menu.
+- Clicking play opens it **side-by-side with Current** (auto vertical split from a
+  single canvas; added as a pane when already split). It renders a **live,
+  read-only** view of the current screen — non-interactive (no selection/drag) and
+  never the active/focused canvas, so there is no need to navigate to or focus it.
+- The window has **floating top-right controls**: an **X** to close the preview
+  (collapses back to a single Current canvas when it was the only extra pane) and an
+  **open-in-new-window** button (present but inert for now).
+- Settings live in a **dropdown** next to the play button (Figma-style):
+  - **Size**: Fit (scale to the window) or Actual size (1×, scrollable on overflow).
+  - **Device frame**: wrap the screen in a device bezel (phone/tablet) or browser
+    chrome (desktop).
+  - **Background**: Dark, Light, or Scene (the document's shell background).
+- It respects the split/grid like the other windows (selectable in the Panels menu
+  and laid out under None/Vertical/Horizontal/Quadrants).
 
 **References window** (a canvas window, like Current/Drafts):
 - Shows references attached to the subject currently open in the canvas (a
@@ -340,6 +356,9 @@ header is a two-select block instead of the single subject row:
     ("Nenhuma camada encontrada") shows when nothing matches.
 
 **Right panel** (collapsible):
+- **Preview launcher bar** sits above the Inspector (a play button + settings
+  dropdown); the Inspector is shortened to make room. See the Preview window
+  section above.
 - Inspector panel
 - Tabs: Element | Canvas | Shell
 - Properties editor: X / Y position, W / H size, rotation, opacity

@@ -10,9 +10,24 @@ import type { ProjectType } from "@/lib/data/types";
 
 export type SplitMode = "none" | "vertical" | "horizontal" | "grid";
 export type CanvasWindowType = "current" | "drafts" | "references" | "versions" | "preview";
-export type CanvasFeatureWindowType = Exclude<CanvasWindowType, "current">;
+// Preview is no longer a togglable feature window — it is a special view-only
+// window launched from the button above the Inspector, so it is excluded here.
+export type CanvasFeatureWindowType = Exclude<CanvasWindowType, "current" | "preview">;
 export type CanvasFeatureFlags = Record<CanvasFeatureWindowType, boolean>;
 export type CanvasSplitWindows = CanvasWindowType[];
+
+/** Settings for the view-only Preview window (transient UI state, not persisted). */
+export type PreviewSettings = {
+  fit: "fit" | "actual";
+  deviceFrame: boolean;
+  background: "dark" | "light" | "scene";
+};
+
+export const DEFAULT_PREVIEW_SETTINGS: PreviewSettings = {
+  fit: "fit",
+  deviceFrame: false,
+  background: "dark",
+};
 
 export const MAX_CANVAS_SPLIT_PANES = 4;
 
@@ -28,7 +43,6 @@ export const CANVAS_FEATURE_WINDOW_ORDER: readonly CanvasFeatureWindowType[] = [
   "versions",
   "drafts",
   "references",
-  "preview",
 ];
 
 export const CANVAS_WINDOW_LABELS: Record<CanvasWindowType, string> = {
@@ -43,7 +57,6 @@ export const DEFAULT_CANVAS_FEATURES: CanvasFeatureFlags = {
   drafts: true,
   references: false,
   versions: false,
-  preview: false,
 };
 
 export const LAYOUT_LABELS: Record<SplitMode, string> = {
@@ -53,10 +66,15 @@ export const LAYOUT_LABELS: Record<SplitMode, string> = {
   grid: "Split quadrants",
 };
 
-export function enabledCanvasWindowTypes(features: CanvasFeatureFlags): CanvasWindowType[] {
-  return CANVAS_WINDOW_ORDER.filter((windowType) => (
-    windowType === "current" || features[windowType]
-  ));
+export function enabledCanvasWindowTypes(
+  features: CanvasFeatureFlags,
+  previewEnabled = false,
+): CanvasWindowType[] {
+  return CANVAS_WINDOW_ORDER.filter((windowType) => {
+    if (windowType === "current") return true;
+    if (windowType === "preview") return previewEnabled;
+    return features[windowType];
+  });
 }
 
 export function firstEnabledSecondaryWindow(

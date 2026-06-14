@@ -16,14 +16,17 @@ import type { ZoomLimits } from "@/canvas/engine/viewport";
 import {
   CANVAS_WINDOW_LABELS,
   canvasSizeForProjectType,
+  DEFAULT_PREVIEW_SETTINGS,
   normalizeCanvasSplitWindows,
   type CanvasFeatureWindowType,
   type CanvasSplitWindows,
   type CanvasWindowType,
+  type PreviewSettings,
   type SplitMode,
 } from "@/canvas/canvasUtils";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasReferencesWindow, type CanvasReferencesContext } from "./CanvasReferencesWindow";
+import { CanvasPreviewSurface } from "./PreviewSurface";
 import { CanvasStage } from "../stage/CanvasStage";
 import type { CanvasToolId } from "@/canvas/tools";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -83,6 +86,8 @@ export function CanvasRender({
   shellBackVisibility = "show",
   shellZoomVisibility = "show",
   shellExpandVisibility = "hover",
+  previewSettings = DEFAULT_PREVIEW_SETTINGS,
+  onClosePreview,
   onCurrentDocumentChange,
   onActiveCanvasChange,
   onToggleExpand,
@@ -115,6 +120,8 @@ export function CanvasRender({
   shellBackVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
   shellExpandVisibility?: ShellControlVisibility;
+  previewSettings?: PreviewSettings;
+  onClosePreview?: () => void;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
   onActiveCanvasChange?: (windowType: CanvasWindowType) => void;
   onToggleExpand?: () => void;
@@ -241,16 +248,6 @@ export function CanvasRender({
       );
     }
 
-    if (windowType === "preview") {
-      return (
-        <CanvasPreviewSurface
-          active={active}
-          showActiveBorder={showActiveBorder}
-          onClick={() => onActiveCanvasChange?.(windowType)}
-        />
-      );
-    }
-
     return (
       <CanvasPlaceholderSurface
         active={active}
@@ -267,6 +264,18 @@ export function CanvasRender({
     showActiveBorder: boolean,
   ) => {
     if (windowType === "current") return renderCurrentSurface(active, showActiveBorder);
+    // Preview is a view-only window: it renders the current document read-only and
+    // never becomes the active/focused canvas (no onActiveCanvasChange, no border).
+    if (windowType === "preview") {
+      return (
+        <CanvasPreviewSurface
+          document={currentDocument ?? createDraftDocument(390, 844)}
+          projectType={projectType}
+          settings={previewSettings}
+          onClose={() => onClosePreview?.()}
+        />
+      );
+    }
     return renderSecondarySurface(windowType, active, showActiveBorder);
   };
   const useGridSplit = split === "grid" && renderedWindows.length >= 3;
@@ -397,41 +406,6 @@ function CanvasPlaceholderSurface({
         <span className="rounded border border-[#2C2C2C] bg-[#1A1A1A] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#737373]">
           No canvas yet
         </span>
-      </span>
-    </div>
-  );
-}
-
-function CanvasPreviewSurface({
-  active,
-  showActiveBorder,
-  onClick,
-}: {
-  active: boolean;
-  showActiveBorder: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        onClick?.();
-      }}
-      className="relative flex flex-1 cursor-default items-center justify-center overflow-hidden rounded-xl border text-left transition-all duration-150"
-      style={{
-        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
-        backgroundColor: "#141615",
-        boxShadow: active && showActiveBorder
-          ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
-          : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
-      }}
-    >
-      <span className="text-[13px] font-medium text-[#5A5A5A]">
-        Real-time preview of changes
       </span>
     </div>
   );

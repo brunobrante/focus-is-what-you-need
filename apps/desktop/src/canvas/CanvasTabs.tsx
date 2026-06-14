@@ -109,7 +109,9 @@ export function CanvasTabs({
       className="relative inline-flex items-center gap-0.5 rounded-lg border border-[#282828] bg-[#181818] p-1"
       style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset" }}
     >
-      {enabledTabs.map((tab) => {
+      {/* Preview is a special view-only window (launched from above the Inspector);
+          it stays selectable in the grid menu but is not a navigable nav tab. */}
+      {enabledTabs.filter((tab) => tab !== "preview").map((tab) => {
         const isActive = activeTab === tab;
         return (
           <button

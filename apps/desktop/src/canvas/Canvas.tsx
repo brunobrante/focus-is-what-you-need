@@ -43,6 +43,7 @@ import {
   canvasSizeForProjectType,
   computeComponentDeviceOrigin,
   createBlankDocumentForProjectType,
+  DEFAULT_PREVIEW_SETTINGS,
   enabledCanvasWindowTypes,
   findTreeNodeById,
   isFactoryMockGraphJSON,
@@ -54,8 +55,10 @@ import {
   type CanvasFeatureWindowType,
   type CanvasSplitWindows,
   type CanvasWindowType,
+  type PreviewSettings,
   type SplitMode,
 } from "./canvasUtils";
+import { PreviewLauncher } from "./shell/PreviewLauncher";
 import { IconChevronLeft, IconPanelRight } from "@/components/icons";
 
 export type { SplitMode } from "./canvasUtils";
@@ -133,6 +136,10 @@ function CanvasPageContent() {
   const [split, setSplit] = useState<SplitMode>("none");
   const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "drafts"]);
   const [canvasExpanded, setCanvasExpanded] = useState(false);
+  // The view-only Preview window, launched from above the Inspector. It is not a
+  // togglable feature nor a nav tab — `previewOpen` makes it available as a window.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSettings, setPreviewSettings] = useState<PreviewSettings>(DEFAULT_PREVIEW_SETTINGS);
   const [canvasFeatures, setCanvasFeatures] = useState<CanvasFeatureFlags>(() => ({
     ...DEFAULT_CANVAS_FEATURES,
     // The references window is now a real, wired surface — make it reachable.
@@ -149,8 +156,8 @@ function CanvasPageContent() {
   const { settings } = useResolvedCanvasSettings(projectIdParam || null);
   const fontTokens = useProjectFontTokens(projectIdParam || null);
   const enabledCanvasTabs = useMemo(
-    () => enabledCanvasWindowTypes(canvasFeatures),
-    [canvasFeatures],
+    () => enabledCanvasWindowTypes(canvasFeatures, previewOpen),
+    [canvasFeatures, previewOpen],
   );
   const normalizedSplitWindows = useMemo(
     () => normalizeCanvasSplitWindows(splitWindows, enabledCanvasTabs),
@@ -662,6 +669,34 @@ function CanvasPageContent() {
       return { ...current, [feature]: enabled };
     });
   }, []);
+
+  // Opening the Preview shows it alongside Current. From a single canvas it opens a
+  // vertical [Current, Preview] split; from an existing split it is added as a pane.
+  const openPreview = useCallback(() => {
+    setPreviewOpen(true);
+    if (split === "none") {
+      setSplitWindows(["current", "preview"]);
+      setSplit("vertical");
+      return;
+    }
+    const enabledWithPreview = enabledCanvasWindowTypes(canvasFeatures, true);
+    setSplitWindows((current) => addCanvasWindowToSplit(current, enabledWithPreview, "preview"));
+  }, [split, canvasFeatures]);
+
+  // Closing removes the Preview pane; if it was the only secondary pane, collapse
+  // back to a single Current canvas.
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setSplitWindows((current) => current.filter((windowType) => windowType !== "preview"));
+    if (splitWindows.filter((windowType) => windowType !== "preview").length < 2) {
+      setSplit("none");
+    }
+  }, [splitWindows]);
+
+  const togglePreview = useCallback(() => {
+    if (previewOpen) closePreview();
+    else openPreview();
+  }, [previewOpen, openPreview, closePreview]);
   // The references window shows references attached to the subject currently
   // open in the canvas (a component takes precedence over its screen). Null when
   // there is no concrete subject (e.g. a detached scene).
@@ -727,6 +762,8 @@ function CanvasPageContent() {
         shellBackVisibility={shellBackVisibility}
         shellZoomVisibility={shellZoomVisibility}
         shellExpandVisibility={shellExpandVisibility}
+        previewSettings={previewSettings}
+        onClosePreview={closePreview}
         onCurrentDocumentChange={handleCurrentDocumentChange}
         onActiveCanvasChange={changeCanvasTab}
         onToggleExpand={() => setCanvasExpanded((v) => !v)}
@@ -892,7 +929,14 @@ function CanvasPageContent() {
       />
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 
-      <div className="pointer-events-none fixed bottom-3 right-3 top-3 z-[6] flex items-stretch gap-3">
+      <div className="pointer-events-none fixed bottom-3 right-3 top-3 z-[6] flex flex-col items-end gap-3">
+        <PreviewLauncher
+          previewOpen={previewOpen}
+          onToggle={togglePreview}
+          settings={previewSettings}
+          onSettingsChange={setPreviewSettings}
+        />
+        <div className="flex min-h-0 flex-1">
         <Inspector
           open={inspectorOpen}
           onClose={() => setInspectorOpen(false)}
@@ -910,6 +954,7 @@ function CanvasPageContent() {
           hasParent={hasParent}
           onInheritParentBackgroundChange={handleInheritParentBackgroundChange}
         />
+        </div>
       </div>
 
       <div className="fixed bottom-6 right-3 z-[11] flex items-center gap-2">
