@@ -179,7 +179,7 @@ test("allows manual zoom beyond 1000 percent", () => {
   );
 
   expect(viewport.zoom).toBe(18);
-  expect(MAX_ZOOM).toBe(25);
+  expect(MAX_ZOOM).toBe(256);
 });
 
 test("opens the draft canvas zoomed into a working area instead of fitting the whole free canvas", () => {

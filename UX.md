@@ -299,7 +299,7 @@ Full-screen visual editor with floating UI layers.
 - Back-to-parent control (visible when editing inside a component)
 
 **Canvas zoom & pan model:**
-- Minimum zoom is `1x` (100%); maximum is `25x` for screens/components (`250x` in the freeform draft canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel (which zooms toward the cursor).
+- Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform draft canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel (which zooms toward the cursor).
 - Panning and zooming clamp to the **navigable region**: by default the edited subject, but when the screen simulator is on it grows to include the whole device frame (see below).
 - **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device.
 - **Once zoomed in past 100%** (the region overflowing) panning gains over-scroll: the camera can travel until **any edge of the region reaches the viewport center** (≈ half the scaled region in each direction). Panning stops there — the region can never be pushed entirely past center into one half. Pan via space-drag or two-finger/wheel scroll.

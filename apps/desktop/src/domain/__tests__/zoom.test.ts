@@ -4,7 +4,7 @@ import { USER_MAX_ZOOM, USER_MIN_ZOOM, clampPanToCenter, zoomToCursorOffset } fr
 
 test("exposes the shared user-facing zoom range", () => {
   expect(USER_MIN_ZOOM).toBe(1);
-  expect(USER_MAX_ZOOM).toBe(25);
+  expect(USER_MAX_ZOOM).toBe(256);
 });
 
 test("zoomToCursorOffset keeps the point under the cursor fixed", () => {

@@ -20,7 +20,7 @@ export type ViewportTransform = ViewportTransformInput & {
 
 export const MIN_ZOOM = USER_MIN_ZOOM;
 export const MAX_ZOOM = USER_MAX_ZOOM;
-export const DRAFT_MAX_ZOOM = 250;
+export const DRAFT_MAX_ZOOM = 2560;
 export const ZOOM_STEP = 0.25;
 export const VIEWPORT_EPSILON = 0.01;
 export const STAGE_VIEWPORT_PADDING = 24;

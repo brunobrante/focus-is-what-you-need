@@ -10,8 +10,8 @@
 /** Minimum user-facing zoom: `1x` (100%). Surfaces never zoom out below this. */
 export const USER_MIN_ZOOM = 1;
 
-/** Maximum user-facing zoom: `25x` (2500%). */
-export const USER_MAX_ZOOM = 25;
+/** Maximum user-facing zoom: `256x` (25600%), matching Figma's ceiling. */
+export const USER_MAX_ZOOM = 256;
 
 /**
  * Zoom-to-cursor for any "screen = offset + world * zoom" projection: returns the

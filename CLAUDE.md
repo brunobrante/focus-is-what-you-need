@@ -304,7 +304,7 @@ Zoom must respect that model:
     scaled region of slack in each direction — so the top/bottom/left/right can be
     brought into centered view. The region can never be panned entirely past
     center into one half.
-- the maximum user zoom is `25x` (`2500%`)
+- the maximum user zoom is `256x` (`25600%`)
 
 Opening a full screen should start at `1x` user zoom.
 At `1x`, one document pixel maps to one CSS pixel — the projection is independent of the browser window size. If the screen is larger than the visible canvas area, the screen overflows and the user pans to see the rest. The browser window is purely a clipping rectangle: resizing it changes what's visible but never recomputes the canvas projection. This is what keeps the selection outline glued to its element while the window is being resized.
