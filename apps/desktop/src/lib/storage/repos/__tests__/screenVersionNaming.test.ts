@@ -45,10 +45,11 @@ test("new screen versions share the name and get stable V-tags", async () => {
 
   const afterFirst = await listScreens();
   const main = afterFirst.find((s) => s.id === home.id)!;
-  expect(main.versionIndex).toBe(1); // original becomes V1 ("main")
+  expect(main.versionIndex).toBe(1); // original is the "main"
   expect(v2?.versionGroupId).toBe(main.versionGroupId);
-  expect(screenVersionLabel(main)).toBe("V1");
-  expect(screenVersionLabel(v2)).toBe("V2");
+  // The original is "main" (not V1); the first version created is V1.
+  expect(screenVersionLabel(main)).toBe("main");
+  expect(screenVersionLabel(v2)).toBe("V1");
 
   const v3 = await createScreenVersion({ screenId: home.id, mode: "linked" });
   expect(v3?.title).toBe("Home");
@@ -66,5 +67,5 @@ test("renaming any version renames the whole group", async () => {
   const all = await listScreens();
   const group = screenVersionsFromList(all, all.find((s) => s.id === home.id));
   expect(group.map((s) => s.title)).toEqual(["Landing", "Landing", "Landing"]);
-  expect(group.map((s) => screenVersionLabel(s))).toEqual(["V1", "V2", "V3"]);
+  expect(group.map((s) => screenVersionLabel(s))).toEqual(["main", "V1", "V2"]);
 });

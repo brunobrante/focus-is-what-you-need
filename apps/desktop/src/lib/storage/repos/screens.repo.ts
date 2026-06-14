@@ -58,12 +58,19 @@ export function screenVersionsFromList(
 }
 
 /**
- * The stable version tag for a screen ("V1", "V2", …), or null when the screen is
- * standalone (not part of a version group). V1 is the original ("main").
+ * The version tag for a screen: "main" for the original, "V1"/"V2"… for the actual
+ * versions (the first version created is V1, not V2). Null when the screen is
+ * standalone (not part of a version group).
  */
 export function screenVersionLabel(screen: ScreenRow | null | undefined): string | null {
   if (!screen?.versionGroupId) return null;
-  return `V${screen.versionIndex ?? 1}`;
+  const index = screen.versionIndex ?? 1;
+  return index <= 1 ? "main" : `V${index - 1}`;
+}
+
+/** Whether the screen is the original ("main") of its version group. */
+export function isMainScreenVersion(screen: ScreenRow | null | undefined): boolean {
+  return Boolean(screen?.versionGroupId) && (screen?.versionIndex ?? 1) <= 1;
 }
 
 export async function findScreenByTitle(

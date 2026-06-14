@@ -13,7 +13,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { createScreenVersion, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, deleteScreen, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -94,6 +94,8 @@ export interface ScreenDetailState {
   removeLinkedReference: (referenceId: string) => void;
   requestDeleteComponent: (component: ComponentRow) => void;
   handleOpenCanvas: (variantId: string) => void;
+  handleOpenVersionCanvas: (versionScreenId: string) => void;
+  handleDeleteVersion: (versionScreenId: string, label: string) => void;
   handleScreenTitleSave: (title: string) => void;
   handleNewComponentCreated: (r: { component: ComponentRow }) => void;
   handleCompareOpenInCanvas: (ids: string[]) => void;
@@ -253,6 +255,27 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     );
   };
 
+  const handleOpenVersionCanvas = (versionScreenId: string) => {
+    navigate(
+      `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${versionScreenId}`,
+    );
+  };
+
+  const handleDeleteVersion = (versionScreenId: string, label: string) => {
+    confirmRef.current?.open({
+      title: "Delete version",
+      message: `Version "${label}" of "${screenName}" will be removed.`,
+      onConfirm: async () => {
+        await deleteScreen(versionScreenId);
+        // If we deleted the version we're viewing, fall back to the group's main.
+        if (versionScreenId === screen?.id) {
+          const main = screenVersionsFromList(screens, screen).find((s) => s.id !== versionScreenId);
+          navigate(buildScreenHref(main?.id ?? screen?.id ?? versionScreenId), { replace: true });
+        }
+      },
+    });
+  };
+
   const handleScreenTitleSave = (title: string) => {
     if (!screen || title === screen.title) return;
     void (async () => {
@@ -328,6 +351,8 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     removeLinkedReference,
     requestDeleteComponent,
     handleOpenCanvas,
+    handleOpenVersionCanvas,
+    handleDeleteVersion,
     handleScreenTitleSave,
     handleNewComponentCreated,
     handleCompareOpenInCanvas,

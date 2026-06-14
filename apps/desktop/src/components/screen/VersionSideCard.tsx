@@ -1,8 +1,69 @@
-import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
+import { CardMenu, CardMenuIcons, type CardMenuButton } from "@/components/screen/CardMenu";
 import { getCanvasMockForTemplate } from "@/components/mocks/data/canvasMocks";
 import { Snapshot } from "@/components/Snapshot";
 import type { ScreenVersion } from "@/lib/data/screenVersions";
 import type { ProjectType } from "@/lib/data/types";
+
+/**
+ * Standard hover-menu buttons for a version card (screen or component), matching the
+ * component card style: open canvas, fast edit (stub), and — for non-main versions —
+ * a More menu with Delete version.
+ */
+export function versionCardButtons(input: {
+  isMain: boolean;
+  onOpenCanvas: () => void;
+  onFastEdit?: () => void;
+  onDelete: () => void;
+}): CardMenuButton[] {
+  const buttons: CardMenuButton[] = [
+    {
+      key: "canvas",
+      label: "Open in canvas",
+      icon: CardMenuIcons.Canvas,
+      onClick: (e) => { e.stopPropagation(); input.onOpenCanvas(); },
+    },
+    {
+      key: "fastedit",
+      label: "Fast edit",
+      icon: CardMenuIcons.FastEdit,
+      onClick: (e) => { e.stopPropagation(); input.onFastEdit?.(); },
+    },
+  ];
+  if (!input.isMain) {
+    buttons.push({
+      key: "more",
+      label: "More",
+      icon: CardMenuIcons.More,
+      menuItems: [
+        {
+          key: "delete",
+          label: "Delete version",
+          icon: CardMenuIcons.Trash,
+          destructive: true,
+          onClick: () => input.onDelete(),
+        },
+      ],
+    });
+  }
+  return buttons;
+}
+
+/** The version tag badge: green for "main", purple for "V1"/"V2"… */
+export function VersionTagBadge({ tag, isMain }: { tag?: string; isMain: boolean }) {
+  if (!tag) return null;
+  return isMain ? (
+    <span
+      className="flex-shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.5px]"
+      style={{ color: "#9EE6AE", borderColor: "#3FB950", background: "rgba(63,185,80,0.1)" }}
+    >
+      {tag}
+    </span>
+  ) : (
+    <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
+      {tag}
+    </span>
+  );
+}
 
 export function PreviewMockImage({
   tpl,
@@ -47,13 +108,20 @@ export function VersionSideCard({
   type,
   allowMock,
   onSelect,
+  onOpenCanvas,
+  onFastEdit,
+  onDelete,
 }: {
   version: ScreenVersion;
   active: boolean;
   type: ProjectType;
   allowMock: boolean;
   onSelect: () => void;
+  onOpenCanvas: () => void;
+  onFastEdit?: () => void;
+  onDelete: () => void;
 }) {
+  const isMain = version.tag === "main";
   return (
     <div className="group flex flex-col gap-2.5 text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5">
       <div
@@ -65,7 +133,7 @@ export function VersionSideCard({
         <button
           type="button"
           onClick={onSelect}
-          aria-label={`Select version ${version.title}`}
+          aria-label={`Select version ${version.tag ?? version.title}`}
           className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
         />
         <div className="h-full w-full overflow-hidden">
@@ -75,29 +143,13 @@ export function VersionSideCard({
             <PreviewMockImage tpl={version.tpl} type={type} compact allowMock={allowMock} />
           )}
         </div>
-        <CardMenu
-          buttons={[
-            { key: "select", label: "Select version", icon: CardMenuIcons.Check, onClick: onSelect },
-            { key: "duplicate", label: "Duplicate", icon: CardMenuIcons.Duplicate },
-            { key: "more", label: "More", icon: CardMenuIcons.More },
-          ]}
-        />
+        <CardMenu buttons={versionCardButtons({ isMain, onOpenCanvas, onFastEdit, onDelete })} />
       </div>
       <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
-          {version.tag ?? "V1"}
-        </span>
+        <VersionTagBadge tag={version.tag} isMain={isMain} />
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
           {version.title}
         </span>
-        {active ? (
-          <span
-            className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]"
-            style={{ color: "#F2F2F2", borderColor: "#3FB950", background: "rgba(63,185,80,0.08)" }}
-          >
-            Atual
-          </span>
-        ) : null}
       </div>
     </div>
   );

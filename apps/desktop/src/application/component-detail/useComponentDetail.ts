@@ -5,7 +5,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { duplicateVariant, getVariant } from "@/lib/storage/repos/variants.repo";
+import { deleteVariant, duplicateVariant, getVariant } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
   useActiveVariants,
@@ -89,6 +89,7 @@ export interface ComponentDetailState {
   handleOpenCanvas: (variantId: string) => void;
   handleAddReference: (input: Parameters<typeof createOrAttachReference>[0]) => Promise<void>;
   handleSelectVariant: (variantId: string) => void;
+  handleDeleteVariant: (variantId: string) => void;
   handleRename: (name: string) => void;
   handleUpdate: (patch: Parameters<typeof updateComponent>[1]) => void;
 }
@@ -291,6 +292,10 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     if (component) void setActiveVariant(component.id, variantId);
   };
 
+  const handleDeleteVariant = (variantId: string) => {
+    void deleteVariant(variantId);
+  };
+
   const handleRename = (name: string) => {
     if (component) void updateComponent(component.id, { name });
   };
@@ -347,6 +352,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     handleOpenCanvas,
     handleAddReference,
     handleSelectVariant,
+    handleDeleteVariant,
     handleRename,
     handleUpdate,
   };

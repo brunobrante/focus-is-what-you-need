@@ -17,7 +17,7 @@ import { Snapshot } from "@/components/Snapshot";
 import { AddCard } from "@/components/screen/AddCard";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
-import { VersionSideCard, PreviewMockImage } from "@/components/screen/VersionSideCard";
+import { VersionSideCard, PreviewMockImage, VersionTagBadge } from "@/components/screen/VersionSideCard";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { FastEditModal } from "@/components/screen/FastEditModal";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
@@ -29,8 +29,8 @@ import { ReferencesModal } from "@/components/modals/ReferencesModal";
 import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ComponentKind, ProjectType, ScreenVariant } from "@/lib/data/types";
-import { screenVersionLabel, updateScreen } from "@/lib/storage/repos/screens.repo";
-import { variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { isMainScreenVersion, screenVersionLabel, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { useScreenDetail, type CmpKindFilter as ScreenCmpKindFilter } from "@/application/screen-detail/useScreenDetail";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 
@@ -64,7 +64,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     versions, activeVersionId, setActiveVersionId, activeTpl,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, openNewComponent, addVersion,
-    removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleScreenTitleSave,
+    removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
 
@@ -131,8 +131,8 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
               <div className="flex items-center gap-2">
                 <EditableTitle value={screen?.title ?? screenName} label="Edit screen name" onSave={handleScreenTitleSave} />
                 {screenVersionLabel(screen) ? (
-                  <span className="mb-1.5 flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
-                    {screenVersionLabel(screen)}
+                  <span className="mb-1.5">
+                    <VersionTagBadge tag={screenVersionLabel(screen)!} isMain={isMainScreenVersion(screen)} />
                   </span>
                 ) : null}
               </div>
@@ -229,13 +229,31 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
               )}
               {sideTab === "versions" && (
                 <>
-                  {filteredVersions.map((v) => (
-                    <VersionSideCard key={v.id} version={v} active={v.id === activeVersionId} type={type} allowMock={canUseFactoryMocks} onSelect={() => setActiveVersionId(v.id)} />
-                  ))}
-                  {filteredVersions.length === 0 && (
-                    <SideEmptyState title="No versions found" description="Saved versions of this screen will appear here when created." actionLabel="New version" onAction={addVersion} />
+                  {versions.length > 1 ? (
+                    <>
+                      {filteredVersions.map((v) => (
+                        <VersionSideCard
+                          key={v.id}
+                          version={v}
+                          active={v.id === activeVersionId}
+                          type={type}
+                          allowMock={canUseFactoryMocks}
+                          onSelect={() => setActiveVersionId(v.id)}
+                          onOpenCanvas={() => { if (v.screenId) handleOpenVersionCanvas(v.screenId); }}
+                          onFastEdit={() => {}}
+                          onDelete={() => { if (v.screenId) handleDeleteVersion(v.screenId, v.tag ?? v.title); }}
+                        />
+                      ))}
+                      <AddCard label="New version" onClick={addVersion} />
+                    </>
+                  ) : (
+                    <SideEmptyState
+                      title="No versions yet"
+                      description="Create a version of this screen to start. The original stays as the main."
+                      actionLabel="New version"
+                      onAction={addVersion}
+                    />
                   )}
-                  {filteredVersions.length > 0 && <AddCard label="New version" onClick={addVersion} />}
                 </>
               )}
               {sideTab === "references" && (
@@ -278,7 +296,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
     setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef,
     openNewChild, addVariant, removeLinkedReference, handleChildDeleteConfirm,
     handleComponentCreated, handleOpenCanvas, handleAddReference, handleSelectVariant,
-    handleRename, handleUpdate,
+    handleDeleteVariant, handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -324,8 +342,8 @@ function ComponentContent({ componentId }: { componentId: string }) {
               <div className="flex items-center gap-2">
                 <EditableTitle value={component.name} label="Edit component name" onSave={handleRename} />
                 {variantCount > 0 && activeVariant ? (
-                  <span className="mb-1.5 flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
-                    {variantVersionLabel(activeVariant)}
+                  <span className="mb-1.5">
+                    <VersionTagBadge tag={variantVersionLabel(activeVariant)} isMain={isMainVariant(activeVariant)} />
                   </span>
                 ) : null}
               </div>
@@ -399,6 +417,9 @@ function ComponentContent({ componentId }: { componentId: string }) {
                       active={v.id === activeVariant?.id}
                       type={type}
                       onSelect={() => handleSelectVariant(v.id)}
+                      onOpenCanvas={() => handleOpenCanvas(v.id)}
+                      onFastEdit={() => {}}
+                      onDelete={() => handleDeleteVariant(v.id)}
                     />
                   ))}
                   {variants.length <= 1 && (
@@ -613,31 +634,29 @@ function ComponentBreadcrumb({
 // ── Component-specific side cards ─────────────────────────────────────────────
 
 function VariantSideCard({
-  variant, active, type, onSelect,
+  variant, active, type, onSelect, onOpenCanvas, onFastEdit, onDelete,
 }: {
   variant: VariantRow;
   active: boolean;
   type: ProjectType;
   onSelect: () => void;
+  onOpenCanvas: () => void;
+  onFastEdit?: () => void;
+  onDelete: () => void;
 }) {
+  const label = variantVersionLabel(variant);
+  const isMain = label === "main";
   return (
     <div className="group flex flex-col gap-2.5 text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5">
       <div className={["relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border bg-[var(--bg)] p-3 transition-colors", active ? "border-[var(--text-muted)]" : "border-[var(--border)] group-hover:border-[var(--border-strong)]"].join(" ")}>
-        <button type="button" onClick={onSelect} aria-label={`Select version ${variantVersionLabel(variant)}`} className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit" />
+        <button type="button" onClick={onSelect} aria-label={`Select version ${label}`} className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit" />
         <div className="h-full w-full overflow-hidden">
           <Snapshot kind="component" ownerType="variant" ownerId={variant.id} seedKey={variant.seedKey} type={type} display="card" />
         </div>
-        <CardMenu buttons={[{ key: "select", label: "Select version", icon: CardMenuIcons.Check, onClick: onSelect }]} />
+        <CardMenu buttons={versionCardButtons({ isMain, onOpenCanvas, onFastEdit, onDelete })} />
       </div>
       <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
-          {variantVersionLabel(variant)}
-        </span>
-        {active ? (
-          <span className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]" style={{ color: "#F2F2F2", borderColor: "#3FB950", background: "rgba(63,185,80,0.08)" }}>
-            Active
-          </span>
-        ) : null}
+        <VersionTagBadge tag={label} isMain={isMain} />
       </div>
     </div>
   );
