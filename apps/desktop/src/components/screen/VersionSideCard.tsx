@@ -137,8 +137,8 @@ export function VersionSideCard({
           className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
         />
         <div className="h-full w-full overflow-hidden">
-          {version.screenId ? (
-            <Snapshot kind="screen" ownerType="screen" ownerId={version.screenId} type={type} display="card" />
+          {version.variantId ? (
+            <Snapshot kind="screen" ownerType="variant" ownerId={version.variantId} type={type} display="card" />
           ) : (
             <PreviewMockImage tpl={version.tpl} type={type} compact allowMock={allowMock} />
           )}

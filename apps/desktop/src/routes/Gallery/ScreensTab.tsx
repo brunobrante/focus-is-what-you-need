@@ -11,9 +11,7 @@ import { Snapshot } from "@/components/Snapshot";
 import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import type { ScreenRow } from "@/lib/storage/schema";
-import { isMainScreenVersion, screenVersionLabel } from "@/lib/storage/repos/screens.repo";
 import { CardMenuIcons as SharedCardMenuIcons } from "@/components/screen/CardMenu";
-import { VersionTagBadge } from "@/components/screen/VersionSideCard";
 import {
   IconChevronDown,
   IconFastEdit,
@@ -295,8 +293,8 @@ function ScreenCard({
       >
         <Snapshot
           kind="screen"
-          ownerType="screen"
-          ownerId={screen.id}
+          ownerType="variant"
+          ownerId={screen.activeVariantId}
           variant={screen.variant}
           type={type}
         />
@@ -335,7 +333,6 @@ function ScreenCard({
       </div>
       <div className="flex items-center justify-between gap-2 px-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
-          <VersionTagBadge tag={screenVersionLabel(screen) ?? undefined} isMain={isMainScreenVersion(screen)} />
           <span className="truncate text-[13px] font-medium tracking-[-0.05px] text-[var(--text)]">
             {screen.title}
           </span>

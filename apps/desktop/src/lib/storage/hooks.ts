@@ -26,6 +26,7 @@ import {
   listVariants,
   listVariantsByComponent,
   listVariantsByIds,
+  listVariantsByScreen,
 } from "@/lib/storage/repos/variants.repo";
 import type {
   ComponentRow,
@@ -284,6 +285,18 @@ export function useVariants(
     async () => (componentId ? listVariantsByComponent(componentId) : []),
     [],
     [componentId ?? ""],
+  );
+}
+
+/** The variants (versions) of a screen master, ordered: main first, then V1, V2… */
+export function useScreenVariants(
+  screenId: string | null | undefined,
+): State<VariantRow[]> {
+  return useTableQuery<VariantRow[]>(
+    [TABLES.variants],
+    async () => (screenId ? listVariantsByScreen(screenId) : []),
+    [],
+    [screenId ?? ""],
   );
 }
 

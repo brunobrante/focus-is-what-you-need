@@ -54,6 +54,7 @@ test("deleteProject removes project-owned screens, components, variants, and ref
       title: "Home",
       variant: "hero",
       order: 0,
+      activeVariantId: "variant-screen-1",
       createdAt: 1,
       updatedAt: 1,
     },
@@ -75,7 +76,18 @@ test("deleteProject removes project-owned screens, components, variants, and ref
   await replaceTable<VariantRow>(TABLES.variants, [
     {
       id: "variant-1",
-      componentId: "component-1",
+      ownerKind: "component",
+      ownerId: "component-1",
+      name: "Default",
+      order: 0,
+      seedKey: null,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: "variant-screen-1",
+      ownerKind: "screen",
+      ownerId: "screen-1",
       name: "Default",
       order: 0,
       seedKey: null,

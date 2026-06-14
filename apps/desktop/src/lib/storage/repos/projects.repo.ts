@@ -112,8 +112,15 @@ export async function deleteProject(projectId: string): Promise<void> {
   for (const c of components) {
     if (c.projectId === projectId) componentIds.add(c.id);
   }
+  // Variants owned by this project's screens (versions) or components.
   const variantIds = new Set(
-    variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
+    variants
+      .filter((v) =>
+        v.ownerKind === "screen"
+          ? screenIds.has(v.ownerId)
+          : componentIds.has(v.ownerId),
+      )
+      .map((v) => v.id),
   );
 
   await replaceTable<ProjectRow>(
@@ -170,21 +177,13 @@ export async function deleteProject(projectId: string): Promise<void> {
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   await replaceTable<SceneRow>(
     TABLES.scenes,
-    scenes.filter(
-      (s) =>
-        !(s.ownerType === "screen" && screenIds.has(s.ownerId)) &&
-        !(s.ownerType === "variant" && variantIds.has(s.ownerId)),
-    ),
+    scenes.filter((s) => !variantIds.has(s.ownerId)),
   );
 
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   await replaceTable<ThumbnailRow>(
     TABLES.thumbnails,
-    thumbnails.filter(
-      (t) =>
-        !(t.ownerType === "screen" && screenIds.has(t.ownerId)) &&
-        !(t.ownerType === "variant" && variantIds.has(t.ownerId)),
-    ),
+    thumbnails.filter((t) => !variantIds.has(t.ownerId)),
   );
 
   if (isLocalProject(project)) {

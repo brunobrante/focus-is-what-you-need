@@ -9,7 +9,8 @@ import type { SceneOwnerType } from "@/lib/storage/schema";
 
 type ScreenSnapshotProps = {
   kind: "screen";
-  ownerType: Extract<SceneOwnerType, "screen">;
+  // A screen's scene/snapshot is owned by its active variant.
+  ownerType: SceneOwnerType;
   ownerId: string;
   variant: ScreenVariant;
   type: ProjectType;
@@ -19,7 +20,7 @@ type ScreenSnapshotProps = {
 
 type ComponentSnapshotProps = {
   kind: "component";
-  ownerType: Extract<SceneOwnerType, "variant">;
+  ownerType: SceneOwnerType;
   ownerId: string;
   seedKey: ComponentVariant | null;
   type: ProjectType;

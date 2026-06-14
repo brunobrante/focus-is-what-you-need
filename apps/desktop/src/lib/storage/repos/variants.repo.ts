@@ -3,10 +3,18 @@ import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
   listChildrenOfVariant,
+  listTopLevelByScreenId,
   setActiveVariant,
 } from "@/lib/storage/repos/components.repo";
 import { getSceneByOwner, linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
-import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
+import type {
+  ComponentRow,
+  SceneRow,
+  ScreenRow,
+  ThumbnailRow,
+  VariantOwnerKind,
+  VariantRow,
+} from "@/lib/storage/schema";
 import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.variants;
@@ -15,13 +23,29 @@ export async function listVariants(): Promise<VariantRow[]> {
   return listTable<VariantRow>(KEY);
 }
 
-export async function listVariantsByComponent(
-  componentId: string,
+/** All variants (versions) owned by a master — a screen or a component. */
+export async function listVariantsByOwner(
+  ownerKind: VariantOwnerKind,
+  ownerId: string,
 ): Promise<VariantRow[]> {
   const rows = await listVariants();
   return rows
-    .filter((r) => r.componentId === componentId)
+    .filter((r) => r.ownerKind === ownerKind && r.ownerId === ownerId)
     .sort((a, b) => a.order - b.order);
+}
+
+/** Convenience: variants of a component master. */
+export async function listVariantsByComponent(
+  componentId: string,
+): Promise<VariantRow[]> {
+  return listVariantsByOwner("component", componentId);
+}
+
+/** Convenience: variants (versions) of a screen master. */
+export async function listVariantsByScreen(
+  screenId: string,
+): Promise<VariantRow[]> {
+  return listVariantsByOwner("screen", screenId);
 }
 
 export async function getVariant(id: string): Promise<VariantRow | null> {
@@ -30,24 +54,25 @@ export async function getVariant(id: string): Promise<VariantRow | null> {
 }
 
 /**
- * The version tag for a component variant: "main" for the default/original variant,
- * "V1"/"V2"… for the actual versions (the first version created is V1). Mirrors the
- * screen version model — a component's variants are its versions, all sharing the
- * component's (one) name, each identified by this tag.
+ * The version tag for a variant: "main" for the default/original (order <= 0),
+ * "V1"/"V2"… for the actual versions. Shared by screens and components — both are
+ * masters that own a variant chain, all sharing the master's (one) name, each
+ * identified by this tag.
  */
 export function variantVersionLabel(variant: VariantRow): string {
   return variant.order <= 0 ? "main" : `V${variant.order}`;
 }
 
-/** Whether the variant is the default/original ("main") version of its component. */
+/** Whether the variant is the default/original ("main") version of its master. */
 export function isMainVariant(variant: VariantRow): boolean {
   return variant.order <= 0;
 }
 
 /**
- * Deletes a component version (variant): its scene, thumbnail, and any nested child
+ * Deletes a variant (a version): its scene, thumbnail, and any nested child
  * components owned by it. The default/original variant ("main") cannot be deleted. If
- * the deleted variant was active, the component switches to its lowest-order sibling.
+ * the deleted variant was the master's active one, the master switches to its
+ * lowest-order sibling. Works for both screen and component masters.
  */
 export async function deleteVariant(variantId: string): Promise<void> {
   const variants = await listVariants();
@@ -56,13 +81,33 @@ export async function deleteVariant(variantId: string): Promise<void> {
 
   const components = await listTable<ComponentRow>(TABLES.components);
 
-  // If active, switch the component to the lowest-order remaining sibling first.
-  const owner = components.find((c) => c.id === variant.componentId);
-  if (owner?.activeVariantId === variantId) {
-    const sibling = variants
-      .filter((v) => v.componentId === variant.componentId && v.id !== variantId)
-      .sort((a, b) => a.order - b.order)[0];
-    if (sibling) await setActiveVariant(owner.id, sibling.id);
+  // Lowest-order remaining sibling to fall back to if this was the active variant.
+  const fallback = variants
+    .filter(
+      (v) =>
+        v.ownerKind === variant.ownerKind &&
+        v.ownerId === variant.ownerId &&
+        v.id !== variantId,
+    )
+    .sort((a, b) => a.order - b.order)[0];
+
+  if (variant.ownerKind === "component") {
+    const owner = components.find((c) => c.id === variant.ownerId);
+    if (owner?.activeVariantId === variantId && fallback) {
+      await setActiveVariant(owner.id, fallback.id);
+    }
+  } else {
+    const screens = await listTable<ScreenRow>(TABLES.screens);
+    const owner = screens.find((s) => s.id === variant.ownerId);
+    if (owner?.activeVariantId === variantId && fallback) {
+      await replaceTable<ScreenRow>(
+        TABLES.screens,
+        screens.map((s) =>
+          s.id === owner.id ? { ...s, activeVariantId: fallback.id, updatedAt: now() } : s,
+        ),
+      );
+      notify(TABLES.screens);
+    }
   }
 
   // Child components nested under this variant (and their whole subtrees).
@@ -71,7 +116,9 @@ export async function deleteVariant(variantId: string): Promise<void> {
     collectComponentTreeIds(child.id, components, variants).forEach((id) => childComponentIds.add(id));
   }
   const childVariantIds = new Set(
-    variants.filter((v) => childComponentIds.has(v.componentId)).map((v) => v.id),
+    variants
+      .filter((v) => v.ownerKind === "component" && childComponentIds.has(v.ownerId))
+      .map((v) => v.id),
   );
   const deletedVariantIds = new Set([variantId, ...childVariantIds]);
 
@@ -86,12 +133,12 @@ export async function deleteVariant(variantId: string): Promise<void> {
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   await replaceTable<SceneRow>(
     TABLES.scenes,
-    scenes.filter((s) => !(s.ownerType === "variant" && deletedVariantIds.has(s.ownerId))),
+    scenes.filter((s) => !deletedVariantIds.has(s.ownerId)),
   );
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   await replaceTable<ThumbnailRow>(
     TABLES.thumbnails,
-    thumbnails.filter((t) => !(t.ownerType === "variant" && deletedVariantIds.has(t.ownerId))),
+    thumbnails.filter((t) => !deletedVariantIds.has(t.ownerId)),
   );
 
   notify(KEY);
@@ -101,10 +148,11 @@ export async function deleteVariant(variantId: string): Promise<void> {
 }
 
 export async function findVariantByName(
-  componentId: string,
+  ownerKind: VariantOwnerKind,
+  ownerId: string,
   name: string,
 ): Promise<VariantRow | null> {
-  const rows = await listVariantsByComponent(componentId);
+  const rows = await listVariantsByOwner(ownerKind, ownerId);
   return (
     rows.find((r) => r.name.toLowerCase() === name.toLowerCase()) ?? null
   );
@@ -120,18 +168,22 @@ export async function listVariantsByIds(
 }
 
 export async function createVariant(input: {
-  componentId: string;
+  ownerKind: VariantOwnerKind;
+  ownerId: string;
   name: string;
   seedKey?: ComponentVariant | null;
 }): Promise<VariantRow> {
   const rows = await listVariants();
-  const siblings = rows.filter((r) => r.componentId === input.componentId);
+  const siblings = rows.filter(
+    (r) => r.ownerKind === input.ownerKind && r.ownerId === input.ownerId,
+  );
   const order =
     siblings.reduce((max, r) => (r.order > max ? r.order : max), -1) + 1;
   const t = now();
   const created: VariantRow = {
     id: newId(),
-    componentId: input.componentId,
+    ownerKind: input.ownerKind,
+    ownerId: input.ownerId,
     name: input.name,
     order,
     seedKey: input.seedKey ?? null,
@@ -145,7 +197,7 @@ export async function createVariant(input: {
 
 /**
  * Create a new variant that is a version of an existing one — the "save current as
- * a new version" flow. Two modes:
+ * a new version" flow. Serves both screen and component masters. Two modes:
  *
  *  - "copy" (default): the source scene graph is duplicated verbatim. Node ids are
  *    scene-scoped, so a verbatim copy is safe for a sibling variant.
@@ -153,22 +205,30 @@ export async function createVariant(input: {
  *    component is collapsed into a linked instance pointing at the original child
  *    master (see linkifyChildComponentsInGraph). Editing a master then reflects in
  *    this version too.
+ *
+ * A component's children are the components nested under the source variant; a
+ * screen's children are the screen's top-level components.
  */
 export async function duplicateVariant(input: {
-  componentId: string;
+  ownerKind: VariantOwnerKind;
+  ownerId: string;
   sourceVariantId: string;
   name: string;
   mode?: "copy" | "linked";
 }): Promise<VariantRow> {
   const created = await createVariant({
-    componentId: input.componentId,
+    ownerKind: input.ownerKind,
+    ownerId: input.ownerId,
     name: input.name,
   });
   const sourceScene = await getSceneByOwner("variant", input.sourceVariantId);
   if (sourceScene) {
     let graphJSON = sourceScene.graphJSON;
     if (input.mode === "linked") {
-      const children = await listChildrenOfVariant(input.sourceVariantId);
+      const children =
+        input.ownerKind === "screen"
+          ? await listTopLevelByScreenId(input.ownerId)
+          : await listChildrenOfVariant(input.sourceVariantId);
       const linked = linkifyChildComponentsInGraph(
         graphJSON,
         children.map((c) => ({

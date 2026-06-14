@@ -49,22 +49,39 @@ link, and the reason the database is a graph.
 
 ## 3. Data Model
 
-### 3.1 Versioning model (as implemented)
+### 3.1 Versioning model (unified — screens own variants)
 
-Versioning is delivered with the **lighter** model rather than a full screen↔variant
-ownership unification, because the unification's blast radius across the scene-ownership
-subsystem was too large to land safely in one pass. Same UX, far less risk:
+There is **one** versioning mechanism: every versionable subject (a component **or** a
+screen) is a master that **owns a chain of `VariantRow`s**. A version is a variant. This
+is the "casal" model — versions belong to their master, never to the project.
 
-- **Components** keep their existing variant chain. A new version is another `VariantRow`
-  (`duplicateVariant`, now with a `mode: "linked" | "copy"`).
-- **Screens** are versioned as **sibling `ScreenRow`s** in the same project
-  (`createScreenVersion`), each owning its own `ownerType: "screen"` scene. Scene
-  ownership is unchanged. Version grouping UI (a `versionGroupId`) can be layered on
-  later; today a version simply appears as another screen titled "… (linked)" / "… (copy)".
+- A **`VariantRow`** is owned by exactly one master, identified by
+  `ownerKind: "screen" | "component"` + `ownerId`. (It no longer carries `componentId`.)
+  `order <= 0` is the original (`"main"`); `order > 0` is `V{order}`.
+- A **`ComponentRow`** owns variants via `ownerKind: "component"`; it already had
+  `activeVariantId`.
+- A **`ScreenRow`** owns variants via `ownerKind: "screen"`; it now also has
+  `activeVariantId`. A screen is no longer special-cased — it is a master like any other.
+  The old sibling model (`versionGroupId` / `versionIndex` on `ScreenRow`, versions
+  living at the project level) is **removed**.
+- **Scenes are always variant-owned.** `SceneOwnerType` collapses to a single value:
+  `"variant"`. A screen's editable scene lives on its active variant; the screen's *main*
+  variant is the scene that embeds its top-level components. Opening a screen opens
+  `screen.activeVariantId`.
 
-Linked instances themselves work identically regardless of whether the parent scene is a
-screen scene or a variant scene — the instance node just references a master component's
-active variant.
+Parent-owner resolution for snapshot propagation is uniform:
+
+- a screen-owned variant is a **root** (no parent) — propagation stops there;
+- a component-owned variant's parent is the parent component's variant
+  (`parentVariantId`), or — for a top-level screen component — the screen's **main**
+  variant (the embedding scene).
+
+Linked instances are unchanged: an instance node references a master component's active
+variant, regardless of whether the parent scene belongs to a screen variant or a
+component variant.
+
+The dead `ScreenVersionRow` (`screen_versions` table) and `ComponentPlacementRow`
+(`placements` table) are removed — they were unused aspirational code.
 
 ### 3.2 The instance reference lives on the live node models
 
@@ -146,9 +163,12 @@ modal (reuse `src/components/modals/Modal.tsx` / `ConfirmActionModal.tsx`):
   master then reflects in both the original and the new version.
 - **Copy** — a full deep copy with no links (today's `duplicateVariant` behavior).
 
-`duplicateVariant` (`src/lib/storage/repos/variants.repo.ts`) gains a
-`mode: "linked" | "copy"` parameter; `addVariant` (`src/routes/ComponentDetail.tsx`)
-opens the choice modal before calling it. The same path serves screen versioning.
+`duplicateVariant({ ownerKind, ownerId, sourceVariantId, name, mode })`
+(`src/lib/storage/repos/variants.repo.ts`) is the single entry point for **both** screen
+and component versions. `addVariant` (component detail) calls it with
+`ownerKind: "component"`; `createScreenVersion` (`screens.repo.ts`) calls it with
+`ownerKind: "screen"`, duplicating from the screen's main variant. Both open the
+"Linked or Copy" modal before calling it.
 
 ---
 
@@ -230,10 +250,17 @@ regressions):
   (`materializeInstancesInGraph` → independent copies) or **cascade**
   (`removeInstancesInGraph` → delete everywhere), wired into `deleteScreen` /
   `deleteComponentTree` via an `instanceStrategy` option (with unit tests).
+- **Phase 8 — Versioning unification (done).** The deferred §3.1 unification landed:
+  `VariantRow` is now owned by a screen **or** a component (`ownerKind`/`ownerId`);
+  screens own a variant chain and carry `activeVariantId`; `SceneOwnerType` collapsed to
+  `"variant"` (screen scenes moved onto the screen's variants); the sibling-screen version
+  model (`versionGroupId`/`versionIndex`, `screenVersionLabel`, `screenVersionsFromList`)
+  and the dead `ScreenVersionRow` / `ComponentPlacementRow` tables were removed. A screen
+  version is now a variant, listed in the screen detail Versions tab and selected/opened
+  via `setActiveScreenVariant`. Local data is reset by the `SCHEMA_VERSION` bump + reseed.
 
-All eight phases are complete. Remaining polish (optional): exact "used in <names>" listing
-in the delete dialog (currently shows a count), per-instance overrides, and a screen
-version-group switcher UI.
+All phases are complete. Remaining polish (optional): exact "used in <names>" listing
+in the delete dialog (currently shows a count), and per-instance overrides.
 
 ## 12. Implementation Plan
 

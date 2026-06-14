@@ -23,7 +23,8 @@ import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
-import { useScene } from "@/lib/storage/hooks";
+import { useAllVariants, useScene } from "@/lib/storage/hooks";
+import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
 import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
@@ -150,12 +151,17 @@ function CanvasPageContent() {
   const editorCanvasActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
   const getEditor = useEditorBridgeReader();
 
+  const { data: allVariants } = useAllVariants();
   const parentSceneOwner = useMemo(() => {
     if (!component) return null;
     if (component.parentVariantId) return { ownerType: "variant" as const, ownerId: component.parentVariantId };
-    if (component.screenId) return { ownerType: "screen" as const, ownerId: component.screenId };
+    if (component.screenId) {
+      // A top-level component's parent scene is the screen's main variant.
+      const mainVariantId = mainVariantIdForScreen(allVariants, component.screenId);
+      if (mainVariantId) return { ownerType: "variant" as const, ownerId: mainVariantId };
+    }
     return null;
-  }, [component?.parentVariantId, component?.screenId]);
+  }, [component?.parentVariantId, component?.screenId, allVariants]);
 
   const { data: parentScene } = useScene(parentSceneOwner?.ownerType ?? null, parentSceneOwner?.ownerId ?? null);
 
@@ -215,7 +221,7 @@ function CanvasPageContent() {
         persistedGraphJSON: effectiveSceneGraphJSON,
         mockGraphJSON: mockScene.graphJSON,
         projectType,
-        targetKind: component ? "variant" : "screen",
+        targetKind: component ? "component" : "screen",
       })
     ) {
       return mockScene.graphJSON;

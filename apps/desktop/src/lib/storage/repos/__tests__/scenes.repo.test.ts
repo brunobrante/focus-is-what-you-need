@@ -73,8 +73,19 @@ test("upsertScene propagates connected component snapshots to parent screen", as
 
   await replaceTable<VariantRow>(TABLES.variants, [
     {
+      id: "variant-home",
+      ownerKind: "screen",
+      ownerId: "screen-home",
+      name: "Default",
+      order: 0,
+      seedKey: null,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
       id: "variant-header",
-      componentId: "component-header",
+      ownerKind: "component",
+      ownerId: "component-header",
       name: "Default",
       order: 0,
       seedKey: null,
@@ -102,8 +113,8 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-home",
-      ownerType: "screen",
-      ownerId: "screen-home",
+      ownerType: "variant",
+      ownerId: "variant-home",
       graphJSON: bundle!.screen.graphJSON,
       sceneVersion: 1,
       updatedAt: 1,
@@ -133,13 +144,13 @@ test("upsertScene propagates connected component snapshots to parent screen", as
 
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   const screenScene = scenes.find(
-    (scene) => scene.ownerType === "screen" && scene.ownerId === "screen-home",
+    (scene) => scene.ownerType === "variant" && scene.ownerId === "variant-home",
   );
   expect(screenScene?.graphJSON).toContain("Updated Summary");
 
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const screenThumbnail = thumbnails.find(
-    (thumbnail) => thumbnail.ownerType === "screen" && thumbnail.ownerId === "screen-home",
+    (thumbnail) => thumbnail.ownerType === "variant" && thumbnail.ownerId === "variant-home",
   );
   expect(screenThumbnail?.dataUrl).toStartWith("data:image/svg+xml;utf8,");
   expect(decodeURIComponent(screenThumbnail!.dataUrl)).toContain("Updated Summary");
@@ -156,8 +167,19 @@ test("upsertScene propagates connected nested component snapshots through every 
 
   await replaceTable<VariantRow>(TABLES.variants, [
     {
+      id: "variant-home",
+      ownerKind: "screen",
+      ownerId: "screen-home",
+      name: "Default",
+      order: 0,
+      seedKey: null,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
       id: "variant-header",
-      componentId: "component-header",
+      ownerKind: "component",
+      ownerId: "component-header",
       name: "Default",
       order: 0,
       seedKey: null,
@@ -166,7 +188,8 @@ test("upsertScene propagates connected nested component snapshots through every 
     },
     {
       id: "variant-logo",
-      componentId: "component-logo",
+      ownerKind: "component",
+      ownerId: "component-logo",
       name: "Default",
       order: 0,
       seedKey: null,
@@ -209,8 +232,8 @@ test("upsertScene propagates connected nested component snapshots through every 
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-home",
-      ownerType: "screen",
-      ownerId: "screen-home",
+      ownerType: "variant",
+      ownerId: "variant-home",
       graphJSON: bundle!.screen.graphJSON,
       sceneVersion: 1,
       updatedAt: 1,
@@ -251,7 +274,7 @@ test("upsertScene propagates connected nested component snapshots through every 
     (scene) => scene.ownerType === "variant" && scene.ownerId === "variant-header",
   );
   const screenScene = scenes.find(
-    (scene) => scene.ownerType === "screen" && scene.ownerId === "screen-home",
+    (scene) => scene.ownerType === "variant" && scene.ownerId === "variant-home",
   );
   expect(headerScene?.graphJSON).toContain("ZX");
   expect(headerScene?.sceneVersion).toBe(2);
@@ -263,7 +286,7 @@ test("upsertScene propagates connected nested component snapshots through every 
     (thumbnail) => thumbnail.ownerType === "variant" && thumbnail.ownerId === "variant-header",
   );
   const screenThumbnail = thumbnails.find(
-    (thumbnail) => thumbnail.ownerType === "screen" && thumbnail.ownerId === "screen-home",
+    (thumbnail) => thumbnail.ownerType === "variant" && thumbnail.ownerId === "variant-home",
   );
   expect(decodeURIComponent(headerThumbnail!.dataUrl)).toContain("ZX");
   expect(decodeURIComponent(screenThumbnail!.dataUrl)).toContain("ZX");
@@ -272,8 +295,19 @@ test("upsertScene propagates connected nested component snapshots through every 
 test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () => {
   await replaceTable<VariantRow>(TABLES.variants, [
     {
+      id: "variant-screen-1",
+      ownerKind: "screen",
+      ownerId: "screen-1",
+      name: "Default",
+      order: 0,
+      seedKey: null,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
       id: "variant-green",
-      componentId: "component-green",
+      ownerKind: "component",
+      ownerId: "component-green",
       name: "Default",
       order: 0,
       seedKey: null,
@@ -303,8 +337,8 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-screen",
-      ownerType: "screen",
-      ownerId: "screen-1",
+      ownerType: "variant",
+      ownerId: "variant-screen-1",
       graphJSON: duplicateRectangleScreenGraph(),
       sceneVersion: 1,
       updatedAt: 1,
@@ -326,7 +360,7 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
   });
 
   const screenScene = (await listTable<SceneRow>(TABLES.scenes)).find(
-    (scene) => scene.ownerType === "screen" && scene.ownerId === "screen-1",
+    (scene) => scene.ownerType === "variant" && scene.ownerId === "variant-screen-1",
   );
   const screenDocument = htmlCanvasDocumentFromJSON(screenScene!.graphJSON)!;
   const orangeChild = screenDocument.nodes.find((node) => node.id === "orange-child");

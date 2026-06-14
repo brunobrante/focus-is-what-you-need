@@ -13,6 +13,19 @@ import { TABLES, listTable, notify, putRecord } from "@/lib/storage/store";
 
 const KEY = TABLES.scenes;
 
+/** The lowest-order ("main") variant id owned by a screen — the embedding scene. */
+export function mainVariantIdForScreen(
+  variants: VariantRow[],
+  screenId: string,
+): string | null {
+  let main: VariantRow | null = null;
+  for (const v of variants) {
+    if (v.ownerKind !== "screen" || v.ownerId !== screenId) continue;
+    if (!main || v.order < main.order) main = v;
+  }
+  return main?.id ?? null;
+}
+
 export async function listScenes(): Promise<SceneRow[]> {
   return listTable<SceneRow>(KEY);
 }
@@ -98,12 +111,15 @@ export async function removeComponentSubtreeFromParentScene(
   const component = components.find((row) => row.id === componentId);
   if (!component) return;
 
-  const parentOwner =
-    component.parentVariantId
-      ? { ownerType: "variant" as const, ownerId: component.parentVariantId }
-      : component.screenId
-        ? { ownerType: "screen" as const, ownerId: component.screenId }
-        : null;
+  let parentOwner: { ownerType: "variant"; ownerId: string } | null = null;
+  if (component.parentVariantId) {
+    parentOwner = { ownerType: "variant", ownerId: component.parentVariantId };
+  } else if (component.screenId) {
+    // Top-level screen component → its embedding scene is the screen's main variant.
+    const variants = await listTable<VariantRow>(TABLES.variants);
+    const mainVariantId = mainVariantIdForScreen(variants, component.screenId);
+    if (mainVariantId) parentOwner = { ownerType: "variant", ownerId: mainVariantId };
+  }
   if (!parentOwner) return;
 
   const parentScene = await getSceneByOwner(parentOwner.ownerType, parentOwner.ownerId);

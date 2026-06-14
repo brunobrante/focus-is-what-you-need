@@ -3,17 +3,15 @@ import { normalizeReferenceRow } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
-  listTopLevelByScreen,
   type InstanceDeleteStrategy,
 } from "@/lib/storage/repos/components.repo";
 import {
   countInstanceUsages,
   detachInstancesOfComponents,
-  getSceneByOwner,
-  linkifyChildComponentsInGraph,
+  mainVariantIdForScreen,
   removeInstancesOfComponents,
-  upsertScene,
 } from "@/lib/storage/repos/scenes.repo";
+import { duplicateVariant } from "@/lib/storage/repos/variants.repo";
 import type {
   ComponentRow,
   ReferenceRow,
@@ -43,42 +41,23 @@ export async function getScreen(id: string): Promise<ScreenRow | null> {
 }
 
 /**
- * The version siblings of a screen (including itself), derived from an already-loaded
- * screens array. A screen with no version group is its own sole version.
+ * Point a screen at a different variant (its active version). Mirrors
+ * `setActiveVariant` for components — `activeVariantId` owns the editable scene.
  */
-export function screenVersionsFromList(
-  screens: ScreenRow[],
-  screen: ScreenRow | null | undefined,
-): ScreenRow[] {
-  if (!screen) return [];
-  if (!screen.versionGroupId) return [screen];
-  return screens
-    .filter((s) => s.versionGroupId === screen.versionGroupId)
-    .sort((a, b) => (a.versionIndex ?? 1) - (b.versionIndex ?? 1) || a.createdAt - b.createdAt);
-}
-
-/**
- * The version tag for a screen: "main" for the original, "V1"/"V2"… for the actual
- * versions (the first version created is V1, not V2). Null when the screen is
- * standalone (not part of a version group).
- */
-export function screenVersionLabel(screen: ScreenRow | null | undefined): string | null {
-  if (!screen?.versionGroupId) return null;
-  const index = screen.versionIndex ?? 1;
-  return index <= 1 ? "main" : `V${index - 1}`;
-}
-
-/** Whether the screen is the original ("main") of its version group. */
-export function isMainScreenVersion(screen: ScreenRow | null | undefined): boolean {
-  return Boolean(screen?.versionGroupId) && (screen?.versionIndex ?? 1) <= 1;
-}
-
-/**
- * Whether the screen is a non-main version (V1, V2…). Versions belong to their screen,
- * not to the project, so they are hidden from project-level screen lists and trees.
- */
-export function isVersionScreen(screen: ScreenRow | null | undefined): boolean {
-  return Boolean(screen?.versionGroupId) && (screen?.versionIndex ?? 1) > 1;
+export async function setActiveScreenVariant(
+  screenId: string,
+  variantId: string,
+): Promise<ScreenRow | null> {
+  const rows = await listScreens();
+  const idx = rows.findIndex((s) => s.id === screenId);
+  if (idx < 0) return null;
+  if (rows[idx]!.activeVariantId === variantId) return rows[idx]!;
+  const next: ScreenRow = { ...rows[idx]!, activeVariantId: variantId, updatedAt: now() };
+  const nextRows = [...rows];
+  nextRows[idx] = next;
+  await replaceTable<ScreenRow>(KEY, nextRows);
+  notify(KEY);
+  return next;
 }
 
 export async function findScreenByTitle(
@@ -108,119 +87,88 @@ export async function createScreen(input: {
   const order =
     projectRows.reduce((max, r) => (r.order > max ? r.order : max), -1) + 1;
   const t = now();
+  const screenId = newId();
+  const variantId = newId();
+
+  // A screen is a master that owns a variant chain; its main variant (order 0) owns
+  // the editable scene, exactly like a component.
+  const mainVariant: VariantRow = {
+    id: variantId,
+    ownerKind: "screen",
+    ownerId: screenId,
+    name: "Default",
+    order: 0,
+    seedKey: null,
+    createdAt: t,
+    updatedAt: t,
+  };
   const created: ScreenRow = {
-    id: newId(),
+    id: screenId,
     projectId: input.projectId,
     title: input.title,
     variant: input.variant ?? "blank",
     order,
+    activeVariantId: variantId,
     createdAt: t,
     updatedAt: t,
   };
+
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  await replaceTable<VariantRow>(TABLES.variants, [mainVariant, ...variants]);
   await replaceTable<ScreenRow>(KEY, [...rows, created]);
   notify(KEY);
+  notify(TABLES.variants);
   return created;
 }
 
 /**
- * Creates a new version of a screen as a sibling screen in the same project.
+ * Creates a new version of a screen — a new variant owned by the screen master, exactly
+ * like creating a new variant of a component. Returns the created variant.
  *
  *  - "linked": the frame and non-component content are copied, but every top-level
  *    child component is collapsed into a linked instance pointing at the original
  *    child master. Editing a master then reflects in this version too.
  *  - "copy": the scene graph is duplicated verbatim (fully independent).
  *
- * The source and the new screen share a `versionGroupId` so the screen detail page
- * can list them together as versions of one another.
+ * The new variant is duplicated from the screen's main variant (its embedding scene).
  */
 export async function createScreenVersion(input: {
   screenId: string;
   mode: "copy" | "linked";
-}): Promise<ScreenRow | null> {
+}): Promise<VariantRow | null> {
   const source = await getScreen(input.screenId);
   if (!source) return null;
 
-  // Ensure both screens share a version group; the original becomes V1 ("main").
-  const groupId = source.versionGroupId ?? newId();
-  if (!source.versionGroupId) {
-    await updateScreen(source.id, { versionGroupId: groupId, versionIndex: 1 });
-  }
+  const variants = await listTable<VariantRow>(TABLES.variants);
+  const mainVariantId = mainVariantIdForScreen(variants, input.screenId) ?? source.activeVariantId;
 
-  // Next stable version index = max existing in the group + 1.
-  const screens = await listScreens();
-  const nextIndex =
-    screens
-      .filter((s) => s.versionGroupId === groupId)
-      .reduce((max, s) => Math.max(max, s.versionIndex ?? 1), 0) + 1;
-
-  // All versions share the same name — the tag (V2, V3…) is the identifier.
-  const created = await createScreen({
-    projectId: source.projectId,
-    title: source.title,
-    variant: source.variant,
+  return duplicateVariant({
+    ownerKind: "screen",
+    ownerId: source.id,
+    sourceVariantId: mainVariantId,
+    name: source.title,
+    mode: input.mode,
   });
-  const versioned = await updateScreen(created.id, {
-    versionGroupId: groupId,
-    versionIndex: nextIndex,
-  });
-
-  const sourceScene = await getSceneByOwner("screen", input.screenId);
-  if (sourceScene) {
-    let graphJSON = sourceScene.graphJSON;
-    if (input.mode === "linked") {
-      const children = await listTopLevelByScreen(source.projectId, input.screenId);
-      const linked = linkifyChildComponentsInGraph(
-        graphJSON,
-        children.map((c) => ({
-          id: c.id,
-          activeVariantId: c.activeVariantId,
-          sourceNodeId: c.sourceNodeId ?? null,
-          name: c.name,
-        })),
-      );
-      if (linked) graphJSON = linked;
-    }
-    await upsertScene(
-      { ownerType: "screen", ownerId: created.id, graphJSON },
-      { propagate: false },
-    );
-  }
-
-  return versioned ?? created;
 }
 
 export async function updateScreen(
   screenId: string,
-  patch: Partial<Pick<ScreenRow, "title" | "variant" | "versionGroupId" | "versionIndex">>,
+  patch: Partial<Pick<ScreenRow, "title" | "variant" | "activeVariantId">>,
 ): Promise<ScreenRow | null> {
   const rows = await listScreens();
   const idx = rows.findIndex((screen) => screen.id === screenId);
   if (idx < 0) return null;
 
   const current = rows[idx]!;
-  const t = now();
   const next: ScreenRow = {
     ...current,
     ...patch,
     title: patch.title?.trim() || current.title,
-    updatedAt: t,
+    updatedAt: now(),
   };
 
-  // All members of a version group share the same name: a title change propagates
-  // to every sibling in the group.
-  const titleChanged = next.title !== current.title;
-  const groupId = next.versionGroupId ?? current.versionGroupId ?? null;
-
-  let nextRows = [...rows];
+  const nextRows = [...rows];
   nextRows[idx] = next;
-  if (titleChanged && groupId) {
-    nextRows = nextRows.map((r) =>
-      r.id !== screenId && r.versionGroupId === groupId
-        ? { ...r, title: next.title, updatedAt: t }
-        : r,
-    );
-  }
-
   await replaceTable<ScreenRow>(KEY, nextRows);
   notify(KEY);
   return next;
@@ -264,8 +212,16 @@ export async function deleteScreen(
       componentIds.add(childId),
     );
   }
+  // Variants to delete: the screen's own version variants, plus every variant owned
+  // by the screen's (transitive) components.
   const variantIds = new Set(
-    variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
+    variants
+      .filter(
+        (v) =>
+          (v.ownerKind === "screen" && v.ownerId === screenId) ||
+          (v.ownerKind === "component" && componentIds.has(v.ownerId)),
+      )
+      .map((v) => v.id),
   );
 
   // Resolve linked instances of this screen's components before they disappear.
@@ -311,21 +267,13 @@ export async function deleteScreen(
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   await replaceTable<SceneRow>(
     TABLES.scenes,
-    scenes.filter(
-      (s) =>
-        !(s.ownerType === "screen" && s.ownerId === screenId) &&
-        !(s.ownerType === "variant" && variantIds.has(s.ownerId)),
-    ),
+    scenes.filter((s) => !variantIds.has(s.ownerId)),
   );
 
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   await replaceTable<ThumbnailRow>(
     TABLES.thumbnails,
-    thumbnails.filter(
-      (t) =>
-        !(t.ownerType === "screen" && t.ownerId === screenId) &&
-        !(t.ownerType === "variant" && variantIds.has(t.ownerId)),
-    ),
+    thumbnails.filter((t) => !variantIds.has(t.ownerId)),
   );
 
   notify(KEY);

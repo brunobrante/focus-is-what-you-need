@@ -12,7 +12,7 @@ import {
   serializeHtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
-import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
+import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
@@ -61,7 +61,8 @@ test("createComponent creates a component with a default variant under a screen"
     order: 0,
   });
   expect(result.defaultVariant).toMatchObject({
-    componentId: result.component.id,
+    ownerKind: "component",
+    ownerId: result.component.id,
     name: "Default",
     order: 0,
     seedKey: null,
@@ -114,6 +115,22 @@ test("deleteComponentTree removes a component, descendants, and their variants",
     parent: { kind: "variant", variantId: parent.defaultVariant.id },
     name: "Logo",
   });
+  // A screen's scene lives on its main variant; the top-level component's subtree is
+  // embedded there and must be removed on delete.
+  const existingVariants = await listTable<VariantRow>(TABLES.variants);
+  await replaceTable<VariantRow>(TABLES.variants, [
+    {
+      id: "variant-screen-1",
+      ownerKind: "screen",
+      ownerId: "screen-1",
+      name: "Default",
+      order: 0,
+      seedKey: null,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    ...existingVariants,
+  ]);
   const screenDocument = createDefaultHtmlCanvasDocument({
     name: "Home",
     projectType: "mobile",
@@ -125,8 +142,8 @@ test("deleteComponentTree removes a component, descendants, and their variants",
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "scene-screen",
-      ownerType: "screen",
-      ownerId: "screen-1",
+      ownerType: "variant",
+      ownerId: "variant-screen-1",
       graphJSON: serializeHtmlCanvasDocument(screenDocument),
       sceneVersion: 1,
       updatedAt: 1,
@@ -138,7 +155,7 @@ test("deleteComponentTree removes a component, descendants, and their variants",
   expect(await listTopLevelByScreen("project-1", "screen-1")).toEqual([]);
   expect(await listChildrenOfVariant(parent.defaultVariant.id)).toEqual([]);
   expect(await listChildrenOfVariant(child.defaultVariant.id)).toEqual([]);
-  const screenScene = await getSceneByOwner("screen", "screen-1");
+  const screenScene = await getSceneByOwner("variant", "variant-screen-1");
   const nextDocument = htmlCanvasDocumentFromJSON(screenScene?.graphJSON ?? null);
   expect(nextDocument?.nodes.some((node) => node.id === "node-panel")).toBe(false);
   expect(nextDocument?.nodes.some((node) => node.id === "node-action")).toBe(false);

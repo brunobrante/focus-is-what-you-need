@@ -776,13 +776,14 @@ version is created:
   "main"), shown on the Versions-tab cards and the component detail header. Creating one
   opens the same Linked/Copy modal as screens.
 - Screen versions: triggered by **New version** either in a screen card's `···` More menu
-  (Gallery Screens tab) or in the **Versions tab** of the screen detail page. It creates a
-  real sibling screen sharing a version group, and opens it. **All versions in a group share
-  the same name** — renaming any one renames them all. Each is identified by a stable
-  **version tag** (`V1`, `V2`, `V3`…, where `V1` is the original/"main"), shown as a purple
-  badge on the screen card, the detail header, and the Versions-tab cards. The screen detail
-  **Versions tab** lists the group's real versions (current marked active, each showing its
-  real snapshot); selecting one opens that screen.
+  (Gallery Screens tab) or in the **Versions tab** of the screen detail page. A screen is a
+  master that owns a variant chain exactly like a component — a screen version **is a
+  variant** of the screen (not a separate screen), so versions never appear at the project
+  level. All versions share the screen's (one) name and are identified by a stable
+  **version tag** (`main`, then `V1`, `V2`…); the active version's tag shows in the screen
+  detail header. The screen detail **Versions tab** lists the screen's variants (active one
+  marked by its border, each showing its own snapshot); selecting one makes it the screen's
+  active variant, and **open in canvas** opens the screen on that variant.
 - **Linked**: child components become read-only instances of the originals — editing a
   master updates every version. **Copy**: a fully independent duplicate.
 
@@ -804,9 +805,10 @@ version is created:
   is indicated by its border only (no "current"/"active" badge).
 - Each version card has the standard hover menu: **open canvas**, **fast edit** (stub), and
   — on non-main versions — a **More** menu with **Delete version**.
-- The **SubComponents tab** of a version lists the main's components as **linked** instances
-  (purple border + "linked" tag, read-only — no delete); detached/own components appear
-  normally.
+- Inside a version's canvas scene, child components that point at the master appear as
+  **linked** instances (purple border + "linked" tag, read-only — no delete); detached/own
+  components appear normally. (The screen detail **Components** tab always lists the screen's
+  own top-level components, independent of which version is active.)
 
 **Deleting a linked master** — when a screen or component being deleted still has linked
 instances elsewhere, an `InstanceDeleteModal` replaces the plain delete confirm. It shows

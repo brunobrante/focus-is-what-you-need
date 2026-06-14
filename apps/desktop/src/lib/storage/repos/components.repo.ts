@@ -51,6 +51,16 @@ export async function listTopLevelByScreen(
     .sort((a, b) => a.order - b.order);
 }
 
+/** Top-level components of a screen, by screen id alone (project is implied). */
+export async function listTopLevelByScreenId(
+  screenId: string,
+): Promise<ComponentRow[]> {
+  const rows = await listComponents();
+  return rows
+    .filter((r) => r.screenId === screenId && r.parentVariantId === null)
+    .sort((a, b) => a.order - b.order);
+}
+
 export async function listChildrenOfVariant(
   variantId: string,
 ): Promise<ComponentRow[]> {
@@ -223,7 +233,8 @@ export async function createComponent(input: {
 
   const defaultVariant: VariantRow = {
     id: variantId,
-    componentId,
+    ownerKind: "component",
+    ownerId: componentId,
     name: "Default",
     order: 0,
     seedKey: null,
@@ -335,7 +346,9 @@ export async function deleteComponentTree(
   await removeComponentSubtreeFromParentScene(componentId);
 
   const variantIds = new Set(
-    variants.filter((v) => componentIds.has(v.componentId)).map((v) => v.id),
+    variants
+      .filter((v) => v.ownerKind === "component" && componentIds.has(v.ownerId))
+      .map((v) => v.id),
   );
 
   await replaceTable<ComponentRow>(
@@ -402,7 +415,7 @@ export function collectComponentTreeIds(
     result.add(currentId);
 
     const ownedVariantIds = variants
-      .filter((v) => v.componentId === currentId)
+      .filter((v) => v.ownerKind === "component" && v.ownerId === currentId)
       .map((v) => v.id);
     for (const child of components) {
       if (child.parentVariantId && ownedVariantIds.includes(child.parentVariantId)) {

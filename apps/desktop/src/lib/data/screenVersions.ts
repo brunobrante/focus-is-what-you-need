@@ -9,7 +9,10 @@ export type ScreenVersion = {
   // When set, this version is backed by a real screen row; cards render its real
   // stored snapshot instead of a template mock.
   screenId?: string;
-  // Stable version tag ("V1", "V2"…). All versions in a group share the same title,
+  // The variant that owns this version's editable scene/snapshot. A screen version is
+  // a variant of the screen master; cards render this variant's stored snapshot.
+  variantId?: string;
+  // Stable version tag ("main", "V1", "V2"…). All versions share the screen's title,
   // so the tag is the real identifier.
   tag?: string;
 };

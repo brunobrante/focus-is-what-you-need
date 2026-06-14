@@ -82,10 +82,11 @@ export function useHtmlCanvasDocument(
 
     const timeout = window.setTimeout(() => {
       // Fire-and-forget into the save queue. Persistence failure becomes queue
-      // state (retry/backoff) — it must never surface as a document error.
+      // state (retry/backoff) — it must never surface as a document error. A
+      // screen's scene lives on its active variant.
       saveScene({
-        ownerType: target.kind,
-        ownerId: target.row.id,
+        ownerType: "variant",
+        ownerId: target.kind === "screen" ? target.row.activeVariantId : target.row.id,
         graphJSON: serialized,
       });
       lastSavedRef.current = serialized;

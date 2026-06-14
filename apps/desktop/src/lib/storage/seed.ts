@@ -12,14 +12,12 @@ import {
 import { newId, now } from "@/lib/storage/ids";
 import {
   SCHEMA_VERSION,
-  type ComponentPlacementRow,
   type ComponentRow,
   type Meta,
   type ProjectRow,
   type ReferenceRow,
   type SceneRow,
   type ScreenRow,
-  type ScreenVersionRow,
   type ThumbnailRow,
   type VariantRow,
   type WorkspaceRow,
@@ -57,8 +55,6 @@ export async function resetToFactoryData(): Promise<void> {
   await writeMeta({ schemaVersion: SCHEMA_VERSION, seededAt: now() });
   notify(TABLES.meta);
   notify(TABLES.workspaces);
-  notify(TABLES.screenVersions);
-  notify(TABLES.placements);
 }
 
 async function firstBootSeedV5(): Promise<void> {
@@ -78,14 +74,32 @@ async function firstBootSeedV5(): Promise<void> {
   }));
 
   const screens: ScreenRow[] = [];
+  const variants: VariantRow[] = [];
+  // Each screen is a master owning a main variant (order 0); that variant owns the
+  // screen's editable scene.
+  const mainVariantByScreenId = new Map<string, string>();
   for (const project of projects) {
     screensForProject(project).forEach((s, idx) => {
+      const screenId = newId();
+      const variantId = newId();
+      variants.push({
+        id: variantId,
+        ownerKind: "screen",
+        ownerId: screenId,
+        name: "Default",
+        order: 0,
+        seedKey: null,
+        createdAt: t,
+        updatedAt: t,
+      });
+      mainVariantByScreenId.set(screenId, variantId);
       screens.push({
-        id: newId(),
+        id: screenId,
         projectId: project.id,
         title: s.title,
         variant: s.variant,
         order: idx,
+        activeVariantId: variantId,
         createdAt: t,
         updatedAt: t,
       });
@@ -93,7 +107,6 @@ async function firstBootSeedV5(): Promise<void> {
   }
 
   const components: ComponentRow[] = [];
-  const variants: VariantRow[] = [];
   const references: ReferenceRow[] = [];
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
   const scenes: SceneRow[] = [];
@@ -104,8 +117,9 @@ async function firstBootSeedV5(): Promise<void> {
     if (!projectType) continue;
     const bundle = await getCanvasMockBundleForScreen(screen, projectType);
     if (!bundle) continue;
-    scenes.push(createMockSceneRow(screen.id, "screen", bundle.screen, t));
-    thumbnails.push(createMockThumbnailRow(screen.id, "screen", bundle.screen, t));
+    const mainVariantId = mainVariantByScreenId.get(screen.id)!;
+    scenes.push(createMockSceneRow(mainVariantId, "variant", bundle.screen, t));
+    thumbnails.push(createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t));
     seedComponentTree({
       projectId: screen.projectId,
       parent: { kind: "screen", screenId: screen.id },
@@ -126,32 +140,6 @@ async function firstBootSeedV5(): Promise<void> {
     updatedAt: t,
   };
 
-  const screenVersions: ScreenVersionRow[] = screens.map((screen) => ({
-    id: newId(),
-    screenId: screen.id,
-    label: "Default",
-    createdAt: t,
-  }));
-
-  const screenVersionByScreenId = new Map(
-    screenVersions.map((sv) => [sv.screenId, sv]),
-  );
-  const placements: ComponentPlacementRow[] = [];
-  for (const component of components) {
-    if (!component.screenId || component.parentVariantId !== null) continue;
-    const screenVersion = screenVersionByScreenId.get(component.screenId);
-    if (!screenVersion) continue;
-    placements.push({
-      id: newId(),
-      screenVersionId: screenVersion.id,
-      componentId: component.id,
-      versionId: component.activeVariantId,
-      slot: component.name.toLowerCase().replace(/\s+/g, "-"),
-      order: component.order,
-      overrides: {},
-    });
-  }
-
   await replaceTable<ProjectRow>(TABLES.projects, projects);
   await replaceTable<ScreenRow>(TABLES.screens, screens);
   await replaceTable<ComponentRow>(TABLES.components, components);
@@ -160,8 +148,6 @@ async function firstBootSeedV5(): Promise<void> {
   await replaceTable<SceneRow>(TABLES.scenes, scenes);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
   await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace]);
-  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
   await replaceTable<never>(TABLES.history, []);
 
   notify(TABLES.projects);
@@ -172,8 +158,6 @@ async function firstBootSeedV5(): Promise<void> {
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
   notify(TABLES.workspaces);
-  notify(TABLES.screenVersions);
-  notify(TABLES.placements);
 }
 
 async function ensureFactoryMocksPresent(): Promise<void> {
@@ -187,8 +171,6 @@ async function ensureFactoryMocksPresent(): Promise<void> {
   let scenes = await listTable<SceneRow>(TABLES.scenes);
   let thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   let workspaces = await listTable<WorkspaceRow>(TABLES.workspaces);
-  let screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
-  let placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   const seedKeys = new Set(
     PROJECTS.map((project) => projectKey(project.name, project.type)),
@@ -229,24 +211,43 @@ async function ensureFactoryMocksPresent(): Promise<void> {
     projects = [...projects, project];
     addedProjectIds.push(project.id);
 
-    const newScreens: ScreenRow[] = screensForProject(project).map((screen, order) => ({
-      id: newId(),
-      projectId: project.id,
-      title: screen.title,
-      variant: screen.variant,
-      order,
-      createdAt: t,
-      updatedAt: t,
-    }));
+    const newScreens: ScreenRow[] = [];
+    const newMainVariantByScreenId = new Map<string, string>();
+    screensForProject(project).forEach((screen, order) => {
+      const screenId = newId();
+      const variantId = newId();
+      variants.push({
+        id: variantId,
+        ownerKind: "screen",
+        ownerId: screenId,
+        name: "Default",
+        order: 0,
+        seedKey: null,
+        createdAt: t,
+        updatedAt: t,
+      });
+      newMainVariantByScreenId.set(screenId, variantId);
+      newScreens.push({
+        id: screenId,
+        projectId: project.id,
+        title: screen.title,
+        variant: screen.variant,
+        order,
+        activeVariantId: variantId,
+        createdAt: t,
+        updatedAt: t,
+      });
+    });
     screens = [...screens, ...newScreens];
 
     for (const screen of newScreens) {
       const bundle = await getCanvasMockBundleForScreen(screen, project.type);
       if (!bundle) continue;
-      scenes = [...scenes, createMockSceneRow(screen.id, "screen", bundle.screen, t)];
+      const mainVariantId = newMainVariantByScreenId.get(screen.id)!;
+      scenes = [...scenes, createMockSceneRow(mainVariantId, "variant", bundle.screen, t)];
       thumbnails = [
         ...thumbnails,
-        createMockThumbnailRow(screen.id, "screen", bundle.screen, t),
+        createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t),
       ];
       seedComponentTree({
         projectId: project.id,
@@ -260,39 +261,6 @@ async function ensureFactoryMocksPresent(): Promise<void> {
       });
     }
 
-    const newScreenVersions: ScreenVersionRow[] = newScreens.map((screen) => ({
-      id: newId(),
-      screenId: screen.id,
-      label: "Default",
-      createdAt: t,
-    }));
-    screenVersions = [...screenVersions, ...newScreenVersions];
-
-    const screenVersionByScreenId = new Map(
-      newScreenVersions.map((screenVersion) => [screenVersion.screenId, screenVersion]),
-    );
-    const newPlacements: ComponentPlacementRow[] = components
-      .filter(
-        (component) =>
-          component.projectId === project.id &&
-          component.screenId !== null &&
-          component.parentVariantId === null,
-      )
-      .map((component) => {
-        const screenVersion = screenVersionByScreenId.get(component.screenId!);
-        if (!screenVersion) return null;
-        return {
-          id: newId(),
-          screenVersionId: screenVersion.id,
-          componentId: component.id,
-          versionId: component.activeVariantId,
-          slot: component.name.toLowerCase().replace(/\s+/g, "-"),
-          order: component.order,
-          overrides: {},
-        } satisfies ComponentPlacementRow;
-      })
-      .filter((placement): placement is ComponentPlacementRow => placement !== null);
-    placements = [...placements, ...newPlacements];
     changed = true;
   }
 
@@ -328,8 +296,6 @@ async function ensureFactoryMocksPresent(): Promise<void> {
   await replaceTable<SceneRow>(TABLES.scenes, scenes);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
   await replaceTable<WorkspaceRow>(TABLES.workspaces, workspaces);
-  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, screenVersions);
-  await replaceTable<ComponentPlacementRow>(TABLES.placements, placements);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -338,8 +304,6 @@ async function ensureFactoryMocksPresent(): Promise<void> {
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
   notify(TABLES.workspaces);
-  notify(TABLES.screenVersions);
-  notify(TABLES.placements);
 }
 
 function projectKey(name: string, type: ProjectRow["type"]): string {
@@ -397,7 +361,8 @@ function seedComponentTree(input: {
 
     input.variants.push({
       id: variantId,
-      componentId,
+      ownerKind: "component",
+      ownerId: componentId,
       name: "Default",
       order: 0,
       seedKey: null,

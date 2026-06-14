@@ -7,14 +7,12 @@ import {
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import {
   SCHEMA_VERSION,
-  type ComponentPlacementRow,
   type ComponentRow,
   type HistoryEntryRow,
   type ProjectRow,
   type ReferenceRow,
   type SceneRow,
   type ScreenRow,
-  type ScreenVersionRow,
   type SystemDesignRow,
   type ThumbnailRow,
   type VariantRow,
@@ -39,8 +37,6 @@ type FigxArchive = {
     references: ReferenceRow[];
     scenes: SceneRow[];
     thumbnails: ThumbnailRow[];
-    screenVersions: ScreenVersionRow[];
-    placements: ComponentPlacementRow[];
     history: HistoryEntryRow[];
     systemDesigns: SystemDesignRow[];
   };
@@ -108,8 +104,6 @@ async function buildLocalProjectArchives(): Promise<
   );
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
-  const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
-  const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
   const history = await listTable<HistoryEntryRow>(TABLES.history);
   const systemDesigns = await listTable<SystemDesignRow>(TABLES.systemDesigns);
 
@@ -120,18 +114,15 @@ async function buildLocalProjectArchives(): Promise<
     );
     const projectScreenIds = new Set(projectScreens.map((screen) => screen.id));
     const projectComponentIds = new Set(projectComponents.map((component) => component.id));
+    // Variants owned by this project's screens (versions) or components.
     const projectVariants = variants.filter((variant) =>
-      projectComponentIds.has(variant.componentId),
+      variant.ownerKind === "screen"
+        ? projectScreenIds.has(variant.ownerId)
+        : projectComponentIds.has(variant.ownerId),
     );
     const projectVariantIds = new Set(projectVariants.map((variant) => variant.id));
     const projectReferences = references.filter((reference) =>
       reference.projectIds.includes(project.id),
-    );
-    const projectScreenVersions = screenVersions.filter((version) =>
-      projectScreenIds.has(version.screenId),
-    );
-    const projectScreenVersionIds = new Set(
-      projectScreenVersions.map((version) => version.id),
     );
 
     const archive: FigxArchive = {
@@ -145,21 +136,9 @@ async function buildLocalProjectArchives(): Promise<
         components: projectComponents,
         variants: projectVariants,
         references: projectReferences,
-        scenes: scenes.filter(
-          (scene) =>
-            (scene.ownerType === "screen" && projectScreenIds.has(scene.ownerId)) ||
-            (scene.ownerType === "variant" && projectVariantIds.has(scene.ownerId)),
-        ),
-        thumbnails: thumbnails.filter(
-          (thumbnail) =>
-            (thumbnail.ownerType === "screen" && projectScreenIds.has(thumbnail.ownerId)) ||
-            (thumbnail.ownerType === "variant" && projectVariantIds.has(thumbnail.ownerId)),
-        ),
-        screenVersions: projectScreenVersions,
-        placements: placements.filter(
-          (placement) =>
-            projectScreenVersionIds.has(placement.screenVersionId) ||
-            projectComponentIds.has(placement.componentId),
+        scenes: scenes.filter((scene) => projectVariantIds.has(scene.ownerId)),
+        thumbnails: thumbnails.filter((thumbnail) =>
+          projectVariantIds.has(thumbnail.ownerId),
         ),
         history: history.filter(
           (entry) =>

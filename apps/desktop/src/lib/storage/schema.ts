@@ -6,7 +6,7 @@ import type {
 } from "@/lib/data/types";
 import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export type Meta = {
   schemaVersion: number;
@@ -33,12 +33,11 @@ export type ScreenRow = {
   title: string;
   variant: ScreenVariant;
   order: number;
-  // Screens that are versions of one another share a version group id. Null/undefined
-  // for a standalone screen that has never been versioned. All members of a group
-  // share the same `title`; each is identified by a stable `versionIndex` (V1, V2…),
-  // where V1 is the original ("main").
-  versionGroupId?: string | null;
-  versionIndex?: number | null;
+  // A screen is a master that owns a chain of variants (its versions), exactly like a
+  // component. `activeVariantId` points at the variant currently being shown/edited;
+  // that variant owns the editable scene. The screen's "main" variant (order 0) is the
+  // scene that embeds its top-level components.
+  activeVariantId: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -71,9 +70,16 @@ export type ComponentRow = {
   updatedAt: number;
 };
 
+// A variant belongs to exactly one master — a screen or a component.
+export type VariantOwnerKind = "screen" | "component";
+
 export type VariantRow = {
   id: string;
-  componentId: string;
+  // The master that owns this variant. For "component" the ownerId is a ComponentRow id;
+  // for "screen" it is a ScreenRow id. `order <= 0` is the original ("main"); `order > 0`
+  // is "V{order}".
+  ownerKind: VariantOwnerKind;
+  ownerId: string;
   name: string;
   order: number;
   // null for empty/default variants.
@@ -85,7 +91,10 @@ export type VariantRow = {
 };
 
 export type OwnerType = "project" | "screen" | "component";
-export type SceneOwnerType = "screen" | "variant";
+// Scenes (and thumbnails) are always owned by a variant — a screen's scene lives on its
+// active variant, a component's on its active variant. There is no separate "screen"
+// scene owner anymore.
+export type SceneOwnerType = "variant";
 
 export type ReferenceAttachment = {
   projectId: string;
@@ -264,33 +273,6 @@ export type SystemDesignRow = {
   tokens: SystemDesignTokens;
   createdAt: number;
   updatedAt: number;
-};
-
-// ---------------------------------------------------------------------------
-// ScreenVersion — parallel alternatives of a screen (not change history)
-// ---------------------------------------------------------------------------
-
-export type ScreenVersionRow = {
-  id: string;
-  screenId: string;
-  label: string;
-  createdAt: number;
-};
-
-// ---------------------------------------------------------------------------
-// ComponentPlacement — the graph edge: N screens → 1 component
-// ---------------------------------------------------------------------------
-
-export type NodeOverride = Record<string, Partial<Record<string, unknown>>>;
-
-export type ComponentPlacementRow = {
-  id: string;
-  screenVersionId: string;
-  componentId: string;
-  versionId: string;
-  slot: string;
-  order: number;
-  overrides: NodeOverride;
 };
 
 // ---------------------------------------------------------------------------

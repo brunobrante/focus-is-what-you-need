@@ -121,7 +121,7 @@ async function resolveScreenAncestor(
     if (!current.parentVariantId) return null;
     const variant = await getVariant(current.parentVariantId);
     if (!variant) return null;
-    current = await getComponent(variant.componentId);
+    current = await getComponent(variant.ownerId);
   }
   return null;
 }
@@ -151,7 +151,7 @@ async function resolveAncestorTrail(
   for (let i = 0; i < 64 && parentVariantId; i++) {
     const variant = await getVariant(parentVariantId);
     if (!variant) break;
-    const parent = await getComponent(variant.componentId);
+    const parent = await getComponent(variant.ownerId);
     if (!parent) break;
     trail.unshift(parent);
     parentVariantId = parent.parentVariantId;
@@ -272,7 +272,8 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
         setCreatingVariant(true);
         try {
           const created = await duplicateVariant({
-            componentId: sourceComponent.id,
+            ownerKind: "component",
+            ownerId: sourceComponent.id,
             sourceVariantId: sourceVariant.id,
             name: `Variant ${variants.length + 1}`,
             mode,

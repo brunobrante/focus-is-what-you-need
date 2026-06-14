@@ -1,8 +1,9 @@
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { createBlankDocument } from "@/canvas/engine/actions";
-import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
+import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
+import { listVariants } from "@/lib/storage/repos/variants.repo";
 import type { CanvasDocument } from "@/canvas/engine/types";
-import type { ComponentRow, SceneOwnerType, ScreenRow } from "@/lib/storage/schema";
+import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
 import type { MockComponentSeed } from "@/components/mocks/data/canvasMocks";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 import type { ProjectType } from "@/lib/data/types";
@@ -148,7 +149,8 @@ export function shouldUseMockGraph(input: {
   persistedGraphJSON: string | null;
   mockGraphJSON: string;
   projectType: ProjectType;
-  targetKind: SceneOwnerType;
+  // Whether the opened subject is a whole screen or a single component.
+  targetKind: "screen" | "component";
 }): boolean {
   const mockDoc = canvasDocumentFromHtmlGraphJSON(input.mockGraphJSON);
   if (!mockDoc) return false;
@@ -156,7 +158,7 @@ export function shouldUseMockGraph(input: {
   const persistedDoc = canvasDocumentFromHtmlGraphJSON(input.persistedGraphJSON);
   if (!persistedDoc) return true;
   if (persistedDoc.rootIds.length === 0) return true;
-  if (input.targetKind !== "variant") return false;
+  if (input.targetKind !== "component") return false;
 
   const deviceSize = canvasSizeForProjectType(input.projectType);
   const persistedIsDeviceSized = sameCanvasSize(persistedDoc.canvas, deviceSize);
@@ -230,6 +232,8 @@ export async function computeComponentDeviceOrigin(
     byActiveVariantId.set(row.activeVariantId, row);
   }
 
+  const variants = await listVariants();
+
   let x = 0;
   let y = 0;
   let current: ComponentRow | undefined = component;
@@ -240,22 +244,26 @@ export async function computeComponentDeviceOrigin(
     visited.add(current.id);
     if (!current.sourceNodeId) return null;
 
-    const owner: { ownerType: SceneOwnerType; ownerId: string } | null =
-      current.parentVariantId
-        ? { ownerType: "variant", ownerId: current.parentVariantId }
-        : current.screenId
-          ? { ownerType: "screen", ownerId: current.screenId }
-          : null;
-    if (!owner) return null;
+    // The embedding scene is the parent variant, or — for a top-level screen
+    // component — the screen's main variant.
+    let ownerId: string | null = null;
+    let isScreenRoot = false;
+    if (current.parentVariantId) {
+      ownerId = current.parentVariantId;
+    } else if (current.screenId) {
+      ownerId = mainVariantIdForScreen(variants, current.screenId);
+      isScreenRoot = true;
+    }
+    if (!ownerId) return null;
 
-    const parentScene = await getSceneByOwner(owner.ownerType, owner.ownerId);
+    const parentScene = await getSceneByOwner("variant", ownerId);
     const bounds = getNodeAbsoluteBoundsInGraph(parentScene?.graphJSON, current.sourceNodeId);
     if (!bounds) return null;
     x += bounds.x;
     y += bounds.y;
 
-    // Reached a screen: that's the device, so the accumulated offset is absolute.
-    if (owner.ownerType === "screen") return { x, y };
+    // Reached the screen: that's the device, so the accumulated offset is absolute.
+    if (isScreenRoot) return { x, y };
 
     // Otherwise climb to the component that owns the parent variant and repeat.
     current = byActiveVariantId.get(current.parentVariantId as string);
@@ -493,8 +501,6 @@ export function buildProjectTree(screens: ScreenRow[], components: ComponentRow[
   };
 
   return [...screens]
-    // Versions belong to their screen, not the project — keep them out of the tree.
-    .filter((screen) => !(screen.versionGroupId && (screen.versionIndex ?? 1) > 1))
     .sort((a, b) => a.order - b.order)
     .map((screen) => ({
       id: screen.id,

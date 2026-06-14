@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   NewScreenModal,
@@ -10,7 +10,7 @@ import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { InstanceDeleteModal } from "@/components/modals/InstanceDeleteModal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
-import { countScreenInstanceUsages, createScreenVersion, isVersionScreen } from "@/lib/storage/repos/screens.repo";
+import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/repos/screens.repo";
 import { countComponentInstanceUsages } from "@/lib/storage/repos/components.repo";
 import { useGallery } from "@/application/gallery/useGallery";
 
@@ -70,9 +70,9 @@ export function GalleryPage() {
     handleConfirmDeleteComponent,
   } = useGallery(projectId);
 
-  // Versions belong to their screen, not the project — show only main/standalone
-  // screens at the project level (versions live in the screen's Versions tab).
-  const projectScreens = useMemo(() => screens.filter((s) => !isVersionScreen(s)), [screens]);
+  // Versions are variants of a screen, not separate screens, so every screen row is a
+  // real project screen. Its versions live in the screen's Versions tab.
+  const projectScreens = screens;
 
   // Linked-instance usage counts for the master being deleted — drive whether the
   // delete shows the detach-all/cascade choice or a plain confirm.

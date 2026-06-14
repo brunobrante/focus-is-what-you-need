@@ -7,13 +7,15 @@ import {
   useScreen,
   useScreenChildren,
   useScreens,
+  useScreenVariants,
 } from "@/lib/storage/hooks";
 import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { createScreenVersion, deleteScreen, isMainScreenVersion, isVersionScreen, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, setActiveScreenVariant, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { deleteVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -113,29 +115,11 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     loadedScreen && loadedScreen.projectId === (project?.id ?? projectId)
       ? loadedScreen
       : null;
-  const { data: ownComponents } = useScreenChildren(project?.id, screen?.id);
-
-  // A version's subcomponents are the main's components, referenced as linked
-  // instances. Load the main's children and mark them linked; the version's own
-  // (detached) components come from ownComponents.
-  const mainScreen = useMemo(
-    () => screenVersionsFromList(screens, screen).find((s) => isMainScreenVersion(s)) ?? null,
-    [screens, screen],
-  );
-  const isVersionScreen = Boolean(screen && mainScreen && screen.id !== mainScreen.id);
-  const { data: mainComponents } = useScreenChildren(
-    project?.id,
-    isVersionScreen ? mainScreen?.id : undefined,
-  );
-
-  const components = useMemo(
-    () => (isVersionScreen ? [...mainComponents, ...ownComponents] : ownComponents),
-    [isVersionScreen, mainComponents, ownComponents],
-  );
-  const linkedComponentIds = useMemo(
-    () => (isVersionScreen ? new Set(mainComponents.map((c) => c.id)) : new Set<string>()),
-    [isVersionScreen, mainComponents],
-  );
+  // A screen owns its top-level components directly; its versions are variants of the
+  // screen (each version's scene references those components as linked instances).
+  const components = useScreenChildren(project?.id, screen?.id).data;
+  const linkedComponentIds = useMemo(() => new Set<string>(), []);
+  const { data: screenVariants } = useScreenVariants(screen?.id);
   const { data: activeVariants } = useActiveVariants(components);
   const { data: references } = useReferences("screen", screen?.id ?? null);
 
@@ -156,26 +140,29 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
 
-  // Versions are real sibling screens sharing a version group (the current screen
-  // is always one of them, shown as active). No more client-side mock versions.
+  // Versions are the screen's variants — the screen is a master that owns a variant
+  // chain, exactly like a component. Each variant owns its own scene/snapshot.
   const versions = useMemo<ScreenVersion[]>(
     () =>
-      screenVersionsFromList(screens, screen).map((s) => ({
-        id: s.id,
-        screenId: s.id,
-        title: s.title,
-        tag: screenVersionLabel(s) ?? undefined,
-        tpl: templateForScreenName(s.title),
+      screenVariants.map((v) => ({
+        id: v.id,
+        variantId: v.id,
+        screenId: screen?.id,
+        title: screen?.title ?? "Screen",
+        tag: variantVersionLabel(v),
+        tpl: templateForScreenName(screen?.title ?? ""),
         updated: "",
         author: "You",
         initials: "VC",
       })),
-    [screens, screen],
+    [screenVariants, screen?.id, screen?.title],
   );
-  const activeVersionId = screen?.id ?? null;
-  // Selecting a version opens that real screen.
+  const activeVersionId = screen?.activeVariantId ?? null;
+  // Selecting a version makes that variant the screen's active one.
   const setActiveVersionId = (id: string | null) => {
-    if (id && id !== screen?.id) navigate(buildScreenHref(id));
+    if (id && screen && id !== screen.activeVariantId) {
+      void setActiveScreenVariant(screen.id, id);
+    }
   };
 
   const activeVersion = versions.find((v) => v.id === activeVersionId) ?? versions[0];
@@ -194,8 +181,8 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     `/project/${encodeURIComponent(project?.id ?? projectId)}/screen/${encodeURIComponent(id)}`;
 
   const { prevScreen, nextScreen } = useMemo(() => {
-    // Prev/next steps between project-level screens only — never into versions.
-    const projectScreens = screens.filter((s) => !isVersionScreen(s));
+    // Prev/next steps between the project's screens (versions are variants, not screens).
+    const projectScreens = screens;
     const idx = projectScreens.findIndex((s) => s.id === screen?.id);
     const hasMultipleScreens = projectScreens.length > 1;
     if (idx < 0 || !hasMultipleScreens) {
@@ -246,8 +233,8 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     newComponentRef.current?.open({ kind: "screen", screenId: screen.id });
   };
 
-  // Creates a real screen version (copying the screen), choosing Linked vs Copy,
-  // then opens the new version. Replaces the old client-side mock.
+  // Creates a new version of the screen (a new variant), choosing Linked vs Copy,
+  // then makes it the screen's active variant.
   const addVersion = () => {
     if (!screen) return;
     const src = screen;
@@ -256,7 +243,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
       message: "How should child components behave in the new version?",
       onSelect: async (mode) => {
         const created = await createScreenVersion({ screenId: src.id, mode });
-        if (created) navigate(buildScreenHref(created.id));
+        if (created) await setActiveScreenVariant(src.id, created.id);
       },
     });
   };
@@ -280,23 +267,25 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     );
   };
 
-  const handleOpenVersionCanvas = (versionScreenId: string) => {
-    navigate(
-      `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${versionScreenId}`,
-    );
+  // Opens a specific version (variant) of the screen in the canvas: make it active,
+  // then open the screen so the device context and the chosen variant both apply.
+  const handleOpenVersionCanvas = (variantId: string) => {
+    if (!screen) return;
+    void (async () => {
+      await setActiveScreenVariant(screen.id, variantId);
+      navigate(
+        `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}`,
+      );
+    })();
   };
 
-  const handleDeleteVersion = (versionScreenId: string, label: string) => {
+  const handleDeleteVersion = (variantId: string, label: string) => {
     confirmRef.current?.open({
       title: "Delete version",
       message: `Version "${label}" of "${screenName}" will be removed.`,
       onConfirm: async () => {
-        await deleteScreen(versionScreenId);
-        // If we deleted the version we're viewing, fall back to the group's main.
-        if (versionScreenId === screen?.id) {
-          const main = screenVersionsFromList(screens, screen).find((s) => s.id !== versionScreenId);
-          navigate(buildScreenHref(main?.id ?? screen?.id ?? versionScreenId), { replace: true });
-        }
+        // deleteVariant switches the screen's active variant to a sibling if needed.
+        await deleteVariant(variantId);
       },
     });
   };

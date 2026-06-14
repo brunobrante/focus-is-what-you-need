@@ -71,8 +71,10 @@ export function useCanvasEntities({
   const activeVariantId =
     variantParam || componentById?.activeVariantId || legacyComponent?.activeVariantId || "";
   const { data: variant, loading: variantLoading } = useVariant(activeVariantId || null);
+  const variantComponentId =
+    variant?.ownerKind === "component" ? variant.ownerId : null;
   const { data: loadedComponent, loading: loadedComponentLoading } = useComponent(
-    variant?.componentId ?? null,
+    variantComponentId,
   );
   const component: ComponentRow | null = loadedComponent ?? componentById ?? legacyComponent;
   const componentLoading =
@@ -87,9 +89,11 @@ export function useCanvasEntities({
     if (variant?.id) return { ownerType: "variant", ownerId: variant.id };
     if (legacyComponent?.activeVariantId)
       return { ownerType: "variant", ownerId: legacyComponent.activeVariantId };
-    if (screen?.id) return { ownerType: "screen", ownerId: screen.id };
+    // A screen's scene lives on its active variant.
+    if (screen?.activeVariantId)
+      return { ownerType: "variant", ownerId: screen.activeVariantId };
     return null;
-  }, [legacyComponent?.activeVariantId, screen?.id, variant?.id]);
+  }, [legacyComponent?.activeVariantId, screen?.activeVariantId, variant?.id]);
 
   const { data: scene, loading: sceneLoading } = useScene(sceneOwner?.ownerType, sceneOwner?.ownerId);
 
@@ -98,7 +102,7 @@ export function useCanvasEntities({
     Boolean(screenParam && screenLoading) ||
     Boolean(componentParam && projectComponentsLoading) ||
     Boolean(activeVariantId && variantLoading) ||
-    Boolean(variant?.componentId && componentLoading) ||
+    Boolean(variantComponentId && componentLoading) ||
     Boolean(component && (projectComponentsLoading || projectScreensLoading));
 
   return {

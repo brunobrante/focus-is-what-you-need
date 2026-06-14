@@ -57,12 +57,13 @@ test("duplicateVariant copies the source variant's scene into a new sibling vari
   });
 
   const copy = await duplicateVariant({
-    componentId: component.id,
+    ownerKind: "component",
+    ownerId: component.id,
     sourceVariantId: defaultVariant.id,
     name: "Variant 2",
   });
 
-  expect(copy.componentId).toBe(component.id);
+  expect(copy.ownerId).toBe(component.id);
   expect(copy.name).toBe("Variant 2");
   expect(copy.id).not.toBe(defaultVariant.id);
 
@@ -86,12 +87,13 @@ test("duplicateVariant works when the source variant has no scene yet", async ()
   });
 
   const copy = await duplicateVariant({
-    componentId: component.id,
+    ownerKind: "component",
+    ownerId: component.id,
     sourceVariantId: defaultVariant.id,
     name: "Variant 2",
   });
 
-  expect(copy.componentId).toBe(component.id);
+  expect(copy.ownerId).toBe(component.id);
   const copyScene = await getSceneByOwner("variant", copy.id);
   expect(copyScene).toBeNull();
 });

@@ -62,10 +62,11 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
       close: () => setIsOpen(false),
     }));
 
-    const ownerType = config?.mode === "screen" ? ("screen" as const) : ("variant" as const);
+    // A screen's scene lives on its active variant, so both modes read a variant scene.
+    const ownerType = "variant" as const;
     const ownerId =
       config?.mode === "screen"
-        ? (config.screen?.id ?? null)
+        ? (config.screen?.activeVariantId ?? null)
         : (config?.variant?.id ?? null);
 
     useEffect(() => {

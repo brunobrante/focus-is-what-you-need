@@ -23,8 +23,23 @@ export function createSceneDependencyIndex(input: {
   const componentByVariantId = new Map<string, ComponentRow>();
   const depthByVariantId = new Map<string, number>();
 
+  // Each screen's main (lowest-order) variant — the scene that embeds the screen's
+  // top-level components. Top-level components propagate into this variant's scene.
+  const mainVariantByScreenId = new Map<string, string>();
   for (const variant of input.variants) {
-    const component = componentById.get(variant.componentId);
+    if (variant.ownerKind !== "screen") continue;
+    const current = mainVariantByScreenId.get(variant.ownerId);
+    if (!current) {
+      mainVariantByScreenId.set(variant.ownerId, variant.id);
+      continue;
+    }
+    const currentOrder = variantById.get(current)?.order ?? 0;
+    if (variant.order < currentOrder) mainVariantByScreenId.set(variant.ownerId, variant.id);
+  }
+
+  for (const variant of input.variants) {
+    if (variant.ownerKind !== "component") continue;
+    const component = componentById.get(variant.ownerId);
     if (component) componentByVariantId.set(variant.id, component);
   }
 
@@ -32,13 +47,19 @@ export function createSceneDependencyIndex(input: {
     componentByVariantId.get(variantId) ?? null;
 
   const getParentOwnerForVariant = (variantId: string): ParentSceneOwner | null => {
+    const variant = variantById.get(variantId);
+    // A screen-owned variant is a root: propagation stops there.
+    if (!variant || variant.ownerKind === "screen") return null;
+
     const component = getComponentForVariant(variantId);
     if (!component) return null;
     if (component.parentVariantId) {
       return { ownerType: "variant", ownerId: component.parentVariantId };
     }
     if (component.screenId) {
-      return { ownerType: "screen", ownerId: component.screenId };
+      // Top-level screen component → its embedding scene is the screen's main variant.
+      const mainVariantId = mainVariantByScreenId.get(component.screenId);
+      if (mainVariantId) return { ownerType: "variant", ownerId: mainVariantId };
     }
     return null;
   };

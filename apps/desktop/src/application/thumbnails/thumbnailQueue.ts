@@ -1,6 +1,6 @@
 import { snapshotDataUrlFromGraphJSON } from "@/lib/storage/sceneSnapshots";
 import { deleteThumbnailByOwner, upsertThumbnail } from "@/lib/storage/repos/thumbnails.repo";
-import { refreshProjectThumbnailForScreenSnapshot } from "@/application/thumbnails/projectThumbnail";
+import { refreshProjectThumbnailForVariantSnapshot } from "@/application/thumbnails/projectThumbnail";
 import type { SceneOwnerType } from "@/lib/storage/schema";
 
 type ThumbnailJob = {
@@ -74,11 +74,10 @@ async function runThumbnailJob(key: string): Promise<void> {
     dataUrl,
   });
 
-  // A screen snapshot just changed — refresh the owning project's card
-  // thumbnail (off the critical path, gated by the auto-generate setting).
-  if (job.ownerType === "screen") {
-    void refreshProjectThumbnailForScreenSnapshot(job.ownerId);
-  }
+  // A snapshot just changed — if it belongs to a screen's variant, refresh the
+  // owning project's card thumbnail (off the critical path, gated by the
+  // auto-generate setting; the helper ignores non-screen variants).
+  void refreshProjectThumbnailForVariantSnapshot(job.ownerId);
 }
 
 function ownerKey(ownerType: SceneOwnerType, ownerId: string): string {

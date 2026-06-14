@@ -2,11 +2,12 @@ import { beforeEach, expect, test } from "bun:test";
 import {
   createScreen,
   createScreenVersion,
-  listScreens,
-  screenVersionLabel,
-  screenVersionsFromList,
-  updateScreen,
 } from "@/lib/storage/repos/screens.repo";
+import {
+  isMainVariant,
+  listVariantsByScreen,
+  variantVersionLabel,
+} from "@/lib/storage/repos/variants.repo";
 import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type { ComponentRow, SceneRow, ScreenRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
@@ -35,37 +36,29 @@ beforeEach(async () => {
   await replaceTable<VariantRow>(TABLES.variants, []);
 });
 
-test("new screen versions share the name and get stable V-tags", async () => {
+test("a new screen owns a single main variant", async () => {
   const home = await createScreen({ projectId: "p1", title: "Home", variant: "hero" });
-  expect(screenVersionLabel(home)).toBeNull(); // standalone → no tag
 
-  const v2 = await createScreenVersion({ screenId: home.id, mode: "copy" });
-  expect(v2?.title).toBe("Home"); // same name, no "(copy)" suffix
-  expect(v2?.versionIndex).toBe(2);
-
-  const afterFirst = await listScreens();
-  const main = afterFirst.find((s) => s.id === home.id)!;
-  expect(main.versionIndex).toBe(1); // original is the "main"
-  expect(v2?.versionGroupId).toBe(main.versionGroupId);
-  // The original is "main" (not V1); the first version created is V1.
-  expect(screenVersionLabel(main)).toBe("main");
-  expect(screenVersionLabel(v2)).toBe("V1");
-
-  const v3 = await createScreenVersion({ screenId: home.id, mode: "linked" });
-  expect(v3?.title).toBe("Home");
-  expect(v3?.versionIndex).toBe(3);
+  const variants = await listVariantsByScreen(home.id);
+  expect(variants).toHaveLength(1);
+  expect(variants[0]!.id).toBe(home.activeVariantId);
+  expect(variants[0]!.ownerKind).toBe("screen");
+  expect(isMainVariant(variants[0]!)).toBe(true);
+  expect(variantVersionLabel(variants[0]!)).toBe("main");
 });
 
-test("renaming any version renames the whole group", async () => {
+test("screen versions are variants of the screen with stable V-tags", async () => {
   const home = await createScreen({ projectId: "p1", title: "Home", variant: "hero" });
-  await createScreenVersion({ screenId: home.id, mode: "copy" });
-  const v3 = await createScreenVersion({ screenId: home.id, mode: "copy" });
 
-  // Rename via a non-main member.
-  await updateScreen(v3!.id, { title: "Landing" });
+  const v1 = await createScreenVersion({ screenId: home.id, mode: "copy" });
+  expect(v1?.ownerKind).toBe("screen");
+  expect(v1?.ownerId).toBe(home.id);
+  expect(variantVersionLabel(v1!)).toBe("V1");
 
-  const all = await listScreens();
-  const group = screenVersionsFromList(all, all.find((s) => s.id === home.id));
-  expect(group.map((s) => s.title)).toEqual(["Landing", "Landing", "Landing"]);
-  expect(group.map((s) => screenVersionLabel(s))).toEqual(["main", "V1", "V2"]);
+  const v2 = await createScreenVersion({ screenId: home.id, mode: "linked" });
+  expect(variantVersionLabel(v2!)).toBe("V2");
+
+  // The original is "main"; the first version created is V1.
+  const variants = await listVariantsByScreen(home.id);
+  expect(variants.map((v) => variantVersionLabel(v))).toEqual(["main", "V1", "V2"]);
 });

@@ -1,4 +1,4 @@
-import { useThumbnail } from "@/lib/storage/hooks";
+import { useScreen, useThumbnail } from "@/lib/storage/hooks";
 
 export function NavTooltip({
   side,
@@ -11,7 +11,8 @@ export function NavTooltip({
   details?: string[];
   screenId?: string;
 }) {
-  const { data: thumbnail } = useThumbnail("screen", screenId ?? null);
+  const { data: screen } = useScreen(screenId ?? null);
+  const { data: thumbnail } = useThumbnail("variant", screen?.activeVariantId ?? null);
 
   return (
     <div

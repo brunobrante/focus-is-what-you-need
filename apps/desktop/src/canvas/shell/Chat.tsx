@@ -17,7 +17,7 @@ const SEED: Message[] = [
     id: "m1",
     role: "assistant",
     text:
-      Hi! I can help iterate on this component — suggest variations, write copy, or review the hierarchy. What would you like to do?,
+      "Hi! I can help iterate on this component — suggest variations, write copy, or review the hierarchy. What would you like to do?",
     ts: "agora",
   },
 ];
@@ -72,7 +72,7 @@ export function Chat({ open, onClose, componentName, screenName }: Props) {
           role: "assistant",
           ts: "agora",
           text:
-            Cool — here are three variations to explore. I can apply one directly to the canvas or just list the diffs?,
+            "Cool — here are three variations to explore. I can apply one directly to the canvas or just list the diffs?",
         },
       ]);
       setThinking(false);

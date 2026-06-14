@@ -8,13 +8,11 @@ import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache, setMeta } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
 import type {
-  ComponentPlacementRow,
   ComponentRow,
   Meta,
   ProjectRow,
   SceneRow,
   ScreenRow,
-  ScreenVersionRow,
   ThumbnailRow,
   VariantRow,
 } from "@/lib/storage/schema";
@@ -78,12 +76,19 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
       .map((screen) => screen.title),
   ).toEqual(["Home", "List", "Detail", "Form"]);
 
-  const sceneFor = (ownerId: string) =>
-    scenes.find((scene) => scene.ownerType === "screen" && scene.ownerId === ownerId);
-  const thumbFor = (ownerId: string) =>
-    thumbnails.find(
-      (thumb) => thumb.ownerType === "screen" && thumb.ownerId === ownerId,
+  // A screen's scene/thumbnail lives on its main (active) variant.
+  const sceneFor = (screenId: string) => {
+    const screen = screens.find((s) => s.id === screenId);
+    return scenes.find(
+      (scene) => scene.ownerType === "variant" && scene.ownerId === screen?.activeVariantId,
     );
+  };
+  const thumbFor = (screenId: string) => {
+    const screen = screens.find((s) => s.id === screenId);
+    return thumbnails.find(
+      (thumb) => thumb.ownerType === "variant" && thumb.ownerId === screen?.activeVariantId,
+    );
+  };
 
   expect(sceneFor(mobileHome!.id)?.graphJSON).toBe(
     mocks["mock-mobile-home"].graphJSON,
@@ -133,7 +138,7 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
   ]);
 
   const headerVariant = variants.find(
-    (variant) => variant.componentId === header?.id,
+    (variant) => variant.ownerKind === "component" && variant.ownerId === header?.id,
   );
   expect(headerVariant).toBeDefined();
   expect(
@@ -166,7 +171,7 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
   expect(variants.every((variant) => variant.seedKey === null)).toBe(true);
 });
 
-test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and placements", async () => {
+test("v7 migration repairs missing mock hierarchy, scenes, and thumbnails", async () => {
   // Schema mismatch (7 ≠ current) triggers a full reseed, wiping any stale state.
   // The test verifies the resulting seed contains the correct hierarchy for the
   // mobile Home screen.
@@ -178,8 +183,6 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
   await replaceTable<VariantRow>(TABLES.variants, []);
   await replaceTable<SceneRow>(TABLES.scenes, []);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
-  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, []);
-  await replaceTable<ComponentPlacementRow>(TABLES.placements, []);
 
   await ensureSeededAndMigrated();
 
@@ -189,8 +192,6 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
   const variants = await listTable<VariantRow>(TABLES.variants);
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
-  const screenVersions = await listTable<ScreenVersionRow>(TABLES.screenVersions);
-  const placements = await listTable<ComponentPlacementRow>(TABLES.placements);
 
   const mobileProject = projects.find(
     (p) => p.type === "mobile" && p.name !== "Alignment Debug",
@@ -213,21 +214,22 @@ test("v7 migration repairs missing mock hierarchy, scenes, thumbnails, and place
   expect(
     components.some((c) => c.parentVariantId === topLevel[0]!.activeVariantId),
   ).toBe(true);
-  expect(variants).toHaveLength(components.length);
+  // One variant per component, plus one main variant per screen.
+  expect(variants).toHaveLength(components.length + screens.length);
+
+  // A screen's scene/thumbnail lives on its main (active) variant.
   expect(
-    scenes.some((s) => s.ownerType === "screen" && s.ownerId === homeScreen!.id),
+    scenes.some((s) => s.ownerType === "variant" && s.ownerId === homeScreen!.activeVariantId),
   ).toBe(true);
   expect(
-    thumbnails.some((t) => t.ownerType === "screen" && t.ownerId === homeScreen!.id),
+    thumbnails.some((t) => t.ownerType === "variant" && t.ownerId === homeScreen!.activeVariantId),
   ).toBe(true);
 
-  const homeVersion = screenVersions.find((v) => v.screenId === homeScreen!.id);
-  const homePlacements = placements.filter((p) => p.screenVersionId === homeVersion?.id);
-  expect(homeVersion).toBeDefined();
-  expect(homePlacements).toHaveLength(topLevel.length);
-  expect(homePlacements.map((p) => p.componentId).sort()).toEqual(
-    topLevel.map((c) => c.id).sort(),
+  // The screen's main variant is owned by the screen.
+  const homeMainVariant = variants.find(
+    (v) => v.ownerKind === "screen" && v.ownerId === homeScreen!.id,
   );
+  expect(homeMainVariant?.id).toBe(homeScreen!.activeVariantId);
 });
 
 test("v9 migration replaces stale full-screen component scenes with component-sized scenes", async () => {
@@ -242,8 +244,6 @@ test("v9 migration replaces stale full-screen component scenes with component-si
   await replaceTable<VariantRow>(TABLES.variants, []);
   await replaceTable<SceneRow>(TABLES.scenes, []);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, []);
-  await replaceTable<ScreenVersionRow>(TABLES.screenVersions, []);
-  await replaceTable<ComponentPlacementRow>(TABLES.placements, []);
 
   await ensureSeededAndMigrated();
 

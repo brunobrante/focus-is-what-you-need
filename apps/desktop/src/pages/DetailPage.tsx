@@ -29,7 +29,7 @@ import { ReferencesModal } from "@/components/modals/ReferencesModal";
 import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ComponentKind, ProjectType, ScreenVariant } from "@/lib/data/types";
-import { isMainScreenVersion, screenVersionLabel, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { useScreenDetail, type CmpKindFilter as ScreenCmpKindFilter } from "@/application/screen-detail/useScreenDetail";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
@@ -61,7 +61,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     type, canUseFactoryMocks, projectName, screenName, tpl, tplLabel,
     prevScreen, nextScreen, canvasHref, filteredComponents, linkedComponentIds, filteredVersions,
     filteredReferences, sideTab, setSideTab, query, setQuery, filter, setFilter,
-    versions, activeVersionId, setActiveVersionId, activeTpl,
+    versions, activeVersionId, setActiveVersionId, activeVersion, activeTpl,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, openNewComponent, addVersion,
     removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
@@ -119,7 +119,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
           } : undefined}
         >
           {screen ? (
-            <SceneCanvasViewer source="stored" ownerType="screen" ownerId={screen.id} kind="screen" />
+            <SceneCanvasViewer source="stored" ownerType="variant" ownerId={screen.activeVariantId} kind="screen" />
           ) : (
             <PreviewMockImage tpl={activeTpl} type={type} allowMock={canUseFactoryMocks} />
           )}
@@ -130,9 +130,9 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
             <div>
               <div className="flex items-center gap-2">
                 <EditableTitle value={screen?.title ?? screenName} label="Edit screen name" onSave={handleScreenTitleSave} />
-                {screen && !isMainScreenVersion(screen) && screenVersionLabel(screen) ? (
+                {activeVersion && activeVersion.tag && activeVersion.tag !== "main" ? (
                   <span className="mb-1.5">
-                    <VersionTagBadge tag={screenVersionLabel(screen)!} isMain={false} />
+                    <VersionTagBadge tag={activeVersion.tag} isMain={false} />
                   </span>
                 ) : null}
               </div>
@@ -240,9 +240,9 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                           type={type}
                           allowMock={canUseFactoryMocks}
                           onSelect={() => setActiveVersionId(v.id)}
-                          onOpenCanvas={() => { if (v.screenId) handleOpenVersionCanvas(v.screenId); }}
+                          onOpenCanvas={() => { if (v.variantId) handleOpenVersionCanvas(v.variantId); }}
                           onFastEdit={() => {}}
-                          onDelete={() => { if (v.screenId) handleDeleteVersion(v.screenId, v.tag ?? v.title); }}
+                          onDelete={() => { if (v.variantId) handleDeleteVersion(v.variantId, v.tag ?? v.title); }}
                         />
                       ))}
                       <AddCard label="New version" onClick={addVersion} />

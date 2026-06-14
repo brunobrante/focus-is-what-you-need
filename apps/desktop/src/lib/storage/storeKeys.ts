@@ -12,8 +12,6 @@ export const TABLES = {
   settings: "settings",
   workspaces: "workspaces",
   systemDesigns: "system_designs",
-  screenVersions: "screen_versions",
-  placements: "placements",
   history: "history",
 } as const;
 

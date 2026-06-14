@@ -133,8 +133,8 @@ export const ProjectPreviewModal = forwardRef<ProjectPreviewModalHandle>(
                   <DeviceStage type={project.type}>
                     <Snapshot
                       kind="screen"
-                      ownerType="screen"
-                      ownerId={currentScreen.id}
+                      ownerType="variant"
+                      ownerId={currentScreen.activeVariantId}
                       variant={currentScreen.variant}
                       type={project.type}
                       emptyMode="preview"

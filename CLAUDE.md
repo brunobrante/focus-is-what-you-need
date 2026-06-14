@@ -320,16 +320,23 @@ This visual scaling must not rewrite the snapshot dimensions, crop the image, di
 
 ### Storage ownership
 
-Storage follows the same hierarchy as the UI:
+Storage follows the same hierarchy as the UI. Screens and components are unified: both
+are masters that own a chain of `VariantRow`s (a `VariantRow` carries
+`ownerKind: "screen" | "component"` + `ownerId`). A version is a variant.
 
-- screen scenes are stored with `ownerType: "screen"` and the screen id
-- component scenes are stored with `ownerType: "variant"` and the component's active variant id
-- a top-level component belongs to its source screen through `screenId`
-- a nested component belongs to its parent component through `parentVariantId`
-- every component owns an `activeVariantId`, and that variant owns the editable canvas scene
+- **all** scenes are stored with `ownerType: "variant"` and a variant id — there is no
+  `"screen"` scene owner. `SceneOwnerType` is just `"variant"`.
+- a screen owns its versions as `ownerKind: "screen"` variants; its **main** variant
+  (order 0) owns the screen's editable scene and embeds its top-level components.
+- a component owns its versions as `ownerKind: "component"` variants.
+- both screens and components carry an `activeVariantId` pointing at the variant whose
+  scene is currently shown/edited.
+- a top-level component belongs to its source screen through `screenId`; its embedding
+  scene is that screen's main variant.
+- a nested component belongs to its parent component through `parentVariantId`.
 
-Do not store component canvas scenes under component ids.
-Variants are the editable scene owners for components.
+Do not store any canvas scene under a screen id or a component id.
+Variants are the editable scene owners for **both** screens and components.
 
 ### Snapshot propagation
 

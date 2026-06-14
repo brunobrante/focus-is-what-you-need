@@ -1,6 +1,7 @@
 import { getProject, listProjects, updateProject } from "@/lib/storage/repos/projects.repo";
 import { getScreen, listScreensByProject } from "@/lib/storage/repos/screens.repo";
 import { getThumbnailByOwner } from "@/lib/storage/repos/thumbnails.repo";
+import { getVariant } from "@/lib/storage/repos/variants.repo";
 import { getGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { renderProjectThumbnailDataUrl } from "@/lib/storage/projectThumbnail";
 
@@ -30,8 +31,9 @@ export async function regenerateProjectThumbnail(projectId: string): Promise<boo
   const firstScreen = screens[0];
   if (!firstScreen) return false;
 
-  // The snapshot must already exist; we never rasterise the screen here.
-  const snapshot = await getThumbnailByOwner("screen", firstScreen.id);
+  // The snapshot must already exist; we never rasterise the screen here. A screen's
+  // snapshot lives on its active variant.
+  const snapshot = await getThumbnailByOwner("variant", firstScreen.activeVariantId);
   if (!snapshot?.dataUrl) return false;
 
   const thumbnailDataUrl = renderProjectThumbnailDataUrl({
@@ -59,19 +61,22 @@ export function scheduleProjectThumbnailRefresh(projectId: string): void {
 }
 
 /**
- * Called when a screen snapshot is (re)generated. Only the first screen of a
- * project drives that project's thumbnail, so edits to any other screen are
- * ignored. Respects the auto-generate setting.
+ * Called when a variant snapshot is (re)generated. Only screen-owned variants drive
+ * a project thumbnail, and only the project's first screen does, so any other variant
+ * is ignored. Respects the auto-generate setting.
  */
-export async function refreshProjectThumbnailForScreenSnapshot(screenId: string): Promise<void> {
+export async function refreshProjectThumbnailForVariantSnapshot(variantId: string): Promise<void> {
   const settings = await getGlobalSettings();
   if (!settings.projectThumbnails.autoGenerate) return;
 
-  const screen = await getScreen(screenId);
+  const variant = await getVariant(variantId);
+  if (!variant || variant.ownerKind !== "screen") return;
+
+  const screen = await getScreen(variant.ownerId);
   if (!screen) return;
 
   const screens = await listScreensByProject(screen.projectId);
-  if (screens[0]?.id !== screenId) return;
+  if (screens[0]?.id !== screen.id) return;
 
   scheduleProjectThumbnailRefresh(screen.projectId);
 }
