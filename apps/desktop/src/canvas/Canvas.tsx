@@ -17,7 +17,9 @@ import type { SceneRow } from "@/lib/storage/schema";
 import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
-import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { useResolvedCanvasSettings } from "@/application/settings/useResolvedCanvasSettings";
+import { useProjectFontTokens } from "@/application/settings/useProjectFontTokens";
+import { ElementFontTokensProvider } from "@/canvas/stage/elementFontTokensContext";
 import { useSearch, useSearchSource } from "@/application/search/SearchProvider";
 import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
 import type { SearchItem } from "@/domain/search/searchTypes";
@@ -144,7 +146,8 @@ function CanvasPageContent() {
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
   const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
   const [shellTabSignal, setShellTabSignal] = useState(0);
-  const { settings } = useGlobalSettings();
+  const { settings } = useResolvedCanvasSettings(projectIdParam || null);
+  const fontTokens = useProjectFontTokens(projectIdParam || null);
   const enabledCanvasTabs = useMemo(
     () => enabledCanvasWindowTypes(canvasFeatures),
     [canvasFeatures],
@@ -697,6 +700,7 @@ function CanvasPageContent() {
   const toolbarActiveTool: CanvasToolId = editorPanning ? "hand" : activeTool;
 
   return (
+    <ElementFontTokensProvider value={fontTokens ?? null}>
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--bg)]">
       <CanvasRender
         treeOpen={treeOpen}
@@ -941,5 +945,6 @@ function CanvasPageContent() {
 
       <VersionModeModal ref={versionModeRef} />
     </div>
+    </ElementFontTokensProvider>
   );
 }

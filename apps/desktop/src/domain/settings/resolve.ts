@@ -39,10 +39,19 @@ function mergeDeep<T>(base: T, override: DeepPartial<T> | undefined): T {
   return next as T;
 }
 
-export function resolveGlobalSettings(
-  overrides?: DeepPartial<GlobalSettings> | null,
+/**
+ * Resolve the effective settings by merging the defaults with an ordered list of
+ * override layers. Later layers win, which gives the cascade
+ * `defaults -> global -> workspace -> project`. Pass the layers in that order.
+ */
+export function resolveSettingsLayers(
+  layers: ReadonlyArray<DeepPartial<GlobalSettings> | null | undefined>,
 ): GlobalSettings {
-  const resolved = mergeDeep(DEFAULT_GLOBAL_SETTINGS, overrides ?? undefined);
+  let resolved = clone(DEFAULT_GLOBAL_SETTINGS);
+  for (const layer of layers) {
+    if (!layer) continue;
+    resolved = mergeDeep(resolved, layer);
+  }
   return {
     ...resolved,
     schemaVersion: DEFAULT_GLOBAL_SETTINGS.schemaVersion,
@@ -55,6 +64,12 @@ export function resolveGlobalSettings(
       },
     },
   };
+}
+
+export function resolveGlobalSettings(
+  overrides?: DeepPartial<GlobalSettings> | null,
+): GlobalSettings {
+  return resolveSettingsLayers([overrides]);
 }
 
 function normalizedKey(value: string | undefined): string {

@@ -634,15 +634,41 @@ multiplying the write cost by the depth of the component tree. Now:
 ## Global Settings Architecture
 
 Settings are stored as ordinary `records` rows, not in `kv_store` and not inside
-projects, scenes, or variants. The current global settings row is:
+projects, scenes, or variants. Settings rows are scoped:
 
 - `table`: `settings`
-- `id`: `global`
-- `json`: a `SettingsRow` containing `schemaVersion`, `scope`, and `overrides`
+- `id`: `global`, `workspace:<workspaceId>`, or `project:<projectId>`
+- `json`: a `SettingsRow` containing `schemaVersion`, `scope`
+  (`global | workspace | project`), `workspaceId`/`projectId`, and `overrides`
 
 The SQLite layer does not need a dedicated settings table. The existing
 `records(tbl, id, json)` table persists settings through the same record-store
 cache and `SaveQueue` used by the rest of the app.
+
+### Scoped resolution (cascade)
+
+Effective settings resolve in this order, later layers overriding earlier ones:
+
+`defaults -> global -> workspace -> project`
+
+- The **global** row stores the full resolved tree (it is the base override).
+- **workspace** and **project** rows store **only their own overrides** (a
+  `DeepPartial<GlobalSettings>`), so unset fields keep inheriting from the parent
+  scope. A new project inside a workspace therefore inherits the workspace's
+  config automatically; editing it writes a project-scoped override.
+- `resolveSettingsLayers([...])` in `src/domain/settings/resolve.ts` merges the
+  layers (deep-merging objects, replacing arrays). `resolveGlobalSettings` is the
+  single-layer special case.
+- The canvas resolves its effective settings with
+  `useResolvedCanvasSettings(projectId)` (which looks up the project's workspace
+  via `getWorkspaceForProject`); element creation then reads those defaults.
+- Element-defaults editing UI: **Global** in the Settings modal's "Element
+  defaults" tab, **workspace** at `/element-defaults`, **project** in the Gallery
+  "Element defaults" tab. All three reuse `ElementDefaultsEditor`; the scoped
+  loaders/savers live in `useScopedElementDefaults.ts`.
+- Font-size snapping (`fontSizeSnap: "designSystem"`) reuses the project's
+  resolved design-system typography sizes, read read-only (no row creation) via
+  `useProjectFontTokens` and passed to `createElementForTool`.
 
 ### File map
 

@@ -16,6 +16,7 @@ import type {
   ProcessingFeatureKey,
 } from "@/domain/settings/types";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 import {
   putGlobalSettings,
   setAutoGenerateProjectThumbnails,
@@ -47,7 +48,13 @@ import {
 } from "@/lib/models/useProcessingFeatures";
 import { FEATURES, modelsForFeature } from "@/lib/models/modelCatalog";
 
-type AppSettingsTab = "canvas" | "projects" | "processing" | "shortcuts" | "storage";
+type AppSettingsTab =
+  | "canvas"
+  | "elements"
+  | "projects"
+  | "processing"
+  | "shortcuts"
+  | "storage";
 
 type RecordingCommand = {
   id: CanvasCommandId;
@@ -124,6 +131,7 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
               {(
                 [
                   { id: "canvas", label: "Canvas" },
+                  { id: "elements", label: "Element defaults" },
                   { id: "projects", label: "Project thumbnails" },
                   { id: "processing", label: "Processing Features" },
                   { id: "shortcuts", label: "Keyboard shortcuts" },
@@ -156,6 +164,8 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
           <div className="flex-1 overflow-y-auto">
             {tab === "canvas" ? (
               <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
+            ) : tab === "elements" ? (
+              <ElementDefaultsTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
             ) : tab === "projects" ? (
               <ProjectThumbnailsTab />
             ) : tab === "processing" ? (
@@ -206,6 +216,7 @@ function CanvasTab({
 }) {
   const autoRevealSelection = settings.canvas.shell.tree.autoRevealSelection;
   const inheritParentBackground = settings.canvas.shell.inheritParentBackground;
+  const invisibleDragGhost = settings.canvas.shell.invisibleDragGhost;
 
   return (
     <div className="px-[22px] py-5 grid gap-6">
@@ -226,6 +237,23 @@ function CanvasTab({
               ariaLabel="Inherit parent background"
               onChange={(checked) =>
                 onSettingsChange(updateInheritParentBackground(settings, checked))
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between gap-5 border-t border-[var(--border)] px-4 py-3">
+            <div>
+              <div className="text-[13px] text-[var(--text)]">Drag ghost for invisible elements</div>
+              <p className="m-0 mt-1 max-w-[520px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                While dragging an element that paints nothing (such as an empty wrapper), show
+                a faint placeholder with a shadow and dashed outline so you can see what you
+                are moving. Purely visual.
+              </p>
+            </div>
+            <Switch
+              checked={invisibleDragGhost}
+              ariaLabel="Drag ghost for invisible elements"
+              onChange={(checked) =>
+                onSettingsChange(updateInvisibleDragGhost(settings, checked))
               }
             />
           </div>
@@ -253,6 +281,38 @@ function CanvasTab({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ElementDefaultsTab({
+  settings,
+  onSettingsChange,
+}: {
+  settings: GlobalSettings;
+  onSettingsChange: (settings: GlobalSettings) => void;
+}) {
+  return (
+    <div className="px-[22px] py-5">
+      <ElementDefaultsEditor
+        scope="global"
+        inherited={DEFAULT_GLOBAL_SETTINGS.canvas.elementDefaults}
+        override={settings.canvas.elementDefaults}
+        parentLabel="default"
+        onChange={(next) =>
+          onSettingsChange({
+            ...settings,
+            canvas: {
+              ...settings.canvas,
+              // At global scope the editor emits the full element-defaults tree.
+              elementDefaults: {
+                ...settings.canvas.elementDefaults,
+                ...next,
+              } as GlobalSettings["canvas"]["elementDefaults"],
+            },
+          })
+        }
+      />
     </div>
   );
 }
@@ -571,6 +631,19 @@ function updateInheritParentBackground(
     canvas: {
       ...settings.canvas,
       shell: { ...settings.canvas.shell, inheritParentBackground },
+    },
+  };
+}
+
+function updateInvisibleDragGhost(
+  settings: GlobalSettings,
+  invisibleDragGhost: boolean,
+): GlobalSettings {
+  return {
+    ...settings,
+    canvas: {
+      ...settings.canvas,
+      shell: { ...settings.canvas.shell, invisibleDragGhost },
     },
   };
 }

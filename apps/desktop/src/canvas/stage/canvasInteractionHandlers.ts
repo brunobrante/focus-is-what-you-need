@@ -3,7 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { getToolElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { createElementForTool, reparentElements, shallowCloneDocument } from "@/canvas/engine/actions";
 import { clamp, getDescendantIds, roundPixel } from "@/canvas/engine/geometry";
-import type { CanvasDocument, EditorState, Point, Rect } from "@/canvas/engine/types";
+import type { CanvasDocument, EditorState, ElementFontTokens, Point, Rect } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import { clampViewportState } from "@/canvas/engine/viewport";
 import type { Size } from "@/canvas/engine/viewport";
@@ -36,6 +36,7 @@ import type {
   RotateInteraction,
 } from "./canvasInteractionTypes";
 import type { CanvasDropTarget } from "./canvasStageTypes";
+import type { NoticeStore } from "@/canvas/engine/noticeStore";
 
 type Dispatch = React.Dispatch<EditorAction>;
 
@@ -75,8 +76,15 @@ function getReparentChangedIds(
   return Array.from(ids);
 }
 
-function elementCreationOptions(elementSizeScale?: number): { sizeScale?: number } | undefined {
-  return elementSizeScale === undefined ? undefined : { sizeScale: elementSizeScale };
+function elementCreationOptions(
+  elementSizeScale?: number,
+  fontTokens?: ElementFontTokens,
+): { sizeScale?: number; allowedFontSizes?: number[]; defaultFontFamily?: string } | undefined {
+  const options: { sizeScale?: number; allowedFontSizes?: number[]; defaultFontFamily?: string } = {};
+  if (elementSizeScale !== undefined) options.sizeScale = elementSizeScale;
+  if (fontTokens?.allowedFontSizes?.length) options.allowedFontSizes = fontTokens.allowedFontSizes;
+  if (fontTokens?.defaultFontFamily) options.defaultFontFamily = fontTokens.defaultFontFamily;
+  return Object.keys(options).length > 0 ? options : undefined;
 }
 
 // === MOVE HANDLERS ===
@@ -118,7 +126,7 @@ export function handleDrawMove(
     0,
     interaction.beforeDocument.canvas,
     settings,
-    elementCreationOptions(interaction.elementSizeScale),
+    elementCreationOptions(interaction.elementSizeScale, interaction.fontTokens),
   );
   const def = getToolElementDefinition(interaction.tool);
   const drawMode = def?.capabilities.drawMode ?? "free";
@@ -331,6 +339,7 @@ export function finishDrawInteraction(
   interaction: DrawInteraction,
   dispatch: Dispatch,
   settings: GlobalSettings = DEFAULT_GLOBAL_SETTINGS,
+  noticeStore?: NoticeStore,
 ): void {
   if (interaction.moved) {
     dispatch({
@@ -347,7 +356,7 @@ export function finishDrawInteraction(
       interaction.startPoint.y,
       interaction.beforeDocument.canvas,
       settings,
-      elementCreationOptions(interaction.elementSizeScale),
+      elementCreationOptions(interaction.elementSizeScale, interaction.fontTokens),
     );
     node.id = interaction.elementId;
     next.elements[node.id] = node;
@@ -360,6 +369,9 @@ export function finishDrawInteraction(
     });
   }
   dispatch({ type: "setTool", tool: "select" });
+  // The wrapper tool draws an element with no fill or border — invisible on the
+  // canvas — so confirm the addition with a transient toolbar notice.
+  if (interaction.tool === "wrapper") noticeStore?.show("Wrapper added");
 }
 
 export function finishMovedInteraction(

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
-import { useEditor, useHoverStore } from "@/canvas/engine/store";
+import { useEditor, useHoverStore, useNoticeStore } from "@/canvas/engine/store";
 import type { CanvasDocument, Point, Rect } from "@/canvas/engine/types";
+import { useElementFontTokens } from "./elementFontTokensContext";
 import type { CanvasToolId } from "@/canvas/tools";
 import { isInsertTool } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -62,6 +63,8 @@ export function CanvasStage({
 }) {
   const { state, dispatch } = useEditor();
   const hoverStore = useHoverStore();
+  const noticeStore = useNoticeStore();
+  const fontTokens = useElementFontTokens();
 
   useEffect(() => {
     if (!activeTool) return;
@@ -286,11 +289,13 @@ export function CanvasStage({
     latestDocumentRef,
     latestStateRef,
     hoverStore,
+    noticeStore,
     textEdit,
     enterTextEditing,
     syncTextSelection,
     scheduleCanvasAlignmentLog,
     settings,
+    fontTokens,
     navigableBounds,
   });
 

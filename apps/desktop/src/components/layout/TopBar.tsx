@@ -182,6 +182,10 @@ export function TopBar({
           <IconColorStyles size={14} strokeWidth={1.7} className="opacity-85" />
           System
         </TopNavLink>
+        <TopNavLink to="/element-defaults">
+          <IconSettings size={14} strokeWidth={1.7} className="opacity-85" />
+          Elements
+        </TopNavLink>
         <TopNavLink to="/references">
           <IconImage size={14} strokeWidth={1.7} className="opacity-85" />
           References

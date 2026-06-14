@@ -195,6 +195,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       tree: {
         autoRevealSelection: true,
       },
+      invisibleDragGhost: true,
     },
   },
   systemDesign: {

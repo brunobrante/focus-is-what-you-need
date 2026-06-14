@@ -140,6 +140,12 @@ export type CanvasShellSettings = {
   tree: {
     autoRevealSelection: boolean;
   };
+  /**
+   * Draw a ghost (soft shadow + faint surface + dashed outline) in place of an
+   * invisible element while it is being dragged, so the user can see what they
+   * are moving. Purely visual. Default on.
+   */
+  invisibleDragGhost: boolean;
 };
 
 export type CanvasSettings = {

@@ -506,7 +506,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       // nothing (e.g. an empty wrapper) is invisible — draw a ghost so the user
       // can see what they are dragging.
       const ghosts: ToolingGhostCommand[] =
-        props.interactionType === "drag"
+        props.interactionType === "drag" && settings.canvas.shell.invisibleDragGhost
           ? transformIds.flatMap((id) => {
               if (!isSubtreeInvisible(doc, id)) return [];
               const box = resolveBox(id);
@@ -566,6 +566,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.selectedIds,
       props.suppressHover,
       parentDistanceModifierDown,
+      settings.canvas.shell.invisibleDragGhost,
       t,
     ]);
 

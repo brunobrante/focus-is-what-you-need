@@ -266,6 +266,15 @@ export type RadiusInteraction = {
   lastGuides: SnapGuide[];
 };
 
+/**
+ * Design-system typography inputs used when creating elements: allowed font
+ * sizes for "designSystem" snapping and a fallback default font family.
+ */
+export type ElementFontTokens = {
+  allowedFontSizes?: number[];
+  defaultFontFamily?: string;
+};
+
 export type DrawInteraction = {
   type: "draw";
   pointerId: number;
@@ -273,6 +282,7 @@ export type DrawInteraction = {
   tool: InsertTool;
   elementId: string;
   elementSizeScale?: number;
+  fontTokens?: ElementFontTokens;
   beforeDocument: CanvasDocument;
   lastDocument: CanvasDocument;
   moved: boolean;

@@ -151,7 +151,7 @@ Shows all screens, components, and references inside a project.
   - Device type selector
   - Save / Cancel buttons
 
-**Tab bar**: Screens | Components | References | System
+**Tab bar**: Screens | Components | References | System | Element defaults
 
 **Screens / Components / References tabs each contain**:
 - "Add" button in the top-right corner
@@ -362,6 +362,10 @@ header is a two-select block instead of the single subject row:
 - Zoom controls: `−` | percentage display | `+`
 - Back-to-parent control (visible when editing inside a component)
 
+**Toolbar notice** (transient confirmation pill, centered just above the toolbar):
+- A small pill with a check icon and a short message appears for ~1.8s, then fades out, to confirm an action whose canvas result is otherwise invisible.
+- It currently fires when a **wrapper** is added — both ways of creating one: choosing the Wrapper tool with a selection (which wraps the selection) and drawing a wrapper on an empty area. Because a wrapper has no fill or border, the message ("Wrapper added") is the user's confirmation that the tool worked.
+
 **Canvas zoom & pan model:**
 - Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform draft canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel (which zooms toward the cursor).
 - Panning and zooming clamp to the **navigable region**: by default the edited subject, but when the screen simulator is on it grows to include the whole device frame (see below).
@@ -385,6 +389,7 @@ header is a two-select block instead of the single subject row:
 - An element that paints nothing on screen (e.g. an empty **wrapper** — a rect with no fill and no visible border, and whose whole subtree is also empty/hidden) has no visible body to follow while it is being moved.
 - While such an element is being dragged, the canvas overlay draws a **ghost** in its place: a soft blue drop shadow under a faint blue surface, framed with a dashed selection-blue outline, following the element's exact bounds (and corner radius / rotation). This lets the user see what they are moving.
 - The ghost appears only during a move-drag, only for the invisible dragged elements; visible elements in the same selection still move as themselves. It disappears on drop, where the normal selection outline returns.
+- This is toggleable in **Settings → Canvas → "Drag ghost for invisible elements"** (on by default).
 
 **Actions panel** (expands above the toolbar):
 - Search bar
@@ -711,11 +716,33 @@ All modals share a consistent structure.
 Opened from the user menu (TopBar → avatar → Settings). Wide modal with a top tab bar and a sticky footer (Cancel / Save changes).
 
 **Tabs**:
-- **Canvas**: shell and layers-tree toggles
+- **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, reveal selected layers)
+- **Element defaults**: global default styles for new canvas elements (see below)
 - **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
 - **Keyboard shortcuts**: rebindable canvas commands
 - **Save location**: workspace base folder and storage details
+
+**Element defaults tab** (global scope):
+
+Sets the default appearance new canvas elements get when dropped (Text, Rectangle,
+Wrapper, Image, Icon, Ellipse, Line, Arrow, Polygon, Star). These defaults are a
+three-level cascade — **Global → Workspace → Project** — and this tab edits the
+**Global** base; the workspace and project levels are edited on their own screens
+(see "Element defaults scopes" below).
+
+- **Adaptive sizing** (global only): Reference size (the frame size that maps to
+  1× scale) plus min/max scale. New elements scale their default size toward the
+  edited frame using these knobs, so editing a small frame yields smaller elements.
+- **Per element**, an expandable card with: width, height, **Size mode**
+  (Auto = adapt to the frame, Fixed = literal size), Fill, Border width, Border
+  color, and Corner radius (where applicable).
+- **Text** additionally has: Text color, Font family, Font weight, Font size,
+  **Font size mode** (Auto/Fixed), and **Snap to design system** — when the font
+  size is auto-computed it rounds to the nearest typography size in the project's
+  design system (e.g. a computed 11.46px becomes 12px) instead of the raw value.
+
+Changes are saved with the modal's Save button.
 
 **Project thumbnails tab**:
 

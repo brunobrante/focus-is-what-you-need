@@ -18,6 +18,7 @@ export function Tabs({
     { id: "components", label: "Components", count: componentsCount },
     { id: "references", label: "References" },
     { id: "system", label: "System" },
+    { id: "elements", label: "Element defaults" },
   ];
   return (
     <nav role="tablist" className="flex gap-1 border-b border-[var(--border)] px-7">

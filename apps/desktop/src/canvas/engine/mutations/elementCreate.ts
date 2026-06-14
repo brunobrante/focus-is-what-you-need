@@ -35,7 +35,30 @@ const DEFAULT_SIZE_RANGES: Record<
 
 type ElementCreationOptions = {
   sizeScale?: number;
+  /**
+   * Allowed typography sizes (px) from the project's design system. When a text
+   * element has `fontSizeSnap: "designSystem"`, its auto-computed font size is
+   * snapped to the nearest value here.
+   */
+  allowedFontSizes?: number[];
+  /** Design-system default font family, used only when the config sets none. */
+  defaultFontFamily?: string;
 };
+
+/** Nearest value in `allowed` to `value`; returns `value` when `allowed` is empty. */
+export function snapToNearest(value: number, allowed: number[]): number {
+  if (allowed.length === 0) return value;
+  let best = allowed[0];
+  let bestDelta = Math.abs(value - best);
+  for (const candidate of allowed) {
+    const delta = Math.abs(value - candidate);
+    if (delta < bestDelta) {
+      best = candidate;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
 
 function scaleDefault(
   canvasSize: { width: number; height: number } | undefined,
@@ -72,17 +95,41 @@ export function createElementForTool(
   const base = { id, parentId: null, children: [], x: 0, y: 0, rotation: 0, visible: true, locked: false };
   const ranges = DEFAULT_SIZE_RANGES[tool];
   const configured = settings.canvas.elementDefaults.tools[tool];
-  const sd = (b: number, min: number, max: number) => scaleDefault(canvasSize, settings, b, min, max, options);
+  const isDraft = options.sizeScale !== undefined;
+  const sizeMode = configured.sizeMode ?? "auto";
+  const fontSizeMode = configured.fontSizeMode ?? "auto";
+
+  // "fixed" uses the literal value; "auto" adapts to the edited frame. Draft mode
+  // (sizeScale set) always goes through scaleDefault to compensate for the draft
+  // viewport scale, regardless of mode.
+  const sized = (b: number, min: number, max: number, mode: "auto" | "fixed") =>
+    !isDraft && mode === "fixed"
+      ? roundPixel(clamp(b, min, max))
+      : scaleDefault(canvasSize, settings, b, min, max, options);
+
   const styles = { ...configured.styles };
   if (typeof styles.fontSize === "number" && ranges.fontSize) {
-    styles.fontSize = sd(styles.fontSize, ranges.fontSize[0], ranges.fontSize[1]);
+    let fontSize = sized(styles.fontSize, ranges.fontSize[0], ranges.fontSize[1], fontSizeMode);
+    if (
+      !isDraft &&
+      fontSizeMode === "auto" &&
+      configured.fontSizeSnap === "designSystem" &&
+      options.allowedFontSizes &&
+      options.allowedFontSizes.length > 0
+    ) {
+      fontSize = snapToNearest(fontSize, options.allowedFontSizes);
+    }
+    styles.fontSize = fontSize;
+  }
+  if (tool === "text" && !styles.fontFamily && options.defaultFontFamily) {
+    styles.fontFamily = options.defaultFontFamily;
   }
   const node = {
     ...base,
     type: TOOL_TYPES[tool],
     name: configured.name,
-    width: sd(configured.width, ranges.width[0], ranges.width[1]),
-    height: sd(configured.height, ranges.height[0], ranges.height[1]),
+    width: sized(configured.width, ranges.width[0], ranges.width[1], sizeMode),
+    height: sized(configured.height, ranges.height[0], ranges.height[1], sizeMode),
     styles,
     ...(configured.content !== undefined ? { content: configured.content } : {}),
   } as ElementNode;

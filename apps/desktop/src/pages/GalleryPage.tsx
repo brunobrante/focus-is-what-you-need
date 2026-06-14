@@ -24,6 +24,7 @@ import {
   ReferencesTab,
   SystemTab,
 } from "@/routes/Gallery";
+import { ElementDefaultsTab } from "@/routes/ElementDefaultsTab";
 
 export function GalleryPage() {
   const { projectId: rawProjectId } = useParams<{ projectId: string }>();
@@ -191,6 +192,9 @@ export function GalleryPage() {
             />
           )}
           {tab === "system" && project ? <SystemTab project={project} /> : null}
+          {tab === "elements" && project ? (
+            <ElementDefaultsTab project={project} />
+          ) : null}
         </>
       )}
 

@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { getCommonParentId, getParentBounds, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget } from "@/canvas/engine/hitTesting";
-import type { EditorState, Point, Rect } from "@/canvas/engine/types";
+import type { ElementFontTokens, EditorState, Point, Rect } from "@/canvas/engine/types";
 import { isInsertTool, isSelectionTool } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
@@ -26,6 +26,7 @@ import type { Interaction } from "../canvasInteractionTypes";
 import type { CanvasDropTarget, TextEditState, ViewportClientRect } from "../canvasStageTypes";
 import type { ContextMenuState } from "../CanvasContextMenu";
 import type { HoverStore } from "@/canvas/engine/hoverStore";
+import type { NoticeStore } from "@/canvas/engine/noticeStore";
 import type { CanvasAlignmentLogInput } from "../canvasAlignmentLog";
 import {
   type InteractionBeginCtx,
@@ -69,11 +70,14 @@ type Params = {
   latestDocumentRef: React.MutableRefObject<CanvasDocument>;
   latestStateRef: React.MutableRefObject<EditorState>;
   hoverStore: HoverStore;
+  noticeStore: NoticeStore;
   textEdit: TextEditState | null;
   enterTextEditing: (nodeId: string, clientPoint?: Point, selectAll?: boolean) => void;
   syncTextSelection: (start: number, end: number, anchor?: number) => void;
   scheduleCanvasAlignmentLog: (input: CanvasAlignmentLogInput) => void;
   settings?: GlobalSettings;
+  // Design-system typography inputs for element creation (font-size snapping).
+  fontTokens?: ElementFontTokens;
   // The region the camera may pan across: the component + device overlay when the
   // screen simulator is on, or null when off. Threaded to the pan handler so
   // space/middle-drag panning can reach the whole device, not just the component.
@@ -107,11 +111,13 @@ export function useCanvasPointerEvents({
   latestDocumentRef,
   latestStateRef,
   hoverStore,
+  noticeStore,
   textEdit,
   enterTextEditing,
   syncTextSelection,
   scheduleCanvasAlignmentLog,
   settings = DEFAULT_GLOBAL_SETTINGS,
+  fontTokens,
   navigableBounds,
 }: Params): CanvasPointerEventsResult {
   const dropTargetRef = useRef<CanvasDropTarget | null>(null);
@@ -220,20 +226,28 @@ export function useCanvasPointerEvents({
     if (isInsertTool(state.tool)) {
       event.preventDefault();
       const elementSizeScale = draftMode ? DRAFT_ELEMENT_SIZE_SCALE : undefined;
+      const creationOptions: {
+        sizeScale?: number;
+        allowedFontSizes?: number[];
+        defaultFontFamily?: string;
+      } = {};
+      if (elementSizeScale !== undefined) creationOptions.sizeScale = elementSizeScale;
+      if (fontTokens?.allowedFontSizes?.length) creationOptions.allowedFontSizes = fontTokens.allowedFontSizes;
+      if (fontTokens?.defaultFontFamily) creationOptions.defaultFontFamily = fontTokens.defaultFontFamily;
       const node = createElementForTool(
         state.tool,
         point.x,
         point.y,
         state.document.canvas,
         settings,
-        elementSizeScale === undefined ? undefined : { sizeScale: elementSizeScale },
+        creationOptions,
       );
       node.x = roundPixel(point.x);
       node.y = roundPixel(point.y);
       node.width = 0;
       node.height = 0;
       const next = insertElement(state.document, node);
-      interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, elementSizeScale, beforeDocument: state.document, lastDocument: next, moved: false };
+      interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, elementSizeScale, fontTokens, beforeDocument: state.document, lastDocument: next, moved: false };
       setInteractionActive(true);
       dispatch({ type: "setDocumentTransient", document: next, changedIds: [node.id] });
       viewport.setPointerCapture(event.pointerId);
@@ -369,7 +383,7 @@ export function useCanvasPointerEvents({
       return;
     }
     if (interaction.type === "marquee") { setMarqueeRect(null); return; }
-    if (interaction.type === "draw") { finishDrawInteraction(interaction, dispatch, settings); return; }
+    if (interaction.type === "draw") { finishDrawInteraction(interaction, dispatch, settings, noticeStore); return; }
 
     const wasCommandMode = commandModeRef.current;
     const capturedDropTarget = dropTargetRef.current;
