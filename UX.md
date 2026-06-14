@@ -207,7 +207,10 @@ Two-column layout for inspecting and editing a screen.
 - **Tab bar**: Sub Components | Versions | References
   - Each tab: search bar + kind filter + "New" button + card grid
   - `ComponentSideCard`: snapshot, name, kind, CardMenu
-  - `VersionSideCard`: version number, date, active status indicator
+  - `VersionSideCard`: version number, date, selected-status indicator. Clicking a
+    version card is **preview-only**: it shows that variant in the detail preview pane
+    and highlights the card. It does **not** persist the screen's active variant — so a
+    single click never changes the screen's main or what the projects gallery shows.
   - **References tab**: a card grid (shared `ReferenceThumbCard`) of references
     attached to this screen/component. A reference can be either a whole library
     image **or** a single cropped component from an image's stack — a stack-node

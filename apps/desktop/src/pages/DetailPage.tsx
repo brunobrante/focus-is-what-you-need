@@ -119,7 +119,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
           } : undefined}
         >
           {screen ? (
-            <SceneCanvasViewer source="stored" ownerType="variant" ownerId={screen.activeVariantId} kind="screen" />
+            <SceneCanvasViewer source="stored" ownerType="variant" ownerId={activeVersionId ?? screen.activeVariantId} kind="screen" />
           ) : (
             <PreviewMockImage tpl={activeTpl} type={type} allowMock={canUseFactoryMocks} />
           )}

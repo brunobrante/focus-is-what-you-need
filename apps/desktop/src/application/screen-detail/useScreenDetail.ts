@@ -157,12 +157,14 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
       })),
     [screenVariants, screen?.id, screen?.title],
   );
-  const activeVersionId = screen?.activeVariantId ?? null;
-  // Selecting a version makes that variant the screen's active one.
+  // Selecting a version is preview-only: it shows that variant in the detail
+  // preview pane without persisting it as the screen's active variant. Activating
+  // a variant for the whole app would change the projects gallery and the screen's
+  // main, which must never happen from a single click in this tab.
+  const [previewVersionId, setPreviewVersionId] = useState<string | null>(null);
+  const activeVersionId = previewVersionId ?? screen?.activeVariantId ?? null;
   const setActiveVersionId = (id: string | null) => {
-    if (id && screen && id !== screen.activeVariantId) {
-      void setActiveScreenVariant(screen.id, id);
-    }
+    setPreviewVersionId(id);
   };
 
   const activeVersion = versions.find((v) => v.id === activeVersionId) ?? versions[0];
