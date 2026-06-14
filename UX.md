@@ -621,6 +621,7 @@ not a separate entity and has no name of its own.
 - Once imported: image is displayed at full size
 - Crop tool: user draws rectangular regions over the image to mark component boundaries
 - Each region is called a "cut"
+- **Crop corner radius**: a locked selection shows a small circle inset from each corner (while the selection is hovered); hovering one shows the custom "bend" cursor. Dragging a handle sets a uniform corner radius for the cut, clamped to half the shorter side, projected onto the corner's 45° rail so perpendicular drift never changes the radius. At the maximum the two handles on the short edge meet and the drag locks; on that merged handle the first drag direction commits the corner — the drag can be pulled back to the lock but cannot cross it into the opposite corner. The live radius is shown in the selection's size badge (`· r N`). This matches the main canvas's radius handle.
 
 **Show original (clean view)**: an image icon button in the **Componentes** header
 (right panel) toggles a clean view of the open subject (no cut overlays, tool rail

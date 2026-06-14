@@ -138,22 +138,76 @@ export function moveCropBox(
   return { ...startBox, x: nextX, y: nextY };
 }
 
-export function roundCropBox(
-  startBox: CropBox,
+// Inward 45° projection of `point` onto the rail the corner's radius handle slides
+// along (equal offset on both axes). The projection is invariant to movement
+// perpendicular to the rail, so perpendicular cursor drift never changes the radius.
+function radiusCornerOffset(
   handle: RadiusHandle,
-  startPoint: { x: number; y: number },
+  point: { x: number; y: number },
+  box: CropBox,
+): number {
+  const dx = handle.includes("w") ? point.x - box.x : box.x + box.w - point.x;
+  const dy = handle.includes("n") ? point.y - box.y : box.y + box.h - point.y;
+  return (dx + dy) / 2;
+}
+
+// The two corners that share the SHORT edge the grabbed handle lives on — the pair
+// whose handles stack at the maximum radius. The grabbed handle may be either one;
+// we resolve the full pair so the commit logic can pick between them.
+function radiusEdgeHandles(handle: RadiusHandle, w: number, h: number): [RadiusHandle, RadiusHandle] {
+  if (w >= h) {
+    // wide (or square): short edges are vertical → pair across the height
+    return handle === "nw" || handle === "sw" ? ["nw", "sw"] : ["ne", "se"];
+  }
+  // tall: short edges are horizontal → pair across the width
+  return handle === "nw" || handle === "ne" ? ["nw", "ne"] : ["sw", "se"];
+}
+
+// How far (canvas units) the cursor must travel toward one corner of a stacked pair
+// before the gesture commits to that corner. Measured as relative divergence between
+// the pair's offsets, so it is immune to where exactly the grab landed on the ball.
+const RADIUS_COMMIT_EPSILON = 0.5;
+
+export function roundCropBox(
+  interaction: {
+    handle: RadiusHandle;
+    startPoint: { x: number; y: number };
+    startBox: CropBox;
+    committedCorner?: RadiusHandle;
+  },
   point: { x: number; y: number },
 ): CropBox {
-  const dx = point.x - startPoint.x;
-  const dy = point.y - startPoint.y;
-  const inwardX = handle.includes("w") ? dx : -dx;
-  const inwardY = handle.includes("n") ? dy : -dy;
-  const delta = (inwardX + inwardY) / 2;
-  const startRadius = startBox.r ?? 0;
-  return {
-    ...startBox,
-    r: clamp(startRadius + delta, 0, maxCropRadius(startBox)),
-  };
+  const box = interaction.startBox;
+  const maxRadius = maxCropRadius(box);
+
+  // When the grab starts at the maximum radius, the two handles on the short edge
+  // sit one on top of the other and we cannot yet tell which corner the user means.
+  // The FIRST drag that diverges toward one corner commits to it for the rest of the
+  // gesture; afterwards only that corner drives the radius, so the ball can be brought
+  // back to the lock (the clamped maximum) but cannot cross it into the other corner.
+  const pair = radiusEdgeHandles(interaction.handle, box.w, box.h);
+  const grabbedAtMax = (box.r ?? 0) >= maxRadius - RADIUS_COMMIT_EPSILON;
+  const o0 = radiusCornerOffset(pair[0], point, box);
+  const o1 = radiusCornerOffset(pair[1], point, box);
+
+  if (!interaction.committedCorner) {
+    if (!grabbedAtMax) {
+      // Unstacked grab: the reported corner is unambiguous, lock to it immediately.
+      interaction.committedCorner = interaction.handle;
+    } else {
+      const s0 = radiusCornerOffset(pair[0], interaction.startPoint, box);
+      const s1 = radiusCornerOffset(pair[1], interaction.startPoint, box);
+      const relDiff = o0 - o1 - (s0 - s1);
+      if (Math.abs(relDiff) > RADIUS_COMMIT_EPSILON) {
+        interaction.committedCorner = relDiff < 0 ? pair[0] : pair[1];
+      }
+    }
+  }
+
+  const offset = interaction.committedCorner
+    ? radiusCornerOffset(interaction.committedCorner, point, box)
+    : Math.min(o0, o1);
+  return { ...box, r: clamp(offset, 0, maxRadius) };
 }
 
 export function resizeCursor(handle: ResizeHandle) {

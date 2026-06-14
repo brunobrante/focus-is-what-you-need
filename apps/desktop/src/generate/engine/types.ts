@@ -156,6 +156,10 @@ export type SelectionInteraction =
       handle: RadiusHandle;
       startPoint: { x: number; y: number };
       startBox: CropBox;
+      // When the grab starts on a pair of stacked handles (radius at the maximum),
+      // the first drag toward one corner commits to it for the rest of the gesture,
+      // so the drag can no longer cross the lock into the other corner of the pair.
+      committedCorner?: RadiusHandle;
     }
   | {
       type: "pan";

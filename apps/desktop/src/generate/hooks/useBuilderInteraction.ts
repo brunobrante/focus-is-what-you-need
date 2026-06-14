@@ -39,6 +39,11 @@ import { componentHitTest, selectionHitTest } from "../engine/hitTesting";
 import { componentAreaAlreadyExists } from "../engine/componentModel";
 import { readCropsOverlayAlpha, readCropsOverlayColor } from "../engine/storage";
 
+// Custom cursor shown over (and while dragging) the corner-radius handle, matching
+// the main canvas. The hotspot sits on the arrow tip; falls back to `grab` if the
+// browser can't load the SVG cursor. The asset lives in `public/`, served from root.
+const RADIUS_CURSOR = "url(/cursor-bend.svg) 4 3, grab";
+
 export type BuilderInteractionInput = {
   item: ToolReference;
   imgRef: RefObject<HTMLImageElement | null>;
@@ -284,7 +289,7 @@ export function useBuilderInteraction({
       const selectionTool = currentTool === "crop" || currentTool === "draw";
       if (canCrop && selection && selectionLocked && selectionTool) {
         const hit = selectionHitTest(point, selection, true, toolZoom);
-        if (hit?.kind === "radius") cursor = "grab";
+        if (hit?.kind === "radius") cursor = RADIUS_CURSOR;
         else if (hit?.kind === "resize") cursor = resizeCursor(hit.handle);
         else if (hit?.kind === "move" && currentTool === "crop") cursor = "move";
       }
@@ -363,6 +368,9 @@ export function useBuilderInteraction({
           startPoint: point,
           startBox: selection,
         };
+        // Keep the bend cursor through the drag — the idle hover handler that sets
+        // it does not run while a pointer interaction is active.
+        if (stageViewportRef.current) stageViewportRef.current.style.cursor = RADIUS_CURSOR;
         setDrawing(true);
         return;
       }
@@ -439,7 +447,7 @@ export function useBuilderInteraction({
     }
 
     if (interaction.type === "radius") {
-      setSelection(roundCropBox(interaction.startBox, interaction.handle, interaction.startPoint, point));
+      setSelection(roundCropBox(interaction, point));
       setSelectionLocked(true);
       return;
     }
