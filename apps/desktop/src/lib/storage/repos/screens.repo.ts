@@ -42,6 +42,21 @@ export async function getScreen(id: string): Promise<ScreenRow | null> {
   return rows.find((r) => r.id === id) ?? null;
 }
 
+/**
+ * The version siblings of a screen (including itself), derived from an already-loaded
+ * screens array. A screen with no version group is its own sole version.
+ */
+export function screenVersionsFromList(
+  screens: ScreenRow[],
+  screen: ScreenRow | null | undefined,
+): ScreenRow[] {
+  if (!screen) return [];
+  if (!screen.versionGroupId) return [screen];
+  return screens
+    .filter((s) => s.versionGroupId === screen.versionGroupId)
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
 export async function findScreenByTitle(
   projectId: string,
   title: string,
@@ -91,8 +106,8 @@ export async function createScreen(input: {
  *    child master. Editing a master then reflects in this version too.
  *  - "copy": the scene graph is duplicated verbatim (fully independent).
  *
- * The new screen appears alongside the original in the project; version grouping
- * UI can be layered on later via a dedicated field.
+ * The source and the new screen share a `versionGroupId` so the screen detail page
+ * can list them together as versions of one another.
  */
 export async function createScreenVersion(input: {
   screenId: string;
@@ -101,11 +116,18 @@ export async function createScreenVersion(input: {
   const source = await getScreen(input.screenId);
   if (!source) return null;
 
+  // Ensure both screens share a version group.
+  const groupId = source.versionGroupId ?? newId();
+  if (!source.versionGroupId) {
+    await updateScreen(source.id, { versionGroupId: groupId });
+  }
+
   const created = await createScreen({
     projectId: source.projectId,
     title: `${source.title} (${input.mode === "linked" ? "linked" : "copy"})`,
     variant: source.variant,
   });
+  await updateScreen(created.id, { versionGroupId: groupId });
 
   const sourceScene = await getSceneByOwner("screen", input.screenId);
   if (sourceScene) {
@@ -134,7 +156,7 @@ export async function createScreenVersion(input: {
 
 export async function updateScreen(
   screenId: string,
-  patch: Partial<Pick<ScreenRow, "title" | "variant">>,
+  patch: Partial<Pick<ScreenRow, "title" | "variant" | "versionGroupId">>,
 ): Promise<ScreenRow | null> {
   const rows = await listScreens();
   const idx = rows.findIndex((screen) => screen.id === screenId);

@@ -1,5 +1,6 @@
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { getCanvasMockForTemplate } from "@/components/mocks/data/canvasMocks";
+import { Snapshot } from "@/components/Snapshot";
 import type { ScreenVersion } from "@/lib/data/screenVersions";
 import type { ProjectType } from "@/lib/data/types";
 
@@ -68,7 +69,11 @@ export function VersionSideCard({
           className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
         />
         <div className="h-full w-full overflow-hidden">
-          <PreviewMockImage tpl={version.tpl} type={type} compact allowMock={allowMock} />
+          {version.screenId ? (
+            <Snapshot kind="screen" ownerType="screen" ownerId={version.screenId} type={type} display="card" />
+          ) : (
+            <PreviewMockImage tpl={version.tpl} type={type} compact allowMock={allowMock} />
+          )}
         </div>
         <CardMenu
           buttons={[

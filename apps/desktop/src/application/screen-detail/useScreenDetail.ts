@@ -13,8 +13,9 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
+import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
   DEFAULT_HISTORY,
   type ScreenVersion,
@@ -67,13 +68,13 @@ export interface ScreenDetailState {
   filter: CmpKindFilter;
   setFilter: (f: CmpKindFilter) => void;
   versions: ScreenVersion[];
-  setVersions: React.Dispatch<React.SetStateAction<ScreenVersion[]>>;
   activeVersionId: string | null;
   setActiveVersionId: (id: string | null) => void;
   activeVersion: ScreenVersion | undefined;
   activeTpl: ReturnType<typeof templateForScreenName>;
 
   // modal refs
+  versionModeRef: React.RefObject<VersionModeModalHandle | null>;
   historyRef: React.RefObject<HistoryModalHandle | null>;
   compareRef: React.RefObject<CompareVersionsModalHandle | null>;
   referencesRef: React.RefObject<ReferencesModalHandle | null>;
@@ -130,12 +131,31 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
 
-  const [versions, setVersions] = useState<ScreenVersion[]>([]);
-  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  // Versions are real sibling screens sharing a version group (the current screen
+  // is always one of them, shown as active). No more client-side mock versions.
+  const versions = useMemo<ScreenVersion[]>(
+    () =>
+      screenVersionsFromList(screens, screen).map((s) => ({
+        id: s.id,
+        screenId: s.id,
+        title: s.title,
+        tpl: templateForScreenName(s.title),
+        updated: "",
+        author: "You",
+        initials: "VC",
+      })),
+    [screens, screen],
+  );
+  const activeVersionId = screen?.id ?? null;
+  // Selecting a version opens that real screen.
+  const setActiveVersionId = (id: string | null) => {
+    if (id && id !== screen?.id) navigate(buildScreenHref(id));
+  };
 
   const activeVersion = versions.find((v) => v.id === activeVersionId) ?? versions[0];
   const activeTpl = activeVersion?.tpl ?? tpl;
 
+  const versionModeRef = useRef<VersionModeModalHandle>(null);
   const historyRef = useRef<HistoryModalHandle>(null);
   const compareRef = useRef<CompareVersionsModalHandle>(null);
   const referencesRef = useRef<ReferencesModalHandle>(null);
@@ -198,19 +218,19 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     newComponentRef.current?.open({ kind: "screen", screenId: screen.id });
   };
 
+  // Creates a real screen version (copying the screen), choosing Linked vs Copy,
+  // then opens the new version. Replaces the old client-side mock.
   const addVersion = () => {
-    const n = versions.length + 1;
-    const tpls: ScreenVersion["tpl"][] = ["hero", "detail", "form"];
-    const newV: ScreenVersion = {
-      id: `v${n}`,
-      title: `v${n} · nova`,
-      tpl: tpls[n % tpls.length],
-      updated: "agora",
-      author: "You",
-      initials: "VC",
-    };
-    setVersions((prev) => [newV, ...prev]);
-    setActiveVersionId(newV.id);
+    if (!screen) return;
+    const src = screen;
+    versionModeRef.current?.open({
+      title: "New version",
+      message: "How should child components behave in the new version?",
+      onSelect: async (mode) => {
+        const created = await createScreenVersion({ screenId: src.id, mode });
+        if (created) navigate(buildScreenHref(created.id));
+      },
+    });
   };
 
   const removeLinkedReference = (referenceId: string) => {
@@ -287,11 +307,11 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     filter,
     setFilter,
     versions,
-    setVersions,
     activeVersionId,
     setActiveVersionId,
     activeVersion,
     activeTpl,
+    versionModeRef,
     historyRef,
     compareRef,
     referencesRef,

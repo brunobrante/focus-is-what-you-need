@@ -12,6 +12,7 @@ import {
   IconSearch,
 } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { AddCard } from "@/components/screen/AddCard";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
@@ -59,7 +60,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     prevScreen, nextScreen, canvasHref, filteredComponents, filteredVersions,
     filteredReferences, sideTab, setSideTab, query, setQuery, filter, setFilter,
     versions, activeVersionId, setActiveVersionId, activeTpl,
-    historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
+    versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, openNewComponent, addVersion,
     removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
@@ -251,6 +252,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
       <FastEditModal ref={fastEditRef} />
       <NewComponentModal ref={newComponentRef} projectId={project?.id ?? null} screens={screens} onCreated={handleNewComponentCreated} />
       <ConfirmActionModal ref={confirmRef} />
+      <VersionModeModal ref={versionModeRef} />
     </div>
   );
 }

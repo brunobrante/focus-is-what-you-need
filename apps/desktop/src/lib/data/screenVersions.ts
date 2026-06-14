@@ -6,6 +6,9 @@ export type ScreenVersion = {
   updated: string;
   author: string;
   initials: string;
+  // When set, this version is backed by a real screen row; cards render its real
+  // stored snapshot instead of a template mock.
+  screenId?: string;
 };
 
 export const DEFAULT_SCREEN_VERSIONS: ScreenVersion[] = [
