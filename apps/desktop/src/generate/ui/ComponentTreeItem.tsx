@@ -1,9 +1,6 @@
-import { Baseline, ChevronRight, Layers, Loader2, ScanText, SquarePen, Trash2 } from "lucide-react";
-import type { ComponentProps, MouseEvent } from "react";
+import { ChevronRight, Layers, SquarePen, Trash2 } from "lucide-react";
+import type { ComponentProps } from "react";
 import type { ComponentTreeNode } from "../engine/types";
-import { useCraftCheck } from "@/lib/models/useCraftCheck";
-import { useFontDetect } from "@/lib/models/useFontDetect";
-import { urlToBytes } from "@/lib/models/modelCommands";
 
 function IconButton({
   danger = false,
@@ -31,8 +28,6 @@ export function ComponentTreeItem({
   expandedIds,
   rootId,
   primaryId,
-  textDetectionModelId = null,
-  fontDetectionEnabled = false,
   onOpen,
   onToggle,
   onHover,
@@ -47,10 +42,6 @@ export function ComponentTreeItem({
   expandedIds: Set<string>;
   rootId: string;
   primaryId: string;
-  /** Active text detector; when set, each card shows an "Is text?" action. */
-  textDetectionModelId?: string | null;
-  /** When true, each card shows a "Font?" action that recognizes the font. */
-  fontDetectionEnabled?: boolean;
   onOpen: (id: string) => void;
   onToggle: (id: string) => void;
   onHover: (id: string | null) => void;
@@ -114,10 +105,6 @@ export function ComponentTreeItem({
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-medium text-[var(--text)]">
           {component.name}
         </span>
-        {textDetectionModelId ? (
-          <CraftCheckButton dataUrl={component.dataUrl} modelId={textDetectionModelId} />
-        ) : null}
-        {fontDetectionEnabled ? <FontCheckButton dataUrl={component.dataUrl} /> : null}
         {hasVariants ? (
           <button
             type="button"
@@ -173,8 +160,6 @@ export function ComponentTreeItem({
               expandedIds={expandedIds}
               rootId={rootId}
               primaryId={primaryId}
-              textDetectionModelId={textDetectionModelId}
-              fontDetectionEnabled={fontDetectionEnabled}
               onOpen={onOpen}
               onToggle={onToggle}
               onHover={onHover}
@@ -184,148 +169,6 @@ export function ComponentTreeItem({
             />
           ))
         : null}
-    </div>
-  );
-}
-
-/**
- * Per-card text-detection control. Reads the cut's image bytes on demand and
- * asks the active detector (`modelId`) whether it contains text, surfacing a
- * Yes/No badge. Only rendered when a text-detection model is installed.
- */
-function CraftCheckButton({
-  dataUrl,
-  modelId,
-}: {
-  dataUrl: string;
-  modelId: string;
-}) {
-  const craft = useCraftCheck(modelId);
-  const busy = craft.status === "running";
-
-  const label =
-    craft.status === "running"
-      ? "Checking…"
-      : craft.status === "done"
-        ? "Check again"
-        : craft.status === "error"
-          ? "Retry"
-          : "Is text?";
-
-  async function handleClick(event: MouseEvent) {
-    event.stopPropagation();
-    if (busy) return;
-    // "Check again" / "Retry": clear the previous result, then run a fresh check.
-    craft.reset();
-    try {
-      const bytes = await urlToBytes(dataUrl);
-      craft.check(bytes);
-    } catch (error) {
-      console.error("Failed to read cut image for text detection", error);
-    }
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
-      {craft.status === "done" ? (
-        // TODO: persist text detection result to ReferenceRow
-        <span
-          className={[
-            "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
-            craft.isText
-              ? "border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.12)] text-[#4ade80]"
-              : "border-[rgba(248,113,113,0.4)] bg-[rgba(248,113,113,0.12)] text-[#f87171]",
-          ].join(" ")}
-        >
-          {craft.isText ? "Yes" : "No"}
-        </span>
-      ) : null}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={handleClick}
-        className="inline-flex h-[26px] shrink-0 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-transparent px-1.5 text-[10.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {busy ? (
-          <Loader2 size={12} strokeWidth={1.8} className="animate-spin" />
-        ) : (
-          <ScanText size={12} strokeWidth={1.8} />
-        )}
-        {label}
-      </button>
-    </div>
-  );
-}
-
-/**
- * Per-card font-recognition control. Reads the cut's image bytes on demand and
- * runs the EfficientNet-B3 font classifier, surfacing the recognized font family
- * (top guess, with the full top-3 in the tooltip). Only rendered when the Font
- * Detector feature is enabled.
- */
-function FontCheckButton({ dataUrl }: { dataUrl: string }) {
-  const font = useFontDetect();
-  const busy = font.status === "running";
-  const top = font.predictions?.[0] ?? null;
-
-  const label =
-    font.status === "running"
-      ? "Detecting…"
-      : font.status === "done"
-        ? "Detect again"
-        : font.status === "error"
-          ? "Retry"
-          : "Font?";
-
-  const allGuesses = font.predictions
-    ?.map((p) => `${p.name} ${Math.round(p.confidence * 100)}%`)
-    .join("  ·  ");
-
-  async function handleClick(event: MouseEvent) {
-    event.stopPropagation();
-    if (busy) return;
-    // "Detect again" / "Retry": clear the previous result, then run fresh.
-    font.reset();
-    try {
-      const bytes = await urlToBytes(dataUrl);
-      font.detect(bytes);
-    } catch (error) {
-      console.error("Failed to read cut image for font detection", error);
-    }
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
-      {font.status === "done" ? (
-        top ? (
-          <span
-            title={allGuesses}
-            className="inline-flex max-w-[128px] items-center gap-1 rounded-full border border-[rgba(167,139,250,0.4)] bg-[rgba(167,139,250,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[#A78BFA]"
-          >
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap">{top.name}</span>
-            <span className="shrink-0 text-[9px] font-medium opacity-70">
-              {Math.round(top.confidence * 100)}%
-            </span>
-          </span>
-        ) : (
-          <span className="inline-flex items-center rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-faint)]">
-            No font
-          </span>
-        )
-      ) : null}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={handleClick}
-        className="inline-flex h-[26px] shrink-0 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-transparent px-1.5 text-[10.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {busy ? (
-          <Loader2 size={12} strokeWidth={1.8} className="animate-spin" />
-        ) : (
-          <Baseline size={12} strokeWidth={1.8} />
-        )}
-        {label}
-      </button>
     </div>
   );
 }

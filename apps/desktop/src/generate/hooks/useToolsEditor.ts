@@ -514,13 +514,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     resetToolViewport();
   }, [cancelSelection, resetToolViewport]);
 
-  const openBuilderMode = useCallback(() => {
-    cancelSelection();
-    setCurrentTool("move");
-    resetToolViewport();
-    setViewMode(selectedComponentId && selectedComponent ? "component" : "original");
-  }, [cancelSelection, resetToolViewport, selectedComponent, selectedComponentId]);
-
   const openStackMode = useCallback(() => {
     if (stackedComponents.length === 0) return;
     cancelSelection();
@@ -555,6 +548,19 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     },
     [cancelSelection, components, expandComponentPath, resetToolViewport, rootComponentId, setActiveRootId],
   );
+
+  const openBuilderMode = useCallback(() => {
+    // Carry the currently focused subject (e.g. the cut shown in the gallery)
+    // straight into the Builder so it renders the same item, scoped to its root.
+    if (selectedComponentId && selectedComponent) {
+      openComponent(selectedComponentId);
+      return;
+    }
+    cancelSelection();
+    setCurrentTool("move");
+    resetToolViewport();
+    setViewMode("original");
+  }, [cancelSelection, openComponent, resetToolViewport, selectedComponent, selectedComponentId]);
 
   const selectRoot = useCallback(
     (id: string) => {
@@ -1179,6 +1185,13 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
           ? preferredRootId
           : rootComponentId;
       const hasStack = hasContent(next);
+      // The "main screen" is the root flagged primary, falling back to the
+      // resolved root. We always open a screen (root) as the editable subject —
+      // never the raw original image. A fresh image lands on its default root;
+      // an existing stack lands on the main screen so the user keeps building.
+      const primaryRootId =
+        next.find((c) => c.parentId == null && c.isPrimaryRoot)?.id ?? nextRootId;
+      const openRootId = hasStack ? primaryRootId : nextRootId;
       if (persistDraft) {
         if (referenceId && item.id === referenceId) {
           writeDraftComponents(componentKey, next);
@@ -1187,12 +1200,12 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         }
       }
       setComponentState({ key: componentKey, items: next });
-      setActiveRootId(nextRootId);
-      setExpandedComponentIds(new Set([nextRootId]));
+      setActiveRootId(openRootId);
+      setExpandedComponentIds(new Set([openRootId]));
       setImageError(false);
       setHoveredComponentId(null);
-      setSelectedComponentId(hasStack ? null : nextRootId);
-      setViewMode(hasStack ? "original" : "component");
+      setSelectedComponentId(openRootId);
+      setViewMode("component");
       resetToolViewport();
       cancelSelection();
       setCurrentTool("move");

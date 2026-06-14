@@ -654,8 +654,14 @@ again, or the canvas ×, returns to the editor.
     thumbnail, visible on hover, filled gold when set). Clicking it marks that
     screen as the reference's **main** screen; exactly one screen can be main. The
     main screen is what shows on the **front of the reference card** in the gallery
-    and is pre-selected when the stack is opened. Defaults to the full-image screen
-    until changed. Save persists the choice.
+    and is what the Builder opens on. Defaults to the full-image screen until
+    changed. Save persists the choice.
+  - **Opening the Builder lands on a screen, never the raw original image.** When
+    a reference with an existing stack is opened, the Builder opens its **main
+    screen** as the editable subject in the Builder tab (ready to crop). A fresh
+    image with no stack opens its default full-image screen. The standalone
+    original-image overview is still reachable via the sidebar "show original"
+    toggle, but it is no longer the landing view.
   - **Delete screen** — each screen card has a trash button (top-left of the
     thumbnail, visible on hover, turns red on hover). Clicking it opens a
     confirmation dialog ("Delete screen") that names the screen and its cut count;
@@ -667,18 +673,20 @@ again, or the canvas ×, returns to the editor.
   - List of cuts created on the image
   - Each cut item: thumbnail preview, name, edit button, delete button
   - **Variants** button (Layers icon + count, only when the cut owns more than one variant): opens the **Variants panel** for that cut (see below). A cut gains variants when a non-crop AI tool (Remove background, Upscale, Remove element) runs on it; the plain crop is always kept as the "Original" variant.
-  - **Is text?** button (only when the Text Detector feature is enabled in Settings): runs the feature's active model (a DBNet variant or CRAFT) on that cut's image to detect whether it contains text. Idle shows "Is text?" with a ScanText icon; while running it shows a spinner and is disabled; on completion it shows "Check again" next to a green **Yes** or red **No** badge; on failure it shows "Retry". "Check again" re-runs the detection immediately. The result is display-only and not persisted in v1.
-  - **Font?** button (only when the Font Detector feature is enabled in Settings): runs the EfficientNet-B3 font classifier on that cut's image to recognize the **font family**. Idle shows "Font?" with a Baseline icon; while running it shows a spinner and is disabled; on completion it shows the recognized font as a purple pill — the top font name plus its confidence (e.g. "Roboto-Regular 87%"), with the full top-3 guesses in the pill's tooltip — and the button becomes "Detect again"; on failure it shows "Retry". The result is display-only and not persisted in v1.
+  - Text detection and font recognition are **not** shown on tree rows — they are Gallery-tab features (see below).
+- **Crops overlay toggle** (bottom-right of the stage, Builder/original views only): a **Crops** button that shows/hides the translucent overlay marking each cut's region on the open subject. It is **not** shown in the Stack or Gallery tabs (the Stack already renders the cuts themselves).
 - **Stack tab**:
   - Shows all cuts from a reference image layered over the original at their exact positions
   - Clicking a cut selects it (blue outline); hovering shows an orange highlight
   - Selected cut name is shown below the canvas
   - Tree list of cuts with name and dimensions in the right panel
+  - No Crops overlay toggle here
 - **Gallery tab**:
   - Carousel view of individual cuts, one at a time
   - Left/right arrows and dot indicators for navigation (arrow keys also work)
   - Cut name and position counter (e.g. "2 / 5") shown below the image
-  - Bottom action bar (when Color Detector, Text Detector, or Font Detector features are enabled): **Colors**, **Text**, and/or **Font** buttons run analysis on the current cut. **Font** runs the EfficientNet-B3 font-classify model and lists the top font-family guesses with confidences (e.g. "Roboto-Regular 87%"). Results are display-only and reset when the cut changes.
+  - Bottom action bar (when Color Detector, Text Detector, or Font Detector features are enabled): **Colors**, **Text**, and/or **Font** buttons run analysis on the current cut. **Text** detects whether the cut contains text (green "Text detected" / red "No text detected"); **Font** runs the EfficientNet-B3 font-classify model and lists the top font-family guesses with confidences (e.g. "Roboto-Regular 87%"). Each result appears in its own **titled box** (Colors / Text / Font), the boxes sitting side by side **above** the buttons. Results are display-only and reset when the cut changes.
+  - **Switching to the Builder opens the cut currently in view** — leaving the Gallery on a given cut and clicking the Builder tab renders that same cut as the editable subject, scoped to its screen.
 - **Variants panel** (replaces the component tree in the right sidebar when opened from a cut's Variants button or the rail's Variants button; the root switcher above stays visible):
   - Header: a **Back to tree** button (ChevronLeft) that returns to the tree, the cut's thumbnail and name, and a variant count
   - One row per variant: a "main" check indicator, thumbnail, the tool label (**Original**, **Background removed**, **Upscaled**, **Element removed**), and a delete button
@@ -807,7 +815,7 @@ Catalog:
 - **Remove Background** — BiRefNet (~220 MB)
 - **Upscale (4×)** — Real-ESRGAN (~5 MB)
 - **Auto-detect Components** — OmniParser (icon detect) (~58 MB, default) and Florence-2 (~1.2 GB, five-file package). Multiple models; the active one is selectable like the Text Detector. When enabled, the **Auto-detect** button appears on the Builder's bottom canvas bar and runs the active model.
-- **Text Detector** — DBNet-MobileNetV3 (~15 MB), DBNet-ResNet34 (~85 MB), DBNet-ResNet50 (~96 MB), CRAFT (~80 MB). When enabled, the **Is text?** button appears on each Builder cut item and runs the active model.
+- **Text Detector** — DBNet-MobileNetV3 (~15 MB), DBNet-ResNet34 (~85 MB), DBNet-ResNet50 (~96 MB), CRAFT (~80 MB). When enabled, the **Text** button appears in the Builder's Gallery action bar and runs the active model on the current cut.
 - **Remove Element** — LaMa (~208 MB). When enabled, the **Remove element** tool appears in the Builder's left tool rail.
 - **Font Detector** — font-classify (EfficientNet-B3, ~64 MB, three-file package: model + two YAML sidecars). When enabled, the **Font** button appears in the Builder's Gallery action bar and identifies the cut's font family.
 - **Color Detector** — model-free (runs built-in). When enabled, the **Colors** button appears in the Builder's Gallery action bar.

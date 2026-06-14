@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Baseline, ChevronLeft, ChevronRight, LayoutGrid, Palette, Type } from "lucide-react";
 import type { SavedComponent } from "../engine/types";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
@@ -16,11 +16,14 @@ export function GallerySlider({
   showColors = false,
   showText = false,
   showFont = false,
+  onFocusChange,
 }: {
   cuts: SavedComponent[];
   showColors?: boolean;
   showText?: boolean;
   showFont?: boolean;
+  /** Reports the cut currently in view so the Builder can open the same item. */
+  onFocusChange?: (cutId: string | null) => void;
 }) {
   const [index, setIndex] = useState(0);
   const [colorResult, setColorResult] = useState<ColorEntry[] | null>(null);
@@ -52,6 +55,10 @@ export function GallerySlider({
   }, [index, cuts.length]);
 
   const current = cuts[index];
+
+  useEffect(() => {
+    onFocusChange?.(current?.id ?? null);
+  }, [current?.id, onFocusChange]);
 
   const checkColors = useCallback(async () => {
     if (!current) return;
@@ -128,6 +135,62 @@ export function GallerySlider({
       {/* Bottom action bar */}
       {(showColors || showText || showFont) && (
       <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3">
+        {/* Results — each in its own titled box, sitting side by side above the buttons */}
+        {(colorResult || textResult !== null || fontResult) && (
+          <div className="flex flex-wrap items-end justify-center gap-2">
+            {colorResult && (
+              <ResultCard title="Colors">
+                <div className="flex items-center gap-1.5">
+                  {colorResult.map((c, i) => (
+                    <div
+                      key={i}
+                      title={`rgb(${c.r},${c.g},${c.b})`}
+                      className="h-5 w-5 shrink-0 rounded-full border border-[rgba(255,255,255,0.12)] shadow-sm"
+                      style={{ background: `rgb(${c.r},${c.g},${c.b})` }}
+                    />
+                  ))}
+                </div>
+              </ResultCard>
+            )}
+
+            {textResult !== null && (
+              <ResultCard title="Text">
+                <div className="flex items-center gap-2 text-[12px]">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: textResult ? "#4ade80" : "#f87171" }}
+                  />
+                  <span className="text-[var(--text)]">
+                    {textResult ? "Text detected" : "No text detected"}
+                  </span>
+                </div>
+              </ResultCard>
+            )}
+
+            {fontResult && (
+              <ResultCard title="Font">
+                <div className="flex items-center gap-2 text-[12px]">
+                  {fontResult.length === 0 ? (
+                    <span className="text-[var(--text-faint)]">No font detected</span>
+                  ) : (
+                    fontResult.map((f, i) => (
+                      <span key={f.name} className="flex items-center gap-1.5">
+                        {i > 0 ? <span className="text-[var(--text-faint)]">·</span> : null}
+                        <span className={i === 0 ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>
+                          {f.name}
+                        </span>
+                        <span className="text-[10.5px] text-[var(--text-faint)]">
+                          {Math.round(f.confidence * 100)}%
+                        </span>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </ResultCard>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           {showColors && (
             <ActionButton
@@ -154,51 +217,6 @@ export function GallerySlider({
             />
           )}
         </div>
-
-        {colorResult && (
-          <div className="flex items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] px-3 py-2 backdrop-blur-[6px]">
-            {colorResult.map((c, i) => (
-              <div
-                key={i}
-                title={`rgb(${c.r},${c.g},${c.b})`}
-                className="h-5 w-5 shrink-0 rounded-full border border-[rgba(255,255,255,0.12)] shadow-sm"
-                style={{ background: `rgb(${c.r},${c.g},${c.b})` }}
-              />
-            ))}
-          </div>
-        )}
-
-        {textResult !== null && (
-          <div className="flex items-center gap-2 rounded-[8px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] px-3 py-2 text-[12px] backdrop-blur-[6px]">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ background: textResult ? "#4ade80" : "#f87171" }}
-            />
-            <span className="text-[var(--text)]">
-              {textResult ? "Text detected" : "No text detected"}
-            </span>
-          </div>
-        )}
-
-        {fontResult && (
-          <div className="flex items-center gap-2 rounded-[8px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] px-3 py-2 text-[12px] backdrop-blur-[6px]">
-            {fontResult.length === 0 ? (
-              <span className="text-[var(--text-faint)]">No font detected</span>
-            ) : (
-              fontResult.map((f, i) => (
-                <span key={f.name} className="flex items-center gap-1.5">
-                  {i > 0 ? <span className="text-[var(--text-faint)]">·</span> : null}
-                  <span className={i === 0 ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>
-                    {f.name}
-                  </span>
-                  <span className="text-[10.5px] text-[var(--text-faint)]">
-                    {Math.round(f.confidence * 100)}%
-                  </span>
-                </span>
-              ))
-            )}
-          </div>
-        )}
       </div>
       )}
 
@@ -211,6 +229,18 @@ export function GallerySlider({
       >
         <ChevronRight size={16} strokeWidth={2} />
       </button>
+    </div>
+  );
+}
+
+/** A titled little box that frames one detection result above the action bar. */
+function ResultCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-start gap-1.5 rounded-[10px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] px-3 py-2 backdrop-blur-[6px]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.6px] text-[var(--text-faint)]">
+        {title}
+      </span>
+      {children}
     </div>
   );
 }

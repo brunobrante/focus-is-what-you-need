@@ -149,6 +149,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     openBuilderMode,
     openStackMode,
     openGalleryMode,
+    focusGalleryCut,
     openComponent,
     selectRoot,
     setPrimaryRoot,
@@ -188,10 +189,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   // Active auto-detect model (OmniParser or Florence-2), or null when not enabled.
   const autoDetectModelId = autoDetectOn ? features.autoDetect.activeModelId : null;
   const removeElementOn = features.removeElement.operational;
-  // Active text detector (a DBNet variant or CRAFT), or null when not enabled.
-  const textDetectionModelId = features.textDetection.operational
-    ? features.textDetection.activeModelId
-    : null;
   const hasProcessingFeature = removeBackgroundOn || upscaleOn || removeElementOn;
   const [running, setRunning] = useState<{ id: string; kind: ProcessingActionKind } | null>(null);
   // LaMa "remove element" mask-drawing state. The brush paints onto an overlay
@@ -433,6 +430,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   showColors={features.colorDetector.operational}
                   showText={features.textDetection.operational}
                   showFont={features.fontDetection.operational}
+                  onFocusChange={focusGalleryCut}
                 />
               ) : null}
 
@@ -452,7 +450,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 }}
               />
 
-              {viewMode !== "gallery" ? (
+              {viewMode !== "gallery" && viewMode !== "stack" ? (
                 <CropsOverlayToggle
                   active={showCropsOverlay}
                   onToggle={() => setShowCropsOverlay((value) => !value)}
@@ -821,8 +819,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                           expandedIds={expandedComponentIds}
                           rootId={rootComponentId}
                           primaryId={activeScopeId}
-                          textDetectionModelId={textDetectionModelId}
-                          fontDetectionEnabled={features.fontDetection.operational}
                           onOpen={openTreeComponent}
                           onToggle={toggleComponentExpanded}
                           onHover={setHoveredComponentId}
