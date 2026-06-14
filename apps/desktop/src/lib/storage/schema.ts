@@ -34,8 +34,11 @@ export type ScreenRow = {
   variant: ScreenVariant;
   order: number;
   // Screens that are versions of one another share a version group id. Null/undefined
-  // for a standalone screen that has never been versioned.
+  // for a standalone screen that has never been versioned. All members of a group
+  // share the same `title`; each is identified by a stable `versionIndex` (V1, V2…),
+  // where V1 is the original ("main").
   versionGroupId?: string | null;
+  versionIndex?: number | null;
   createdAt: number;
   updatedAt: number;
 };

@@ -29,7 +29,7 @@ import { ReferencesModal } from "@/components/modals/ReferencesModal";
 import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ComponentKind, ProjectType, ScreenVariant } from "@/lib/data/types";
-import { updateScreen } from "@/lib/storage/repos/screens.repo";
+import { screenVersionLabel, updateScreen } from "@/lib/storage/repos/screens.repo";
 import { useScreenDetail, type CmpKindFilter as ScreenCmpKindFilter } from "@/application/screen-detail/useScreenDetail";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 
@@ -127,7 +127,14 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
         <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
           <div className="flex shrink-0 items-end justify-between gap-4 border-b border-[var(--border)] px-6 pb-[18px] pt-[22px]">
             <div>
-              <EditableTitle value={screen?.title ?? screenName} label="Edit screen name" onSave={handleScreenTitleSave} />
+              <div className="flex items-center gap-2">
+                <EditableTitle value={screen?.title ?? screenName} label="Edit screen name" onSave={handleScreenTitleSave} />
+                {screenVersionLabel(screen) ? (
+                  <span className="mb-1.5 flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
+                    {screenVersionLabel(screen)}
+                  </span>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2.5 text-[12.5px] text-[var(--text-muted)]">
                 <span>{projectDims[type]}</span>
                 <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />

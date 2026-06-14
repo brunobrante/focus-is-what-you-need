@@ -9,6 +9,9 @@ export type ScreenVersion = {
   // When set, this version is backed by a real screen row; cards render its real
   // stored snapshot instead of a template mock.
   screenId?: string;
+  // Stable version tag ("V1", "V2"…). All versions in a group share the same title,
+  // so the tag is the real identifier.
+  tag?: string;
 };
 
 export const DEFAULT_SCREEN_VERSIONS: ScreenVersion[] = [

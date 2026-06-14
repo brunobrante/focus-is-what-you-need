@@ -54,7 +54,16 @@ export function screenVersionsFromList(
   if (!screen.versionGroupId) return [screen];
   return screens
     .filter((s) => s.versionGroupId === screen.versionGroupId)
-    .sort((a, b) => a.createdAt - b.createdAt);
+    .sort((a, b) => (a.versionIndex ?? 1) - (b.versionIndex ?? 1) || a.createdAt - b.createdAt);
+}
+
+/**
+ * The stable version tag for a screen ("V1", "V2", …), or null when the screen is
+ * standalone (not part of a version group). V1 is the original ("main").
+ */
+export function screenVersionLabel(screen: ScreenRow | null | undefined): string | null {
+  if (!screen?.versionGroupId) return null;
+  return `V${screen.versionIndex ?? 1}`;
 }
 
 export async function findScreenByTitle(
@@ -116,18 +125,29 @@ export async function createScreenVersion(input: {
   const source = await getScreen(input.screenId);
   if (!source) return null;
 
-  // Ensure both screens share a version group.
+  // Ensure both screens share a version group; the original becomes V1 ("main").
   const groupId = source.versionGroupId ?? newId();
   if (!source.versionGroupId) {
-    await updateScreen(source.id, { versionGroupId: groupId });
+    await updateScreen(source.id, { versionGroupId: groupId, versionIndex: 1 });
   }
 
+  // Next stable version index = max existing in the group + 1.
+  const screens = await listScreens();
+  const nextIndex =
+    screens
+      .filter((s) => s.versionGroupId === groupId)
+      .reduce((max, s) => Math.max(max, s.versionIndex ?? 1), 0) + 1;
+
+  // All versions share the same name — the tag (V2, V3…) is the identifier.
   const created = await createScreen({
     projectId: source.projectId,
-    title: `${source.title} (${input.mode === "linked" ? "linked" : "copy"})`,
+    title: source.title,
     variant: source.variant,
   });
-  await updateScreen(created.id, { versionGroupId: groupId });
+  const versioned = await updateScreen(created.id, {
+    versionGroupId: groupId,
+    versionIndex: nextIndex,
+  });
 
   const sourceScene = await getSceneByOwner("screen", input.screenId);
   if (sourceScene) {
@@ -151,25 +171,41 @@ export async function createScreenVersion(input: {
     );
   }
 
-  return created;
+  return versioned ?? created;
 }
 
 export async function updateScreen(
   screenId: string,
-  patch: Partial<Pick<ScreenRow, "title" | "variant" | "versionGroupId">>,
+  patch: Partial<Pick<ScreenRow, "title" | "variant" | "versionGroupId" | "versionIndex">>,
 ): Promise<ScreenRow | null> {
   const rows = await listScreens();
   const idx = rows.findIndex((screen) => screen.id === screenId);
   if (idx < 0) return null;
 
+  const current = rows[idx]!;
+  const t = now();
   const next: ScreenRow = {
-    ...rows[idx]!,
+    ...current,
     ...patch,
-    title: patch.title?.trim() || rows[idx]!.title,
-    updatedAt: now(),
+    title: patch.title?.trim() || current.title,
+    updatedAt: t,
   };
-  const nextRows = [...rows];
+
+  // All members of a version group share the same name: a title change propagates
+  // to every sibling in the group.
+  const titleChanged = next.title !== current.title;
+  const groupId = next.versionGroupId ?? current.versionGroupId ?? null;
+
+  let nextRows = [...rows];
   nextRows[idx] = next;
+  if (titleChanged && groupId) {
+    nextRows = nextRows.map((r) =>
+      r.id !== screenId && r.versionGroupId === groupId
+        ? { ...r, title: next.title, updatedAt: t }
+        : r,
+    );
+  }
+
   await replaceTable<ScreenRow>(KEY, nextRows);
   notify(KEY);
   return next;

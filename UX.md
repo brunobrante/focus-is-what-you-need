@@ -773,9 +773,12 @@ version is created:
 - Component versions: triggered by **New variant** in the Component detail Variants tab.
 - Screen versions: triggered by **New version** either in a screen card's `···` More menu
   (Gallery Screens tab) or in the **Versions tab** of the screen detail page. It creates a
-  real sibling screen (titled "… (linked)" / "… (copy)") sharing a version group, and opens
-  it. The screen detail **Versions tab** lists the real versions in that group (the current
-  one marked active, each showing its real snapshot); selecting one opens that screen.
+  real sibling screen sharing a version group, and opens it. **All versions in a group share
+  the same name** — renaming any one renames them all. Each is identified by a stable
+  **version tag** (`V1`, `V2`, `V3`…, where `V1` is the original/"main"), shown as a purple
+  badge on the screen card, the detail header, and the Versions-tab cards. The screen detail
+  **Versions tab** lists the group's real versions (current marked active, each showing its
+  real snapshot); selecting one opens that screen.
 - **Linked**: child components become read-only instances of the originals — editing a
   master updates every version. **Copy**: a fully independent duplicate.
 

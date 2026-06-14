@@ -13,7 +13,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { createScreenVersion, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -139,6 +139,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
         id: s.id,
         screenId: s.id,
         title: s.title,
+        tag: screenVersionLabel(s) ?? undefined,
         tpl: templateForScreenName(s.title),
         updated: "",
         author: "You",

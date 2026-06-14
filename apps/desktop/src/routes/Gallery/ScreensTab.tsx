@@ -11,6 +11,7 @@ import { Snapshot } from "@/components/Snapshot";
 import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import type { ScreenRow } from "@/lib/storage/schema";
+import { screenVersionLabel } from "@/lib/storage/repos/screens.repo";
 import { CardMenuIcons as SharedCardMenuIcons } from "@/components/screen/CardMenu";
 import {
   IconChevronDown,
@@ -332,8 +333,15 @@ function ScreenCard({
         />
       </div>
       <div className="flex items-center justify-between gap-2 px-0.5">
-        <span className="truncate text-[13px] font-medium tracking-[-0.05px] text-[var(--text)]">
-          {screen.title}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {screenVersionLabel(screen) ? (
+            <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1 py-px text-[9.5px] font-semibold uppercase tracking-[0.4px] text-[#c9b3ff]">
+              {screenVersionLabel(screen)}
+            </span>
+          ) : null}
+          <span className="truncate text-[13px] font-medium tracking-[-0.05px] text-[var(--text)]">
+            {screen.title}
+          </span>
         </span>
         <span className="text-[11px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
           {PROJECT_TYPE_DIMS[type]}

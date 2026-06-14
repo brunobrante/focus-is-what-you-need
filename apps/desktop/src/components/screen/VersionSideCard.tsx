@@ -83,33 +83,21 @@ export function VersionSideCard({
           ]}
         />
       </div>
-      <div className="flex min-w-0 flex-col gap-1 px-0.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
-            {version.title}
-          </span>
-          {active ? (
-            <span
-              className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]"
-              style={{
-                color: "#F2F2F2",
-                borderColor: "#3FB950",
-                background: "rgba(63,185,80,0.08)",
-              }}
-            >
-              Atual
-            </span>
-          ) : (
-            <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-              {version.updated}
-            </span>
-          )}
-        </div>
-        <span className="text-[11px] text-[var(--text-muted)]">
-          <span className="rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-            {version.author}
-          </span>
+      <div className="flex min-w-0 items-center gap-2 px-0.5">
+        <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
+          {version.tag ?? "V1"}
         </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
+          {version.title}
+        </span>
+        {active ? (
+          <span
+            className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]"
+            style={{ color: "#F2F2F2", borderColor: "#3FB950", background: "rgba(63,185,80,0.08)" }}
+          >
+            Atual
+          </span>
+        ) : null}
       </div>
     </div>
   );
