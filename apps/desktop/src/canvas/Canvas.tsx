@@ -9,7 +9,7 @@ import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { CanvasReferencesContext } from "@/canvas/shell/CanvasReferencesWindow";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
-import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementBefore, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
+import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementToParent, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
 import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { peekTable, TABLES } from "@/lib/storage/store";
 import type { SceneRow } from "@/lib/storage/schema";
@@ -639,10 +639,36 @@ function CanvasPageContent() {
         autoRevealSelection={settings.canvas.shell.tree.autoRevealSelection}
         canvasActive={editorCanvasActive}
         onSelectNode={(nodeId) => { getEditor()?.dispatch({ type: "setSelected", selectedIds: [nodeId] }); }}
-        onReorderNode={(activeNodeId, overNodeId) => {
+        onMoveNode={(activeNodeId, overNodeId, mode) => {
           const editor = getEditor();
           if (!editor) return;
-          editor.dispatch({ type: "commitDocument", document: moveElementBefore(editor.state.document, activeNodeId, overNodeId) });
+          const doc = editor.state.document;
+          const over = doc.elements[overNodeId];
+          if (!over) return;
+
+          let newParentId: string | null;
+          let beforeId: string | null;
+          if (mode === "inside") {
+            // Nest the dragged node inside the hovered one (appended on top).
+            newParentId = overNodeId;
+            beforeId = null;
+          } else {
+            newParentId = over.parentId;
+            const siblings = over.parentId
+              ? doc.elements[over.parentId]?.children ?? []
+              : doc.rootIds;
+            const overIndex = siblings.indexOf(overNodeId);
+            beforeId =
+              mode === "before"
+                ? overNodeId
+                : overIndex >= 0 && overIndex + 1 < siblings.length
+                  ? siblings[overIndex + 1]
+                  : null;
+          }
+
+          const nextDoc = moveElementToParent(doc, activeNodeId, newParentId, beforeId);
+          if (nextDoc === doc) return;
+          editor.dispatch({ type: "commitDocument", document: nextDoc });
         }}
         onToggleVisible={(nodeId, visible) => {
           const editor = getEditor();

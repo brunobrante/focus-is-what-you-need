@@ -5,6 +5,7 @@ import {
   PointerSensor,
   closestCenter,
   type DragEndEvent,
+  type DragMoveEvent,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -28,7 +29,7 @@ import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import { CANVAS_WINDOW_LABELS, type CanvasWindowType } from "@/canvas/canvasUtils";
 
-import type { DeviceType, ProjectTreeNode } from "./tree/treeTypes";
+import type { DeviceType, DropMode, ProjectTreeNode } from "./tree/treeTypes";
 import {
   ancestorIdsForNodeIds,
   collectOpenableIds,
@@ -93,6 +94,9 @@ type Props = {
   canvasActive?: boolean;
   onSelectNode?: (nodeId: string) => void;
   onReorderNode?: (activeNodeId: string, overNodeId: string) => void;
+  // Drag-and-drop move that can also reparent: `mode` says whether the active node
+  // lands before/after `overNodeId` as a sibling, or nests inside it as a child.
+  onMoveNode?: (activeNodeId: string, overNodeId: string, mode: DropMode) => void;
   onToggleVisible?: (nodeId: string, visible: boolean) => void;
   onToggleLocked?: (nodeId: string, locked: boolean) => void;
   onToggleCanvasActive?: (active: boolean) => void;
@@ -122,6 +126,7 @@ export function Tree({
   canvasActive = false,
   onSelectNode,
   onReorderNode,
+  onMoveNode,
   onToggleVisible,
   onToggleLocked,
   onToggleCanvasActive,
@@ -263,11 +268,45 @@ export function Tree({
     setLocalSelectedId(nodeId);
     if (nodeId) onSelectNode?.(nodeId);
   };
+  // Drag-and-drop drop intent. As the row is dragged we resolve whether it will land
+  // before/after the hovered row (sibling reorder) or inside it (reparent/nest),
+  // based on where the pointer sits within the hovered row's height.
+  const [dropTarget, setDropTarget] = useState<{ overId: string; mode: DropMode } | null>(
+    null,
+  );
+
+  const resolveDropTarget = (
+    event: DragMoveEvent | DragEndEvent,
+  ): { overId: string; mode: DropMode } | null => {
+    const { active, over, delta, activatorEvent } = event;
+    if (!over) return null;
+    const overId = String(over.id);
+    if (overId === String(active.id)) return null;
+    const rect = over.rect;
+    const startY =
+      activatorEvent && "clientY" in activatorEvent
+        ? (activatorEvent as PointerEvent).clientY
+        : rect.top + rect.height / 2;
+    const pointerY = startY + (delta?.y ?? 0);
+    const ratio = rect.height > 0 ? (pointerY - rect.top) / rect.height : 0.5;
+    const mode: DropMode = ratio < 0.3 ? "before" : ratio > 0.7 ? "after" : "inside";
+    return { overId, mode };
+  };
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    setDropTarget(resolveDropTarget(event));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    const target = dropTarget ?? resolveDropTarget(event);
+    setDropTarget(null);
     const activeId = String(event.active.id);
-    const overId = event.over?.id ? String(event.over.id) : null;
-    if (!overId || activeId === overId) return;
-    onReorderNode?.(activeId, overId);
+    if (!target || target.overId === activeId) return;
+    if (onMoveNode) {
+      onMoveNode(activeId, target.overId, target.mode);
+    } else if (onReorderNode && target.mode !== "inside") {
+      onReorderNode(activeId, target.overId);
+    }
   };
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -359,7 +398,9 @@ export function Tree({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
+          onDragCancel={() => setDropTarget(null)}
         >
           <SortableContext
             items={visibleLayerIds}
@@ -376,7 +417,9 @@ export function Tree({
                     setOpenSet={rowsSetOpenSet}
                     selectedIds={selectedIdSet}
                     setSelectedId={selectLayer}
-                    sortable={Boolean(onReorderNode) && !filterActive}
+                    sortable={Boolean(onMoveNode || onReorderNode) && !filterActive}
+                    dropTargetId={dropTarget?.overId ?? null}
+                    dropMode={dropTarget?.mode}
                     onToggleVisible={onToggleVisible}
                     onToggleLocked={onToggleLocked}
                     canOpenNodeCanvas={canOpenNodeCanvas}

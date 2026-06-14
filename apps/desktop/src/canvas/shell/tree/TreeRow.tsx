@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Node } from "./treeTypes";
+import type { DropMode, Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
 import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLink, IconLock, IconOpenCanvas, IconUnlink, IconUnlock } from "@/components/icons";
 
@@ -21,6 +21,8 @@ export function TreeRow({
   onContextMenuNode,
   onGoToInstance,
   onDetachNode,
+  dropTargetId,
+  dropMode,
 }: {
   node: Node;
   depth: number;
@@ -29,6 +31,10 @@ export function TreeRow({
   selectedIds: ReadonlySet<string>;
   setSelectedId: (id: string | null) => void;
   sortable?: boolean;
+  // Drag-and-drop drop indicator: the row whose id matches `dropTargetId` shows a
+  // before/after insertion line or an "inside" nesting highlight per `dropMode`.
+  dropTargetId?: string | null;
+  dropMode?: DropMode;
   onToggleVisible?: (nodeId: string, visible: boolean) => void;
   onToggleLocked?: (nodeId: string, locked: boolean) => void;
   canOpenNodeCanvas?: (nodeId: string) => boolean;
@@ -57,6 +63,11 @@ export function TreeRow({
   const canOpenCanvas = Boolean(onOpenNodeCanvas && (canOpenNodeCanvas?.(node.id) ?? false));
   const canFocus = Boolean(showFocusButton && onFocusNode);
   const isLinked = node.linked === true;
+  const isDropTarget = dropTargetId === node.id;
+  const dropInside = isDropTarget && dropMode === "inside";
+  const dropBefore = isDropTarget && dropMode === "before";
+  const dropAfter = isDropTarget && dropMode === "after";
+  const indicatorLeft = 6 + depth * 14;
 
   const baseColor = isLinked
     ? isSelected
@@ -96,7 +107,12 @@ export function TreeRow({
         style={{
           paddingLeft: 6 + depth * 14,
           color: baseColor,
-          background: isSelected ? "rgba(255,255,255,0.07)" : "transparent",
+          background: dropInside
+            ? "rgba(182,156,255,0.14)"
+            : isSelected
+              ? "rgba(255,255,255,0.07)"
+              : "transparent",
+          boxShadow: dropInside ? "inset 0 0 0 1.5px #B69CFF" : undefined,
           cursor: "default",
           transform: CSS.Transform.toString(transform),
           transition,
@@ -104,6 +120,18 @@ export function TreeRow({
           zIndex: isDragging ? 2 : undefined,
         }}
       >
+        {dropBefore ? (
+          <span
+            className="pointer-events-none absolute right-1.5 top-0 z-[3] h-0.5 rounded-full bg-[#B69CFF]"
+            style={{ left: indicatorLeft }}
+          />
+        ) : null}
+        {dropAfter ? (
+          <span
+            className="pointer-events-none absolute bottom-0 right-1.5 z-[3] h-0.5 rounded-full bg-[#B69CFF]"
+            style={{ left: indicatorLeft }}
+          />
+        ) : null}
         <span
           onClick={(e) => {
             e.stopPropagation();
@@ -257,6 +285,8 @@ export function TreeRow({
               onContextMenuNode={onContextMenuNode}
               onGoToInstance={onGoToInstance}
               onDetachNode={onDetachNode}
+              dropTargetId={dropTargetId}
+              dropMode={dropMode}
             />
           ))
         : null}

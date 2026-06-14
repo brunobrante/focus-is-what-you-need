@@ -274,6 +274,17 @@ Full-screen visual editor with floating UI layers.
 - Hierarchical list of nodes, each with: type icon, node name
 - Per-item controls: visibility toggle (eye icon), lock toggle (padlock icon), drag handle for reordering
 - Indentation reflects nesting depth
+- **Drag-and-drop reorder + reparent**: dragging a row shows a drop indicator based
+  on where the pointer sits within the hovered row:
+  - top third → an insertion line **before** the hovered row (reorder as sibling)
+  - bottom third → an insertion line **after** the hovered row (reorder as sibling)
+  - middle third → a highlight ring on the hovered row, nesting the dragged node
+    **inside** it as a child
+  Dropping inside another node reparents it (its on-canvas position is preserved).
+  Because "component" vs "element" is derived purely from whether a node has
+  children, nesting a node into a childless element turns that element into a
+  component, and emptying a component's last child turns it back into an element.
+  Dropping a node into itself or one of its own descendants is rejected.
 - **Footer** (filter bar, above the back-to-parent row):
   - **Search input** — filters layers by name. While any filter is active the tree
     collapses into a **flat list** of every matching node (depth-first order), with

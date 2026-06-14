@@ -13,6 +13,10 @@ export type Node = {
   instanceVariantId?: string;
 };
 
+// Where a dragged layer row will land relative to the row it is hovering:
+// "before"/"after" reorder as siblings, "inside" nests it as a child.
+export type DropMode = "before" | "after" | "inside";
+
 export type DeviceType = "mobile" | "tablet" | "desktop";
 
 export type ProjectTreeNode = {

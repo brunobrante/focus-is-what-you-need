@@ -141,6 +141,87 @@ export function reparentElements(
   return next;
 }
 
+/**
+ * Move a single node so it becomes a child of `newParentId` (or a root when null),
+ * inserted immediately before `beforeId` (or appended when `beforeId` is null).
+ *
+ * Reparenting (the parent actually changes) re-derives the node's local position and
+ * rotation so it stays put visually — same maths as {@link reparentElements}. A
+ * same-parent move is a pure reorder and leaves geometry untouched.
+ *
+ * Dropping a node into itself or into one of its own descendants would create a cycle,
+ * so those are rejected (returns the document unchanged).
+ */
+export function moveElementToParent(
+  document: CanvasDocument,
+  id: string,
+  newParentId: string | null,
+  beforeId: string | null,
+): CanvasDocument {
+  const node = document.elements[id];
+  if (!node) return document;
+  if (newParentId === id) return document;
+  if (newParentId && newParentId !== node.parentId) {
+    // Block cycles: the new parent must not be the node itself or a descendant.
+    if (new Set(getDescendantIds(document, id)).has(newParentId)) return document;
+  }
+  if (newParentId && !document.elements[newParentId]) return document;
+
+  const sameParent = node.parentId === newParentId;
+  const next = cloneDocument(document);
+  const moved = next.elements[id];
+
+  // Detach from the old list (parent's children, or rootIds).
+  const oldList = node.parentId ? next.elements[node.parentId]?.children : next.rootIds;
+  if (oldList) {
+    const oldIndex = oldList.indexOf(id);
+    if (oldIndex >= 0) oldList.splice(oldIndex, 1);
+  }
+
+  if (!sameParent) {
+    const visualCenter = getAbsoluteCenter(document, id);
+    const oldParentId = node.parentId;
+    const oldParentRotation = oldParentId ? getEffectiveRotation(document, oldParentId) : 0;
+    const newParentRotation = newParentId ? getEffectiveRotation(document, newParentId) : 0;
+    moved.rotation = roundAngle(
+      normalizeAngle((node.rotation ?? 0) + oldParentRotation - newParentRotation),
+    );
+
+    if (visualCenter) {
+      let localCx = visualCenter.x;
+      let localCy = visualCenter.y;
+      if (newParentId) {
+        const newParent = document.elements[newParentId];
+        const parentVisualCenter = getAbsoluteCenter(document, newParentId);
+        if (newParent && parentVisualCenter) {
+          const dx = visualCenter.x - parentVisualCenter.x;
+          const dy = visualCenter.y - parentVisualCenter.y;
+          const localOffset = rotatePoint({ x: dx, y: dy }, { x: 0, y: 0 }, -newParentRotation);
+          const bw = newParent.styles.borderWidth ?? 0;
+          localCx = newParent.width / 2 + localOffset.x - bw;
+          localCy = newParent.height / 2 + localOffset.y - bw;
+        }
+      }
+      moved.x = roundPixel(localCx - node.width / 2);
+      moved.y = roundPixel(localCy - node.height / 2);
+    }
+
+    moved.parentId = newParentId;
+  }
+
+  // Insert into the new list at the requested position.
+  const newList = newParentId ? next.elements[newParentId]?.children : next.rootIds;
+  if (!newList) return document;
+  let insertIndex = newList.length;
+  if (beforeId) {
+    const beforeIndex = newList.indexOf(beforeId);
+    if (beforeIndex >= 0) insertIndex = beforeIndex;
+  }
+  newList.splice(insertIndex, 0, id);
+
+  return next;
+}
+
 export function deleteElements(document: CanvasDocument, ids: string[]): CanvasDocument {
   const next = cloneDocument(document);
   const topLevelIds = filterTopLevelIds(document, ids);
