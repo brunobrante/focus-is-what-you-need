@@ -296,7 +296,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
     filter, setFilter, fastEditOpen, setFastEditOpen, pendingChildDelete,
     setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef,
     openNewChild, addVariant, removeLinkedReference, handleChildDeleteConfirm,
-    handleComponentCreated, handleOpenCanvas, handleAddReference, handleSelectVariant,
+    handleComponentCreated, handleOpenCanvas, handleOpenVersionCanvas, handleAddReference, handleSelectVariant,
     handleDeleteVariant, handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
@@ -419,7 +419,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
                       active={v.id === activeVariant?.id}
                       type={type}
                       onSelect={() => handleSelectVariant(v.id)}
-                      onOpenCanvas={() => handleOpenCanvas(v.id)}
+                      onOpenCanvas={() => handleOpenVersionCanvas(v.id)}
                       onFastEdit={() => {}}
                       onDelete={() => handleDeleteVariant(v.id)}
                     />

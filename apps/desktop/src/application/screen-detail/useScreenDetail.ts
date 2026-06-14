@@ -267,16 +267,15 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     );
   };
 
-  // Opens a specific version (variant) of the screen in the canvas: make it active,
-  // then open the screen so the device context and the chosen variant both apply.
+  // Opens a specific version (variant) of the screen in the canvas's dedicated
+  // "Versions" window — the Current window keeps showing the screen itself, so the
+  // version is never rendered in Current. `versionVariant` activates and feeds the
+  // Versions window.
   const handleOpenVersionCanvas = (variantId: string) => {
     if (!screen) return;
-    void (async () => {
-      await setActiveScreenVariant(screen.id, variantId);
-      navigate(
-        `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}`,
-      );
-    })();
+    navigate(
+      `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}&versionVariant=${encodeURIComponent(variantId)}`,
+    );
   };
 
   const handleDeleteVersion = (variantId: string, label: string) => {

@@ -16,6 +16,9 @@ export type ToolingBoxCommand = {
   corners: [Point, Point, Point, Point];
   /** When set, only these handles are drawn/hit-tested. null / undefined = all 4 corners. */
   allowedHandles?: readonly ResizeHandle[] | null;
+  /** Resize-handle stroke color. Defaults to the blue selection color when unset;
+   *  set to the purple instance color when the selection is an external component. */
+  color?: string;
 };
 
 export type ToolingDropTargetCommand = {

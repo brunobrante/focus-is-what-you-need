@@ -204,6 +204,7 @@ type ToolingRenderData = {
   radiusLabel: { text: string; left: number; top: number; transform: string } | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
+  isInstanceSelection: boolean;
   isDragging: boolean;
   isEditingText: boolean;
 };
@@ -471,6 +472,13 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           ? getParentDistanceMeasurements(doc, transformIds[0])
           : null;
 
+      // The selection is an "external component" when every selected node is a linked
+      // instance — then the whole selection chrome (outline + handles + size tag) is purple.
+      const isInstanceSelection =
+        transformIds.length > 0 &&
+        transformIds.every((id) => Boolean(doc.elements[id]?.instanceOf));
+      const selectionColor = isInstanceSelection ? INSTANCE_SELECTION_COLOR : SELECTION_COLOR;
+
       const hitGeometry = props.canvasStageActive
         ? {
             selectionBox: canvasBox,
@@ -510,7 +518,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         resizeBox: props.canvasStageActive
           ? canvasBox
           : !suppressHandles && canResize && selectionBox
-            ? { ...selectionBox, allowedHandles: allowedResizeHandles }
+            ? { ...selectionBox, allowedHandles: allowedResizeHandles, color: selectionColor }
             : null,
         radiusHandlePositions:
           !props.canvasStageActive && !suppressHandles && hasRadiusHandles
@@ -519,6 +527,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         radiusLabel,
         dropTarget,
         parentDistances,
+        isInstanceSelection,
         isDragging,
         isEditingText,
       };
@@ -897,6 +906,9 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             style={{
               left: sizeLabel.left,
               top: sizeLabel.top,
+              ...(renderData.isInstanceSelection
+                ? { background: INSTANCE_SELECTION_COLOR }
+                : null),
             }}
           >
             {sizeLabel.text}

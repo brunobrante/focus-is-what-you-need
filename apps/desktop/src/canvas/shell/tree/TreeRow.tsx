@@ -1,7 +1,11 @@
 import { useSortable } from "@dnd-kit/sortable";
 import type { DropMode, Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
-import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLink, IconLock, IconOpenCanvas, IconUnlink, IconUnlock } from "@/components/icons";
+import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLock, IconOpenCanvas, IconUnlink, IconUnlock } from "@/components/icons";
+
+// The accent for an "external" (linked component) instance — its tree icon and its
+// single open-in-canvas link. Matches the canvas instance-selection purple.
+const EXTERNAL_COMPONENT_COLOR = "#8638E5";
 
 export function TreeRow({
   node,
@@ -64,6 +68,10 @@ export function TreeRow({
   const canOpenCanvas = Boolean(onOpenNodeCanvas && (canOpenNodeCanvas?.(node.id) ?? false));
   const canFocus = Boolean(showFocusButton && onFocusNode);
   const isLinked = node.linked === true;
+  // A linked instance's single "open in canvas" link goes to its master variant; a
+  // normal openable node opens its own canvas. Both use the same icon/affordance.
+  const goToInstanceVariantId = isLinked && onGoToInstance ? node.instanceVariantId ?? null : null;
+  const showOpenCanvasButton = canOpenCanvas || Boolean(goToInstanceVariantId);
   const isDropTarget = dropTargetId === node.id;
   const dropInside = isDropTarget && dropMode === "inside";
   const dropBefore = isDropTarget && dropMode === "before";
@@ -71,9 +79,7 @@ export function TreeRow({
   const indicatorLeft = 6 + depth * 14;
 
   const baseColor = isLinked
-    ? isSelected
-      ? "#D9C9FF"
-      : "#B69CFF"
+    ? EXTERNAL_COMPONENT_COLOR
     : isSelected
       ? "#FFFFFF"
       : "#CFCFCF";
@@ -156,9 +162,9 @@ export function TreeRow({
         </span>
         <span
           className="grid w-[18px] shrink-0 place-items-center"
-          style={{ color: "#9A9A9A" }}
+          style={{ color: isLinked ? EXTERNAL_COMPONENT_COLOR : "#9A9A9A" }}
         >
-          <TypeIcon type={node.type} hasChildren={hasChildren} />
+          <TypeIcon type={node.type} hasChildren={hasChildren} linked={isLinked} />
         </span>
         <span
           className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
@@ -185,34 +191,26 @@ export function TreeRow({
             <IconCrosshair size={12} strokeWidth={1.8} />
           </button>
         ) : null}
-        {canOpenCanvas ? (
+        {/* A single "open in canvas" link — the standard affordance used by every
+            openable node. For a linked instance it goes straight to the master variant
+            and is tinted purple to signal an external component. */}
+        {showOpenCanvasButton ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onOpenNodeCanvas?.(node.id);
+              if (goToInstanceVariantId) onGoToInstance?.(goToInstanceVariantId);
+              else onOpenNodeCanvas?.(node.id);
             }}
-            aria-label="Open component in canvas"
-            title="Open component in canvas"
-            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#7A7A7A] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
-            style={{ opacity: 0.72 }}
+            aria-label={goToInstanceVariantId ? "Go to component" : "Open component in canvas"}
+            title={goToInstanceVariantId ? "Go to component" : "Open component in canvas"}
+            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent hover:bg-[#2A2A2A]"
+            style={{
+              opacity: goToInstanceVariantId ? 0.95 : 0.72,
+              color: goToInstanceVariantId ? EXTERNAL_COMPONENT_COLOR : "#7A7A7A",
+            }}
           >
             <IconOpenCanvas size={12} strokeWidth={1.8} />
-          </button>
-        ) : null}
-        {isLinked && onGoToInstance && node.instanceVariantId ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onGoToInstance(node.instanceVariantId!);
-            }}
-            aria-label="Go to component"
-            title="Go to component"
-            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#B69CFF] hover:bg-[#2A2A2A] hover:text-[#D9C9FF]"
-            style={{ opacity: 0.85 }}
-          >
-            <IconLink size={12} strokeWidth={1.8} />
           </button>
         ) : null}
         {isLinked && onDetachNode ? (
@@ -224,8 +222,8 @@ export function TreeRow({
             }}
             aria-label="Detach instance"
             title="Detach instance"
-            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent text-[#B69CFF] hover:bg-[#2A2A2A] hover:text-[#D9C9FF]"
-            style={{ opacity: 0.85 }}
+            className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded border-0 bg-transparent hover:bg-[#2A2A2A]"
+            style={{ opacity: 0.85, color: EXTERNAL_COMPONENT_COLOR }}
           >
             <IconUnlink size={12} strokeWidth={1.8} />
           </button>

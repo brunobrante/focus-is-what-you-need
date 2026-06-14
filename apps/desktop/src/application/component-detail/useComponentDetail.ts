@@ -88,6 +88,7 @@ export interface ComponentDetailState {
   handleChildDeleteConfirm: () => Promise<void>;
   handleComponentCreated: (r: { component: ComponentRow }) => void;
   handleOpenCanvas: (variantId: string) => void;
+  handleOpenVersionCanvas: (variantId: string) => void;
   handleAddReference: (input: Parameters<typeof createOrAttachReference>[0]) => Promise<void>;
   handleSelectVariant: (variantId: string) => void;
   handleDeleteVariant: (variantId: string) => void;
@@ -307,6 +308,16 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     );
   };
 
+  // Opening a version (variant) card: go to the component's MAIN canvas and surface
+  // the chosen variant in the persistent Versions window — never in Current.
+  const handleOpenVersionCanvas = (variantId: string) => {
+    const mainVariant = variants.find((v) => v.order <= 0) ?? activeVariant;
+    const mainId = mainVariant?.id ?? variantId;
+    navigate(
+      `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&variant=${mainId}&versionVariant=${encodeURIComponent(variantId)}`,
+    );
+  };
+
   const handleAddReference = async (input: Parameters<typeof createOrAttachReference>[0]) => {
     await createOrAttachReference(input);
   };
@@ -374,6 +385,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     handleChildDeleteConfirm,
     handleComponentCreated,
     handleOpenCanvas,
+    handleOpenVersionCanvas,
     handleAddReference,
     handleSelectVariant,
     handleDeleteVariant,

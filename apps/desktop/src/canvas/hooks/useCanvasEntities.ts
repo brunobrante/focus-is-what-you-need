@@ -8,6 +8,7 @@ import {
   useScreen,
   useScreenByTitle,
   useScreens,
+  useScreenVariants,
   useVariant,
 } from "@/lib/storage/hooks";
 import { findComponentByPath } from "../canvasUtils";
@@ -59,6 +60,14 @@ export function useCanvasEntities({
   const screenLoading =
     screenByIdLoading || (!screenById && Boolean(screenParam) && screenByTitleLoading);
 
+  // The canvas Current window always edits a screen's MAIN variant (its canonical
+  // "home"), never whichever version is active in the detail page. Versions are
+  // browsed in the dedicated Versions window. `useScreenVariants` is ordered, so
+  // the first entry (order 0) is the main. While it loads we resolve to null (Current
+  // waits) rather than `activeVariantId`, which could momentarily be a version.
+  const { data: screenVariants } = useScreenVariants(screen?.id ?? null);
+  const screenMainVariantId = screenVariants[0]?.id ?? null;
+
   const legacyComponent = useMemo(() => {
     if (!screen?.id || !componentParam) return null;
     const path = legacyElementName ? [componentParam, legacyElementName] : [componentParam];
@@ -89,11 +98,11 @@ export function useCanvasEntities({
     if (variant?.id) return { ownerType: "variant", ownerId: variant.id };
     if (legacyComponent?.activeVariantId)
       return { ownerType: "variant", ownerId: legacyComponent.activeVariantId };
-    // A screen's scene lives on its active variant.
-    if (screen?.activeVariantId)
-      return { ownerType: "variant", ownerId: screen.activeVariantId };
+    // A screen's Current scene is its main variant (the canonical "home").
+    if (screenMainVariantId)
+      return { ownerType: "variant", ownerId: screenMainVariantId };
     return null;
-  }, [legacyComponent?.activeVariantId, screen?.activeVariantId, variant?.id]);
+  }, [legacyComponent?.activeVariantId, screenMainVariantId, variant?.id]);
 
   const { data: scene, loading: sceneLoading } = useScene(sceneOwner?.ownerType, sceneOwner?.ownerId);
 

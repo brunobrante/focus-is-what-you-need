@@ -253,6 +253,8 @@ Full-screen visual editor with floating UI layers.
 **Top-center**:
 - Canvas tabs: Current | Drafts | References (Versions, Preview when enabled)
 - Split mode selector: None | Vertical | Grid (icon buttons)
+- The Current tab always renders the opened screen/component itself; a screen
+  **version** is never rendered in Current — it opens in the Versions window.
 
 **Preview window** (a canvas window, like Current/Drafts):
 - Placeholder window showing "Real-time preview of changes" centered text.
@@ -268,6 +270,29 @@ Full-screen visual editor with floating UI layers.
 - The window's **Add** button opens the standard `AddReferenceModal`, scoped to
   the current subject, so new references appear here and in the side References tab.
 - Empty state prompts to add the first reference.
+
+**Versions window** (a canvas window, like Current/Drafts) — always available:
+- A persistent, functional clone of the Current canvas surface — a real, editable
+  stage — **bound to the current subject** (the component or screen open in Current).
+  It is never created on open; it is part of the canvas and reflects whatever subject
+  Current is editing.
+- The version is chosen from the **layers-tree header dropdown** (see Left panel),
+  which — while the Versions window is focused — lists the current subject's **real
+  versions only** (`V1`, `V2`…, never the main). There is **no in-canvas selector**.
+  Picking one renders+edits that variant here; the Current window keeps showing the
+  subject's own (main) variant. Edits in the Versions window save to that variant's scene.
+- Defaults to the first version (`V1`).
+- **Open in canvas** on a version card (screen or component detail Versions tab) goes
+  to the **main** subject's canvas in Current and focuses the Versions window on the
+  clicked variant (URL carries `versionVariant=<variantId>` alongside the main
+  `screen=`/`variant=`). The version is therefore never rendered in Current.
+- With no real versions (subject has only its main) the window shows a "No versions yet"
+  empty state.
+
+**Layers-tree header (Versions window)**: when the focused window is Versions, the
+header row shows the subject title + size **plus the selected version's tag** (e.g.
+`V1`), and the header dropdown switches the **version** shown in the Versions window
+(the subject's real versions) instead of switching project screens.
 
 **Left panel** (collapsible):
 - Layers / tree panel
@@ -814,15 +839,19 @@ version is created:
   **version tag** (`main`, then `V1`, `V2`…); the active version's tag shows in the screen
   detail header. The screen detail **Versions tab** lists the screen's variants (active one
   marked by its border, each showing its own snapshot); selecting one makes it the screen's
-  active variant, and **open in canvas** opens the screen on that variant.
+  active variant, and **open in canvas** opens the screen's main in the canvas Current
+  window with the chosen variant shown in the persistent **Versions window** (see §6).
 - **Linked**: child components become read-only instances of the originals — editing a
   master updates every version. **Copy**: a fully independent duplicate.
 
 **Linked instances in the canvas**:
-- Selecting an instance shows a **purple** outline (vs blue for editable content).
+- Selecting an instance shows **purple** selection chrome (`#8638E5`) — outline, resize
+  handles, and the size tag — vs blue for editable content, signalling an external component.
 - An instance's contents are **read-only**: clicking inside selects the instance as a whole.
-- In the layers tree, an instance row is **purple** and exposes two actions:
-  - **Go to component** (link icon) — opens the master variant in the canvas for editing.
+- In the layers tree, an instance row uses a purple **diamond-cluster component icon** and
+  exposes:
+  - **Open in canvas** (the same icon every openable row uses, tinted purple) — a single
+    link that opens the master variant. (There is no separate "Go to component" link.)
   - **Detach** (broken-link icon) — breaks the link, turning the instance into editable
     own content.
 - The tree shows an instance as a single row; its inlined master content is not expanded.

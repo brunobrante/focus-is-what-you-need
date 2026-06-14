@@ -23,11 +23,13 @@ import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
-import { useAllVariants, useScene } from "@/lib/storage/hooks";
+import { useAllVariants, useScene, useScreenVariants, useVariant, useVariants } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
+import { variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
 import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
+import { useVersionScenePersistence } from "./hooks/useVersionScenePersistence";
 import { useCanvasNavigation } from "./hooks/useCanvasNavigation";
 import {
   DEFAULT_CANVAS_FEATURES,
@@ -83,12 +85,14 @@ function CanvasPageContent() {
   // canvas the user came from, so Back returns there instead of the master's parent.
   const fromParam = params.get("from") || "";
   const legacyElementName = params.get("element") || "";
+  // A screen version (a variant) to open in the dedicated "Versions" window instead
+  // of the "Current" window. Current keeps showing the screen's active variant.
+  const versionVariantParam = params.get("versionVariant") || "";
 
   const {
     project,
     screen,
     component,
-    variant,
     scene,
     sceneOwner,
     projectScreens,
@@ -115,8 +119,12 @@ function CanvasPageContent() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [treeOpen, setTreeOpen] = useState(true);
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
-  const [activeTab, setActiveTab] = useState<CanvasWindowType>("current");
-  const [treeTab, setTreeTab] = useState<CanvasWindowType>("current");
+  const [activeTab, setActiveTab] = useState<CanvasWindowType>(
+    versionVariantParam ? "versions" : "current",
+  );
+  const [treeTab, setTreeTab] = useState<CanvasWindowType>(
+    versionVariantParam ? "versions" : "current",
+  );
   const [split, setSplit] = useState<SplitMode>("none");
   const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "drafts"]);
   const [canvasExpanded, setCanvasExpanded] = useState(false);
@@ -124,6 +132,9 @@ function CanvasPageContent() {
     ...DEFAULT_CANVAS_FEATURES,
     // The references window is now a real, wired surface — make it reachable.
     references: true,
+    // The Versions window is a persistent surface bound to the current subject's
+    // variants — always reachable, not gated on a URL param.
+    versions: true,
   }));
   const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
   const [shellBackVisibility, setShellBackVisibility] = useState<ShellControlVisibility>("show");
@@ -259,6 +270,86 @@ function CanvasPageContent() {
     return { ...doc, shellBackground: effectiveShellBackground };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground, resolveMaster]);
+
+  // --- Versions window: a persistent second canvas bound to the CURRENT subject.
+  // It lists every variant of the open component/screen and renders the selected one
+  // as an editable surface — a clone of Current. The `versionVariant` URL param only
+  // pre-selects and focuses; the window is always there, never created on open.
+  const { data: componentVariants } = useVariants(component?.id ?? null);
+  const { data: screenVariantList } = useScreenVariants(component ? null : screen?.id ?? null);
+  const subjectVariants = useMemo(
+    () => (component ? componentVariants : screen ? screenVariantList : []),
+    [component, screen, componentVariants, screenVariantList],
+  );
+  // The Versions window browses real versions (V1, V2…) — never the main, and never
+  // the variant already open in Current (that would mount two editors on one scene).
+  const currentVariantId = sceneOwner?.ownerId ?? null;
+  const availableVersions = useMemo(
+    () => subjectVariants.filter((v) => v.order > 0 && v.id !== currentVariantId),
+    [subjectVariants, currentVariantId],
+  );
+
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(versionVariantParam || null);
+  // Opening a version (URL param) selects it.
+  useEffect(() => {
+    if (versionVariantParam) setSelectedVersionId(versionVariantParam);
+  }, [versionVariantParam]);
+  // Keep the selection valid against the available versions, defaulting to the first.
+  // Null when there are none → the window shows its empty state. `subjectVariants`
+  // always has the main once loaded, so an empty array means "still loading" — don't
+  // clobber a URL-selected version then.
+  useEffect(() => {
+    if (subjectVariants.length === 0) return;
+    if (selectedVersionId && availableVersions.some((v) => v.id === selectedVersionId)) return;
+    setSelectedVersionId(availableVersions[0]?.id ?? null);
+  }, [subjectVariants, availableVersions, selectedVersionId]);
+
+  const versionsVariants = useMemo(
+    () => availableVersions.map((v) => ({ id: v.id, label: variantVersionLabel(v) })),
+    [availableVersions],
+  );
+
+  const versionSceneOwner = selectedVersionId
+    ? { ownerType: "variant" as const, ownerId: selectedVersionId }
+    : null;
+  const { data: versionScene, loading: versionSceneLoading } = useScene(
+    versionSceneOwner?.ownerType ?? null,
+    versionSceneOwner?.ownerId ?? null,
+  );
+  const { data: selectedVersionRow } = useVariant(selectedVersionId);
+  const versionGraphJSON = versionScene?.graphJSON ?? null;
+  const versionsReady = !versionSceneOwner || !versionSceneLoading;
+  const versionsStorageKey = selectedVersionId
+    ? `desktop-canvas-editor:versions:${selectedVersionId}:v1`
+    : "desktop-canvas-editor:versions:none:v1";
+  const versionsResolveMaster = useMemo(
+    () => buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)),
+    [versionGraphJSON],
+  );
+  const versionsDocument = useMemo(() => {
+    if (!selectedVersionId) return undefined;
+    return (
+      canvasDocumentFromHtmlGraphJSON(versionGraphJSON, {
+        promoteSubjectRoot: true,
+        resolveMaster: versionsResolveMaster,
+      }) ?? createBlankDocumentForProjectType(projectType)
+    );
+  }, [selectedVersionId, versionGraphJSON, projectType, versionsResolveMaster]);
+  const versionsCanvasName =
+    selectedVersionRow?.name || component?.name || screen?.title || projectName || "Version";
+  const handleVersionsDocumentChange = useVersionScenePersistence({
+    variantId: selectedVersionId,
+    ready: versionsReady,
+    baseGraphJSON: versionGraphJSON,
+    canvasName: versionsCanvasName,
+  });
+
+  // Opening a version (URL param) focuses the Versions window.
+  useEffect(() => {
+    if (!versionVariantParam) return;
+    setActiveTab("versions");
+    setTreeTab("versions");
+  }, [versionVariantParam]);
 
   useEffect(() => {
     const editor = getEditor();
@@ -563,6 +654,10 @@ function CanvasPageContent() {
         currentDocument={currentDocument}
         currentStorageKey={currentStorageKey}
         currentReady={currentReady}
+        versionsDocument={versionsDocument}
+        versionsStorageKey={versionsStorageKey}
+        versionsReady={versionsReady}
+        onVersionsDocumentChange={handleVersionsDocumentChange}
         projectType={projectType}
         parentTarget={parentProjectNode}
         isComponent={!!component}
@@ -715,6 +810,9 @@ function CanvasPageContent() {
         projectTree={projectTree}
         parentNode={parentProjectNode}
         subjectSize={selectedSubjectSize}
+        versionOptions={versionsVariants}
+        selectedVersionId={selectedVersionId}
+        onSelectVersion={setSelectedVersionId}
       />
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 

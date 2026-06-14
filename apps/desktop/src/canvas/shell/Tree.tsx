@@ -131,6 +131,12 @@ type Props = {
   projectTree?: ProjectTreeNode[];
   parentNode?: ProjectTreeNode | null;
   subjectSize?: { width: number; height: number };
+  // Versions window: the subject's real versions (V1, V2…), the selected one, and the
+  // setter. When the focused window is "versions" the header dropdown lists these
+  // instead of the project's screens.
+  versionOptions?: ReadonlyArray<{ id: string; label: string }>;
+  selectedVersionId?: string | null;
+  onSelectVersion?: (variantId: string) => void;
 };
 
 export function Tree({
@@ -159,6 +165,9 @@ export function Tree({
   projectTree,
   parentNode,
   subjectSize,
+  versionOptions = [],
+  selectedVersionId = null,
+  onSelectVersion,
 }: Props) {
   const bridgeDocument = useEditorBridge(
     (value) => value?.state.document ?? null,
@@ -379,6 +388,12 @@ export function Tree({
   const focusedWindowLabel = activeTab === "current" ? null : CANVAS_WINDOW_LABELS[activeTab];
   const rowWidth = subjectSize?.width ?? document?.canvas.width;
   const rowHeight = subjectSize?.height ?? document?.canvas.height;
+  // In the Versions window the header shows the selected version's tag (e.g. "V1") and
+  // its dropdown lists the subject's versions instead of the project's screens.
+  const isVersionsWindow = activeTab === "versions";
+  const headerVersionTag = isVersionsWindow
+    ? versionOptions.find((v) => v.id === selectedVersionId)?.label ?? versionOptions[0]?.label
+    : undefined;
 
   return (
     <>
@@ -415,6 +430,7 @@ export function Tree({
           <CurrentSceneTreeRow
             active={canvasActive}
             label={headerName}
+            tag={headerVersionTag}
             width={rowWidth}
             height={rowHeight}
             isScreen={isScreen}
@@ -522,8 +538,44 @@ export function Tree({
           boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03) inset",
         }}
       >
-        <div className="overflow-y-auto" style={{ maxHeight: 320 }}>
-          {pickerTree.length > 0 ? (
+        <div className="overflow-y-auto p-1.5" style={{ maxHeight: 320 }}>
+          {isVersionsWindow ? (
+            versionOptions.length > 0 ? (
+              versionOptions.map((option) => {
+                const isSelected = option.id === selectedVersionId;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setPickerOpen(false);
+                      onSelectVersion?.(option.id);
+                    }}
+                    className={[
+                      "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
+                      isSelected ? "bg-[#2A2233]" : "hover:bg-[#222]",
+                    ].join(" ")}
+                  >
+                    <span
+                      className="grid h-6 min-w-6 shrink-0 place-items-center rounded-md border px-1 text-[10px] font-semibold uppercase"
+                      style={{
+                        borderColor: isSelected ? "rgba(134,56,229,0.55)" : "#303030",
+                        color: isSelected ? "#C4A1F2" : "#8A8A8A",
+                        background: isSelected ? "rgba(134,56,229,0.16)" : "#1D1D1D",
+                      }}
+                    >
+                      {option.label}
+                    </span>
+                    <span className="block truncate text-[12px] font-medium text-[#E2E2E2]">
+                      {option.label}
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-4 py-6 text-[12px] text-[#6B6B6B]">No versions yet.</div>
+            )
+          ) : pickerTree.length > 0 ? (
             pickerTree.map((screen) => (
               <PickerNode
                 key={screen.id}

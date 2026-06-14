@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronDown, Plus, Monitor, RotateCcw, Smartphone } from "lucide-react";
+import { Monitor, RotateCcw, Smartphone } from "lucide-react";
 import {
   IconCenterAlign, IconChevronLeft, IconChevronUp, IconCollapse, IconExpand,
   IconGrid, IconMinus, IconOriginAlign, IconPlus, IconScreen, IconWindow,
 } from "@/components/icons";
 
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
-import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
+import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY, VERSIONS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import { EditorProvider, useEditor } from "@/canvas/engine/store";
 import { createDraftDocument } from "@/canvas/engine/actions";
 import type { CanvasDocument } from "@/canvas/engine/types";
@@ -52,12 +52,6 @@ const PANEL_MARGIN = 12;
 
 const HEADER_HEIGHT = 64;
 
-const VERSION_MENU_ITEMS = [
-  { id: "v3", name: "Version 3", description: "Latest snapshot", meta: "2 min ago" },
-  { id: "v2", name: "Version 2", description: "Layout pass", meta: "Yesterday" },
-  { id: "v1", name: "Version 1", description: "Initial canvas", meta: "Last week" },
-];
-
 export type ZoomSetter = (next: number | ((zoom: number) => number)) => void;
 type CanvasParentTarget = {
   name: string;
@@ -76,6 +70,10 @@ export function CanvasRender({
   currentDocument,
   currentStorageKey = CURRENT_CANVAS_STORAGE_KEY,
   currentReady = true,
+  versionsDocument,
+  versionsStorageKey = VERSIONS_CANVAS_STORAGE_KEY,
+  versionsReady = true,
+  onVersionsDocumentChange,
   projectType = "desktop",
   parentTarget,
   isComponent = false,
@@ -104,6 +102,10 @@ export function CanvasRender({
   currentDocument?: CanvasDocument;
   currentStorageKey?: string;
   currentReady?: boolean;
+  versionsDocument?: CanvasDocument;
+  versionsStorageKey?: string;
+  versionsReady?: boolean;
+  onVersionsDocumentChange?: (document: CanvasDocument) => void;
   projectType?: ProjectType;
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
@@ -201,6 +203,29 @@ export function CanvasRender({
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
           onOpenSelectedComponentShortcut={undefined}
+        />
+      );
+    }
+
+    if (windowType === "versions") {
+      // A persistent clone of the Current surface, bound to the current subject's
+      // variants. The selector switches which variant is shown/edited here.
+      return (
+        <VersionsWindowSurface
+          active={active}
+          showActiveBorder={showActiveBorder}
+          expanded={expanded}
+          onClick={() => onActiveCanvasChange?.("versions")}
+          document={versionsDocument}
+          storageKey={versionsStorageKey}
+          ready={versionsReady}
+          onDocumentChange={onVersionsDocumentChange}
+          activeTool={activeTool}
+          projectType={projectType}
+          shellDeviceVisibility={surfaceDeviceVisibility}
+          shellZoomVisibility={surfaceZoomVisibility}
+          settings={settings}
+          onCanvasToolShortcut={onCanvasToolShortcut}
         />
       );
     }
@@ -362,7 +387,6 @@ function CanvasPlaceholderSurface({
           : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
       }}
     >
-      <FeaturePlaceholderControls windowType={windowType} />
       <span className="flex flex-col items-center gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
           <IconWindow />
@@ -413,118 +437,97 @@ function CanvasPreviewSurface({
   );
 }
 
-// Controls for the Versions placeholder window. References has its own real
-// window (CanvasReferencesWindow) and no longer routes through here.
-function FeaturePlaceholderControls({ windowType }: { windowType: CanvasFeatureWindowType }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedVersionId, setSelectedVersionId] = useState(VERSION_MENU_ITEMS[0]?.id ?? "");
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (ref.current?.contains(event.target as Node)) return;
-      setMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [menuOpen]);
-
-  if (windowType !== "versions") return null;
-
-  const selectedVersion = VERSION_MENU_ITEMS.find((item) => item.id === selectedVersionId) ?? VERSION_MENU_ITEMS[0];
-
-  return (
-    <div
-      ref={ref}
-      className="absolute left-3 top-3 z-[12] flex items-center gap-1.5"
-      onClick={(event) => event.stopPropagation()}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      <button
-        type="button"
-        onClick={() => setMenuOpen((open) => !open)}
-        aria-label={`Select ${CANVAS_WINDOW_LABELS[windowType].toLowerCase()}`}
-        aria-expanded={menuOpen}
-        className="inline-flex h-8 max-w-[220px] items-center gap-2 rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222]"
-      >
-        <span className="min-w-0 truncate">{selectedVersion?.name}</span>
-        <ChevronDown
-          size={13}
-          strokeWidth={2}
-          className="shrink-0 text-[#777] transition-transform duration-150"
-          style={{ transform: menuOpen ? "rotate(180deg)" : "none" }}
-        />
-      </button>
-
-      <button
-        type="button"
-        aria-label="Add version"
-        className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222] hover:text-[#E2E2E2]"
-      >
-        <Plus size={14} strokeWidth={2} />
-      </button>
-
-      {menuOpen ? (
-        <VersionDropdownMenu
-          selectedId={selectedVersionId}
-          onSelect={(id) => {
-            setSelectedVersionId(id);
-            setMenuOpen(false);
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function VersionDropdownMenu({
-  selectedId,
-  onSelect,
+// The Versions window: a persistent editable clone of Current, bound to the version
+// selected in the layers-tree header dropdown (no in-canvas selector). Empty when the
+// current subject has no versions yet.
+function VersionsWindowSurface({
+  active,
+  showActiveBorder,
+  expanded,
+  onClick,
+  document,
+  storageKey,
+  ready,
+  onDocumentChange,
+  activeTool,
+  projectType,
+  shellDeviceVisibility,
+  shellZoomVisibility,
+  settings,
+  onCanvasToolShortcut,
 }: {
-  selectedId: string;
-  onSelect: (id: string) => void;
+  active: boolean;
+  showActiveBorder: boolean;
+  expanded?: boolean;
+  onClick?: () => void;
+  document?: CanvasDocument;
+  storageKey: string;
+  ready: boolean;
+  onDocumentChange?: (document: CanvasDocument) => void;
+  activeTool?: string;
+  projectType: ProjectType;
+  shellDeviceVisibility: ShellControlVisibility;
+  shellZoomVisibility: ShellControlVisibility;
+  settings: GlobalSettings;
+  onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
 }) {
+  // No version selected (the current subject has no versions yet) → empty state.
+  if (!document) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          onClick?.();
+        }}
+        className="relative flex flex-1 cursor-default items-center justify-center overflow-hidden rounded-xl border text-left transition-all duration-150"
+        style={{
+          borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
+          backgroundColor: "#141615",
+          boxShadow: active && showActiveBorder
+            ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
+            : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
+        }}
+      >
+        <span className="flex flex-col items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
+            <IconWindow />
+          </span>
+          <span className="text-[13px] font-semibold text-[#E6E6E6]">Versions</span>
+          <span className="rounded border border-[#2C2C2C] bg-[#1A1A1A] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#737373]">
+            No versions yet
+          </span>
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className="absolute left-0 top-[calc(100%+6px)] w-[230px] overflow-hidden rounded-xl border border-[#2E2E2E] bg-[#171717] p-1.5 shadow-[0_14px_34px_rgba(0,0,0,0.55)]">
-      {VERSION_MENU_ITEMS.map((item) => {
-        const selected = selectedId === item.id;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onSelect(item.id)}
-            className={[
-              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-100",
-              selected ? "bg-[#263545]" : "hover:bg-[#222]",
-            ].join(" ")}
-          >
-            <span
-              className="grid h-6 w-6 shrink-0 place-items-center rounded-md border text-[10px] font-semibold"
-              style={{
-                borderColor: selected ? "rgba(13,153,255,0.45)" : "#303030",
-                color: selected ? "#8CCBFF" : "#8A8A8A",
-                background: selected ? "rgba(13,153,255,0.14)" : "#1D1D1D",
-              }}
-            >
-              {item.name.replace("Version ", "V")}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] font-semibold text-[#E2E2E2]">{item.name}</span>
-              <span className="block truncate text-[10.5px] text-[#777]">{item.description}</span>
-            </span>
-            <span className="shrink-0 text-[10px] text-[#5F5F5F]">{item.meta}</span>
-          </button>
-        );
-      })}
-    </div>
+    <CanvasSurface
+      active={active}
+      showActiveBorder={showActiveBorder}
+      sourceId="versions"
+      publishBridge={active}
+      expanded={expanded}
+      onClick={onClick}
+      storageKey={storageKey}
+      draftMode={false}
+      fallbackDocument={document}
+      persistStorage={false}
+      ready={ready}
+      onDocumentChange={onDocumentChange}
+      activeTool={activeTool}
+      projectType={projectType}
+      shellDeviceVisibility={shellDeviceVisibility}
+      shellBackVisibility="hidden"
+      shellZoomVisibility={shellZoomVisibility}
+      settings={settings}
+      onCanvasToolShortcut={onCanvasToolShortcut}
+      onOpenSelectedComponentShortcut={undefined}
+    />
   );
 }
 

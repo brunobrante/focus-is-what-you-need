@@ -6,6 +6,7 @@ import { IconChevronDown } from "@/components/icons";
 export function CurrentSceneTreeRow({
   active,
   label,
+  tag,
   width,
   height,
   isScreen,
@@ -16,6 +17,8 @@ export function CurrentSceneTreeRow({
 }: {
   active: boolean;
   label: string;
+  // A version tag (e.g. "V1") shown beside the title in the Versions window.
+  tag?: string;
   width?: number;
   height?: number;
   isScreen: boolean;
@@ -47,6 +50,14 @@ export function CurrentSceneTreeRow({
           {width && height ? (
             <span className="ml-1.5 text-[10.5px]" style={{ color: "#4A4A4A", fontWeight: 400 }}>
               {width}×{height}
+            </span>
+          ) : null}
+          {tag ? (
+            <span
+              className="ml-1.5 rounded border px-1 py-px text-[9.5px] font-semibold uppercase tracking-[0.4px]"
+              style={{ borderColor: "rgba(134,56,229,0.55)", color: "#C4A1F2", background: "rgba(134,56,229,0.16)" }}
+            >
+              {tag}
             </span>
           ) : null}
         </span>

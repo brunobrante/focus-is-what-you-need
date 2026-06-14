@@ -473,7 +473,7 @@ function drawResizeHandles(
 ): void {
   const half = HANDLE_SIZE / 2;
   const fillPaint = pool.getFill(HANDLE_FILL);
-  const strokePaint = pool.getStroke(SELECTION_COLOR, 1);
+  const strokePaint = pool.getStroke(box.color ?? SELECTION_COLOR, 1);
 
   for (const pos of resolveSkiaHandlePoints(box)) {
     const handleRect = {
