@@ -18,52 +18,29 @@ import type {
   ActiveSubject,
   ViewMode,
   DrawingPath,
-  SelectionInteraction,
   EditorTool,
   SidebarTab,
   NewScreenSource,
+  CutVariantTool,
 } from "../types";
 import {
-  MIN_TOOL_ZOOM,
-  CROPS_OVERLAY_COLOR_STORAGE_KEY,
-  CROPS_OVERLAY_ALPHA_STORAGE_KEY,
   COMPONENT_STORAGE_PREFIX,
 } from "../types";
 
 import {
-  clamp,
-  clampToolPan,
-  intersectCropBoxes,
-  cropBoxFromPoints,
-  boundsFromDrawingPath,
-  resizeCropBox,
-  moveCropBox,
-  roundCropBox,
-  getContentPoint,
-  getImageContentBounds,
-  getVisibleContentBounds,
-  resizeCursor,
-  componentBoxInSubject,
-} from "../engine/geometry";
-import {
-  selectionHitTest,
-  componentHitTest,
-} from "../engine/hitTesting";
-import { roundedRectPath } from "../engine/drawing";
+  roundedRectPath,
+} from "../engine/drawing";
 import {
   sourceRootComponentId,
   newRootComponentId,
   createRootComponent,
   ensureRootComponent,
-  componentAreaAlreadyExists,
   writeReferenceStackFromComponents,
   readReferenceStackComponents,
 } from "../engine/componentModel";
 import {
   buildComponentTree,
-  flattenComponentTree,
   componentSubtreeIds,
-  componentAncestorIds,
 } from "../engine/componentTree";
 import {
   addVariant,
@@ -71,15 +48,12 @@ import {
   removeVariant as removeVariantFrom,
   setOriginalVariantImage,
 } from "../engine/variants";
-import type { CutVariantTool } from "../types";
 import {
   readSavedComponents,
   writeSavedComponents,
   writeDraftComponents,
   hasDraftComponents,
   removeSavedComponents,
-  readCropsOverlayColor,
-  readCropsOverlayAlpha,
 } from "../engine/storage";
 import {
   canvasToDataUrl,
@@ -88,9 +62,6 @@ import {
   shortComponentName,
   waitForImage,
 } from "../engine/image";
-import { useBuilderViewport } from "./useBuilderViewport";
-import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
-import { confirmationDialogCopy } from "../ui/ConfirmModal";
 import {
   bytesToPngDataUrl,
   runBirefnet,
@@ -99,6 +70,13 @@ import {
   urlToBytes,
   type ProcessingFeatureKey,
 } from "@/lib/models/modelCommands";
+import { clamp } from "../engine/geometry";
+import { confirmationDialogCopy } from "../ui/ConfirmModal";
+
+import { useBuilderViewport } from "./useBuilderViewport";
+import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
+import { useBuilderComponents } from "./useBuilderComponents";
+import { useBuilderInteraction } from "./useBuilderInteraction";
 
 export type ToolsEditorProps = {
   item: ToolReference;
@@ -221,6 +199,7 @@ export type ToolsEditorState = {
   openBuilderMode: () => void;
   openStackMode: () => void;
   openGalleryMode: () => void;
+  focusGalleryCut: (id: string | null) => void;
   openComponent: (id: string) => void;
   selectRoot: (id: string) => void;
   setPrimaryRoot: (id: string) => void;
@@ -259,61 +238,28 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageViewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const selectionInteractionRef = useRef<SelectionInteraction | null>(null);
 
   const [currentTool, setCurrentTool] = useState<EditorTool>("move");
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [selection, setSelection] = useState<CropBox | null>(null);
-  const [selectionLocked, setSelectionLocked] = useState(false);
-  const [drawing, setDrawing] = useState(false);
-  const [drawingPath, setDrawingPath] = useState<DrawingPath | null>(null);
-  const [brushSize, setBrushSize] = useState(4);
-  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
-  const [showCropsOverlay, setShowCropsOverlay] = useState(false);
-  const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
-  const [isHoveringSelection, setIsHoveringSelection] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imagePaintVersion, setImagePaintVersion] = useState(0);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [savingStack, setSavingStack] = useState(false);
   const [stackSaveStatus, setStackSaveStatus] = useState<string | null>(null);
-  const [expandedComponentIds, setExpandedComponentIds] = useState<Set<string>>(
-    () => new Set([rootComponentId]),
-  );
-  const [componentState, setComponentState] = useState<ComponentState>(() => ({
-    key: componentKey,
-    items: ensureRootComponent(
-      referenceId && item.id === referenceId && !hasDraftComponents(componentKey)
-        ? []
-        : readSavedComponents(componentKey),
-      item,
-    ),
-  }));
-  const [activeRootId, setActiveRootId] = useState(rootComponentId);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("components");
-  const [cropsOverlayColor, setCropsOverlayColor] = useState<string>(
-    () => readCropsOverlayColor(),
-  );
-  const [cropsOverlayAlpha, setCropsOverlayAlpha] = useState<number>(
-    () => readCropsOverlayAlpha(),
-  );
-  // Florence-2 auto-detect: transient proposals staged over the open subject,
-  // plus the running flag and a short-lived status message (toast).
   const [autoDetecting, setAutoDetecting] = useState(false);
   const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null);
   const autoDetectMessageTimer = useRef<number | null>(null);
 
-  // Repaints are coalesced to one per animation frame. N cut images settling
-  // asynchronously (plus resize/onload) would otherwise trigger N full canvas
-  // repaints in the same tick; rAF collapses them into a single bump.
+  // Coalesce repaints to one per animation frame: N async cut images settling in
+  // the same tick would otherwise trigger N full canvas repaints.
   const paintRafRef = useRef<number | null>(null);
   const bumpPaintVersion = useCallback(() => {
     if (paintRafRef.current != null) return;
     paintRafRef.current = requestAnimationFrame(() => {
       paintRafRef.current = null;
-      setImagePaintVersion((value) => value + 1);
+      setImagePaintVersion((v) => v + 1);
     });
   }, []);
 
@@ -323,21 +269,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(CROPS_OVERLAY_COLOR_STORAGE_KEY, cropsOverlayColor);
-    } catch {
-      // ignore quota errors
-    }
-  }, [cropsOverlayColor]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(CROPS_OVERLAY_ALPHA_STORAGE_KEY, String(cropsOverlayAlpha));
-    } catch {
-      // ignore quota errors
-    }
-  }, [cropsOverlayAlpha]);
+  // --- Viewport ------------------------------------------------------------
 
   const {
     toolZoom,
@@ -350,107 +282,53 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     zoomPercent,
   } = useBuilderViewport({ stageViewportRef, imgRef, imageError });
 
-  const components =
-    componentState.key === componentKey
-      ? componentState.items
-      : ensureRootComponent(readSavedComponents(componentKey), item);
+  // --- Components ----------------------------------------------------------
 
-  // Persisting the component array to localStorage serialises every cut's PNG
-  // data URL. Doing that synchronously inside the state updater stalls the main
-  // thread on each commit. Instead we keep the latest snapshot in a ref and flush
-  // it on a debounce / at unmount, off the interaction's critical path.
-  const persistTimerRef = useRef<number | null>(null);
-  const pendingPersistRef = useRef<{ items: SavedComponent[]; isDraft: boolean } | null>(null);
+  const {
+    componentState,
+    setComponentState,
+    components,
+    selectedComponent,
+    rootComponent,
+    activeRootId,
+    setActiveRootId,
+    expandedComponentIds,
+    setExpandedComponentIds,
+    sidebarTab,
+    setSidebarTab,
+    roots,
+    activeScopeId,
+    activeRoot,
+    componentTree,
+    scopedComponents,
+    stackedComponents,
+    cutCountByRoot,
+    updateComponents: rawUpdateComponents,
+    flushPendingPersist,
+    cancelPendingPersist,
+    schedulePersist,
+    expandComponentPath,
+    toggleComponentExpanded,
+    expandAllComponents,
+    collapseAllComponents,
+  } = useBuilderComponents({
+    item,
+    referenceId,
+    componentKey,
+    rootComponentId,
+    selectedComponentId,
+  });
 
-  const flushPendingPersist = useCallback(() => {
-    if (persistTimerRef.current != null) {
-      clearTimeout(persistTimerRef.current);
-      persistTimerRef.current = null;
-    }
-    const pending = pendingPersistRef.current;
-    if (!pending) return;
-    pendingPersistRef.current = null;
-    if (pending.isDraft) {
-      writeDraftComponents(componentKey, pending.items);
-    } else {
-      writeSavedComponents(componentKey, pending.items);
-    }
-  }, [componentKey]);
-
-  const cancelPendingPersist = useCallback(() => {
-    if (persistTimerRef.current != null) {
-      clearTimeout(persistTimerRef.current);
-      persistTimerRef.current = null;
-    }
-    pendingPersistRef.current = null;
-  }, []);
-
-  const schedulePersist = useCallback(
-    (items: SavedComponent[], isDraft: boolean) => {
-      pendingPersistRef.current = { items, isDraft };
-      if (persistTimerRef.current != null) return;
-      persistTimerRef.current = window.setTimeout(() => {
-        persistTimerRef.current = null;
-        flushPendingPersist();
-      }, 250);
-    },
-    [flushPendingPersist],
-  );
-
-  // Flush any queued draft before the editor unmounts (e.g. switching references,
-  // which remounts via `key={item.id}`), so unsaved edits are never dropped.
-  useEffect(() => flushPendingPersist, [flushPendingPersist]);
-
+  // Wrap so any component mutation also clears the save-status badge.
   const updateComponents = useCallback(
     (updater: (items: SavedComponent[]) => SavedComponent[]) => {
       setStackSaveStatus(null);
-      setComponentState((current) => {
-        // `current.items` is already normalised; only re-normalise when the key
-        // changed (stale snapshot from a previous reference).
-        const base =
-          current.key === componentKey
-            ? current.items
-            : ensureRootComponent(readSavedComponents(componentKey), item);
-        const next = ensureRootComponent(updater(base), item);
-        schedulePersist(next, Boolean(referenceId && item.id === referenceId));
-        return { key: componentKey, items: next };
-      });
+      rawUpdateComponents(updater);
     },
-    [componentKey, item, referenceId, schedulePersist],
+    [rawUpdateComponents],
   );
 
-  const selectedComponent = components.find((component) => component.id === selectedComponentId) ?? null;
-  const rootComponent = components.find((component) => component.id === rootComponentId) ?? createRootComponent(item);
-  const roots = useMemo(() => {
-    const list = components.filter((component) => component.parentId == null);
-    return list.sort((a, b) => {
-      if (a.isDefaultRoot && !b.isDefaultRoot) return -1;
-      if (!a.isDefaultRoot && b.isDefaultRoot) return 1;
-      return (a.createdAt || "").localeCompare(b.createdAt || "");
-    });
-  }, [components]);
-  const activeScopeId = components.some((component) => component.id === activeRootId)
-    ? activeRootId
-    : rootComponentId;
-  const activeRoot = components.find((component) => component.id === activeScopeId) ?? rootComponent;
-  const componentTree = useMemo(
-    () => buildComponentTree(components, activeScopeId),
-    [components, activeScopeId],
-  );
-  const scopedComponents = useMemo(() => flattenComponentTree(componentTree), [componentTree]);
-  const stackedComponents = useMemo(
-    () => scopedComponents.filter((component) => component.id !== activeScopeId),
-    [activeScopeId, scopedComponents],
-  );
-  const cutCountByRoot = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const component of components) {
-      if (component.parentId == null) continue;
-      const rid = component.rootId ?? rootComponentId;
-      counts.set(rid, (counts.get(rid) ?? 0) + 1);
-    }
-    return counts;
-  }, [components, rootComponentId]);
+  // --- Active subject / canCrop --------------------------------------------
 
   const activeSubject = useMemo<ActiveSubject>(() => {
     if (viewMode === "component" && selectedComponent) {
@@ -493,63 +371,127 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       originBox: { x: 0, y: 0, w: item.w, h: item.h },
       rootId: rootComponentId,
     };
-  }, [activeRoot, item.h, item.id, item.name, item.type, item.url, item.w, rootComponentId, selectedComponent, viewMode]);
+  }, [activeRoot, item, rootComponentId, selectedComponent, viewMode]);
 
-  const headerSubject =
-    viewMode === "stack" && selectedComponent
-      ? {
-          name: selectedComponent.name,
-          w: selectedComponent.box.w,
-          h: selectedComponent.box.h,
-          type: selectedComponent.type || "PNG",
-        }
-      : activeSubject;
-  // Cutting happens inside an opened root (component view) and produces child
-  // components. Any component can later be promoted to a root via "Become root".
   const canCrop = activeSubject.kind === "component";
 
-  const cancelSelection = useCallback(() => {
-    selectionInteractionRef.current = null;
-    setDrawing(false);
-    setSelection(null);
-    setSelectionLocked(false);
-    setDrawingPath(null);
-    setEditingComponentId(null);
-  }, []);
+  // --- Interaction ---------------------------------------------------------
 
-  const expandComponentPath = useCallback(
+  const selectStackComponent = useCallback(
     (id: string) => {
-      setExpandedComponentIds((current) => {
-        const next = new Set(current);
-        next.add(id);
-        for (const ancestorId of componentAncestorIds(components, id)) {
-          next.add(ancestorId);
-        }
-        return next;
-      });
+      cancelSelection();
+      expandComponentPath(id);
+      setSelectedComponentId(id);
     },
-    [components],
+    // cancelSelection is defined below — React guarantees stable refs for setState,
+    // so we reference the stable expandComponentPath + setSelectedComponentId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [expandComponentPath],
   );
 
-  const toggleComponentExpanded = useCallback((id: string) => {
-    setExpandedComponentIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  // cancelSelection is returned from the interaction hook; we need a stable
+  // forward-ref so it can be used in onSelectStackComponent without a cycle.
+  const cancelSelectionRef = useRef<(() => void) | null>(null);
+  const cancelSelectionStable = useCallback(() => {
+    cancelSelectionRef.current?.();
   }, []);
 
-  const expandAllComponents = useCallback(() => {
-    setExpandedComponentIds(new Set(components.map((entry) => entry.id)));
-  }, [components]);
+  const {
+    selection,
+    setSelection,
+    selectionLocked,
+    setSelectionLocked,
+    drawing,
+    setDrawing,
+    drawingPath,
+    setDrawingPath,
+    editingComponentId,
+    setEditingComponentId,
+    showCropsOverlay,
+    setShowCropsOverlay,
+    hoveredComponentId,
+    setHoveredComponentId,
+    brushSize,
+    setBrushSize,
+    cropsOverlayColor,
+    setCropsOverlayColor,
+    cropsOverlayAlpha,
+    setCropsOverlayAlpha,
+    isHoveringSelection,
+    cancelSelection,
+    selectionToSubjectCoords,
+    toOriginalCoords,
+    selectionCrop,
+    selectionSourceBox,
+    selectionMatchesExistingCut,
+    canSaveSelection,
+    selectionSize,
+    updateIdleCursorAndHover,
+    handleStagePointerLeave,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+  } = useBuilderInteraction({
+    item,
+    imgRef,
+    stageViewportRef,
+    toolZoom,
+    toolPan,
+    setToolPan,
+    currentTool,
+    setCurrentTool,
+    canCrop,
+    viewMode,
+    stackedComponents,
+    activeSubject,
+    scopedComponents,
+    rootComponentId,
+    components,
+    imagePaintVersion,
+    onSelectStackComponent: useCallback(
+      (id: string) => {
+        cancelSelectionStable();
+        expandComponentPath(id);
+        setSelectedComponentId(id);
+      },
+      [cancelSelectionStable, expandComponentPath],
+    ),
+  });
 
-  const collapseAllComponents = useCallback(() => {
-    setExpandedComponentIds(new Set());
-  }, []);
+  // Wire the stable forward-ref now that the real cancelSelection is available.
+  useEffect(() => {
+    cancelSelectionRef.current = cancelSelection;
+  });
+
+  // --- Canvas painter ------------------------------------------------------
+
+  const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
+    imgRef,
+    components,
+    stackedComponents,
+    activeSubject,
+    rootComponentId,
+    viewMode,
+    toolZoom,
+    toolPan,
+    selection,
+    selectionLocked,
+    isHoveringSelection,
+    selectionCrop,
+    selectionMatchesExistingCut,
+    drawingPath,
+    brushSize,
+    selectedComponentId,
+    hoveredComponentId,
+    editingComponentId,
+    showCropsOverlay,
+    cropsOverlayColor,
+    cropsOverlayAlpha,
+    imagePaintVersion,
+    bumpPaintVersion,
+  });
+
+  // --- Navigation ----------------------------------------------------------
 
   const setTool = useCallback(
     (tool: EditorTool) => {
@@ -592,11 +534,13 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     setViewMode("gallery");
   }, [cancelSelection]);
 
-  // Opening any node (root or cut) shows it as the editable subject and scopes the
-  // tree to its owning root. A root opens as its own croppable subject.
+  const focusGalleryCut = useCallback((id: string | null) => {
+    setSelectedComponentId(id);
+  }, []);
+
   const openComponent = useCallback(
     (id: string) => {
-      const component = components.find((entry) => entry.id === id);
+      const component = components.find((c) => c.id === id);
       const rid = component
         ? component.parentId == null
           ? component.id
@@ -609,100 +553,83 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       setViewMode("component");
       resetToolViewport();
     },
-    [cancelSelection, components, expandComponentPath, resetToolViewport, rootComponentId],
+    [cancelSelection, components, expandComponentPath, resetToolViewport, rootComponentId, setActiveRootId],
   );
 
-  // Select a root from the switcher and open it for editing. Opening a root
-  // normally drops to the Builder view, but if the user was on the Stack tab we
-  // keep them there — as long as the target screen actually has a stack. A
-  // screen with no cuts has no stack to show, so it falls back to Builder.
   const selectRoot = useCallback(
     (id: string) => {
       const keepStack = viewMode === "stack" && (cutCountByRoot.get(id) ?? 0) > 0;
       openComponent(id);
-      if (keepStack) {
-        setViewMode("stack");
-      }
+      if (keepStack) setViewMode("stack");
     },
-    [openComponent, viewMode, cutCountByRoot],
+    [cutCountByRoot, openComponent, viewMode],
   );
 
-  // Mark a root as the reference's main screen (the one shown on the card front).
-  // Exactly one root may be primary, so flagging one clears the others.
   const setPrimaryRoot = useCallback(
     (id: string) => {
       updateComponents((current) =>
-        current.map((entry) =>
-          entry.parentId == null ? { ...entry, isPrimaryRoot: entry.id === id } : entry,
+        current.map((c) =>
+          c.parentId == null ? { ...c, isPrimaryRoot: c.id === id } : c,
         ),
       );
     },
     [updateComponents],
   );
 
-  // "+ New" creates a brand-new, independent root seeded with an original image.
-  // The source defaults to this reference's original, but the switcher may pass a
-  // different original to copy from. The original is only a starting point: each
-  // root is its own workspace and can later be narrowed via "Become root".
-  const beginRootCreation = useCallback((source?: NewScreenSource) => {
-    const src: NewScreenSource = source ?? {
-      url: item.url,
-      w: item.w,
-      h: item.h,
-      type: item.type,
-      name: item.name,
-    };
-    const id = newRootComponentId();
-    const newRoot: SavedComponent = {
-      id,
-      name: "New screen",
-      box: { x: 0, y: 0, w: src.w || 0, h: src.h || 0 },
-      dataUrl: src.url,
-      type: src.type || "IMG",
-      createdAt: new Date().toISOString(),
-      parentId: null,
-      kind: "root",
-      rootId: id,
-      isDefaultRoot: false,
-    };
-    cancelSelection();
-    updateComponents((current) => [...current, newRoot]);
-    setActiveRootId(id);
-    setSelectedComponentId(id);
-    setExpandedComponentIds((current) => {
-      const next = new Set(current);
-      next.add(id);
-      return next;
-    });
-    setViewMode("component");
-    setCurrentTool("crop");
-    resetToolViewport();
-  }, [cancelSelection, item.h, item.name, item.type, item.url, item.w, resetToolViewport, updateComponents]);
+  const beginRootCreation = useCallback(
+    (source?: NewScreenSource) => {
+      const src: NewScreenSource = source ?? {
+        url: item.url,
+        w: item.w,
+        h: item.h,
+        type: item.type,
+        name: item.name,
+      };
+      const id = newRootComponentId();
+      const newRoot: SavedComponent = {
+        id,
+        name: "New screen",
+        box: { x: 0, y: 0, w: src.w || 0, h: src.h || 0 },
+        dataUrl: src.url,
+        type: src.type || "IMG",
+        createdAt: new Date().toISOString(),
+        parentId: null,
+        kind: "root",
+        rootId: id,
+        isDefaultRoot: false,
+      };
+      cancelSelection();
+      updateComponents((current) => [...current, newRoot]);
+      setActiveRootId(id);
+      setSelectedComponentId(id);
+      setExpandedComponentIds((current) => {
+        const next = new Set(current);
+        next.add(id);
+        return next;
+      });
+      setViewMode("component");
+      setCurrentTool("crop");
+      resetToolViewport();
+    },
+    [cancelSelection, item, resetToolViewport, setActiveRootId, setExpandedComponentIds, updateComponents],
+  );
 
-  // "Become root" redefines the currently open root *in place* to be the selected
-  // section: the section's pixels/bounds replace the root's, its own children move
-  // up to the root, and the other crops of that root (along with the previous root
-  // image) are discarded. No copy is made and no extra root is created — the
-  // element simply becomes the root of its workspace.
   const promoteToRoot = useCallback(
     (id: string) => {
-      const section = components.find((entry) => entry.id === id);
+      const section = components.find((c) => c.id === id);
       if (!section || section.parentId == null) return;
       const targetRootId = section.rootId ?? activeScopeId ?? rootComponentId;
       const subtree = componentSubtreeIds(components, id);
       updateComponents((current) =>
         current
-          .filter((entry) => {
-            // Drop the redefined root's crops that aren't part of the section's subtree.
-            const inTargetRoot = (entry.rootId ?? null) === targetRootId && entry.id !== targetRootId;
-            return !inTargetRoot || subtree.has(entry.id);
+          .filter((c) => {
+            const inTargetRoot = (c.rootId ?? null) === targetRootId && c.id !== targetRootId;
+            return !inTargetRoot || subtree.has(c.id);
           })
-          .map((entry): SavedComponent | null => {
-            if (entry.id === targetRootId) {
-              // Adopt the section's identity while keeping the root id stable so the
-              // surviving subtree's rootId references stay valid.
+          .map((c): SavedComponent | null => {
+            if (c.id === targetRootId) {
               return {
-                ...entry,
+                ...c,
                 name: section.name,
                 box: section.box,
                 dataUrl: section.dataUrl,
@@ -713,17 +640,17 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
                 isDefaultRoot: false,
               };
             }
-            if (entry.id === id) return null; // section is now merged into the root
-            if (subtree.has(entry.id)) {
+            if (c.id === id) return null;
+            if (subtree.has(c.id)) {
               return {
-                ...entry,
-                parentId: entry.parentId === id ? targetRootId : entry.parentId,
+                ...c,
+                parentId: c.parentId === id ? targetRootId : c.parentId,
                 rootId: targetRootId,
               };
             }
-            return entry;
+            return c;
           })
-          .filter((entry): entry is SavedComponent => entry != null),
+          .filter((c): c is SavedComponent => c != null),
       );
       cancelSelection();
       setEditingComponentId(null);
@@ -737,51 +664,59 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       setViewMode("component");
       resetToolViewport();
     },
-    [activeScopeId, cancelSelection, components, resetToolViewport, rootComponentId, updateComponents],
+    [
+      activeScopeId,
+      cancelSelection,
+      components,
+      resetToolViewport,
+      rootComponentId,
+      setActiveRootId,
+      setEditingComponentId,
+      setExpandedComponentIds,
+      updateComponents,
+    ],
   );
 
   const startEditComponent = useCallback(
     (id: string) => {
-      const component = components.find((entry) => entry.id === id);
+      const component = components.find((c) => c.id === id);
       if (!component || component.parentId == null) return;
       const parentId = component.parentId;
-
-      selectionInteractionRef.current = null;
-      setDrawing(false);
-      setSelection(null);
-      setSelectionLocked(false);
-      setDrawingPath(null);
-
+      cancelSelection();
       expandComponentPath(parentId);
       setActiveRootId(component.rootId ?? rootComponentId);
       setSelectedComponentId(parentId);
       setViewMode("component");
-
       resetToolViewport();
       setEditingComponentId(id);
       setCurrentTool("crop");
     },
-    [components, expandComponentPath, resetToolViewport, rootComponentId],
+    [
+      cancelSelection,
+      components,
+      expandComponentPath,
+      resetToolViewport,
+      rootComponentId,
+      setActiveRootId,
+      setEditingComponentId,
+    ],
   );
 
-  // Reset only the active stack back to the original image: drop its crops and
-  // restore its root node to the full original image. Other stacks of this image
-  // are left untouched.
   const resetActiveStack = useCallback(() => {
     cancelPendingPersist();
     const stackId = activeScopeId;
     const isDefault = stackId === rootComponentId;
     updateComponents((current) =>
       current
-        .filter((entry) => {
-          const belongsToStack = (entry.rootId ?? null) === stackId && entry.id !== stackId;
+        .filter((c) => {
+          const belongsToStack = (c.rootId ?? null) === stackId && c.id !== stackId;
           return !belongsToStack;
         })
-        .map((entry): SavedComponent =>
-          entry.id === stackId
+        .map((c): SavedComponent =>
+          c.id === stackId
             ? {
-                ...entry,
-                name: isDefault ? "root" : entry.name,
+                ...c,
+                name: isDefault ? "root" : c.name,
                 box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
                 dataUrl: item.url,
                 type: item.type || "IMG",
@@ -790,7 +725,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
                 rootId: stackId,
                 isDefaultRoot: isDefault,
               }
-            : entry,
+            : c,
         ),
     );
     setActiveRootId(stackId);
@@ -804,23 +739,13 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     activeScopeId,
     cancelPendingPersist,
     cancelSelection,
-    item.h,
-    item.type,
-    item.url,
-    item.w,
+    item,
     resetToolViewport,
     rootComponentId,
+    setActiveRootId,
+    setExpandedComponentIds,
     updateComponents,
   ]);
-
-  const selectStackComponent = useCallback(
-    (id: string) => {
-      cancelSelection();
-      expandComponentPath(id);
-      setSelectedComponentId(id);
-    },
-    [cancelSelection, expandComponentPath],
-  );
 
   const openTreeComponent = useCallback(
     (id: string) => {
@@ -833,17 +758,12 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [openComponent, selectStackComponent, viewMode],
   );
 
-  // Delete a screen (root) and its entire crop subtree. If the deleted screen is
-  // the one currently open, fall back to another remaining screen; when none are
-  // left, return to the original full image (the Screens panel goes empty).
   const removeRoot = useCallback(
     (id: string) => {
       const removedIds = componentSubtreeIds(components, id);
       const wasActive = removedIds.has(activeScopeId);
-      const nextRoot = wasActive ? roots.find((root) => !removedIds.has(root.id)) : undefined;
-      updateComponents((current) =>
-        current.filter((entry) => !removedIds.has(entry.id)),
-      );
+      const nextRoot = wasActive ? roots.find((r) => !removedIds.has(r.id)) : undefined;
+      updateComponents((current) => current.filter((c) => !removedIds.has(c.id)));
       if (!wasActive) return;
       if (nextRoot) {
         openComponent(nextRoot.id);
@@ -852,12 +772,12 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         openOriginal();
       }
     },
-    [activeScopeId, components, openComponent, openOriginal, roots, rootComponentId, updateComponents],
+    [activeScopeId, components, openComponent, openOriginal, roots, rootComponentId, setActiveRootId, updateComponents],
   );
 
   const requestRootDeletion = useCallback(
     (id: string) => {
-      const root = components.find((entry) => entry.id === id);
+      const root = components.find((c) => c.id === id);
       if (!root) return;
       setPendingConfirmation({
         type: "delete-root",
@@ -884,10 +804,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     resetActiveStack();
   }, [pendingConfirmation, removeRoot, resetActiveStack]);
 
+  // --- Operations ----------------------------------------------------------
+
   const persistReferenceStack = useCallback(async () => {
     if (savingStack) return;
-    // An explicit save supersedes any queued draft write; drop it so a late
-    // flush can't resurrect the draft we are about to clear.
     cancelPendingPersist();
     setSavingStack(true);
     setStackSaveStatus(null);
@@ -923,221 +843,159 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     }
   }, [cancelPendingPersist, componentKey, components, item, referenceId, rootComponentId, savingStack]);
 
-  const selectionToSubjectCoords = useCallback(
-    (box: CropBox): CropBox | null => {
+  const saveSelection = useCallback(
+    async (postProcess?: ProcessingFeatureKey) => {
+      if (!selection || !selectionLocked || !canCrop) return;
       const img = imgRef.current;
-      if (!img || !img.clientWidth || !img.clientHeight || !img.naturalWidth || !img.naturalHeight) {
-        return null;
-      }
-      const imageBox = { x: 0, y: 0, w: img.clientWidth, h: img.clientHeight };
-      const visibleBox = intersectCropBoxes(box, imageBox);
-      if (!visibleBox || visibleBox.w < 1 || visibleBox.h < 1) return null;
+      const subjectBox = selectionToSubjectCoords(selection);
+      if (!subjectBox) return;
+      const sourceBox = toOriginalCoords(subjectBox);
+      let dataUrl = activeSubject.url;
 
-      const sx = (img.naturalWidth || activeSubject.w || img.clientWidth) / img.clientWidth;
-      const sy = (img.naturalHeight || activeSubject.h || img.clientHeight) / img.clientHeight;
-      return {
-        x: (visibleBox.x - imageBox.x) * sx,
-        y: (visibleBox.y - imageBox.y) * sy,
-        w: visibleBox.w * sx,
-        h: visibleBox.h * sy,
-        r: Math.min(
-          ((box.r ?? 0) * (sx + sy)) / 2,
-          (visibleBox.w * sx) / 2,
-          (visibleBox.h * sy) / 2,
-        ),
-      };
-    },
-    [activeSubject.h, activeSubject.w],
-  );
-
-  const toOriginalCoords = useCallback(
-    (subjectBox: CropBox): CropBox => {
-      const origin = activeSubject.kind === "component" ? activeSubject.originBox : null;
-      const x = (origin?.x ?? 0) + subjectBox.x;
-      const y = (origin?.y ?? 0) + subjectBox.y;
-      const maxW = item.w ? Math.max(1, item.w - x) : subjectBox.w;
-      const maxH = item.h ? Math.max(1, item.h - y) : subjectBox.h;
-      return {
-        x,
-        y,
-        w: Math.min(subjectBox.w, maxW),
-        h: Math.min(subjectBox.h, maxH),
-        r: Math.min(subjectBox.r ?? 0, subjectBox.w / 2, subjectBox.h / 2),
-      };
-    },
-    [activeSubject, item.h, item.w],
-  );
-
-  const saveSelection = useCallback(async (postProcess?: ProcessingFeatureKey) => {
-    if (!selection || !selectionLocked || !canCrop) return;
-    const img = imgRef.current;
-    const subjectBox = selectionToSubjectCoords(selection);
-    if (!subjectBox) return;
-    const sourceBox = toOriginalCoords(subjectBox);
-    let dataUrl = activeSubject.url;
-
-    if (img) {
-      try {
-        await waitForImage(img);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(subjectBox.w));
-        canvas.height = Math.max(1, Math.round(subjectBox.h));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas unavailable");
-        const radius = Math.min(subjectBox.r ?? 0, canvas.width / 2, canvas.height / 2);
-        ctx.imageSmoothingEnabled = false;
-        if (radius > 0) {
-          ctx.save();
-          roundedRectPath(ctx, 0, 0, canvas.width, canvas.height, radius);
-          ctx.clip();
+      if (img) {
+        try {
+          await waitForImage(img);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(subjectBox.w));
+          canvas.height = Math.max(1, Math.round(subjectBox.h));
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas unavailable");
+          const radius = Math.min(subjectBox.r ?? 0, canvas.width / 2, canvas.height / 2);
+          ctx.imageSmoothingEnabled = false;
+          if (radius > 0) {
+            ctx.save();
+            roundedRectPath(ctx, 0, 0, canvas.width, canvas.height, radius);
+            ctx.clip();
+          }
+          ctx.drawImage(
+            img,
+            subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h,
+            0, 0, canvas.width, canvas.height,
+          );
+          if (radius > 0) ctx.restore();
+          dataUrl = await canvasToDataUrl(canvas, "image/png");
+        } catch {
+          dataUrl = activeSubject.url;
         }
-        ctx.drawImage(
-          img,
-          subjectBox.x,
-          subjectBox.y,
-          subjectBox.w,
-          subjectBox.h,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
+      }
+
+      let processed: { tool: CutVariantTool; dataUrl: string } | null = null;
+      if (postProcess) {
+        try {
+          const input = await urlToBytes(dataUrl);
+          const output =
+            postProcess === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
+          processed = { tool: postProcess as CutVariantTool, dataUrl: bytesToPngDataUrl(output) };
+        } catch (error) {
+          console.error(`Draw post-process (${postProcess}) failed`, error);
+        }
+      }
+
+      if (editingComponentId) {
+        const editedId = editingComponentId;
+        updateComponents((current) =>
+          current.map((c) => {
+            if (c.id !== editedId) return c;
+            let next = setOriginalVariantImage({ ...c, box: sourceBox }, dataUrl);
+            if (processed) next = addVariant(next, { ...processed, createdAt: new Date().toISOString() });
+            return next;
+          }),
         );
-        if (radius > 0) ctx.restore();
-        dataUrl = await canvasToDataUrl(canvas, "image/png");
-      } catch {
-        dataUrl = activeSubject.url;
-      }
-    }
-
-    // Optionally run an AI model on the freshly cropped image. Its output is
-    // kept as a separate variant (and made the main one) so the plain crop
-    // ("original") stays available to switch back to. On failure, we just keep
-    // the plain crop with no extra variant.
-    let processed: { tool: CutVariantTool; dataUrl: string } | null = null;
-    if (postProcess) {
-      try {
-        const input = await urlToBytes(dataUrl);
-        const output =
-          postProcess === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
-        processed = { tool: postProcess as CutVariantTool, dataUrl: bytesToPngDataUrl(output) };
-      } catch (error) {
-        console.error(`Draw post-process (${postProcess}) failed`, error);
-      }
-    }
-
-    if (editingComponentId) {
-      const editedId = editingComponentId;
-      updateComponents((current) =>
-        current.map((entry) => {
-          if (entry.id !== editedId) return entry;
-          // Re-cropping replaces the "original" variant's pixels; existing AI
-          // variants are preserved. A post-processed re-crop appends a variant.
-          let next = setOriginalVariantImage({ ...entry, box: sourceBox }, dataUrl);
-          if (processed) next = addVariant(next, { ...processed, createdAt: new Date().toISOString() });
+        setEditingComponentId(null);
+        setExpandedComponentIds((current) => {
+          const next = new Set(current);
+          next.add(editedId);
           return next;
-        }),
-      );
-      setEditingComponentId(null);
+        });
+        setSelectedComponentId(editedId);
+        setViewMode("component");
+        resetToolViewport();
+        cancelSelection();
+        return;
+      }
+
+      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+      const parentId =
+        activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
+      const rootId = activeSubject.rootId ?? activeScopeId;
+      const createdAt = new Date().toISOString();
+      let cut: SavedComponent = {
+        id: nextId,
+        name: shortComponentName(nextId),
+        box: sourceBox,
+        dataUrl,
+        type: "PNG",
+        createdAt,
+        parentId,
+        kind: "cut",
+        rootId,
+      };
+      if (processed) cut = addVariant(cut, { ...processed, createdAt });
+      updateComponents((current) => [cut, ...current]);
       setExpandedComponentIds((current) => {
         const next = new Set(current);
-        next.add(editedId);
+        next.add(parentId);
+        next.add(nextId);
         return next;
       });
-      setSelectedComponentId(editedId);
+      setSelectedComponentId(nextId);
       setViewMode("component");
       resetToolViewport();
       cancelSelection();
-      return;
-    }
+    },
+    [
+      activeScopeId,
+      activeSubject,
+      canCrop,
+      cancelSelection,
+      editingComponentId,
+      resetToolViewport,
+      rootComponent.id,
+      selection,
+      selectionLocked,
+      selectionToSubjectCoords,
+      setEditingComponentId,
+      setExpandedComponentIds,
+      toOriginalCoords,
+      updateComponents,
+    ],
+  );
 
-    const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
-    const parentId = activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
-    const rootId = activeSubject.rootId ?? activeScopeId;
-    const createdAt = new Date().toISOString();
-    let cut: SavedComponent = {
-      id: nextId,
-      name: shortComponentName(nextId),
-      box: sourceBox,
-      dataUrl,
-      type: "PNG",
-      createdAt,
-      parentId,
-      kind: "cut",
-      rootId,
-    };
-    // Seeds both the "original" (plain crop) and the processed variant in one go.
-    if (processed) cut = addVariant(cut, { ...processed, createdAt });
-    updateComponents((current) => [cut, ...current]);
-    setExpandedComponentIds((current) => {
-      const next = new Set(current);
-      next.add(parentId);
-      next.add(nextId);
-      return next;
-    });
-    setSelectedComponentId(nextId);
-    setViewMode("component");
-    resetToolViewport();
-    cancelSelection();
-  }, [
-    activeScopeId,
-    activeSubject,
-    canCrop,
-    cancelSelection,
-    editingComponentId,
-    resetToolViewport,
-    rootComponent.id,
-    selection,
-    selectionLocked,
-    selectionToSubjectCoords,
-    toOriginalCoords,
-    updateComponents,
-  ]);
-
-  // --- Cut variants (non-crop AI edits) -----------------------------------
-
-  // Appends an AI-edited image as a new variant of `cutId` and makes it the
-  // main one. The cut's "original" (plain crop) is kept and stays selectable.
   const addCutVariant = useCallback(
     (cutId: string, input: { tool: CutVariantTool; dataUrl: string }) => {
       const createdAt = new Date().toISOString();
       updateComponents((current) =>
-        current.map((entry) =>
-          entry.id === cutId && entry.parentId != null
-            ? addVariant(entry, { ...input, createdAt })
-            : entry,
+        current.map((c) =>
+          c.id === cutId && c.parentId != null
+            ? addVariant(c, { ...input, createdAt })
+            : c,
         ),
       );
     },
     [updateComponents],
   );
 
-  // Switches which stored variant of `cutId` is the main one.
   const setCutVariant = useCallback(
     (cutId: string, variantId: string) => {
       updateComponents((current) =>
-        current.map((entry) => (entry.id === cutId ? setActiveVariantOn(entry, variantId) : entry)),
+        current.map((c) => (c.id === cutId ? setActiveVariantOn(c, variantId) : c)),
       );
     },
     [updateComponents],
   );
 
-  // Deletes a non-original variant; if it was the main one, falls back to original.
   const removeCutVariant = useCallback(
     (cutId: string, variantId: string) => {
       updateComponents((current) =>
-        current.map((entry) => (entry.id === cutId ? removeVariantFrom(entry, variantId) : entry)),
+        current.map((c) => (c.id === cutId ? removeVariantFrom(c, variantId) : c)),
       );
     },
     [updateComponents],
   );
 
-  // --- Auto-detect (switchable model) -------------------------------------
-
   const flashAutoDetectMessage = useCallback((message: string) => {
     setAutoDetectMessage(message);
-    if (autoDetectMessageTimer.current != null) {
-      clearTimeout(autoDetectMessageTimer.current);
-    }
+    if (autoDetectMessageTimer.current != null) clearTimeout(autoDetectMessageTimer.current);
     autoDetectMessageTimer.current = window.setTimeout(() => {
       autoDetectMessageTimer.current = null;
       setAutoDetectMessage(null);
@@ -1146,129 +1004,120 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   useEffect(() => {
     return () => {
-      if (autoDetectMessageTimer.current != null) {
-        clearTimeout(autoDetectMessageTimer.current);
-      }
+      if (autoDetectMessageTimer.current != null) clearTimeout(autoDetectMessageTimer.current);
     };
   }, []);
 
-  // Run the active auto-detect model on the open subject and turn every detected
-  // region directly into a saved cut — no review step. Boxes are mapped from the
-  // model's normalized space into subject/original coordinates through the same
-  // crop pipeline a hand-drawn region uses, so they obey the same bounds. The
-  // resulting cuts are editable afterward like any other.
-  const autoDetect = useCallback(async (modelId: string | null) => {
-    if (autoDetecting || !canCrop) return;
-    if (!modelId) {
-      flashAutoDetectMessage("Install an auto-detect model in Settings first");
-      return;
-    }
-    const img = imgRef.current;
-    const cw = img?.clientWidth ?? 0;
-    const ch = img?.clientHeight ?? 0;
-    if (!cw || !ch) {
-      flashAutoDetectMessage("Open a stack before auto-detecting");
-      return;
-    }
-    const parentId = activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
-    const rootId = activeSubject.rootId ?? activeScopeId;
-    setAutoDetecting(true);
-    setAutoDetectMessage(null);
-    try {
-      const bytes = await urlToBytes(activeSubject.url);
-      const regions = await runAutoDetect(modelId, bytes);
-      if (regions.length === 0) {
-        flashAutoDetectMessage("No components detected — try drawing regions manually");
+  const autoDetect = useCallback(
+    async (modelId: string | null) => {
+      if (autoDetecting || !canCrop) return;
+      if (!modelId) {
+        flashAutoDetectMessage("Install an auto-detect model in Settings first");
         return;
       }
-      if (img) await waitForImage(img).catch(() => {});
-      const created: SavedComponent[] = [];
-      for (const region of regions) {
-        // Normalized model coords → display space → subject space → original.
-        const x = clamp(region.x * cw, 0, cw);
-        const y = clamp(region.y * ch, 0, ch);
-        const displayBox: CropBox = {
-          x,
-          y,
-          w: clamp(region.w * cw, 1, cw - x),
-          h: clamp(region.h * ch, 1, ch - y),
-        };
-        const subjectBox = selectionToSubjectCoords(displayBox);
-        if (!subjectBox) continue;
-        const sourceBox = toOriginalCoords(subjectBox);
-        let dataUrl = activeSubject.url;
-        if (img) {
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.max(1, Math.round(subjectBox.w));
-            canvas.height = Math.max(1, Math.round(subjectBox.h));
-            const ctx = canvas.getContext("2d");
-            if (!ctx) throw new Error("Canvas unavailable");
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(
-              img,
-              subjectBox.x,
-              subjectBox.y,
-              subjectBox.w,
-              subjectBox.h,
-              0,
-              0,
-              canvas.width,
-              canvas.height,
-            );
-            dataUrl = await canvasToDataUrl(canvas, "image/png");
-          } catch {
-            dataUrl = activeSubject.url;
-          }
+      const img = imgRef.current;
+      const cw = img?.clientWidth ?? 0;
+      const ch = img?.clientHeight ?? 0;
+      if (!cw || !ch) {
+        flashAutoDetectMessage("Open a stack before auto-detecting");
+        return;
+      }
+      const parentId =
+        activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
+      const rootId = activeSubject.rootId ?? activeScopeId;
+      setAutoDetecting(true);
+      setAutoDetectMessage(null);
+      try {
+        const bytes = await urlToBytes(activeSubject.url);
+        const regions = await runAutoDetect(modelId, bytes);
+        if (regions.length === 0) {
+          flashAutoDetectMessage("No components detected — try drawing regions manually");
+          return;
         }
-        const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
-        const trimmedLabel = region.label?.trim();
-        created.push({
-          id: nextId,
-          name: trimmedLabel ? trimmedLabel : shortComponentName(nextId),
-          box: sourceBox,
-          dataUrl,
-          type: "PNG",
-          createdAt: new Date().toISOString(),
-          parentId,
-          kind: "cut",
-          rootId,
+        if (img) await waitForImage(img).catch(() => {});
+        const created: SavedComponent[] = [];
+        for (const region of regions) {
+          const x = clamp(region.x * cw, 0, cw);
+          const y = clamp(region.y * ch, 0, ch);
+          const displayBox = {
+            x,
+            y,
+            w: clamp(region.w * cw, 1, cw - x),
+            h: clamp(region.h * ch, 1, ch - y),
+          };
+          const subjectBox = selectionToSubjectCoords(displayBox);
+          if (!subjectBox) continue;
+          const sourceBox = toOriginalCoords(subjectBox);
+          let dataUrl = activeSubject.url;
+          if (img) {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = Math.max(1, Math.round(subjectBox.w));
+              canvas.height = Math.max(1, Math.round(subjectBox.h));
+              const ctx = canvas.getContext("2d");
+              if (!ctx) throw new Error("Canvas unavailable");
+              ctx.imageSmoothingEnabled = false;
+              ctx.drawImage(
+                img,
+                subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h,
+                0, 0, canvas.width, canvas.height,
+              );
+              dataUrl = await canvasToDataUrl(canvas, "image/png");
+            } catch {
+              dataUrl = activeSubject.url;
+            }
+          }
+          const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+          const trimmedLabel = region.label?.trim();
+          created.push({
+            id: nextId,
+            name: trimmedLabel ? trimmedLabel : shortComponentName(nextId),
+            box: sourceBox,
+            dataUrl,
+            type: "PNG",
+            createdAt: new Date().toISOString(),
+            parentId,
+            kind: "cut",
+            rootId,
+          });
+        }
+        if (created.length === 0) {
+          flashAutoDetectMessage("No components detected — try drawing regions manually");
+          return;
+        }
+        updateComponents((current) => [...created, ...current]);
+        setExpandedComponentIds((current) => {
+          const next = new Set(current);
+          next.add(parentId);
+          for (const c of created) next.add(c.id);
+          return next;
         });
+        setSelectedComponentId(created[0].id);
+        setViewMode("component");
+        resetToolViewport();
+        cancelSelection();
+      } catch (error) {
+        console.error("[tools] auto-detect failed", error);
+        flashAutoDetectMessage("Auto-detect failed — see console for details");
+      } finally {
+        setAutoDetecting(false);
       }
-      if (created.length === 0) {
-        flashAutoDetectMessage("No components detected — try drawing regions manually");
-        return;
-      }
-      updateComponents((current) => [...created, ...current]);
-      setExpandedComponentIds((current) => {
-        const next = new Set(current);
-        next.add(parentId);
-        for (const component of created) next.add(component.id);
-        return next;
-      });
-      setSelectedComponentId(created[0].id);
-      setViewMode("component");
-      resetToolViewport();
-      cancelSelection();
-    } catch (error) {
-      console.error("[tools] auto-detect failed", error);
-      flashAutoDetectMessage("Auto-detect failed — see console for details");
-    } finally {
-      setAutoDetecting(false);
-    }
-  }, [
-    activeScopeId,
-    activeSubject,
-    autoDetecting,
-    canCrop,
-    cancelSelection,
-    flashAutoDetectMessage,
-    resetToolViewport,
-    rootComponent.id,
-    selectionToSubjectCoords,
-    toOriginalCoords,
-    updateComponents,
-  ]);
+    },
+    [
+      activeScopeId,
+      activeSubject,
+      autoDetecting,
+      canCrop,
+      cancelSelection,
+      flashAutoDetectMessage,
+      resetToolViewport,
+      rootComponent.id,
+      selectionToSubjectCoords,
+      setExpandedComponentIds,
+      toOriginalCoords,
+      updateComponents,
+    ],
+  );
 
   const uploadImage = useCallback(
     async (file: File | null | undefined) => {
@@ -1295,12 +1144,29 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [onUploadedLocally],
   );
 
+  const handleRemoveComponent = useCallback(
+    (id: string) => {
+      const removedIds = componentSubtreeIds(components, id);
+      updateComponents((current) => current.filter((c) => !removedIds.has(c.id)));
+      if (removedIds.has(activeScopeId)) {
+        setActiveRootId(rootComponentId);
+        openOriginal();
+      } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
+        openOriginal();
+      }
+    },
+    [activeScopeId, components, openOriginal, rootComponentId, selectedComponentId, setActiveRootId, updateComponents],
+  );
+
+  // --- Effects -------------------------------------------------------------
+
+  // Load component state from storage / network when the reference item changes.
   useEffect(() => {
     let cancelled = false;
 
     const hasContent = (items: SavedComponent[]) =>
-      items.some((component) => component.parentId != null) ||
-      items.filter((component) => component.parentId == null).length > 1;
+      items.some((c) => c.parentId != null) ||
+      items.filter((c) => c.parentId == null).length > 1;
 
     const applyState = (
       items: SavedComponent[],
@@ -1308,9 +1174,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       persistDraft: boolean,
     ) => {
       const next = ensureRootComponent(items, item);
-      const nextRootId = preferredRootId && next.some((component) => component.id === preferredRootId)
-        ? preferredRootId
-        : rootComponentId;
+      const nextRootId =
+        preferredRootId && next.some((c) => c.id === preferredRootId)
+          ? preferredRootId
+          : rootComponentId;
       const hasStack = hasContent(next);
       if (persistDraft) {
         if (referenceId && item.id === referenceId) {
@@ -1324,8 +1191,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       setExpandedComponentIds(new Set([nextRootId]));
       setImageError(false);
       setHoveredComponentId(null);
-      // Fresh image with no stack: open the default root for immediate cropping.
-      // Existing stack: land on the original overview so the user picks a root.
       setSelectedComponentId(hasStack ? null : nextRootId);
       setViewMode(hasStack ? "original" : "component");
       resetToolViewport();
@@ -1344,9 +1209,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
     if (!referenceId || item.id !== referenceId || (hasDraft && hasLocalStack)) {
       applyState(localComponents, rootComponentId, !referenceId || item.id !== referenceId || hasLocalStack);
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
 
     void readReferenceStackComponents(item).then((savedStack) => {
@@ -1356,76 +1219,30 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         applyState(savedStack.items, savedStack.activeRootId, false);
         return;
       }
-
-      const fallbackLocalComponents = hasDraft
+      const fallback = hasDraft
         ? localComponents
         : ensureRootComponent(readSavedComponents(componentKey), item);
-      applyState(fallbackLocalComponents, rootComponentId, hasContent(fallbackLocalComponents));
+      applyState(fallback, rootComponentId, hasContent(fallback));
     });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [cancelSelection, componentKey, item, referenceId, resetToolViewport, rootComponentId]);
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
 
+  // Deselect when navigating away from a component that no longer exists.
   useEffect(() => {
     if ((viewMode !== "component" && viewMode !== "stack") || !selectedComponentId || selectedComponent) return;
     setSelectedComponentId(null);
     setViewMode("original");
   }, [selectedComponent, selectedComponentId, viewMode]);
 
-  useEffect(() => {
-    if (!editingComponentId || selection) return;
-    const component = components.find((entry) => entry.id === editingComponentId);
-    if (!component) {
-      setEditingComponentId(null);
-      return;
-    }
-    const expectedSubjectId = component.parentId ?? rootComponentId;
-    let activeSubjectId: string | null = null;
-    if (activeSubject.kind === "component") {
-      activeSubjectId = activeSubject.id;
-    } else if (activeSubject.kind === "original") {
-      activeSubjectId = rootComponentId;
-    }
-    if (activeSubjectId !== expectedSubjectId) return;
-
-    const img = imgRef.current;
-    if (!img || !img.clientWidth || !img.clientHeight || !img.naturalWidth || !img.naturalHeight) {
-      return;
-    }
-
-    const subjectBox = componentBoxInSubject(component.box, activeSubject);
-    if (!subjectBox) {
-      setEditingComponentId(null);
-      return;
-    }
-
-    const sx = img.naturalWidth / img.clientWidth;
-    const sy = img.naturalHeight / img.clientHeight;
-    const avgScale = (sx + sy) / 2;
-
-    setSelection({
-      x: subjectBox.x / sx,
-      y: subjectBox.y / sy,
-      w: subjectBox.w / sx,
-      h: subjectBox.h / sy,
-      r: (component.box.r ?? 0) / (avgScale || 1),
-    });
-    setSelectionLocked(true);
-  }, [activeSubject, components, editingComponentId, imagePaintVersion, rootComponentId, selection]);
-
+  // Auto-expand the tree path to the selected component.
   useEffect(() => {
     if (!selectedComponentId) return;
     expandComponentPath(selectedComponentId);
   }, [expandComponentPath, selectedComponentId]);
 
-  useEffect(() => {
-    if ((currentTool !== "crop" && currentTool !== "draw") || canCrop) return;
-    setCurrentTool("move");
-    cancelSelection();
-  }, [canCrop, cancelSelection, currentTool]);
-
+  // Keyboard shortcuts.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -1445,324 +1262,34 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         if (selectionLocked) { event.preventDefault(); void saveSelection(); }
       }
     };
-
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [beginRootCreation, cancelSelection, drawingPath, saveSelection, selection, selectionLocked, setTool]);
 
-  const selectionCrop = selection ? selectionToSubjectCoords(selection) : null;
-  const selectionSourceBox = selectionCrop && canCrop ? toOriginalCoords(selectionCrop) : null;
-  const selectionMatchesExistingCut = Boolean(
-    selectionSourceBox &&
-      componentAreaAlreadyExists(selectionSourceBox, scopedComponents, rootComponentId),
-  );
-  const canSaveSelection = Boolean(
-    selectionLocked && selectionCrop && canCrop,
-  );
-  const selectionSize = selectionCrop ?? { x: 0, y: 0, w: 0, h: 0 };
-  const confirmationCopy = pendingConfirmation
-    ? confirmationDialogCopy(pendingConfirmation)
-    : null;
+  // --- Derived display values ----------------------------------------------
+
+  const headerSubject =
+    viewMode === "stack" && selectedComponent
+      ? {
+          name: selectedComponent.name,
+          w: selectedComponent.box.w,
+          h: selectedComponent.box.h,
+          type: selectedComponent.type || "PNG",
+        }
+      : activeSubject;
+
+  const confirmationCopy = pendingConfirmation ? confirmationDialogCopy(pendingConfirmation) : null;
   const showGroupNavigator = Boolean(groupContext && groupContext.references.length >= 1);
 
-  const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
-    imgRef,
-    components,
-    stackedComponents,
-    activeSubject,
-    rootComponentId,
-    viewMode,
-    toolZoom,
-    toolPan,
-    selection,
-    selectionLocked,
-    isHoveringSelection,
-    selectionCrop,
-    selectionMatchesExistingCut,
-    drawingPath,
-    brushSize,
-    selectedComponentId,
-    hoveredComponentId,
-    editingComponentId,
-    showCropsOverlay,
-    cropsOverlayColor,
-    cropsOverlayAlpha,
-    imagePaintVersion,
-    bumpPaintVersion,
-  });
-
-  function updateIdleCursorAndHover(event: PointerEvent<HTMLDivElement>) {
-    const stage = stageViewportRef.current;
-    const point = getContentPoint(event, imgRef.current, toolZoom);
-    let cursor = "";
-    let nextHovered: string | null = null;
-
-    if (point) {
-      const selectionTool = currentTool === "crop" || currentTool === "draw";
-      if (canCrop && selection && selectionLocked && selectionTool) {
-        const hit = selectionHitTest(point, selection, true, toolZoom);
-        if (hit?.kind === "radius") cursor = "grab";
-        else if (hit?.kind === "resize") cursor = resizeCursor(hit.handle);
-        else if (hit?.kind === "move" && currentTool === "crop") cursor = "move";
-      }
-
-      if (viewMode === "stack") {
-        const hovered = componentHitTest(point, stackedComponents, activeSubject, imgRef.current);
-        nextHovered = hovered?.id ?? null;
-        if (!cursor && hovered) cursor = "pointer";
-      }
-
-      const nextHoveringSelection = Boolean(
-        selection &&
-          point.x >= selection.x && point.x <= selection.x + selection.w &&
-          point.y >= selection.y && point.y <= selection.y + selection.h,
-      );
-      if (nextHoveringSelection !== isHoveringSelection) setIsHoveringSelection(nextHoveringSelection);
-    } else if (isHoveringSelection) {
-      setIsHoveringSelection(false);
-    }
-
-    if (stage && stage.style.cursor !== cursor) stage.style.cursor = cursor;
-    if (viewMode === "stack" && nextHovered !== hoveredComponentId) {
-      setHoveredComponentId(nextHovered);
-    }
-  }
-
-  function handleStagePointerLeave() {
-    const stage = stageViewportRef.current;
-    if (stage) stage.style.cursor = "";
-    if (viewMode === "stack" && hoveredComponentId) setHoveredComponentId(null);
-    if (isHoveringSelection) setIsHoveringSelection(false);
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.button === 1 && toolZoom > MIN_TOOL_ZOOM) {
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      selectionInteractionRef.current = {
-        type: "pan",
-        pointerId: event.pointerId,
-        startClient: { x: event.clientX, y: event.clientY },
-        startPan: toolPan,
-      };
-      setDrawing(true);
-      return;
-    }
-
-    if (event.button !== 0) return;
-    if ((event.target as HTMLElement).closest("[data-selection-action]")) return;
-
-    const point = getContentPoint(event, imgRef.current, toolZoom);
-    if (!point) return;
-
-    if (viewMode === "stack") {
-      const hit = componentHitTest(point, stackedComponents, activeSubject, imgRef.current);
-      if (hit) {
-        event.preventDefault();
-        selectStackComponent(hit.id);
-      }
-      return;
-    }
-
-    if (!canCrop) return;
-
-    if (currentTool !== "crop" && currentTool !== "draw") return;
-
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-
-    if (selection && selectionLocked) {
-      const hit = selectionHitTest(point, selection, true, toolZoom);
-      if (hit?.kind === "radius") {
-        selectionInteractionRef.current = {
-          type: "radius",
-          pointerId: event.pointerId,
-          handle: hit.handle,
-          startPoint: point,
-          startBox: selection,
-        };
-        setDrawing(true);
-        return;
-      }
-      if (hit?.kind === "resize") {
-        selectionInteractionRef.current = {
-          type: "resize",
-          pointerId: event.pointerId,
-          handle: hit.handle,
-          startPoint: point,
-          startBox: selection,
-        };
-        setDrawing(true);
-        return;
-      }
-      if (hit?.kind === "move" && currentTool === "crop") {
-        selectionInteractionRef.current = {
-          type: "move",
-          pointerId: event.pointerId,
-          startPoint: point,
-          startBox: selection,
-        };
-        setDrawing(true);
-        return;
-      }
-    }
-
-    if (currentTool === "draw") {
-      selectionInteractionRef.current = { type: "free-draw", pointerId: event.pointerId };
-      setDrawing(true);
-      setSelectionLocked(false);
-      setSelection(null);
-      setDrawingPath({ points: [point] });
-      return;
-    }
-
-    selectionInteractionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point };
-    setDrawing(true);
-    setSelectionLocked(false);
-    setSelection({ x: point.x, y: point.y, w: 0, h: 0 });
-  }
-
-  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-    const interaction = selectionInteractionRef.current;
-    if (!drawing || !interaction) {
-      updateIdleCursorAndHover(event);
-      return;
-    }
-
-    if (interaction.type === "pan") {
-      setToolPan(
-        clampToolPan(
-          {
-            x: interaction.startPan.x + event.clientX - interaction.startClient.x,
-            y: interaction.startPan.y + event.clientY - interaction.startClient.y,
-          },
-          toolZoom,
-          stageViewportRef.current,
-          imgRef.current,
-        ),
-      );
-      return;
-    }
-
-    const point = getContentPoint(event, imgRef.current, toolZoom);
-    if (!point) return;
-    const imageBounds = getImageContentBounds(imgRef.current);
-
-    if (interaction.type === "resize") {
-      const bounds = imageBounds ?? getVisibleContentBounds(stageViewportRef.current, imgRef.current, toolZoom);
-      if (!bounds) return;
-      setSelection(
-        resizeCropBox(interaction.startBox, interaction.handle, point, bounds),
-      );
-      setSelectionLocked(true);
-      return;
-    }
-
-    if (interaction.type === "radius") {
-      setSelection(
-        roundCropBox(interaction.startBox, interaction.handle, interaction.startPoint, point),
-      );
-      setSelectionLocked(true);
-      return;
-    }
-
-    if (interaction.type === "move") {
-      const bounds = imageBounds ?? getVisibleContentBounds(stageViewportRef.current, imgRef.current, toolZoom);
-      setSelection(moveCropBox(interaction.startBox, interaction.startPoint, point, bounds));
-      setSelectionLocked(true);
-      return;
-    }
-
-    if (interaction.type === "free-draw") {
-      setDrawingPath((current) => {
-        if (!current) return { points: [point] };
-        const last = current.points[current.points.length - 1];
-        if (last && Math.abs(last.x - point.x) < 0.5 && Math.abs(last.y - point.y) < 0.5) {
-          return current;
-        }
-        return { points: [...current.points, point] };
-      });
-      return;
-    }
-
-    const rawBox = cropBoxFromPoints(interaction.startPoint, point);
-    if (imageBounds) {
-      const clipped = intersectCropBoxes(rawBox, imageBounds);
-      setSelection(clipped ?? { x: rawBox.x, y: rawBox.y, w: 0, h: 0 });
-    } else {
-      setSelection(rawBox);
-    }
-  }
-
-  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
-    if (!drawing || !selectionInteractionRef.current) return;
-    const interaction = selectionInteractionRef.current;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    setDrawing(false);
-    selectionInteractionRef.current = null;
-    if (interaction.type === "pan") {
-      return;
-    }
-
-    if (interaction.type === "free-draw") {
-      const points = drawingPath?.points ?? [];
-      const bounds = boundsFromDrawingPath(points);
-      if (!bounds) {
-        setDrawingPath(null);
-        setSelection(null);
-        setSelectionLocked(false);
-        return;
-      }
-      const imageBounds = getImageContentBounds(imgRef.current);
-      const clipped = imageBounds ? intersectCropBoxes(bounds, imageBounds) : bounds;
-      if (!clipped || clipped.w < 8 || clipped.h < 8) {
-        setDrawingPath(null);
-        setSelection(null);
-        setSelectionLocked(false);
-        return;
-      }
-      // Keep the freehand stroke painted on the canvas. It stays until an action
-      // is picked from the draw toolbar (which commits) or the user cancels.
-      setSelection(clipped);
-      setSelectionLocked(true);
-      return;
-    }
-
-    setSelection((current) => {
-      if (!current || current.w < 8 || current.h < 8) {
-        setSelectionLocked(false);
-        return null;
-      }
-      setSelectionLocked(true);
-      return current;
-    });
-  }
-
-  const handleRemoveComponent = useCallback(
-    (id: string) => {
-      const removedIds = componentSubtreeIds(components, id);
-      updateComponents((current) =>
-        current.filter((entry) => !removedIds.has(entry.id)),
-      );
-      if (removedIds.has(activeScopeId)) {
-        setActiveRootId(rootComponentId);
-        openOriginal();
-      } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
-        openOriginal();
-      }
-    },
-    [activeScopeId, components, openOriginal, rootComponentId, selectedComponentId, updateComponents],
-  );
+  // --- Return --------------------------------------------------------------
 
   return {
-    // Refs
     fileInputRef,
     stageViewportRef,
     imgRef,
     overlayCanvasRef,
     cropsCanvasRef,
 
-    // State
     currentTool,
     viewMode,
     selectedComponentId,
@@ -1789,7 +1316,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     cropsOverlayColor,
     cropsOverlayAlpha,
 
-    // Setters
     setCurrentTool,
     setViewMode,
     setSelectedComponentId,
@@ -1814,7 +1340,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     setCropsOverlayColor,
     setCropsOverlayAlpha,
 
-    // Viewport
     toolZoom,
     toolPan,
     setToolPan,
@@ -1824,7 +1349,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     handleZoomOut,
     zoomPercent,
 
-    // Computed values
     components,
     selectedComponent,
     rootComponent,
@@ -1847,7 +1371,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     showGroupNavigator,
     rootComponentId,
 
-    // Handlers
     bumpPaintVersion,
     flushPendingPersist,
     cancelPendingPersist,
@@ -1863,6 +1386,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     openBuilderMode,
     openStackMode,
     openGalleryMode,
+    focusGalleryCut,
     openComponent,
     selectRoot,
     setPrimaryRoot,

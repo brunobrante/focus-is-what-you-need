@@ -71,7 +71,8 @@ export function useBuilderViewport({
       if (imageError) return;
       event.preventDefault();
 
-      if (event.ctrlKey || event.metaKey || event.altKey || toolZoom <= MIN_TOOL_ZOOM) {
+      // A pinch (ctrl/meta/alt + wheel) always zooms about the cursor.
+      if (event.ctrlKey || event.metaKey || event.altKey) {
         const anchor = cursorOffsetFromCenter(event, stageViewportRef.current);
         if (event.deltaY < 0) {
           changeToolZoom(1, anchor);
@@ -80,6 +81,11 @@ export function useBuilderViewport({
         }
         return;
       }
+
+      // At 100% (minimum zoom) the subject is fully framed, so a plain wheel
+      // gesture does nothing — there is no scroll to consume. Panning only kicks
+      // in once zoomed past 100%.
+      if (toolZoom <= MIN_TOOL_ZOOM) return;
 
       setToolPan((pan) =>
         clampToolPan(
