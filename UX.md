@@ -262,6 +262,24 @@ Full-screen visual editor with floating UI layers.
   Preview button above the Inspector (see below). It still appears as a selectable /
   addable pane in the split ("Panels") menu once it is open.
 
+**Multiple Current windows**:
+- While split, the **Panels** menu offers **Add Current** — it adds another Current
+  pane (up to the 4-pane cap) that **mirrors the primary Current's subject** and turns
+  on the split if it was off.
+- Each extra Current appears in the nav tab bar as **Current +1**, **Current +2**, …
+  next to the primary **Current**. Hovering a Current tab shows a small popover —
+  *"In this window"* — naming the screen/component currently loaded there.
+- Selecting a Current tab (or clicking its pane) **focuses** that window: the layers
+  tree, inspector, and shortcuts all reflect it, exactly like switching to any other
+  window.
+- An extra Current is **independently navigable**: when it is the focused window, the
+  layers-tree header's subject picker re-points **that** Current at any screen/component
+  (the primary Current is unaffected). Each Current keeps its own viewport (pan/zoom).
+- Extra Currents are **session-only** — they are removed via the **×** on their pane in
+  the Panels menu, and they do not persist across a reload (the canvas reopens with a
+  single Current from the URL). Two Currents may point at the same subject; edits are
+  last-writer-wins on that scene.
+
 **Preview window** (a special, view-only window):
 - Launched by the **Preview button** (play icon) in the bar above the Inspector,
   not from the canvas tabs or the Features menu.

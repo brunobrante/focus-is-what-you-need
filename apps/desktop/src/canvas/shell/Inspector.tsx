@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  CANVAS_WINDOW_LABELS,
-  type CanvasWindowType,
-} from "@/canvas/canvasUtils";
+import { windowKeyLabel } from "@/canvas/canvasUtils";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import {
   renameElement,
@@ -88,7 +85,7 @@ export function Inspector({
   const selectedCount = editorProp !== undefined ? (editorProp?.state.selectedIds.length ?? 0) : bridgeSelectedCount;
   const canvasStageActive = editorProp !== undefined ? (editorProp?.state.canvasStageActive ?? false) : bridgeCanvasStageActive;
   const sourceId = editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId;
-  const sourceLabel = CANVAS_WINDOW_LABELS[(sourceId as CanvasWindowType | null) ?? "current"] ?? "Current";
+  const sourceLabel = windowKeyLabel(sourceId ?? "current");
   const node = document && selectedId ? document.elements[selectedId] ?? null : null;
 
   useEffect(() => {

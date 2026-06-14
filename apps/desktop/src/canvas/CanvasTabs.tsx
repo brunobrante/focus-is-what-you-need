@@ -3,8 +3,11 @@ import {
   CANVAS_FEATURE_WINDOW_ORDER,
   CANVAS_WINDOW_LABELS,
   MAX_CANVAS_SPLIT_PANES,
+  isCurrentKey,
+  windowKeyLabel,
   type CanvasFeatureFlags,
   type CanvasFeatureWindowType,
+  type CanvasWindowKey,
   type CanvasWindowType,
   type SplitMode,
   LAYOUT_LABELS,
@@ -23,23 +26,40 @@ export function CanvasTabs({
   split,
   splitWindows,
   canvasFeatures,
+  extraCurrentKeys = [],
+  currentSubjects = {},
+  canAddCurrent = false,
+  onAddCurrent,
+  onRemoveCurrent,
   onSplitChange,
   onSplitWindowsChange,
   onCanvasFeatureChange,
 }: {
-  activeTab: CanvasWindowType;
+  activeTab: CanvasWindowKey;
   enabledTabs: readonly CanvasWindowType[];
-  onTabChange: (t: CanvasWindowType) => void;
+  onTabChange: (t: CanvasWindowKey) => void;
   split: SplitMode;
-  splitWindows: readonly CanvasWindowType[];
+  splitWindows: readonly CanvasWindowKey[];
   canvasFeatures: CanvasFeatureFlags;
+  extraCurrentKeys?: readonly CanvasWindowKey[];
+  currentSubjects?: Record<CanvasWindowKey, { name: string; kind: "screen" | "component" }>;
+  canAddCurrent?: boolean;
+  onAddCurrent?: () => void;
+  onRemoveCurrent?: (key: CanvasWindowKey) => void;
   onSplitChange: (mode: SplitMode) => void;
-  onSplitWindowsChange: (windows: readonly CanvasWindowType[]) => void;
+  onSplitWindowsChange: (windows: readonly CanvasWindowKey[]) => void;
   onCanvasFeatureChange: (feature: CanvasFeatureWindowType, enabled: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hoveredCurrent, setHoveredCurrent] = useState<CanvasWindowKey | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const canSplit = enabledTabs.length >= 2;
+  // The nav tabs render: primary Current, each extra Current, then feature windows.
+  const navTabKeys: CanvasWindowKey[] = [
+    "current",
+    ...extraCurrentKeys,
+    ...enabledTabs.filter((tab) => tab !== "preview" && tab !== "current"),
+  ];
   const addableTabs = enabledTabs.filter((tab) => !splitWindows.includes(tab));
   const quadrantsEnabled = canSplit && splitWindows.length >= 3;
   const canAddPane =
@@ -48,26 +68,27 @@ export function CanvasTabs({
     splitWindows.length < MAX_CANVAS_SPLIT_PANES &&
     addableTabs.length > 0;
 
-  const changePane = (index: number, windowType: CanvasWindowType) => {
+  const changePane = (index: number, windowKey: CanvasWindowKey) => {
     const currentWindow = splitWindows[index];
-    if (!currentWindow || currentWindow === windowType) return;
+    if (!currentWindow || currentWindow === windowKey) return;
 
-    const existingIndex = splitWindows.indexOf(windowType);
+    const existingIndex = splitWindows.indexOf(windowKey);
     if (existingIndex >= 0) {
       const next = [...splitWindows];
-      next[index] = windowType;
+      next[index] = windowKey;
       next[existingIndex] = currentWindow;
       onSplitWindowsChange(next);
-      onTabChange(windowType);
+      onTabChange(windowKey);
       return;
     }
 
-    if (currentWindow === "current") return;
+    // Current panes (primary or extra) can't be swapped to a feature window here.
+    if (isCurrentKey(currentWindow)) return;
     const next = splitWindows.map((existing, existingIndex) =>
-      existingIndex === index ? windowType : existing,
+      existingIndex === index ? windowKey : existing,
     );
     onSplitWindowsChange(next);
-    onTabChange(windowType);
+    onTabChange(windowKey);
   };
 
   const addPane = () => {
@@ -78,7 +99,14 @@ export function CanvasTabs({
   };
 
   const removePane = (index: number) => {
-    if (splitWindows[index] === "current") return;
+    const removed = splitWindows[index];
+    // The primary Current pane is locked; an extra Current is removed through its
+    // owner (session state) which also drops it from the split.
+    if (removed === "current") return;
+    if (isCurrentKey(removed)) {
+      onRemoveCurrent?.(removed);
+      return;
+    }
     const next = splitWindows.filter((_, existingIndex) => existingIndex !== index);
     onSplitWindowsChange(next);
     onTabChange(next[0] ?? "current");
@@ -110,23 +138,35 @@ export function CanvasTabs({
       style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset" }}
     >
       {/* Preview is a special view-only window (launched from above the Inspector);
-          it stays selectable in the grid menu but is not a navigable nav tab. */}
-      {enabledTabs.filter((tab) => tab !== "preview").map((tab) => {
+          it stays selectable in the grid menu but is not a navigable nav tab.
+          Primary Current first, then any extra Currents, then feature windows. */}
+      {navTabKeys.map((tab) => {
         const isActive = activeTab === tab;
+        const currentTab = isCurrentKey(tab);
+        const subject = currentTab ? currentSubjects[tab] : undefined;
         return (
-          <button
+          <div
             key={tab}
-            type="button"
-            onClick={() => onTabChange(tab)}
-            className="rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100"
-            style={{
-              background: isActive ? "#2A2A2A" : "transparent",
-              color: isActive ? "#F2F2F2" : "#5A5A5A",
-              letterSpacing: "0.1px",
-            }}
+            className="relative"
+            onMouseEnter={currentTab ? () => setHoveredCurrent(tab) : undefined}
+            onMouseLeave={currentTab ? () => setHoveredCurrent((k) => (k === tab ? null : k)) : undefined}
           >
-            {CANVAS_WINDOW_LABELS[tab]}
-          </button>
+            <button
+              type="button"
+              onClick={() => onTabChange(tab)}
+              className="rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100"
+              style={{
+                background: isActive ? "#2A2A2A" : "transparent",
+                color: isActive ? "#F2F2F2" : "#5A5A5A",
+                letterSpacing: "0.1px",
+              }}
+            >
+              {windowKeyLabel(tab)}
+            </button>
+            {currentTab && hoveredCurrent === tab ? (
+              <CurrentTabPopover subject={subject} />
+            ) : null}
+          </div>
         );
       })}
 
@@ -180,26 +220,38 @@ export function CanvasTabs({
             {split !== "none" ? (
               <MenuSection title="Panels">
                 <div className="flex flex-col gap-1.5">
-                  {splitWindows.map((windowType, index) => (
+                  {splitWindows.map((windowKey, index) => (
                     <SplitPanePicker
-                      key={`${windowType}-${index}`}
+                      key={`${windowKey}-${index}`}
                       index={index}
-                      value={windowType}
+                      value={windowKey}
                       enabledTabs={enabledTabs}
                       onChange={(nextWindow) => changePane(index, nextWindow)}
                       onRemove={() => removePane(index)}
                     />
                   ))}
-                  {canAddPane ? (
-                    <button
-                      type="button"
-                      onClick={addPane}
-                      className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[#2C2C2C] bg-[#202020] text-[11px] font-medium text-[#9A9A9A] transition-colors duration-100 hover:bg-[#282828] hover:text-[#D8D8D8]"
-                    >
-                      <PlusIcon />
-                      Add panel
-                    </button>
-                  ) : null}
+                  <div className="flex gap-1.5">
+                    {canAddPane ? (
+                      <button
+                        type="button"
+                        onClick={addPane}
+                        className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border border-[#2C2C2C] bg-[#202020] text-[11px] font-medium text-[#9A9A9A] transition-colors duration-100 hover:bg-[#282828] hover:text-[#D8D8D8]"
+                      >
+                        <PlusIcon />
+                        Add panel
+                      </button>
+                    ) : null}
+                    {canAddCurrent && onAddCurrent ? (
+                      <button
+                        type="button"
+                        onClick={onAddCurrent}
+                        className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border border-[#2C2C2C] bg-[#202020] text-[11px] font-medium text-[#9A9A9A] transition-colors duration-100 hover:bg-[#282828] hover:text-[#D8D8D8]"
+                      >
+                        <PlusIcon />
+                        Add Current
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </MenuSection>
             ) : null}
@@ -283,32 +335,37 @@ function SplitPanePicker({
   onRemove,
 }: {
   index: number;
-  value: CanvasWindowType;
+  value: CanvasWindowKey;
   enabledTabs: readonly CanvasWindowType[];
-  onChange: (value: CanvasWindowType) => void;
+  onChange: (value: CanvasWindowKey) => void;
   onRemove: () => void;
 }) {
-  const currentLocked = value === "current";
+  // A Current pane (primary or extra) can't be re-typed to a feature window: the
+  // select is locked and just shows its label. The primary Current also can't be
+  // removed; extra Currents can.
+  const currentKey = isCurrentKey(value);
+  const removable = value !== "current";
 
   return (
     <div className="flex h-7 w-full shrink-0 items-center overflow-hidden rounded-md border border-[#2C2C2C] bg-[#202020]">
       <select
-        value={value}
-        onChange={(event) => onChange(event.target.value as CanvasWindowType)}
+        value={currentKey ? "current" : value}
+        onChange={(event) => onChange(event.target.value as CanvasWindowKey)}
         aria-label={`Split pane ${index + 1}`}
-        className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent pl-2 pr-3 text-[10.5px] font-medium text-[#CFCFCF] outline-none"
+        disabled={currentKey}
+        className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent pl-2 pr-3 text-[10.5px] font-medium text-[#CFCFCF] outline-none disabled:cursor-default disabled:opacity-100"
       >
-        {enabledTabs.map((tab) => (
-          <option
-            key={tab}
-            value={tab}
-            disabled={currentLocked && tab !== "current"}
-          >
-            {CANVAS_WINDOW_LABELS[tab]}
-          </option>
-        ))}
+        {currentKey ? (
+          <option value="current">{windowKeyLabel(value)}</option>
+        ) : (
+          enabledTabs.map((tab) => (
+            <option key={tab} value={tab}>
+              {CANVAS_WINDOW_LABELS[tab]}
+            </option>
+          ))
+        )}
       </select>
-      {!currentLocked ? (
+      {removable ? (
         <button
           type="button"
           onClick={onRemove}
@@ -318,6 +375,33 @@ function SplitPanePicker({
           <CloseIcon />
         </button>
       ) : null}
+    </div>
+  );
+}
+
+function CurrentTabPopover({
+  subject,
+}: {
+  subject?: { name: string; kind: "screen" | "component" };
+}) {
+  return (
+    <div
+      className="absolute left-1/2 top-[calc(100%+6px)] z-[40] w-max max-w-[220px] -translate-x-1/2 rounded-lg border border-[#2C2C2C] bg-[#171717] px-2.5 py-2 text-left"
+      style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset" }}
+    >
+      <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">
+        In this window
+      </div>
+      {subject ? (
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-[12px] font-medium text-[#E6E6E6]">{subject.name}</span>
+          <span className="shrink-0 rounded border border-[#2C2C2C] px-1 py-px text-[9px] uppercase tracking-[0.06em] text-[#8A8A8A]">
+            {subject.kind}
+          </span>
+        </div>
+      ) : (
+        <div className="text-[12px] text-[#8A8A8A]">Empty</div>
+      )}
     </div>
   );
 }

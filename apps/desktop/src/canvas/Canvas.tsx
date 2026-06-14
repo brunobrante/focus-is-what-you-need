@@ -36,9 +36,11 @@ import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
 import { useVersionScenePersistence } from "./hooks/useVersionScenePersistence";
 import { useCanvasNavigation } from "./hooks/useCanvasNavigation";
+import type { SubjectOwner } from "./hooks/useSubjectCanvasWindow";
 import {
   DEFAULT_CANVAS_FEATURES,
   addCanvasWindowToSplit,
+  addCurrentToSplit,
   buildProjectTree,
   canvasSizeForProjectType,
   computeComponentDeviceOrigin,
@@ -46,14 +48,18 @@ import {
   DEFAULT_PREVIEW_SETTINGS,
   enabledCanvasWindowTypes,
   findTreeNodeById,
+  isCurrentKey,
   isFactoryMockGraphJSON,
+  MAX_CURRENT_WINDOWS,
   mockTargetKey,
   normalizeCanvasSplitWindows,
   normalizeProjectType,
   shouldUseMockGraph,
+  windowTypeOfKey,
   type CanvasFeatureFlags,
   type CanvasFeatureWindowType,
   type CanvasSplitWindows,
+  type CanvasWindowKey,
   type CanvasWindowType,
   type PreviewSettings,
   type SplitMode,
@@ -127,14 +133,20 @@ function CanvasPageContent() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [treeOpen, setTreeOpen] = useState(true);
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
-  const [activeTab, setActiveTab] = useState<CanvasWindowType>(
+  const [activeTab, setActiveTab] = useState<CanvasWindowKey>(
     versionVariantParam ? "versions" : "current",
   );
-  const [treeTab, setTreeTab] = useState<CanvasWindowType>(
+  const [treeTab, setTreeTab] = useState<CanvasWindowKey>(
     versionVariantParam ? "versions" : "current",
   );
   const [split, setSplit] = useState<SplitMode>("none");
   const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "drafts"]);
+  // Extra "Current" windows (current-2, current-3…). Session-only: never persisted,
+  // gone on reload. Each mirrors a subject and gets its own editor/viewport via
+  // useSubjectCanvasWindow inside CanvasRender.
+  const [extraCurrents, setExtraCurrents] = useState<
+    Array<{ key: CanvasWindowKey; subject: SubjectOwner }>
+  >([]);
   const [canvasExpanded, setCanvasExpanded] = useState(false);
   // The view-only Preview window, launched from above the Inspector. It is not a
   // togglable feature nor a nav tab — `previewOpen` makes it available as a window.
@@ -472,6 +484,43 @@ function CanvasPageContent() {
   );
   const versionsSubjectSize = versionsDocument?.canvas;
 
+  // Subject (name + kind) shown in each Current tab's hover popover. The primary
+  // Current reflects the open subject; each extra Current resolves its mirrored/
+  // retargeted variant back to its owning screen or component.
+  const currentSubjects = useMemo<Record<CanvasWindowKey, { name: string; kind: "screen" | "component" }>>(() => {
+    const map: Record<CanvasWindowKey, { name: string; kind: "screen" | "component" }> = {
+      current: {
+        name: componentName || screenTitle || projectName || "Current",
+        kind: component ? "component" : "screen",
+      },
+    };
+    for (const entry of extraCurrents) {
+      const variant = allVariants.find((v) => v.id === entry.subject.ownerId);
+      const node = variant ? findTreeNodeById(projectTree, variant.ownerId) : null;
+      map[entry.key] = {
+        name: node?.name ?? componentName ?? screenTitle ?? "Current",
+        kind: variant?.ownerKind === "component" ? "component" : "screen",
+      };
+    }
+    return map;
+  }, [allVariants, component, componentName, extraCurrents, projectName, projectTree, screenTitle]);
+
+  // When the layers tree is focused on an extra Current, its header reflects THAT
+  // window's subject (not the primary's), and picking a project node re-points that
+  // window instead of navigating the primary Current.
+  const treeExtraCurrent = useMemo(
+    () => (isCurrentKey(treeTab) && treeTab !== "current"
+      ? extraCurrents.find((entry) => entry.key === treeTab) ?? null
+      : null),
+    [extraCurrents, treeTab],
+  );
+  const treeExtraSubjectId = useMemo(
+    () => (treeExtraCurrent
+      ? allVariants.find((v) => v.id === treeExtraCurrent.subject.ownerId)?.ownerId ?? null
+      : null),
+    [allVariants, treeExtraCurrent],
+  );
+
   const { canOpenCanvasNode, openCanvasForNode, openProjectNodeCanvas } = useCanvasNavigation({
     component,
     canUseFactoryMocks,
@@ -482,6 +531,24 @@ function CanvasPageContent() {
     projectType,
     flushPendingSave,
   });
+
+  // Picking a project node from the layers-tree header: re-point the focused extra
+  // Current at that subject (its main/active variant scene), or navigate the primary
+  // Current as before.
+  const handleOpenProjectNode = useCallback(
+    (node: ProjectTreeNode) => {
+      if (treeExtraCurrent) {
+        const ownerId =
+          node.kind === "screen"
+            ? mainVariantIdForScreen(allVariants, node.id)
+            : projectComponents.find((c) => c.id === node.id)?.activeVariantId ?? null;
+        if (ownerId) retargetExtraCurrent(treeExtraCurrent.key, { ownerType: "variant", ownerId });
+        return;
+      }
+      openProjectNodeCanvas(node);
+    },
+    [allVariants, openProjectNodeCanvas, projectComponents, retargetExtraCurrent, treeExtraCurrent],
+  );
 
   const handleInheritParentBackgroundChange = useCallback(
     (value: boolean) => {
@@ -624,25 +691,76 @@ function CanvasPageContent() {
     if (parentProjectNode) openProjectNodeCanvas(parentProjectNode);
   }, [flushPendingSave, fromParam, navigateToOwnerToken, parentProjectNode, openProjectNodeCanvas]);
 
+  // A window key is still reachable if it's any Current instance (Current keys are
+  // always valid while they exist) or an enabled feature window.
+  const isTabKeyEnabled = useCallback(
+    (key: CanvasWindowKey) => isCurrentKey(key) || enabledCanvasTabs.includes(windowTypeOfKey(key)),
+    [enabledCanvasTabs],
+  );
+
   useEffect(() => {
-    if (!enabledCanvasTabs.includes(activeTab)) setActiveTab("current");
-    if (!enabledCanvasTabs.includes(treeTab)) setTreeTab("current");
+    if (!isTabKeyEnabled(activeTab)) setActiveTab("current");
+    if (!isTabKeyEnabled(treeTab)) setTreeTab("current");
     setSplitWindows((current) => normalizeCanvasSplitWindows(current, enabledCanvasTabs));
     if (split !== "none" && (enabledCanvasTabs.length < 2 || normalizedSplitWindows.length < 2)) {
       setSplit("none");
     } else if (split === "grid" && normalizedSplitWindows.length < 3) {
       setSplit("vertical");
     }
-  }, [activeTab, enabledCanvasTabs, normalizedSplitWindows.length, split, treeTab]);
+  }, [activeTab, enabledCanvasTabs, isTabKeyEnabled, normalizedSplitWindows.length, split, treeTab]);
 
-  const changeCanvasTab = useCallback((tab: CanvasWindowType) => {
-    const nextTab = enabledCanvasTabs.includes(tab) ? tab : "current";
+  const changeCanvasTab = useCallback((tab: CanvasWindowKey) => {
+    const nextTab = isTabKeyEnabled(tab) ? tab : "current";
     setActiveTab(nextTab);
     setTreeTab(nextTab);
-    if (split !== "none" && enabledCanvasTabs.length >= 2) {
+    // Extra Current keys are managed alongside their session state, never added to the
+    // split here; only feature windows get pulled into the split on selection.
+    if (split !== "none" && !isCurrentKey(nextTab) && enabledCanvasTabs.length >= 2) {
       setSplitWindows((current) => addCanvasWindowToSplit(current, enabledCanvasTabs, nextTab));
     }
-  }, [enabledCanvasTabs, split]);
+  }, [enabledCanvasTabs, isTabKeyEnabled, split]);
+
+  // ── Extra Current windows ─────────────────────────────────────────────────────
+  // Add a new Current that mirrors the primary Current's subject, then focus it. The
+  // primary's scene owner is always a variant in this codebase, so mirroring is a
+  // straight copy of sceneOwner.
+  const handleAddCurrent = useCallback(() => {
+    if (!sceneOwner || sceneOwner.ownerType !== "variant") return;
+    const { windows, key } = addCurrentToSplit(splitWindows, enabledCanvasTabs);
+    if (!key) return;
+    const mirrored: SubjectOwner = { ownerType: "variant", ownerId: sceneOwner.ownerId };
+    setExtraCurrents((list) =>
+      list.some((entry) => entry.key === key) ? list : [...list, { key, subject: mirrored }],
+    );
+    setSplitWindows(windows);
+    setSplit((mode) => (mode === "none" ? "vertical" : mode));
+    setActiveTab(key);
+    setTreeTab(key);
+  }, [enabledCanvasTabs, sceneOwner, splitWindows]);
+
+  const removeExtraCurrent = useCallback((key: CanvasWindowKey) => {
+    setExtraCurrents((list) => list.filter((entry) => entry.key !== key));
+    setSplitWindows((current) => current.filter((windowKey) => windowKey !== key));
+    // Collapse to a single canvas when only the primary Current would remain.
+    if (splitWindows.filter((windowKey) => windowKey !== key && windowKey !== "preview").length < 2) {
+      setSplit("none");
+    }
+    setActiveTab((tab) => (tab === key ? "current" : tab));
+    setTreeTab((tab) => (tab === key ? "current" : tab));
+  }, [splitWindows]);
+
+  // Re-point an extra Current at a different subject (independent navigation). Used by
+  // the layers-tree header subject select when that Current is the focused tree tab.
+  const retargetExtraCurrent = useCallback((key: CanvasWindowKey, subject: SubjectOwner) => {
+    setExtraCurrents((list) =>
+      list.map((entry) => (entry.key === key ? { ...entry, subject } : entry)),
+    );
+  }, []);
+
+  const canAddCurrent =
+    Boolean(sceneOwner && sceneOwner.ownerType === "variant") &&
+    extraCurrents.length + 1 < MAX_CURRENT_WINDOWS &&
+    normalizedSplitWindows.length < MAX_CURRENT_WINDOWS;
 
   const changeSplitMode = useCallback((mode: SplitMode) => {
     if (mode !== "none" && enabledCanvasTabs.length < 2) {
@@ -659,7 +777,7 @@ function CanvasPageContent() {
     }
   }, [enabledCanvasTabs, normalizedSplitWindows.length]);
 
-  const changeSplitWindows = useCallback((windows: readonly CanvasWindowType[]) => {
+  const changeSplitWindows = useCallback((windows: readonly CanvasWindowKey[]) => {
     setSplitWindows(normalizeCanvasSplitWindows(windows, enabledCanvasTabs));
   }, [enabledCanvasTabs]);
 
@@ -749,6 +867,7 @@ function CanvasPageContent() {
         currentDocument={currentDocument}
         currentStorageKey={currentStorageKey}
         currentReady={currentReady}
+        extraCurrents={extraCurrents}
         versionsDocument={versionsDocument}
         versionsStorageKey={versionsStorageKey}
         versionsReady={versionsReady}
@@ -781,6 +900,11 @@ function CanvasPageContent() {
           split={split}
           splitWindows={normalizedSplitWindows}
           canvasFeatures={canvasFeatures}
+          extraCurrentKeys={extraCurrents.map((entry) => entry.key)}
+          currentSubjects={currentSubjects}
+          canAddCurrent={canAddCurrent}
+          onAddCurrent={handleAddCurrent}
+          onRemoveCurrent={removeExtraCurrent}
           onSplitChange={changeSplitMode}
           onSplitWindowsChange={changeSplitWindows}
           onCanvasFeatureChange={updateCanvasFeature}
@@ -825,8 +949,16 @@ function CanvasPageContent() {
       <Tree
         open={treeOpen}
         onClose={() => setTreeOpen(false)}
-        componentName={componentName || undefined}
-        screenName={screenTitle || undefined}
+        componentName={
+          treeExtraCurrent
+            ? (currentSubjects[treeExtraCurrent.key]?.kind === "component" ? currentSubjects[treeExtraCurrent.key]?.name : undefined)
+            : componentName || undefined
+        }
+        screenName={
+          treeExtraCurrent
+            ? (currentSubjects[treeExtraCurrent.key]?.kind === "screen" ? currentSubjects[treeExtraCurrent.key]?.name : undefined)
+            : screenTitle || undefined
+        }
         selectedNodeIds={selectedNodeIds}
         autoRevealSelection={settings.canvas.shell.tree.autoRevealSelection}
         canvasActive={editorCanvasActive}
@@ -902,7 +1034,7 @@ function CanvasPageContent() {
             document: detachInstance(editor.state.document, nodeId),
           });
         }}
-        onOpenProjectNode={openProjectNodeCanvas}
+        onOpenProjectNode={handleOpenProjectNode}
         activeTab={treeTab}
         enabledTabs={enabledCanvasTabs}
         onTabChange={changeCanvasTab}
@@ -914,7 +1046,7 @@ function CanvasPageContent() {
         selectedVersionId={selectedVersionId}
         onSelectVersion={setSelectedVersionId}
         onAddVersion={handleAddVersion}
-        currentSubjectId={component?.id ?? screen?.id ?? null}
+        currentSubjectId={treeExtraCurrent ? treeExtraSubjectId : component?.id ?? screen?.id ?? null}
         versionsSubjectId={versionsSubject?.id ?? null}
         versionsSubjectName={versionsSubjectNode?.name ?? componentName ?? screenTitle ?? undefined}
         versionsSubjectIsScreen={(versionsSubject?.kind ?? (component ? "component" : "screen")) === "screen"}

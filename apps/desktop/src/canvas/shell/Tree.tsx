@@ -31,7 +31,7 @@ import {
 import { copyElements, hasClipboard, pasteElements } from "@/canvas/engine/clipboard";
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import type { CanvasDocument } from "@/canvas/engine/types";
-import { CANVAS_WINDOW_LABELS, type CanvasWindowType } from "@/canvas/canvasUtils";
+import { isCurrentKey, windowKeyLabel, type CanvasWindowKey, type CanvasWindowType } from "@/canvas/canvasUtils";
 
 import type { DeviceType, DropMode, ProjectTreeNode } from "./tree/treeTypes";
 import {
@@ -125,9 +125,9 @@ type Props = {
   onGoToInstance?: (variantId: string) => void;
   onDetachNode?: (nodeId: string) => void;
   onOpenProjectNode?: (node: ProjectTreeNode) => void;
-  activeTab?: CanvasWindowType;
+  activeTab?: CanvasWindowKey;
   enabledTabs?: readonly CanvasWindowType[];
-  onTabChange?: (tab: CanvasWindowType) => void;
+  onTabChange?: (tab: CanvasWindowKey) => void;
   projectType?: DeviceType;
   projectTree?: ProjectTreeNode[];
   parentNode?: ProjectTreeNode | null;
@@ -411,7 +411,7 @@ export function Tree({
 
   const headerName = componentName || screenName || "Frame";
   const isScreen = !componentName && !!screenName;
-  const focusedWindowLabel = activeTab === "current" ? null : CANVAS_WINDOW_LABELS[activeTab];
+  const focusedWindowLabel = activeTab === "current" ? null : windowKeyLabel(activeTab);
   const rowWidth = subjectSize?.width ?? document?.canvas.width;
   const rowHeight = subjectSize?.height ?? document?.canvas.height;
   // In the Versions window the header is two selects (screen + version). The version

@@ -14,7 +14,14 @@ export type CanvasWindowType = "current" | "drafts" | "references" | "versions" 
 // window launched from the button above the Inspector, so it is excluded here.
 export type CanvasFeatureWindowType = Exclude<CanvasWindowType, "current" | "preview">;
 export type CanvasFeatureFlags = Record<CanvasFeatureWindowType, boolean>;
-export type CanvasSplitWindows = CanvasWindowType[];
+
+// A window is identified by a string KEY, not just its type. Feature windows use
+// their type as the key ("drafts", "versions", …). The "current" window can have
+// multiple instances: the primary is "current"; extras are "current-2", "current-3"…
+// Keys stay unique strings, so the dedup logic below (which used to mean "each type
+// once") now means "each key once" with no other change.
+export type CanvasWindowKey = string;
+export type CanvasSplitWindows = CanvasWindowKey[];
 
 /** Settings for the view-only Preview window (transient UI state, not persisted). */
 export type PreviewSettings = {
@@ -30,6 +37,8 @@ export const DEFAULT_PREVIEW_SETTINGS: PreviewSettings = {
 };
 
 export const MAX_CANVAS_SPLIT_PANES = 4;
+// A Current can only exist inside a split pane, so the cap equals the pane cap.
+export const MAX_CURRENT_WINDOWS = MAX_CANVAS_SPLIT_PANES;
 
 export const CANVAS_WINDOW_ORDER: readonly CanvasWindowType[] = [
   "current",
@@ -59,6 +68,48 @@ export const DEFAULT_CANVAS_FEATURES: CanvasFeatureFlags = {
   versions: false,
 };
 
+// ── Window key helpers ──────────────────────────────────────────────────────────
+// Extra Current instances are keyed "current-2", "current-3", … The primary is
+// the bare "current". These helpers project a key back to its window TYPE (for
+// rendering/labels) and generate/identify Current instance keys.
+
+const CURRENT_INSTANCE_KEY_RE = /^current-(\d+)$/;
+
+export function isCurrentKey(key: CanvasWindowKey): boolean {
+  return key === "current" || CURRENT_INSTANCE_KEY_RE.test(key);
+}
+
+export function windowTypeOfKey(key: CanvasWindowKey): CanvasWindowType {
+  return isCurrentKey(key) ? "current" : (key as CanvasWindowType);
+}
+
+/** 0 for the primary "current"; N-1 for "current-N" (so "current-2" → index 1). */
+export function currentInstanceIndex(key: CanvasWindowKey): number {
+  if (key === "current") return 0;
+  const match = CURRENT_INSTANCE_KEY_RE.exec(key);
+  return match ? Number(match[1]) - 1 : 0;
+}
+
+export function currentInstanceLabel(index: number): string {
+  return index === 0 ? "Current" : `Current +${index}`;
+}
+
+/** The single label entry point for any window key (handles Current instances). */
+export function windowKeyLabel(key: CanvasWindowKey): string {
+  if (isCurrentKey(key)) return currentInstanceLabel(currentInstanceIndex(key));
+  return CANVAS_WINDOW_LABELS[windowTypeOfKey(key)];
+}
+
+/** Smallest unused "current-N" (N in 2..MAX), or null when the cap is reached. */
+export function nextCurrentKey(existingKeys: readonly CanvasWindowKey[]): CanvasWindowKey | null {
+  const taken = new Set(existingKeys);
+  for (let n = 2; n <= MAX_CURRENT_WINDOWS; n += 1) {
+    const key = `current-${n}`;
+    if (!taken.has(key)) return key;
+  }
+  return null;
+}
+
 export const LAYOUT_LABELS: Record<SplitMode, string> = {
   none: "Single canvas",
   vertical: "Split vertical",
@@ -84,21 +135,21 @@ export function firstEnabledSecondaryWindow(
 }
 
 export function normalizeCanvasSplitWindows(
-  windows: readonly CanvasWindowType[],
+  windows: readonly CanvasWindowKey[],
   enabledWindowTypes: readonly CanvasWindowType[],
 ): CanvasSplitWindows {
   const normalized: CanvasSplitWindows = [];
 
-  for (const windowType of windows) {
+  for (const windowKey of windows) {
     if (
-      enabledWindowTypes.includes(windowType) &&
-      !normalized.includes(windowType)
+      enabledWindowTypes.includes(windowTypeOfKey(windowKey)) &&
+      !normalized.includes(windowKey)
     ) {
-      normalized.push(windowType);
+      normalized.push(windowKey);
     }
   }
 
-  if (enabledWindowTypes.includes("current") && !normalized.includes("current")) {
+  if (enabledWindowTypes.includes("current") && !normalized.some(isCurrentKey)) {
     normalized.unshift("current");
   }
 
@@ -111,14 +162,32 @@ export function normalizeCanvasSplitWindows(
 }
 
 export function addCanvasWindowToSplit(
-  windows: readonly CanvasWindowType[],
+  windows: readonly CanvasWindowKey[],
   enabledWindowTypes: readonly CanvasWindowType[],
-  windowType: CanvasWindowType,
+  windowKey: CanvasWindowKey,
 ): CanvasSplitWindows {
   const normalized = normalizeCanvasSplitWindows(windows, enabledWindowTypes);
-  if (!enabledWindowTypes.includes(windowType) || normalized.includes(windowType)) return normalized;
-  if (normalized.length < MAX_CANVAS_SPLIT_PANES) return [...normalized, windowType];
-  return [...normalized.slice(0, MAX_CANVAS_SPLIT_PANES - 1), windowType];
+  if (!enabledWindowTypes.includes(windowTypeOfKey(windowKey)) || normalized.includes(windowKey)) {
+    return normalized;
+  }
+  if (normalized.length < MAX_CANVAS_SPLIT_PANES) return [...normalized, windowKey];
+  return [...normalized.slice(0, MAX_CANVAS_SPLIT_PANES - 1), windowKey];
+}
+
+/**
+ * Appends a NEW Current instance ("current-2"…) to the split, returning the next
+ * windows array and the key created (or null when the cap is reached). Unlike
+ * addCanvasWindowToSplit, this never refuses just because "current" is present.
+ */
+export function addCurrentToSplit(
+  windows: readonly CanvasWindowKey[],
+  enabledWindowTypes: readonly CanvasWindowType[],
+): { windows: CanvasSplitWindows; key: CanvasWindowKey | null } {
+  const normalized = normalizeCanvasSplitWindows(windows, enabledWindowTypes);
+  if (normalized.length >= MAX_CANVAS_SPLIT_PANES) return { windows: normalized, key: null };
+  const key = nextCurrentKey(normalized);
+  if (!key) return { windows: normalized, key: null };
+  return { windows: [...normalized, key], key };
 }
 
 export function normalizeName(value: string): string {

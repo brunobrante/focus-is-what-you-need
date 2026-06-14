@@ -17,13 +17,17 @@ import {
   CANVAS_WINDOW_LABELS,
   canvasSizeForProjectType,
   DEFAULT_PREVIEW_SETTINGS,
+  isCurrentKey,
   normalizeCanvasSplitWindows,
+  windowTypeOfKey,
   type CanvasFeatureWindowType,
   type CanvasSplitWindows,
+  type CanvasWindowKey,
   type CanvasWindowType,
   type PreviewSettings,
   type SplitMode,
 } from "@/canvas/canvasUtils";
+import { useSubjectCanvasWindow, type SubjectOwner } from "@/canvas/hooks/useSubjectCanvasWindow";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
 import { CanvasReferencesWindow, type CanvasReferencesContext } from "./CanvasReferencesWindow";
 import { CanvasPreviewSurface } from "./PreviewSurface";
@@ -73,6 +77,7 @@ export function CanvasRender({
   currentDocument,
   currentStorageKey = CURRENT_CANVAS_STORAGE_KEY,
   currentReady = true,
+  extraCurrents = [],
   versionsDocument,
   versionsStorageKey = VERSIONS_CANVAS_STORAGE_KEY,
   versionsReady = true,
@@ -99,14 +104,15 @@ export function CanvasRender({
   treeOpen: boolean;
   inspectorOpen: boolean;
   split: SplitMode;
-  activeTab?: CanvasWindowType;
+  activeTab?: CanvasWindowKey;
   enabledTabs?: readonly CanvasWindowType[];
-  splitWindows?: readonly CanvasWindowType[];
+  splitWindows?: readonly CanvasWindowKey[];
   expanded: boolean;
   activeTool?: string;
   currentDocument?: CanvasDocument;
   currentStorageKey?: string;
   currentReady?: boolean;
+  extraCurrents?: ReadonlyArray<{ key: CanvasWindowKey; subject: SubjectOwner }>;
   versionsDocument?: CanvasDocument;
   versionsStorageKey?: string;
   versionsReady?: boolean;
@@ -123,7 +129,7 @@ export function CanvasRender({
   previewSettings?: PreviewSettings;
   onClosePreview?: () => void;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
-  onActiveCanvasChange?: (windowType: CanvasWindowType) => void;
+  onActiveCanvasChange?: (windowKey: CanvasWindowKey) => void;
   onToggleExpand?: () => void;
   onBackToParent?: () => void;
   settings?: GlobalSettings;
@@ -146,7 +152,9 @@ export function CanvasRender({
     return createDraftDocument(Math.max(400, w), Math.max(300, h));
   }, []);
 
-  const selectedTab = enabledTabs.includes(activeTab) ? activeTab : "current";
+  const isKeyRenderable = (key: CanvasWindowKey) =>
+    isCurrentKey(key) || enabledTabs.includes(windowTypeOfKey(key));
+  const selectedTab = isKeyRenderable(activeTab) ? activeTab : "current";
   const normalizedSplitWindows: CanvasSplitWindows = normalizeCanvasSplitWindows(
     splitWindows,
     enabledTabs,
@@ -259,14 +267,33 @@ export function CanvasRender({
   };
 
   const renderWindowSurface = (
-    windowType: CanvasWindowType,
+    windowKey: CanvasWindowKey,
     active: boolean,
     showActiveBorder: boolean,
   ) => {
-    if (windowType === "current") return renderCurrentSurface(active, showActiveBorder);
+    if (windowKey === "current") return renderCurrentSurface(active, showActiveBorder);
+    if (isCurrentKey(windowKey)) {
+      const entry = extraCurrents.find((item) => item.key === windowKey);
+      return (
+        <ExtraCurrentSurface
+          windowKey={windowKey}
+          subject={entry?.subject ?? null}
+          active={active}
+          showActiveBorder={showActiveBorder}
+          expanded={expanded}
+          onClick={() => onActiveCanvasChange?.(windowKey)}
+          activeTool={activeTool}
+          projectType={projectType}
+          shellDeviceVisibility={surfaceDeviceVisibility}
+          shellZoomVisibility={surfaceZoomVisibility}
+          settings={settings}
+          onCanvasToolShortcut={onCanvasToolShortcut}
+        />
+      );
+    }
     // Preview is a view-only window: it renders the current document read-only and
     // never becomes the active/focused canvas (no onActiveCanvasChange, no border).
-    if (windowType === "preview") {
+    if (windowKey === "preview") {
       return (
         <CanvasPreviewSurface
           document={currentDocument ?? createDraftDocument(390, 844)}
@@ -276,7 +303,7 @@ export function CanvasRender({
         />
       );
     }
-    return renderSecondarySurface(windowType, active, showActiveBorder);
+    return renderSecondarySurface(windowTypeOfKey(windowKey) as CanvasFeatureWindowType, active, showActiveBorder);
   };
   const useGridSplit = split === "grid" && renderedWindows.length >= 3;
 
@@ -299,13 +326,13 @@ export function CanvasRender({
           }
           style={useGridSplit ? { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" } : undefined}
         >
-          {renderedWindows.map((windowType, index) => (
+          {renderedWindows.map((windowKey, index) => (
             <div
-              key={windowType}
+              key={windowKey}
               className="flex min-h-0 min-w-0 flex-1"
               style={gridPaneStyle(index, renderedWindows.length)}
             >
-              {renderWindowSurface(windowType, activeWindow === windowType, true)}
+              {renderWindowSurface(windowKey, activeWindow === windowKey, true)}
             </div>
           ))}
         </div>
@@ -484,6 +511,70 @@ function VersionsWindowSurface({
       active={active}
       showActiveBorder={showActiveBorder}
       sourceId="versions"
+      publishBridge={active}
+      expanded={expanded}
+      onClick={onClick}
+      storageKey={storageKey}
+      draftMode={false}
+      fallbackDocument={document}
+      persistStorage={false}
+      ready={ready}
+      onDocumentChange={onDocumentChange}
+      activeTool={activeTool}
+      projectType={projectType}
+      shellDeviceVisibility={shellDeviceVisibility}
+      shellBackVisibility="hidden"
+      shellZoomVisibility={shellZoomVisibility}
+      settings={settings}
+      onCanvasToolShortcut={onCanvasToolShortcut}
+      onOpenSelectedComponentShortcut={undefined}
+    />
+  );
+}
+
+// An extra "Current" window: an independent editable clone of the Current surface
+// bound to its own subject (mirrored from the primary Current, then retargetable).
+// It loads/persists its own scene via useSubjectCanvasWindow, so it gets its own
+// editor and viewport. Session-only — persistStorage is off.
+function ExtraCurrentSurface({
+  windowKey,
+  subject,
+  active,
+  showActiveBorder,
+  expanded,
+  onClick,
+  activeTool,
+  projectType,
+  shellDeviceVisibility,
+  shellZoomVisibility,
+  settings,
+  onCanvasToolShortcut,
+}: {
+  windowKey: CanvasWindowKey;
+  subject: SubjectOwner | null;
+  active: boolean;
+  showActiveBorder: boolean;
+  expanded?: boolean;
+  onClick?: () => void;
+  activeTool?: string;
+  projectType: ProjectType;
+  shellDeviceVisibility: ShellControlVisibility;
+  shellZoomVisibility: ShellControlVisibility;
+  settings: GlobalSettings;
+  onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+}) {
+  const { document, storageKey, ready, onDocumentChange } = useSubjectCanvasWindow({
+    subjectOwner: subject,
+    storageKeyPrefix: windowKey,
+    projectType,
+    canvasName: "Current",
+  });
+
+  return (
+    <CanvasSurface
+      active={active}
+      showActiveBorder={showActiveBorder}
+      sourceId={windowKey}
       publishBridge={active}
       expanded={expanded}
       onClick={onClick}
