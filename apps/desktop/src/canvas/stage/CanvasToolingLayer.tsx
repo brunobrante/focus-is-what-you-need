@@ -38,10 +38,12 @@ import {
 import { createToolingRendererAdapter } from "./toolingRendererFactory";
 import type {
   ToolingDropTargetCommand,
+  ToolingGhostCommand,
   ToolingOutlineCommand,
   ToolingParentDistanceCommand,
   ToolingRendererAdapter,
 } from "./toolingRenderAdapter";
+import { isSubtreeInvisible } from "./canvasToolingUtils";
 
 export type { RadiusCorner } from "./canvasHitTesting";
 
@@ -199,6 +201,7 @@ type ToolingRenderData = {
   sizeLabelViewportRect: Rect | null;
   hitGeometry: ToolingGeometry;
   outlines: ToolingOutlineCommand[];
+  ghosts: ToolingGhostCommand[];
   resizeBox: ToolingBox | null;
   radiusHandlePositions: Point[] | null;
   radiusLabel: { text: string; left: number; top: number; transform: string } | null;
@@ -499,11 +502,32 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             allowedResizeHandles: suppressHandles ? null : allowedResizeHandles,
           };
 
+      // While moving a selection, any dragged element whose whole subtree paints
+      // nothing (e.g. an empty wrapper) is invisible — draw a ghost so the user
+      // can see what they are dragging.
+      const ghosts: ToolingGhostCommand[] =
+        props.interactionType === "drag"
+          ? transformIds.flatMap((id) => {
+              if (!isSubtreeInvisible(doc, id)) return [];
+              const box = resolveBox(id);
+              if (!box) return [];
+              return [
+                {
+                  rect: box.rect,
+                  corners: box.corners,
+                  borderRadius: doc.elements[id]?.styles.borderRadius ?? 0,
+                  displayZoom: t.displayZoom,
+                },
+              ];
+            })
+          : [];
+
       return {
         transformIds,
         sizeLabelCanvasRect,
         sizeLabelViewportRect,
         hitGeometry,
+        ghosts,
         outlines: props.canvasStageActive
           ? [{ rect: canvasBox?.rect ?? null, corners: canvasBox?.corners, color: SELECTION_COLOR }]
           : [
@@ -866,6 +890,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         width: overlaySize.width,
         height: overlaySize.height,
         outlines: renderData.outlines,
+        ghosts: renderData.ghosts,
         resizeBox: renderData.resizeBox,
         radiusHandlePositions: renderData.radiusHandlePositions,
         guides: props.guides,

@@ -21,6 +21,19 @@ export type ToolingBoxCommand = {
   color?: string;
 };
 
+/**
+ * A drag ghost for an element that paints nothing on screen (e.g. an empty
+ * wrapper). Drawn as a soft shadow + faint surface so the user can see what
+ * they are moving. Rect/corners are in viewport space.
+ */
+export type ToolingGhostCommand = {
+  rect: Rect;
+  corners?: [Point, Point, Point, Point] | null;
+  /** Element corner radius in canvas px; scaled by displayZoom at paint time. */
+  borderRadius: number;
+  displayZoom: number;
+};
+
 export type ToolingDropTargetCommand = {
   rect: Rect;
   borderRadius: number;
@@ -45,6 +58,7 @@ export type ToolingRenderFrame = {
   width: number;
   height: number;
   outlines: ToolingOutlineCommand[];
+  ghosts: ToolingGhostCommand[];
   resizeBox: ToolingBoxCommand | null;
   radiusHandlePositions: Point[] | null;
   guides: SnapGuide[];

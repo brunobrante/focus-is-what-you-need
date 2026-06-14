@@ -3,6 +3,7 @@ import CanvasKitInit, {
   type CanvasKit,
   type Font,
   type Paint,
+  type Path,
   type Surface,
   type Typeface,
 } from "canvaskit-wasm";
@@ -21,12 +22,19 @@ import {
 import type {
   ToolingBoxCommand,
   ToolingDropTargetCommand,
+  ToolingGhostCommand,
   ToolingOutlineCommand,
   ToolingRenderFrame,
   ToolingRendererAdapter,
 } from "./toolingRenderAdapter";
 
 const HANDLE_FILL = "#ffffff";
+// Drag ghost for invisible elements: a soft blue drop shadow under a faint
+// surface, framed with a dashed selection-blue outline.
+const GHOST_FILL = "rgba(13, 153, 255, 0.10)";
+const GHOST_SHADOW_COLOR = "rgba(13, 99, 168, 0.45)";
+const GHOST_SHADOW_BLUR = 10;
+const GHOST_SHADOW_OFFSET_Y = 4;
 const HANDLE_BORDER_RADIUS = 2;
 const GUIDE_COLOR = "#ff2ca8";
 const MARQUEE_FILL = "rgba(13, 153, 255, 0.08)";
@@ -58,6 +66,7 @@ function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
     a.width === b.width &&
     a.height === b.height &&
     a.outlines === b.outlines &&
+    a.ghosts === b.ghosts &&
     a.resizeBox === b.resizeBox &&
     a.radiusHandlePositions === b.radiusHandlePositions &&
     a.guides === b.guides &&
@@ -111,6 +120,9 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
   private host: HTMLElement | null = null;
   private surface: Surface | null = null;
   private paintPool: PaintPool | null = null;
+  // Blurred shadow paint for drag ghosts. Built lazily (needs a MaskFilter, which
+  // the PaintPool does not manage) and disposed on destroy.
+  private ghostShadowPaint: Paint | null = null;
   private parentDistanceTypeface: Typeface | null = null;
   private ownsParentDistanceTypeface = false;
   private ready = false;
@@ -193,6 +205,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
       canvas.save();
       canvas.scale(this.size.resolution, this.size.resolution);
 
+      for (const ghost of frame.ghosts) {
+        drawGhost(ck, canvas, pool, ghost, this.getGhostShadowPaint(ck));
+      }
+
       for (const outline of frame.outlines) {
         drawOutline(ck, canvas, pool, outline);
       }
@@ -245,6 +261,8 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.disposeSurface();
     this.paintPool?.dispose();
     this.paintPool = null;
+    this.ghostShadowPaint?.delete();
+    this.ghostShadowPaint = null;
     if (this.ownsParentDistanceTypeface) this.parentDistanceTypeface?.delete();
     this.parentDistanceTypeface = null;
     this.ownsParentDistanceTypeface = false;
@@ -267,6 +285,15 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.canvasKit = null;
     this.host = null;
     this.size = { width: 0, height: 0, resolution: 1 };
+  }
+
+  private getGhostShadowPaint(ck: CanvasKit): Paint {
+    if (!this.ghostShadowPaint) {
+      const paint = createFillPaint(ck, GHOST_SHADOW_COLOR);
+      paint.setMaskFilter(ck.MaskFilter.MakeBlur(ck.BlurStyle.Normal, GHOST_SHADOW_BLUR, false));
+      this.ghostShadowPaint = paint;
+    }
+    return this.ghostShadowPaint;
   }
 
   private ensureSurface(frame: ToolingRenderFrame): Surface | null {
@@ -522,6 +549,64 @@ function drawGuide(
 
   const paint = pool.getStroke(GUIDE_COLOR, 1);
   canvas.drawLine(p1.x, p1.y, p2.x, p2.y, paint);
+}
+
+function drawGhost(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  command: ToolingGhostCommand,
+  shadowPaint: Paint,
+): void {
+  const { rect, corners } = command;
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const rotated = Boolean(corners && !isAxisAlignedBox(rect, corners));
+
+  if (rotated && corners) {
+    const path = pathFromCorners(ck, corners);
+    try {
+      const shadow = pathFromCorners(ck, corners, GHOST_SHADOW_OFFSET_Y);
+      try {
+        canvas.drawPath(shadow, shadowPaint);
+      } finally {
+        shadow.delete();
+      }
+      canvas.drawPath(path, pool.getFill(GHOST_FILL));
+    } finally {
+      path.delete();
+    }
+    drawPolygonOutline(ck, canvas, pool, corners, SELECTION_COLOR);
+    return;
+  }
+
+  const radius = Math.min(
+    command.borderRadius * command.displayZoom,
+    maxBorderRadiusForSize(rect.width, rect.height),
+  );
+  drawRoundRectWithPaint(
+    ck,
+    canvas,
+    { ...rect, y: rect.y + GHOST_SHADOW_OFFSET_Y },
+    radius,
+    shadowPaint,
+  );
+  drawRoundRectWithPaint(ck, canvas, rect, radius, pool.getFill(GHOST_FILL));
+  drawDashedRect(ck, canvas, pool, rect, SELECTION_COLOR, 4, 4);
+}
+
+function pathFromCorners(
+  ck: CanvasKit,
+  corners: [Point, Point, Point, Point],
+  offsetY = 0,
+): Path {
+  const path = new ck.Path();
+  path.moveTo(corners[0].x, corners[0].y + offsetY);
+  path.lineTo(corners[1].x, corners[1].y + offsetY);
+  path.lineTo(corners[2].x, corners[2].y + offsetY);
+  path.lineTo(corners[3].x, corners[3].y + offsetY);
+  path.close();
+  return path;
 }
 
 function drawDropTarget(

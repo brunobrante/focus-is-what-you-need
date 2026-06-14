@@ -6,7 +6,7 @@ import {
   getSelectionAABB,
   getSelectionBox,
 } from "@/canvas/engine/geometry";
-import type { CanvasDocument, Rect, ViewportMode } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, Rect, ViewportMode } from "@/canvas/engine/types";
 
 export function getTransformIds(document: CanvasDocument, selectedIds: string[]): string[] {
   return filterTopLevelIds(document, selectedIds).filter((id) => {
@@ -63,6 +63,49 @@ export function rectsIntersect(a: Rect, b: Rect): boolean {
     a.y < b.y + b.height &&
     a.y + a.height > b.y
   );
+}
+
+/**
+ * True when a color string would paint nothing — undefined, `transparent`,
+ * `none`, or any rgba()/hsla() with a zero alpha channel.
+ */
+function isVisibleColor(color: string | undefined): boolean {
+  if (!color) return false;
+  const value = color.trim().toLowerCase();
+  if (value === "transparent" || value === "none") return false;
+  const fn = value.match(/(?:rgba?|hsla?)\(([^)]+)\)/);
+  if (fn) {
+    const parts = fn[1].split(",").map((part) => part.trim());
+    const alpha = parts[3] !== undefined ? Number(parts[3]) : 1;
+    return Number.isFinite(alpha) ? alpha > 0 : true;
+  }
+  return true;
+}
+
+/**
+ * A node that paints nothing on its own: a `rect`/wrapper with no fill and no
+ * visible border. Other element types (text, image, icon, shapes) always render
+ * something, so they are never considered visually empty here.
+ */
+export function isVisuallyEmptyNode(node: ElementNode): boolean {
+  if (node.type !== "rect") return false;
+  if ((node.styles.opacity ?? 1) <= 0) return true;
+  const hasFill = isVisibleColor(node.styles.background);
+  const hasBorder = (node.styles.borderWidth ?? 0) > 0 && isVisibleColor(node.styles.borderColor);
+  return !hasFill && !hasBorder;
+}
+
+/**
+ * True when nothing inside this subtree renders any pixels — the node itself is
+ * visually empty (or hidden) and every descendant is too. Dragging such a node
+ * shows nothing on screen, so the tooling layer draws a ghost in its place.
+ */
+export function isSubtreeInvisible(document: CanvasDocument, id: string): boolean {
+  const node = document.elements[id];
+  if (!node) return true;
+  if (node.visible === false) return true;
+  if (!isVisuallyEmptyNode(node)) return false;
+  return node.children.every((childId) => isSubtreeInvisible(document, childId));
 }
 
 export function findElementsInMarquee(document: CanvasDocument, marquee: Rect): string[] {
