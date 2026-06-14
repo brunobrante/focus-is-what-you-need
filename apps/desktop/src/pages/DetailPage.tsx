@@ -59,7 +59,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
   const {
     project, screens, screen, components, activeVariants, references,
     type, canUseFactoryMocks, projectName, screenName, tpl, tplLabel,
-    prevScreen, nextScreen, canvasHref, filteredComponents, filteredVersions,
+    prevScreen, nextScreen, canvasHref, filteredComponents, linkedComponentIds, filteredVersions,
     filteredReferences, sideTab, setSideTab, query, setQuery, filter, setFilter,
     versions, activeVersionId, setActiveVersionId, activeTpl,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
@@ -203,6 +203,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                       variant={activeVariants.get(c.id) ?? null}
                       projectId={project?.id ?? pid}
                       type={type}
+                      linked={linkedComponentIds.has(c.id)}
                       onRequestDelete={requestDeleteComponent}
                       onOpenCanvas={handleOpenCanvas}
                       onFastEdit={(cmp) => {
@@ -289,7 +290,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
 function ComponentContent({ componentId }: { componentId: string }) {
   const {
     component, project, screens, variants, activeVariant, screen, trail,
-    children, childVariants, projectComponents, references, type, projectId,
+    children, linkedChildIds, childVariants, projectComponents, references, type, projectId,
     projectName, variantCount, canvasHref, filteredChildren, filteredVariants,
     filteredReferences, history, sideTab, setSideTab, query, setQuery,
     filter, setFilter, fastEditOpen, setFastEditOpen, pendingChildDelete,
@@ -398,6 +399,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
                       variant={childVariants.get(c.id) ?? null}
                       projectId={projectId}
                       type={type}
+                      linked={linkedChildIds.has(c.id)}
                       onRequestDelete={setPendingChildDelete}
                       onOpenCanvas={handleOpenCanvas}
                     />
@@ -663,12 +665,13 @@ function VariantSideCard({
 }
 
 function ChildCard({
-  component, variant, projectId, type, onRequestDelete, onOpenCanvas,
+  component, variant, projectId, type, linked = false, onRequestDelete, onOpenCanvas,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
   projectId: string;
   type: ProjectType;
+  linked?: boolean;
   onRequestDelete: (c: ComponentRow) => void;
   onOpenCanvas: (variantId: string) => void;
 }) {
@@ -676,20 +679,22 @@ function ChildCard({
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
   return (
     <Link to={href} className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5">
-      <div className="preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] p-4 transition-colors group-hover:border-[var(--border-strong)]">
+      <div className={["preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border p-4 transition-colors", linked ? "border-[#9b6dff] group-hover:border-[#b69cff]" : "border-[var(--border)] group-hover:border-[var(--border-strong)]"].join(" ")}>
         {variant ? <Snapshot kind="component" ownerType="variant" ownerId={variant.id} seedKey={variant.seedKey} type={type} display="card" /> : null}
         <CardMenu
           buttons={[
             { key: "open", label: "Open component", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
             { key: "canvas", label: "Open in canvas", icon: CardMenuIcons.Canvas, onClick: () => { if (variant) onOpenCanvas(variant.id); } },
-            { key: "more", label: "More", icon: CardMenuIcons.More, menuItems: [{ key: "delete", label: "Delete component", icon: CardMenuIcons.Trash, destructive: true, onClick: () => onRequestDelete(component) }] },
+            ...(linked ? [] : [{ key: "more", label: "More", icon: CardMenuIcons.More, menuItems: [{ key: "delete", label: "Delete component", icon: CardMenuIcons.Trash, destructive: true, onClick: () => onRequestDelete(component) }] }]),
           ]}
         />
       </div>
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">{component.name}</span>
-          {component.kind ? (
+          {linked ? (
+            <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[#c9b3ff]">linked</span>
+          ) : component.kind ? (
             <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[var(--text-faint)]">{component.kind}</span>
           ) : null}
         </div>

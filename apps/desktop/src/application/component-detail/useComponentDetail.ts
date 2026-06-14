@@ -5,7 +5,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { deleteVariant, duplicateVariant, getVariant } from "@/lib/storage/repos/variants.repo";
+import { deleteVariant, duplicateVariant, getVariant, isMainVariant } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
   useActiveVariants,
@@ -44,6 +44,7 @@ export interface ComponentDetailState {
   screen: ScreenRow | null | undefined;
   trail: ComponentRow[];
   children: ComponentRow[];
+  linkedChildIds: Set<string>;
   childVariants: Map<string, VariantRow>;
   projectComponents: ComponentRow[] | undefined;
   references: ReturnType<typeof useReferences>["data"];
@@ -171,7 +172,28 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const screenIdAncestor = useScreenAncestor(component ?? null);
   const { data: screen } = useScreen(screenIdAncestor);
   const trail = useAncestorTrail(component ?? null);
-  const { data: children } = useVariantChildren(activeVariant?.id);
+  // A non-main variant's subcomponents are the main variant's children, referenced as
+  // linked instances. Load the main's children and mark them linked; the version's own
+  // (detached) children come from ownChildren.
+  const mainVariant = useMemo(
+    () => variants.find((v) => isMainVariant(v)) ?? null,
+    [variants],
+  );
+  const isVersionVariant = Boolean(
+    activeVariant && mainVariant && activeVariant.id !== mainVariant.id,
+  );
+  const { data: ownChildren } = useVariantChildren(activeVariant?.id);
+  const { data: mainChildren } = useVariantChildren(
+    isVersionVariant ? mainVariant?.id : undefined,
+  );
+  const children = useMemo(
+    () => (isVersionVariant ? [...mainChildren, ...ownChildren] : ownChildren),
+    [isVersionVariant, mainChildren, ownChildren],
+  );
+  const linkedChildIds = useMemo(
+    () => (isVersionVariant ? new Set(mainChildren.map((c) => c.id)) : new Set<string>()),
+    [isVersionVariant, mainChildren],
+  );
   const { data: childVariants } = useActiveVariants(children);
   const { data: projectComponents } = useComponentsByProject(project?.id ?? null);
   const { data: references } = useReferences("component", component?.id ?? null);
@@ -315,6 +337,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     screen,
     trail,
     children,
+    linkedChildIds,
     childVariants,
     projectComponents,
     references,

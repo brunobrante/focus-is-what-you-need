@@ -9,6 +9,7 @@ export function ComponentSideCard({
   variant,
   projectId,
   type,
+  linked = false,
   onRequestDelete,
   onOpenCanvas,
   onFastEdit,
@@ -19,6 +20,10 @@ export function ComponentSideCard({
   variant: VariantRow | null;
   projectId: string;
   type: ProjectType;
+  // True when shown inside a version's detail: the component belongs to the main and
+  // is referenced as a linked instance — rendered with a purple border and read-only
+  // (no destructive actions).
+  linked?: boolean;
   onRequestDelete: (component: ComponentRow) => void;
   onOpenCanvas: (variantId: string) => void;
   onFastEdit: (component: ComponentRow) => void;
@@ -32,7 +37,14 @@ export function ComponentSideCard({
       to={href}
       className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
     >
-      <div className="preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border border-[var(--border)] p-4 transition-colors group-hover:border-[var(--border-strong)]">
+      <div
+        className={[
+          "preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border p-4 transition-colors",
+          linked
+            ? "border-[#9b6dff] group-hover:border-[#b69cff]"
+            : "border-[var(--border)] group-hover:border-[var(--border-strong)]",
+        ].join(" ")}
+      >
         {variant ? (
           <Snapshot
             kind="component"
@@ -60,32 +72,22 @@ export function ComponentSideCard({
               icon: CardMenuIcons.FastEdit,
               onClick: () => onFastEdit(component),
             },
-            {
-              key: "more",
-              label: "More",
-              icon: CardMenuIcons.More,
-              menuItems: [
-                {
-                  key: "move-to",
-                  label: "Move to",
-                  icon: CardMenuIcons.MoveTo,
-                  onClick: () => onMoveTo(component),
-                },
-                {
-                  key: "make-global",
-                  label: "Make global",
-                  icon: CardMenuIcons.MakeGlobal,
-                  onClick: () => onMakeGlobal(component),
-                },
-                {
-                  key: "delete",
-                  label: "Delete component",
-                  icon: CardMenuIcons.Trash,
-                  destructive: true,
-                  onClick: () => onRequestDelete(component),
-                },
-              ],
-            },
+            // A linked instance references the main's component — no destructive
+            // actions from a version's view.
+            ...(linked
+              ? []
+              : [
+                  {
+                    key: "more",
+                    label: "More",
+                    icon: CardMenuIcons.More,
+                    menuItems: [
+                      { key: "move-to", label: "Move to", icon: CardMenuIcons.MoveTo, onClick: () => onMoveTo(component) },
+                      { key: "make-global", label: "Make global", icon: CardMenuIcons.MakeGlobal, onClick: () => onMakeGlobal(component) },
+                      { key: "delete", label: "Delete component", icon: CardMenuIcons.Trash, destructive: true, onClick: () => onRequestDelete(component) },
+                    ],
+                  },
+                ]),
           ]}
         />
       </div>
@@ -94,7 +96,11 @@ export function ComponentSideCard({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
             {component.name}
           </span>
-          {component.kind ? (
+          {linked ? (
+            <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[#c9b3ff]">
+              linked
+            </span>
+          ) : component.kind ? (
             <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[var(--text-faint)]">
               {component.kind}
             </span>

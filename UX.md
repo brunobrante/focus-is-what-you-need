@@ -795,6 +795,19 @@ version is created:
     own content.
 - The tree shows an instance as a single row; its inlined master content is not expanded.
 
+**Version details (screens & components)**:
+- The original is labelled **"main"** (green badge); the versions created from it are
+  **V1, V2, V3…** (purple badge) — the first version is V1, never the main.
+- The **Versions tab** shows an empty "create version" state while only the main exists,
+  and the grid (including the main card) once there is 1+ version. The main card always
+  shows the green "main" badge regardless of which version is selected; the selected card
+  is indicated by its border only (no "current"/"active" badge).
+- Each version card has the standard hover menu: **open canvas**, **fast edit** (stub), and
+  — on non-main versions — a **More** menu with **Delete version**.
+- The **SubComponents tab** of a version lists the main's components as **linked** instances
+  (purple border + "linked" tag, read-only — no delete); detached/own components appear
+  normally.
+
 **Deleting a linked master** — when a screen or component being deleted still has linked
 instances elsewhere, an `InstanceDeleteModal` replaces the plain delete confirm. It shows
 how many places use it and offers two paths:

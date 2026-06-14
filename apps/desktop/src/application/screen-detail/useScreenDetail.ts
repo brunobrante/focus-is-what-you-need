@@ -13,7 +13,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { createScreenVersion, deleteScreen, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, deleteScreen, isMainScreenVersion, screenVersionLabel, screenVersionsFromList, updateScreen } from "@/lib/storage/repos/screens.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -41,6 +41,7 @@ export interface ScreenDetailState {
   screens: ReturnType<typeof useScreens>["data"];
   screen: ReturnType<typeof useScreen>["data"] | null;
   components: ReturnType<typeof useScreenChildren>["data"];
+  linkedComponentIds: Set<string>;
   activeVariants: ReturnType<typeof useActiveVariants>["data"];
   references: ReturnType<typeof useReferences>["data"];
   type: ProjectType;
@@ -112,7 +113,29 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     loadedScreen && loadedScreen.projectId === (project?.id ?? projectId)
       ? loadedScreen
       : null;
-  const { data: components } = useScreenChildren(project?.id, screen?.id);
+  const { data: ownComponents } = useScreenChildren(project?.id, screen?.id);
+
+  // A version's subcomponents are the main's components, referenced as linked
+  // instances. Load the main's children and mark them linked; the version's own
+  // (detached) components come from ownComponents.
+  const mainScreen = useMemo(
+    () => screenVersionsFromList(screens, screen).find((s) => isMainScreenVersion(s)) ?? null,
+    [screens, screen],
+  );
+  const isVersionScreen = Boolean(screen && mainScreen && screen.id !== mainScreen.id);
+  const { data: mainComponents } = useScreenChildren(
+    project?.id,
+    isVersionScreen ? mainScreen?.id : undefined,
+  );
+
+  const components = useMemo(
+    () => (isVersionScreen ? [...mainComponents, ...ownComponents] : ownComponents),
+    [isVersionScreen, mainComponents, ownComponents],
+  );
+  const linkedComponentIds = useMemo(
+    () => (isVersionScreen ? new Set(mainComponents.map((c) => c.id)) : new Set<string>()),
+    [isVersionScreen, mainComponents],
+  );
   const { data: activeVariants } = useActiveVariants(components);
   const { data: references } = useReferences("screen", screen?.id ?? null);
 
@@ -310,6 +333,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     screens,
     screen,
     components,
+    linkedComponentIds,
     activeVariants,
     references,
     type,
