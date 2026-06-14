@@ -23,7 +23,7 @@ import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
-import { useAllVariants, useScene, useScreenVariants, useVariant, useVariants } from "@/lib/storage/hooks";
+import { useAllVariants, useScene, useVariant } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { createScreenVersion } from "@/lib/storage/repos/screens.repo";
 import { duplicateVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
@@ -273,22 +273,38 @@ function CanvasPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground, resolveMaster]);
 
-  // --- Versions window: a persistent second canvas bound to the CURRENT subject.
-  // It lists every variant of the open component/screen and renders the selected one
-  // as an editable surface — a clone of Current. The `versionVariant` URL param only
-  // pre-selects and focuses; the window is always there, never created on open.
-  const { data: componentVariants } = useVariants(component?.id ?? null);
-  const { data: screenVariantList } = useScreenVariants(component ? null : screen?.id ?? null);
-  const subjectVariants = useMemo(
-    () => (component ? componentVariants : screen ? screenVariantList : []),
-    [component, screen, componentVariants, screenVariantList],
-  );
+  // --- Versions window: a persistent second canvas, decoupled from Current. The user
+  // picks ANY screen or component (first dropdown) and then one of its versions (second
+  // dropdown), and the selected version renders as an editable surface — a clone of
+  // Current. The `versionVariant` URL param only pre-selects and focuses; the window is
+  // always there, never created on open.
+  const [versionsSubject, setVersionsSubject] = useState<{
+    id: string;
+    kind: "screen" | "component";
+  } | null>(null);
+  // Seed the versions subject from the current subject until the user picks another one.
+  useEffect(() => {
+    if (versionsSubject) return;
+    if (component) setVersionsSubject({ id: component.id, kind: "component" });
+    else if (screen) setVersionsSubject({ id: screen.id, kind: "screen" });
+  }, [component, screen, versionsSubject]);
+
+  // Every variant of the selected versions subject, main first. Filtered from the full
+  // variant table so the subject can roam the whole project, not just the open one.
+  const versionsSubjectVariants = useMemo(() => {
+    if (!versionsSubject) return [];
+    return allVariants
+      .filter((v) => v.ownerKind === versionsSubject.kind && v.ownerId === versionsSubject.id)
+      .slice()
+      .sort((a, b) => a.order - b.order);
+  }, [allVariants, versionsSubject]);
+
   // The Versions window browses real versions (V1, V2…) — never the main, and never
   // the variant already open in Current (that would mount two editors on one scene).
   const currentVariantId = sceneOwner?.ownerId ?? null;
   const availableVersions = useMemo(
-    () => subjectVariants.filter((v) => v.order > 0 && v.id !== currentVariantId),
-    [subjectVariants, currentVariantId],
+    () => versionsSubjectVariants.filter((v) => v.order > 0 && v.id !== currentVariantId),
+    [versionsSubjectVariants, currentVariantId],
   );
 
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(versionVariantParam || null);
@@ -296,15 +312,15 @@ function CanvasPageContent() {
   useEffect(() => {
     if (versionVariantParam) setSelectedVersionId(versionVariantParam);
   }, [versionVariantParam]);
-  // Keep the selection valid against the available versions, defaulting to the first.
-  // Null when there are none → the window shows its empty state. `subjectVariants`
-  // always has the main once loaded, so an empty array means "still loading" — don't
-  // clobber a URL-selected version then.
+  // Keep the selection valid against the available versions (e.g. after switching the
+  // subject), defaulting to the first. Null when there are none → the window shows its
+  // empty state. `versionsSubjectVariants` always has the main once loaded, so an empty
+  // array means "still loading" — don't clobber a URL-selected version then.
   useEffect(() => {
-    if (subjectVariants.length === 0) return;
+    if (versionsSubjectVariants.length === 0) return;
     if (selectedVersionId && availableVersions.some((v) => v.id === selectedVersionId)) return;
     setSelectedVersionId(availableVersions[0]?.id ?? null);
-  }, [subjectVariants, availableVersions, selectedVersionId]);
+  }, [versionsSubjectVariants, availableVersions, selectedVersionId]);
 
   const versionsVariants = useMemo(
     () => availableVersions.map((v) => ({ id: v.id, label: variantVersionLabel(v) })),
@@ -353,32 +369,33 @@ function CanvasPageContent() {
     setTreeTab("versions");
   }, [versionVariantParam]);
 
-  // "Add version" from the Versions window: create a new version of the current subject
-  // (Linked/Copy chosen via the modal) and focus the Versions window. The new version
-  // appears in the dropdown; when it is the subject's first version it auto-shows.
+  // "Add version" from the Versions window: create a new version of the SELECTED versions
+  // subject (Linked/Copy chosen via the modal) and focus the Versions window. The new
+  // version appears in the dropdown; when it is the subject's first version it auto-shows.
   const versionModeRef = useRef<VersionModeModalHandle>(null);
   const handleAddVersion = useCallback(() => {
-    if (!component && !screen) return;
+    const subject = versionsSubject;
+    if (!subject) return;
     versionModeRef.current?.open({
       onSelect: async (mode) => {
-        if (component) {
-          const mainId =
-            subjectVariants.find((v) => v.order <= 0)?.id ?? component.activeVariantId;
+        if (subject.kind === "component") {
+          const mainId = versionsSubjectVariants.find((v) => v.order <= 0)?.id;
+          if (!mainId) return;
           await duplicateVariant({
             ownerKind: "component",
-            ownerId: component.id,
+            ownerId: subject.id,
             sourceVariantId: mainId,
-            name: `Variant ${subjectVariants.length + 1}`,
+            name: `Variant ${versionsSubjectVariants.length + 1}`,
             mode,
           });
-        } else if (screen) {
-          await createScreenVersion({ screenId: screen.id, mode });
+        } else {
+          await createScreenVersion({ screenId: subject.id, mode });
         }
         setActiveTab("versions");
         setTreeTab("versions");
       },
     });
-  }, [component, screen, subjectVariants]);
+  }, [versionsSubject, versionsSubjectVariants]);
 
   useEffect(() => {
     const editor = getEditor();
@@ -435,6 +452,14 @@ function CanvasPageContent() {
     }
     return null;
   }, [component, projectComponents, projectTree]);
+
+  // Display info for the Versions window's first ("Screen") dropdown: the selected
+  // subject's tree node (name + kind) and the rendered version's intrinsic size.
+  const versionsSubjectNode = useMemo<ProjectTreeNode | null>(
+    () => (versionsSubject ? findTreeNodeById(projectTree, versionsSubject.id) : null),
+    [versionsSubject, projectTree],
+  );
+  const versionsSubjectSize = versionsDocument?.canvas;
 
   const { canOpenCanvasNode, openCanvasForNode, openProjectNodeCanvas } = useCanvasNavigation({
     component,
@@ -846,6 +871,18 @@ function CanvasPageContent() {
         selectedVersionId={selectedVersionId}
         onSelectVersion={setSelectedVersionId}
         onAddVersion={handleAddVersion}
+        currentSubjectId={component?.id ?? screen?.id ?? null}
+        versionsSubjectId={versionsSubject?.id ?? null}
+        versionsSubjectName={versionsSubjectNode?.name ?? componentName ?? screenTitle ?? undefined}
+        versionsSubjectIsScreen={(versionsSubject?.kind ?? (component ? "component" : "screen")) === "screen"}
+        versionsSubjectSize={versionsSubjectSize}
+        onSelectVersionsSubject={(node) => setVersionsSubject({ id: node.id, kind: node.kind })}
+        onLinkVersionsToCurrent={() => {
+          // Re-point the Versions window at whatever is open in Current, so it shows that
+          // element's versions instead of the subject it was left on.
+          if (component) setVersionsSubject({ id: component.id, kind: "component" });
+          else if (screen) setVersionsSubject({ id: screen.id, kind: "screen" });
+        }}
       />
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 

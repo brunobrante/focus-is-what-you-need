@@ -10,12 +10,14 @@ export function PickerNode({
 }: {
   node: ProjectTreeNode;
   depth: number;
-  activeId: string;
+  // The id of the currently-selected node. Matched by id, not name, so two screens
+  // sharing a name don't both highlight as active.
+  activeId: string | null;
   onSelect: (node: ProjectTreeNode) => void;
 }) {
   const [open, setOpen] = useState(depth === 0);
   const hasChildren = (node.children ?? []).length > 0;
-  const isActive = node.name === activeId;
+  const isActive = node.id === activeId;
 
   return (
     <>

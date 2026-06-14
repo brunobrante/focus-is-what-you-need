@@ -50,6 +50,7 @@ import {
 import { BackFooter } from "./tree/BackFooter";
 import { LayersFooter, type ExpandMode } from "./tree/LayersFooter";
 import { CurrentSceneTreeRow } from "./tree/CurrentSceneTreeRow";
+import { VersionsSubjectHeader } from "./tree/VersionsSubjectHeader";
 import { PickerNode } from "./tree/PickerNode";
 import { TreeRow } from "./tree/TreeRow";
 import { TypeIcon } from "./tree/TypeIcon";
@@ -138,6 +139,19 @@ type Props = {
   selectedVersionId?: string | null;
   onSelectVersion?: (variantId: string) => void;
   onAddVersion?: () => void;
+  // The id of the subject open in Current — highlighted (by id) in the "current" picker.
+  currentSubjectId?: string | null;
+  // Versions window: the selected subject (screen/component) shown in the first ("Screen")
+  // dropdown — its id (for highlight), name + kind (for display), intrinsic size, and the
+  // setter that roams the whole project tree.
+  versionsSubjectId?: string | null;
+  versionsSubjectName?: string;
+  versionsSubjectIsScreen?: boolean;
+  versionsSubjectSize?: { width: number; height: number };
+  onSelectVersionsSubject?: (node: ProjectTreeNode) => void;
+  // Re-points the Versions window at whatever subject is open in Current, so it follows
+  // along to that element's versions.
+  onLinkVersionsToCurrent?: () => void;
 };
 
 export function Tree({
@@ -170,6 +184,13 @@ export function Tree({
   selectedVersionId = null,
   onSelectVersion,
   onAddVersion,
+  currentSubjectId,
+  versionsSubjectId,
+  versionsSubjectName,
+  versionsSubjectIsScreen,
+  versionsSubjectSize,
+  onSelectVersionsSubject,
+  onLinkVersionsToCurrent,
 }: Props) {
   const bridgeDocument = useEditorBridge(
     (value) => value?.state.document ?? null,
@@ -352,7 +373,10 @@ export function Tree({
     setActiveDragId(null);
   };
 
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Which header dropdown is open. The Current window has one ("current" → project tree);
+  // the Versions window has two ("subject" → project tree, "version" → version list).
+  const [openPicker, setOpenPicker] = useState<"current" | "subject" | "version" | null>(null);
+  const pickerOpen = openPicker !== null;
   const [pickerAnchor, setPickerAnchor] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<TreeContextMenuState>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -376,7 +400,7 @@ export function Tree({
         !pickerRef.current?.contains(e.target as Node) &&
         !pickerTriggerRef.current?.contains(e.target as Node)
       ) {
-        setPickerOpen(false);
+        setOpenPicker(null);
       }
     };
     window.addEventListener("pointerdown", handler, true);
@@ -390,12 +414,15 @@ export function Tree({
   const focusedWindowLabel = activeTab === "current" ? null : CANVAS_WINDOW_LABELS[activeTab];
   const rowWidth = subjectSize?.width ?? document?.canvas.width;
   const rowHeight = subjectSize?.height ?? document?.canvas.height;
-  // In the Versions window the header shows the selected version's tag (e.g. "V1") and
-  // its dropdown lists the subject's versions instead of the project's screens.
+  // In the Versions window the header is two selects (screen + version). The version
+  // tag (e.g. "V1") and size come from the selected subject's chosen version, not from
+  // whatever is open in Current.
   const isVersionsWindow = activeTab === "versions";
   const headerVersionTag = isVersionsWindow
     ? versionOptions.find((v) => v.id === selectedVersionId)?.label ?? versionOptions[0]?.label
     : undefined;
+  const versionRowWidth = versionsSubjectSize?.width ?? document?.canvas.width;
+  const versionRowHeight = versionsSubjectSize?.height ?? document?.canvas.height;
 
   return (
     <>
@@ -429,21 +456,47 @@ export function Tree({
 
       <>
         <div ref={pickerTriggerRef}>
-          <CurrentSceneTreeRow
-            active={canvasActive}
-            label={headerName}
-            tag={headerVersionTag}
-            width={rowWidth}
-            height={rowHeight}
-            isScreen={isScreen}
-            projectType={projectType ?? "mobile"}
-            pickerOpen={pickerOpen}
-            onOpenPicker={(rect) => {
-              setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
-              setPickerOpen((v) => !v);
-            }}
-            onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
-          />
+          {isVersionsWindow ? (
+            <VersionsSubjectHeader
+              active={canvasActive}
+              subjectName={versionsSubjectName ?? headerName}
+              isScreen={versionsSubjectIsScreen ?? isScreen}
+              projectType={projectType ?? "mobile"}
+              versionTag={headerVersionTag}
+              width={versionRowWidth}
+              height={versionRowHeight}
+              hasVersion={Boolean(headerVersionTag)}
+              subjectPickerOpen={openPicker === "subject"}
+              versionPickerOpen={openPicker === "version"}
+              onOpenSubjectPicker={(rect) => {
+                setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+                setOpenPicker((m) => (m === "subject" ? null : "subject"));
+              }}
+              onOpenVersionPicker={(rect) => {
+                setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+                setOpenPicker((m) => (m === "version" ? null : "version"));
+              }}
+              linkedToCurrent={versionsSubjectId != null && versionsSubjectId === currentSubjectId}
+              onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
+              onLinkToCurrent={() => onLinkVersionsToCurrent?.()}
+            />
+          ) : (
+            <CurrentSceneTreeRow
+              active={canvasActive}
+              label={headerName}
+              tag={headerVersionTag}
+              width={rowWidth}
+              height={rowHeight}
+              isScreen={isScreen}
+              projectType={projectType ?? "mobile"}
+              pickerOpen={pickerOpen}
+              onOpenPicker={(rect) => {
+                setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+                setOpenPicker((m) => (m === "current" ? null : "current"));
+              }}
+              onToggleEdit={() => onToggleCanvasActive?.(!canvasActive)}
+            />
+          )}
         </div>
         <DndContext
           sensors={sensors}
@@ -541,7 +594,7 @@ export function Tree({
         }}
       >
         <div className="overflow-y-auto p-1.5" style={{ maxHeight: 320 }}>
-          {isVersionsWindow ? (
+          {openPicker === "version" ? (
             <>
               {versionOptions.length > 0 ? (
                 versionOptions.map((option) => {
@@ -551,7 +604,7 @@ export function Tree({
                       key={option.id}
                       type="button"
                       onClick={() => {
-                        setPickerOpen(false);
+                        setOpenPicker(null);
                         onSelectVersion?.(option.id);
                       }}
                       className={[
@@ -582,7 +635,7 @@ export function Tree({
                 <button
                   type="button"
                   onClick={() => {
-                    setPickerOpen(false);
+                    setOpenPicker(null);
                     onAddVersion();
                   }}
                   className="mt-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-[#A6A6A6] transition-colors duration-100 hover:bg-[#222] hover:text-[#E2E2E2]"
@@ -595,15 +648,19 @@ export function Tree({
               ) : null}
             </>
           ) : pickerTree.length > 0 ? (
+            // Both the Current window's "current" picker and the Versions window's
+            // "subject" picker browse the same project tree — they differ only in what
+            // selecting a node does and which node is highlighted.
             pickerTree.map((screen) => (
               <PickerNode
                 key={screen.id}
                 node={screen}
                 depth={0}
-                activeId={headerName}
+                activeId={openPicker === "subject" ? versionsSubjectId ?? null : currentSubjectId ?? null}
                 onSelect={(node) => {
-                  setPickerOpen(false);
-                  onOpenProjectNode?.(node);
+                  setOpenPicker(null);
+                  if (openPicker === "subject") onSelectVersionsSubject?.(node);
+                  else onOpenProjectNode?.(node);
                 }}
               />
             ))

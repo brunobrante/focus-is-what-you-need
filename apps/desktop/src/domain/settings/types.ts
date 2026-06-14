@@ -5,7 +5,7 @@ import type {
   ShellGridType,
 } from "@/canvas/engine/types";
 
-export type SettingsScope = "global" | "project";
+export type SettingsScope = "global" | "workspace" | "project";
 
 export type CanvasKeyCommandId =
   | "canvas.history.undo"
@@ -91,12 +91,34 @@ export type CanvasToolDefaultsSettings = {
   shapeRenderModes: Partial<Record<CanvasToolId, "svg" | "div">>;
 };
 
+/** How an element's intrinsic size reacts to the frame it is dropped into. */
+export type ElementSizePolicy = "auto" | "fixed";
+
+/** Whether an auto-computed font size snaps to the project's design system. */
+export type FontSizeSnapPolicy = "off" | "designSystem";
+
 export type CanvasElementDefault = {
   name: string;
   width: number;
   height: number;
   styles: ElementStyles;
   content?: string;
+  /**
+   * "auto" (default) scales the default width/height to the edited frame, so a
+   * small frame yields smaller elements. "fixed" uses the literal width/height.
+   */
+  sizeMode?: ElementSizePolicy;
+  /**
+   * Text only. "auto" (default) scales fontSize to the edited frame the same way
+   * as size; "fixed" uses the literal fontSize regardless of frame size.
+   */
+  fontSizeMode?: ElementSizePolicy;
+  /**
+   * Text only. When the font size is computed automatically, "designSystem"
+   * snaps it to the nearest typography size allowed by the project's design
+   * system; "off" (default) keeps the raw computed value.
+   */
+  fontSizeSnap?: FontSizeSnapPolicy;
 };
 
 export type CanvasElementDefaultsSettings = {
@@ -189,6 +211,9 @@ export type DeepPartial<T> = T extends Array<infer U>
 export type SettingsRow = {
   id: string;
   scope: SettingsScope;
+  /** Set for workspace-scoped rows; null otherwise. */
+  workspaceId: string | null;
+  /** Set for project-scoped rows; null otherwise. */
   projectId: string | null;
   schemaVersion: number;
   overrides: DeepPartial<GlobalSettings>;

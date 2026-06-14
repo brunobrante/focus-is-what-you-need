@@ -273,28 +273,40 @@ Full-screen visual editor with floating UI layers.
 
 **Versions window** (a canvas window, like Current/Drafts) — always available:
 - A persistent, functional clone of the Current canvas surface — a real, editable
-  stage — **bound to the current subject** (the component or screen open in Current).
-  It is never created on open; it is part of the canvas and reflects whatever subject
-  Current is editing.
-- The version is chosen from the **layers-tree header dropdown** (see Left panel),
-  which — while the Versions window is focused — lists the current subject's **real
-  versions only** (`V1`, `V2`…, never the main). There is **no in-canvas selector**.
-  Picking one renders+edits that variant here; the Current window keeps showing the
-  subject's own (main) variant. Edits in the Versions window save to that variant's scene.
-- Defaults to the first version (`V1`).
+  stage — **decoupled from Current**. It is never created on open; it is part of the
+  canvas. It seeds its subject from whatever Current is editing, but the user can then
+  point it at **any** screen or component in the project.
+- The subject and version are chosen from the **layers-tree header**, which — while the
+  Versions window is focused — shows **two stacked selects** (see Left panel): a
+  **Screen** select (the full project tree of screens + components, current subject
+  highlighted) and a **Version** select (that subject's **real versions only** — `V1`,
+  `V2`…, never the main). There is **no in-canvas selector**. Picking a version
+  renders+edits that variant here; the Current window is unaffected. Edits in the
+  Versions window save to that variant's scene.
+- Defaults to the first version (`V1`) of the seeded subject. Switching the subject
+  re-defaults the version to that subject's first.
 - **Open in canvas** on a version card (screen or component detail Versions tab) goes
   to the **main** subject's canvas in Current and focuses the Versions window on the
   clicked variant (URL carries `versionVariant=<variantId>` alongside the main
   `screen=`/`variant=`). The version is therefore never rendered in Current.
-- With no real versions (subject has only its main) the window shows a "No versions yet"
-  empty state.
+- When the selected subject has no real versions (only its main) the Version select
+  shows "No versions" and the window shows a "No versions yet" empty state.
 
 **Layers-tree header (Versions window)**: when the focused window is Versions, the
-header row shows the subject title + size **plus the selected version's tag** (e.g.
-`V1`), and the header dropdown switches the **version** shown in the Versions window
-(the subject's real versions) instead of switching project screens. The dropdown also
-ends with a **New version** action (shown below the list, or in place of it when there
-are none) that opens the Linked/Copy modal and creates a version of the current subject.
+header is a two-select block instead of the single subject row:
+- **Screen** select — opens the project-tree picker (screens + components, the current
+  subject highlighted); choosing a node re-points the Versions window at that subject.
+- **Version** select — shows the selected version's tag (`V1`) + the version's intrinsic
+  size, and opens the list of the chosen subject's real versions. The list ends with a
+  **New version** action (below the list, or in place of it when there are none) that
+  opens the Linked/Copy modal and creates a version of the **selected** subject.
+- An **Edit** button (next to the Version select) toggles the Versions stage active; it
+  is disabled when the subject has no version to edit.
+- A **Link to Current** icon button (next to the Screen select) re-points the Versions
+  window at whatever element is open in the **Current** window, so it follows along to
+  that element's versions. Because the window is otherwise decoupled, switching Current
+  to a child component does **not** auto-update the Versions subject — this button is how
+  you re-sync. Disabled when the subject already matches Current.
 
 **Left panel** (collapsible):
 - Layers / tree panel

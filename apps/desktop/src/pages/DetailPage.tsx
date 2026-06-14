@@ -72,7 +72,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: components.length },
-    { id: "versions" as const, label: "Versions", count: versions.length },
+    { id: "versions" as const, label: "Versions", count: Math.max(0, versions.length - 1) },
     { id: "references" as const, label: "References", count: references.length },
   ] as const;
 
@@ -128,7 +128,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
         <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
           <div className="flex shrink-0 items-end justify-between gap-4 border-b border-[var(--border)] px-6 pb-[18px] pt-[22px]">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <EditableTitle value={screen?.title ?? screenName} label="Edit screen name" onSave={handleScreenTitleSave} />
                 {activeVersion && activeVersion.tag && activeVersion.tag !== "main" ? (
                   <span className="mb-1.5">
@@ -312,7 +312,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: children.length },
-    { id: "versions" as const, label: "Versions", count: variantCount },
+    { id: "versions" as const, label: "Versions", count: Math.max(0, variants.length - 1) },
     { id: "references" as const, label: "References", count: references.length ?? 0 },
   ] as const;
 
@@ -340,7 +340,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
         <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
           <div className="flex shrink-0 items-end justify-between gap-4 border-b border-[var(--border)] px-6 pb-[18px] pt-[22px]">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <EditableTitle value={component.name} label="Edit component name" onSave={handleRename} />
                 {activeVariant && !isMainVariant(activeVariant) ? (
                   <span className="mb-1.5">
@@ -496,7 +496,7 @@ function SideTabs<T extends string>({
             ].join(" ")}
           >
             {t.label}
-            {t.count !== undefined ? (
+            {t.count ? (
               <span className="ml-1.5 text-[10.5px] text-[var(--text-faint)]" style={{ fontVariantNumeric: "tabular-nums" }}>
                 {t.count}
               </span>
@@ -583,10 +583,10 @@ function EditableTitle({ value, label, onSave }: { value: string; label: string;
       type="button"
       aria-label={label}
       onClick={() => { setDraft(value); setEditing(true); }}
-      className="group/title mb-1.5 flex cursor-text items-center gap-2 border-0 bg-transparent p-0 text-left text-[22px] font-semibold tracking-[-0.3px] text-[var(--text)]"
+      className="group/title mb-1.5 flex cursor-text items-center border-0 bg-transparent p-0 text-left text-[22px] font-semibold tracking-[-0.3px] text-[var(--text)]"
     >
       <span>{value}</span>
-      <span className="grid h-6 w-6 place-items-center rounded-md border border-[var(--border)] text-[var(--text-faint)] opacity-0 transition-opacity group-hover/title:opacity-100">
+      <span className="ml-0 grid h-6 w-0 place-items-center overflow-hidden rounded-md border border-transparent text-[var(--text-faint)] opacity-0 transition-all group-hover/title:ml-2 group-hover/title:w-6 group-hover/title:border-[var(--border)] group-hover/title:opacity-100">
         <IconFastEdit size={12} strokeWidth={1.7} />
       </span>
     </button>
