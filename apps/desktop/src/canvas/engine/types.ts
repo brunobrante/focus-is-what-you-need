@@ -255,6 +255,10 @@ export type RadiusInteraction = {
   startPoint: Point;
   elementId: string;
   corner: RadiusCorner;
+  // When the grab starts on a pair of stacked handles (radius at the maximum), the
+  // first drag toward one corner commits to it for the rest of the gesture, so the
+  // drag can no longer cross the lock into the other corner of the pair.
+  committedCorner?: RadiusCorner;
   beforeDocument: CanvasDocument;
   selectedIds: string[];
   moved: boolean;

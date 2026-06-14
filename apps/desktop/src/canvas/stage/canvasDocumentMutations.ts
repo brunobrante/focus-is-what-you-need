@@ -12,6 +12,7 @@ import {
   getEffectiveRotation,
   getParentBounds,
   getParentSize,
+  maxBorderRadiusForSize,
   MIN_ELEMENT_SIZE,
   normalizeAngle,
   rectCenterX,
@@ -26,7 +27,7 @@ import {
 import { buildSnapCandidates, snapRectWithCandidates } from "@/canvas/engine/snapping";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
-import type { CanvasDocument, Point, Rect, SnapGuide } from "@/canvas/engine/types";
+import type { CanvasDocument, Point, RadiusCorner, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
@@ -458,6 +459,42 @@ export function rotateDocument(
   return { document: next, guides: [] };
 }
 
+// Inward 45° projection of `local` onto the rail the corner's radius handle slides
+// along (equal offset on both axes). The projection is invariant to movement
+// perpendicular to the rail, so perpendicular cursor drift never changes the radius.
+function radiusCornerOffset(corner: RadiusCorner, local: Point, rect: Rect): number {
+  let dx = 0;
+  let dy = 0;
+  switch (corner) {
+    case "nw": dx = local.x - rect.x; dy = local.y - rect.y; break;
+    case "ne": dx = rect.x + rect.width - local.x; dy = local.y - rect.y; break;
+    case "se": dx = rect.x + rect.width - local.x; dy = rect.y + rect.height - local.y; break;
+    case "sw": dx = local.x - rect.x; dy = rect.y + rect.height - local.y; break;
+  }
+  return (dx + dy) / 2;
+}
+
+// How far (canvas units) the cursor must travel toward one corner of a stacked pair
+// before the gesture commits to that corner. Measured as relative divergence between
+// the pair's offsets, so it is immune to where exactly the grab landed on the ball.
+const RADIUS_COMMIT_EPSILON = 0.5;
+
+// The two corners that share the SHORT edge the grabbed handle lives on — the pair
+// whose handles stack at the maximum radius. The grabbed corner may be either one;
+// the hit test reports whichever is drawn on top, so we resolve the full pair here.
+function radiusEdgeCorners(
+  corner: RadiusCorner,
+  width: number,
+  height: number,
+): [RadiusCorner, RadiusCorner] {
+  if (width >= height) {
+    // wide (or square): short edges are vertical → pair across the height
+    return corner === "nw" || corner === "sw" ? ["nw", "sw"] : ["ne", "se"];
+  }
+  // tall: short edges are horizontal → pair across the width
+  return corner === "nw" || corner === "ne" ? ["nw", "ne"] : ["sw", "se"];
+}
+
 export function radiusDocument(
   interaction: RadiusInteraction,
   currentPoint: Point,
@@ -468,18 +505,43 @@ export function radiusDocument(
   if (!rect) return { document: interaction.beforeDocument, guides: [] };
   const cx = rect.x + rect.width / 2;
   const cy = rect.y + rect.height / 2;
+  const center = { x: cx, y: cy };
   const local = element.rotation
-    ? rotatePoint(currentPoint, { x: cx, y: cy }, -element.rotation)
+    ? rotatePoint(currentPoint, center, -element.rotation)
     : { x: currentPoint.x, y: currentPoint.y };
-  let dx: number;
-  let dy: number;
-  switch (interaction.corner) {
-    case "nw": dx = local.x - rect.x; dy = local.y - rect.y; break;
-    case "ne": dx = rect.x + rect.width - local.x; dy = local.y - rect.y; break;
-    case "se": dx = rect.x + rect.width - local.x; dy = rect.y + rect.height - local.y; break;
-    case "sw": dx = local.x - rect.x; dy = rect.y + rect.height - local.y; break;
+
+  // When the grab starts at the maximum radius, the two handles on the short edge sit
+  // one on top of the other and we cannot yet tell which corner the user means. The
+  // FIRST drag that diverges toward one corner commits to it for the rest of the
+  // gesture; afterwards only that corner drives the radius, so the ball can be brought
+  // back to the lock (the clamped maximum) but cannot cross it into the other corner.
+  const pair = radiusEdgeCorners(interaction.corner, rect.width, rect.height);
+  const maxRadius = maxBorderRadiusForSize(rect.width, rect.height);
+  const grabbedAtMax = (element.styles.borderRadius ?? 0) >= maxRadius - RADIUS_COMMIT_EPSILON;
+  const o0 = radiusCornerOffset(pair[0], local, rect);
+  const o1 = radiusCornerOffset(pair[1], local, rect);
+
+  if (!interaction.committedCorner) {
+    if (!grabbedAtMax) {
+      // Unstacked grab: the reported corner is unambiguous, lock to it immediately.
+      interaction.committedCorner = interaction.corner;
+    } else {
+      const startLocal = element.rotation
+        ? rotatePoint(interaction.startPoint, center, -element.rotation)
+        : interaction.startPoint;
+      const s0 = radiusCornerOffset(pair[0], startLocal, rect);
+      const s1 = radiusCornerOffset(pair[1], startLocal, rect);
+      const relDiff = o0 - o1 - (s0 - s1);
+      if (Math.abs(relDiff) > RADIUS_COMMIT_EPSILON) {
+        interaction.committedCorner = relDiff < 0 ? pair[0] : pair[1];
+      }
+    }
   }
-  const newRadius = roundPixel(clampBorderRadiusForSize(Math.min(dx!, dy!), rect.width, rect.height));
+
+  const offset = interaction.committedCorner
+    ? radiusCornerOffset(interaction.committedCorner, local, rect)
+    : Math.min(o0, o1);
+  const newRadius = roundPixel(clampBorderRadiusForSize(offset, rect.width, rect.height));
   const next = shallowCloneDocument(interaction.beforeDocument);
   const node = mutateElementWithStyles(next, interaction.elementId);
   if (node) node.styles.borderRadius = newRadius;

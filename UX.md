@@ -336,6 +336,12 @@ Full-screen visual editor with floating UI layers.
   - **Centralizado (center)** — the device frame is drawn symmetrically around the component, and the camera centers on it (component stays centered).
   - **Local original (origin)** — the device frame is placed so the component sits at its **real position on the device**. The **device** centers itself in the viewport, so the component sits off-center where it actually lives; you zoom and scroll across the device to reach it.
 
+**Corner radius handle:**
+- When a single radius-capable element is hovered (or while its handle is being dragged), a small circle appears inset from each corner; hovering it shows a custom "bend" cursor.
+- Dragging a handle sets a uniform corner radius for all four corners, clamped to half the shorter side. At the maximum the two handles on the short edge meet and the drag locks there.
+- On a merged (maxed) handle the first drag direction commits the corner: the drag can be pulled back to the lock but cannot cross it into the opposite corner.
+- While dragging, a value tag showing the current radius is rendered just beside the dragged handle.
+
 **Actions panel** (expands above the toolbar):
 - Search bar
 - Filter tabs: All | Assets | Plugins

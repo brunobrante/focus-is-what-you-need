@@ -457,6 +457,12 @@ export function CanvasStage({
         viewportTransform={viewportTransform}
         suppressHover={interactionActive}
         interactionType={interactionActive ? (interactionRef.current?.type ?? null) : null}
+        radiusDragCorner={(() => {
+          const ri = interactionRef.current;
+          return interactionActive && ri?.type === "radius"
+            ? (ri.committedCorner ?? ri.corner)
+            : null;
+        })()}
         marqueeRect={marqueeRect}
         dropTarget={dropTarget}
         onCommitDocument={commitContextToolbarDocument}

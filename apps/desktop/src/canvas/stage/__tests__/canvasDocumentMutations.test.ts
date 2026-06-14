@@ -141,24 +141,69 @@ test("command drag can leave the current parent before detaching", () => {
   expect(detached.elements.parent.children).toEqual([]);
 });
 
-test("radius drag stays clamped after the pointer passes the maximum corner radius", () => {
-  const document = createDocument();
-  const interaction: RadiusInteraction = {
+function createRadiusInteraction(
+  document: CanvasDocument,
+  corner: RadiusInteraction["corner"],
+  startPoint: { x: number; y: number } = { x: 100, y: 80 },
+): RadiusInteraction {
+  return {
     type: "radius",
     pointerId: 1,
-    startPoint: { x: 100, y: 80 },
+    startPoint,
     elementId: "node",
-    corner: "nw",
+    corner,
     beforeDocument: document,
     selectedIds: ["node"],
     moved: false,
     lastDocument: document,
     lastGuides: [],
   };
+}
 
-  const result = radiusDocument(interaction, { x: 1000, y: 1000 });
+// node is { x: 100, y: 80, width: 50, height: 40 } → maxRadius = min(50, 40) / 2 = 20.
+// At the max the short-edge handles stack: nw+sw at (120, 100), ne+se at (130, 100).
+
+test("radius drag stays clamped while the pointer is dragged inward past the maximum", () => {
+  const document = createDocument();
+  const interaction = createRadiusInteraction(document, "nw");
+
+  // Far inward (200px past the meeting point) at mid-height stays pinned at the max.
+  const result = radiusDocument(interaction, { x: 300, y: 100 });
 
   expect(result.document.elements.node.styles.borderRadius).toBe(20);
+});
+
+// A grab that starts on stacked handles (radius already at the max). The box is wide,
+// so the short edges are vertical and ne+se stack at (130, 100), where the grab lands.
+function createStackedDocument(): CanvasDocument {
+  const document = createDocument();
+  document.elements.node.styles.borderRadius = 20;
+  return document;
+}
+
+test("stacked radius grab commits to the corner of the first drag (up → ne)", () => {
+  const interaction = createRadiusInteraction(createStackedDocument(), "ne", { x: 130, y: 100 });
+
+  // First move pulls up toward the ne corner → radius shrinks.
+  const up = radiusDocument(interaction, { x: 140, y: 90 });
+  expect(up.document.elements.node.styles.borderRadius).toBeLessThan(20);
+
+  // Dragging back down past the meeting point only returns to the lock; it cannot
+  // cross into the se corner (would otherwise shrink again on the other side).
+  const back = radiusDocument(interaction, { x: 140, y: 115 });
+  expect(back.document.elements.node.styles.borderRadius).toBe(20);
+});
+
+test("stacked radius grab commits to the corner of the first drag (down → se)", () => {
+  const interaction = createRadiusInteraction(createStackedDocument(), "ne", { x: 130, y: 100 });
+
+  // The hit test reported ne, but the first move pulls down toward se → it must shrink.
+  const down = radiusDocument(interaction, { x: 140, y: 110 });
+  expect(down.document.elements.node.styles.borderRadius).toBeLessThan(20);
+
+  // Dragging back up past the meeting point only returns to the lock, no crossing.
+  const back = radiusDocument(interaction, { x: 140, y: 85 });
+  expect(back.document.elements.node.styles.borderRadius).toBe(20);
 });
 
 test("resizes a 180 degree element from the visual handle direction", () => {

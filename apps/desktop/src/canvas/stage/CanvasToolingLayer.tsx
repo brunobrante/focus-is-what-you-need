@@ -58,6 +58,7 @@ export type CanvasToolingLayerProps = {
   viewportTransform: ViewportTransform;
   suppressHover: boolean;
   interactionType: string | null;
+  radiusDragCorner?: RadiusCorner | null;
   marqueeRect: Rect | null;
   dropTarget: CanvasDropTarget | null;
   onCommitDocument: (document: CanvasDocument, selectedIds?: string[]) => void;
@@ -184,6 +185,9 @@ function getElementViewportBox(doc: CanvasDocument, id: string, t: ViewportTrans
   return elementToViewportBox(doc, id, t);
 }
 
+const RADIUS_CORNER_INDEX: Record<RadiusCorner, number> = { nw: 0, ne: 1, se: 2, sw: 3 };
+const RADIUS_LABEL_GAP = 14;
+
 function boxFromRects(rects: Rect[]): ToolingBox | null {
   const rect = unionRects(rects);
   return rect ? rectToToolingBox(rect) : null;
@@ -197,6 +201,7 @@ type ToolingRenderData = {
   outlines: ToolingOutlineCommand[];
   resizeBox: ToolingBox | null;
   radiusHandlePositions: Point[] | null;
+  radiusLabel: { text: string; left: number; top: number; transform: string } | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
   isDragging: boolean;
@@ -393,6 +398,28 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         }
       }
 
+      // Value tag shown beside the dragged ball while adjusting the corner radius.
+      let radiusLabel: ToolingRenderData["radiusLabel"] = null;
+      if (
+        isRadiusDragging &&
+        hasRadiusHandles &&
+        radiusHandlePositions &&
+        props.radiusDragCorner &&
+        radiusElement
+      ) {
+        const ball = radiusHandlePositions[RADIUS_CORNER_INDEX[props.radiusDragCorner]];
+        if (ball) {
+          const onLeftEdge =
+            props.radiusDragCorner === "nw" || props.radiusDragCorner === "sw";
+          radiusLabel = {
+            text: formatSizeValue(radiusElement.styles.borderRadius ?? 0),
+            left: onLeftEdge ? ball.x - RADIUS_LABEL_GAP : ball.x + RADIUS_LABEL_GAP,
+            top: ball.y,
+            transform: onLeftEdge ? "translate(-100%, -50%)" : "translateY(-50%)",
+          };
+        }
+      }
+
       const hoveredEligibleId =
         !props.suppressHover &&
         !isEditingText &&
@@ -489,6 +516,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           !props.canvasStageActive && !suppressHandles && hasRadiusHandles
             ? radiusHandlePositions
             : null,
+        radiusLabel,
         dropTarget,
         parentDistances,
         isDragging,
@@ -501,6 +529,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.dropTarget,
       props.editingTextId,
       props.interactionType,
+      props.radiusDragCorner,
       props.selectedIds,
       props.suppressHover,
       parentDistanceModifierDown,
@@ -871,6 +900,19 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             }}
           >
             {sizeLabel.text}
+          </div>
+        ) : null}
+
+        {renderData.radiusLabel ? (
+          <div
+            className="radius-value-tag"
+            style={{
+              left: renderData.radiusLabel.left,
+              top: renderData.radiusLabel.top,
+              transform: renderData.radiusLabel.transform,
+            }}
+          >
+            {renderData.radiusLabel.text}
           </div>
         ) : null}
 

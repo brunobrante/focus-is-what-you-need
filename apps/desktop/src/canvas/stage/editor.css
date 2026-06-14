@@ -247,6 +247,29 @@
   user-select: none;
 }
 
+.radius-value-tag {
+  position: absolute;
+  z-index: 9;
+  height: 20px;
+  /* Floor wide enough (incl. the global border-box padding) for a 2-digit value
+     plus one decimal, e.g. "24.5" — so the tag never resizes as the value flips
+     between int and float while dragging. */
+  min-width: 36px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  background: #0d99ff;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
 .context-toolbar {
   position: absolute;
   z-index: 9;

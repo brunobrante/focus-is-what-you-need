@@ -47,6 +47,11 @@ import {
 } from "../canvasInteractionHandlers";
 import { useCanvasTextInteraction } from "./useCanvasTextInteraction";
 
+// Custom cursor shown over (and while dragging) the corner-radius handle. The
+// hotspot sits on the arrow tip; falls back to `pointer` if the browser can't load
+// the SVG cursor. The asset lives in `public/`, so it is served from the root.
+const RADIUS_CURSOR = "url(/cursor-bend.svg) 4 3, pointer";
+
 type Dispatch = React.Dispatch<EditorAction>;
 
 type Params = {
@@ -311,7 +316,7 @@ export function useCanvasPointerEvents({
         const vpRect = getCurrentViewportRect();
         const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
         if (hit.cursor) {
-          viewport.style.cursor = hit.cursor;
+          viewport.style.cursor = hit.type === "radius" ? RADIUS_CURSOR : hit.cursor;
           if (hit.type !== "radius") hoverStore.set(null);
           return;
         }
