@@ -25,6 +25,15 @@ export async function getVariant(id: string): Promise<VariantRow | null> {
   return rows.find((r) => r.id === id) ?? null;
 }
 
+/**
+ * The stable version tag for a component variant ("V1", "V2"…). Mirrors the screen
+ * version model: a component's variants are its versions, all sharing the component's
+ * (one) name, each identified by this tag. The default/original variant is V1 ("main").
+ */
+export function variantVersionLabel(variant: VariantRow): string {
+  return `V${variant.order + 1}`;
+}
+
 export async function findVariantByName(
   componentId: string,
   name: string,

@@ -30,6 +30,7 @@ import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ComponentKind, ProjectType, ScreenVariant } from "@/lib/data/types";
 import { screenVersionLabel, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { useScreenDetail, type CmpKindFilter as ScreenCmpKindFilter } from "@/application/screen-detail/useScreenDetail";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 
@@ -274,7 +275,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
     projectName, variantCount, canvasHref, filteredChildren, filteredVariants,
     filteredReferences, history, sideTab, setSideTab, query, setQuery,
     filter, setFilter, fastEditOpen, setFastEditOpen, pendingChildDelete,
-    setPendingChildDelete, historyRef, referencesRef, newComponentRef, addRefModalRef,
+    setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef,
     openNewChild, addVariant, removeLinkedReference, handleChildDeleteConfirm,
     handleComponentCreated, handleOpenCanvas, handleAddReference, handleSelectVariant,
     handleRename, handleUpdate,
@@ -320,7 +321,14 @@ function ComponentContent({ componentId }: { componentId: string }) {
         <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
           <div className="flex shrink-0 items-end justify-between gap-4 border-b border-[var(--border)] px-6 pb-[18px] pt-[22px]">
             <div>
-              <EditableTitle value={component.name} label="Edit component name" onSave={handleRename} />
+              <div className="flex items-center gap-2">
+                <EditableTitle value={component.name} label="Edit component name" onSave={handleRename} />
+                {variantCount > 0 && activeVariant ? (
+                  <span className="mb-1.5 flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
+                    {variantVersionLabel(activeVariant)}
+                  </span>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2.5 text-[12.5px] text-[var(--text-muted)]">
                 {component.kind ? <span>{component.kind}</span> : <span>Componente</span>}
                 <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
@@ -432,6 +440,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
         onConfirm={handleChildDeleteConfirm}
       />
       <AddReferenceModal ref={addRefModalRef} projectId={project?.id ?? null} screens={screens} components={projectComponents} existingReferences={references} defaultComponentId={component.id} onAdd={handleAddReference} />
+      <VersionModeModal ref={versionModeRef} />
     </div>
   );
 }
@@ -614,14 +623,16 @@ function VariantSideCard({
   return (
     <div className="group flex flex-col gap-2.5 text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5">
       <div className={["relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border bg-[var(--bg)] p-3 transition-colors", active ? "border-[var(--text-muted)]" : "border-[var(--border)] group-hover:border-[var(--border-strong)]"].join(" ")}>
-        <button type="button" onClick={onSelect} aria-label={`Select variant ${variant.name}`} className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit" />
+        <button type="button" onClick={onSelect} aria-label={`Select version ${variantVersionLabel(variant)}`} className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit" />
         <div className="h-full w-full overflow-hidden">
           <Snapshot kind="component" ownerType="variant" ownerId={variant.id} seedKey={variant.seedKey} type={type} display="card" />
         </div>
-        <CardMenu buttons={[{ key: "select", label: "Select variant", icon: CardMenuIcons.Check, onClick: onSelect }]} />
+        <CardMenu buttons={[{ key: "select", label: "Select version", icon: CardMenuIcons.Check, onClick: onSelect }]} />
       </div>
       <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">{variant.name}</span>
+        <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.5px] text-[#c9b3ff]">
+          {variantVersionLabel(variant)}
+        </span>
         {active ? (
           <span className="flex-shrink-0 rounded border px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px]" style={{ color: "#F2F2F2", borderColor: "#3FB950", background: "rgba(63,185,80,0.08)" }}>
             Active

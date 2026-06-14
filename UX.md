@@ -770,7 +770,11 @@ See [`Versioning.md`](./Versioning.md) for the full model. UX surface:
 
 **Creating a version** — a `VersionModeModal` ("Linked or Copy") appears before a new
 version is created:
-- Component versions: triggered by **New variant** in the Component detail Variants tab.
+- Component versions: triggered by **New version** in the Component detail Versions tab.
+  A component's variants are its versions — they share the component's (one) name, and
+  each is identified by the same purple **version tag** (`V1`, `V2`…, V1 = the default/
+  "main"), shown on the Versions-tab cards and the component detail header. Creating one
+  opens the same Linked/Copy modal as screens.
 - Screen versions: triggered by **New version** either in a screen card's `···` More menu
   (Gallery Screens tab) or in the **Versions tab** of the screen detail page. It creates a
   real sibling screen sharing a version group, and opens it. **All versions in a group share

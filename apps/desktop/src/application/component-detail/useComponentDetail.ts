@@ -25,6 +25,7 @@ import type { HistoryModalHandle } from "@/components/modals/HistoryModal";
 import type { NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import type { ReferencesModalHandle } from "@/components/modals/ReferencesModal";
 import type { AddReferenceModalHandle } from "@/components/modals/AddReferenceModal";
+import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 
 type SideTab = "components" | "info" | "versions" | "references";
 type CmpKindFilter = "all" | ComponentKind;
@@ -73,6 +74,7 @@ export interface ComponentDetailState {
   setPendingChildDelete: (c: ComponentRow | null) => void;
 
   // Refs
+  versionModeRef: React.RefObject<VersionModeModalHandle | null>;
   historyRef: React.RefObject<HistoryModalHandle | null>;
   referencesRef: React.RefObject<ReferencesModalHandle | null>;
   newComponentRef: React.RefObject<NewComponentModalHandle | null>;
@@ -80,7 +82,7 @@ export interface ComponentDetailState {
 
   // Handlers
   openNewChild: () => void;
-  addVariant: () => Promise<void>;
+  addVariant: () => void;
   removeLinkedReference: (referenceId: string) => void;
   handleChildDeleteConfirm: () => Promise<void>;
   handleComponentCreated: (r: { component: ComponentRow }) => void;
@@ -184,6 +186,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const [creatingVariant, setCreatingVariant] = useState(false);
   const [pendingChildDelete, setPendingChildDelete] = useState<ComponentRow | null>(null);
 
+  const versionModeRef = useRef<VersionModeModalHandle>(null);
   const historyRef = useRef<HistoryModalHandle>(null);
   const referencesRef = useRef<ReferencesModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
@@ -237,17 +240,26 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
 
   const addVariant = async () => {
     if (!component || !activeVariant || creatingVariant) return;
-    setCreatingVariant(true);
-    try {
-      const created = await duplicateVariant({
-        componentId: component.id,
-        sourceVariantId: activeVariant.id,
-        name: `Variant ${variants.length + 1}`,
-      });
-      await setActiveVariant(component.id, created.id);
-    } finally {
-      setCreatingVariant(false);
-    }
+    const sourceComponent = component;
+    const sourceVariant = activeVariant;
+    versionModeRef.current?.open({
+      title: "New version",
+      message: "How should child components behave in the new version?",
+      onSelect: async (mode) => {
+        setCreatingVariant(true);
+        try {
+          const created = await duplicateVariant({
+            componentId: sourceComponent.id,
+            sourceVariantId: sourceVariant.id,
+            name: `Variant ${variants.length + 1}`,
+            mode,
+          });
+          await setActiveVariant(sourceComponent.id, created.id);
+        } finally {
+          setCreatingVariant(false);
+        }
+      },
+    });
   };
 
   const removeLinkedReference = (referenceId: string) => {
@@ -322,6 +334,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     creatingVariant,
     pendingChildDelete,
     setPendingChildDelete,
+    versionModeRef,
     historyRef,
     referencesRef,
     newComponentRef,
