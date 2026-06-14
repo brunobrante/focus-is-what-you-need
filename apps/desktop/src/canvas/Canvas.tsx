@@ -784,6 +784,9 @@ function CanvasPageContent() {
         onOpenNodeCanvas={openCanvasForNode}
         onGoToInstance={(variantId) => {
           void flushPendingSave();
+          // Going to the master opens it as the Current subject — focus the Current tab
+          // (the click may have come from the Versions window's layers tree).
+          changeCanvasTab("current");
           const origin = variantParam
             ? `variant:${variantParam}`
             : screenParam
