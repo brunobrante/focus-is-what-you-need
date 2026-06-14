@@ -93,6 +93,8 @@ export async function materializeComponentFromCanvasNode(input: {
   const ensureNodeComponent = async (nodeId: string): Promise<ComponentRow | null> => {
     const node = input.document.elements[nodeId];
     if (!node || node.children.length === 0) return null;
+    // Never materialize a linked instance — it references a master, it is not one.
+    if (node.instanceOf) return null;
 
     const cached = createdByNodeId.get(nodeId);
     if (cached) return cached;

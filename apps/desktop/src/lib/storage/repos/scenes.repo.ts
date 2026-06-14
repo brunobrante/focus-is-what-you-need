@@ -235,6 +235,10 @@ function replaceComponentSubtreeInGraph(
       (node) => normalizeName(node.name) === normalizeName(component.name),
     );
   if (!target) return null;
+  // If this parent uses the component as a linked instance, there is no embedded
+  // subtree to sync — leave the bare instance node so its instanceOf is preserved
+  // (it resolves the master at render time).
+  if (target.instanceOf) return null;
 
   const childNodesByParent = groupNodesByParent(child.nodes);
   const parentDescendantIds = collectDescendantIds(parent.nodes, target.id);

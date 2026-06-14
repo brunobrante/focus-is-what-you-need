@@ -364,6 +364,10 @@ export function componentNodeIdsFromDocument(document: CanvasDocument): string[]
   const walk = (nodeId: string) => {
     const node = document.elements[nodeId];
     if (!node) return;
+    // A linked instance is a reference, not a materializable component — its inlined
+    // master content (the resolved children) must not be turned into components, and
+    // it must not be re-saved (that would trigger propagation stripping instanceOf).
+    if (node.instanceOf) return;
     if (node.children.length > 0) ids.push(nodeId);
     for (const childId of node.children) walk(childId);
   };
