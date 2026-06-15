@@ -532,6 +532,14 @@ function CanvasPageContent() {
     flushPendingSave,
   });
 
+  // Re-point an extra Current at a different subject (independent navigation). Used by
+  // the layers-tree header subject select when that Current is the focused tree tab.
+  const retargetExtraCurrent = useCallback((key: CanvasWindowKey, subject: SubjectOwner) => {
+    setExtraCurrents((list) =>
+      list.map((entry) => (entry.key === key ? { ...entry, subject } : entry)),
+    );
+  }, []);
+
   // Picking a project node from the layers-tree header: re-point the focused extra
   // Current at that subject (its main/active variant scene), or navigate the primary
   // Current as before.
@@ -748,14 +756,6 @@ function CanvasPageContent() {
     setActiveTab((tab) => (tab === key ? "current" : tab));
     setTreeTab((tab) => (tab === key ? "current" : tab));
   }, [splitWindows]);
-
-  // Re-point an extra Current at a different subject (independent navigation). Used by
-  // the layers-tree header subject select when that Current is the focused tree tab.
-  const retargetExtraCurrent = useCallback((key: CanvasWindowKey, subject: SubjectOwner) => {
-    setExtraCurrents((list) =>
-      list.map((entry) => (entry.key === key ? { ...entry, subject } : entry)),
-    );
-  }, []);
 
   const canAddCurrent =
     Boolean(sceneOwner && sceneOwner.ownerType === "variant") &&
