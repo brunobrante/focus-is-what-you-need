@@ -222,7 +222,11 @@ export function clampViewportState(
   // Centering at the floor means *exactly* the minimum zoom (zoom-out clamps to
   // it), not a band around it — otherwise small zoom-in steps just above 100%
   // would keep snapping back to centered instead of anchoring under the cursor.
-  const atMinZoom = zoom <= limits.min + 1e-6;
+  // The draft canvas is the exception: it is a freeform 100k×100k space with no
+  // meaningful center, so force-centering it at min zoom would dump the user's
+  // real content (which lives in a tiny corner) thousands of px off-screen. There
+  // the offset stays anchored/clamped to the pannable range instead.
+  const atMinZoom = mode !== "draft" && zoom <= limits.min + 1e-6;
   const offsetX = clampAxisOffset(viewport.offsetX, containerSize.width, bounds.x, bounds.width, displayZoom, preserveSmallCanvasOffset, atMinZoom);
   const offsetY = clampAxisOffset(viewport.offsetY, containerSize.height, bounds.y, bounds.height, displayZoom, preserveSmallCanvasOffset, atMinZoom);
   return { zoom, offsetX, offsetY };
