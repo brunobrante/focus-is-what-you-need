@@ -8,7 +8,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Dispatch, ReactNode } from "react";
-import type { CanvasDocument, EditorState, Rect, Size, SnapGuide, Tool, ViewportMode } from "./types";
+import type { AncestorOverlayItem, CanvasDocument, EditorState, Rect, Size, SnapGuide, Tool, ViewportMode } from "./types";
+import { DEFAULT_ANCESTOR_OVERLAY_ITEM } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
@@ -24,6 +25,8 @@ export type EditorAction =
   | { type: "setZoom"; zoom: number }
   | { type: "setViewport"; zoom?: number; offsetX?: number; offsetY?: number }
   | { type: "setViewportMetrics"; viewportSize: Size; navigableBounds: Rect | null }
+  | { type: "setAncestorOverlayEnabled"; enabled: boolean }
+  | { type: "updateAncestorOverlayItem"; id: string; patch: Partial<AncestorOverlayItem> }
   | { type: "setSelected"; selectedIds: string[] }
   | { type: "setIsolatedParent"; isolatedParentId: string | null }
   | { type: "setEditingText"; editingTextId: string | null }
@@ -160,6 +163,7 @@ function createInitialState(
     focusNodeId: null,
     viewportSize: { width: 0, height: 0 },
     navigableBounds: null,
+    ancestorOverlay: { enabled: false, items: {} },
   };
 }
 
@@ -214,6 +218,21 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const boundsChanged = !rectsEqual(state.navigableBounds, action.navigableBounds);
     if (!sizeChanged && !boundsChanged) return state;
     return { ...state, viewportSize: action.viewportSize, navigableBounds: action.navigableBounds };
+  },
+  setAncestorOverlayEnabled(state, action) {
+    if (state.ancestorOverlay.enabled === action.enabled) return state;
+    return { ...state, ancestorOverlay: { ...state.ancestorOverlay, enabled: action.enabled } };
+  },
+  updateAncestorOverlayItem(state, action) {
+    const prev = state.ancestorOverlay.items[action.id] ?? DEFAULT_ANCESTOR_OVERLAY_ITEM;
+    const next: AncestorOverlayItem = { ...prev, ...action.patch };
+    return {
+      ...state,
+      ancestorOverlay: {
+        ...state.ancestorOverlay,
+        items: { ...state.ancestorOverlay.items, [action.id]: next },
+      },
+    };
   },
   setViewport(state, action) {
     const limits = getViewportZoomLimits(state.viewportMode);

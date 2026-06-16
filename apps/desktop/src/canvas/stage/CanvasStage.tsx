@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { ScreenOverlay } from "@/canvas/shell/CanvasRender";
+import { ancestorOverlayItemFor, resolveAncestorOverlayStyle, type AncestorFrame } from "@/canvas/canvasUtils";
 import { useEditor, useHoverStore, useNoticeStore } from "@/canvas/engine/store";
-import type { CanvasDocument, Point, Rect } from "@/canvas/engine/types";
+import type { AncestorOverlayState, CanvasDocument, Point, Rect } from "@/canvas/engine/types";
 import { useElementFontTokens } from "./elementFontTokensContext";
 import type { CanvasToolId } from "@/canvas/tools";
 import { isInsertTool } from "@/canvas/engine/types";
@@ -45,22 +45,20 @@ export function CanvasStage({
   draftMode = false,
   activeTool,
   viewportSubjectKey,
-  screenOverlay,
+  ancestorFrames = [],
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
   onBackToParentShortcut,
-  onToggleScreenOverlayShortcut,
 }: {
   draftMode?: boolean;
   activeTool?: string;
   viewportSubjectKey?: string;
-  screenOverlay?: ScreenOverlay | null;
+  ancestorFrames?: AncestorFrame[];
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
   onBackToParentShortcut?: () => boolean | void;
-  onToggleScreenOverlayShortcut?: () => boolean | void;
 }) {
   const { state, dispatch } = useEditor();
   const hoverStore = useHoverStore();
@@ -105,23 +103,30 @@ export function CanvasStage({
     [state.document.canvas.height, state.document.canvas.width],
   );
 
-  // The navigable region is what the camera can pan/zoom across: the edited
-  // component by default, or the union of the component and its device overlay
-  // when the overlay is on. With the overlay on, the device frame extends beyond
-  // the component, so the navigable region grows to the device — that is what
-  // makes the whole device scrollable while the component itself is rendered 1:1.
-  const overlayRect = useMemo<Rect | null>(
-    () => (!draftMode && screenOverlay ? screenOverlayRectInCanvas(screenOverlay, canvasSize) : null),
-    [draftMode, screenOverlay, canvasSize.width, canvasSize.height],
-  );
+  // The parent-frames overlay: each enabled, non-zero-opacity ancestor frame is a
+  // guide rect placed in the edited component's canvas space (its offset is stored
+  // relative to the component). The component renders 1:1 inside them.
+  const ancestorOverlay = state.ancestorOverlay;
+  const visibleAncestorRects = useMemo<Array<{ frame: AncestorFrame; rect: Rect }>>(() => {
+    if (draftMode || !ancestorOverlay.enabled) return [];
+    return ancestorFrames
+      .map((frame) => ({
+        frame,
+        rect: { x: frame.offsetX, y: frame.offsetY, width: frame.width, height: frame.height },
+      }))
+      .filter(({ frame }) => ancestorOverlayItemFor(ancestorOverlay, frame.id).opacity > 0);
+  }, [draftMode, ancestorOverlay, ancestorFrames]);
   // The region the camera may pan/zoom across. It is null when there is no device
   // overlay — the camera then falls back to the component bounds everywhere — and
   // the union of the component and the device frame when the simulator is on. A
   // non-null value is therefore exactly the signal "the overlay is active".
   const navigableBounds = useMemo<Rect | null>(() => {
-    if (!overlayRect) return null;
-    return unionRect({ x: 0, y: 0, width: canvasSize.width, height: canvasSize.height }, overlayRect);
-  }, [overlayRect, canvasSize.width, canvasSize.height]);
+    if (visibleAncestorRects.length === 0) return null;
+    return visibleAncestorRects.reduce<Rect>(
+      (acc, { rect }) => unionRect(acc, rect),
+      { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height },
+    );
+  }, [visibleAncestorRects, canvasSize.width, canvasSize.height]);
 
   // The camera focus point drives re-centering/reframing (handled in
   // useViewportControls). It centers the navigable region, so:
@@ -162,7 +167,7 @@ export function CanvasStage({
     onCanvasToolShortcut,
     onOpenSelectedComponentShortcut,
     onBackToParentShortcut,
-    onToggleScreenOverlayShortcut,
+    ancestorOverlayAvailable: ancestorFrames.length > 0,
   });
 
   const { onWheel } = useViewportControls({
@@ -402,13 +407,11 @@ export function CanvasStage({
         className={`stage-space${draftMode ? " stage-space--draft" : ""}`}
         style={stageSpaceStyle}
       >
-        {screenOverlay && overlayRect ? (
-          <ScreenBoundsOverlay
-            rect={overlayRect}
-            borderRadius={screenOverlay.borderRadius}
-            renderScale={renderScale}
-          />
-        ) : null}
+        <AncestorOverlay
+          frames={visibleAncestorRects}
+          overlay={ancestorOverlay}
+          renderScale={renderScale}
+        />
         {draftMode ? (
           <RenderedScene
             draftMode
@@ -515,29 +518,6 @@ export function CanvasStage({
   );
 }
 
-// The device overlay's bounds in canvas space (same units as the component):
-//  - "center": the device is drawn symmetrically around the component;
-//  - "origin": the device is placed so the component sits at its real position
-//    on the device (i.e. the device's top-left is `-originPosition`).
-// This is the single source of truth for where the device sits — reused both to
-// draw the overlay and to compute the navigable region the camera pans across.
-export function screenOverlayRectInCanvas(overlay: ScreenOverlay, canvasSize: { width: number; height: number }): Rect {
-  if (overlay.alignment === "origin") {
-    return {
-      x: -(overlay.originPosition?.x ?? 0),
-      y: -(overlay.originPosition?.y ?? 0),
-      width: overlay.width,
-      height: overlay.height,
-    };
-  }
-  return {
-    x: (canvasSize.width - overlay.width) / 2,
-    y: (canvasSize.height - overlay.height) / 2,
-    width: overlay.width,
-    height: overlay.height,
-  };
-}
-
 function unionRect(a: Rect, b: Rect): Rect {
   const x = Math.min(a.x, b.x);
   const y = Math.min(a.y, b.y);
@@ -546,29 +526,44 @@ function unionRect(a: Rect, b: Rect): Rect {
   return { x, y, width, height };
 }
 
-function ScreenBoundsOverlay({
-  rect,
-  borderRadius,
+// The parent-frames overlay: a stack of guide rects (one per visible ancestor
+// frame) drawn behind the scene, farthest ancestor first so closer parents sit
+// on top. Each frame inherits only size, background color, and radius; opacity is
+// user-set and no border is drawn — purely a visual placement guide.
+function AncestorOverlay({
+  frames,
+  overlay,
   renderScale,
 }: {
-  rect: Rect;
-  borderRadius: number;
+  frames: Array<{ frame: AncestorFrame; rect: Rect }>;
+  overlay: AncestorOverlayState;
   renderScale: number;
 }) {
+  if (frames.length === 0) return null;
+  // Outermost ancestor (largest enclosing frame) painted first.
+  const ordered = [...frames].sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height);
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: rect.x * renderScale,
-        top: rect.y * renderScale,
-        width: rect.width * renderScale,
-        height: rect.height * renderScale,
-        borderRadius: borderRadius * renderScale,
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        pointerEvents: "none",
-        boxSizing: "border-box",
-      }}
-    />
+    <>
+      {ordered.map(({ frame, rect }) => {
+        const style = resolveAncestorOverlayStyle(frame, ancestorOverlayItemFor(overlay, frame.id));
+        return (
+          <div
+            key={frame.id}
+            style={{
+              position: "absolute",
+              left: rect.x * renderScale,
+              top: rect.y * renderScale,
+              width: rect.width * renderScale,
+              height: rect.height * renderScale,
+              borderRadius: style.borderRadius * renderScale,
+              background: style.background,
+              opacity: style.opacity,
+              pointerEvents: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        );
+      })}
+    </>
   );
 }

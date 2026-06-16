@@ -24,7 +24,8 @@ type Params = {
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
   onBackToParentShortcut?: () => boolean | void;
-  onToggleScreenOverlayShortcut?: () => boolean | void;
+  // When true, the toggle-screen-overlay shortcut flips the parent-frames overlay.
+  ancestorOverlayAvailable?: boolean;
 };
 
 export function useKeyboardShortcuts({
@@ -37,7 +38,7 @@ export function useKeyboardShortcuts({
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
   onBackToParentShortcut,
-  onToggleScreenOverlayShortcut,
+  ancestorOverlayAvailable,
 }: Params): { spacePressedRef: MutableRefObject<boolean> } {
   const spacePressedRef = useRef(false);
 
@@ -122,9 +123,9 @@ export function useKeyboardShortcuts({
         }
       }
       if (matchesKeyCommand(event, settings, "canvas.overlay.toggleScreen")) {
-        const handled = onToggleScreenOverlayShortcut?.() === true;
-        if (handled) {
+        if (ancestorOverlayAvailable) {
           event.preventDefault();
+          dispatch({ type: "setAncestorOverlayEnabled", enabled: !currentState.ancestorOverlay.enabled });
           return;
         }
       }
@@ -165,7 +166,7 @@ export function useKeyboardShortcuts({
     onBackToParentShortcut,
     onCanvasToolShortcut,
     onOpenSelectedComponentShortcut,
-    onToggleScreenOverlayShortcut,
+    ancestorOverlayAvailable,
     setInteractionActive,
     settings,
     viewportRef,

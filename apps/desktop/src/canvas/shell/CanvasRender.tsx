@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Monitor, RotateCcw, Smartphone } from "lucide-react";
 import {
-  IconCenterAlign, IconChevronLeft, IconChevronUp, IconCollapse, IconExpand,
-  IconGrid, IconMinus, IconOriginAlign, IconPlus, IconScreen, IconWindow,
+  IconChevronLeft, IconCollapse, IconExpand,
+  IconGrid, IconMinus, IconPlus, IconScreen, IconWindow,
 } from "@/components/icons";
 
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
@@ -15,11 +15,11 @@ import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, getViewportZoomLimits } from "@/canvas/e
 import type { ZoomLimits } from "@/canvas/engine/viewport";
 import {
   CANVAS_WINDOW_LABELS,
-  canvasSizeForProjectType,
   DEFAULT_PREVIEW_SETTINGS,
   isCurrentKey,
   normalizeCanvasSplitWindows,
   windowTypeOfKey,
+  type AncestorFrame,
   type CanvasFeatureWindowType,
   type CanvasSplitWindows,
   type CanvasWindowKey,
@@ -41,16 +41,6 @@ function shellVisibilityStyle(v: ShellControlVisibility, localHovered: boolean):
   if (v === "hover") return { opacity: localHovered ? 1 : 0, transition: "opacity 150ms" };
   return {};
 }
-
-export type ScreenOverlayAlignment = "center" | "origin";
-
-export type ScreenOverlay = {
-  width: number;
-  height: number;
-  borderRadius: number;
-  alignment: ScreenOverlayAlignment;
-  originPosition: { x: number; y: number } | null;
-};
 
 const GAP = 8;
 const TREE_WIDTH = 300;
@@ -86,7 +76,7 @@ export function CanvasRender({
   parentTarget,
   isComponent = false,
   referencesContext = null,
-  componentOriginPosition = null,
+  ancestorFrames = [],
   shellDeviceVisibility = "show",
   shellBackVisibility = "show",
   shellZoomVisibility = "show",
@@ -121,7 +111,7 @@ export function CanvasRender({
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
   referencesContext?: CanvasReferencesContext | null;
-  componentOriginPosition?: { x: number; y: number } | null;
+  ancestorFrames?: AncestorFrame[];
   shellDeviceVisibility?: ShellControlVisibility;
   shellBackVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
@@ -183,7 +173,7 @@ export function CanvasRender({
       projectType={projectType}
       parentTarget={parentTarget}
       isComponent={isComponent}
-      componentOriginPosition={componentOriginPosition}
+      ancestorFrames={ancestorFrames}
       shellDeviceVisibility={surfaceDeviceVisibility}
       shellBackVisibility={shellBackVisibility}
       shellZoomVisibility={surfaceZoomVisibility}
@@ -613,7 +603,7 @@ function CanvasSurface({
   projectType,
   parentTarget,
   isComponent = false,
-  componentOriginPosition = null,
+  ancestorFrames = [],
   shellDeviceVisibility = "show",
   shellBackVisibility = "show",
   shellZoomVisibility = "show",
@@ -638,7 +628,7 @@ function CanvasSurface({
   projectType: ProjectType;
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
-  componentOriginPosition?: { x: number; y: number } | null;
+  ancestorFrames?: AncestorFrame[];
   shellDeviceVisibility?: ShellControlVisibility;
   shellBackVisibility?: ShellControlVisibility;
   shellZoomVisibility?: ShellControlVisibility;
@@ -648,21 +638,7 @@ function CanvasSurface({
   onOpenSelectedComponentShortcut?: () => boolean | void;
 }) {
   const viewportSubjectKey = storageKey;
-  const [screenOverlayEnabled, setScreenOverlayEnabled] = useState(false);
-  const [screenOverlayAlignment, setScreenOverlayAlignment] = useState<ScreenOverlayAlignment>("center");
-
-  useEffect(() => {
-    setScreenOverlayEnabled(false);
-  }, [storageKey]);
-
-  const screenOverlay: ScreenOverlay | null = screenOverlayEnabled
-    ? {
-        ...canvasSizeForProjectType(projectType),
-        borderRadius: projectType === "desktop" ? 0 : 32,
-        alignment: screenOverlayAlignment,
-        originPosition: componentOriginPosition ?? null,
-      }
-    : null;
+  const hasAncestors = ancestorFrames.length > 0;
   const shortcutEnabled = active && !draftMode;
   const openSelectedComponentShortcut = shortcutEnabled ? onOpenSelectedComponentShortcut : undefined;
   const backToParentShortcut =
@@ -672,16 +648,9 @@ function CanvasSurface({
           return true;
         }
       : undefined;
-  const toggleScreenOverlayShortcut =
-    shortcutEnabled && isComponent && shellDeviceVisibility !== "hidden"
-      ? () => {
-          setScreenOverlayEnabled((enabled) => !enabled);
-          return true;
-        }
-      : undefined;
   const showSurfaceCanvasControls =
     !expanded &&
-    (shellZoomVisibility !== "hidden" || (isComponent && shellDeviceVisibility !== "hidden"));
+    (shellZoomVisibility !== "hidden" || (isComponent && hasAncestors && shellDeviceVisibility !== "hidden"));
 
   return (
     <div
@@ -709,12 +678,11 @@ function CanvasSurface({
             draftMode={draftMode}
             activeTool={activeTool}
             viewportSubjectKey={viewportSubjectKey}
-            screenOverlay={screenOverlay}
+            ancestorFrames={ancestorFrames}
             settings={settings}
             onCanvasToolShortcut={onCanvasToolShortcut}
             onOpenSelectedComponentShortcut={openSelectedComponentShortcut}
             onBackToParentShortcut={backToParentShortcut}
-            onToggleScreenOverlayShortcut={toggleScreenOverlayShortcut}
           />
           {!draftMode && parentTarget && shellBackVisibility !== "hidden" ? (
             <CanvasParentBackButton
@@ -727,12 +695,9 @@ function CanvasSurface({
             <SurfaceCanvasControls
               projectType={projectType}
               isComponent={isComponent}
-              screenOverlayEnabled={screenOverlayEnabled}
-              screenOverlayAlignment={screenOverlayAlignment}
+              hasAncestors={hasAncestors}
               shellDeviceVisibility={shellDeviceVisibility}
               shellZoomVisibility={shellZoomVisibility}
-              onToggleScreenOverlay={() => setScreenOverlayEnabled((v) => !v)}
-              onChangeScreenOverlayAlignment={setScreenOverlayAlignment}
             />
           ) : null}
         </EditorProvider>
@@ -804,24 +769,17 @@ function ParentComponentIcon() {
 function SurfaceCanvasControls({
   projectType,
   isComponent,
-  screenOverlayEnabled,
-  screenOverlayAlignment,
+  hasAncestors,
   shellDeviceVisibility,
   shellZoomVisibility,
-  onToggleScreenOverlay,
-  onChangeScreenOverlayAlignment,
 }: {
   projectType: ProjectType;
   isComponent: boolean;
-  screenOverlayEnabled: boolean;
-  screenOverlayAlignment: ScreenOverlayAlignment;
+  hasAncestors: boolean;
   shellDeviceVisibility: ShellControlVisibility;
   shellZoomVisibility: ShellControlVisibility;
-  onToggleScreenOverlay: () => void;
-  onChangeScreenOverlayAlignment: (a: ScreenOverlayAlignment) => void;
 }) {
   const { state, dispatch } = useEditor();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [localHovered, setLocalHovered] = useState(false);
 
   const setZoom: ZoomSetter = (next) => {
@@ -829,6 +787,7 @@ function SurfaceCanvasControls({
     dispatch({ type: "setZoom", zoom });
   };
 
+  const overlayEnabled = state.ancestorOverlay.enabled;
   const deviceStyle = shellVisibilityStyle(shellDeviceVisibility, localHovered);
   const zoomStyle = shellVisibilityStyle(shellZoomVisibility, localHovered);
 
@@ -838,31 +797,13 @@ function SurfaceCanvasControls({
       onMouseEnter={() => setLocalHovered(true)}
       onMouseLeave={() => setLocalHovered(false)}
     >
-      {menuOpen && (
-        <div
-          className="fixed inset-0"
-          style={{ zIndex: 9 }}
-          onPointerDown={() => setMenuOpen(false)}
-        />
-      )}
-      {isComponent && shellDeviceVisibility !== "hidden" && (
+      {isComponent && hasAncestors && shellDeviceVisibility !== "hidden" && (
         <div className="relative" style={deviceStyle}>
           <DeviceButton
-            overlayEnabled={screenOverlayEnabled}
-            menuOpen={menuOpen}
+            overlayEnabled={overlayEnabled}
             projectType={projectType}
-            onToggleOverlay={onToggleScreenOverlay}
-            onToggleMenu={() => setMenuOpen((v) => !v)}
+            onToggleOverlay={() => dispatch({ type: "setAncestorOverlayEnabled", enabled: !overlayEnabled })}
           />
-          {menuOpen && (
-            <ScreenAlignmentMenu
-              alignment={screenOverlayAlignment}
-              onChange={(a) => {
-                onChangeScreenOverlayAlignment(a);
-                setMenuOpen(false);
-              }}
-            />
-          )}
         </div>
       )}
       {shellZoomVisibility !== "hidden" && (
@@ -876,143 +817,34 @@ function SurfaceCanvasControls({
 
 function DeviceButton({
   overlayEnabled,
-  menuOpen,
   projectType,
   onToggleOverlay,
-  onToggleMenu,
 }: {
   overlayEnabled: boolean;
-  menuOpen: boolean;
   projectType: ProjectType;
   onToggleOverlay: () => void;
-  onToggleMenu: () => void;
 }) {
   const isMobile = projectType === "mobile";
   const Icon = isMobile ? Smartphone : Monitor;
   const active = overlayEnabled;
 
   return (
-    <div
+    <button
+      type="button"
+      aria-label={`${overlayEnabled ? "Ocultar" : "Mostrar"} elementos pai`}
+      aria-pressed={overlayEnabled}
+      onClick={onToggleOverlay}
       className={[
-        "flex items-center overflow-hidden rounded-lg border transition-colors duration-[100ms]",
+        "grid h-[34px] w-[34px] place-items-center rounded-lg border transition-colors duration-[100ms]",
         active
           ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
-          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#CFCFCF]",
+          : "border-[#2C2C2C] bg-[#1A1A1A] text-[#CFCFCF] hover:bg-[#2A2A2A]",
       ].join(" ")}
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)" }}
     >
-      <button
-        type="button"
-        aria-label={`${overlayEnabled ? "Disable" : "Enable"} screen simulator`}
-        aria-pressed={overlayEnabled}
-        onClick={onToggleOverlay}
-        className={[
-          "grid h-[34px] w-[34px] shrink-0 place-items-center transition-colors duration-[100ms]",
-          active ? "" : "hover:bg-[#2A2A2A]",
-        ].join(" ")}
-      >
-        <Icon size={16} strokeWidth={1.8} />
-      </button>
-
-      <span
-        className="block h-[18px] w-px shrink-0"
-        style={{ background: active ? "rgba(13,153,255,0.25)" : "#2C2C2C" }}
-      />
-
-      <button
-        type="button"
-        aria-label="Screen position options"
-        aria-expanded={menuOpen}
-        onClick={onToggleMenu}
-        className={[
-          "grid h-[34px] w-[18px] shrink-0 place-items-center transition-colors duration-[100ms]",
-          active
-            ? "hover:bg-[#0D99FF]/20"
-            : menuOpen
-              ? "bg-[#2A2A2A] text-[#CFCFCF]"
-              : "text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
-        ].join(" ")}
-      >
-        <IconChevronUp
-          size={8} strokeWidth={1.8}
-          className={menuOpen ? "rotate-180 transition-transform duration-150" : "transition-transform duration-150"}
-        />
-      </button>
-    </div>
+      <Icon size={16} strokeWidth={1.8} />
+    </button>
   );
-}
-
-function ScreenAlignmentMenu({
-  alignment,
-  onChange,
-}: {
-  alignment: ScreenOverlayAlignment;
-  onChange: (a: ScreenOverlayAlignment) => void;
-}) {
-  return (
-    <div
-      className="absolute bottom-[calc(100%+6px)] left-0 flex gap-1 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-1"
-      style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset", zIndex: 10 }}
-    >
-      <AlignmentOption
-        active={alignment === "center"}
-        label="Centralizado"
-        onClick={() => onChange("center")}
-        icon={<CenterAlignIcon />}
-      />
-      <AlignmentOption
-        active={alignment === "origin"}
-        label="Local original"
-        onClick={() => onChange("origin")}
-        icon={<OriginAlignIcon />}
-      />
-    </div>
-  );
-}
-
-function AlignmentOption({
-  active,
-  label,
-  onClick,
-  icon,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="group relative">
-      <button
-        type="button"
-        aria-label={label}
-        aria-pressed={active}
-        onClick={onClick}
-        className={[
-          "grid h-[34px] w-[34px] place-items-center rounded-md border transition-colors duration-[100ms]",
-          active
-            ? "border-[#0D99FF]/60 bg-[#0D99FF]/15 text-[#8CCBFF]"
-            : "border-transparent text-[#888] hover:bg-[#2A2A2A] hover:text-[#CFCFCF]",
-        ].join(" ")}
-      >
-        {icon}
-      </button>
-      <div
-        className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-[#333] bg-[#1E1E1E] px-2 py-1 text-[10px] font-medium leading-none text-[#CFCFCF] opacity-0 transition-opacity duration-100 group-hover:opacity-100"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
-      >
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function CenterAlignIcon() {
-  return <IconCenterAlign />;
-}
-
-function OriginAlignIcon() {
-  return <IconOriginAlign />;
 }
 
 export function ZoomControl({

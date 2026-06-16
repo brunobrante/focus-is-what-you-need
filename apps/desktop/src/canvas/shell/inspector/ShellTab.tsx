@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { ShellGridType } from "@/canvas/engine/types";
-import { InsColor, InsRow, InsSection, InsSwitch, InsToggle } from "./InsComponents";
+import type { AncestorOverlayItem, AncestorOverlayState, ShellGridType } from "@/canvas/engine/types";
+import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
+import { InsColor, InsRow, InsSection, InsSlider, InsSwitch, InsToggle } from "./InsComponents";
 
 type ShapeRenderMode = "svg" | "div";
 
@@ -43,6 +44,10 @@ type ShellTabProps = {
   inheritParentBackground?: boolean;
   hasParent?: boolean;
   onInheritParentBackgroundChange?: (value: boolean) => void;
+  ancestorFrames?: AncestorFrame[];
+  ancestorOverlay: AncestorOverlayState;
+  onToggleAncestorOverlay: (enabled: boolean) => void;
+  onUpdateAncestorItem: (id: string, patch: Partial<AncestorOverlayItem>) => void;
 };
 
 export function ShellTab({
@@ -62,6 +67,10 @@ export function ShellTab({
   inheritParentBackground = false,
   hasParent = false,
   onInheritParentBackgroundChange,
+  ancestorFrames = [],
+  ancestorOverlay,
+  onToggleAncestorOverlay,
+  onUpdateAncestorItem,
 }: ShellTabProps) {
   const [shapeRenderModes, setShapeRenderModes] = useState<Record<string, ShapeRenderMode>>(
     Object.fromEntries(SHAPE_LIST.map((s) => [s.id, "svg" as ShapeRenderMode])),
@@ -82,6 +91,69 @@ export function ShellTab({
           <InsColor value={background} onChange={onUpdateBackground} />
         </InsRow>
       </InsSection>
+
+      {isComponent && (
+        <InsSection title="Elementos pai">
+          <InsRow label="Ativar">
+            <InsSwitch
+              checked={ancestorOverlay.enabled}
+              onChange={onToggleAncestorOverlay}
+            />
+          </InsRow>
+          {ancestorFrames.length === 0 ? (
+            <p className="text-[11px] leading-snug text-[#6B6B6B]">
+              Sem elementos pai para este componente.
+            </p>
+          ) : (
+            ancestorFrames.map((frame) => {
+              const item = ancestorOverlayItemFor(ancestorOverlay, frame.id);
+              return (
+                <div
+                  key={frame.id}
+                  className="flex flex-col gap-2 rounded-md border border-[#2C2C2C] bg-[#1A1A1A] p-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-[11px] text-[#CFCFCF]">{frame.name}</span>
+                    <span className="shrink-0 text-[9px] uppercase tracking-[0.4px] text-[#6B6B6B]">
+                      {frame.kind === "screen" ? "Screen" : "Componente"}
+                    </span>
+                  </div>
+                  <InsRow label="Herdar cor">
+                    <InsSwitch
+                      checked={item.inheritColor}
+                      onChange={(v) => onUpdateAncestorItem(frame.id, { inheritColor: v })}
+                    />
+                  </InsRow>
+                  {!item.inheritColor && (
+                    <InsRow label="Cor">
+                      <InsColor
+                        value={item.color}
+                        onChange={(v) => onUpdateAncestorItem(frame.id, { color: v })}
+                      />
+                    </InsRow>
+                  )}
+                  <InsRow label="Opacidade">
+                    <InsSlider
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={Math.round(item.opacity * 100)}
+                      format={(v) => `${v}%`}
+                      onChange={(v) => onUpdateAncestorItem(frame.id, { opacity: v / 100 })}
+                    />
+                  </InsRow>
+                  <InsRow label="Radius">
+                    <InsSwitch
+                      checked={item.keepRadius}
+                      onChange={(v) => onUpdateAncestorItem(frame.id, { keepRadius: v })}
+                    />
+                  </InsRow>
+                </div>
+              );
+            })
+          )}
+        </InsSection>
+      )}
 
       <InsSection title="Controles">
         {isComponent && (

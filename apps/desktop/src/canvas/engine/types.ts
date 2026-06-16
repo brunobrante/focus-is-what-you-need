@@ -138,6 +138,29 @@ export type ViewportMatrix = {
   f: number;
 };
 
+// Per-ancestor config for the "parent frames" overlay (a visual guide drawn
+// behind the edited component, like a grid). A frame inherits only size +
+// background color + radius from its parent; opacity is always user-set and the
+// border is never drawn. Keyed in `AncestorOverlayState.items` by ancestor id.
+export type AncestorOverlayItem = {
+  inheritColor: boolean; // true → use the parent frame's background color value
+  color: string;         // custom color used when inheritColor is false
+  opacity: number;       // 0..1, user-set (never inherited)
+  keepRadius: boolean;   // true → use the parent frame's radius, false → square
+};
+
+export type AncestorOverlayState = {
+  enabled: boolean;
+  items: Record<string, AncestorOverlayItem>;
+};
+
+export const DEFAULT_ANCESTOR_OVERLAY_ITEM: AncestorOverlayItem = {
+  inheritColor: true,
+  color: "#FFFFFF",
+  opacity: 0.35,
+  keepRadius: true,
+};
+
 export type EditorState = {
   document: CanvasDocument;
   viewportMode: ViewportMode;
@@ -172,6 +195,9 @@ export type EditorState = {
   // overlay) or null when there is no overlay. Transient — never persisted.
   viewportSize: Size;
   navigableBounds: Rect | null;
+  // Transient (session-only) config for the parent-frames overlay. Reset whenever
+  // a new subject mounts a fresh editor, so it never persists to the document.
+  ancestorOverlay: AncestorOverlayState;
 };
 
 // ─── Text editing types ───────────────────────────────────────────────────────

@@ -335,6 +335,39 @@ export function InsMultiSelect({
   );
 }
 
+export function InsSlider({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  format = String,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  format?: (value: number) => string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-7 min-w-0 flex-1 cursor-pointer accent-[#0D99FF]"
+      />
+      <span className="w-9 shrink-0 text-right text-[10.5px] tabular-nums text-[#6B6B6B]">
+        {format(value)}
+      </span>
+    </div>
+  );
+}
+
 export function InsSwitch({
   checked,
   onChange,

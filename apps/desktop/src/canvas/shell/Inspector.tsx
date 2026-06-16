@@ -16,7 +16,8 @@ import {
   updateShellGrid,
   DEFAULT_SHELL_GRID,
 } from "@/canvas/engine/actions";
-import type { CanvasDocument, CanvasProperties, ElementSizing, ElementStyles } from "@/canvas/engine/types";
+import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument, CanvasProperties, ElementSizing, ElementStyles } from "@/canvas/engine/types";
+import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { CanvasTab } from "./inspector/CanvasTab";
 import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
@@ -42,7 +43,10 @@ type InspectorProps = {
   inheritParentBackground?: boolean;
   hasParent?: boolean;
   onInheritParentBackgroundChange?: (value: boolean) => void;
+  ancestorFrames?: AncestorFrame[];
 };
+
+const EMPTY_ANCESTOR_OVERLAY: AncestorOverlayState = { enabled: false, items: {} };
 
 type InspectorTab = "element" | "canvas" | "shell";
 
@@ -54,6 +58,7 @@ export function Inspector({
   inheritParentBackground = false,
   hasParent = false,
   onInheritParentBackgroundChange,
+  ancestorFrames = [],
   shellDeviceVisibility,
   shellBackVisibility,
   shellZoomVisibility,
@@ -78,9 +83,12 @@ export function Inspector({
   const bridgeSelectedCount = useEditorBridge((v) => v?.state.selectedIds.length ?? 0);
   const bridgeCanvasStageActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
   const bridgeSourceId = useEditorBridge((v) => v?.sourceId ?? null);
+  const bridgeAncestorOverlay = useEditorBridge((v) => v?.state.ancestorOverlay ?? null);
   const getEditorSnapshot = useEditorBridgeReader();
 
   const document = editorProp !== undefined ? (editorProp?.state.document ?? null) : bridgeDocument;
+  const ancestorOverlay =
+    (editorProp !== undefined ? editorProp?.state.ancestorOverlay : bridgeAncestorOverlay) ?? EMPTY_ANCESTOR_OVERLAY;
   const selectedId = editorProp !== undefined ? (editorProp?.state.selectedIds[0] ?? null) : bridgeSelectedId;
   const selectedCount = editorProp !== undefined ? (editorProp?.state.selectedIds.length ?? 0) : bridgeSelectedCount;
   const canvasStageActive = editorProp !== undefined ? (editorProp?.state.canvasStageActive ?? false) : bridgeCanvasStageActive;
@@ -102,6 +110,25 @@ export function Inspector({
       document: nextDocument,
       ...(selectedIds !== undefined ? { selectedIds } : {}),
     });
+  };
+
+  const dispatchAncestor = (action: { type: string } & Record<string, unknown>) => {
+    (editorProp ?? getEditorSnapshot())?.dispatch(action);
+  };
+  const onToggleAncestorOverlay = (enabled: boolean) => {
+    dispatchAncestor({ type: "setAncestorOverlayEnabled", enabled });
+  };
+  const onUpdateAncestorItem = (id: string, patch: Partial<AncestorOverlayItem>) => {
+    dispatchAncestor({ type: "updateAncestorOverlayItem", id, patch });
+    // When the last visible frame drops to 0% there is nothing left to show, so
+    // turn the whole overlay off automatically.
+    if (patch.opacity === 0) {
+      const allZero = ancestorFrames.every((frame) => {
+        const opacity = frame.id === id ? 0 : ancestorOverlayItemFor(ancestorOverlay, frame.id).opacity;
+        return opacity === 0;
+      });
+      if (allZero) dispatchAncestor({ type: "setAncestorOverlayEnabled", enabled: false });
+    }
   };
 
   const commitCanvas = (props: Partial<CanvasProperties>) => {
@@ -213,6 +240,10 @@ export function Inspector({
             inheritParentBackground={inheritParentBackground}
             hasParent={hasParent}
             onInheritParentBackgroundChange={onInheritParentBackgroundChange}
+            ancestorFrames={ancestorFrames}
+            ancestorOverlay={ancestorOverlay}
+            onToggleAncestorOverlay={onToggleAncestorOverlay}
+            onUpdateAncestorItem={onUpdateAncestorItem}
           />
         ) : selectedCount > 1 ? (
           <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />

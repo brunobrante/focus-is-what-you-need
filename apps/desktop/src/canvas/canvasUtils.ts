@@ -2,7 +2,8 @@ import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@
 import { createBlankDocument } from "@/canvas/engine/actions";
 import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { listVariants } from "@/lib/storage/repos/variants.repo";
-import type { CanvasDocument } from "@/canvas/engine/types";
+import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument } from "@/canvas/engine/types";
+import { DEFAULT_ANCESTOR_OVERLAY_ITEM } from "@/canvas/engine/types";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
 import type { MockComponentSeed } from "@/components/mocks/data/canvasMocks";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
@@ -301,38 +302,52 @@ export function componentPathFromRoot(
 }
 
 /**
- * Returns a component's ABSOLUTE position on its root device (screen), walking
- * the full component ancestry. Reading a single parent scene only yields the
- * position relative to the immediate parent's frame; for a component nested
- * several levels deep that is wrong. This sums each ancestor's position within
- * its own parent scene until it reaches the screen, which is the device origin.
- *
- * Returns null if the chain cannot be fully resolved (missing scene, missing
- * sourceNodeId, missing parent component, or a cycle), so callers can fall back.
+ * One ancestor frame of the component being edited, resolved for the parent-
+ * frames overlay. `offsetX/offsetY` are the frame's top-left relative to the
+ * edited component's own top-left (negative, since ancestors enclose it), so the
+ * frame can be drawn directly in the component's canvas space.
  */
-export async function computeComponentDeviceOrigin(
+export type AncestorFrame = {
+  id: string; // the ancestor scene's owner variant id — stable key for per-frame config
+  name: string;
+  kind: "component" | "screen";
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  background: string; // "" when the frame is transparent
+  borderRadius: number;
+};
+
+/**
+ * Resolves every ancestor frame of `component` — its parent component, that
+ * parent's parent, … up to the screen — each sized to its own frame and offset
+ * to where the edited component actually sits inside it. Walks the component
+ * ancestry — summing each level's position within its own parent scene — and
+ * emits one entry per level up to the screen. Stops (returning what it has) when
+ * a scene/sourceNode can't be resolved, since this only drives a visual guide.
+ */
+export async function computeComponentAncestorFrames(
   component: ComponentRow,
   components: ComponentRow[],
-): Promise<{ x: number; y: number } | null> {
+  screens: ScreenRow[],
+): Promise<AncestorFrame[]> {
   const byActiveVariantId = new Map<string, ComponentRow>();
-  for (const row of components) {
-    byActiveVariantId.set(row.activeVariantId, row);
-  }
+  for (const row of components) byActiveVariantId.set(row.activeVariantId, row);
+  const screensById = new Map(screens.map((s) => [s.id, s]));
 
   const variants = await listVariants();
-
-  let x = 0;
-  let y = 0;
+  const frames: AncestorFrame[] = [];
+  let accX = 0;
+  let accY = 0;
   let current: ComponentRow | undefined = component;
   const visited = new Set<string>();
 
   while (current) {
-    if (visited.has(current.id)) return null;
+    if (visited.has(current.id)) break;
     visited.add(current.id);
-    if (!current.sourceNodeId) return null;
+    if (!current.sourceNodeId) break;
 
-    // The embedding scene is the parent variant, or — for a top-level screen
-    // component — the screen's main variant.
     let ownerId: string | null = null;
     let isScreenRoot = false;
     if (current.parentVariantId) {
@@ -341,22 +356,84 @@ export async function computeComponentDeviceOrigin(
       ownerId = mainVariantIdForScreen(variants, current.screenId);
       isScreenRoot = true;
     }
-    if (!ownerId) return null;
+    if (!ownerId) break;
 
     const parentScene = await getSceneByOwner("variant", ownerId);
     const bounds = getNodeAbsoluteBoundsInGraph(parentScene?.graphJSON, current.sourceNodeId);
-    if (!bounds) return null;
-    x += bounds.x;
-    y += bounds.y;
+    const frameDoc = canvasDocumentFromHtmlGraphJSON(parentScene?.graphJSON);
+    if (!bounds || !frameDoc) break;
+    accX += bounds.x;
+    accY += bounds.y;
 
-    // Reached the screen: that's the device, so the accumulated offset is absolute.
-    if (isScreenRoot) return { x, y };
+    const name = isScreenRoot
+      ? (current.screenId ? screensById.get(current.screenId)?.title ?? "Screen" : "Screen")
+      : (byActiveVariantId.get(current.parentVariantId as string)?.name ?? "Componente");
 
-    // Otherwise climb to the component that owns the parent variant and repeat.
+    frames.push({
+      id: ownerId,
+      name,
+      kind: isScreenRoot ? "screen" : "component",
+      width: frameDoc.canvas.width,
+      height: frameDoc.canvas.height,
+      offsetX: -accX,
+      offsetY: -accY,
+      background: frameDoc.canvas.background ?? "",
+      borderRadius: frameDoc.canvas.borderRadius ?? 0,
+    });
+
+    if (isScreenRoot) break;
     current = byActiveVariantId.get(current.parentVariantId as string);
   }
 
-  return null;
+  return frames;
+}
+
+// A faint near-white used when a parent frame is transparent, so the guide stays
+// visible instead of vanishing on a transparent parent.
+export const ANCESTOR_OVERLAY_FALLBACK_COLOR = "#E8E8EC";
+
+/**
+ * Strips any alpha channel from a CSS color, returning just the solid color
+ * value (or "" when there is none). The parent's own opacity is intentionally
+ * ignored — only the color value is inherited; the overlay opacity is user-set.
+ */
+export function solidColorValue(color: string): string {
+  const c = (color ?? "").trim();
+  if (!c || c === "transparent" || c === "none") return "";
+  const hex = c.match(/^#([0-9a-fA-F]{3,8})$/);
+  if (hex) {
+    const h = hex[1];
+    if (h.length === 8) return "#" + h.slice(0, 6);
+    if (h.length === 4) return "#" + h.slice(0, 3);
+    return c;
+  }
+  const fn = c.match(/^(rgba?|hsla?)\(([^)]+)\)$/i);
+  if (fn) {
+    const parts = fn[2].split(/[,/]/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      const base = fn[1].toLowerCase().startsWith("rgb") ? "rgb" : "hsl";
+      return `${base}(${parts.slice(0, 3).join(", ")})`;
+    }
+  }
+  return c;
+}
+
+/** The per-frame config for `id`, falling back to the shared defaults. */
+export function ancestorOverlayItemFor(overlay: AncestorOverlayState, id: string): AncestorOverlayItem {
+  return overlay.items[id] ?? DEFAULT_ANCESTOR_OVERLAY_ITEM;
+}
+
+/** Resolved CSS for drawing one ancestor frame given its per-frame config. */
+export function resolveAncestorOverlayStyle(
+  frame: AncestorFrame,
+  item: AncestorOverlayItem,
+): { background: string; opacity: number; borderRadius: number } {
+  const inherited = solidColorValue(frame.background);
+  return {
+    background: item.inheritColor ? inherited || ANCESTOR_OVERLAY_FALLBACK_COLOR : item.color,
+    opacity: item.opacity,
+    borderRadius: item.keepRadius ? frame.borderRadius : 0,
+  };
 }
 
 export function componentNamePathFromDocument(document: CanvasDocument, nodeId: string): string[] {
