@@ -22,6 +22,7 @@ import type { CanvasToolingRef } from "./CanvasToolingLayer";
 import type { Interaction } from "./canvasInteractionTypes";
 import { getShellPatternStyle, getStageBoxShadow, TOOLBAR_TOOL_MAP } from "./canvasShellStyle";
 import { CanvasGridOverlay } from "./CanvasGridOverlay";
+import { CanvasScrollbars, useElementScrollbars } from "@/components/ui/CanvasScrollbars";
 import { getCanvasSize } from "./canvasCoordinates";
 import type { CanvasAlignmentLogInput } from "./canvasAlignmentLog";
 import { RenderedScene } from "./RenderedScene";
@@ -336,6 +337,14 @@ export function CanvasStage({
     () => shouldUseScaledDomProjection({ canvasSize, displayZoom, canvasRotation: state.document.canvas.rotation ?? 0 }),
     [canvasSize, displayZoom, state.document.canvas.rotation],
   );
+  // Discrete scroll indicators that appear only once the subject overflows the
+  // viewport (i.e. zoomed past fit). The freeform draft canvas is effectively
+  // infinite, so a scrollbar there would never be meaningful — skip it.
+  const scroll = useElementScrollbars(
+    viewportRef,
+    draftMode ? null : stageRef,
+    `${displayZoom}:${state.offsetX}:${state.offsetY}`,
+  );
   const renderScale = scaledDomProjection ? displayZoom : 1;
   const stageWidth = canvasSize.width;
   const stageHeight = canvasSize.height;
@@ -500,6 +509,8 @@ export function CanvasStage({
       />
 
       {contextMenu && <CanvasContextMenu menu={contextMenu} onClose={closeContextMenu} />}
+
+      <CanvasScrollbars x={scroll.x} y={scroll.y} />
     </div>
   );
 }

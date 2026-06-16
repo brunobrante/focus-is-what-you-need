@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
+import { CanvasScrollbars, useElementScrollbars } from "@/components/ui/CanvasScrollbars";
 import {
   Brush,
   Check,
@@ -179,6 +181,15 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     updateComponents,
     selectStackComponent,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
+
+  // Discrete scroll indicators for the Builder stage — only shown once the zoomed
+  // image overflows the stage (zoom in past 100%).
+  const stageContentRef = useRef<HTMLDivElement | null>(null);
+  const stageScroll = useElementScrollbars(
+    stageViewportRef,
+    stageContentRef,
+    `${toolZoom}:${toolPan.x}:${toolPan.y}:${viewMode}`,
+  );
 
   const [cleanOriginal, setCleanOriginal] = useState(false);
 
@@ -533,6 +544,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 </div>
               ) : viewMode === "stack" && imageStack && !cleanOriginal ? (
                 <div
+                  ref={stageContentRef}
                   className="relative inline-block overflow-visible rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
                   style={{
                     transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
@@ -560,6 +572,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               ) : (
                 <>
                   <div
+                    ref={stageContentRef}
                     className="relative max-h-full max-w-full overflow-visible rounded-[8px] bg-[#0E0E0E] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
                     style={{
                       transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
@@ -726,6 +739,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 </div>
               ) : null}
               </>)}
+
+              <CanvasScrollbars x={stageScroll.x} y={stageScroll.y} />
             </div>
 
             <div className="sticky bottom-0 z-20 flex min-h-[56px] shrink-0 items-center gap-2.5 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3.5 py-2.5 backdrop-blur-[8px]">

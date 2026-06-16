@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { clampPanToCenter } from "@/domain/zoom";
+import { useElementScrollbars } from "@/components/ui/CanvasScrollbars";
 import { ZOOM_DEFAULT_IDX, ZOOM_STEPS } from "./ZoomControls";
 
 // Accumulated wheel delta (in px) required to advance one discrete zoom stop, so
@@ -199,6 +200,11 @@ export function useStepZoom(
 
   const transform = contentRef ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` : undefined;
 
+  // Discrete scroll indicators — only present when a contentRef is supplied (the
+  // panning viewers) and the content overflows the stage. Spread onto
+  // `<CanvasScrollbars>` inside the stage.
+  const scroll = useElementScrollbars(targetRef, contentRef, `${zoom}:${pan.x}:${pan.y}`);
+
   return {
     index,
     zoom,
@@ -210,6 +216,7 @@ export function useStepZoom(
     isPanning,
     canPan,
     transform,
+    scroll,
     panHandlers: { onPointerDown, onClickCapture },
   };
 }

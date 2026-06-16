@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { NavTooltip } from "./NavTooltip";
 import { ZOOM_DEFAULT_IDX, ZoomControls } from "./ZoomControls";
 import { useStepZoom } from "./useStepZoom";
+import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
 import { IconChevronDown, IconChevronLeft, IconChevronRight, IconFastEdit, IconOpenCanvas } from "@/components/icons";
 
 type NeighborScreen = { name: string; details?: string[]; href?: string; screenId?: string };
@@ -261,6 +262,8 @@ export function PreviewShell({
         onZoomOut={zoomCtl.zoomOut}
         onReset={zoomCtl.reset}
       />
+
+      <CanvasScrollbars x={zoomCtl.scroll.x} y={zoomCtl.scroll.y} />
     </div>
   );
 }

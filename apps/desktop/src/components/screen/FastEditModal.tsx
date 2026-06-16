@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Modal, ModalBody } from "@/components/modals/Modal";
 import { ZoomControls } from "@/components/screen/ZoomControls";
 import { useStepZoom } from "@/components/screen/useStepZoom";
+import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
 import { IconChevronDown, IconClose, IconOpenCanvas, IconSpinner } from "@/components/icons";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
@@ -213,6 +214,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                 onZoomOut={zoomCtl.zoomOut}
                 onReset={zoomCtl.reset}
               />
+
+              <CanvasScrollbars x={zoomCtl.scroll.x} y={zoomCtl.scroll.y} />
             </div>
 
             <aside className="flex min-h-0 flex-col bg-[var(--bg)]">

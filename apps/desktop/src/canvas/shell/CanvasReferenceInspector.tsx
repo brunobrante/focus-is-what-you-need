@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { IconImage } from "@/components/icons";
 import { ZoomControls } from "@/components/screen/ZoomControls";
 import { useStepZoom } from "@/components/screen/useStepZoom";
+import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
 import {
   SceneCanvasInspector,
   type ImageStack,
@@ -241,6 +242,8 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
             onReset={zoomCtl.reset}
           />
         ) : null}
+
+        <CanvasScrollbars x={zoomCtl.scroll.x} y={zoomCtl.scroll.y} />
       </div>
     </div>
   );
