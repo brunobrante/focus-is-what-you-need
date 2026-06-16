@@ -144,6 +144,11 @@ export function getInitialZoomForSubjectSize(
 //     top/bottom (or left/right) of a frame — or the whole device overlay — into
 //     comfortable, centered view. The centered position is the midpoint of this
 //     range, which strictly contains the old edge-to-padding bounds.
+//   - With `allowOverscroll` off (the freeform draft canvas) there is no such
+//     slack: an overflowing region is clamped so its edge stops flush against the
+//     viewport edge, never past it. Scrolling to the maximum lands on the border
+//     instead of leaving a half-viewport margin you can't fill — so an element at
+//     the very top can actually be brought to the top of the view.
 function clampAxisOffset(
   rawOffset: number,
   containerLength: number,
@@ -152,6 +157,7 @@ function clampAxisOffset(
   displayZoom: number,
   preserveOffset: boolean,
   centerOnly: boolean,
+  allowOverscroll: boolean,
 ): number {
   const scaled = rectLength * displayZoom;
   const startScreen = rectStart * displayZoom;
@@ -172,6 +178,10 @@ function clampAxisOffset(
   // always re-centers and there is no scroll slack. Once zoomed in past 100% the
   // offset is free to travel until either edge reaches the viewport center.
   if (centerOnly) return centered;
+  // No over-scroll: the region edge can reach, but not pass, the viewport edge.
+  if (!allowOverscroll) {
+    return clamp(rawOffset, containerLength - startScreen - scaled, -startScreen);
+  }
   return clamp(rawOffset, containerLength / 2 - startScreen - scaled, containerLength / 2 - startScreen);
 }
 
@@ -228,8 +238,11 @@ export function clampViewportState(
   // real content (which lives in a tiny corner) thousands of px off-screen. There
   // the offset stays anchored/clamped to the pannable range instead.
   const atMinZoom = mode !== "draft" && zoom <= limits.min + 1e-6;
-  const offsetX = clampAxisOffset(viewport.offsetX, containerSize.width, bounds.x, bounds.width, displayZoom, preserveSmallCanvasOffset, atMinZoom);
-  const offsetY = clampAxisOffset(viewport.offsetY, containerSize.height, bounds.y, bounds.height, displayZoom, preserveSmallCanvasOffset, atMinZoom);
+  // The freeform draft canvas has no edge-to-center over-scroll: panning stops
+  // flush against the region edge so a max scroll lands on the border.
+  const allowOverscroll = mode !== "draft";
+  const offsetX = clampAxisOffset(viewport.offsetX, containerSize.width, bounds.x, bounds.width, displayZoom, preserveSmallCanvasOffset, atMinZoom, allowOverscroll);
+  const offsetY = clampAxisOffset(viewport.offsetY, containerSize.height, bounds.y, bounds.height, displayZoom, preserveSmallCanvasOffset, atMinZoom, allowOverscroll);
   return { zoom, offsetX, offsetY };
 }
 

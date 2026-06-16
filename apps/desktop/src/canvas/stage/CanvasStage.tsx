@@ -22,7 +22,7 @@ import type { CanvasToolingRef } from "./CanvasToolingLayer";
 import type { Interaction } from "./canvasInteractionTypes";
 import { getShellPatternStyle, getStageBoxShadow, TOOLBAR_TOOL_MAP } from "./canvasShellStyle";
 import { CanvasGridOverlay } from "./CanvasGridOverlay";
-import { CanvasScrollbars, computeDraftScrollAxis, HIDDEN_SCROLL, useElementScrollbars } from "@/components/ui/CanvasScrollbars";
+import { CanvasScrollbars, computeScrollAxis, HIDDEN_SCROLL, useElementScrollbars } from "@/components/ui/CanvasScrollbars";
 import { getCanvasSize } from "./canvasCoordinates";
 import type { CanvasAlignmentLogInput } from "./canvasAlignmentLog";
 import { RenderedScene } from "./RenderedScene";
@@ -350,12 +350,12 @@ export function CanvasStage({
     draftMode ? null : stageRef,
     `${displayZoom}:${state.offsetX}:${state.offsetY}`,
   );
-  // The freeform draft canvas has no fixed extent to measure, so its indicators
-  // are derived from the real content's bounds instead. The track is the content's
-  // bounding box (thumb length stable per zoom) and the thumb is the viewport
-  // window within it, so panning moves the thumb without resizing it; when you pan
-  // past the content the thumb pins to the edge, pointing the way back. Stays
-  // visible whenever any content is off-screen, hides when it is fully in view.
+  // The freeform draft canvas has no fixed stage to measure, so its indicators are
+  // computed from the real content's bounding box projected through the current
+  // transform. The track is that content box and the thumb is the viewport within
+  // it (Figma/Penpot-style): thumb length = viewport / content, so it is
+  // proportional to the window (a 600px window over 1000px of content → a 60%
+  // thumb) and shrinks as you zoom in. Hidden whenever the content fits the window.
   const draftContentBounds = useMemo(
     () => (draftMode ? getSelectionAABB(state.document, state.document.rootIds) : null),
     [draftMode, state.document],
@@ -365,8 +365,8 @@ export function CanvasStage({
     const startX = draftContentBounds.x * displayZoom + viewportTransform.offsetX;
     const startY = draftContentBounds.y * displayZoom + viewportTransform.offsetY;
     return {
-      x: computeDraftScrollAxis(viewportSize.width, startX, draftContentBounds.width * displayZoom),
-      y: computeDraftScrollAxis(viewportSize.height, startY, draftContentBounds.height * displayZoom),
+      x: computeScrollAxis(viewportSize.width, startX, draftContentBounds.width * displayZoom),
+      y: computeScrollAxis(viewportSize.height, startY, draftContentBounds.height * displayZoom),
     };
   }, [draftContentBounds, displayZoom, viewportTransform.offsetX, viewportTransform.offsetY, viewportSize.width, viewportSize.height]);
   const scroll = draftMode ? draftScroll : elementScroll;

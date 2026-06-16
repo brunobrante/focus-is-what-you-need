@@ -221,6 +221,42 @@ test("keeps the frame zoom cap separate from draft zoom", () => {
   expect(viewport.zoom).toBe(MAX_ZOOM);
 });
 
+test("draft canvas has no edge-to-center over-scroll: max scroll lands on the border", () => {
+  const container = { width: 900, height: 600 };
+  const draftCanvas = { width: 65_536, height: 65_536 };
+  const displayZoom = 50 * DRAFT_VIEWPORT_SCALE; // zoom 50 → 5
+  const scaled = draftCanvas.height * displayZoom;
+
+  // Scroll all the way "up" (reveal the top edge): the region's near edge stops
+  // flush at the viewport top — offset clamps to 0, never past it into a margin.
+  const top = clampViewportState(
+    { zoom: 50, offsetX: 0, offsetY: 99_999 },
+    container,
+    draftCanvas,
+    false,
+    "draft",
+  );
+  expect(top.offsetY).toBeCloseTo(0);
+
+  // Scroll all the way "down": the far edge stops flush at the viewport bottom.
+  const bottom = clampViewportState(
+    { zoom: 50, offsetX: 0, offsetY: -9_999_999 },
+    container,
+    draftCanvas,
+    false,
+    "draft",
+  );
+  expect(bottom.offsetY).toBeCloseTo(container.height - scaled);
+
+  // A frame, by contrast, keeps the over-scroll slack (edge reaches the center).
+  const frame = clampViewportState(
+    { zoom: 2, offsetX: 0, offsetY: 99_999 },
+    { width: 300, height: 300 },
+    { width: 390, height: 844 },
+  );
+  expect(frame.offsetY).toBeGreaterThan(0);
+});
+
 test("scales the proportional subject zoom up in draft mode", () => {
   const frameZoom = getInitialZoomForSubjectSize({ width: 60, height: 60 });
   const draftZoom = getInitialZoomForSubjectSize({ width: 60, height: 60 }, "draft");
