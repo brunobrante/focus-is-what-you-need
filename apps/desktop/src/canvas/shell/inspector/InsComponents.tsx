@@ -103,10 +103,13 @@ export function InsSection({
   title,
   children,
   defaultOpen = true,
+  disabled = false,
 }: {
   title: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  /** When true the section's controls are shown but become read-only (locked). */
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -120,7 +123,14 @@ export function InsSection({
         <span>{title}</span>
         <IconChevronDown size={10} strokeWidth={2} className={`transition-transform duration-[120ms] ${open ? "rotate-0" : "-rotate-90"}`} />
       </button>
-      {open ? <div className="flex flex-col gap-2.5 px-3.5 pb-3.5">{children}</div> : null}
+      {open ? (
+        <div
+          className={`flex flex-col gap-2.5 px-3.5 pb-3.5${disabled ? " pointer-events-none select-none opacity-50" : ""}`}
+          inert={disabled || undefined}
+        >
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 }

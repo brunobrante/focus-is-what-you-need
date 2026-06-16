@@ -131,6 +131,9 @@ type Props = {
   projectType?: DeviceType;
   projectTree?: ProjectTreeNode[];
   parentNode?: ProjectTreeNode | null;
+  // Parent of the Versions-window subject; the back footer re-points the versions
+  // subject to it (staying in the Versions window) instead of navigating Current.
+  versionsParentNode?: ProjectTreeNode | null;
   subjectSize?: { width: number; height: number };
   // Versions window: the subject's real versions (V1, V2…), the selected one, and the
   // setter. When the focused window is "versions" the header dropdown lists these
@@ -178,6 +181,7 @@ export function Tree({
   activeTab = "current",
   projectType,
   projectTree,
+  versionsParentNode,
   parentNode,
   subjectSize,
   versionOptions = [],
@@ -498,6 +502,18 @@ export function Tree({
             />
           )}
         </div>
+        <BackFooter
+          parentNode={isVersionsWindow ? versionsParentNode : parentNode}
+          onBack={() => {
+            if (isVersionsWindow) {
+              // Stay in the Versions window: re-point its subject to the parent so it
+              // shows the parent's versions, instead of navigating the Current window.
+              if (versionsParentNode) onSelectVersionsSubject?.(versionsParentNode);
+            } else if (parentNode) {
+              onOpenProjectNode?.(parentNode);
+            }
+          }}
+        />
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -527,8 +543,13 @@ export function Tree({
                     dragActive={activeDragId != null}
                     onToggleVisible={onToggleVisible}
                     onToggleLocked={onToggleLocked}
-                    canOpenNodeCanvas={canOpenNodeCanvas}
-                    onOpenNodeCanvas={onOpenNodeCanvas}
+                    // In the Versions window, "open in canvas" (which materializes a
+                    // component from the node) is suppressed — materializing from a
+                    // version's scene is destructive and resolves against the wrong
+                    // document. Linked instances keep their separate "go to master"
+                    // link (onGoToInstance). Detached content is edited inline.
+                    canOpenNodeCanvas={isVersionsWindow ? undefined : canOpenNodeCanvas}
+                    onOpenNodeCanvas={isVersionsWindow ? undefined : onOpenNodeCanvas}
                     onGoToInstance={onGoToInstance}
                     onDetachNode={onDetachNode}
                     showFocusButton={isDraftMode}
@@ -573,11 +594,6 @@ export function Tree({
         onRemoveKind={removeKindFilter}
         expandMode={expandMode}
         onCycleExpand={cycleExpand}
-      />
-
-      <BackFooter
-        parentNode={parentNode}
-        onBack={() => parentNode && onOpenProjectNode?.(parentNode)}
       />
     </aside>
 

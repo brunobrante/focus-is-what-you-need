@@ -5,13 +5,16 @@ import {
   getParentBounds,
   getSelectionAABB,
   getSelectionBox,
+  isInsideInstance,
 } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, Rect, ViewportMode } from "@/canvas/engine/types";
 
 export function getTransformIds(document: CanvasDocument, selectedIds: string[]): string[] {
   return filterTopLevelIds(document, selectedIds).filter((id) => {
     const node = document.elements[id];
-    return Boolean(node && !node.locked && node.visible !== false);
+    // Children of a linked instance are read-only: selectable, but never moved/resized
+    // (see Versioning.md §3.2). The instance root itself stays transformable.
+    return Boolean(node && !node.locked && node.visible !== false && !isInsideInstance(document, id));
   });
 }
 

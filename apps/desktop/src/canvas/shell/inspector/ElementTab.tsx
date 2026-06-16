@@ -2,6 +2,7 @@ import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
+import { IconLink } from "@/components/icons";
 import {
   clamp,
   InsColor,
@@ -27,6 +28,12 @@ type ElementTabProps = {
   onUpdateSizing: (sizing: ElementSizing) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
+  /** When true every field is shown but read-only (linked instance or its descendants). */
+  locked?: boolean;
+  /** Master variant the banner link opens (the instance root's variant), or null. */
+  lockedInstanceVariantId?: string | null;
+  /** Opens the master variant this instance points to (used by the locked banner link). */
+  onGoToInstance?: (variantId: string) => void;
 };
 
 function labelForWeight(value: string | undefined): string {
@@ -56,6 +63,9 @@ export function ElementTab({
   onUpdateSizing,
   onToggleLocked,
   onToggleVisible,
+  locked = false,
+  lockedInstanceVariantId = null,
+  onGoToInstance,
 }: ElementTabProps) {
   const rect = getAbsoluteRect(document, node.id);
   const parentSize = getParentSize(document, node.id);
@@ -70,13 +80,37 @@ export function ElementTab({
 
   return (
     <>
+      {locked ? (
+        <div className="flex items-start gap-2 border-b border-[#2C2C2C] bg-[#1A1A1A] px-3.5 py-2.5 text-[11px] text-[#8638E5]">
+          <span className="mt-px shrink-0">
+            <IconLink size={12} strokeWidth={1.8} />
+          </span>
+          <span className="min-w-0 leading-snug text-[#9A9A9A]">
+            Instância linkada — somente leitura. Faça detach para editar.
+            {lockedInstanceVariantId && onGoToInstance ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => onGoToInstance(lockedInstanceVariantId)}
+                  className="cursor-pointer border-0 bg-transparent p-0 font-medium text-[#8638E5] underline underline-offset-2 hover:text-[#A855E6]"
+                >
+                  Ou clique aqui
+                </button>{" "}
+                para abrir o componente.
+              </>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
+
       {node.type === "text" ? (
-        <InsSection title="Content">
+        <InsSection title="Content" disabled={locked}>
           <InsTextarea value={node.content ?? ""} onChange={onUpdateText} />
         </InsSection>
       ) : null}
 
-      <InsSection title="Position">
+      <InsSection title="Position" disabled={locked}>
         <Readout label="Abs X" value={String(Math.round(rect?.x ?? 0))} />
         <Readout label="Abs Y" value={String(Math.round(rect?.y ?? 0))} />
         <InsRow label="X">
@@ -90,7 +124,7 @@ export function ElementTab({
         </InsRow>
       </InsSection>
 
-      <InsSection title="Tamanho">
+      <InsSection title="Tamanho" disabled={locked}>
         {node.type === "text" ? (
           <>
             <InsRow label="W mode">
@@ -135,7 +169,7 @@ export function ElementTab({
         {c.height.max !== undefined && <Readout label="Max H" value={String(c.height.max)} />}
       </InsSection>
 
-      <InsSection title="Layout" defaultOpen={false}>
+      <InsSection title="Layout" defaultOpen={false} disabled={locked}>
         <InsRow label="Display">
           <InsToggle
             value={node.styles.display ?? "block"}
@@ -172,7 +206,7 @@ export function ElementTab({
         </InsRow>
       </InsSection>
 
-      <InsSection title="Appearance">
+      <InsSection title="Appearance" disabled={locked}>
         <InsRow label="Fill">
           <InsColor value={node.styles.background ?? "#FFFFFF"} onChange={(background) => onUpdateStyle({ background })} />
         </InsRow>
@@ -197,7 +231,7 @@ export function ElementTab({
       </InsSection>
 
       {node.type === "text" ? (
-        <InsSection title="Tipografia" defaultOpen={false}>
+        <InsSection title="Tipografia" defaultOpen={false} disabled={locked}>
           <InsRow label="Size">
             <InsInput value={String(node.styles.fontSize ?? 14)} onChange={(value) => updateNumber(value, (fontSize) => onUpdateStyle({ fontSize }))} suffix="px" />
           </InsRow>
@@ -215,7 +249,7 @@ export function ElementTab({
       ) : null}
 
       {node.type === "image" ? (
-        <InsSection title="Image" defaultOpen={false}>
+        <InsSection title="Image" defaultOpen={false} disabled={locked}>
           <InsRow label="URL">
             <InsInput value={node.src ?? ""} onChange={onUpdateImageSource} placeholder="https://..." />
           </InsRow>

@@ -369,6 +369,37 @@ header is a two-select block instead of the single subject row:
   that element's versions. Because the window is otherwise decoupled, switching Current
   to a child component does **not** auto-update the Versions subject — this button is how
   you re-sync. Disabled when the subject already matches Current.
+- The **back footer** ("Voltar para …") in the Versions window operates **within** the
+  Versions window: it re-points the versions subject to its **parent** (showing the parent's
+  versions), rather than navigating the Current window. It is shown only when the versions
+  subject is a component with a parent (a screen subject is top-level, so no back footer).
+- **Open in canvas is suppressed in the Versions window.** A version's scene is a snapshot;
+  materializing a component from one of its nodes is destructive (it creates project
+  components and rewrites scenes). So ordinary tree rows show **no** "open in canvas" icon
+  while the Versions window is focused — detached content is edited **inline** on the version
+  canvas, and to open a component as its own canvas you use the **Current** window. Linked
+  instances are the exception: they keep their **"go to master"** link (it navigates to the
+  master variant, which is non-destructive).
+
+**Read-only linked instances (Versions window)**: when the Versions window is focused and
+the selected element is a **linked instance** (a node referencing a master component), the
+Inspector's Element tab still shows every section (Position, Tamanho, Layout, Appearance, …)
+but they are **locked** — fields are dimmed and non-interactive. A purple link banner at the
+top reads "Instância linkada — somente leitura. Faça detach para editar." followed by an
+inline **"Ou clique aqui"** link that opens the **master component** the instance points to
+(navigates to that variant's canvas in the Current window, same as the layers-tree
+"go to instance" action). Section headers can still be expanded/collapsed so the values
+remain inspectable; only editing is blocked. This mirrors the versioning rule that instances
+are read-only (edit the master, or detach first).
+
+**Read-only linked instances (canvas selection)**: elements inside a linked instance stay
+**individually selectable** (single-click, drill-in, marquee — exactly like normal nodes),
+but they are **read-only**. Their selection outline renders in **purple** (the instance
+colour) instead of the usual blue, and they get **no transform handles and cannot be
+dragged or resized** — only the instance **root** can be moved/resized/detached as a whole
+(Versioning.md §3.2). Selecting any instance descendant also locks the Inspector (same purple
+banner + "Ou clique aqui" link to open the master), so editing is blocked from every surface.
+To edit the contents, open the master or detach the instance first.
 
 **Left panel** (collapsible):
 - Layers / tree panel
@@ -981,14 +1012,17 @@ version is created:
 **Linked instances in the canvas**:
 - Selecting an instance shows **purple** selection chrome (`#8638E5`) — outline, resize
   handles, and the size tag — vs blue for editable content, signalling an external component.
-- An instance's contents are **read-only**: clicking inside selects the instance as a whole.
+- An instance's contents are **read-only** but individually selectable: a child can be
+  clicked/selected and shows a purple outline, yet has no transform handles and cannot be
+  moved/resized; only the instance root moves as a whole (see the canvas-selection note above).
 - In the layers tree, an instance row uses a purple **diamond-cluster component icon** and
   exposes:
   - **Open in canvas** (the same icon every openable row uses, tinted purple) — a single
     link that opens the master variant. (There is no separate "Go to component" link.)
   - **Detach** (broken-link icon) — breaks the link, turning the instance into editable
-    own content.
-- The tree shows an instance as a single row; its inlined master content is not expanded.
+    own content (edited inline on the canvas).
+- While linked, the tree shows an instance as a single row; its inlined master content is
+  not expanded.
 
 **Version details (screens & components)**:
 - The original is labelled **"main"** (green badge); the versions created from it are

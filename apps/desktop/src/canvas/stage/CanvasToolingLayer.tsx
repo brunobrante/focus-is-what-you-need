@@ -9,7 +9,7 @@ import {
   setTextElementSizing,
   updateElementStyles,
 } from "@/canvas/engine/actions";
-import { filterTopLevelIds, getCommonParentId, getParentDistanceMeasurements, getSelectionBox, unionRects } from "@/canvas/engine/geometry";
+import { filterTopLevelIds, getCommonParentId, getInstanceRootId, getParentDistanceMeasurements, getSelectionBox, isInsideInstance, unionRects } from "@/canvas/engine/geometry";
 import { useHoveredId } from "@/canvas/engine/store";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementStyles, Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
@@ -23,6 +23,7 @@ import {
   type ViewportTransform,
   GROUP_FILL,
   HOVER_COLOR,
+  INSTANCE_HOVER_COLOR,
   INSTANCE_SELECTION_COLOR,
   RADIUS_MIN_ELEMENT_SCREEN,
   SELECTION_COLOR,
@@ -72,7 +73,9 @@ export type CanvasToolingLayerProps = {
 function computeTransformIds(doc: CanvasDocument, selectedIds: string[]): string[] {
   return filterTopLevelIds(doc, selectedIds).filter((id) => {
     const node = doc.elements[id];
-    return Boolean(node && !node.locked && node.visible !== false);
+    // Children of a linked instance are read-only: they keep a (purple) selection
+    // outline but get no transform handles and cannot be dragged (Versioning.md §3.2).
+    return Boolean(node && !node.locked && node.visible !== false && !isInsideInstance(doc, id));
   });
 }
 
@@ -537,9 +540,15 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
               ...renderedSelected.map(({ id, box }) => ({
                 rect: box.rect,
                 corners: box.corners,
-                color: doc.elements[id]?.instanceOf ? INSTANCE_SELECTION_COLOR : SELECTION_COLOR,
+                // Purple for a linked instance AND everything inside it (read-only).
+                color: getInstanceRootId(doc, id) ? INSTANCE_SELECTION_COLOR : SELECTION_COLOR,
               })),
-              { rect: hoverBox?.rect ?? hoverRect, corners: hoverBox?.corners, color: HOVER_COLOR },
+              {
+                rect: hoverBox?.rect ?? hoverRect,
+                corners: hoverBox?.corners,
+                // Purple hover for a linked instance and anything inside it.
+                color: getInstanceRootId(doc, hoveredEligibleId) ? INSTANCE_HOVER_COLOR : HOVER_COLOR,
+              },
             ],
         resizeBox: props.canvasStageActive
           ? canvasBox

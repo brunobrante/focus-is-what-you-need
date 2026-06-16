@@ -18,6 +18,7 @@ import {
 } from "@/canvas/engine/actions";
 import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument, CanvasProperties, ElementSizing, ElementStyles } from "@/canvas/engine/types";
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
+import { getInstanceRootId } from "@/canvas/engine/geometry";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { CanvasTab } from "./inspector/CanvasTab";
 import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
@@ -44,6 +45,8 @@ type InspectorProps = {
   hasParent?: boolean;
   onInheritParentBackgroundChange?: (value: boolean) => void;
   ancestorFrames?: AncestorFrame[];
+  /** Opens the master variant a linked instance points to (used by the locked banner). */
+  onGoToInstance?: (variantId: string) => void;
 };
 
 const EMPTY_ANCESTOR_OVERLAY: AncestorOverlayState = { enabled: false, items: {} };
@@ -59,6 +62,7 @@ export function Inspector({
   hasParent = false,
   onInheritParentBackgroundChange,
   ancestorFrames = [],
+  onGoToInstance,
   shellDeviceVisibility,
   shellBackVisibility,
   shellZoomVisibility,
@@ -95,6 +99,21 @@ export function Inspector({
   const sourceId = editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId;
   const sourceLabel = windowKeyLabel(sourceId ?? "current");
   const node = document && selectedId ? document.elements[selectedId] ?? null : null;
+  // Linked instances are read-only (Versioning.md §2). The fields stay visible but
+  // locked; detaching is the only way to edit:
+  //   • any element INSIDE an instance (a descendant) is locked in every window — it
+  //     mirrors the canvas, where instance children get a purple outline and no handles;
+  //   • the instance ROOT itself is locked only in the Versions window (in Current it can
+  //     still be moved/resized/detached as a whole, §3.2).
+  const instanceRootId = document ? getInstanceRootId(document, selectedId) : null;
+  const isInstanceDescendant = instanceRootId != null && instanceRootId !== selectedId;
+  const elementLocked =
+    isInstanceDescendant || (sourceId === "versions" && node?.instanceOf != null);
+  // The master variant to open from the banner link — the root's link (works whether the
+  // root itself or one of its descendants is selected).
+  const lockedInstanceVariantId = instanceRootId
+    ? document?.elements[instanceRootId]?.instanceOf?.variantId ?? null
+    : null;
 
   useEffect(() => {
     if (canvasStageActive) setActiveTab("canvas");
@@ -268,6 +287,9 @@ export function Inspector({
                 visible ? ids : [],
               );
             }}
+            locked={elementLocked}
+            lockedInstanceVariantId={lockedInstanceVariantId}
+            onGoToInstance={onGoToInstance}
           />
         )}
       </div>

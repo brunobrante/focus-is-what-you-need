@@ -291,6 +291,39 @@ export function isDescendantOf(
   return false;
 }
 
+// Returns the outermost linked-instance ancestor of `id` (or `id` itself when it is
+// an instance). Null when `id` is not part of any linked instance. Used to keep an
+// instance read-only as a single unit: selecting anything inside it resolves to the
+// instance root (see Versioning.md §2 — instances are read-only; detach to edit).
+export function getInstanceRootId(
+  document: CanvasDocument,
+  id: string | null,
+): string | null {
+  if (!id) return null;
+  let current: string | null = id;
+  let outermost: string | null = null;
+  while (current) {
+    const node = document.elements[current];
+    if (!node) break;
+    if (node.instanceOf) outermost = current;
+    current = node.parentId ?? null;
+  }
+  return outermost;
+}
+
+// True when `id` lives INSIDE a linked instance (has an instance ancestor strictly
+// above it). The instance root itself returns false — it is editable as a whole, while
+// its children are read-only (see Versioning.md §3.2).
+export function isInsideInstance(document: CanvasDocument, id: string | null): boolean {
+  if (!id) return false;
+  let parentId = document.elements[id]?.parentId ?? null;
+  while (parentId) {
+    if (document.elements[parentId]?.instanceOf) return true;
+    parentId = document.elements[parentId]?.parentId ?? null;
+  }
+  return false;
+}
+
 export function filterTopLevelIds(document: CanvasDocument, ids: string[]): string[] {
   const idSet = new Set(ids);
   return ids.filter((id) => {

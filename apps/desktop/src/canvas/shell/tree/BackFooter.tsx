@@ -14,7 +14,7 @@ export function BackFooter({
     <button
       type="button"
       onClick={onBack}
-      className="group flex w-full shrink-0 items-center gap-2 border-t border-[#2C2C2C] px-2.5 py-2 text-left transition-colors duration-[90ms] hover:bg-[#1E1E1E]"
+      className="group flex w-full shrink-0 items-center gap-2 border-b border-[#2C2C2C] px-2.5 py-2 text-left transition-colors duration-[90ms] hover:bg-[#1E1E1E]"
     >
       <span className="grid h-5 w-5 shrink-0 place-items-center text-[#4A4A4A] transition-colors duration-[90ms] group-hover:text-[#CFCFCF]">
         <IconChevronLeft size={12} strokeWidth={2} />

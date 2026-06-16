@@ -1,7 +1,84 @@
 import { useState } from "react";
 import type { AncestorOverlayItem, AncestorOverlayState, ShellGridType } from "@/canvas/engine/types";
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
+import { IconChevronDown, IconGrid, IconScreen } from "@/components/icons";
 import { InsColor, InsRow, InsSection, InsSlider, InsSwitch, InsToggle } from "./InsComponents";
+
+function AncestorCard({
+  frame,
+  depth,
+  item,
+  disabled,
+  onUpdate,
+}: {
+  frame: AncestorFrame;
+  depth: number;
+  item: AncestorOverlayItem;
+  disabled: boolean;
+  onUpdate: (patch: Partial<AncestorOverlayItem>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isScreen = frame.kind === "screen";
+  return (
+    <div
+      className="overflow-hidden rounded-md border border-[#2C2C2C] bg-[#1A1A1A] transition-opacity duration-[120ms]"
+      style={{ opacity: disabled ? 0.45 : 1 }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-2 py-1.5 text-left transition-colors duration-[120ms] hover:bg-[#202020]"
+      >
+        <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[#262626] text-[9px] font-medium tabular-nums text-[#8A8A8A]">
+          {depth + 1}
+        </span>
+        <span className="grid h-4 w-4 shrink-0 place-items-center text-[#7A7A7A]">
+          {isScreen ? <IconScreen size={12} /> : <IconGrid size={12} />}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-[#CFCFCF]">{frame.name}</span>
+        <span className="shrink-0 text-[9px] uppercase tracking-[0.4px] text-[#6B6B6B]">
+          {isScreen ? "Screen" : "Componente"}
+        </span>
+        <IconChevronDown
+          size={10}
+          strokeWidth={2}
+          className={`shrink-0 text-[#6B6B6B] transition-transform duration-[120ms] ${open ? "rotate-0" : "-rotate-90"}`}
+        />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2 border-t border-[#262626] px-2 py-2">
+          <InsRow label="Herdar cor">
+            <InsSwitch
+              checked={item.inheritColor}
+              onChange={(v) => onUpdate({ inheritColor: v })}
+            />
+          </InsRow>
+          {!item.inheritColor && (
+            <InsRow label="Cor">
+              <InsColor value={item.color} onChange={(v) => onUpdate({ color: v })} />
+            </InsRow>
+          )}
+          <InsRow label="Opacidade">
+            <InsSlider
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(item.opacity * 100)}
+              format={(v) => `${v}%`}
+              onChange={(v) => onUpdate({ opacity: v / 100 })}
+            />
+          </InsRow>
+          <InsRow label="Radius">
+            <InsSwitch
+              checked={item.keepRadius}
+              onChange={(v) => onUpdate({ keepRadius: v })}
+            />
+          </InsRow>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type ShapeRenderMode = "svg" | "div";
 
@@ -105,52 +182,16 @@ export function ShellTab({
               Sem elementos pai para este componente.
             </p>
           ) : (
-            ancestorFrames.map((frame) => {
-              const item = ancestorOverlayItemFor(ancestorOverlay, frame.id);
-              return (
-                <div
-                  key={frame.id}
-                  className="flex flex-col gap-2 rounded-md border border-[#2C2C2C] bg-[#1A1A1A] p-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-[11px] text-[#CFCFCF]">{frame.name}</span>
-                    <span className="shrink-0 text-[9px] uppercase tracking-[0.4px] text-[#6B6B6B]">
-                      {frame.kind === "screen" ? "Screen" : "Componente"}
-                    </span>
-                  </div>
-                  <InsRow label="Herdar cor">
-                    <InsSwitch
-                      checked={item.inheritColor}
-                      onChange={(v) => onUpdateAncestorItem(frame.id, { inheritColor: v })}
-                    />
-                  </InsRow>
-                  {!item.inheritColor && (
-                    <InsRow label="Cor">
-                      <InsColor
-                        value={item.color}
-                        onChange={(v) => onUpdateAncestorItem(frame.id, { color: v })}
-                      />
-                    </InsRow>
-                  )}
-                  <InsRow label="Opacidade">
-                    <InsSlider
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={Math.round(item.opacity * 100)}
-                      format={(v) => `${v}%`}
-                      onChange={(v) => onUpdateAncestorItem(frame.id, { opacity: v / 100 })}
-                    />
-                  </InsRow>
-                  <InsRow label="Radius">
-                    <InsSwitch
-                      checked={item.keepRadius}
-                      onChange={(v) => onUpdateAncestorItem(frame.id, { keepRadius: v })}
-                    />
-                  </InsRow>
-                </div>
-              );
-            })
+            ancestorFrames.map((frame, depth) => (
+              <AncestorCard
+                key={frame.id}
+                frame={frame}
+                depth={depth}
+                item={ancestorOverlayItemFor(ancestorOverlay, frame.id)}
+                disabled={!ancestorOverlay.enabled}
+                onUpdate={(patch) => onUpdateAncestorItem(frame.id, patch)}
+              />
+            ))
           )}
         </InsSection>
       )}

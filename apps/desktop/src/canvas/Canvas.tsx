@@ -476,6 +476,25 @@ function CanvasPageContent() {
     return null;
   }, [component, projectComponents, projectTree]);
 
+  // Parent of the VERSIONS subject (not the Current subject) — drives the Versions
+  // window's back footer, which re-points the versions subject to its parent instead of
+  // navigating the Current window. Screens are top-level, so they have no parent.
+  const versionsParentNode = useMemo<ProjectTreeNode | null>(() => {
+    if (!versionsSubject || versionsSubject.kind !== "component") return null;
+    const comp = projectComponents.find((c) => c.id === versionsSubject.id);
+    if (!comp) return null;
+    if (!comp.parentVariantId && comp.screenId) {
+      return projectTree.find((n) => n.id === comp.screenId) ?? null;
+    }
+    if (comp.parentVariantId) {
+      const parentComponent = projectComponents.find(
+        (c) => c.activeVariantId === comp.parentVariantId,
+      );
+      return parentComponent ? findTreeNodeById(projectTree, parentComponent.id) : null;
+    }
+    return null;
+  }, [versionsSubject, projectComponents, projectTree]);
+
   // Display info for the Versions window's first ("Screen") dropdown: the selected
   // subject's tree node (name + kind) and the rendered version's intrinsic size.
   const versionsSubjectNode = useMemo<ProjectTreeNode | null>(
@@ -727,6 +746,27 @@ function CanvasPageContent() {
       setSplitWindows((current) => addCanvasWindowToSplit(current, enabledCanvasTabs, nextTab));
     }
   }, [enabledCanvasTabs, isTabKeyEnabled, split]);
+
+  // Opens the master variant a linked instance points to as the Current subject.
+  // Shared by the layers tree and the Inspector's read-only banner.
+  const goToInstanceMaster = useCallback(
+    (variantId: string) => {
+      void flushPendingSave();
+      // Going to the master opens it as the Current subject — focus the Current tab
+      // (the click may have come from the Versions window).
+      changeCanvasTab("current");
+      const origin = variantParam
+        ? `variant:${variantParam}`
+        : screenParam
+          ? `screen:${screenParam}`
+          : "";
+      const fromQuery = origin ? `&from=${encodeURIComponent(origin)}` : "";
+      navigate(
+        `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&variant=${encodeURIComponent(variantId)}${fromQuery}`,
+      );
+    },
+    [flushPendingSave, changeCanvasTab, variantParam, screenParam, navigate, projectId, projectType],
+  );
 
   // ── Extra Current windows ─────────────────────────────────────────────────────
   // Add a new Current that mirrors the primary Current's subject, then focus it. The
@@ -1011,21 +1051,7 @@ function CanvasPageContent() {
         onToggleCanvasActive={(active) => { getEditor()?.dispatch({ type: "setCanvasStageActive", active }); }}
         canOpenNodeCanvas={canOpenCanvasNode}
         onOpenNodeCanvas={openCanvasForNode}
-        onGoToInstance={(variantId) => {
-          void flushPendingSave();
-          // Going to the master opens it as the Current subject — focus the Current tab
-          // (the click may have come from the Versions window's layers tree).
-          changeCanvasTab("current");
-          const origin = variantParam
-            ? `variant:${variantParam}`
-            : screenParam
-              ? `screen:${screenParam}`
-              : "";
-          const fromQuery = origin ? `&from=${encodeURIComponent(origin)}` : "";
-          navigate(
-            `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&variant=${encodeURIComponent(variantId)}${fromQuery}`,
-          );
-        }}
+        onGoToInstance={goToInstanceMaster}
         onDetachNode={(nodeId) => {
           const editor = getEditor();
           if (!editor) return;
@@ -1041,6 +1067,7 @@ function CanvasPageContent() {
         projectType={projectType}
         projectTree={projectTree}
         parentNode={parentProjectNode}
+        versionsParentNode={versionsParentNode}
         subjectSize={selectedSubjectSize}
         versionOptions={versionsVariants}
         selectedVersionId={selectedVersionId}
@@ -1086,6 +1113,7 @@ function CanvasPageContent() {
           hasParent={hasParent}
           onInheritParentBackgroundChange={handleInheritParentBackgroundChange}
           ancestorFrames={ancestorFrames}
+          onGoToInstance={goToInstanceMaster}
         />
         </div>
       </div>

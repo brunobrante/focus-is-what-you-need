@@ -39,6 +39,11 @@ export function documentTreeShapeEqual(
       ea.type !== eb.type ||
       ea.visible !== eb.visible ||
       ea.locked !== eb.locked ||
+      // A linked instance renders as a single leaf (children hidden) with link/detach
+      // affordances; detaching flips `instanceOf` to null, which changes the rendered
+      // tree even when name/children/locked are untouched. Without this the tree's
+      // re-render guard treats a detach as a no-op and the change never shows.
+      Boolean(ea.instanceOf) !== Boolean(eb.instanceOf) ||
       !stringArraysEqual(ea.children, eb.children)
     ) {
       return false;

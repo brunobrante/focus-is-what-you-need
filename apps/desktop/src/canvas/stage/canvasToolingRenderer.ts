@@ -19,6 +19,8 @@ export const SELECTION_COLOR = "#0d99ff";
 // editable content — outline and resize handles alike.
 export const INSTANCE_SELECTION_COLOR = "#8638E5";
 export const HOVER_COLOR = "rgba(13, 153, 255, 0.55)";
+// Hover over a linked instance (or anything inside it) mirrors the purple selection.
+export const INSTANCE_HOVER_COLOR = "rgba(134, 56, 229, 0.55)";
 export const GROUP_FILL = "rgba(13, 153, 255, 0.06)";
 const GUIDE_COLOR = "#ff2ca8";
 const MARQUEE_FILL = "rgba(13, 153, 255, 0.08)";
