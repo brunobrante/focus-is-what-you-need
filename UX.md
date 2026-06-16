@@ -317,8 +317,18 @@ Full-screen visual editor with floating UI layers.
 - Shows references attached to the subject currently open in the canvas (a
   component takes precedence over its screen) as a gallery of `ReferenceThumbCard`s.
 - Clicking a card enlarges that reference **inline within the canvas window**
-  (not a modal) — the image fills the window; a **Back** control returns to the
-  gallery and a trash control removes it. Card hover also reveals remove.
+  (not a modal) — a **Back** control returns to the gallery and a trash control
+  removes it. Card hover also reveals remove.
+- **Stack references** (a whole stacked image **or** a sub-screen root) open as an
+  **interactive composite**, mirroring the Builder Stack tab: the background image
+  with its cuts overlaid. Hovering a cut outlines it; clicking selects it; clicking
+  the background selects the **parent** screen/root. A left **stack tree** lists the
+  same nodes (also selectable). When a cut or the parent is selected, a **floating
+  card** at the **bottom-center** shows the selected node's name, type, and
+  dimensions. A reference pinned to a single leaf cut, and a plain image with no
+  stack, render as a flat image with **no card**.
+- **Zoom**: every enlarged reference is zoom/pannable (shared step-zoom — wheel +
+  drag, edge-to-center over-scroll). The **zoom control sits in the top-left**.
 - The window's **Add** button opens the standard `AddReferenceModal`, scoped to
   the current subject, so new references appear here and in the side References tab.
 - Empty state prompts to add the first reference.
@@ -493,14 +503,6 @@ Reference image library for UI research.
   screen's composite (its background plus only its own cuts). A single screen
   renders its composite directly. The composite draws each cut once — the root is
   never re-painted over the background (fixes the prior duplicated image).
-  - The composite is an **interactive, zoom/pannable canvas** (mirrors the Builder
-    Stack tab): hovering a cut outlines it, clicking selects it. Clicking the
-    background selects the **parent** screen/root. **Zoom + pan**: wheel zooms
-    toward the cursor (100%–800%, clamped, re-centers at 100%), drag pans; a
-    **−/percent/+ zoom control sits in the top-left corner**.
-  - When a cut **or** the parent is selected, a **floating info card** appears at
-    the **bottom-center** showing the selected node's name, dimensions (W × H), and
-    type. Plain (non-stack) images show no card.
   - "All / Solo" toggle (composite overlay vs an isolated single cut) appears only
     when the screen in view actually holds cuts; a screen with just its root shows
     its image directly with no toggle. Solo with no cut selected falls back to the

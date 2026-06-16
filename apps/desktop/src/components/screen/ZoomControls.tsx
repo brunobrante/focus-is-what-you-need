@@ -12,9 +12,13 @@ type Props = {
   onZoomOut: () => void;
   onReset: () => void;
   onFullscreen?: () => void;
+  // Tailwind position utilities for the floating toolbar. Defaults to bottom-right;
+  // pass e.g. "left-3 top-3" to dock it elsewhere (the reference inspector docks
+  // it top-left).
+  position?: string;
 };
 
-export function ZoomControls({ index, onZoomIn, onZoomOut, onReset, onFullscreen }: Props) {
+export function ZoomControls({ index, onZoomIn, onZoomOut, onReset, onFullscreen, position = "bottom-4 right-4" }: Props) {
   const z = ZOOM_STEPS[index] ?? 1;
   const canReset = index !== ZOOM_DEFAULT_IDX;
   const isMin = index <= 0;
@@ -24,7 +28,7 @@ export function ZoomControls({ index, onZoomIn, onZoomOut, onReset, onFullscreen
     <div
       role="toolbar"
       aria-label="Zoom"
-      className="absolute bottom-4 right-4 z-[6] flex items-center gap-0 overflow-hidden rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)]"
+      className={`absolute ${position} z-[6] flex items-center gap-0 overflow-hidden rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)]`}
     >
       <ZoomBtn label="Zoom out" disabled={isMin} onClick={onZoomOut}>
         <IconMinus size={14} strokeWidth={2} />

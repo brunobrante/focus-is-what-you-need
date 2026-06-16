@@ -18,26 +18,34 @@ import {
   buildStackTree,
   findStackNode,
   countStackTreeNodes,
-  defaultStackSelectionId,
 } from "@/routes/references/lib/stackHelpers";
 
-// A reference card represents a whole stack (cuts overlaid on the original image)
-// only when the stack is enabled and the card is the original — node cards
-// (stackNodeId set) are a single cut and behave like a plain image.
-export function isStackReference(reference: ReferenceRow): boolean {
-  return Boolean(reference.stack?.enabled) && !reference.stackNodeId;
-}
+// Everything the stage needs to render, derived from the loaded stack graph plus
+// which node (whole image / sub-screen root / leaf cut) the card is pinned to.
+type InspectorView = {
+  mode: "stack" | "plain";
+  // The root the composite is scoped to (its parent, selectable from the canvas).
+  scopeRootId: string | null;
+  stack: ImageStack | null;
+  tree: StackTreeNode[];
+};
 
-// The inspector always renders the subject through SceneCanvasInspector (stack
-// source): a plain image is a stack with no overlay layers, a real stack carries
-// its cut layers. Zoom wraps the inspector the same way FastEditModal does, and
+// The inspector renders the subject through SceneCanvasInspector (stack source):
+// a plain image is a layer-less stack, a real stack overlays its cuts (hover +
+// click select). Zoom wraps the inspector the same way FastEditModal does, and
 // stacks additionally get a tree to pick items plus a footer card for the pick.
 export function CanvasReferenceInspector({ reference }: { reference: ReferenceRow }) {
-  const isStack = isStackReference(reference);
   const sourceId = reference.sourceReferenceId ?? reference.id;
+  const nodeId = reference.stackNodeId ?? null;
+  // Try to load the stack graph for any card derived from a source image — a
+  // whole-image stack, a sub-screen root, or a leaf cut — so sub-screen roots
+  // render their cuts instead of falling back to a flat image.
+  const mayHaveStack = Boolean(
+    reference.stack?.enabled || reference.stackNodeId || reference.sourceReferenceId,
+  );
 
   const [preview, setPreview] = useState<StackPreviewState | null>(null);
-  const [loading, setLoading] = useState(isStack);
+  const [loading, setLoading] = useState(mayHaveStack);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -51,14 +59,13 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
     zoomCtl.reset();
   }, [reference.id]);
 
-  // Load the stack graph (cuts + per-cut object URLs) only for stack cards.
+  // Load the stack graph (cuts + per-cut object URLs) for any source-derived card.
   useEffect(() => {
-    if (!isStack) {
+    if (!mayHaveStack) {
       setPreview((prev) => {
         releaseStackPreview(prev);
         return null;
       });
-      setSelectedId(null);
       setLoading(false);
       return;
     }
@@ -68,7 +75,6 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
       releaseStackPreview(prev);
       return null;
     });
-    setSelectedId(null);
     void loadStackPreviewById(sourceId)
       .then((loaded) => {
         if (cancelled) {
@@ -76,7 +82,6 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
           return;
         }
         setPreview(loaded);
-        setSelectedId(loaded ? defaultStackSelectionId(loaded.data) : null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -84,57 +89,98 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
     return () => {
       cancelled = true;
     };
-  }, [isStack, sourceId]);
+  }, [mayHaveStack, sourceId]);
 
   // Release URLs when the inspector unmounts.
   useEffect(() => () => releaseStackPreview(preview), [preview]);
 
-  const tree = useMemo(() => (preview ? buildStackTree(preview.data) : []), [preview]);
-
-  // The subject for SceneCanvasInspector. A plain image becomes a layer-less
-  // stack whose background is the card thumbnail; a real stack overlays its cuts.
-  const imageStack = useMemo<ImageStack | null>(() => {
-    if (!isStack) {
-      if (!imageUrl) return null;
-      return { w: 1, h: 1, backgroundUrl: imageUrl, layers: [] };
+  // Resolve the render mode + scoped composite from the loaded graph. A leaf-cut
+  // card renders as a plain image; a whole-image or root card renders its cuts,
+  // with cut boxes projected against the scoped root's frame.
+  const view = useMemo<InspectorView>(() => {
+    if (preview?.data) {
+      const { data, urls } = preview;
+      const rootIds = stackRootIds(data);
+      const nodeIsRoot = Boolean(
+        nodeId && (rootIds.has(nodeId) || nodeId === data.rootComponentId),
+      );
+      const nodeIsCut = Boolean(
+        nodeId && !nodeIsRoot && data.components.some((c) => c.id === nodeId),
+      );
+      if (!nodeIsCut) {
+        const scopeRootId =
+          (nodeIsRoot ? nodeId : null) ??
+          data.roots?.find((r) => r.isDefault)?.id ??
+          data.roots?.[0]?.id ??
+          data.rootComponentId ??
+          null;
+        const scopeRoot = data.roots?.find((r) => r.id === scopeRootId) ?? null;
+        const frame = scopeRoot
+          ? scopeRoot.box
+          : { x: 0, y: 0, w: data.original.w, h: data.original.h };
+        const backgroundUrl =
+          (scopeRootId ? urls[scopeRootId] : undefined) ?? urls[data.rootComponentId ?? ""] ?? "";
+        const layers = data.components
+          .filter(
+            (cut) =>
+              !rootIds.has(cut.id) &&
+              urls[cut.id] &&
+              (cut.rootId == null || cut.rootId === scopeRootId),
+          )
+          .map((cut) => ({
+            id: cut.id,
+            name: cut.name,
+            dataUrl: urls[cut.id]!,
+            x: cut.box.x - frame.x,
+            y: cut.box.y - frame.y,
+            w: cut.box.w,
+            h: cut.box.h,
+          }));
+        const fullTree = buildStackTree(data);
+        const tree = scopeRoot ? fullTree.filter((n) => n.component.id === scopeRootId) : fullTree;
+        return {
+          mode: "stack",
+          scopeRootId,
+          stack: { w: frame.w, h: frame.h, backgroundUrl, layers },
+          tree,
+        };
+      }
+      // Pinned to a single leaf cut → its own pixels as a plain image.
+      const cutUrl = (nodeId ? urls[nodeId] : undefined) ?? imageUrl;
+      return {
+        mode: "plain",
+        scopeRootId: null,
+        stack: cutUrl ? { w: 1, h: 1, backgroundUrl: cutUrl, layers: [] } : null,
+        tree: [],
+      };
     }
-    if (!preview) return null;
-    const { data, urls } = preview;
-    const rootIds = stackRootIds(data);
-    const defaultRootId =
-      data.roots?.find((r) => r.isDefault)?.id ?? data.roots?.[0]?.id ?? data.rootComponentId;
-    const backgroundUrl =
-      (defaultRootId ? urls[defaultRootId] : undefined) ?? urls[data.rootComponentId ?? ""] ?? "";
-    // Cut boxes live in original-image space. Project them against the full
-    // original (the default root spans it), so only the default root's cuts —
-    // and legacy cuts with no rootId — overlay correctly. Foreign-root cuts
-    // belong to a trimmed frame and would misposition here, so they are skipped.
-    const layers = data.components
-      .filter(
-        (cut) =>
-          !rootIds.has(cut.id) &&
-          urls[cut.id] &&
-          (cut.rootId == null || cut.rootId === defaultRootId),
-      )
-      .map((cut) => ({
-        id: cut.id,
-        name: cut.name,
-        dataUrl: urls[cut.id]!,
-        x: cut.box.x,
-        y: cut.box.y,
-        w: cut.box.w,
-        h: cut.box.h,
-      }));
-    return { w: data.original.w, h: data.original.h, backgroundUrl, layers };
-  }, [isStack, preview, imageUrl]);
+    // No stack graph → plain image.
+    return {
+      mode: "plain",
+      scopeRootId: null,
+      stack: imageUrl ? { w: 1, h: 1, backgroundUrl: imageUrl, layers: [] } : null,
+      tree: [],
+    };
+  }, [preview, imageUrl, nodeId]);
 
-  const selectedNode = selectedId && tree.length ? findStackNode(tree, selectedId) : null;
+  const stackMode = view.mode === "stack";
+  const imageStack = view.stack;
+  const tree = view.tree;
+  const scopeRootId = view.scopeRootId;
+
+  // Select the parent root by default so its card shows immediately; reset when
+  // the scoped subject changes. Cuts/parent are then re-selectable from the canvas.
+  useEffect(() => {
+    setSelectedId(stackMode ? scopeRootId : null);
+  }, [stackMode, scopeRootId]);
+
+  const selectedNode = stackMode && selectedId ? findStackNode(tree, selectedId) : null;
   const selectedUrl = selectedId && preview ? preview.urls[selectedId] : undefined;
 
   return (
     <div className="absolute inset-0 flex">
       {/* Tree panel — stack only */}
-      {isStack ? (
+      {stackMode ? (
         <div className="z-10 flex w-[240px] shrink-0 flex-col overflow-hidden border-r border-[#262626] bg-[#101110]/95 pt-14">
           <div className="shrink-0 border-b border-[#262626] px-3 py-2.5">
             <p className="m-0 text-[11.5px] font-semibold text-[#E6E6E6]">Stack tree</p>
@@ -184,12 +230,15 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
                 transformOrigin: "center",
                 transition: zoomCtl.isPanning ? "none" : "transform 120ms",
               }}
+              // Clicking the background (cuts stopPropagation) selects the parent
+              // root — so the parent screen is selectable from the canvas itself.
+              onClick={stackMode ? () => setSelectedId(scopeRootId) : undefined}
             >
               <SceneCanvasInspector
                 source="stack"
                 stack={imageStack}
                 selectedId={selectedId}
-                onSelect={isStack ? setSelectedId : () => undefined}
+                onSelect={stackMode ? setSelectedId : () => undefined}
                 backgroundClassName="block max-h-[calc(100vh-260px)] max-w-full select-none rounded-[8px] shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
               />
             </div>
@@ -202,7 +251,7 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
         </div>
 
         {/* Centered footer card — the current stack selection */}
-        {isStack && selectedNode ? (
+        {stackMode && selectedNode ? (
           <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2">
             <div className="pointer-events-auto flex items-stretch gap-3 rounded-[12px] border border-[#303030] bg-[#161616]/95 p-2.5 pr-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur">
               <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-[8px] border border-[#2A2A2A] bg-[#0E0E0E]">
@@ -240,6 +289,7 @@ export function CanvasReferenceInspector({ reference }: { reference: ReferenceRo
             onZoomIn={zoomCtl.zoomIn}
             onZoomOut={zoomCtl.zoomOut}
             onReset={zoomCtl.reset}
+            position="left-3 top-14"
           />
         ) : null}
 
