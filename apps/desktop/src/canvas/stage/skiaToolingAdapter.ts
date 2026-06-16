@@ -24,8 +24,10 @@ import type {
   ToolingDropTargetCommand,
   ToolingGhostCommand,
   ToolingOutlineCommand,
+  ToolingRadiusLabelCommand,
   ToolingRenderFrame,
   ToolingRendererAdapter,
+  ToolingSizeLabelCommand,
 } from "./toolingRenderAdapter";
 
 const HANDLE_FILL = "#ffffff";
@@ -50,6 +52,27 @@ const PARENT_DISTANCE_LABEL_FONT_SIZE = 11;
 const PARENT_DISTANCE_LABEL_MARGIN = 4;
 const PARENT_DISTANCE_SHORT_LABEL_OFFSET = 8;
 
+// Selection value tags (size + radius). These mirror, pixel-for-pixel, the DOM
+// `.selection-size-tag` / `.radius-value-tag` rules in editor.css — geometry,
+// 4px corner radius, white 700-weight 11px text, and the drop shadow.
+const VALUE_LABEL_TEXT_COLOR = "#ffffff";
+const VALUE_LABEL_RADIUS = 4;
+const VALUE_LABEL_FONT_SIZE = 11;
+// box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28). A CSS blur radius of 12px maps to a
+// Gaussian standard deviation of 6 (blur / 2), which is Skia's blur sigma.
+const VALUE_LABEL_SHADOW_COLOR = "rgba(0, 0, 0, 0.28)";
+const VALUE_LABEL_SHADOW_SIGMA = 6;
+const VALUE_LABEL_SHADOW_OFFSET_Y = 4;
+
+const SIZE_LABEL_HEIGHT = 22;
+const SIZE_LABEL_MIN_WIDTH = 48;
+const SIZE_LABEL_MAX_WIDTH = 160;
+const SIZE_LABEL_PADDING_X = 8;
+
+const RADIUS_LABEL_HEIGHT = 20;
+const RADIUS_LABEL_MIN_WIDTH = 36;
+const RADIUS_LABEL_PADDING_X = 6;
+
 type ParsedColor = {
   r: number;
   g: number;
@@ -73,7 +96,9 @@ function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
     a.viewportTransform === b.viewportTransform &&
     a.marqueeRect === b.marqueeRect &&
     a.dropTarget === b.dropTarget &&
-    a.parentDistances === b.parentDistances
+    a.parentDistances === b.parentDistances &&
+    a.sizeLabel === b.sizeLabel &&
+    a.radiusLabel === b.radiusLabel
   );
 }
 
@@ -123,6 +148,11 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
   // Blurred shadow paint for drag ghosts. Built lazily (needs a MaskFilter, which
   // the PaintPool does not manage) and disposed on destroy.
   private ghostShadowPaint: Paint | null = null;
+  // Blurred drop-shadow paint shared by the size/radius value tags. Built lazily
+  // (needs a MaskFilter the PaintPool does not manage) and disposed on destroy.
+  private valueLabelShadowPaint: Paint | null = null;
+  // Bold 11px Geist font for the value tags, matching the DOM `font-weight: 700`.
+  private valueLabelFont: Font | null = null;
   private parentDistanceTypeface: Typeface | null = null;
   private ownsParentDistanceTypeface = false;
   private ready = false;
@@ -239,6 +269,30 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
         drawDropTarget(ck, canvas, pool, frame.dropTarget);
       }
 
+      // Value tags paint last so they sit above every other piece of chrome,
+      // matching the DOM tags' z-index 9 (the canvas chrome was z-index 8).
+      if (frame.sizeLabel) {
+        drawSizeLabel(
+          ck,
+          canvas,
+          pool,
+          frame.sizeLabel,
+          this.getValueLabelFont(ck),
+          this.getValueLabelShadowPaint(ck),
+        );
+      }
+
+      if (frame.radiusLabel) {
+        drawRadiusLabel(
+          ck,
+          canvas,
+          pool,
+          frame.radiusLabel,
+          this.getValueLabelFont(ck),
+          this.getValueLabelShadowPaint(ck),
+        );
+      }
+
       canvas.restore();
       surface.flush();
       this.lastRenderedFrame = frame;
@@ -263,6 +317,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.paintPool = null;
     this.ghostShadowPaint?.delete();
     this.ghostShadowPaint = null;
+    this.valueLabelShadowPaint?.delete();
+    this.valueLabelShadowPaint = null;
+    this.valueLabelFont?.delete();
+    this.valueLabelFont = null;
     if (this.ownsParentDistanceTypeface) this.parentDistanceTypeface?.delete();
     this.parentDistanceTypeface = null;
     this.ownsParentDistanceTypeface = false;
@@ -294,6 +352,33 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
       this.ghostShadowPaint = paint;
     }
     return this.ghostShadowPaint;
+  }
+
+  private getValueLabelShadowPaint(ck: CanvasKit): Paint {
+    if (!this.valueLabelShadowPaint) {
+      const paint = createFillPaint(ck, VALUE_LABEL_SHADOW_COLOR);
+      paint.setMaskFilter(
+        ck.MaskFilter.MakeBlur(ck.BlurStyle.Normal, VALUE_LABEL_SHADOW_SIGMA, false),
+      );
+      this.valueLabelShadowPaint = paint;
+    }
+    return this.valueLabelShadowPaint;
+  }
+
+  private getValueLabelFont(ck: CanvasKit): Font {
+    if (!this.valueLabelFont) {
+      const font = new ck.Font(
+        this.parentDistanceTypeface ?? ck.Typeface.GetDefault(),
+        VALUE_LABEL_FONT_SIZE,
+      );
+      // Geist ships as a single variable typeface here, so synthesize the DOM's
+      // 700 weight rather than loading a separate bold face.
+      font.setEmbolden(true);
+      font.setSubpixel(true);
+      font.setEdging(ck.FontEdging.AntiAlias);
+      this.valueLabelFont = font;
+    }
+    return this.valueLabelFont;
   }
 
   private ensureSurface(frame: ToolingRenderFrame): Surface | null {
@@ -811,6 +896,93 @@ function measureTextWidth(font: Font, text: string): number {
 function clampOverlayCoordinate(value: number, min: number, max: number): number {
   if (max < min) return Math.max(0, max);
   return Math.min(Math.max(value, min), max);
+}
+
+function drawSizeLabel(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  command: ToolingSizeLabelCommand,
+  font: Font,
+  shadowPaint: Paint,
+): void {
+  const textWidth = measureTextWidth(font, command.text);
+  // Shrink-to-fit border-box width, clamped to the CSS min/max (border-box, so
+  // padding is included in the clamp bounds — matching the DOM tag exactly).
+  const width = Math.min(
+    Math.max(textWidth + SIZE_LABEL_PADDING_X * 2, SIZE_LABEL_MIN_WIDTH),
+    SIZE_LABEL_MAX_WIDTH,
+  );
+  drawValuePill(ck, canvas, pool, {
+    text: command.text,
+    x: command.centerX - width / 2,
+    y: command.top,
+    width,
+    height: SIZE_LABEL_HEIGHT,
+    background: command.color,
+    font,
+    shadowPaint,
+  });
+}
+
+function drawRadiusLabel(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  command: ToolingRadiusLabelCommand,
+  font: Font,
+  shadowPaint: Paint,
+): void {
+  const textWidth = measureTextWidth(font, command.text);
+  const width = Math.max(textWidth + RADIUS_LABEL_PADDING_X * 2, RADIUS_LABEL_MIN_WIDTH);
+  drawValuePill(ck, canvas, pool, {
+    text: command.text,
+    x: command.align === "end" ? command.x - width : command.x,
+    y: command.centerY - RADIUS_LABEL_HEIGHT / 2,
+    width,
+    height: RADIUS_LABEL_HEIGHT,
+    background: SELECTION_COLOR,
+    font,
+    shadowPaint,
+  });
+}
+
+function drawValuePill(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  input: {
+    text: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    background: string;
+    font: Font;
+    shadowPaint: Paint;
+  },
+): void {
+  const rect = { x: input.x, y: input.y, width: input.width, height: input.height };
+
+  drawRoundRectWithPaint(
+    ck,
+    canvas,
+    { ...rect, y: rect.y + VALUE_LABEL_SHADOW_OFFSET_Y },
+    VALUE_LABEL_RADIUS,
+    input.shadowPaint,
+  );
+  drawRoundRectWithPaint(ck, canvas, rect, VALUE_LABEL_RADIUS, pool.getFill(input.background));
+
+  const textWidth = measureTextWidth(input.font, input.text);
+  const metrics = input.font.getMetrics();
+  const baseline = rect.y + (rect.height - metrics.ascent - metrics.descent) / 2;
+  canvas.drawText(
+    input.text,
+    rect.x + (rect.width - textWidth) / 2,
+    baseline,
+    pool.getFill(VALUE_LABEL_TEXT_COLOR),
+    input.font,
+  );
 }
 
 function drawDashedRect(

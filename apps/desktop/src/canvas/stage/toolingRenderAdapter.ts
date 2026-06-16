@@ -52,6 +52,33 @@ export type ToolingParentDistanceCommand = {
   };
 };
 
+/**
+ * The "width × height" tag drawn beside a selection. Coordinates are in overlay
+ * space (0,0 = tooling host top-left). `centerX` is the horizontal anchor — the
+ * pill is centered on it (matching the DOM `translateX(-50%)`); `top` is the
+ * pill's top edge.
+ */
+export type ToolingSizeLabelCommand = {
+  text: string;
+  centerX: number;
+  top: number;
+  /** Pill background — blue for content, purple for instance selections. */
+  color: string;
+};
+
+/**
+ * The corner-radius value tag shown beside the dragged radius ball. Coordinates
+ * are in overlay space. `x` is the horizontal anchor and `centerY` the vertical
+ * center; `align` decides whether the pill sits to the right of `x` ("start") or
+ * to its left ("end"), matching the DOM `translate(0|-100%, -50%)`.
+ */
+export type ToolingRadiusLabelCommand = {
+  text: string;
+  x: number;
+  centerY: number;
+  align: "start" | "end";
+};
+
 export type ToolingRenderFrame = {
   left: number;
   top: number;
@@ -66,6 +93,8 @@ export type ToolingRenderFrame = {
   marqueeRect: Rect | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
+  sizeLabel: ToolingSizeLabelCommand | null;
+  radiusLabel: ToolingRadiusLabelCommand | null;
 };
 
 export type ToolingRendererAdapter = {

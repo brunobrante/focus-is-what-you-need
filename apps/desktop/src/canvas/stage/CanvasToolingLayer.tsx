@@ -41,7 +41,9 @@ import type {
   ToolingGhostCommand,
   ToolingOutlineCommand,
   ToolingParentDistanceCommand,
+  ToolingRadiusLabelCommand,
   ToolingRendererAdapter,
+  ToolingSizeLabelCommand,
 } from "./toolingRenderAdapter";
 import { isSubtreeInvisible } from "./canvasToolingUtils";
 
@@ -204,7 +206,7 @@ type ToolingRenderData = {
   ghosts: ToolingGhostCommand[];
   resizeBox: ToolingBox | null;
   radiusHandlePositions: Point[] | null;
-  radiusLabel: { text: string; left: number; top: number; transform: string } | null;
+  radiusLabel: ToolingRadiusLabelCommand | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
   isInstanceSelection: boolean;
@@ -417,9 +419,9 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             props.radiusDragCorner === "nw" || props.radiusDragCorner === "sw";
           radiusLabel = {
             text: formatSizeValue(radiusElement.styles.borderRadius ?? 0),
-            left: onLeftEdge ? ball.x - RADIUS_LABEL_GAP : ball.x + RADIUS_LABEL_GAP,
-            top: ball.y,
-            transform: onLeftEdge ? "translate(-100%, -50%)" : "translateY(-50%)",
+            x: onLeftEdge ? ball.x - RADIUS_LABEL_GAP : ball.x + RADIUS_LABEL_GAP,
+            centerY: ball.y,
+            align: onLeftEdge ? "end" : "start",
           };
         }
       }
@@ -570,7 +572,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       t,
     ]);
 
-    const sizeLabel = useMemo(() => (
+    const sizeLabel = useMemo<ToolingSizeLabelCommand | null>(() => (
       !props.canvasStageActive &&
       !renderData.isDragging &&
       !renderData.isEditingText &&
@@ -578,7 +580,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       renderData.sizeLabelViewportRect
         ? {
             text: `${formatSizeValue(renderData.sizeLabelCanvasRect.width)} × ${formatSizeValue(renderData.sizeLabelCanvasRect.height)}`,
-            left: clampLabelCenter(
+            centerX: clampLabelCenter(
               renderData.sizeLabelViewportRect.x + renderData.sizeLabelViewportRect.width / 2,
               overlaySize.width,
             ),
@@ -586,6 +588,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
               renderData.sizeLabelViewportRect.y + renderData.sizeLabelViewportRect.height + 30 <= overlaySize.height
                 ? renderData.sizeLabelViewportRect.y + renderData.sizeLabelViewportRect.height + 8
                 : Math.max(0, renderData.sizeLabelViewportRect.y - 30),
+            color: renderData.isInstanceSelection ? INSTANCE_SELECTION_COLOR : SELECTION_COLOR,
           }
         : null
     ), [
@@ -594,6 +597,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.canvasStageActive,
       renderData.isDragging,
       renderData.isEditingText,
+      renderData.isInstanceSelection,
       renderData.sizeLabelCanvasRect,
       renderData.sizeLabelViewportRect,
     ]);
@@ -899,6 +903,8 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         marqueeRect: props.marqueeRect,
         dropTarget: renderData.dropTarget,
         parentDistances: renderData.parentDistances,
+        sizeLabel,
+        radiusLabel: renderData.radiusLabel,
       });
     }, [
       hostRect.left,
@@ -908,6 +914,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.guides,
       props.marqueeRect,
       renderData,
+      sizeLabel,
       t,
     ]);
 
@@ -926,34 +933,6 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         ref={hostRef}
         style={TOOLING_HOST_STYLE}
       >
-        {sizeLabel ? (
-          <div
-            className="selection-size-tag"
-            style={{
-              left: sizeLabel.left,
-              top: sizeLabel.top,
-              ...(renderData.isInstanceSelection
-                ? { background: INSTANCE_SELECTION_COLOR }
-                : null),
-            }}
-          >
-            {sizeLabel.text}
-          </div>
-        ) : null}
-
-        {renderData.radiusLabel ? (
-          <div
-            className="radius-value-tag"
-            style={{
-              left: renderData.radiusLabel.left,
-              top: renderData.radiusLabel.top,
-              transform: renderData.radiusLabel.transform,
-            }}
-          >
-            {renderData.radiusLabel.text}
-          </div>
-        ) : null}
-
         {contextualToolbar ? (
           <div
             key={isRenamingSelection ? "rename" : String(contextToolbarModifierDown)} // remount on toggle to replay animation
