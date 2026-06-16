@@ -178,6 +178,14 @@ export function CanvasStage({
     navigableBounds,
   });
 
+  // Mirror the current viewport geometry into the store so zoom changes that have
+  // no cursor to pivot on (zoom buttons, keyboard, toolbar) can anchor on the
+  // viewport center via the `setZoom` reducer. Only fires on resize / overlay
+  // toggle, so it is cheap.
+  useEffect(() => {
+    dispatch({ type: "setViewportMetrics", viewportSize, navigableBounds });
+  }, [dispatch, viewportSize, navigableBounds]);
+
   // Focus request from the canvas tree: move the camera to frame a node without
   // moving the node itself. Used by the draft canvas "focus" button. We zoom to
   // the node's intrinsic size (proportional rule) and center on it, then clear

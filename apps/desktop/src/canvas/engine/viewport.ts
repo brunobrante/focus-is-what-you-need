@@ -249,6 +249,51 @@ export function centerViewportOnPoint(
   };
 }
 
+// Zoom while keeping the canvas point currently under the viewport center fixed,
+// then clamp. This is the button / keyboard / toolbar counterpart to the wheel's
+// cursor-anchored zoom: those callers have no cursor, so they pivot on the middle
+// of the viewport, which is what makes the zoom feel centered instead of growing
+// out of the canvas top-left corner. Mirrors the wheel math so canvas rotation is
+// handled correctly.
+export function zoomViewportAroundCenter(
+  viewport: ViewportState,
+  nextZoom: number,
+  containerSize: Size,
+  canvasSize: Size,
+  navigableBounds: Rect | null = null,
+  mode: ViewportMode = "frame",
+  canvasRotation = 0,
+): ViewportState {
+  const limits = getViewportZoomLimits(mode);
+  const clampedZoom = clamp(nextZoom, limits.min, limits.max);
+  const displayScale = getCanvasDisplayScale(containerSize, canvasSize, mode);
+  const center = { x: containerSize.width / 2, y: containerSize.height / 2 };
+  const currentTransform = createViewportTransform({
+    displayZoom: viewport.zoom * displayScale,
+    offsetX: viewport.offsetX,
+    offsetY: viewport.offsetY,
+    canvasRotation,
+    canvasWidth: canvasSize.width,
+    canvasHeight: canvasSize.height,
+  });
+  const centerCanvas = viewportPointToCanvas(center, currentTransform);
+  const nextBaseTransform = createViewportTransform({
+    displayZoom: clampedZoom * displayScale,
+    offsetX: 0,
+    offsetY: 0,
+    canvasRotation,
+    canvasWidth: canvasSize.width,
+    canvasHeight: canvasSize.height,
+  });
+  const nextBaseCenter = canvasPointToViewport(centerCanvas, nextBaseTransform);
+  const raw = {
+    zoom: clampedZoom,
+    offsetX: center.x - nextBaseCenter.x,
+    offsetY: center.y - nextBaseCenter.y,
+  };
+  return clampViewportState(raw, containerSize, canvasSize, false, mode, navigableBounds);
+}
+
 // Recenter the subject in the viewport at a given zoom. Unlike
 // `clampViewportState`, this always places the subject's center at the viewport
 // center (symmetric overflow when the subject is larger than the viewport),

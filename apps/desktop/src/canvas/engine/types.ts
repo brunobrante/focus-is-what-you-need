@@ -165,6 +165,13 @@ export type EditorState = {
   // sits centered, without moving the node. The stage consumes it and clears it
   // back to null. Transient — never persisted.
   focusNodeId?: string | null;
+  // Current viewport geometry, mirrored from the stage so the reducer can anchor
+  // zoom changes (buttons / keyboard / toolbar) on the viewport center the same
+  // way the wheel anchors on the cursor. `viewportSize` is the container size in
+  // CSS pixels; `navigableBounds` is the pan/zoom region (component plus device
+  // overlay) or null when there is no overlay. Transient — never persisted.
+  viewportSize: Size;
+  navigableBounds: Rect | null;
 };
 
 // ─── Text editing types ───────────────────────────────────────────────────────

@@ -8,13 +8,13 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Dispatch, ReactNode } from "react";
-import type { CanvasDocument, EditorState, SnapGuide, Tool, ViewportMode } from "./types";
+import type { CanvasDocument, EditorState, Rect, Size, SnapGuide, Tool, ViewportMode } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
 import { createNoticeStore, type CanvasNotice, type NoticeStore } from "./noticeStore";
 import { CANVAS_DOCUMENT_SAVED_EVENT, CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
-import { getInitialZoomForSubjectSize, getViewportZoomLimits } from "./viewport";
+import { getInitialZoomForSubjectSize, getViewportZoomLimits, zoomViewportAroundCenter } from "./viewport";
 
 const STORAGE_KEY = CURRENT_CANVAS_STORAGE_KEY;
 
@@ -23,6 +23,7 @@ export type EditorAction =
   | { type: "setPanning"; panning: boolean }
   | { type: "setZoom"; zoom: number }
   | { type: "setViewport"; zoom?: number; offsetX?: number; offsetY?: number }
+  | { type: "setViewportMetrics"; viewportSize: Size; navigableBounds: Rect | null }
   | { type: "setSelected"; selectedIds: string[] }
   | { type: "setIsolatedParent"; isolatedParentId: string | null }
   | { type: "setEditingText"; editingTextId: string | null }
@@ -95,6 +96,12 @@ function idsEqual(a: readonly string[], b: readonly string[]): boolean {
   return true;
 }
 
+function rectsEqual(a: Rect | null, b: Rect | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
 function guidesEqual(a: readonly SnapGuide[], b: readonly SnapGuide[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -151,6 +158,8 @@ function createInitialState(
     future: [],
     transientChangedIds: null,
     focusNodeId: null,
+    viewportSize: { width: 0, height: 0 },
+    navigableBounds: null,
   };
 }
 
@@ -179,7 +188,32 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const limits = getViewportZoomLimits(state.viewportMode);
     const zoom = Math.max(limits.min, Math.min(limits.max, action.zoom));
     if (state.zoom === zoom) return state;
-    return { ...state, zoom };
+    // Anchor the zoom on the viewport center (buttons / keyboard / toolbar have no
+    // cursor to pivot on) so it grows from the middle of the view instead of the
+    // canvas top-left corner. Falls back to a plain zoom change before the stage
+    // has reported its geometry.
+    const { viewportSize } = state;
+    if (viewportSize.width <= 0 || viewportSize.height <= 0) {
+      return { ...state, zoom };
+    }
+    const next = zoomViewportAroundCenter(
+      { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY },
+      zoom,
+      viewportSize,
+      { width: state.document.canvas.width, height: state.document.canvas.height },
+      state.navigableBounds,
+      state.viewportMode,
+      state.document.canvas.rotation ?? 0,
+    );
+    return { ...state, zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY };
+  },
+  setViewportMetrics(state, action) {
+    const sizeChanged =
+      state.viewportSize.width !== action.viewportSize.width ||
+      state.viewportSize.height !== action.viewportSize.height;
+    const boundsChanged = !rectsEqual(state.navigableBounds, action.navigableBounds);
+    if (!sizeChanged && !boundsChanged) return state;
+    return { ...state, viewportSize: action.viewportSize, navigableBounds: action.navigableBounds };
   },
   setViewport(state, action) {
     const limits = getViewportZoomLimits(state.viewportMode);
