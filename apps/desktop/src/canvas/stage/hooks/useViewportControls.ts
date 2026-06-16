@@ -184,7 +184,7 @@ export function useViewportControls({
     if (state.viewportMode === "draft") {
       // The draft canvas is freeform and has no meaningful subject center, so on
       // resize we keep the point currently under the viewport center fixed
-      // instead of snapping to the middle of the 100k canvas. The draft display
+      // instead of snapping to the middle of the freeform canvas. The draft display
       // scale is constant, so this reduces to shifting by half the size delta.
       next = {
         zoom: state.zoom,

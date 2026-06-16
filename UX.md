@@ -226,6 +226,10 @@ Two-column layout for inspecting and editing a screen.
 **Screen navigation**:
 - Left and right arrows with tooltip showing the adjacent screen name
 - Disabled at the first and last screen
+- **Hidden while previewing a version**: when a non-main version is shown in the
+  preview pane (via a Versions-tab card click), the prev/next screen arrows are
+  removed — a previewed version is not a screen you step between. Selecting the
+  main version (or none) restores them.
 
 ---
 
@@ -234,12 +238,16 @@ Two-column layout for inspecting and editing a screen.
 Same structure as Screen Detail with these differences:
 
 - **Full breadcrumb**: Projects > Project > Screen > Component
-- **Preview** shows the active variant snapshot, zoomed proportionally to the component's intrinsic size
+- **Preview** shows the active variant snapshot (or the previewed version), zoomed proportionally to the component's intrinsic size
 - **Inspector** differences:
   - Component name (editable)
   - Metadata: kind, variant count, sub-component count
   - Additional button: Compare versions
   - InfoPanel fields: description textarea, kind dropdown, category input
+- **Versions tab**: clicking a `VariantSideCard` is **preview-only**, exactly like
+  the screen detail page — it shows that variant in the preview pane and highlights
+  the card, but never persists it as the component's active/main variant and never
+  changes what the projects gallery shows.
 
 ---
 
@@ -409,11 +417,11 @@ header is a two-select block instead of the single subject row:
 **Canvas zoom & pan model:**
 - Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform draft canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel. The wheel zooms toward the **cursor**; the toolbar/percentage/keyboard zoom (which have no cursor to pivot on) anchor on the **viewport center**, so the view grows from the middle instead of the canvas top-left corner.
 - Panning and zooming clamp to the **navigable region**: by default the edited subject, but when the screen simulator is on it grows to include the whole device frame (see below).
-- **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device.
+- **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device. The freeform draft canvas is the exception: it has no meaningful center, so it is **not** force-centered at minimum zoom (doing so would push the user's content, which sits in a tiny corner of the huge canvas, off-screen); its offset stays anchored to wherever you panned/zoomed.
 - **Once zoomed in past 100%** (the region overflowing) panning gains over-scroll: the camera can travel until **any edge of the region reaches the viewport center** (≈ half the scaled region in each direction). Panning stops there — the region can never be pushed entirely past center into one half. Pan via space-drag or two-finger/wheel scroll.
 - On window resize (or when the overlay/alignment changes) the camera re-centers on the **navigable region's center**.
 - This same **edge-to-center over-scroll** is shared by the Builder stage and the snapshot viewers (Preview, FastEdit, the reference inspector): once the content is zoomed past 100% (or otherwise larger than its stage) it can be **dragged to pan** — or panned with plain wheel/two-finger scroll — until any edge reaches the viewport center, and never past it; when it fits the stage it snaps centered. In the viewers a click still selects the node under the cursor; only a drag past a small threshold pans.
-- **Scroll indicators:** every zoom surface (the canvas, the Builder stage, and the snapshot viewers) shows thin, discrete scroll thumbs — bottom edge for horizontal, right edge for vertical, no track background — that appear **only on an axis where the content overflows its viewport** (i.e. once zoomed in). They are non-interactive position indicators that track the pan in real time and disappear when the content fits. The freeform draft canvas, being effectively infinite, shows none.
+- **Scroll indicators:** every zoom surface (the canvas, the Builder stage, and the snapshot viewers) shows thin, discrete scroll thumbs — bottom edge for horizontal, right edge for vertical, no track background — that appear **only on an axis where the content overflows its viewport** (i.e. once zoomed in). They are non-interactive position indicators that track the pan in real time and disappear when the content fits. The freeform draft canvas, being effectively infinite, can't measure that way, so its indicators are **content-relative** instead: the thumb maps the viewport onto the bounds of the actual drawn elements, showing where your content sits relative to the current view and which way to pan to reach it. It appears whenever any content is off-screen (regardless of zoom) and hides only when everything is fully in view.
 
 **Parent-frames overlay** (bottom-left of the canvas; the phone/monitor button appears only when editing a component that has resolvable ancestors):
 - The toggle button draws **all ancestor frames** of the edited component — its parent component, that parent's parent, … up to the screen — behind it as a translucent **visual guide, like a grid**. Each frame is sized to that ancestor's own frame and placed at its **real relative position** (the offset where the component actually lives inside it), so the component still renders 1:1 inside the stack. The navigable region expands to enclose every visible frame, so the whole stack can be scrolled into view; enabling it reframes/centers on that region. There is no alignment menu — frames always sit at their true positions.

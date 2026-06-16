@@ -29,7 +29,8 @@ export const SCALED_DOM_PROJECTION_MIN_ZOOM = MIN_ZOOM;
 export const DRAFT_VIEWPORT_SCALE = 0.1;
 export const DRAFT_ELEMENT_SIZE_SCALE = 1 / DRAFT_VIEWPORT_SCALE;
 
-// The draft canvas is freeform and huge (100k x 100k), so there is no real
+// The draft canvas is freeform and large (Figma-scale, see DRAFT_CANVAS_SIZE),
+// so there is no real
 // "subject" to fit. Instead we open it at a nominal working area so newly drawn
 // components come out at a realistic size instead of being created excessively
 // large to compensate for the 0.1 display scale.
@@ -222,7 +223,7 @@ export function clampViewportState(
   // Centering at the floor means *exactly* the minimum zoom (zoom-out clamps to
   // it), not a band around it — otherwise small zoom-in steps just above 100%
   // would keep snapping back to centered instead of anchoring under the cursor.
-  // The draft canvas is the exception: it is a freeform 100k×100k space with no
+  // The draft canvas is the exception: it is a large freeform space with no
   // meaningful center, so force-centering it at min zoom would dump the user's
   // real content (which lives in a tiny corner) thousands of px off-screen. There
   // the offset stays anchored/clamped to the pannable range instead.

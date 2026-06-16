@@ -15,14 +15,14 @@ import {
   shouldUseScaledDomProjection,
   viewportChanged,
 } from "@/canvas/engine/viewport";
-import { getAbsoluteRect } from "@/canvas/engine/geometry/bounds";
+import { getAbsoluteRect, getSelectionAABB } from "@/canvas/engine/geometry/bounds";
 import { CanvasContextMenu } from "./CanvasContextMenu";
 import { CanvasToolingLayer } from "./CanvasToolingLayer";
 import type { CanvasToolingRef } from "./CanvasToolingLayer";
 import type { Interaction } from "./canvasInteractionTypes";
 import { getShellPatternStyle, getStageBoxShadow, TOOLBAR_TOOL_MAP } from "./canvasShellStyle";
 import { CanvasGridOverlay } from "./CanvasGridOverlay";
-import { CanvasScrollbars, useElementScrollbars } from "@/components/ui/CanvasScrollbars";
+import { CanvasScrollbars, computeDraftScrollAxis, HIDDEN_SCROLL, useElementScrollbars } from "@/components/ui/CanvasScrollbars";
 import { getCanvasSize } from "./canvasCoordinates";
 import type { CanvasAlignmentLogInput } from "./canvasAlignmentLog";
 import { RenderedScene } from "./RenderedScene";
@@ -343,13 +343,33 @@ export function CanvasStage({
     [canvasSize, displayZoom, state.document.canvas.rotation],
   );
   // Discrete scroll indicators that appear only once the subject overflows the
-  // viewport (i.e. zoomed past fit). The freeform draft canvas is effectively
-  // infinite, so a scrollbar there would never be meaningful — skip it.
-  const scroll = useElementScrollbars(
+  // viewport (i.e. zoomed past fit). Measured straight off the transformed stage
+  // box for the bounded frame canvases.
+  const elementScroll = useElementScrollbars(
     viewportRef,
     draftMode ? null : stageRef,
     `${displayZoom}:${state.offsetX}:${state.offsetY}`,
   );
+  // The freeform draft canvas has no fixed extent to measure, so its indicators
+  // are derived from the real content's bounds instead. The track is the content's
+  // bounding box (thumb length stable per zoom) and the thumb is the viewport
+  // window within it, so panning moves the thumb without resizing it; when you pan
+  // past the content the thumb pins to the edge, pointing the way back. Stays
+  // visible whenever any content is off-screen, hides when it is fully in view.
+  const draftContentBounds = useMemo(
+    () => (draftMode ? getSelectionAABB(state.document, state.document.rootIds) : null),
+    [draftMode, state.document],
+  );
+  const draftScroll = useMemo(() => {
+    if (!draftContentBounds || viewportSize.width <= 0 || viewportSize.height <= 0) return HIDDEN_SCROLL;
+    const startX = draftContentBounds.x * displayZoom + viewportTransform.offsetX;
+    const startY = draftContentBounds.y * displayZoom + viewportTransform.offsetY;
+    return {
+      x: computeDraftScrollAxis(viewportSize.width, startX, draftContentBounds.width * displayZoom),
+      y: computeDraftScrollAxis(viewportSize.height, startY, draftContentBounds.height * displayZoom),
+    };
+  }, [draftContentBounds, displayZoom, viewportTransform.offsetX, viewportTransform.offsetY, viewportSize.width, viewportSize.height]);
+  const scroll = draftMode ? draftScroll : elementScroll;
   const renderScale = scaledDomProjection ? displayZoom : 1;
   const stageWidth = canvasSize.width;
   const stageHeight = canvasSize.height;

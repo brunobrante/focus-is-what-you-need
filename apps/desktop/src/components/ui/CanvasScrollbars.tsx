@@ -31,6 +31,30 @@ export function computeScrollAxis(
   return { visible: true, start, length };
 }
 
+// Scroll axis for a freeform (draft) canvas, derived from the real content's
+// bounding box. Unlike `computeScrollAxis` the track is the content box and the
+// thumb is the viewport window within it, so the thumb LENGTH depends only on the
+// zoom (stable) while only its position follows the pan — no jitter. It stays
+// visible whenever the content is not fully in view on this axis (including small
+// content panned off-screen), pinning to the edge to point the way back, and
+// hides only once the content is entirely inside the viewport.
+export function computeDraftScrollAxis(
+  viewportLength: number,
+  contentStart: number,
+  contentLength: number,
+): ScrollAxis {
+  if (viewportLength <= 0 || contentLength <= 0) return HIDDEN_AXIS;
+  const contentEnd = contentStart + contentLength;
+  if (contentStart >= -0.5 && contentEnd <= viewportLength + 0.5) return HIDDEN_AXIS;
+  const length = Math.min(
+    viewportLength,
+    Math.max(MIN_THUMB, (viewportLength / contentLength) * viewportLength),
+  );
+  const rawStart = (-contentStart / contentLength) * viewportLength;
+  const start = Math.min(viewportLength - length, Math.max(0, rawStart));
+  return { visible: true, start, length };
+}
+
 // Measure a transformed content element against its viewport using live bounding
 // rects — the rects already reflect the element's transform, so no per-surface
 // pan/zoom/origin math is needed. Recomputes whenever `signal` changes (pan/zoom)

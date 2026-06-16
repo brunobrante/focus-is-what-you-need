@@ -13,7 +13,12 @@ export function createBlankDocument(width: number, height: number): CanvasDocume
   };
 }
 
-const DRAFT_CANVAS_SIZE = 100_000;
+// Matches Figma's working canvas boundary (~±65k per axis). Smaller than the old
+// 100k extent: a large freeform area is materialized as a real DOM stage box of
+// `size × displayZoom` px, so an oversized canvas blows past WebKit's renderable
+// layer size when zoomed in. 65_536 keeps that projection in check while still
+// giving plenty of room to draft.
+const DRAFT_CANVAS_SIZE = 65_536;
 
 export function createDraftDocument(_width?: number, _height?: number): CanvasDocument {
   return {

@@ -86,6 +86,21 @@ function readStoredDocument(
   return makeDefault();
 }
 
+// The draft canvas is a freeform scratch space whose dimensions are a fixed system
+// value (like a screen's device size), not user data. An older persisted draft may
+// still carry a stale, larger canvas box; force it back to the current draft size
+// so the projected DOM stage stays within WebKit's renderable budget when zoomed.
+function normalizeDraftCanvas(
+  document: CanvasDocument,
+  viewportMode: ViewportMode,
+  fallbackDocument?: CanvasDocument,
+): CanvasDocument {
+  if (viewportMode !== "draft" || !fallbackDocument) return document;
+  const { width, height } = fallbackDocument.canvas;
+  if (document.canvas.width === width && document.canvas.height === height) return document;
+  return { ...document, canvas: { ...document.canvas, width, height } };
+}
+
 function sanitizeSelection(document: CanvasDocument, ids: string[]): string[] {
   return ids.filter((id) => Boolean(document.elements[id]));
 }
@@ -142,7 +157,11 @@ function createInitialState(
   persistStorage = true,
   viewportMode: ViewportMode = "frame",
 ): EditorState {
-  const document = readStoredDocument(storageKey, fallbackDocument, persistStorage);
+  const document = normalizeDraftCanvas(
+    readStoredDocument(storageKey, fallbackDocument, persistStorage),
+    viewportMode,
+    fallbackDocument,
+  );
   return {
     document,
     viewportMode,
@@ -466,12 +485,15 @@ export function EditorProvider({
       const parsed = JSON.parse(raw) as unknown;
       if (isCanvasDocument(parsed)) {
         hoverStore.set(null);
-        dispatch({ type: "hydrateDocument", document: parsed });
+        dispatch({
+          type: "hydrateDocument",
+          document: normalizeDraftCanvas(parsed, viewportMode, fallbackDocument),
+        });
       }
     } catch {
       /* ignore malformed draft */
     }
-  }, [hoverStore, persistStorage, storageKey]);
+  }, [hoverStore, persistStorage, storageKey, viewportMode, fallbackDocument]);
 
   useEffect(() => {
     // Transient (in-flight drag/resize/draw) frames push a new document ref ~60Hz,
