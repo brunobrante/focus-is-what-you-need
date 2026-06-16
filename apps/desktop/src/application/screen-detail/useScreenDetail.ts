@@ -14,7 +14,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { createScreenVersion, setActiveScreenVariant, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { createScreenVersion, updateScreen } from "@/lib/storage/repos/screens.repo";
 import { deleteVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
@@ -75,6 +75,7 @@ export interface ScreenDetailState {
   setActiveVersionId: (id: string | null) => void;
   activeVersion: ScreenVersion | undefined;
   activeTpl: ReturnType<typeof templateForScreenName>;
+  isPreviewingVersion: boolean;
 
   // modal refs
   versionModeRef: React.RefObject<VersionModeModalHandle | null>;
@@ -169,6 +170,9 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
 
   const activeVersion = versions.find((v) => v.id === activeVersionId) ?? versions[0];
   const activeTpl = activeVersion?.tpl ?? tpl;
+  // While the preview pane shows a non-main version, the screen-stepper buttons
+  // are hidden: a previewed version is not a screen you navigate between.
+  const isPreviewingVersion = Boolean(activeVersion && activeVersion.tag !== "main");
 
   const versionModeRef = useRef<VersionModeModalHandle>(null);
   const historyRef = useRef<HistoryModalHandle>(null);
@@ -235,8 +239,11 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     newComponentRef.current?.open({ kind: "screen", screenId: screen.id });
   };
 
-  // Creates a new version of the screen (a new variant), choosing Linked vs Copy,
-  // then makes it the screen's active variant.
+  // Creates a new version of the screen (a new variant), choosing Linked vs Copy.
+  // The new version is shown in the preview pane (preview-only) but is NOT promoted
+  // to the screen's active/main variant — creating a version must never change the
+  // screen's main or what the projects gallery shows. Promoting a version to main
+  // will be a separate, explicit action.
   const addVersion = () => {
     if (!screen) return;
     const src = screen;
@@ -245,7 +252,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
       message: "How should child components behave in the new version?",
       onSelect: async (mode) => {
         const created = await createScreenVersion({ screenId: src.id, mode });
-        if (created) await setActiveScreenVariant(src.id, created.id);
+        if (created) setPreviewVersionId(created.id);
       },
     });
   };
@@ -351,6 +358,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     setActiveVersionId,
     activeVersion,
     activeTpl,
+    isPreviewingVersion,
     versionModeRef,
     historyRef,
     compareRef,

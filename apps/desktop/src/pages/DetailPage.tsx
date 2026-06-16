@@ -61,7 +61,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     type, canUseFactoryMocks, projectName, screenName, tpl, tplLabel,
     prevScreen, nextScreen, canvasHref, filteredComponents, linkedComponentIds, filteredVersions,
     filteredReferences, sideTab, setSideTab, query, setQuery, filter, setFilter,
-    versions, activeVersionId, setActiveVersionId, activeVersion, activeTpl,
+    versions, activeVersionId, setActiveVersionId, activeVersion, activeTpl, isPreviewingVersion,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, openNewComponent, addVersion,
     removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
@@ -105,13 +105,13 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
         <PreviewShell
           onFastEdit={() => fastEditRef.current?.open({ mode: "screen", screen, components, type, canvasHref })}
           canvasHref={canvasHref}
-          prev={prevScreen ? {
+          prev={!isPreviewingVersion && prevScreen ? {
             name: prevScreen.title,
             details: [`${components.length} component${components.length === 1 ? "" : "s"}`, projectDims[type]],
             href: buildScreenHref(prevScreen.id),
             screenId: prevScreen.id,
           } : undefined}
-          next={nextScreen ? {
+          next={!isPreviewingVersion && nextScreen ? {
             name: nextScreen.title,
             details: [`${components.length} component${components.length === 1 ? "" : "s"}`, projectDims[type]],
             href: buildScreenHref(nextScreen.id),
@@ -289,7 +289,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
 
 function ComponentContent({ componentId }: { componentId: string }) {
   const {
-    component, project, screens, variants, activeVariant, screen, trail,
+    component, project, screens, variants, activeVariant, displayVariant, screen, trail,
     children, linkedChildIds, childVariants, projectComponents, references, type, projectId,
     projectName, variantCount, canvasHref, filteredChildren, filteredVariants,
     filteredReferences, history, sideTab, setSideTab, query, setQuery,
@@ -331,8 +331,8 @@ function ComponentContent({ componentId }: { componentId: string }) {
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
         <PreviewShell onFastEdit={() => setFastEditOpen(true)} canvasHref={canvasHref}>
           <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
-            {activeVariant ? (
-              <Snapshot kind="component" ownerType="variant" ownerId={activeVariant.id} seedKey={activeVariant.seedKey} type={type} emptyMode="preview" display="natural" />
+            {displayVariant ? (
+              <Snapshot kind="component" ownerType="variant" ownerId={displayVariant.id} seedKey={displayVariant.seedKey} type={type} emptyMode="preview" display="natural" />
             ) : null}
           </div>
         </PreviewShell>
@@ -342,9 +342,9 @@ function ComponentContent({ componentId }: { componentId: string }) {
             <div>
               <div className="flex items-center gap-1.5">
                 <EditableTitle value={component.name} label="Edit component name" onSave={handleRename} />
-                {activeVariant && !isMainVariant(activeVariant) ? (
+                {displayVariant && !isMainVariant(displayVariant) ? (
                   <span className="mb-1.5">
-                    <VersionTagBadge tag={variantVersionLabel(activeVariant)} isMain={false} />
+                    <VersionTagBadge tag={variantVersionLabel(displayVariant)} isMain={false} />
                   </span>
                 ) : null}
               </div>
@@ -416,7 +416,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
                     <VariantSideCard
                       key={v.id}
                       variant={v}
-                      active={v.id === activeVariant?.id}
+                      active={v.id === displayVariant?.id}
                       type={type}
                       onSelect={() => handleSelectVariant(v.id)}
                       onOpenCanvas={() => handleOpenVersionCanvas(v.id)}

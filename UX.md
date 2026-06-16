@@ -211,6 +211,11 @@ Two-column layout for inspecting and editing a screen.
     version card is **preview-only**: it shows that variant in the detail preview pane
     and highlights the card. It does **not** persist the screen's active variant — so a
     single click never changes the screen's main or what the projects gallery shows.
+  - **Creating a version** ("New version") likewise does **not** promote the new
+    version to the screen's main/active variant. The freshly created version is only
+    shown in the preview pane (preview-only); the screen's main and the projects
+    gallery stay unchanged. Promoting a version to main will be a separate, explicit
+    action (not yet implemented).
   - **References tab**: a card grid (shared `ReferenceThumbCard`) of references
     attached to this screen/component. A reference can be either a whole library
     image **or** a single cropped component from an image's stack — a stack-node
@@ -247,7 +252,9 @@ Same structure as Screen Detail with these differences:
 - **Versions tab**: clicking a `VariantSideCard` is **preview-only**, exactly like
   the screen detail page — it shows that variant in the preview pane and highlights
   the card, but never persists it as the component's active/main variant and never
-  changes what the projects gallery shows.
+  changes what the projects gallery shows. **Creating a version** also stays
+  preview-only: the new version is shown in the preview pane but is not promoted to
+  the component's main/active variant.
 
 ---
 
@@ -421,7 +428,7 @@ header is a two-select block instead of the single subject row:
 - **Once zoomed in past 100%** (the region overflowing) panning gains over-scroll: the camera can travel until **any edge of the region reaches the viewport center** (≈ half the scaled region in each direction). Panning stops there — the region can never be pushed entirely past center into one half. Pan via space-drag or two-finger/wheel scroll.
 - On window resize (or when the overlay/alignment changes) the camera re-centers on the **navigable region's center**.
 - This same **edge-to-center over-scroll** is shared by the Builder stage and the snapshot viewers (Preview, FastEdit, the reference inspector): once the content is zoomed past 100% (or otherwise larger than its stage) it can be **dragged to pan** — or panned with plain wheel/two-finger scroll — until any edge reaches the viewport center, and never past it; when it fits the stage it snaps centered. In the viewers a click still selects the node under the cursor; only a drag past a small threshold pans.
-- **Scroll indicators:** every zoom surface (the canvas, the Builder stage, and the snapshot viewers) shows thin, discrete scroll thumbs — bottom edge for horizontal, right edge for vertical, no track background — that appear **only on an axis where the content overflows its viewport** (i.e. once zoomed in). They are non-interactive position indicators that track the pan in real time and disappear when the content fits. The freeform draft canvas, being effectively infinite, can't measure that way, so its indicators are **content-relative** instead: the thumb maps the viewport onto the bounds of the actual drawn elements, showing where your content sits relative to the current view and which way to pan to reach it. It appears whenever any content is off-screen (regardless of zoom) and hides only when everything is fully in view.
+- **Scroll indicators:** every zoom surface (the canvas, the Builder stage, and the snapshot viewers) shows thin, discrete scroll thumbs — bottom edge for horizontal, right edge for vertical, no track background — that appear **only on an axis where the content overflows its viewport** (i.e. once zoomed in). They are non-interactive position indicators that track the pan in real time and disappear when the content fits. The freeform draft canvas, being effectively infinite, can't measure that way, so its indicators are **content-relative** and Figma-style: the scrollable region on each axis is the union of the viewport and the drawn elements' bounds, and the thumb is the viewport window within it — it shrinks and moves as you pan or zoom away from the content, pointing the way back. Like the frame canvases it is **hidden whenever that region fits the window** (e.g. at minimum zoom / when everything is in view) and appears only once the region overflows the viewport, so a visible thumb is always shorter than the window.
 
 **Parent-frames overlay** (bottom-left of the canvas; the phone/monitor button appears only when editing a component that has resolvable ancestors):
 - The toggle button draws **all ancestor frames** of the edited component — its parent component, that parent's parent, … up to the screen — behind it as a translucent **visual guide, like a grid**. Each frame is sized to that ancestor's own frame and placed at its **real relative position** (the offset where the component actually lives inside it), so the component still renders 1:1 inside the stack. The navigable region expands to enclose every visible frame, so the whole stack can be scrolled into view; enabling it reframes/centers on that region. There is no alignment menu — frames always sit at their true positions.
@@ -486,6 +493,14 @@ Reference image library for UI research.
   screen's composite (its background plus only its own cuts). A single screen
   renders its composite directly. The composite draws each cut once — the root is
   never re-painted over the background (fixes the prior duplicated image).
+  - The composite is an **interactive, zoom/pannable canvas** (mirrors the Builder
+    Stack tab): hovering a cut outlines it, clicking selects it. Clicking the
+    background selects the **parent** screen/root. **Zoom + pan**: wheel zooms
+    toward the cursor (100%–800%, clamped, re-centers at 100%), drag pans; a
+    **−/percent/+ zoom control sits in the top-left corner**.
+  - When a cut **or** the parent is selected, a **floating info card** appears at
+    the **bottom-center** showing the selected node's name, dimensions (W × H), and
+    type. Plain (non-stack) images show no card.
   - "All / Solo" toggle (composite overlay vs an isolated single cut) appears only
     when the screen in view actually holds cuts; a screen with just its root shows
     its image directly with no toggle. Solo with no cut selected falls back to the

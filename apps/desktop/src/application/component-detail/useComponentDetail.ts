@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { deleteComponentTree, getComponent, setActiveVariant, updateComponent } from "@/lib/storage/repos/components.repo";
+import { deleteComponentTree, getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
@@ -41,6 +41,14 @@ export interface ComponentDetailState {
   screens: ScreenRow[] | undefined;
   variants: VariantRow[];
   activeVariant: VariantRow | null | undefined;
+  /**
+   * Variant shown in the detail preview pane. Defaults to the active variant, but
+   * clicking a version card overrides it (preview-only) without persisting that
+   * version as the component's active/main variant.
+   */
+  displayVariant: VariantRow | null;
+  /** True while the preview pane is showing a non-main version. */
+  isPreviewingVersion: boolean;
   screen: ScreenRow | null | undefined;
   trail: ComponentRow[];
   children: ComponentRow[];
@@ -209,6 +217,20 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const [fastEditOpen, setFastEditOpen] = useState(false);
   const [creatingVariant, setCreatingVariant] = useState(false);
   const [pendingChildDelete, setPendingChildDelete] = useState<ComponentRow | null>(null);
+  // Preview-only selection: which version the preview pane shows. Null falls back
+  // to the active variant. Selecting a version never persists it as main.
+  const [previewVariantId, setPreviewVariantId] = useState<string | null>(null);
+
+  const displayVariant = useMemo<VariantRow | null>(() => {
+    if (previewVariantId) {
+      return variants.find((v) => v.id === previewVariantId) ?? activeVariant ?? null;
+    }
+    return activeVariant ?? null;
+  }, [previewVariantId, variants, activeVariant]);
+
+  const isPreviewingVersion = Boolean(
+    displayVariant && mainVariant && displayVariant.id !== mainVariant.id,
+  );
 
   const versionModeRef = useRef<VersionModeModalHandle>(null);
   const historyRef = useRef<HistoryModalHandle>(null);
@@ -279,7 +301,10 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
             name: `Variant ${variants.length + 1}`,
             mode,
           });
-          await setActiveVariant(sourceComponent.id, created.id);
+          // Preview the new version without promoting it to the component's
+          // active/main variant — creating a version must never change the main
+          // or what the projects gallery shows. Promoting is a separate action.
+          setPreviewVariantId(created.id);
         } finally {
           setCreatingVariant(false);
         }
@@ -323,7 +348,9 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   };
 
   const handleSelectVariant = (variantId: string) => {
-    if (component) void setActiveVariant(component.id, variantId);
+    // Preview-only: surface the chosen version in the preview pane without
+    // changing the component's active/main variant or the project gallery.
+    setPreviewVariantId(variantId);
   };
 
   const handleDeleteVariant = (variantId: string) => {
@@ -346,6 +373,8 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     screens,
     variants,
     activeVariant,
+    displayVariant,
+    isPreviewingVersion,
     screen,
     trail,
     children,
