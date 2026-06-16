@@ -13,6 +13,7 @@ export const TABLES = {
   workspaces: "workspaces",
   systemDesigns: "system_designs",
   history: "history",
+  checklists: "checklists",
 } as const;
 
 export type TableKey = (typeof TABLES)[keyof typeof TABLES];

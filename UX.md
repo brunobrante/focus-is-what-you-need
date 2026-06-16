@@ -436,6 +436,13 @@ header is a two-select block instead of the single subject row:
 - Search bar
 - Filter tabs: All | Assets | Plugins
 - Library mode buttons: Images / Icons / Assets
+- **Checklist mode** (opened via the "Checklist" suggestion):
+  - A persisted to-do list scoped to the currently-opened canvas subject — each
+    screen and each component has its own checklist, keyed on the master id so it
+    survives version changes.
+  - Items can be checked/unchecked, added (Enter or +), and deleted; all changes
+    persist immediately through the record store.
+  - Empty state shows "No items yet."
 - **AI chat mode**:
   - Message history with user and assistant bubbles
   - Tags showing currently selected nodes

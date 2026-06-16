@@ -90,6 +90,25 @@ export type VariantRow = {
   updatedAt: number;
 };
 
+// A single checklist task in the canvas actions panel.
+export type ChecklistItem = {
+  id: string;
+  label: string;
+  checked: boolean;
+};
+
+// A checklist is owned by a single canvas subject — a screen or a component
+// (the master, not a variant, so the list survives version changes). The row
+// `id` is the composite owner key `"<ownerKind>:<ownerId>"`.
+export type ChecklistRow = {
+  id: string;
+  ownerKind: VariantOwnerKind;
+  ownerId: string;
+  items: ChecklistItem[];
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type OwnerType = "project" | "screen" | "component";
 // Scenes (and thumbnails) are always owned by a variant — a screen's scene lives on its
 // active variant, a component's on its active variant. There is no separate "screen"

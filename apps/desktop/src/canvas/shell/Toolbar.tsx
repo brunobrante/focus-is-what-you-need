@@ -11,6 +11,8 @@ import {
 } from "@/components/icons";
 
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
+import { useChecklist } from "@/application/checklists/useChecklist";
+import type { ChecklistOwner } from "@/lib/storage/repos/checklists.repo";
 import type { CanvasToolId } from "@/canvas/tools";
 import {
   DEFAULT_TOOLBAR_CONFIG,
@@ -41,6 +43,7 @@ export function Toolbar({
   onBackToParent,
   config = DEFAULT_TOOLBAR_CONFIG,
   onBadgeClick,
+  checklistOwner = null,
 }: {
   activeTool?: CanvasToolId;
   defaultTool?: CanvasToolId;
@@ -56,6 +59,7 @@ export function Toolbar({
   onBackToParent?: () => void;
   config?: ToolbarConfig;
   onBadgeClick?: () => void;
+  checklistOwner?: ChecklistOwner | null;
 }) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [uncontrolledActive, setUncontrolledActive] = useState<CanvasToolId>(defaultTool);
@@ -138,6 +142,7 @@ export function Toolbar({
           onClose={() => { setActionsMenuOpen(false); setActionsAiMode(false); }}
           aiMode={actionsAiMode}
           onAiModeChange={setActionsAiMode}
+          checklistOwner={checklistOwner}
         />
       )}
 
@@ -508,21 +513,11 @@ const MOCK_CONVERSATION = [
   { role: "assistant" as const, content: "Here are a few options:\n\n• \"Track, plan, and deliver on time.\"\n• \"One dashboard. Every metric.\"\n• \"Your operations, simplified.\"" },
 ];
 
-type ChecklistItem = { id: string; label: string; checked: boolean };
-
-const INITIAL_CHECKLIST: ChecklistItem[] = [
-  { id: "todo-1", label: "Review hero banner spacing", checked: false },
-  { id: "todo-2", label: "Adjust footer contrast tokens", checked: true },
-  { id: "todo-3", label: "Polish toolbar icon alignment", checked: false },
-  { id: "todo-4", label: "Validate mobile inspector width", checked: false },
-  { id: "todo-5", label: "Sync shell tab labels", checked: true },
-];
-
-function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => void; aiMode: boolean; onAiModeChange: (v: boolean) => void }) {
+function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner }: { onClose?: () => void; aiMode: boolean; onAiModeChange: (v: boolean) => void; checklistOwner: ChecklistOwner | null }) {
   const [activeTab, setActiveTab] = useState<"all" | "assets" | "plugins">("all");
   const [searchValue, setSearchValue] = useState("");
   const [checklistMode, setChecklistMode] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(INITIAL_CHECKLIST);
+  const { items: checklistItems, addItem: addChecklistItem, toggleItem: toggleChecklistItem, removeItem: removeChecklistItem } = useChecklist(checklistOwner);
   const [checklistInput, setChecklistInput] = useState("");
   const setAiMode = onAiModeChange;
   const [aiInput, setAiInput] = useState("");
@@ -641,11 +636,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                   <input
                     type="checkbox"
                     checked={item.checked}
-                    onChange={() =>
-                      setChecklistItems((prev) =>
-                        prev.map((i) => (i.id === item.id ? { ...i, checked: !i.checked } : i)),
-                      )
-                    }
+                    onChange={() => toggleChecklistItem(item.id)}
                     className="h-3.5 w-3.5 shrink-0 rounded accent-[#0D99FF]"
                   />
                   <span className={`min-w-0 flex-1 truncate text-[12px] ${item.checked ? "text-[#555] line-through" : "text-[#CFCFCF]"}`}>
@@ -654,7 +645,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                   <button
                     type="button"
                     aria-label="Delete"
-                    onClick={() => setChecklistItems((prev) => prev.filter((i) => i.id !== item.id))}
+                    onClick={() => removeChecklistItem(item.id)}
                     className="grid h-5 w-5 shrink-0 place-items-center rounded text-[#505050] opacity-0 transition-all duration-100 hover:text-[#E4A1A1] group-hover:opacity-100"
                   >
                     <IconClose size={9} strokeWidth={2} />
@@ -675,9 +666,8 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 onChange={(e) => setChecklistInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    const label = checklistInput.trim();
-                    if (!label) return;
-                    setChecklistItems((prev) => [...prev, { id: `todo-${Date.now()}`, label, checked: false }]);
+                    if (!checklistInput.trim()) return;
+                    addChecklistItem(checklistInput);
                     setChecklistInput("");
                   }
                 }}
@@ -688,9 +678,8 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange }: { onClose?: () => voi
                 type="button"
                 aria-label="Add item"
                 onClick={() => {
-                  const label = checklistInput.trim();
-                  if (!label) return;
-                  setChecklistItems((prev) => [...prev, { id: `todo-${Date.now()}`, label, checked: false }]);
+                  if (!checklistInput.trim()) return;
+                  addChecklistItem(checklistInput);
                   setChecklistInput("");
                 }}
                 className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[#505050] transition-colors duration-100 hover:bg-[#333] hover:text-[#CFCFCF]"

@@ -43,7 +43,8 @@ import {
   addCurrentToSplit,
   buildProjectTree,
   canvasSizeForProjectType,
-  computeComponentDeviceOrigin,
+  computeComponentAncestorFrames,
+  type AncestorFrame,
   createBlankDocumentForProjectType,
   DEFAULT_PREVIEW_SETTINGS,
   enabledCanvasWindowTypes,
@@ -201,25 +202,24 @@ function CanvasPageContent() {
 
   const { data: parentScene } = useScene(parentSceneOwner?.ownerType ?? null, parentSceneOwner?.ownerId ?? null);
 
-  // The device overlay's "original position" must be the component's absolute
-  // position on the screen (device), which means walking the full ancestry — a
-  // component nested inside another component is positioned relative to that
-  // parent's frame, not the device. That walk loads ancestor scenes, so it runs
-  // async into state rather than a synchronous useMemo.
-  const [componentOriginPosition, setComponentOriginPosition] = useState<{ x: number; y: number } | null>(null);
+  // The parent-frames overlay draws every ancestor frame of the edited component
+  // (parent component(s) up to the screen) behind it as a visual guide. Resolving
+  // each frame's size/position/background walks the full ancestry and loads
+  // ancestor scenes, so it runs async into state rather than a synchronous memo.
+  const [ancestorFrames, setAncestorFrames] = useState<AncestorFrame[]>([]);
   useEffect(() => {
     if (!component?.sourceNodeId) {
-      setComponentOriginPosition(null);
+      setAncestorFrames([]);
       return;
     }
     let cancelled = false;
-    void computeComponentDeviceOrigin(component, projectComponents).then((origin) => {
-      if (!cancelled) setComponentOriginPosition(origin);
+    void computeComponentAncestorFrames(component, projectComponents, projectScreens).then((frames) => {
+      if (!cancelled) setAncestorFrames(frames);
     });
     return () => {
       cancelled = true;
     };
-  }, [component, projectComponents]);
+  }, [component, projectComponents, projectScreens]);
 
   const currentOwnerKey = sceneOwner
     ? `${sceneOwner.ownerType}:${sceneOwner.ownerId}`
@@ -876,7 +876,7 @@ function CanvasPageContent() {
         parentTarget={parentProjectNode}
         isComponent={!!component}
         referencesContext={referencesContext}
-        componentOriginPosition={componentOriginPosition}
+        ancestorFrames={ancestorFrames}
         shellDeviceVisibility={shellDeviceVisibility}
         shellBackVisibility={shellBackVisibility}
         shellZoomVisibility={shellZoomVisibility}
@@ -1085,6 +1085,7 @@ function CanvasPageContent() {
           inheritParentBackground={inheritParentBackground}
           hasParent={hasParent}
           onInheritParentBackgroundChange={handleInheritParentBackgroundChange}
+          ancestorFrames={ancestorFrames}
         />
         </div>
       </div>
@@ -1113,6 +1114,13 @@ function CanvasPageContent() {
           onBackToParent={handleBackToParent}
           onCanvasExpandedChange={setCanvasExpanded}
           config={toolbarConfig}
+          checklistOwner={
+            component?.id
+              ? { ownerKind: "component", ownerId: component.id }
+              : screen?.id
+                ? { ownerKind: "screen", ownerId: screen.id }
+                : null
+          }
           onBadgeClick={() => {
             setInspectorOpen(true);
             setShellTabSignal((s) => s + 1);
