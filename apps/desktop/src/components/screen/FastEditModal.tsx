@@ -202,6 +202,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                   }}
                 >
                   <SceneCanvasInspector
+                    source="scene"
                     scene={scene}
                     selectedId={selectedNode.id}
                     onSelect={setSelectedId}
