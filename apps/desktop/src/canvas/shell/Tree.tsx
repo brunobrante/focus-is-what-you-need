@@ -122,6 +122,11 @@ type Props = {
   onToggleCanvasActive?: (active: boolean) => void;
   canOpenNodeCanvas?: (nodeId: string) => boolean;
   onOpenNodeCanvas?: (nodeId: string) => void;
+  // Versions window only: open a nested component row as a version-owned copy
+  // (materialize it under the version's variant, then open it). Distinct from the
+  // Current-window handlers, which resolve against the Current subject's scene.
+  versionsCanOpenNodeCanvas?: (nodeId: string) => boolean;
+  versionsOnOpenNodeCanvas?: (nodeId: string) => void;
   onGoToInstance?: (variantId: string) => void;
   onDetachNode?: (nodeId: string) => void;
   onOpenProjectNode?: (node: ProjectTreeNode) => void;
@@ -155,6 +160,9 @@ type Props = {
   // Re-points the Versions window at whatever subject is open in Current, so it follows
   // along to that element's versions.
   onLinkVersionsToCurrent?: () => void;
+  // Back navigation for the Versions window: pops its drill-in history (or falls back to
+  // the structural parent). Drives the back footer instead of a plain subject re-point.
+  onVersionsBack?: () => void;
 };
 
 export function Tree({
@@ -175,6 +183,8 @@ export function Tree({
   onToggleCanvasActive,
   canOpenNodeCanvas,
   onOpenNodeCanvas,
+  versionsCanOpenNodeCanvas,
+  versionsOnOpenNodeCanvas,
   onGoToInstance,
   onDetachNode,
   onOpenProjectNode,
@@ -195,6 +205,7 @@ export function Tree({
   versionsSubjectSize,
   onSelectVersionsSubject,
   onLinkVersionsToCurrent,
+  onVersionsBack,
 }: Props) {
   const bridgeDocument = useEditorBridge(
     (value) => value?.state.document ?? null,
@@ -506,9 +517,9 @@ export function Tree({
           parentNode={isVersionsWindow ? versionsParentNode : parentNode}
           onBack={() => {
             if (isVersionsWindow) {
-              // Stay in the Versions window: re-point its subject to the parent so it
-              // shows the parent's versions, instead of navigating the Current window.
-              if (versionsParentNode) onSelectVersionsSubject?.(versionsParentNode);
+              // Stay in the Versions window: pop its drill-in history (or fall back to the
+              // structural parent) instead of navigating the Current window.
+              onVersionsBack?.();
             } else if (parentNode) {
               onOpenProjectNode?.(parentNode);
             }
@@ -543,13 +554,14 @@ export function Tree({
                     dragActive={activeDragId != null}
                     onToggleVisible={onToggleVisible}
                     onToggleLocked={onToggleLocked}
-                    // In the Versions window, "open in canvas" (which materializes a
-                    // component from the node) is suppressed — materializing from a
-                    // version's scene is destructive and resolves against the wrong
-                    // document. Linked instances keep their separate "go to master"
-                    // link (onGoToInstance). Detached content is edited inline.
-                    canOpenNodeCanvas={isVersionsWindow ? undefined : canOpenNodeCanvas}
-                    onOpenNodeCanvas={isVersionsWindow ? undefined : onOpenNodeCanvas}
+                    // The Current window opens a node against the Current subject's
+                    // scene. The Versions window uses version-scoped handlers that
+                    // materialize a copy owned by the selected version's variant (a
+                    // versioned screen is a normal screen — the copy is owned by the
+                    // version). Linked instances in either window keep their separate
+                    // "go to master" link (onGoToInstance).
+                    canOpenNodeCanvas={isVersionsWindow ? versionsCanOpenNodeCanvas : canOpenNodeCanvas}
+                    onOpenNodeCanvas={isVersionsWindow ? versionsOnOpenNodeCanvas : onOpenNodeCanvas}
                     onGoToInstance={onGoToInstance}
                     onDetachNode={onDetachNode}
                     showFocusButton={isDraftMode}

@@ -23,7 +23,7 @@ export function useVersionScenePersistence(input: {
   ready: boolean;
   baseGraphJSON: string | null;
   canvasName: string;
-}): (document: CanvasDocument) => void {
+}): { onChange: (document: CanvasDocument) => void; flush: () => void } {
   const { variantId, ready, baseGraphJSON, canvasName } = input;
   const timerRef = useRef<number | null>(null);
   const pendingRef = useRef<PendingVersionSave | null>(null);
@@ -75,5 +75,5 @@ export function useVersionScenePersistence(input: {
     [variantId, ready, baseGraphJSON, canvasName, flush],
   );
 
-  return onDocumentChange;
+  return { onChange: onDocumentChange, flush };
 }

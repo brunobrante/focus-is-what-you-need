@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   ownerInvalidationKey,
@@ -102,8 +102,21 @@ function useInvalidationQuery<T>(
   load: () => Promise<T>,
   initial: T,
   deps: ReadonlyArray<unknown>,
+  // When true, the cached value is dropped synchronously the moment the query key
+  // changes, so consumers never read the previous key's data during the reload. This
+  // matters for owner-scoped reads like a scene: without it, switching owners briefly
+  // yields the prior owner's value with `loading: false`, which a canvas editor can
+  // seed and then persist over the real scene.
+  resetOnKeyChange = false,
 ): State<T> {
   const [state, setState] = useState<State<T>>({ loading: true, data: initial });
+
+  const keyId = keys.join("|");
+  const prevKeyRef = useRef(keyId);
+  if (resetOnKeyChange && prevKeyRef.current !== keyId) {
+    prevKeyRef.current = keyId;
+    setState({ loading: true, data: initial });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -397,6 +410,9 @@ export function useScene(
       ownerType && ownerId ? getSceneByOwner(ownerType, ownerId) : null,
     null,
     [ownerType ?? "", ownerId ?? ""],
+    // Drop the prior owner's scene immediately on owner change — a stale scene seeded
+    // into the versions/current editor would be persisted over the real one.
+    true,
   );
 }
 

@@ -70,6 +70,12 @@ export function setElementVisible(document: CanvasDocument, id: string, visible:
  * already present in the in-memory document, simply dropping the link and
  * unlocking the descendants is enough — on save it persists as a deep copy
  * (the adapter only skips children of nodes that still carry `instanceOf`).
+ *
+ * Nested linked instances are preserved as links: the nested instance node is
+ * unlocked (so it can be moved/detached within the now-editable content), but its
+ * own inlined children stay read-only and the walk does not recurse past it. This
+ * keeps child components that are themselves components as openable instances after
+ * the parent is detached, instead of flattening them into plain content.
  */
 export function detachInstance(document: CanvasDocument, id: string): CanvasDocument {
   const node = document.elements[id];
@@ -84,6 +90,8 @@ export function detachInstance(document: CanvasDocument, id: string): CanvasDocu
     const child = next.elements[childId];
     if (!child) continue;
     child.locked = false;
+    // Stop at a nested instance boundary: its inlined children remain read-only.
+    if (child.instanceOf) continue;
     stack.push(...child.children);
   }
   return next;

@@ -361,7 +361,12 @@ function htmlNodeFromElement(
     appearance: previous?.appearance ?? "rect",
     visible: element.visible !== false,
     locked: element.locked === true,
-    instanceOf: element.instanceOf ?? previous?.instanceOf ?? null,
+    // The engine element's `instanceOf` is authoritative (it is always set on load
+    // via `node.instanceOf ?? null`). Never fall back to the previously-stored link:
+    // detaching sets it to null, and a `?? previous?.instanceOf` fallback would
+    // resurrect the link on save — re-linking a node whose master subtree was just
+    // persisted as own content, corrupting the scene on the next resolve.
+    instanceOf: element.instanceOf ?? null,
   };
 }
 

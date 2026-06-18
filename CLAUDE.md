@@ -32,6 +32,55 @@ Copy" version creation, detach, and master-deletion handling) is specified in
 [`Versioning.md`](./Versioning.md). Read it before touching variant creation, the layers
 tree's component rows, instance rendering/resolution, or screen/component version flows.
 
+### Component ownership & navigation (read before touching open / detach / version flows)
+
+This is the model the canvas must obey. Get it right before changing any "open a
+component", "go to component", or "detach" behavior.
+
+**Ownership — a component has exactly one owner, fixed at creation:**
+
+| Created where | Owner | Canonical location |
+| --- | --- | --- |
+| Inside a screen | that screen (`screenId`) | `project/screen/component` |
+| Inside a **versioned** screen (e.g. by detach) | that **version** (`parentVariantId` = the screen's version variant) | `project/screen/version/component` |
+| Inside another component | that parent component (`parentVariantId` = the parent's variant) | nested |
+| Global project component | the project (or null) | `project/component` |
+
+A **linked instance** (`instanceOf`) placed inside any screen or version is only a
+**visual reference** — it does **not** transfer ownership.
+
+**A versioned screen is a normal screen in every way** — same storage, same operations,
+same component creation. It is only "versioned" in that it is linked to a main screen.
+Components created or detached inside it are owned by **that version**, not the main
+screen. Therefore a `parentVariantId` that points at a **screen variant** (a version, or
+the main) must resolve to that screen everywhere paths are walked
+(`componentPathFromRoot`, the Versions back footer, etc.) — never assume `parentVariantId`
+is always a *component's* variant.
+
+**Navigation — "open" depends on whether the node is a link or owned content:**
+
+- **Linked instance** → "go to component" opens the **master's own canonical location**
+  (its origin), regardless of where the instance is placed. The master is shown in the
+  **Current** window. (A linked component inside `screen1/version1` still opens
+  `screen1/component`, owned by `screen1` — not by the version.)
+- **Owned / detached content** (a real component, not an instance) → "open" navigates
+  **within the same window** to that component's own scene. In **Current** it navigates
+  Current (this is how a global component, not part of the screen, is opened — accessed
+  without being linked to the screen). In the **Versions** window it navigates the
+  **Versions** window (stays on the version tab) — the copy belongs to the version, so it
+  is edited there.
+
+**Detach** turns a linked instance into a **local copy owned by the current screen /
+version**, completely **unlinked from the master**. In a version this copy is owned by the
+version variant — a duplicate within the version screen. It is then a normal local
+component you can open and edit.
+
+**The Versions window is a full editor, identical to Current** — same canvas, same
+functionalities. It can open/drill into its own components (with a back button that pops
+its drill-in history to return to the exact screen+version, and a header showing the
+current subject), and it can show a **component** subject's own variant, not only screen
+versions.
+
 ---
 
 ## Branching Rule

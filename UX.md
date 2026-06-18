@@ -370,16 +370,26 @@ header is a two-select block instead of the single subject row:
   to a child component does **not** auto-update the Versions subject — this button is how
   you re-sync. Disabled when the subject already matches Current.
 - The **back footer** ("Voltar para …") in the Versions window operates **within** the
-  Versions window: it re-points the versions subject to its **parent** (showing the parent's
-  versions), rather than navigating the Current window. It is shown only when the versions
-  subject is a component with a parent (a screen subject is top-level, so no back footer).
-- **Open in canvas is suppressed in the Versions window.** A version's scene is a snapshot;
-  materializing a component from one of its nodes is destructive (it creates project
-  components and rewrites scenes). So ordinary tree rows show **no** "open in canvas" icon
-  while the Versions window is focused — detached content is edited **inline** on the version
-  canvas, and to open a component as its own canvas you use the **Current** window. Linked
-  instances are the exception: they keep their **"go to master"** link (it navigates to the
-  master variant, which is non-destructive).
+  Versions window: it pops the window's **drill-in history** — returning to the exact
+  screen+version (or parent component) you opened the current subject from — rather than
+  navigating the Current window. Drilling into a component inside the Versions window (e.g.
+  opening a detached copy) pushes the previous subject+version onto that history; the footer
+  shows while there is somewhere to go back to (history entry or structural parent), and the
+  **Screen** select header shows the **current** drilled-in subject's name. Manually picking a
+  subject from the Screen select is a fresh navigation and clears the history.
+- **Open in canvas in the Versions window opens a version-owned copy — in the Versions window.**
+  A versioned screen is a normal screen, so a nested component row (a node with children that is
+  **not** a linked instance — i.e. detached/own content) shows the standard **"open in canvas"**
+  icon. Clicking it materializes that node into a new component **owned by the selected version's
+  variant** — independent of the master and of every other version (canonical location
+  `project/screen/version/component`) — collapses the version's node into a **linked instance** of
+  that copy (so the version reflects edits to it), then re-points the **Versions** window's subject
+  at the new copy and shows its own scene. It stays on the **Versions** tab — the copy belongs to
+  the version, so it is edited there, the same way the Current window opens one of its own
+  components. (The Versions window can therefore show a **component** subject's own main variant,
+  not only screen versions.) Linked-instance rows instead keep their **"go to master"** link, which
+  navigates to the master's own canonical location (shown in **Current**, its origin) regardless of
+  where the instance is placed; they are never materialized.
 
 **Read-only linked instances (Versions window)**: when the Versions window is focused and
 the selected element is a **linked instance** (a node referencing a master component), the

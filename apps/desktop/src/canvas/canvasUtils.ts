@@ -276,14 +276,27 @@ export function createBlankDocumentForProjectType(projectType: ProjectType): Can
   };
 }
 
+/**
+ * Resolves a component up to its owning screen, building the name path on the way.
+ *
+ * Ownership is one of: `screenId` (created in a screen's main), `parentVariantId` of a
+ * parent **component** (nested), or `parentVariantId` of a **screen** variant — its main
+ * OR one of its versions (created/detached inside that screen, version included). A
+ * version is a normal screen, so a component owned by a screen's version variant
+ * resolves to that screen. The optional `variants` list is what lets us recognize a
+ * screen-owned variant; without it, only the screen-main and nested-component cases
+ * resolve (back-compat for callers that don't have the variant table).
+ */
 export function componentPathFromRoot(
   component: ComponentRow,
   components: ComponentRow[],
+  variants?: ReadonlyArray<{ id: string; ownerKind: string; ownerId: string }>,
 ): { screenId: string | null; names: string[] } | null {
   const byParentVariantId = new Map<string, ComponentRow>();
   for (const row of components) {
     byParentVariantId.set(row.activeVariantId, row);
   }
+  const variantById = new Map((variants ?? []).map((v) => [v.id, v]));
 
   const names: string[] = [];
   let current: ComponentRow | undefined = component;
@@ -295,7 +308,18 @@ export function componentPathFromRoot(
     names.unshift(current.name);
     if (current.screenId) return { screenId: current.screenId, names };
     if (!current.parentVariantId) return { screenId: null, names };
-    current = byParentVariantId.get(current.parentVariantId);
+    const parentComponent = byParentVariantId.get(current.parentVariantId);
+    if (parentComponent) {
+      current = parentComponent;
+      continue;
+    }
+    // The parent variant is not a component's — it belongs to a screen (its main or a
+    // version). A component owned by a screen variant resolves to that screen.
+    const ownerVariant = variantById.get(current.parentVariantId);
+    if (ownerVariant?.ownerKind === "screen") {
+      return { screenId: ownerVariant.ownerId, names };
+    }
+    return { screenId: null, names };
   }
 
   return null;
@@ -518,6 +542,7 @@ export function fullComponentPathForCanvasNode(input: {
   nodeId: string;
   projectComponents: ComponentRow[];
   screen: ScreenRow | null;
+  variants?: ReadonlyArray<{ id: string; ownerKind: string; ownerId: string }>;
 }): { screenId: string | null; names: string[] } | null {
   const nodePath = componentNamePathFromDocument(input.document, input.nodeId);
   if (nodePath.length === 0) return null;
@@ -526,7 +551,11 @@ export function fullComponentPathForCanvasNode(input: {
     return { screenId: input.screen?.id ?? null, names: nodePath };
   }
 
-  const currentPath = componentPathFromRoot(input.currentComponent, input.projectComponents);
+  const currentPath = componentPathFromRoot(
+    input.currentComponent,
+    input.projectComponents,
+    input.variants,
+  );
   if (!currentPath) return null;
   return { screenId: currentPath.screenId, names: [...currentPath.names, ...nodePath] };
 }
@@ -610,6 +639,7 @@ export function mockTargetKey(input: {
   screen: ScreenRow | null;
   projectComponents: ComponentRow[];
   projectScreens: ScreenRow[];
+  variants?: ReadonlyArray<{ id: string; ownerKind: string; ownerId: string }>;
 }): string {
   if (!input.canUseFactoryMocks) {
     if (input.component) return ["local-component", input.projectType, input.component.id].join(":");
@@ -617,7 +647,7 @@ export function mockTargetKey(input: {
     return "none";
   }
   if (input.component) {
-    const path = componentPathFromRoot(input.component, input.projectComponents);
+    const path = componentPathFromRoot(input.component, input.projectComponents, input.variants);
     return [
       "component", input.projectType, input.component.id,
       path?.screenId ?? "orphan",

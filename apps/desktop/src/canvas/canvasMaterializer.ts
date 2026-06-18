@@ -5,6 +5,7 @@ import {
   findComponentBySourceNode,
   updateComponent,
 } from "@/lib/storage/repos/components.repo";
+import { linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
@@ -82,6 +83,7 @@ export async function materializeComponentFromCanvasNode(input: {
   projectComponents: ComponentRow[];
   projectId: string | null;
   screen: ScreenRow | null;
+  variants?: ReadonlyArray<{ id: string; ownerKind: string; ownerId: string }>;
 }): Promise<ComponentRow | null> {
   if (!input.projectId) return null;
   const targetNode = input.document.elements[input.nodeId];
@@ -105,6 +107,7 @@ export async function materializeComponentFromCanvasNode(input: {
       nodeId,
       projectComponents: components,
       screen: input.screen,
+      variants: input.variants,
     });
     if (!fullPath?.screenId) return null;
 
@@ -154,6 +157,83 @@ export async function materializeComponentFromCanvasNode(input: {
   };
 
   return ensureNodeComponent(input.nodeId);
+}
+
+/**
+ * Opens a nested component from a version's scene as a VERSION-OWNED copy.
+ *
+ * Per the ownership model, a versioned screen is a normal screen: a component created
+ * or detached inside a version is owned by that version (`parent: { kind: "variant",
+ * variantId: <versionVariantId> }`), independent of the master and of every other
+ * version. This:
+ *   1. materializes the node's subtree into a new component owned by the version,
+ *      AWAITING the scene write so the new canvas never loads an empty scene;
+ *   2. collapses the version node into a linked instance of the copy (derived from the
+ *      live document, race-free) so the version reflects edits to the copy.
+ *
+ * Returns the version-owned component to open, or null when the node is not a
+ * materializable component (no children, or already a linked instance).
+ */
+export async function materializeVersionNodeAsComponent(input: {
+  versionVariantId: string;
+  document: CanvasDocument;
+  versionGraphJSON: string | null;
+  canvasName: string;
+  nodeId: string;
+  projectId: string | null;
+}): Promise<ComponentRow | null> {
+  if (!input.projectId) return null;
+  const node = input.document.elements[input.nodeId];
+  // A linked instance already references a master — it is opened via "go to component"
+  // (navigate to the master's canonical URL), never materialized here.
+  if (!node || node.children.length === 0 || node.instanceOf) return null;
+
+  const componentGraphJSON = htmlGraphJSONFromCanvasDocument(
+    canvasDocumentForNode(input.document, input.nodeId),
+    null,
+    node.name,
+  );
+
+  const component = await createOrFindComponent({
+    graphJSON: componentGraphJSON,
+    name: node.name,
+    parent: { kind: "variant", variantId: input.versionVariantId },
+    projectId: input.projectId,
+    sourceNodeId: node.id,
+  });
+  if (!component) return null;
+
+  // Ensure the copy's scene is durably written BEFORE the caller navigates to it —
+  // createOrFindComponent only fire-and-forgets it, which raced the canvas load and
+  // left the opened component blank.
+  await upsertScene(
+    { ownerType: "variant", ownerId: component.activeVariantId, graphJSON: componentGraphJSON },
+    { propagate: false },
+  );
+
+  // Collapse the version node into a linked instance of the copy. Derive the version
+  // scene from the live document (race-free) and linkify the node by its id.
+  const versionGraphJSON = htmlGraphJSONFromCanvasDocument(
+    input.document,
+    input.versionGraphJSON,
+    input.canvasName,
+  );
+  const linked = linkifyChildComponentsInGraph(versionGraphJSON, [
+    {
+      id: component.id,
+      activeVariantId: component.activeVariantId,
+      sourceNodeId: node.id,
+      name: component.name,
+    },
+  ]);
+  if (linked && linked !== versionGraphJSON) {
+    await upsertScene(
+      { ownerType: "variant", ownerId: input.versionVariantId, graphJSON: linked },
+      { propagate: false },
+    );
+  }
+
+  return component;
 }
 
 export async function materializeComponentsFromCanvasDocument(input: {

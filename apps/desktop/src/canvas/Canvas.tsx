@@ -36,6 +36,7 @@ import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
 import { useVersionScenePersistence } from "./hooks/useVersionScenePersistence";
 import { useCanvasNavigation } from "./hooks/useCanvasNavigation";
+import { materializeVersionNodeAsComponent } from "./canvasMaterializer";
 import type { SubjectOwner } from "./hooks/useSubjectCanvasWindow";
 import {
   DEFAULT_CANVAS_FEATURES,
@@ -234,8 +235,8 @@ function CanvasPageContent() {
       : currentSceneGraphJSON;
 
   const currentMockTargetKey = useMemo(
-    () => mockTargetKey({ canUseFactoryMocks, component, projectType, screen, projectComponents, projectScreens }),
-    [canUseFactoryMocks, component, projectComponents, projectScreens, projectType, screen],
+    () => mockTargetKey({ canUseFactoryMocks, component, projectType, screen, projectComponents, projectScreens, variants: allVariants }),
+    [canUseFactoryMocks, component, projectComponents, projectScreens, projectType, screen, allVariants],
   );
 
   const mockScene = useMockScene({
@@ -341,14 +342,45 @@ function CanvasPageContent() {
   // array means "still loading" — don't clobber a URL-selected version then.
   useEffect(() => {
     if (versionsSubjectVariants.length === 0) return;
-    if (selectedVersionId && availableVersions.some((v) => v.id === selectedVersionId)) return;
+    // Keep the current selection when it is a real variant of the subject and not the one
+    // already open in Current (two editors on one scene). This lets the Versions window
+    // show a COMPONENT subject's own (main) variant — e.g. a detached copy opened inside
+    // the Versions window — not only screen versions (order > 0).
+    if (
+      selectedVersionId &&
+      versionsSubjectVariants.some((v) => v.id === selectedVersionId) &&
+      selectedVersionId !== currentVariantId
+    ) {
+      return;
+    }
     setSelectedVersionId(availableVersions[0]?.id ?? null);
-  }, [versionsSubjectVariants, availableVersions, selectedVersionId]);
+  }, [versionsSubjectVariants, availableVersions, selectedVersionId, currentVariantId]);
 
   const versionsVariants = useMemo(
     () => availableVersions.map((v) => ({ id: v.id, label: variantVersionLabel(v) })),
     [availableVersions],
   );
+
+  // Back-stack for the Versions window: each time the user drills into a component
+  // inside it (e.g. opening a detached copy), the previous subject+version is pushed so
+  // the back button can return to the exact tree/version they came from. Independent of
+  // the structural-parent resolution, which can't reach a version variant.
+  const [versionsBackStack, setVersionsBackStack] = useState<
+    Array<{ id: string; kind: "screen" | "component"; versionId: string | null }>
+  >([]);
+  const pushVersionsHistory = useCallback(() => {
+    if (!versionsSubject) return;
+    setVersionsBackStack((stack) => [
+      ...stack,
+      { id: versionsSubject.id, kind: versionsSubject.kind, versionId: selectedVersionId },
+    ]);
+  }, [versionsSubject, selectedVersionId]);
+  // Manually picking a subject from the header dropdown is a fresh navigation — drop the
+  // drill-in history so the back button reflects the new path, not the old one.
+  const selectVersionsSubject = useCallback((node: { id: string; kind: "screen" | "component" }) => {
+    setVersionsBackStack([]);
+    setVersionsSubject({ id: node.id, kind: node.kind });
+  }, []);
 
   const versionSceneOwner = selectedVersionId
     ? { ownerType: "variant" as const, ownerId: selectedVersionId }
@@ -369,21 +401,26 @@ function CanvasPageContent() {
   );
   const versionsDocument = useMemo(() => {
     if (!selectedVersionId) return undefined;
+    // Never fall back to a blank document: when the version's scene has not loaded yet
+    // (or failed to parse), returning undefined keeps the editor unmounted instead of
+    // seeding an empty scene that the persistence layer would write back, wiping the
+    // version. The editor mounts only once the real graph is present.
     return (
       canvasDocumentFromHtmlGraphJSON(versionGraphJSON, {
         promoteSubjectRoot: true,
         resolveMaster: versionsResolveMaster,
-      }) ?? createBlankDocumentForProjectType(projectType)
+      }) ?? undefined
     );
-  }, [selectedVersionId, versionGraphJSON, projectType, versionsResolveMaster]);
+  }, [selectedVersionId, versionGraphJSON, versionsResolveMaster]);
   const versionsCanvasName =
     selectedVersionRow?.name || component?.name || screen?.title || projectName || "Version";
-  const handleVersionsDocumentChange = useVersionScenePersistence({
-    variantId: selectedVersionId,
-    ready: versionsReady,
-    baseGraphJSON: versionGraphJSON,
-    canvasName: versionsCanvasName,
-  });
+  const { onChange: handleVersionsDocumentChange, flush: flushVersionsSave } =
+    useVersionScenePersistence({
+      variantId: selectedVersionId,
+      ready: versionsReady,
+      baseGraphJSON: versionGraphJSON,
+      canvasName: versionsCanvasName,
+    });
 
   // Opening a version (URL param) focuses the Versions window.
   useEffect(() => {
@@ -495,13 +532,49 @@ function CanvasPageContent() {
     return null;
   }, [versionsSubject, projectComponents, projectTree]);
 
-  // Display info for the Versions window's first ("Screen") dropdown: the selected
-  // subject's tree node (name + kind) and the rendered version's intrinsic size.
-  const versionsSubjectNode = useMemo<ProjectTreeNode | null>(
-    () => (versionsSubject ? findTreeNodeById(projectTree, versionsSubject.id) : null),
-    [versionsSubject, projectTree],
-  );
   const versionsSubjectSize = versionsDocument?.canvas;
+
+  // The Versions header name, resolved from the rows (not the project tree): a detached
+  // copy is owned by a version variant and so isn't in the tree, but its name must still
+  // show ("…/Header" while editing the copy), matching the Current breadcrumb.
+  const versionsSubjectDisplayName = useMemo<string | undefined>(() => {
+    if (!versionsSubject) return undefined;
+    if (versionsSubject.kind === "component") {
+      return projectComponents.find((c) => c.id === versionsSubject.id)?.name;
+    }
+    return projectScreens.find((s) => s.id === versionsSubject.id)?.title;
+  }, [versionsSubject, projectComponents, projectScreens]);
+
+  // Back-button target for the Versions window. Prefer the drill-in history (so back
+  // returns to the exact screen+version the copy was opened from); fall back to the
+  // structural parent for the non-drilled case.
+  const versionsBackNode = useMemo<ProjectTreeNode | null>(() => {
+    const top = versionsBackStack[versionsBackStack.length - 1];
+    if (!top) return versionsParentNode;
+    if (top.kind === "screen") {
+      const s = projectScreens.find((x) => x.id === top.id);
+      return s ? { id: s.id, name: s.title, kind: "screen", children: [] } : versionsParentNode;
+    }
+    const c = projectComponents.find((x) => x.id === top.id);
+    return c ? { id: c.id, name: c.name, kind: "component", children: [] } : versionsParentNode;
+  }, [versionsBackStack, versionsParentNode, projectScreens, projectComponents]);
+
+  const goBackVersions = useCallback(() => {
+    setVersionsBackStack((stack) => {
+      const prev = stack[stack.length - 1];
+      if (!prev) {
+        // No drill-in history — fall back to the structural parent (e.g. a component
+        // nested inside another component), re-pointing the Versions subject to it.
+        if (versionsParentNode) {
+          setVersionsSubject({ id: versionsParentNode.id, kind: versionsParentNode.kind });
+        }
+        return stack;
+      }
+      setVersionsSubject({ id: prev.id, kind: prev.kind });
+      setSelectedVersionId(prev.versionId);
+      return stack.slice(0, -1);
+    });
+  }, [versionsParentNode]);
 
   // Subject (name + kind) shown in each Current tab's hover popover. The primary
   // Current reflects the open subject; each extra Current resolves its mirrored/
@@ -540,16 +613,77 @@ function CanvasPageContent() {
     [allVariants, treeExtraCurrent],
   );
 
-  const { canOpenCanvasNode, openCanvasForNode, openProjectNodeCanvas } = useCanvasNavigation({
-    component,
-    canUseFactoryMocks,
-    currentDocument,
-    projectComponents,
-    screen,
-    projectId,
-    projectType,
-    flushPendingSave,
-  });
+  const { canOpenCanvasNode, openCanvasForNode, openProjectNodeCanvas } =
+    useCanvasNavigation({
+      component,
+      canUseFactoryMocks,
+      currentDocument,
+      projectComponents,
+      screen,
+      variants: allVariants,
+      projectId,
+      projectType,
+      flushPendingSave,
+    });
+
+  // Versions window: a nested component row opens as a VERSION-OWNED copy — a versioned
+  // screen is a normal screen, so the copy is owned by the selected version's variant
+  // (independent of the master). Linked instances are excluded; they keep their own
+  // "go to component" link to the shared master's canonical location.
+  //
+  // These read the LIVE editor document (the same source the layers tree and detach use
+  // via getEditor()), not the persisted-derived `versionsDocument`. After a detach the
+  // node is unlinked in the live document immediately, but the persisted graph lags —
+  // reading the stale copy left the node looking like an instance, so the open icon never
+  // appeared and the materialize bailed out (it skips `instanceOf` nodes).
+  const canOpenVersionNode = useCallback(
+    (nodeId: string): boolean => {
+      const node = getEditor()?.state.document.elements[nodeId];
+      return Boolean(node && node.children.length > 0 && !node.instanceOf);
+    },
+    [getEditor],
+  );
+  const openCanvasForVersionNode = useCallback(
+    (nodeId: string) => {
+      if (!selectedVersionId) return;
+      const liveDocument = getEditor()?.state.document;
+      if (!liveDocument) return;
+      void (async () => {
+        await flushPendingSave();
+        // Clear the version editor's pending debounced save so it can't later write the
+        // pre-collapse document over our linked-instance collapse.
+        flushVersionsSave();
+        const created = await materializeVersionNodeAsComponent({
+          versionVariantId: selectedVersionId,
+          document: liveDocument,
+          versionGraphJSON,
+          canvasName: versionsCanvasName,
+          nodeId,
+          projectId: projectId || null,
+        });
+        if (created) {
+          // Open the detached copy IN THE VERSIONS window (not Current): it is a local
+          // component owned by this version, so the Versions canvas navigates to it like
+          // Current would for one of its own components. Remember where we came from (for
+          // the back button), then point the Versions subject at the copy and show its own
+          // (main) variant scene; stay on the Versions tab.
+          pushVersionsHistory();
+          setVersionsSubject({ id: created.id, kind: "component" });
+          setSelectedVersionId(created.activeVariantId);
+        }
+      })();
+    },
+    [
+      selectedVersionId,
+      getEditor,
+      versionGraphJSON,
+      versionsCanvasName,
+      flushPendingSave,
+      flushVersionsSave,
+      projectId,
+      pushVersionsHistory,
+    ],
+  );
 
   // Re-point an extra Current at a different subject (independent navigation). Used by
   // the layers-tree header subject select when that Current is the focused tree tab.
@@ -1051,6 +1185,8 @@ function CanvasPageContent() {
         onToggleCanvasActive={(active) => { getEditor()?.dispatch({ type: "setCanvasStageActive", active }); }}
         canOpenNodeCanvas={canOpenCanvasNode}
         onOpenNodeCanvas={openCanvasForNode}
+        versionsCanOpenNodeCanvas={canOpenVersionNode}
+        versionsOnOpenNodeCanvas={openCanvasForVersionNode}
         onGoToInstance={goToInstanceMaster}
         onDetachNode={(nodeId) => {
           const editor = getEditor();
@@ -1067,7 +1203,8 @@ function CanvasPageContent() {
         projectType={projectType}
         projectTree={projectTree}
         parentNode={parentProjectNode}
-        versionsParentNode={versionsParentNode}
+        versionsParentNode={versionsBackNode}
+        onVersionsBack={goBackVersions}
         subjectSize={selectedSubjectSize}
         versionOptions={versionsVariants}
         selectedVersionId={selectedVersionId}
@@ -1075,10 +1212,10 @@ function CanvasPageContent() {
         onAddVersion={handleAddVersion}
         currentSubjectId={treeExtraCurrent ? treeExtraSubjectId : component?.id ?? screen?.id ?? null}
         versionsSubjectId={versionsSubject?.id ?? null}
-        versionsSubjectName={versionsSubjectNode?.name ?? componentName ?? screenTitle ?? undefined}
+        versionsSubjectName={versionsSubjectDisplayName ?? componentName ?? screenTitle ?? undefined}
         versionsSubjectIsScreen={(versionsSubject?.kind ?? (component ? "component" : "screen")) === "screen"}
         versionsSubjectSize={versionsSubjectSize}
-        onSelectVersionsSubject={(node) => setVersionsSubject({ id: node.id, kind: node.kind })}
+        onSelectVersionsSubject={(node) => selectVersionsSubject({ id: node.id, kind: node.kind })}
         onLinkVersionsToCurrent={() => {
           // Re-point the Versions window at whatever is open in Current, so it shows that
           // element's versions instead of the subject it was left on.

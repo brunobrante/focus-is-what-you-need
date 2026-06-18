@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
-import { createBlankDocumentForProjectType } from "@/canvas/canvasUtils";
 import { peekTable, TABLES } from "@/lib/storage/store";
 import { useScene } from "@/lib/storage/hooks";
 import type { SceneRow } from "@/lib/storage/schema";
@@ -31,7 +30,7 @@ export function useSubjectCanvasWindow(input: {
   graphJSON: string | null;
   onDocumentChange: (document: CanvasDocument) => void;
 } {
-  const { subjectOwner, storageKeyPrefix, projectType, canvasName } = input;
+  const { subjectOwner, storageKeyPrefix, canvasName } = input;
 
   const { data: scene, loading: sceneLoading } = useScene(
     subjectOwner?.ownerType ?? null,
@@ -51,15 +50,18 @@ export function useSubjectCanvasWindow(input: {
 
   const document = useMemo(() => {
     if (!ownerId) return undefined;
+    // Never seed a blank document: when the scene has not loaded yet (graph null), the
+    // editor must stay unmounted rather than seed an empty scene the persistence layer
+    // would write back, wiping the subject. It mounts once the real graph is present.
     return (
       canvasDocumentFromHtmlGraphJSON(graphJSON, {
         promoteSubjectRoot: true,
         resolveMaster,
-      }) ?? createBlankDocumentForProjectType(projectType)
+      }) ?? undefined
     );
-  }, [ownerId, graphJSON, projectType, resolveMaster]);
+  }, [ownerId, graphJSON, resolveMaster]);
 
-  const onDocumentChange = useVersionScenePersistence({
+  const { onChange: onDocumentChange } = useVersionScenePersistence({
     variantId: ownerId,
     ready,
     baseGraphJSON: graphJSON,

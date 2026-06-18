@@ -8,7 +8,7 @@ import {
 } from "../canvasUtils";
 import { materializeComponentFromCanvasNode } from "../canvasMaterializer";
 import type { CanvasDocument } from "@/canvas/engine/types";
-import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
+import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 
 interface Params {
@@ -17,6 +17,7 @@ interface Params {
   currentDocument: CanvasDocument;
   projectComponents: ComponentRow[];
   screen: ScreenRow | null;
+  variants: VariantRow[];
   projectId: string;
   projectType: string;
   flushPendingSave: () => Promise<void>;
@@ -28,6 +29,7 @@ export function useCanvasNavigation({
   currentDocument,
   projectComponents,
   screen,
+  variants,
   projectId,
   projectType,
   flushPendingSave,
@@ -62,7 +64,7 @@ export function useCanvasNavigation({
       if (nodePath.length === 0) return null;
 
       if (component) {
-        const currentPath = componentPathFromRoot(component, projectComponents);
+        const currentPath = componentPathFromRoot(component, projectComponents, variants);
         if (!currentPath?.screenId) return null;
         return findComponentByPath(projectComponents, currentPath.screenId, [
           ...currentPath.names,
@@ -73,7 +75,7 @@ export function useCanvasNavigation({
       if (!screen?.id) return null;
       return findComponentByPath(projectComponents, screen.id, nodePath);
     },
-    [canUseFactoryMocks, component, currentDocument, projectComponents, screen],
+    [canUseFactoryMocks, component, currentDocument, projectComponents, screen, variants],
   );
 
   const canOpenCanvasNode = useCallback(
@@ -96,6 +98,7 @@ export function useCanvasNavigation({
           projectComponents,
           projectId: projectId || null,
           screen,
+          variants,
         });
         openCanvasForComponent(materialized);
       })();
@@ -108,6 +111,7 @@ export function useCanvasNavigation({
       projectComponents,
       projectId,
       screen,
+      variants,
     ],
   );
 
