@@ -2,13 +2,16 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   useActiveVariants,
+  useComponentsByProject,
   useProject,
   useReferences,
+  useScene,
   useScreen,
   useScreenChildren,
   useScreens,
   useScreenVariants,
 } from "@/lib/storage/hooks";
+import { subcomponentsForVariantScene } from "@/canvas/canvasUtils";
 import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
 import {
   createOrAttachReference,
@@ -34,7 +37,7 @@ import type { ReferencesModalHandle } from "@/components/modals/ReferencesModal"
 import type { AddReferenceModalHandle } from "@/components/modals/AddReferenceModal";
 import type { FastEditModalHandle } from "@/components/screen/FastEditModal";
 import type { ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
-export type SideTab = "components" | "versions" | "references";
+export type SideTab = "components" | "references";
 export type CmpKindFilter = "all" | ComponentKind;
 
 export interface ScreenDetailState {
@@ -43,6 +46,9 @@ export interface ScreenDetailState {
   screens: ReturnType<typeof useScreens>["data"];
   screen: ReturnType<typeof useScreen>["data"] | null;
   components: ReturnType<typeof useScreenChildren>["data"];
+  // The subcomponents to display — follows the selected version (the screen's own
+  // children for the main; the version's scene-derived subcomponents otherwise).
+  displayComponents: ComponentRow[];
   linkedComponentIds: Set<string>;
   activeVariants: ReturnType<typeof useActiveVariants>["data"];
   references: ReturnType<typeof useReferences>["data"];
@@ -120,9 +126,12 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   // A screen owns its top-level components directly; its versions are variants of the
   // screen (each version's scene references those components as linked instances).
   const components = useScreenChildren(project?.id, screen?.id).data;
+  const projectComponents = useComponentsByProject(project?.id).data;
   const linkedComponentIds = useMemo(() => new Set<string>(), []);
   const { data: screenVariants } = useScreenVariants(screen?.id);
-  const { data: activeVariants } = useActiveVariants(components);
+  // Active variants are looked up across ALL project components so a version-owned
+  // subcomponent (not in the screen's top-level list) still resolves its thumbnail.
+  const { data: activeVariants } = useActiveVariants(projectComponents);
   const { data: references } = useReferences("screen", screen?.id ?? null);
 
   const type: ProjectType = project?.type ?? "desktop";
@@ -175,6 +184,25 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   // are hidden: a previewed version is not a screen you navigate between.
   const isPreviewingVersion = Boolean(activeVersion && activeVersion.tag !== "main");
 
+  // The Sub Components list follows the selected version. For the main, the screen's
+  // own top-level children ARE its subcomponents (no scene parse needed). For a version
+  // we derive the subcomponents from that variant's scene (linked instances → masters,
+  // version-owned content → its component), so switching the top switcher repopulates
+  // the grid live.
+  const { data: selectedVariantScene } = useScene(
+    "variant",
+    isPreviewingVersion ? activeVersionId : null,
+  );
+  const displayComponents = useMemo<ComponentRow[]>(() => {
+    if (!isPreviewingVersion || !activeVersionId) return components;
+    return subcomponentsForVariantScene({
+      graphJSON: selectedVariantScene?.graphJSON ?? null,
+      variantId: activeVersionId,
+      screenId: screen?.id ?? null,
+      projectComponents,
+    });
+  }, [isPreviewingVersion, activeVersionId, components, selectedVariantScene?.graphJSON, screen?.id, projectComponents]);
+
   const versionModeRef = useRef<VersionModeModalHandle>(null);
   const historyRef = useRef<HistoryModalHandle>(null);
   const compareRef = useRef<CompareVersionsModalHandle>(null);
@@ -212,12 +240,12 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
 
   const filteredComponents = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return components.filter((c) => {
+    return displayComponents.filter((c) => {
       const matchQ = !q || c.name.toLowerCase().includes(q);
       const matchF = filter === "all" || c.kind === filter;
       return matchQ && matchF;
     });
-  }, [components, query, filter]);
+  }, [displayComponents, query, filter]);
 
   const filteredVersions = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -344,6 +372,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     screens,
     screen,
     components,
+    displayComponents,
     linkedComponentIds,
     activeVariants,
     references,

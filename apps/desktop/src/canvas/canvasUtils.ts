@@ -1,4 +1,5 @@
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
+import { htmlCanvasDocumentFromJSON } from "@/lib/canvas/htmlScene/document";
 import { createBlankDocument } from "@/canvas/engine/actions";
 import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { listVariants } from "@/lib/storage/repos/variants.repo";
@@ -509,6 +510,49 @@ export function findComponentBySourceNodeInList(
       return c.parentVariantId === parent.variantId;
     }) ?? null
   );
+}
+
+/**
+ * The top-level subcomponents a given variant's scene actually composes — used by the
+ * screen detail "Sub Components" list so it follows the selected version. A direct child
+ * of the scene frame resolves to a ComponentRow when it is either a linked instance
+ * (→ its master) or owned content matching a component by `sourceNodeId` (version-owned,
+ * or — for the main variant — a screen-level child). Decoration nodes resolve to nothing
+ * and are skipped. Deduped by component id, preserving scene order.
+ */
+export function subcomponentsForVariantScene(input: {
+  graphJSON: string | null;
+  variantId: string;
+  screenId: string | null;
+  projectComponents: ComponentRow[];
+}): ComponentRow[] {
+  const doc = input.graphJSON ? htmlCanvasDocumentFromJSON(input.graphJSON) : null;
+  if (!doc) return [];
+  const byId = new Map(input.projectComponents.map((c) => [c.id, c] as const));
+  const result: ComponentRow[] = [];
+  const seen = new Set<string>();
+  for (const node of doc.nodes) {
+    if (node.parentId !== doc.rootId) continue; // top-level subcomponents only
+    const comp = node.instanceOf
+      ? byId.get(node.instanceOf.componentId) ?? null
+      : findComponentBySourceNodeInList(
+          input.projectComponents,
+          { kind: "variant", variantId: input.variantId },
+          node.id,
+        ) ??
+        (input.screenId != null
+          ? findComponentBySourceNodeInList(
+              input.projectComponents,
+              { kind: "screen", screenId: input.screenId },
+              node.id,
+            )
+          : null);
+    if (comp && !seen.has(comp.id)) {
+      seen.add(comp.id);
+      result.push(comp);
+    }
+  }
+  return result;
 }
 
 export function findComponentByCanvasNode(input: {

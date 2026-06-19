@@ -5,7 +5,6 @@ import {
   IconFastEdit,
   IconChevronLeft,
   IconClose,
-  IconCompare,
   IconHistory,
   IconOpenCanvas,
   IconPencil,
@@ -18,7 +17,8 @@ import { AddCard } from "@/components/screen/AddCard";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
 import { CardSourceIcon, scopeOf } from "@/components/component/componentSource";
-import { VersionSideCard, PreviewMockImage, VersionTagBadge } from "@/components/screen/VersionSideCard";
+import { PreviewMockImage, VersionTagBadge, versionCardButtons } from "@/components/screen/VersionSideCard";
+import { VersionSwitcher } from "@/components/screen/VersionSwitcher";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { FastEditModal } from "@/components/screen/FastEditModal";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
@@ -60,8 +60,9 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
   const {
     project, screens, screen, components, activeVariants, references,
     type, canUseFactoryMocks, projectName, screenName, tpl, tplLabel,
-    prevScreen, nextScreen, canvasHref, filteredComponents, linkedComponentIds, filteredVersions,
+    prevScreen, nextScreen, canvasHref, filteredComponents, linkedComponentIds,
     filteredReferences, sideTab, setSideTab, query, setQuery, filter, setFilter,
+    displayComponents,
     versions, activeVersionId, setActiveVersionId, activeVersion, activeTpl, isPreviewingVersion,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, openNewComponent, addVersion,
@@ -72,8 +73,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
   const [infoOpen, setInfoOpen] = useState(false);
 
   const tabs = [
-    { id: "components" as const, label: "Sub Components", count: components.length },
-    { id: "versions" as const, label: "Versions", count: Math.max(0, versions.length - 1) },
+    { id: "components" as const, label: "Sub Components", count: displayComponents.length },
     { id: "references" as const, label: "References", count: references.length },
   ] as const;
 
@@ -158,7 +158,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                 <IconPencil size={12} strokeWidth={1.7} />
               </button>
               <span className="rounded border border-[var(--border)] px-[7px] py-0.5 text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                {components.length} component{components.length === 1 ? "" : "s"}
+                {displayComponents.length} component{displayComponents.length === 1 ? "" : "s"}
               </span>
             </div>
           </div>
@@ -177,20 +177,25 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
             </InlineInfoPanel>
           ) : (
             <>
+          <VersionSwitcher
+            versions={versions}
+            activeId={activeVersionId}
+            onSelect={setActiveVersionId}
+            onAdd={addVersion}
+            onCompare={() => compareRef.current?.open()}
+            onOpenCanvas={(v) => {
+              // The main is the screen itself, not a version — open it in Current.
+              if (v.tag === "main") handleOpenScreenCanvas();
+              else if (v.variantId) handleOpenVersionCanvas(v.variantId);
+            }}
+            onDelete={(v) => { if (v.variantId) handleDeleteVersion(v.variantId, v.tag ?? v.title); }}
+          />
           <SideTabs tabs={tabs} active={sideTab} onChange={setSideTab} />
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
               <SideSearch query={query} onChange={setQuery} />
               {sideTab === "components" ? <SideKindFilter value={filter} onChange={setFilter} /> : null}
-              {sideTab === "versions" ? (
-                <button type="button" aria-label="Compare versions" onClick={() => compareRef.current?.open()}
-                  className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 text-[12px] text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111]"
-                >
-                  <IconCompare size={13} strokeWidth={1.7} />
-                  Comparar
-                </button>
-              ) : null}
             </div>
             <div className="grid min-h-0 flex-1 content-start gap-x-4 gap-y-[22px] overflow-y-auto px-6 pb-8 pt-[22px]"
               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
@@ -227,40 +232,6 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                     />
                   )}
                   {filteredComponents.length > 0 ? <AddCard label="New component" onClick={openNewComponent} /> : null}
-                </>
-              )}
-              {sideTab === "versions" && (
-                <>
-                  {versions.length > 1 ? (
-                    <>
-                      {filteredVersions.map((v) => (
-                        <VersionSideCard
-                          key={v.id}
-                          version={v}
-                          active={v.id === activeVersionId}
-                          type={type}
-                          allowMock={canUseFactoryMocks}
-                          onSelect={() => setActiveVersionId(v.id)}
-                          onOpenCanvas={() => {
-                            // The main is the screen itself, not a version — open it in
-                            // Current, never through the Versions window.
-                            if (v.tag === "main") handleOpenScreenCanvas();
-                            else if (v.variantId) handleOpenVersionCanvas(v.variantId);
-                          }}
-                          onFastEdit={() => {}}
-                          onDelete={() => { if (v.variantId) handleDeleteVersion(v.variantId, v.tag ?? v.title); }}
-                        />
-                      ))}
-                      <AddCard label="New version" onClick={addVersion} />
-                    </>
-                  ) : (
-                    <SideEmptyState
-                      title="No versions yet"
-                      description="Create a version of this screen to start. The original stays as the main."
-                      actionLabel="New version"
-                      onAction={addVersion}
-                    />
-                  )}
                 </>
               )}
               {sideTab === "references" && (
