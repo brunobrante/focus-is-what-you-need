@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
-import { CardSourceIcon, scopeOf } from "@/components/component/componentSource";
+import { IconComponentLink } from "@/components/icons";
 import type { ComponentRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 
@@ -56,10 +56,16 @@ export function ComponentSideCard({
             display="card"
           />
         ) : null}
-        <CardSourceIcon
-          scope={linked ? "screen" : scopeOf(component)}
-          className={linked ? "border-[#9b6dff] text-[#c9b3ff]" : undefined}
-        />
+        {/* Linked instances carry a purple component-link badge; owned subcomponents
+            show no source icon here (the Sub Components tab is always screen-scoped). */}
+        {linked ? (
+          <span
+            title="Linked component"
+            className="pointer-events-none absolute right-2 top-2 z-[1] grid h-[22px] w-[22px] place-items-center rounded-md border border-[#9b6dff] bg-[rgba(20,20,20,0.85)] text-[#c9b3ff] backdrop-blur-sm"
+          >
+            <IconComponentLink size={13} />
+          </span>
+        ) : null}
         <CardMenu
           buttons={[
             {
@@ -98,14 +104,10 @@ export function ComponentSideCard({
       </div>
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className={["min-w-0 flex-1 truncate text-[13px] font-medium", linked ? "text-[#c9b3ff]" : "text-[var(--text)]"].join(" ")}>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
             {component.name}
           </span>
-          {linked ? (
-            <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[#c9b3ff]">
-              linked
-            </span>
-          ) : component.kind ? (
+          {component.kind ? (
             <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[var(--text-faint)]">
               {component.kind}
             </span>

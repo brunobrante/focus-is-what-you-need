@@ -1070,13 +1070,15 @@ version is created:
   cards they are the standard hover menu (**open canvas**, **fast edit** stub, and — on
   non-main versions — a **More** menu with **Delete version**).
 - Inside a version's canvas scene, child components that point at the master appear as
-  **linked** instances (purple border + "linked" tag, read-only — no delete); detached/own
-  components appear normally. (The screen detail **Components** tab always lists the screen's
-  own top-level components, independent of which version is active.)
-- **Subcomponent cards** (Component detail and Screen detail "Sub Components" tabs) carry the
-  same **source icon** in their upper-right corner. An **external / linked** subcomponent is
-  rendered with a **purple border**, a purple-tinted title, a "linked" badge, and a
-  purple-tinted source icon; an owned child shows its scope icon with a normal border.
+  **linked** instances (purple border, read-only — no delete); detached/own components
+  appear normally. The screen detail **Sub Components** tab mirrors this: it follows the
+  selected version (see the version switcher), listing that variant's subcomponents.
+- **Subcomponent cards** in the screen detail **Sub Components** tab (`ComponentSideCard`):
+  - an **owned** child shows **no source icon**, a normal border, and its **kind** badge
+    (Layout / Section / Pattern …);
+  - a **linked** child shows a **purple border**, a purple **component-link** badge
+    (diamond-cluster glyph) pinned upper-right, a normal title, and the same **kind** badge
+    (there is no separate "linked" text badge). Its hover menu is read-only (no delete).
 
 **Linkable components & "Add components"**:
 - A component becomes **linkable** automatically when it is created **project-global** or
