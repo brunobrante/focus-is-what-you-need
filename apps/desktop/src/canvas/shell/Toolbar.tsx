@@ -45,6 +45,10 @@ export type ComponentPickerContext = {
   openComponentId: string | null;
   graphJSON: string | null;
   canvasName: string;
+  // When the open scene is a screen's MAIN variant, that screen's own components
+  // are native editable content (not external links) — exclude them from the
+  // picker. Null when editing a version/component/another subject.
+  excludeScreenId: string | null;
 };
 
 export function Toolbar({
@@ -589,15 +593,22 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner, compone
         workspaceId: workspace?.id ?? null,
       });
       if (cancelled) return;
+      const excludeScreenId = componentPicker?.excludeScreenId ?? null;
       setComponentItems(
-        rows.filter((row) => row.id !== componentPicker?.openComponentId),
+        rows.filter(
+          (row) =>
+            row.id !== componentPicker?.openComponentId &&
+            // A screen's own components are native content in that screen's main
+            // scene — don't offer them as links there (only in other screens).
+            !(excludeScreenId != null && row.screenId === excludeScreenId),
+        ),
       );
       setComponentsLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [componentsMode, componentPicker?.projectId, componentPicker?.openComponentId]);
+  }, [componentsMode, componentPicker?.projectId, componentPicker?.openComponentId, componentPicker?.excludeScreenId]);
 
   const insertLinkedComponent = async (master: ComponentRow) => {
     const editor = getEditor();

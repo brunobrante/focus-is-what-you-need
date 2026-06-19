@@ -1291,6 +1291,12 @@ function CanvasPageContent() {
             openComponentId: component?.id ?? null,
             graphJSON: resolvedSceneGraphJSON ?? null,
             canvasName: currentCanvasName,
+            // Editing a screen's MAIN scene → its own components are native
+            // content here; only offer them as links in OTHER screens/versions.
+            excludeScreenId:
+              screen && currentVariantId === mainVariantIdForScreen(allVariants, screen.id)
+                ? screen.id
+                : null,
           }}
           onBadgeClick={() => {
             setInspectorOpen(true);
