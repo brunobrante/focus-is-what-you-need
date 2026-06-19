@@ -145,13 +145,24 @@ Shows all screens, components, and references inside a project.
 **ProjectOverview section**:
 - Project thumbnail on the left
 - Right side: editable project name, counts, Preview button, Edit button
-- **ProjectEditPanel** slides in from the right in edit mode:
-  - Name field
-  - Description field
-  - Device type selector
-  - Save / Cancel buttons
 
-**Tab bar**: Screens | Components | References | System | Element defaults
+**ProjectEditPanel** (Edit mode): clicking **Edit** opens a full-page editor in
+place of the ProjectOverview and tab bar — it fills everything below the breadcrumb
+header (no routing, just a swapped-in component). It has a sticky action bar (Close
+× · "Edit project" · Cancel / Save changes) and a scrollable, centered body with two
+stacked sections:
+- **Details** — icon picker + thumbnail upload on the left; project name,
+  description, preview-screen selector, and read-only platform info on the right.
+  Saved by the action bar's **Save changes** button.
+- **Element defaults** — the project-scope canvas element defaults editor (same
+  `ElementDefaultsEditor` as the global Settings modal). Values inherit from the
+  workspace (or Global when there is no workspace); toggling an element to **Custom**
+  overrides it for this project only. Changes here persist immediately, independent
+  of the Save button.
+
+Closing (Close ×, Cancel, or saving) returns to the ProjectOverview + tabs.
+
+**Tab bar**: Screens | Components | References | System
 
 **Screens / Components / References tabs each contain**:
 - "Add" button in the top-right corner
@@ -885,8 +896,9 @@ Opened from the user menu (TopBar → avatar → Settings). Wide modal with a to
 Sets the default appearance new canvas elements get when dropped (Text, Rectangle,
 Wrapper, Image, Icon, Ellipse, Line, Arrow, Polygon, Star). These defaults are a
 three-level cascade — **Global → Workspace → Project** — and this tab edits the
-**Global** base; the workspace and project levels are edited on their own screens
-(see "Element defaults scopes" below).
+**Global** base. The **workspace** level is edited on its own screen
+(`/element-defaults`); the **project** level is edited in the project's **Edit**
+page (Gallery → Edit → Element defaults section).
 
 - **Adaptive sizing** (global only): Reference size (the frame size that maps to
   1× scale) plus min/max scale. New elements scale their default size toward the

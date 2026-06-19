@@ -24,7 +24,6 @@ import {
   ReferencesTab,
   SystemTab,
 } from "@/routes/Gallery";
-import { ElementDefaultsTab } from "@/routes/ElementDefaultsTab";
 
 export function GalleryPage() {
   const { projectId: rawProjectId } = useParams<{ projectId: string }>();
@@ -114,16 +113,9 @@ export function GalleryPage() {
         <Crumbs projectName={projectName} type={type} />
       </header>
 
-      <ProjectOverview
-        project={project}
-        screensCount={projectScreens.length}
-        componentsCount={components.length}
-        referencesCount={references.length}
-        onPreview={projectScreens.length > 0 && project ? () => previewRef.current?.open(project, projectScreens) : null}
-        onEdit={() => setEditOpen((v) => !v)}
-        editOpen={editOpen}
-      />
       {editOpen && project ? (
+        // The editor opens in place of the overview + tabs — a full page below the
+        // breadcrumb header, no routing. Closing returns to the overview.
         <ProjectEditPanel
           project={project}
           screens={projectScreens}
@@ -135,6 +127,15 @@ export function GalleryPage() {
         />
       ) : (
         <>
+          <ProjectOverview
+            project={project}
+            screensCount={projectScreens.length}
+            componentsCount={components.length}
+            referencesCount={references.length}
+            onPreview={projectScreens.length > 0 && project ? () => previewRef.current?.open(project, projectScreens) : null}
+            onEdit={() => setEditOpen(true)}
+            editOpen={editOpen}
+          />
           <Tabs
             tab={tab}
             onChange={setTab}
@@ -192,9 +193,6 @@ export function GalleryPage() {
             />
           )}
           {tab === "system" && project ? <SystemTab project={project} /> : null}
-          {tab === "elements" && project ? (
-            <ElementDefaultsTab project={project} />
-          ) : null}
         </>
       )}
 
