@@ -12,7 +12,7 @@ import {
   type ToolEntry,
 } from "@/canvas/toolbarConfig";
 import type { ProjectType } from "@/lib/data/types";
-import { ZoomControl, type ZoomSetter } from "@/canvas/shell/CanvasRender";
+import { ZoomControl, type ZoomSetter } from "@/canvas/shell/ZoomControl";
 import type { ZoomLimits } from "@/canvas/engine/viewport";
 import { ActionsPanel } from "./actions/ActionsPanel";
 import type { ComponentPickerContext } from "./actions/ComponentPicker";
