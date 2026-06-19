@@ -143,7 +143,8 @@ export function VersionSwitcher({
               role="tab"
               type="button"
               aria-selected={isActive}
-              onClick={() => onSelect(v.id)}
+              // Selecting closes any open/pending hover preview.
+              onClick={() => { hidePreview(); onSelect(v.id); }}
               // Only versions (never the main) get a hover preview of their screen.
               onMouseEnter={main ? undefined : (e) => schedulePreview(v, e.currentTarget)}
               onMouseLeave={main ? undefined : hidePreview}
