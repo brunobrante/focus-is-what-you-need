@@ -902,6 +902,9 @@ function CanvasPageContent() {
               screen && currentVariantId === mainVariantIdForScreen(allVariants, screen.id)
                 ? screen.id
                 : null,
+            // Nested components owned by the exact scene being edited are native content
+            // here too — never offer them as links into their own origin.
+            excludeParentVariantId: currentVariantId ?? null,
           }}
           onBadgeClick={() => {
             setInspectorOpen(true);

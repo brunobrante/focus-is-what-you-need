@@ -17,7 +17,24 @@ export type ComponentPickerContext = {
   graphJSON: string | null;
   canvasName: string;
   excludeScreenId: string | null;
+  // The variant whose scene is being edited. A component native to this scene (a nested
+  // component owned by this variant) must not be offered/inserted as a linked instance —
+  // it would render purple/locked in its own origin.
+  excludeParentVariantId: string | null;
 };
+
+// A master is "native" to the scene being edited when its origin owner IS that scene —
+// inserting a link to it there would create a purple/locked instance in its own origin.
+function isNativeToCurrentScene(
+  row: Pick<ComponentRow, "id" | "screenId" | "parentVariantId">,
+  ctx: ComponentPickerContext,
+): boolean {
+  return (
+    row.id === ctx.openComponentId ||
+    (ctx.excludeScreenId != null && row.screenId === ctx.excludeScreenId) ||
+    (ctx.excludeParentVariantId != null && row.parentVariantId === ctx.excludeParentVariantId)
+  );
+}
 
 export function ComponentPicker({
   componentPicker,
@@ -41,22 +58,23 @@ export function ComponentPicker({
       const workspace = projectId ? await getWorkspaceForProject(projectId) : null;
       const rows = await listLinkableComponents({ projectId, workspaceId: workspace?.id ?? null });
       if (cancelled) return;
-      const excludeScreenId = componentPicker?.excludeScreenId ?? null;
-      setItems(
-        rows.filter(
-          (row) =>
-            row.id !== componentPicker?.openComponentId &&
-            !(excludeScreenId != null && row.screenId === excludeScreenId),
-        ),
-      );
+      setItems(componentPicker ? rows.filter((row) => !isNativeToCurrentScene(row, componentPicker)) : rows);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [componentPicker?.projectId, componentPicker?.openComponentId, componentPicker?.excludeScreenId]);
+  }, [
+    componentPicker?.projectId,
+    componentPicker?.openComponentId,
+    componentPicker?.excludeScreenId,
+    componentPicker?.excludeParentVariantId,
+  ]);
 
   const insert = async (master: ComponentRow) => {
     const editor = getEditor();
     if (!editor) return;
+    // Defensive last line: never drop a self-instance even if one slipped past the list
+    // filter — a master native to the current scene would render purple in its own origin.
+    if (componentPicker && isNativeToCurrentScene(master, componentPicker)) return;
     const size = await getVariantFrameSize(master.activeVariantId);
     const doc = editor.state.document;
     const node = buildLinkedInstanceNode({

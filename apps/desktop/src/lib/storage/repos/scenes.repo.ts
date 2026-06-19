@@ -248,6 +248,29 @@ async function upsertSceneRowWithoutPropagation(input: {
   notifyInvalidation(ownerInvalidationKey("scene", input.ownerType, input.ownerId));
 }
 
+/**
+ * Resolves the parent-scene node that a child component corresponds to, for embed
+ * sync (`replaceComponentSubtreeInGraph`) and linkify (`linkifyChildComponentsInGraph`).
+ *
+ * Matching is deliberately strict to avoid corrupting the wrong node:
+ *   - when the child carries a `sourceNodeId`, match ONLY by that id — a missing id means
+ *     the subtree is gone, so we skip rather than fall back to a fragile name guess;
+ *   - otherwise match by normalized name, but only when it is UNAMBIGUOUS (exactly one
+ *     non-root node bears that name). Ambiguous (duplicate names) or absent → no match.
+ */
+function findChildTargetNode<N extends { id: string; name: string }>(
+  nodes: ReadonlyArray<N>,
+  child: { sourceNodeId?: string | null; name: string },
+  rootId: string,
+): N | null {
+  if (child.sourceNodeId) {
+    return nodes.find((node) => node.id === child.sourceNodeId) ?? null;
+  }
+  const key = normalizeName(child.name);
+  const matches = nodes.filter((node) => node.id !== rootId && normalizeName(node.name) === key);
+  return matches.length === 1 ? matches[0]! : null;
+}
+
 function replaceComponentSubtreeInGraph(
   parentGraphJSON: string,
   childGraphJSON: string,
@@ -260,13 +283,7 @@ function replaceComponentSubtreeInGraph(
   const childSubject = subjectNodeForDocument(child);
   if (!childSubject) return null;
 
-  const target =
-    (component.sourceNodeId
-      ? parent.nodes.find((node) => node.id === component.sourceNodeId)
-      : null) ??
-    parent.nodes.find(
-      (node) => normalizeName(node.name) === normalizeName(component.name),
-    );
+  const target = findChildTargetNode(parent.nodes, component, parent.rootId);
   if (!target) return null;
   // If this parent uses the component as a linked instance, there is no embedded
   // subtree to sync — leave the bare instance node so its instanceOf is preserved
@@ -334,11 +351,7 @@ export function linkifyChildComponentsInGraph(
   const instanceByNodeId = new Map<string, { componentId: string; variantId: string }>();
 
   for (const child of children) {
-    const target =
-      (child.sourceNodeId ? doc.nodes.find((n) => n.id === child.sourceNodeId) : null) ??
-      doc.nodes.find(
-        (n) => n.id !== doc.rootId && normalizeName(n.name) === normalizeName(child.name),
-      );
+    const target = findChildTargetNode(doc.nodes, child, doc.rootId);
     if (!target || target.id === doc.rootId) continue;
     for (const id of collectDescendantIds(doc.nodes, target.id)) removed.add(id);
     instanceByNodeId.set(target.id, { componentId: child.id, variantId: child.activeVariantId });
