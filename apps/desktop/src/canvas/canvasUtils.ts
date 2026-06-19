@@ -1,5 +1,6 @@
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { htmlCanvasDocumentFromJSON } from "@/lib/canvas/htmlScene/document";
+import { subjectNodeForDocument } from "@/lib/canvas/htmlScene";
 import { createBlankDocument } from "@/canvas/engine/actions";
 import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { listVariants } from "@/lib/storage/repos/variants.repo";
@@ -532,12 +533,17 @@ export function subcomponentsForVariantScene(input: {
 }): { components: ComponentRow[]; linkedIds: Set<string> } {
   const doc = input.graphJSON ? htmlCanvasDocumentFromJSON(input.graphJSON) : null;
   if (!doc) return { components: [], linkedIds: new Set() };
+  // Top-level subcomponents are the direct children of the SUBJECT frame, not the root —
+  // scenes wrap the subject in a "<name> Canvas" root, so the components sit one level
+  // below it. Filtering on the root id would only ever match the subject itself.
+  const subject = subjectNodeForDocument(doc);
+  const parentId = subject?.id ?? doc.rootId;
   const byId = new Map(input.projectComponents.map((c) => [c.id, c] as const));
   const components: ComponentRow[] = [];
   const linkedIds = new Set<string>();
   const seen = new Set<string>();
   for (const node of doc.nodes) {
-    if (node.parentId !== doc.rootId) continue; // top-level subcomponents only
+    if (node.parentId !== parentId) continue; // top-level subcomponents only
     const comp = node.instanceOf
       ? byId.get(node.instanceOf.componentId) ?? null
       : findComponentBySourceNodeInList(

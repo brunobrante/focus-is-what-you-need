@@ -143,7 +143,13 @@ export function stripResolvedInstanceChildren(document: HtmlCanvasDocument): Htm
 // ─── Local copies of the subtree helpers used by scenes.repo (kept private here so
 //     the resolver stays a leaf module with no storage imports) ──────────────────
 
-function subjectNodeForDocument(document: HtmlCanvasDocument): HtmlCanvasNode | null {
+/**
+ * The "subject" node of a scene — the actual screen/component frame. Scenes wrap the
+ * subject in a "<name> Canvas" root; when that wrapper is present the subject is its sole
+ * full-bleed child, otherwise the root itself is the subject. Top-level subcomponents are
+ * the subject's direct children, NOT the root's.
+ */
+export function subjectNodeForDocument(document: HtmlCanvasDocument): HtmlCanvasNode | null {
   const root = document.nodes.find((node) => node.id === document.rootId);
   if (!root) return null;
   const rootChildren = document.nodes.filter((node) => node.parentId === root.id);
