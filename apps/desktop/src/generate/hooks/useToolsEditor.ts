@@ -33,9 +33,7 @@ import {
 import {
   sourceRootComponentId,
   newRootComponentId,
-  createRootComponent,
   ensureRootComponent,
-  writeReferenceStackFromComponents,
   readReferenceStackComponents,
 } from "../engine/componentModel";
 import {
@@ -44,8 +42,6 @@ import {
 } from "../engine/componentTree";
 import {
   addVariant,
-  setActiveVariant as setActiveVariantOn,
-  removeVariant as removeVariantFrom,
   setOriginalVariantImage,
 } from "../engine/variants";
 import {
@@ -66,17 +62,18 @@ import {
   bytesToPngDataUrl,
   runBirefnet,
   runRealEsrgan,
-  runAutoDetect,
   urlToBytes,
   type ProcessingFeatureKey,
 } from "@/lib/models/modelCommands";
-import { clamp } from "../engine/geometry";
 import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
+import { useAutoDetect } from "./useAutoDetect";
+import { useStackPersist } from "./useStackPersist";
+import { useCutVariants } from "./useCutVariants";
 
 export type ToolsEditorProps = {
   item: ToolReference;
@@ -253,11 +250,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const [uploading, setUploading] = useState(false);
   const [imagePaintVersion, setImagePaintVersion] = useState(0);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
-  const [savingStack, setSavingStack] = useState(false);
-  const [stackSaveStatus, setStackSaveStatus] = useState<string | null>(null);
-  const [autoDetecting, setAutoDetecting] = useState(false);
-  const [autoDetectMessage, setAutoDetectMessage] = useState<string | null>(null);
-  const autoDetectMessageTimer = useRef<number | null>(null);
 
   // Coalesce repaints to one per animation frame: N async cut images settling in
   // the same tick would otherwise trigger N full canvas repaints.
@@ -326,14 +318,19 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectedComponentId,
   });
 
+  const { savingStack, setSavingStack, stackSaveStatus, setStackSaveStatus, persistReferenceStack } =
+    useStackPersist({ components, item, referenceId, componentKey, rootComponentId, cancelPendingPersist });
+
   // Wrap so any component mutation also clears the save-status badge.
   const updateComponents = useCallback(
     (updater: (items: SavedComponent[]) => SavedComponent[]) => {
       setStackSaveStatus(null);
       rawUpdateComponents(updater);
     },
-    [rawUpdateComponents],
+    [rawUpdateComponents, setStackSaveStatus],
   );
+
+  const { addCutVariant, setCutVariant, removeCutVariant } = useCutVariants({ updateComponents });
 
   // --- Active subject / canCrop --------------------------------------------
 
@@ -468,6 +465,22 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   // Wire the stable forward-ref now that the real cancelSelection is available.
   useEffect(() => {
     cancelSelectionRef.current = cancelSelection;
+  });
+
+  const { autoDetecting, autoDetectMessage, autoDetect } = useAutoDetect({
+    canCrop,
+    activeSubject,
+    rootComponent,
+    activeScopeId,
+    imgRef,
+    selectionToSubjectCoords,
+    toOriginalCoords,
+    updateComponents,
+    setExpandedComponentIds,
+    setSelectedComponentId,
+    setViewMode,
+    cancelSelection,
+    resetToolViewport,
   });
 
   // --- Canvas painter ------------------------------------------------------
@@ -819,42 +832,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   // --- Operations ----------------------------------------------------------
 
-  const persistReferenceStack = useCallback(async () => {
-    if (savingStack) return;
-    cancelPendingPersist();
-    setSavingStack(true);
-    setStackSaveStatus(null);
-    try {
-      if (!referenceId || item.id !== referenceId) {
-        writeSavedComponents(componentKey, components);
-        setStackSaveStatus("Local state saved");
-        return;
-      }
-
-      const data = await writeReferenceStackFromComponents({
-        components,
-        item,
-        primaryComponentId: rootComponentId,
-        rootComponentId,
-      });
-      const cutCount = data?.components.length ?? 0;
-      const extraStackCount = Math.max(0, (data?.roots?.length ?? 1) - 1);
-      setStackSaveStatus(
-        data
-          ? `${cutCount} ${cutCount === 1 ? "cut" : "cuts"}` +
-              (extraStackCount > 0
-                ? `, ${extraStackCount} ${extraStackCount === 1 ? "stack" : "stacks"} saved`
-                : " saved")
-          : "Stack removed",
-      );
-      removeSavedComponents(componentKey);
-    } catch (err) {
-      console.error("[tools] stack save failed:", err);
-      setStackSaveStatus("Failed to save stack");
-    } finally {
-      setSavingStack(false);
-    }
-  }, [cancelPendingPersist, componentKey, components, item, referenceId, rootComponentId, savingStack]);
 
   const saveSelection = useCallback(
     async (postProcess?: ProcessingFeatureKey) => {
@@ -974,163 +951,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     ],
   );
 
-  const addCutVariant = useCallback(
-    (cutId: string, input: { tool: CutVariantTool; dataUrl: string }) => {
-      const createdAt = new Date().toISOString();
-      updateComponents((current) =>
-        current.map((c) =>
-          c.id === cutId && c.parentId != null
-            ? addVariant(c, { ...input, createdAt })
-            : c,
-        ),
-      );
-    },
-    [updateComponents],
-  );
 
-  const setCutVariant = useCallback(
-    (cutId: string, variantId: string) => {
-      updateComponents((current) =>
-        current.map((c) => (c.id === cutId ? setActiveVariantOn(c, variantId) : c)),
-      );
-    },
-    [updateComponents],
-  );
-
-  const removeCutVariant = useCallback(
-    (cutId: string, variantId: string) => {
-      updateComponents((current) =>
-        current.map((c) => (c.id === cutId ? removeVariantFrom(c, variantId) : c)),
-      );
-    },
-    [updateComponents],
-  );
-
-  const flashAutoDetectMessage = useCallback((message: string) => {
-    setAutoDetectMessage(message);
-    if (autoDetectMessageTimer.current != null) clearTimeout(autoDetectMessageTimer.current);
-    autoDetectMessageTimer.current = window.setTimeout(() => {
-      autoDetectMessageTimer.current = null;
-      setAutoDetectMessage(null);
-    }, 4000);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (autoDetectMessageTimer.current != null) clearTimeout(autoDetectMessageTimer.current);
-    };
-  }, []);
-
-  const autoDetect = useCallback(
-    async (modelId: string | null) => {
-      if (autoDetecting || !canCrop) return;
-      if (!modelId) {
-        flashAutoDetectMessage("Install an auto-detect model in Settings first");
-        return;
-      }
-      const img = imgRef.current;
-      const cw = img?.clientWidth ?? 0;
-      const ch = img?.clientHeight ?? 0;
-      if (!cw || !ch) {
-        flashAutoDetectMessage("Open a stack before auto-detecting");
-        return;
-      }
-      const parentId =
-        activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
-      const rootId = activeSubject.rootId ?? activeScopeId;
-      setAutoDetecting(true);
-      setAutoDetectMessage(null);
-      try {
-        const bytes = await urlToBytes(activeSubject.url);
-        const regions = await runAutoDetect(modelId, bytes);
-        if (regions.length === 0) {
-          flashAutoDetectMessage("No components detected — try drawing regions manually");
-          return;
-        }
-        if (img) await waitForImage(img).catch(() => {});
-        const created: SavedComponent[] = [];
-        for (const region of regions) {
-          const x = clamp(region.x * cw, 0, cw);
-          const y = clamp(region.y * ch, 0, ch);
-          const displayBox = {
-            x,
-            y,
-            w: clamp(region.w * cw, 1, cw - x),
-            h: clamp(region.h * ch, 1, ch - y),
-          };
-          const subjectBox = selectionToSubjectCoords(displayBox);
-          if (!subjectBox) continue;
-          const sourceBox = toOriginalCoords(subjectBox);
-          let dataUrl = activeSubject.url;
-          if (img) {
-            try {
-              const canvas = document.createElement("canvas");
-              canvas.width = Math.max(1, Math.round(subjectBox.w));
-              canvas.height = Math.max(1, Math.round(subjectBox.h));
-              const ctx = canvas.getContext("2d");
-              if (!ctx) throw new Error("Canvas unavailable");
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(
-                img,
-                subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h,
-                0, 0, canvas.width, canvas.height,
-              );
-              dataUrl = await canvasToDataUrl(canvas, "image/png");
-            } catch {
-              dataUrl = activeSubject.url;
-            }
-          }
-          const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
-          const trimmedLabel = region.label?.trim();
-          created.push({
-            id: nextId,
-            name: trimmedLabel ? trimmedLabel : shortComponentName(nextId),
-            box: sourceBox,
-            dataUrl,
-            type: "PNG",
-            createdAt: new Date().toISOString(),
-            parentId,
-            kind: "cut",
-            rootId,
-          });
-        }
-        if (created.length === 0) {
-          flashAutoDetectMessage("No components detected — try drawing regions manually");
-          return;
-        }
-        updateComponents((current) => [...created, ...current]);
-        setExpandedComponentIds((current) => {
-          const next = new Set(current);
-          next.add(parentId);
-          for (const c of created) next.add(c.id);
-          return next;
-        });
-        setSelectedComponentId(created[0].id);
-        setViewMode("component");
-        resetToolViewport();
-        cancelSelection();
-      } catch (error) {
-        console.error("[tools] auto-detect failed", error);
-        flashAutoDetectMessage("Auto-detect failed — see console for details");
-      } finally {
-        setAutoDetecting(false);
-      }
-    },
-    [
-      activeScopeId,
-      activeSubject,
-      autoDetecting,
-      canCrop,
-      cancelSelection,
-      flashAutoDetectMessage,
-      resetToolViewport,
-      rootComponent.id,
-      selectionToSubjectCoords,
-      setExpandedComponentIds,
-      toOriginalCoords,
-      updateComponents,
-    ],
-  );
 
   const uploadImage = useCallback(
     async (file: File | null | undefined) => {
