@@ -206,7 +206,13 @@ Two-column layout for inspecting and editing a screen.
 **Left column (≈40%) — Preview**:
 - PreviewShell container (see Components section)
 - Device mockup wrapping the screen snapshot
-- Floating buttons: Open in Canvas, FastEdit
+- Floating buttons: Open in Canvas, FastEdit. Both **follow the selected version**: when
+  a version is previewed (via the version switcher), **Open in Canvas** opens that variant
+  (`?screen=…&versionVariant=…`, the Versions window) and **FastEdit** edits that variant's
+  scene. In FastEdit a version's **linked** subcomponents are resolved for display but
+  **read-only** — selecting one shows a purple "Linked component — read-only" banner and
+  disables the property controls (edit the master at its origin instead). On the main both
+  buttons target the screen itself.
 
 **Right column (≈60%) — Inspector**:
 - Editable screen title with edit icon

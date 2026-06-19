@@ -20,6 +20,9 @@ export type SceneNode = {
   radius: number;
   fontSize: number;
   fontWeight: number;
+  // True for a linked component instance and everything inside it — read-only in
+  // FastEdit (the master is edited at its origin, not here).
+  linked?: boolean;
   children: SceneNode[];
 };
 

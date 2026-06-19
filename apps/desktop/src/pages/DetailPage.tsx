@@ -77,6 +77,14 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     { id: "references" as const, label: "References", count: references.length },
   ] as const;
 
+  // The preview's "Open in canvas" and "Fast edit" follow the selected version: a
+  // previewed version opens/edits that variant (its linked subcomponents are read-only
+  // in Fast edit); the main opens/edits the screen itself.
+  const previewVariantId = isPreviewingVersion ? activeVersionId : null;
+  const previewCanvasHref = previewVariantId
+    ? `${canvasHref}&versionVariant=${encodeURIComponent(previewVariantId)}`
+    : canvasHref;
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]" data-type={type}>
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
@@ -104,8 +112,8 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
 
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
         <PreviewShell
-          onFastEdit={() => fastEditRef.current?.open({ mode: "screen", screen, components, type, canvasHref })}
-          canvasHref={canvasHref}
+          onFastEdit={() => fastEditRef.current?.open({ mode: "screen", screen, components: displayComponents, type, canvasHref: previewCanvasHref, variantId: previewVariantId })}
+          canvasHref={previewCanvasHref}
           prev={!isPreviewingVersion && prevScreen ? {
             name: prevScreen.title,
             details: [`${components.length} component${components.length === 1 ? "" : "s"}`, projectDims[type]],

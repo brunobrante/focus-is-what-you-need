@@ -4,11 +4,18 @@ import { Modal, ModalBody } from "@/components/modals/Modal";
 import { ZoomControls } from "@/components/screen/ZoomControls";
 import { useStepZoom } from "@/components/screen/useStepZoom";
 import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
-import { IconChevronDown, IconClose, IconOpenCanvas, IconSpinner } from "@/components/icons";
-import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
+import { IconChevronDown, IconClose, IconComponentLink, IconOpenCanvas, IconSpinner } from "@/components/icons";
+import type { ComponentRow, ScreenRow, SceneRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
-import { htmlCanvasDocumentFromJSON, type HtmlCanvasDocument, type HtmlCanvasNode } from "@/lib/canvas/htmlScene";
+import { peekTable, TABLES } from "@/lib/storage/store";
+import {
+  buildMasterResolver,
+  htmlCanvasDocumentFromJSON,
+  resolveInstances,
+  type HtmlCanvasDocument,
+  type HtmlCanvasNode,
+} from "@/lib/canvas/htmlScene";
 import {
   SceneCanvasInspector,
   findSceneNode,
@@ -27,6 +34,9 @@ export type FastEditConfig =
       components: ComponentRow[];
       type: ProjectType;
       canvasHref: string;
+      // When set, FastEdit edits this variant's scene instead of the screen's main —
+      // used to edit a selected version. Its linked subcomponents are read-only.
+      variantId?: string | null;
     }
   | {
       mode: "component";
@@ -67,7 +77,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const ownerType = "variant" as const;
     const ownerId =
       config?.mode === "screen"
-        ? (config.screen?.activeVariantId ?? null)
+        ? (config.variantId ?? config.screen?.activeVariantId ?? null)
         : (config?.variant?.id ?? null);
 
     useEffect(() => {
@@ -77,7 +87,13 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
         if (cancelled || !row) return;
         const doc = htmlCanvasDocumentFromJSON(row.graphJSON);
         if (!doc) return;
-        const built = buildSceneFromHtmlCanvas(doc);
+        // Resolve linked instances so their master content shows; buildScene marks
+        // those subtrees as `linked` (read-only) so they can't be edited here.
+        const resolved = resolveInstances(
+          doc,
+          buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)),
+        );
+        const built = buildSceneFromHtmlCanvas(resolved);
         if (!cancelled && built) setScene(built);
       });
       return () => { cancelled = true; };
@@ -108,7 +124,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const selectedNode = scene ? (findSceneNode(scene.root, selectedId) ?? scene.root) : null;
 
     const updateSelected = (patch: Partial<SceneNode>) => {
-      if (!selectedNode) return;
+      if (!selectedNode || selectedNode.linked) return; // linked instances are read-only
       setScene((prev) => (prev ? updateNodeInScene(prev, selectedNode.id, patch) : prev));
     };
 
@@ -220,8 +236,21 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
             </div>
 
             <aside className="flex min-h-0 flex-col bg-[var(--bg)]">
+              {selectedNode.linked ? (
+                <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[rgba(155,109,255,0.08)] px-4 py-2.5">
+                  <IconComponentLink size={13} className="shrink-0 text-[#c9b3ff]" />
+                  <span className="text-[11.5px] leading-snug text-[#c9b3ff]">
+                    Linked component — read-only. Edit it at its origin.
+                  </span>
+                </div>
+              ) : null}
               <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="grid gap-3 p-4">
+                <div
+                  className={[
+                    "grid gap-3 p-4",
+                    selectedNode.linked ? "pointer-events-none opacity-50" : "",
+                  ].join(" ")}
+                >
                   <Section title="Texto">
                     <Field label="Content">
                       <input
@@ -339,10 +368,18 @@ function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
 
   const subjectAbs = absPos(subject.id);
 
-  function convert(node: HtmlCanvasNode, absX: number, absY: number, isRoot: boolean): SceneNode {
+  function convert(
+    node: HtmlCanvasNode,
+    absX: number,
+    absY: number,
+    isRoot: boolean,
+    linkedAncestor: boolean,
+  ): SceneNode {
+    // A linked instance and everything resolved inside it is read-only here.
+    const linked = linkedAncestor || Boolean(node.instanceOf);
     const htmlChildren = (childrenMap.get(node.id) ?? []).filter((n) => n.visible !== false);
     const children = htmlChildren.map((child) =>
-      convert(child, absX + child.bounds.x, absY + child.bounds.y, false)
+      convert(child, absX + child.bounds.x, absY + child.bounds.y, false, linked)
     );
     const kind: NodeKind = isRoot
       ? "frame"
@@ -369,11 +406,12 @@ function buildSceneFromHtmlCanvas(doc: HtmlCanvasDocument): Scene | null {
       radius: node.style.borderRadius ?? 0,
       fontSize: node.style.fontSize ?? 14,
       fontWeight: node.style.fontWeight ?? 400,
+      linked,
       children,
     };
   }
 
-  const rootNode = convert(subject, subjectAbs.x, subjectAbs.y, true);
+  const rootNode = convert(subject, subjectAbs.x, subjectAbs.y, true, false);
   const size: SceneSize = {
     w: Math.round(subject.bounds.width),
     h: Math.round(subject.bounds.height),
