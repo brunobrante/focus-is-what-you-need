@@ -100,9 +100,12 @@ export async function listProjectGlobalComponents(
 }
 
 /**
- * Linkable components reachable from a project: its project-global components
- * plus the workspace-global components of the workspace it belongs to. These are
- * the only components offered by the canvas "Add components" picker.
+ * Linkable components reachable from a project: any component flagged `linkable`
+ * that belongs to the project or to its workspace — regardless of scope. This
+ * includes project/workspace-global components AND the screen-level or nested
+ * children that a linked version captured as linked instances (those get flagged
+ * via `markComponentsLinkable`). These are the components offered by the canvas
+ * "Add components" picker.
  */
 export async function listLinkableComponents(input: {
   projectId: string | null;
@@ -112,13 +115,8 @@ export async function listLinkableComponents(input: {
   return rows
     .filter((r) => {
       if (r.linkable !== true) return false;
-      const scope = componentScope(r);
-      if (scope === "project") {
-        return input.projectId != null && r.projectId === input.projectId;
-      }
-      if (scope === "workspace") {
-        return input.workspaceId != null && r.workspaceId === input.workspaceId;
-      }
+      if (input.projectId != null && r.projectId === input.projectId) return true;
+      if (input.workspaceId != null && r.workspaceId === input.workspaceId) return true;
       return false;
     })
     .sort((a, b) => a.order - b.order);

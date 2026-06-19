@@ -19,7 +19,7 @@ import { getWorkspaceForProject } from "@/lib/storage/repos/workspace.repo";
 import { insertElement } from "@/canvas/engine/mutations/elementHierarchy";
 import { buildLinkedInstanceNode } from "@/canvas/engine/mutations/buildLinkedInstanceNode";
 import { buildMasterResolver, withResolvedInstances } from "@/canvas/engine/htmlSceneAdapter";
-import { scopeOf, sourceScopeIcon } from "@/components/component/componentSource";
+import { scopeOf, sourceScopeIcon, SOURCE_SCOPE_LABEL } from "@/components/component/componentSource";
 import { peekTable, TABLES } from "@/lib/storage/store";
 import type { ComponentRow, SceneRow } from "@/lib/storage/schema";
 import type { CanvasToolId } from "@/canvas/tools";
@@ -836,7 +836,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner, compone
                       </span>
                       <span className="min-w-0 flex-1 truncate text-[12px] text-[#CFCFCF]">{c.name}</span>
                       <span className="shrink-0 text-[9px] font-medium uppercase tracking-[0.3px] text-[#4A4A4A]">
-                        {scopeOf(c) === "workspace" ? "Workspace" : "Project"}
+                        {SOURCE_SCOPE_LABEL[scopeOf(c)]}
                       </span>
                     </button>
                   ))}
