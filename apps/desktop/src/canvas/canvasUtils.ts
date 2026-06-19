@@ -519,17 +519,22 @@ export function findComponentBySourceNodeInList(
  * (→ its master) or owned content matching a component by `sourceNodeId` (version-owned,
  * or — for the main variant — a screen-level child). Decoration nodes resolve to nothing
  * and are skipped. Deduped by component id, preserving scene order.
+ *
+ * `linkedIds` carries the component ids that appear as **linked instances** in this scene
+ * (the node had `instanceOf`), so the cards can render the read-only purple/linked
+ * treatment for exactly those subcomponents.
  */
 export function subcomponentsForVariantScene(input: {
   graphJSON: string | null;
   variantId: string;
   screenId: string | null;
   projectComponents: ComponentRow[];
-}): ComponentRow[] {
+}): { components: ComponentRow[]; linkedIds: Set<string> } {
   const doc = input.graphJSON ? htmlCanvasDocumentFromJSON(input.graphJSON) : null;
-  if (!doc) return [];
+  if (!doc) return { components: [], linkedIds: new Set() };
   const byId = new Map(input.projectComponents.map((c) => [c.id, c] as const));
-  const result: ComponentRow[] = [];
+  const components: ComponentRow[] = [];
+  const linkedIds = new Set<string>();
   const seen = new Set<string>();
   for (const node of doc.nodes) {
     if (node.parentId !== doc.rootId) continue; // top-level subcomponents only
@@ -549,10 +554,11 @@ export function subcomponentsForVariantScene(input: {
           : null);
     if (comp && !seen.has(comp.id)) {
       seen.add(comp.id);
-      result.push(comp);
+      components.push(comp);
+      if (node.instanceOf) linkedIds.add(comp.id);
     }
   }
-  return result;
+  return { components, linkedIds };
 }
 
 export function findComponentByCanvasNode(input: {

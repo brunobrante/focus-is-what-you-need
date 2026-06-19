@@ -127,7 +127,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   // screen (each version's scene references those components as linked instances).
   const components = useScreenChildren(project?.id, screen?.id).data;
   const projectComponents = useComponentsByProject(project?.id).data;
-  const linkedComponentIds = useMemo(() => new Set<string>(), []);
   const { data: screenVariants } = useScreenVariants(screen?.id);
   // Active variants are looked up across ALL project components so a version-owned
   // subcomponent (not in the screen's top-level list) still resolves its thumbnail.
@@ -193,14 +192,23 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     "variant",
     isPreviewingVersion ? activeVersionId : null,
   );
-  const displayComponents = useMemo<ComponentRow[]>(() => {
-    if (!isPreviewingVersion || !activeVersionId) return components;
-    return subcomponentsForVariantScene({
+  // For the main, the screen's own children are owned content (nothing linked). For a
+  // version, derive both the subcomponents and which of them are linked instances so the
+  // cards render the purple/linked, read-only treatment for exactly those.
+  const { displayComponents, linkedComponentIds } = useMemo<{
+    displayComponents: ComponentRow[];
+    linkedComponentIds: Set<string>;
+  }>(() => {
+    if (!isPreviewingVersion || !activeVersionId) {
+      return { displayComponents: components, linkedComponentIds: new Set<string>() };
+    }
+    const { components: list, linkedIds } = subcomponentsForVariantScene({
       graphJSON: selectedVariantScene?.graphJSON ?? null,
       variantId: activeVersionId,
       screenId: screen?.id ?? null,
       projectComponents,
     });
+    return { displayComponents: list, linkedComponentIds: linkedIds };
   }, [isPreviewingVersion, activeVersionId, components, selectedVariantScene?.graphJSON, screen?.id, projectComponents]);
 
   const versionModeRef = useRef<VersionModeModalHandle>(null);
