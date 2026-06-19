@@ -137,23 +137,20 @@ export function VersionSwitcher({
         {versions.map((v) => {
           const isActive = v.id === active?.id;
           const main = isMainVersion(v);
+          // Preview only the OTHER versions: never the main, and never the currently
+          // selected one (its screen is already shown in the preview pane beside it).
+          const canPreview = !main && !isActive;
           return (
             <button
               key={v.id}
               role="tab"
               type="button"
               aria-selected={isActive}
-              // Selecting closes the open card immediately, then re-arms the dwell so the
-              // preview still reappears while the mouse keeps resting on the (now selected)
-              // chip — onMouseEnter won't re-fire on its own since the pointer never left.
-              onClick={(e) => {
-                hidePreview();
-                onSelect(v.id);
-                if (!main) schedulePreview(v, e.currentTarget);
-              }}
-              // Only versions (never the main) get a hover preview of their screen.
-              onMouseEnter={main ? undefined : (e) => schedulePreview(v, e.currentTarget)}
-              onMouseLeave={main ? undefined : hidePreview}
+              // Selecting closes any open/pending preview (and the chip becomes active, so
+              // it stops previewing on hover).
+              onClick={() => { hidePreview(); onSelect(v.id); }}
+              onMouseEnter={canPreview ? (e) => schedulePreview(v, e.currentTarget) : undefined}
+              onMouseLeave={canPreview ? hidePreview : undefined}
               className={[
                 "inline-flex h-[30px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition-colors",
                 isActive
