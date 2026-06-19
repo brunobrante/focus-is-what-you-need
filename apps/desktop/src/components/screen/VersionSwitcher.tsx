@@ -143,8 +143,14 @@ export function VersionSwitcher({
               role="tab"
               type="button"
               aria-selected={isActive}
-              // Selecting closes any open/pending hover preview.
-              onClick={() => { hidePreview(); onSelect(v.id); }}
+              // Selecting closes the open card immediately, then re-arms the dwell so the
+              // preview still reappears while the mouse keeps resting on the (now selected)
+              // chip — onMouseEnter won't re-fire on its own since the pointer never left.
+              onClick={(e) => {
+                hidePreview();
+                onSelect(v.id);
+                if (!main) schedulePreview(v, e.currentTarget);
+              }}
               // Only versions (never the main) get a hover preview of their screen.
               onMouseEnter={main ? undefined : (e) => schedulePreview(v, e.currentTarget)}
               onMouseLeave={main ? undefined : hidePreview}
