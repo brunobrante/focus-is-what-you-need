@@ -41,9 +41,14 @@ link, and the reason the database is a graph.
 4. **The master is owned where it was born.** If a button was created inside `Home`, its
    master is screen-scoped to `Home`. Versions of `Home` reference that master in place;
    it does not become global.
-5. **Reference everywhere, not just in versions.** Child components are instances in
-   *every* parent scene — the original screen and all its versions alike. This retires
-   the old embed-and-resync machinery (see §11).
+5. **Owned at the origin, referenced elsewhere.** A child component is **owned, editable
+   content** in the scene where it was created (its origin screen or parent component): it
+   renders normally there — blue selection, no purple lock — and is edited in place. It
+   becomes a **linked instance** only where it is *placed/linked elsewhere*, or when a
+   **linked version** (§7) collapses it into a reference. The origin keeps the embedded
+   subtree, kept in sync by content propagation (§11); only the *other* parents hold bare
+   instance nodes. (Opening the master's own origin screen must therefore never show its
+   children purple — that is a bug, not the model.)
 
 ---
 
@@ -250,16 +255,26 @@ extend the existing `ComponentPlacementRow` index, or scan scenes for nodes carr
 
 ---
 
-## 11. What This Retires
+## 11. Embed at the origin, instances elsewhere
 
-The current architecture **embeds** a child component's full subtree inline in the parent
-scene and keeps it in sync via `replaceComponentSubtreeInGraph` /
-`propagateSceneToParents` (`src/lib/storage/repos/scenes.repo.ts`). Once children are
-instances:
+A child component's full subtree is **embedded inline in its origin parent scene** (the
+screen or component where it was created) and kept in sync via
+`replaceComponentSubtreeInGraph` / `propagateSceneToParents`
+(`src/lib/storage/repos/scenes.repo.ts`). This embedded copy is exactly what makes the
+origin editable in place. Where the *same* component is **placed or linked elsewhere**
+(including inside a linked version, §7), that parent stores only a bare instance node and
+resolves the master at render time.
 
-- **Content propagation is removed** — there is no duplicated subtree to resync.
+- **Content propagation stays — but only for embedded subtrees.** Propagation explicitly
+  skips any parent node carrying `instanceOf` (`replaceComponentSubtreeInGraph` returns
+  early): an instance has no embedded subtree to resync.
 - **Thumbnail propagation stays** — a parent's preview is still a visual composition of
   its children, so ancestor thumbnails regenerate as before.
+
+> Earlier drafts of this doc claimed children were instances in *every* parent scene
+> (including the origin) and that content propagation was removed. That is **not** the
+> implemented model and contradicts §2.5 — the origin is owned, embedded, editable
+> content; only other placements are instances.
 
 ---
 
@@ -304,9 +319,10 @@ parallel; 5 depends on 4; 6 depends on 5; 7 depends on 1.
 
 - **Phase 0 — Data model + migration.** Add `instanceOf` to the live node models and
   (de)serialization. Unify screens onto the variant chain (`ownerType: "variant"`),
-  resetting local data. Remove the dead `componentRef`/`referencedBy`. Migrate existing
-  embedded subtrees into instance references (reuse the `sourceNodeId`/name matching from
-  propagation). Disable content propagation; keep thumbnail propagation.
+  resetting local data. Remove the dead `componentRef`/`referencedBy`. Keep the origin's
+  embedded subtree (it is the editable copy); a node becomes an `instanceOf` reference
+  only when placed/linked elsewhere or via a linked version (§7). Content propagation
+  stays for embedded subtrees and skips `instanceOf` nodes; thumbnail propagation stays.
 - **Phase 1 — Render resolution (read-only).** Write `resolveInstances`; plug into the
   engine adapter and the SVG thumbnail renderer. Cycle guard. Hit-testing selects the
   instance node; resolved children are non-editable. Purple selection outline.

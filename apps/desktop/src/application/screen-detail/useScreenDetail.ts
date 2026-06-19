@@ -98,6 +98,7 @@ export interface ScreenDetailState {
   removeLinkedReference: (referenceId: string) => void;
   requestDeleteComponent: (component: ComponentRow) => void;
   handleOpenCanvas: (variantId: string) => void;
+  handleOpenScreenCanvas: () => void;
   handleOpenVersionCanvas: (versionScreenId: string) => void;
   handleDeleteVersion: (versionScreenId: string, label: string) => void;
   handleScreenTitleSave: (title: string) => void;
@@ -276,6 +277,17 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     );
   };
 
+  // Opens the screen itself (its main variant) in the canvas's Current window — the
+  // canonical "edit this screen" entry, identical to the screen's primary Open in
+  // canvas. The main is NOT a version: it must never be routed through the Versions
+  // window like `handleOpenVersionCanvas` does.
+  const handleOpenScreenCanvas = () => {
+    if (!screen) return;
+    navigate(
+      `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}`,
+    );
+  };
+
   // Opens a specific version (variant) of the screen in the canvas's dedicated
   // "Versions" window — the Current window keeps showing the screen itself, so the
   // version is never rendered in Current. `versionVariant` activates and feeds the
@@ -375,6 +387,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     removeLinkedReference,
     requestDeleteComponent,
     handleOpenCanvas,
+    handleOpenScreenCanvas,
     handleOpenVersionCanvas,
     handleDeleteVersion,
     handleScreenTitleSave,

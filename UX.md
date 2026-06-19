@@ -359,6 +359,12 @@ Full-screen visual editor with floating UI layers.
   to the **main** subject's canvas in Current and focuses the Versions window on the
   clicked variant (URL carries `versionVariant=<variantId>` alongside the main
   `screen=`/`variant=`). The version is therefore never rendered in Current.
+- **The main card is not a version.** The Versions tab also lists the subject's **main**
+  (the original). Opening *it* in canvas goes straight to the subject in **Current** —
+  a screen opens via `screen=<id>`, a component via `variant=<mainVariantId>` — with **no**
+  `versionVariant` and **no** Versions window. Only `V1+` cards route through the Versions
+  window. (Previously the main card wrongly opened itself as a version in the Versions
+  window; that was a bug.)
 - When the selected subject has no real versions (only its main) the Version select
   shows "No versions" and the window shows a "No versions yet" empty state.
 

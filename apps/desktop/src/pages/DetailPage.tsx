@@ -65,7 +65,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
     versions, activeVersionId, setActiveVersionId, activeVersion, activeTpl, isPreviewingVersion,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, openNewComponent, addVersion,
-    removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
+    removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
 
@@ -241,7 +241,12 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
                           type={type}
                           allowMock={canUseFactoryMocks}
                           onSelect={() => setActiveVersionId(v.id)}
-                          onOpenCanvas={() => { if (v.variantId) handleOpenVersionCanvas(v.variantId); }}
+                          onOpenCanvas={() => {
+                            // The main is the screen itself, not a version — open it in
+                            // Current, never through the Versions window.
+                            if (v.tag === "main") handleOpenScreenCanvas();
+                            else if (v.variantId) handleOpenVersionCanvas(v.variantId);
+                          }}
                           onFastEdit={() => {}}
                           onDelete={() => { if (v.variantId) handleDeleteVersion(v.variantId, v.tag ?? v.title); }}
                         />
@@ -420,7 +425,11 @@ function ComponentContent({ componentId }: { componentId: string }) {
                       active={v.id === displayVariant?.id}
                       type={type}
                       onSelect={() => handleSelectVariant(v.id)}
-                      onOpenCanvas={() => handleOpenVersionCanvas(v.id)}
+                      onOpenCanvas={() =>
+                        // The main variant is the component itself, not a version —
+                        // open it in Current, never through the Versions window.
+                        v.order <= 0 ? handleOpenCanvas(v.id) : handleOpenVersionCanvas(v.id)
+                      }
                       onFastEdit={() => {}}
                       onDelete={() => handleDeleteVariant(v.id)}
                     />
