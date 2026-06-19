@@ -11,7 +11,7 @@ import type { CanvasReferencesContext } from "@/canvas/shell/CanvasReferencesWin
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementToParent, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
-import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
+import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { peekTable, TABLES } from "@/lib/storage/store";
 import type { SceneRow } from "@/lib/storage/schema";
 import type { CanvasToolId } from "@/canvas/tools";
@@ -26,45 +26,28 @@ import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
-import { useAllVariants, useScene, useVariant } from "@/lib/storage/hooks";
+import { useAllVariants, useScene } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
-import { createScreenVersion } from "@/lib/storage/repos/screens.repo";
-import { duplicateVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
 import { useMockScene } from "./hooks/useMockScene";
 import { useDeferredPersistence } from "./hooks/useDeferredPersistence";
-import { useVersionScenePersistence } from "./hooks/useVersionScenePersistence";
 import { useCanvasNavigation } from "./hooks/useCanvasNavigation";
-import { materializeVersionNodeAsComponent } from "./canvasMaterializer";
-import type { SubjectOwner } from "./hooks/useSubjectCanvasWindow";
+import { useCanvasWindows } from "./hooks/useCanvasWindows";
+import { useVersionsWindow } from "./hooks/useVersionsWindow";
 import {
-  DEFAULT_CANVAS_FEATURES,
-  addCanvasWindowToSplit,
-  addCurrentToSplit,
   buildProjectTree,
   canvasSizeForProjectType,
   computeComponentAncestorFrames,
-  type AncestorFrame,
   createBlankDocumentForProjectType,
-  DEFAULT_PREVIEW_SETTINGS,
-  enabledCanvasWindowTypes,
   findTreeNodeById,
   isCurrentKey,
   isFactoryMockGraphJSON,
-  MAX_CURRENT_WINDOWS,
   mockTargetKey,
-  normalizeCanvasSplitWindows,
   normalizeProjectType,
   shouldUseMockGraph,
-  windowTypeOfKey,
-  type CanvasFeatureFlags,
-  type CanvasFeatureWindowType,
-  type CanvasSplitWindows,
+  type AncestorFrame,
   type CanvasWindowKey,
-  type CanvasWindowType,
-  type PreviewSettings,
-  type SplitMode,
 } from "./canvasUtils";
 import { PreviewLauncher } from "./shell/PreviewLauncher";
 import { IconChevronLeft, IconPanelRight } from "@/components/icons";
@@ -135,33 +118,7 @@ function CanvasPageContent() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [treeOpen, setTreeOpen] = useState(true);
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
-  const [activeTab, setActiveTab] = useState<CanvasWindowKey>(
-    versionVariantParam ? "versions" : "current",
-  );
-  const [treeTab, setTreeTab] = useState<CanvasWindowKey>(
-    versionVariantParam ? "versions" : "current",
-  );
-  const [split, setSplit] = useState<SplitMode>("none");
-  const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "drafts"]);
-  // Extra "Current" windows (current-2, current-3…). Session-only: never persisted,
-  // gone on reload. Each mirrors a subject and gets its own editor/viewport via
-  // useSubjectCanvasWindow inside CanvasRender.
-  const [extraCurrents, setExtraCurrents] = useState<
-    Array<{ key: CanvasWindowKey; subject: SubjectOwner }>
-  >([]);
   const [canvasExpanded, setCanvasExpanded] = useState(false);
-  // The view-only Preview window, launched from above the Inspector. It is not a
-  // togglable feature nor a nav tab — `previewOpen` makes it available as a window.
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewSettings, setPreviewSettings] = useState<PreviewSettings>(DEFAULT_PREVIEW_SETTINGS);
-  const [canvasFeatures, setCanvasFeatures] = useState<CanvasFeatureFlags>(() => ({
-    ...DEFAULT_CANVAS_FEATURES,
-    // The references window is now a real, wired surface — make it reachable.
-    references: true,
-    // The Versions window is a persistent surface bound to the current subject's
-    // variants — always reachable, not gated on a URL param.
-    versions: true,
-  }));
   const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
   const [shellBackVisibility, setShellBackVisibility] = useState<ShellControlVisibility>("show");
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
@@ -169,14 +126,6 @@ function CanvasPageContent() {
   const [shellTabSignal, setShellTabSignal] = useState(0);
   const { settings } = useResolvedCanvasSettings(projectIdParam || null);
   const fontTokens = useProjectFontTokens(projectIdParam || null);
-  const enabledCanvasTabs = useMemo(
-    () => enabledCanvasWindowTypes(canvasFeatures, previewOpen),
-    [canvasFeatures, previewOpen],
-  );
-  const normalizedSplitWindows = useMemo(
-    () => normalizeCanvasSplitWindows(splitWindows, enabledCanvasTabs),
-    [enabledCanvasTabs, splitWindows],
-  );
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const editorPanning = useEditorBridge((v) => v?.state.panning ?? false);
@@ -297,177 +246,6 @@ function CanvasPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground, resolveMaster]);
 
-  // --- Versions window: a persistent second canvas, decoupled from Current. The user
-  // picks ANY screen or component (first dropdown) and then one of its versions (second
-  // dropdown), and the selected version renders as an editable surface — a clone of
-  // Current. The `versionVariant` URL param only pre-selects and focuses; the window is
-  // always there, never created on open.
-  const [versionsSubject, setVersionsSubject] = useState<{
-    id: string;
-    kind: "screen" | "component";
-  } | null>(null);
-  // Seed the versions subject from the current subject until the user picks another one.
-  useEffect(() => {
-    if (versionsSubject) return;
-    if (component) setVersionsSubject({ id: component.id, kind: "component" });
-    else if (screen) setVersionsSubject({ id: screen.id, kind: "screen" });
-  }, [component, screen, versionsSubject]);
-
-  // Every variant of the selected versions subject, main first. Filtered from the full
-  // variant table so the subject can roam the whole project, not just the open one.
-  const versionsSubjectVariants = useMemo(() => {
-    if (!versionsSubject) return [];
-    return allVariants
-      .filter((v) => v.ownerKind === versionsSubject.kind && v.ownerId === versionsSubject.id)
-      .slice()
-      .sort((a, b) => a.order - b.order);
-  }, [allVariants, versionsSubject]);
-
-  // The Versions window browses real versions (V1, V2…) — never the main, and never
-  // the variant already open in Current (that would mount two editors on one scene).
-  const currentVariantId = sceneOwner?.ownerId ?? null;
-  const availableVersions = useMemo(
-    () => versionsSubjectVariants.filter((v) => v.order > 0 && v.id !== currentVariantId),
-    [versionsSubjectVariants, currentVariantId],
-  );
-
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(versionVariantParam || null);
-  // Opening a version (URL param) selects it.
-  useEffect(() => {
-    if (versionVariantParam) setSelectedVersionId(versionVariantParam);
-  }, [versionVariantParam]);
-  // Keep the selection valid against the available versions (e.g. after switching the
-  // subject), defaulting to the first. Null when there are none → the window shows its
-  // empty state. `versionsSubjectVariants` always has the main once loaded, so an empty
-  // array means "still loading" — don't clobber a URL-selected version then.
-  useEffect(() => {
-    if (versionsSubjectVariants.length === 0) return;
-    // Keep the current selection when it is a real variant of the subject and not the one
-    // already open in Current (two editors on one scene). This lets the Versions window
-    // show a COMPONENT subject's own (main) variant — e.g. a detached copy opened inside
-    // the Versions window — not only screen versions (order > 0).
-    if (
-      selectedVersionId &&
-      versionsSubjectVariants.some((v) => v.id === selectedVersionId) &&
-      selectedVersionId !== currentVariantId
-    ) {
-      return;
-    }
-    setSelectedVersionId(availableVersions[0]?.id ?? null);
-  }, [versionsSubjectVariants, availableVersions, selectedVersionId, currentVariantId]);
-
-  const versionsVariants = useMemo(
-    () => availableVersions.map((v) => ({ id: v.id, label: variantVersionLabel(v) })),
-    [availableVersions],
-  );
-
-  // Back-stack for the Versions window: each time the user drills into a component
-  // inside it (e.g. opening a detached copy), the previous subject+version is pushed so
-  // the back button can return to the exact tree/version they came from. Independent of
-  // the structural-parent resolution, which can't reach a version variant.
-  const [versionsBackStack, setVersionsBackStack] = useState<
-    Array<{ id: string; kind: "screen" | "component"; versionId: string | null }>
-  >([]);
-  const pushVersionsHistory = useCallback(() => {
-    if (!versionsSubject) return;
-    setVersionsBackStack((stack) => [
-      ...stack,
-      { id: versionsSubject.id, kind: versionsSubject.kind, versionId: selectedVersionId },
-    ]);
-  }, [versionsSubject, selectedVersionId]);
-  // Manually picking a subject from the header dropdown is a fresh navigation — drop the
-  // drill-in history so the back button reflects the new path, not the old one.
-  const selectVersionsSubject = useCallback((node: { id: string; kind: "screen" | "component" }) => {
-    setVersionsBackStack([]);
-    setVersionsSubject({ id: node.id, kind: node.kind });
-  }, []);
-
-  const versionSceneOwner = selectedVersionId
-    ? { ownerType: "variant" as const, ownerId: selectedVersionId }
-    : null;
-  const { data: versionScene, loading: versionSceneLoading } = useScene(
-    versionSceneOwner?.ownerType ?? null,
-    versionSceneOwner?.ownerId ?? null,
-  );
-  const { data: selectedVersionRow } = useVariant(selectedVersionId);
-  const versionGraphJSON = versionScene?.graphJSON ?? null;
-  const versionsReady = !versionSceneOwner || !versionSceneLoading;
-  const versionsStorageKey = selectedVersionId
-    ? `desktop-canvas-editor:versions:${selectedVersionId}:v1`
-    : "desktop-canvas-editor:versions:none:v1";
-  const versionsResolveMaster = useMemo(
-    () => buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)),
-    [versionGraphJSON],
-  );
-  const versionsDocument = useMemo(() => {
-    if (!selectedVersionId) return undefined;
-    // Never fall back to a blank document: when the version's scene has not loaded yet
-    // (or failed to parse), returning undefined keeps the editor unmounted instead of
-    // seeding an empty scene that the persistence layer would write back, wiping the
-    // version. The editor mounts only once the real graph is present.
-    return (
-      canvasDocumentFromHtmlGraphJSON(versionGraphJSON, {
-        promoteSubjectRoot: true,
-        resolveMaster: versionsResolveMaster,
-      }) ?? undefined
-    );
-  }, [selectedVersionId, versionGraphJSON, versionsResolveMaster]);
-  const versionsCanvasName =
-    selectedVersionRow?.name || component?.name || screen?.title || projectName || "Version";
-  const { onChange: handleVersionsDocumentChange, flush: flushVersionsSave } =
-    useVersionScenePersistence({
-      variantId: selectedVersionId,
-      ready: versionsReady,
-      baseGraphJSON: versionGraphJSON,
-      canvasName: versionsCanvasName,
-    });
-
-  // Opening a version (URL param) focuses the Versions window.
-  useEffect(() => {
-    if (!versionVariantParam) return;
-    setActiveTab("versions");
-    setTreeTab("versions");
-  }, [versionVariantParam]);
-
-  // "Add version" from the Versions window: create a new version of the SELECTED versions
-  // subject (Linked/Copy chosen via the modal) and focus the Versions window. The new
-  // version appears in the dropdown; when it is the subject's first version it auto-shows.
-  const versionModeRef = useRef<VersionModeModalHandle>(null);
-  const handleAddVersion = useCallback(() => {
-    const subject = versionsSubject;
-    if (!subject) return;
-    versionModeRef.current?.open({
-      onSelect: async (mode) => {
-        if (subject.kind === "component") {
-          const mainId = versionsSubjectVariants.find((v) => v.order <= 0)?.id;
-          if (!mainId) return;
-          await duplicateVariant({
-            ownerKind: "component",
-            ownerId: subject.id,
-            sourceVariantId: mainId,
-            name: `Variant ${versionsSubjectVariants.length + 1}`,
-            mode,
-          });
-        } else {
-          await createScreenVersion({ screenId: subject.id, mode });
-        }
-        setActiveTab("versions");
-        setTreeTab("versions");
-      },
-    });
-  }, [versionsSubject, versionsSubjectVariants]);
-
-  useEffect(() => {
-    const editor = getEditor();
-    if (!editor) return;
-    const doc = editor.state.document;
-    if (doc.shellBackground === effectiveShellBackground) return;
-    editor.dispatch({
-      type: "commitDocument",
-      document: updateShellBackground(doc, effectiveShellBackground),
-    });
-  }, [effectiveShellBackground, getEditor]);
-
   const currentReady =
     (!sceneOwner || !sceneLoading) &&
     !entityLoading &&
@@ -513,68 +291,79 @@ function CanvasPageContent() {
     return null;
   }, [component, projectComponents, projectTree]);
 
-  // Parent of the VERSIONS subject (not the Current subject) — drives the Versions
-  // window's back footer, which re-points the versions subject to its parent instead of
-  // navigating the Current window. Screens are top-level, so they have no parent.
-  const versionsParentNode = useMemo<ProjectTreeNode | null>(() => {
-    if (!versionsSubject || versionsSubject.kind !== "component") return null;
-    const comp = projectComponents.find((c) => c.id === versionsSubject.id);
-    if (!comp) return null;
-    if (!comp.parentVariantId && comp.screenId) {
-      return projectTree.find((n) => n.id === comp.screenId) ?? null;
-    }
-    if (comp.parentVariantId) {
-      const parentComponent = projectComponents.find(
-        (c) => c.activeVariantId === comp.parentVariantId,
-      );
-      return parentComponent ? findTreeNodeById(projectTree, parentComponent.id) : null;
-    }
-    return null;
-  }, [versionsSubject, projectComponents, projectTree]);
+  const currentVariantId = sceneOwner?.ownerId ?? null;
 
-  const versionsSubjectSize = versionsDocument?.canvas;
+  const versionModeRef = useRef<VersionModeModalHandle>(null);
 
-  // The Versions header name, resolved from the rows (not the project tree): a detached
-  // copy is owned by a version variant and so isn't in the tree, but its name must still
-  // show ("…/Header" while editing the copy), matching the Current breadcrumb.
-  const versionsSubjectDisplayName = useMemo<string | undefined>(() => {
-    if (!versionsSubject) return undefined;
-    if (versionsSubject.kind === "component") {
-      return projectComponents.find((c) => c.id === versionsSubject.id)?.name;
-    }
-    return projectScreens.find((s) => s.id === versionsSubject.id)?.title;
-  }, [versionsSubject, projectComponents, projectScreens]);
+  const {
+    split,
+    splitWindows: normalizedSplitWindows,
+    activeTab,
+    treeTab,
+    extraCurrents,
+    previewOpen,
+    previewSettings,
+    setPreviewSettings,
+    canvasFeatures,
+    enabledCanvasTabs,
+    splitActive,
+    canAddCurrent,
+    changeCanvasTab,
+    focusVersionsTab,
+    handleAddCurrent,
+    removeExtraCurrent,
+    retargetExtraCurrent,
+    changeSplitMode,
+    changeSplitWindows,
+    updateCanvasFeature,
+    closePreview,
+    togglePreview,
+  } = useCanvasWindows({ versionVariantParam, sceneOwner });
 
-  // Back-button target for the Versions window. Prefer the drill-in history (so back
-  // returns to the exact screen+version the copy was opened from); fall back to the
-  // structural parent for the non-drilled case.
-  const versionsBackNode = useMemo<ProjectTreeNode | null>(() => {
-    const top = versionsBackStack[versionsBackStack.length - 1];
-    if (!top) return versionsParentNode;
-    if (top.kind === "screen") {
-      const s = projectScreens.find((x) => x.id === top.id);
-      return s ? { id: s.id, name: s.title, kind: "screen", children: [] } : versionsParentNode;
-    }
-    const c = projectComponents.find((x) => x.id === top.id);
-    return c ? { id: c.id, name: c.name, kind: "component", children: [] } : versionsParentNode;
-  }, [versionsBackStack, versionsParentNode, projectScreens, projectComponents]);
+  const {
+    versionsSubject,
+    setVersionsSubject,
+    selectedVersionId,
+    setSelectedVersionId,
+    versionsVariants,
+    versionsDocument,
+    versionsReady,
+    versionsStorageKey,
+    versionsSubjectSize,
+    versionsSubjectDisplayName,
+    versionsBackNode,
+    selectVersionsSubject,
+    goBackVersions,
+    handleAddVersion,
+    canOpenVersionNode,
+    openCanvasForVersionNode,
+    handleVersionsDocumentChange,
+  } = useVersionsWindow({
+    allVariants,
+    currentVariantId,
+    versionVariantParam,
+    component,
+    screen,
+    projectComponents,
+    projectScreens,
+    projectTree,
+    projectId,
+    projectName,
+    flushPendingSave,
+    versionModeRef,
+    onFocusVersionsTab: focusVersionsTab,
+  });
 
-  const goBackVersions = useCallback(() => {
-    setVersionsBackStack((stack) => {
-      const prev = stack[stack.length - 1];
-      if (!prev) {
-        // No drill-in history — fall back to the structural parent (e.g. a component
-        // nested inside another component), re-pointing the Versions subject to it.
-        if (versionsParentNode) {
-          setVersionsSubject({ id: versionsParentNode.id, kind: versionsParentNode.kind });
-        }
-        return stack;
-      }
-      setVersionsSubject({ id: prev.id, kind: prev.kind });
-      setSelectedVersionId(prev.versionId);
-      return stack.slice(0, -1);
+  useEffect(() => {
+    const editor = getEditor();
+    if (!editor) return;
+    const doc = editor.state.document;
+    if (doc.shellBackground === effectiveShellBackground) return;
+    editor.dispatch({
+      type: "commitDocument",
+      document: updateShellBackground(doc, effectiveShellBackground),
     });
-  }, [versionsParentNode]);
+  }, [effectiveShellBackground, getEditor]);
 
   // Subject (name + kind) shown in each Current tab's hover popover. The primary
   // Current reflects the open subject; each extra Current resolves its mirrored/
@@ -625,73 +414,6 @@ function CanvasPageContent() {
       projectType,
       flushPendingSave,
     });
-
-  // Versions window: a nested component row opens as a VERSION-OWNED copy — a versioned
-  // screen is a normal screen, so the copy is owned by the selected version's variant
-  // (independent of the master). Linked instances are excluded; they keep their own
-  // "go to component" link to the shared master's canonical location.
-  //
-  // These read the LIVE editor document (the same source the layers tree and detach use
-  // via getEditor()), not the persisted-derived `versionsDocument`. After a detach the
-  // node is unlinked in the live document immediately, but the persisted graph lags —
-  // reading the stale copy left the node looking like an instance, so the open icon never
-  // appeared and the materialize bailed out (it skips `instanceOf` nodes).
-  const canOpenVersionNode = useCallback(
-    (nodeId: string): boolean => {
-      const node = getEditor()?.state.document.elements[nodeId];
-      return Boolean(node && node.children.length > 0 && !node.instanceOf);
-    },
-    [getEditor],
-  );
-  const openCanvasForVersionNode = useCallback(
-    (nodeId: string) => {
-      if (!selectedVersionId) return;
-      const liveDocument = getEditor()?.state.document;
-      if (!liveDocument) return;
-      void (async () => {
-        await flushPendingSave();
-        // Clear the version editor's pending debounced save so it can't later write the
-        // pre-collapse document over our linked-instance collapse.
-        flushVersionsSave();
-        const created = await materializeVersionNodeAsComponent({
-          versionVariantId: selectedVersionId,
-          document: liveDocument,
-          versionGraphJSON,
-          canvasName: versionsCanvasName,
-          nodeId,
-          projectId: projectId || null,
-        });
-        if (created) {
-          // Open the detached copy IN THE VERSIONS window (not Current): it is a local
-          // component owned by this version, so the Versions canvas navigates to it like
-          // Current would for one of its own components. Remember where we came from (for
-          // the back button), then point the Versions subject at the copy and show its own
-          // (main) variant scene; stay on the Versions tab.
-          pushVersionsHistory();
-          setVersionsSubject({ id: created.id, kind: "component" });
-          setSelectedVersionId(created.activeVariantId);
-        }
-      })();
-    },
-    [
-      selectedVersionId,
-      getEditor,
-      versionGraphJSON,
-      versionsCanvasName,
-      flushPendingSave,
-      flushVersionsSave,
-      projectId,
-      pushVersionsHistory,
-    ],
-  );
-
-  // Re-point an extra Current at a different subject (independent navigation). Used by
-  // the layers-tree header subject select when that Current is the focused tree tab.
-  const retargetExtraCurrent = useCallback((key: CanvasWindowKey, subject: SubjectOwner) => {
-    setExtraCurrents((list) =>
-      list.map((entry) => (entry.key === key ? { ...entry, subject } : entry)),
-    );
-  }, []);
 
   // Picking a project node from the layers-tree header: re-point the focused extra
   // Current at that subject (its main/active variant scene), or navigate the primary
@@ -852,35 +574,6 @@ function CanvasPageContent() {
     if (parentProjectNode) openProjectNodeCanvas(parentProjectNode);
   }, [flushPendingSave, fromParam, navigateToOwnerToken, parentProjectNode, openProjectNodeCanvas]);
 
-  // A window key is still reachable if it's any Current instance (Current keys are
-  // always valid while they exist) or an enabled feature window.
-  const isTabKeyEnabled = useCallback(
-    (key: CanvasWindowKey) => isCurrentKey(key) || enabledCanvasTabs.includes(windowTypeOfKey(key)),
-    [enabledCanvasTabs],
-  );
-
-  useEffect(() => {
-    if (!isTabKeyEnabled(activeTab)) setActiveTab("current");
-    if (!isTabKeyEnabled(treeTab)) setTreeTab("current");
-    setSplitWindows((current) => normalizeCanvasSplitWindows(current, enabledCanvasTabs));
-    if (split !== "none" && (enabledCanvasTabs.length < 2 || normalizedSplitWindows.length < 2)) {
-      setSplit("none");
-    } else if (split === "grid" && normalizedSplitWindows.length < 3) {
-      setSplit("vertical");
-    }
-  }, [activeTab, enabledCanvasTabs, isTabKeyEnabled, normalizedSplitWindows.length, split, treeTab]);
-
-  const changeCanvasTab = useCallback((tab: CanvasWindowKey) => {
-    const nextTab = isTabKeyEnabled(tab) ? tab : "current";
-    setActiveTab(nextTab);
-    setTreeTab(nextTab);
-    // Extra Current keys are managed alongside their session state, never added to the
-    // split here; only feature windows get pulled into the split on selection.
-    if (split !== "none" && !isCurrentKey(nextTab) && enabledCanvasTabs.length >= 2) {
-      setSplitWindows((current) => addCanvasWindowToSplit(current, enabledCanvasTabs, nextTab));
-    }
-  }, [enabledCanvasTabs, isTabKeyEnabled, split]);
-
   // Opens the master variant a linked instance points to as the Current subject.
   // Shared by the layers tree and the Inspector's read-only banner.
   const goToInstanceMaster = useCallback(
@@ -902,93 +595,6 @@ function CanvasPageContent() {
     [flushPendingSave, changeCanvasTab, variantParam, screenParam, navigate, projectId, projectType],
   );
 
-  // ── Extra Current windows ─────────────────────────────────────────────────────
-  // Add a new Current that mirrors the primary Current's subject, then focus it. The
-  // primary's scene owner is always a variant in this codebase, so mirroring is a
-  // straight copy of sceneOwner.
-  const handleAddCurrent = useCallback(() => {
-    if (!sceneOwner || sceneOwner.ownerType !== "variant") return;
-    const { windows, key } = addCurrentToSplit(splitWindows, enabledCanvasTabs);
-    if (!key) return;
-    const mirrored: SubjectOwner = { ownerType: "variant", ownerId: sceneOwner.ownerId };
-    setExtraCurrents((list) =>
-      list.some((entry) => entry.key === key) ? list : [...list, { key, subject: mirrored }],
-    );
-    setSplitWindows(windows);
-    setSplit((mode) => (mode === "none" ? "vertical" : mode));
-    setActiveTab(key);
-    setTreeTab(key);
-  }, [enabledCanvasTabs, sceneOwner, splitWindows]);
-
-  const removeExtraCurrent = useCallback((key: CanvasWindowKey) => {
-    setExtraCurrents((list) => list.filter((entry) => entry.key !== key));
-    setSplitWindows((current) => current.filter((windowKey) => windowKey !== key));
-    // Collapse to a single canvas when only the primary Current would remain.
-    if (splitWindows.filter((windowKey) => windowKey !== key && windowKey !== "preview").length < 2) {
-      setSplit("none");
-    }
-    setActiveTab((tab) => (tab === key ? "current" : tab));
-    setTreeTab((tab) => (tab === key ? "current" : tab));
-  }, [splitWindows]);
-
-  const canAddCurrent =
-    Boolean(sceneOwner && sceneOwner.ownerType === "variant") &&
-    extraCurrents.length + 1 < MAX_CURRENT_WINDOWS &&
-    normalizedSplitWindows.length < MAX_CURRENT_WINDOWS;
-
-  const changeSplitMode = useCallback((mode: SplitMode) => {
-    if (mode !== "none" && enabledCanvasTabs.length < 2) {
-      setSplit("none");
-      return;
-    }
-    const nextMode =
-      mode === "grid" && normalizedSplitWindows.length < 3
-        ? "vertical"
-        : mode;
-    setSplit(nextMode);
-    if (mode !== "none") {
-      setSplitWindows((current) => normalizeCanvasSplitWindows(current, enabledCanvasTabs));
-    }
-  }, [enabledCanvasTabs, normalizedSplitWindows.length]);
-
-  const changeSplitWindows = useCallback((windows: readonly CanvasWindowKey[]) => {
-    setSplitWindows(normalizeCanvasSplitWindows(windows, enabledCanvasTabs));
-  }, [enabledCanvasTabs]);
-
-  const updateCanvasFeature = useCallback((feature: CanvasFeatureWindowType, enabled: boolean) => {
-    setCanvasFeatures((current) => {
-      if (current[feature] === enabled) return current;
-      return { ...current, [feature]: enabled };
-    });
-  }, []);
-
-  // Opening the Preview shows it alongside Current. From a single canvas it opens a
-  // vertical [Current, Preview] split; from an existing split it is added as a pane.
-  const openPreview = useCallback(() => {
-    setPreviewOpen(true);
-    if (split === "none") {
-      setSplitWindows(["current", "preview"]);
-      setSplit("vertical");
-      return;
-    }
-    const enabledWithPreview = enabledCanvasWindowTypes(canvasFeatures, true);
-    setSplitWindows((current) => addCanvasWindowToSplit(current, enabledWithPreview, "preview"));
-  }, [split, canvasFeatures]);
-
-  // Closing removes the Preview pane; if it was the only secondary pane, collapse
-  // back to a single Current canvas.
-  const closePreview = useCallback(() => {
-    setPreviewOpen(false);
-    setSplitWindows((current) => current.filter((windowType) => windowType !== "preview"));
-    if (splitWindows.filter((windowType) => windowType !== "preview").length < 2) {
-      setSplit("none");
-    }
-  }, [splitWindows]);
-
-  const togglePreview = useCallback(() => {
-    if (previewOpen) closePreview();
-    else openPreview();
-  }, [previewOpen, openPreview, closePreview]);
   // The references window shows references attached to the subject currently
   // open in the canvas (a component takes precedence over its screen). Null when
   // there is no concrete subject (e.g. a detached scene).
@@ -1017,7 +623,6 @@ function CanvasPageContent() {
     return null;
   }, [projectId, component, screen, projectScreens, projectComponents]);
 
-  const splitActive = split !== "none";
   const selectedSubjectSize = component
     ? currentDocument.canvas
     : canvasSizeForProjectType(projectType);

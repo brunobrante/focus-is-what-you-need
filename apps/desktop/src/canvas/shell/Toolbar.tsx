@@ -15,6 +15,7 @@ import type { ProjectType } from "@/lib/data/types";
 import { ZoomControl, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { ZoomLimits } from "@/canvas/engine/viewport";
 import { ActionsPanel } from "./actions/ActionsPanel";
+import type { ComponentPickerContext } from "./actions/ComponentPicker";
 export type { ComponentPickerContext } from "./actions/ComponentPicker";
 
 type ToolbarParentTarget = {
