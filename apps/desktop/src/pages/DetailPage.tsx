@@ -188,6 +188,7 @@ function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string
           <VersionSwitcher
             versions={versions}
             activeId={activeVersionId}
+            type={type}
             onSelect={setActiveVersionId}
             onAdd={addVersion}
             onCompare={() => compareRef.current?.open()}
