@@ -13,6 +13,23 @@ import { TABLES, listTable, notify, putRecord } from "@/lib/storage/store";
 
 const KEY = TABLES.scenes;
 
+/**
+ * Intrinsic size of a variant's frame (its root bounds) read from the stored
+ * scene. Used to size a linked instance placed onto another scene. Returns null
+ * when no scene exists yet (e.g. a just-created copy) so the caller can fall
+ * back to a default.
+ */
+export async function getVariantFrameSize(
+  variantId: string,
+): Promise<{ width: number; height: number } | null> {
+  const scene = await getSceneByOwner("variant", variantId);
+  const doc = htmlCanvasDocumentFromJSON(scene?.graphJSON ?? null);
+  if (!doc) return null;
+  const root = doc.nodes.find((node) => node.id === doc.rootId);
+  if (!root) return null;
+  return { width: root.bounds.width, height: root.bounds.height };
+}
+
 /** The lowest-order ("main") variant id owned by a screen — the embedding scene. */
 export function mainVariantIdForScreen(
   variants: VariantRow[],

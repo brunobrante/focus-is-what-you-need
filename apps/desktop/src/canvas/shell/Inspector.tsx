@@ -99,16 +99,15 @@ export function Inspector({
   const sourceId = editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId;
   const sourceLabel = windowKeyLabel(sourceId ?? "current");
   const node = document && selectedId ? document.elements[selectedId] ?? null : null;
-  // Linked instances are read-only (Versioning.md §2). The fields stay visible but
-  // locked; detaching is the only way to edit:
-  //   • any element INSIDE an instance (a descendant) is locked in every window — it
-  //     mirrors the canvas, where instance children get a purple outline and no handles;
-  //   • the instance ROOT itself is locked only in the Versions window (in Current it can
-  //     still be moved/resized/detached as a whole, §3.2).
+  // Linked instances are read-only in the inspector (Versioning.md §2). The fields stay
+  // visible but locked; detaching or "go to component" is the only way to edit. This
+  // holds for both an instance ROOT and any element INSIDE it (a descendant), in every
+  // window — a placed/global linked component reads the same read-only way it does in
+  // the Versions window. The root can still be moved/resized/detached as a whole on the
+  // canvas (its node is not locked); only its editable *properties* are gated here.
   const instanceRootId = document ? getInstanceRootId(document, selectedId) : null;
   const isInstanceDescendant = instanceRootId != null && instanceRootId !== selectedId;
-  const elementLocked =
-    isInstanceDescendant || (sourceId === "versions" && node?.instanceOf != null);
+  const elementLocked = isInstanceDescendant || node?.instanceOf != null;
   // The master variant to open from the banner link — the root's link (works whether the
   // root itself or one of its descendants is selected).
   const lockedInstanceVariantId = instanceRootId

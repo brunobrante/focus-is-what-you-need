@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { getCommonParentId, getParentBounds, roundPixel } from "@/canvas/engine/geometry";
+import { getCommonParentId, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget } from "@/canvas/engine/hitTesting";
 import type { ElementFontTokens, EditorState, Point, Rect } from "@/canvas/engine/types";
 import { isInsertTool, isSelectionTool } from "@/canvas/engine/types";
@@ -254,7 +254,11 @@ export function useCanvasPointerEvents({
       return;
     }
 
-    const targetId = initialTargetId;
+    // If the click landed inside a linked instance, treat the instance root as the
+    // target — instances are read-only units and must move as a whole.
+    const targetId = initialTargetId && isInsideInstance(state.document, initialTargetId)
+      ? (getInstanceRootId(state.document, initialTargetId) ?? initialTargetId)
+      : initialTargetId;
     if (!targetId) {
       dispatch({ type: "setSelected", selectedIds: [] });
       interactionRef.current = { type: "marquee", pointerId: event.pointerId, startPoint: point, currentPoint: point, moved: false };
@@ -265,7 +269,7 @@ export function useCanvasPointerEvents({
     }
 
     let effectiveTargetId = targetId;
-    if (!state.isolatedParentId && !event.shiftKey && state.selectedIds.length === 1 && state.selectedIds[0] === targetId && state.document.elements[targetId]?.children.length) {
+    if (!state.isolatedParentId && !event.shiftKey && state.selectedIds.length === 1 && state.selectedIds[0] === targetId && state.document.elements[targetId]?.children.length && !state.document.elements[targetId]?.instanceOf) {
       const child = findChildAtPoint(state.document, targetId, point);
       if (child) effectiveTargetId = child;
     }

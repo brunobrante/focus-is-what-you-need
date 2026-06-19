@@ -3,6 +3,7 @@ import {
   createComponent,
   findComponentByName,
   findComponentBySourceNode,
+  markComponentsLinkable,
   updateComponent,
 } from "@/lib/storage/repos/components.repo";
 import { linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
@@ -231,6 +232,9 @@ export async function materializeVersionNodeAsComponent(input: {
       { ownerType: "variant", ownerId: input.versionVariantId, graphJSON: linked },
       { propagate: false },
     );
+    // The copy is now referenced as a linked instance inside the version —
+    // expose it to the canvas "Add components" picker.
+    await markComponentsLinkable([component.id]);
   }
 
   return component;

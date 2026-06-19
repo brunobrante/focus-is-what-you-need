@@ -134,6 +134,11 @@ Resolved subtrees are tagged as read-only and belonging to the instance.
   resolved child (hit-testing in `src/canvas/stage/canvasHitTesting.ts`).
 - The instance node itself can be moved, deleted, or detached as a whole. Its internal
   contents cannot be edited, dragged, or restyled.
+- The **inspector** treats a selected instance (root or descendant) as **read-only in every
+  window** — including the Current window for a placed/global linked component — so the
+  property fields visibly indicate it cannot be edited, exactly as in the Versions window
+  (`elementLocked` in `src/canvas/shell/Inspector.tsx`). Moving/resizing the root as a whole
+  is still done on the canvas (its node is not locked).
 - To edit the contents for everyone: **go to the master** (§6). To diverge only here:
   **detach** (§8).
 
@@ -169,6 +174,36 @@ and component versions. `addVariant` (component detail) calls it with
 `ownerKind: "component"`; `createScreenVersion` (`screens.repo.ts`) calls it with
 `ownerKind: "screen"`, duplicating from the screen's main variant. Both open the
 "Linked or Copy" modal before calling it.
+
+---
+
+## 7b. Linkable Components
+
+A component is **linkable** when it may be picked from the canvas toolbar's
+**Actions → All → Add components** picker to drop a linked instance onto another scene.
+`ComponentRow.linkable` (`src/lib/storage/schema.ts`) carries this; it is **derived with no
+migration** — `normalizeComponentRow` (`defaults.ts`) backfills `linkable` to true whenever
+`componentScope(row)` is `"project"` or `"workspace"`.
+
+Linkability is set automatically:
+
+- **On creation** — `createComponent` marks `linkable: true` for `project` and `workspace`
+  parents (global components).
+- **On linked-version creation** — when `duplicateVariant(mode: "linked")` or
+  `materializeVersionNodeAsComponent` collapses child components into linked instances,
+  those child masters are flipped via `markComponentsLinkable(ids)` (`components.repo.ts`),
+  so they too become pickable.
+
+The picker lists only linkable components reachable from the current project —
+`listLinkableComponents({ projectId, workspaceId })` returns the project's project-global
+components plus its workspace's workspace-global components. Selecting one builds a bare
+instance node (`buildLinkedInstanceNode`, `canvas/engine/mutations/`) sized from the
+master's frame (`getVariantFrameSize`, `scenes.repo.ts`), inserts it via `insertElement`,
+and commits — rendering with the standard purple, read-only instance treatment.
+
+> Linkage is intentionally minimal for now (owner = "main" + `assignedScreenIds`). A richer
+> link graph (which projects/workspaces a component is linked into) is a planned structural
+> follow-up.
 
 ---
 

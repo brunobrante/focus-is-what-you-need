@@ -373,6 +373,10 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       const radiusEligible = Boolean(
         radiusElement &&
           !radiusElement.locked &&
+          // A linked instance is read-only — its radius is owned by the master.
+          // The root stays unlocked (so it can be moved as a whole), so guard on
+          // instanceOf explicitly to drop the radius handles and their drag.
+          !radiusElement.instanceOf &&
           getElementDefinition(radiusElement.type).capabilities.radius,
       );
       const radiusElementHovered = Boolean(

@@ -17,6 +17,7 @@ import { Snapshot } from "@/components/Snapshot";
 import { AddCard } from "@/components/screen/AddCard";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
+import { CardSourceIcon, scopeOf } from "@/components/component/componentSource";
 import { VersionSideCard, PreviewMockImage, VersionTagBadge } from "@/components/screen/VersionSideCard";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { FastEditModal } from "@/components/screen/FastEditModal";
@@ -681,6 +682,10 @@ function ChildCard({
     <Link to={href} className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5">
       <div className={["preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border p-4 transition-colors", linked ? "border-[#9b6dff] group-hover:border-[#b69cff]" : "border-[var(--border)] group-hover:border-[var(--border-strong)]"].join(" ")}>
         {variant ? <Snapshot kind="component" ownerType="variant" ownerId={variant.id} seedKey={variant.seedKey} type={type} display="card" /> : null}
+        <CardSourceIcon
+          scope={linked ? "screen" : scopeOf(component)}
+          className={linked ? "border-[#9b6dff] text-[#c9b3ff]" : undefined}
+        />
         <CardMenu
           buttons={[
             { key: "open", label: "Open component", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
@@ -691,7 +696,7 @@ function ChildCard({
       </div>
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">{component.name}</span>
+          <span className={["min-w-0 flex-1 truncate text-[13px] font-medium", linked ? "text-[#c9b3ff]" : "text-[var(--text)]"].join(" ")}>{component.name}</span>
           {linked ? (
             <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[#c9b3ff]">linked</span>
           ) : component.kind ? (

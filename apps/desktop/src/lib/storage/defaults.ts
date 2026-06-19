@@ -53,6 +53,7 @@ export function normalizeProjectRow(row: ProjectRow): ProjectRow {
 }
 
 export function normalizeComponentRow(row: ComponentRow): ComponentRow {
+  const scope = componentScope(row);
   return {
     ...row,
     workspaceId: row.workspaceId ?? null,
@@ -61,6 +62,9 @@ export function normalizeComponentRow(row: ComponentRow): ComponentRow {
     description: row.description ?? null,
     assignedScreenIds: Array.isArray(row.assignedScreenIds) ? row.assignedScreenIds : [],
     sourceNodeId: row.sourceNodeId ?? null,
+    // Project/workspace-global components are linkable by default; existing rows
+    // need no migration. An explicit `linkable: false` is preserved.
+    linkable: row.linkable ?? (scope === "project" || scope === "workspace"),
   };
 }
 

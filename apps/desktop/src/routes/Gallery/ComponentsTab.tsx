@@ -15,6 +15,7 @@ import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
 import { CardMenuIcons as SharedCardMenuIcons } from "@/components/screen/CardMenu";
 import { Snapshot } from "@/components/Snapshot";
 import { Badge } from "@/components/ui/badge";
+import { scopeOf, sourceScopeIcon, SOURCE_SCOPE_LABEL } from "@/components/component/componentSource";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import { updateComponent } from "@/lib/storage/repos/components.repo";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
@@ -23,7 +24,6 @@ import {
   IconDiamond,
   IconFastEdit,
   IconFolder,
-  IconGlobe,
   IconOpenCanvas,
   IconPhone,
   IconPlus,
@@ -72,6 +72,7 @@ export function ComponentsTab({
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [screenFilter, setScreenFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
   const [createSectionRequest, setCreateSectionRequest] = useState(0);
   const [screenAssignmentComponent, setScreenAssignmentComponent] = useState<ComponentRow | null>(null);
@@ -87,11 +88,13 @@ export function ComponentsTab({
         screenFilter === "all" ||
         component.screenId === screenFilter ||
         component.assignedScreenIds.includes(screenFilter);
+      const matchesSource =
+        sourceFilter === "all" || scopeOf(component) === sourceFilter;
       const matchesSection =
         sectionFilter === "all" || (sectionById[component.id] ?? "unassigned") === sectionFilter;
-      return matchesKind && matchesQuery && matchesScreen && matchesSection;
+      return matchesKind && matchesQuery && matchesScreen && matchesSource && matchesSection;
     });
-  }, [components, filter, query, screenFilter, sectionById, sectionFilter]);
+  }, [components, filter, query, screenFilter, sourceFilter, sectionById, sectionFilter]);
 
   return (
     <>
@@ -114,6 +117,14 @@ export function ComponentsTab({
           screenOptions={[
             { value: "all", label: "All screens" },
             ...screens.map((screen) => ({ value: screen.id, label: screen.title })),
+          ]}
+          sourceFilter={sourceFilter}
+          onSourceFilterChange={setSourceFilter}
+          sourceOptions={[
+            { value: "all", label: "All sources" },
+            { value: "workspace", label: "Workspace" },
+            { value: "project", label: "Project" },
+            { value: "screen", label: "Screen" },
           ]}
           sectionFilter={sectionFilter}
           onSectionFilterChange={setSectionFilter}
@@ -361,6 +372,7 @@ function ComponentCard({
             display="card"
           />
         ) : null}
+        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} />
         <CardMenu
           actions={[
             { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
@@ -401,7 +413,6 @@ function ComponentCard({
           </span>
           {component.kind ? <KindPill kind={component.kind} /> : null}
         </div>
-        <CmpSource component={component} screens={screens} projectId={projectId} />
       </div>
     </Link>
   );
@@ -566,7 +577,7 @@ function ComponentListRow({
       </div>
 
       <div className="hidden shrink-0 xl:block">
-        <CmpSource component={component} screens={screens} projectId={projectId} />
+        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} inline />
       </div>
     </Link>
   );
@@ -671,75 +682,44 @@ function ComponentScreensModal({
   );
 }
 
-function CmpSource({
+/**
+ * Source indicator pinned to a component card. Shows the owner-scope icon
+ * (screen / project / workspace / nested) and, on hover, a small menu listing
+ * where the component lives: the owner ("Main") plus any linked screens. The
+ * menu is structured so project/workspace link rows can be added once the link
+ * graph exists.
+ */
+function ComponentSourceBadge({
   component,
   screens,
   projectId,
+  inline = false,
 }: {
   component: ComponentRow;
   screens: ScreenRow[];
   projectId: string;
+  inline?: boolean;
 }) {
   const navigate = useNavigate();
-  const sourceScreens = getComponentSourceScreens(component, screens);
-  const primaryScreen = sourceScreens[0] ?? null;
-  const extraScreens = sourceScreens.slice(1);
-  const title = sourceScreens.length > 0
-    ? sourceScreens.map((screen) => screen.title).join(", ")
-    : "Global";
-  const openScreen = (event: MouseEvent, screen: ScreenRow) => {
-    event.preventDefault();
-    event.stopPropagation();
-    navigate(`/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`);
-  };
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
-      <span className="group/source relative inline-flex min-w-0 items-center gap-1.5" title={title}>
-        {primaryScreen ? <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" /> : <IconGlobe size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />}
-        <span className="min-w-0 truncate">
-          {primaryScreen ? (
-            <>
-              em{" "}
-              <button
-                type="button"
-                onClick={(event) => openScreen(event, primaryScreen)}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[11.5px] font-medium text-[var(--text)] underline-offset-2 hover:underline"
-              >
-                {primaryScreen.title}
-              </button>
-            </>
-          ) : (
-            "Global"
-          )}
-        </span>
-        {extraScreens.length > 0 ? (
-          <ScreenLinksBadge
-            screens={extraScreens}
-            onOpenScreen={openScreen}
-          />
-        ) : null}
-      </span>
-      {component.category ? (
-        <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.35px] text-[var(--text-faint)]">
-          {component.category}
-        </span>
-      ) : null}
-    </div>
+  const scope = scopeOf(component);
+  const mainScreen = component.screenId
+    ? screens.find((s) => s.id === component.screenId) ?? null
+    : null;
+  const linkedScreens = screens.filter(
+    (s) => component.assignedScreenIds.includes(s.id) && s.id !== component.screenId,
   );
-}
+  const mainLabel =
+    scope === "screen"
+      ? mainScreen?.title ?? "Screen"
+      : scope === "workspace"
+        ? "Workspace"
+        : scope === "nested"
+          ? "Parent component"
+          : "This project";
 
-function ScreenLinksBadge({
-  screens,
-  onOpenScreen,
-}: {
-  screens: ScreenRow[];
-  onOpenScreen: (event: MouseEvent, screen: ScreenRow) => void;
-}) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const closeTimerRef = useRef<number | null>(null);
-
   const cancelClose = () => {
     if (closeTimerRef.current == null) return;
     window.clearTimeout(closeTimerRef.current);
@@ -749,58 +729,85 @@ function ScreenLinksBadge({
     cancelClose();
     closeTimerRef.current = window.setTimeout(() => setOpen(false), 90);
   };
+  useEffect(() => () => cancelClose(), []);
 
-  useEffect(() => {
-    return () => cancelClose();
-  }, []);
+  const openScreen = (event: MouseEvent, screen: ScreenRow) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setOpen(false);
+    navigate(`/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`);
+  };
 
   return (
     <>
-      <span
-        className="flex-shrink-0"
+      <button
+        type="button"
+        aria-label={`Source: ${SOURCE_SCOPE_LABEL[scope]}`}
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}
         onMouseEnter={(event) => {
           cancelClose();
           const rect = event.currentTarget.getBoundingClientRect();
-          const width = 190;
+          const width = 200;
           setPosition({
             top: rect.bottom + 6,
-            left: Math.min(window.innerWidth - width - 8, Math.max(8, rect.left)),
+            left: Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width)),
           });
           setOpen(true);
         }}
         onMouseLeave={scheduleClose}
+        className={[
+          "z-[2] grid h-[22px] w-[22px] place-items-center rounded-md border border-[var(--border)] bg-[rgba(20,20,20,0.85)] text-[var(--text-muted)] backdrop-blur-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+          inline ? "" : "absolute right-2 top-2 cursor-default",
+        ].join(" ")}
       >
-        <Badge
-          variant="outline"
-          className="h-[18px] cursor-default border-[var(--border)] px-1.5 text-[10px] font-medium leading-none text-[var(--text-faint)]"
-        >
-          +{screens.length}
-        </Badge>
-      </span>
+        {sourceScopeIcon(scope, { size: 11, strokeWidth: 1.7 })}
+      </button>
       {open && position ? createPortal(
         <div
-          className="fixed z-[120] min-w-[160px] max-w-[240px] rounded-lg border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)]"
+          className="fixed z-[120] min-w-[180px] max-w-[260px] rounded-lg border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)]"
           style={{ top: position.top, left: position.left }}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
+          onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}
         >
-          {screens.map((screen) => (
+          <div className="px-2 pb-1 pt-0.5 text-[9.5px] font-medium uppercase tracking-[0.4px] text-[var(--text-faint)]">
+            Source
+          </div>
+          {mainScreen ? (
             <button
-              key={screen.id}
               type="button"
-              onClick={(event) => {
-                setOpen(false);
-                onOpenScreen(event, screen);
-              }}
-              className="block w-full cursor-pointer truncate rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-[11.5px] font-medium text-[var(--text-muted)] underline-offset-2 hover:bg-[var(--surface-hover)] hover:text-[var(--text)] hover:underline"
+              onClick={(event) => openScreen(event, mainScreen)}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-[11.5px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
             >
-              {screen.title}
+              {sourceScopeIcon(scope, { size: 11, strokeWidth: 1.7, className: "flex-shrink-0" })}
+              <span className="min-w-0 flex-1 truncate">{mainLabel}</span>
+              <MainTag />
             </button>
-          ))}
+          ) : (
+            <div className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)]">
+              {sourceScopeIcon(scope, { size: 11, strokeWidth: 1.7, className: "flex-shrink-0" })}
+              <span className="min-w-0 flex-1 truncate">{mainLabel}</span>
+              <MainTag />
+            </div>
+          )}
+          {linkedScreens.length > 0 ? (
+            <>
+              <div className="mt-1 px-2 pb-1 pt-1 text-[9.5px] font-medium uppercase tracking-[0.4px] text-[var(--text-faint)]">
+                Linked screens
+              </div>
+              {linkedScreens.map((screen) => (
+                <button
+                  key={screen.id}
+                  type="button"
+                  onClick={(event) => openScreen(event, screen)}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-[11.5px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+                >
+                  <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{screen.title}</span>
+                </button>
+              ))}
+            </>
+          ) : null}
         </div>,
         document.body,
       ) : null}
@@ -808,11 +815,12 @@ function ScreenLinksBadge({
   );
 }
 
-function getComponentSourceScreens(component: ComponentRow, screens: ScreenRow[]): ScreenRow[] {
-  const ids = new Set<string>();
-  if (component.screenId) ids.add(component.screenId);
-  component.assignedScreenIds.forEach((id) => ids.add(id));
-  return screens.filter((screen) => ids.has(screen.id));
+function MainTag() {
+  return (
+    <span className="flex-shrink-0 rounded border border-[var(--border)] px-1 py-px text-[8.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+      Main
+    </span>
+  );
 }
 
 function KindPill({ kind }: { kind: ComponentKind | null }) {
@@ -833,6 +841,9 @@ function ComponentSearchBar({
   screenFilter,
   onScreenFilterChange,
   screenOptions,
+  sourceFilter,
+  onSourceFilterChange,
+  sourceOptions,
   sectionFilter,
   onSectionFilterChange,
   sectionOptions,
@@ -845,6 +856,9 @@ function ComponentSearchBar({
   screenFilter: string;
   onScreenFilterChange: (v: string) => void;
   screenOptions: CmpChipOption[];
+  sourceFilter: string;
+  onSourceFilterChange: (v: string) => void;
+  sourceOptions: CmpChipOption[];
   sectionFilter: string;
   onSectionFilterChange: (v: string) => void;
   sectionOptions: CmpChipOption[];
@@ -852,6 +866,7 @@ function ComponentSearchBar({
   const activeCount =
     (typeFilter !== "all" ? 1 : 0) +
     (screenFilter !== "all" ? 1 : 0) +
+    (sourceFilter !== "all" ? 1 : 0) +
     (sectionFilter !== "all" ? 1 : 0);
 
   return (
@@ -868,6 +883,7 @@ function ComponentSearchBar({
       </label>
       <FilterButton activeCount={activeCount}>
         <FilterSection title="Type" options={typeOptions} value={typeFilter} onChange={onTypeFilterChange} />
+        <FilterSection title="Source" options={sourceOptions} value={sourceFilter} onChange={onSourceFilterChange} />
         <FilterSection title="Screen" options={screenOptions} value={screenFilter} onChange={onScreenFilterChange} />
         {sectionOptions.length > 2 && (
           <FilterSection title="Section" options={sectionOptions} value={sectionFilter} onChange={onSectionFilterChange} />

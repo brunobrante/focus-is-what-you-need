@@ -172,7 +172,15 @@ the project's own tokens shown together — see section 8a.
 **ComponentMock** (card):
 - Component snapshot preview
 - Component name + kind badge
+- **Source icon** pinned to the preview's upper-right corner, indicating the
+  component's owner scope: a **screen** icon (screen-owned), a **folder** icon
+  (project-global), a **grid** icon (workspace-global), or a **diamond** icon
+  (nested). Hovering it opens a small menu listing where the component lives —
+  the owner row tagged **Main**, plus any linked screens (clickable to open the
+  screen). (The old "Global"/"em {screen}" text line beneath the name is gone.)
 - On hover: CardMenu with actions
+- The **Source** filter (in the filter dropdown) narrows the grid by owner scope
+  (All / Workspace / Project / Screen), alongside the Type / Screen / Section filters.
 
 **References tab card** (`ReferenceProjectCard`):
 - 4:3 image preview only (no caption beneath); on hover, an **open** (eye) button
@@ -1047,6 +1055,24 @@ version is created:
   **linked** instances (purple border + "linked" tag, read-only — no delete); detached/own
   components appear normally. (The screen detail **Components** tab always lists the screen's
   own top-level components, independent of which version is active.)
+- **Subcomponent cards** (Component detail and Screen detail "Sub Components" tabs) carry the
+  same **source icon** in their upper-right corner. An **external / linked** subcomponent is
+  rendered with a **purple border**, a purple-tinted title, a "linked" badge, and a
+  purple-tinted source icon; an owned child shows its scope icon with a normal border.
+
+**Linkable components & "Add components"**:
+- A component becomes **linkable** automatically when it is created **project-global** or
+  **workspace-global**, and when a **linked version** captures it as a linked instance.
+- The canvas toolbar **Actions** menu → **All** tab → **Add components** opens a picker
+  sub-panel (same pattern as the Image/Icon/TMB library sub-panels) listing the linkable
+  components reachable from the current project (its project-global components plus its
+  workspace's workspace-global components), each with its scope icon and a search box.
+  Selecting one inserts a **linked instance** (purple) centered on the current
+  frame; the open component itself is excluded to prevent self-insertion.
+- A placed linked instance can be **moved/resized as a whole** on the canvas, but the
+  **inspector shows it read-only** (property fields locked, with the "go to component"
+  banner) — the same read-only treatment as the Versions window — signalling it cannot be
+  edited in place; edit it via **go to component** or **detach**.
 
 **Deleting a linked master** — when a screen or component being deleted still has linked
 instances elsewhere, an `InstanceDeleteModal` replaces the plain delete confirm. It shows

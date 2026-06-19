@@ -1286,6 +1286,12 @@ function CanvasPageContent() {
                 ? { ownerKind: "screen", ownerId: screen.id }
                 : null
           }
+          componentPicker={{
+            projectId: project?.id ?? null,
+            openComponentId: component?.id ?? null,
+            graphJSON: resolvedSceneGraphJSON ?? null,
+            canvasName: currentCanvasName,
+          }}
           onBadgeClick={() => {
             setInspectorOpen(true);
             setShellTabSignal((s) => s + 1);

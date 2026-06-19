@@ -187,6 +187,8 @@ export function startRadiusInteraction(
   const elementId = transformIds[0];
   const element = state.document.elements[elementId];
   if (!element || !getElementDefinition(element.type).capabilities.radius) return;
+  // Linked instances are read-only — no radius drag (master owns the radius).
+  if (element.instanceOf) return;
   interactionRef.current = {
     type: "radius",
     pointerId: event.pointerId,

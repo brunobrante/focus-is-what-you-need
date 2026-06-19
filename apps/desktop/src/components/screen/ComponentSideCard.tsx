@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
+import { CardSourceIcon, scopeOf } from "@/components/component/componentSource";
 import type { ComponentRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 
@@ -55,6 +56,10 @@ export function ComponentSideCard({
             display="card"
           />
         ) : null}
+        <CardSourceIcon
+          scope={linked ? "screen" : scopeOf(component)}
+          className={linked ? "border-[#9b6dff] text-[#c9b3ff]" : undefined}
+        />
         <CardMenu
           buttons={[
             {
@@ -93,7 +98,7 @@ export function ComponentSideCard({
       </div>
       <div className="flex min-w-0 flex-col gap-1 px-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">
+          <span className={["min-w-0 flex-1 truncate text-[13px] font-medium", linked ? "text-[#c9b3ff]" : "text-[var(--text)]"].join(" ")}>
             {component.name}
           </span>
           {linked ? (

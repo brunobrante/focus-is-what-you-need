@@ -13,6 +13,15 @@ import {
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { useChecklist } from "@/application/checklists/useChecklist";
 import type { ChecklistOwner } from "@/lib/storage/repos/checklists.repo";
+import { listLinkableComponents } from "@/lib/storage/repos/components.repo";
+import { getVariantFrameSize } from "@/lib/storage/repos/scenes.repo";
+import { getWorkspaceForProject } from "@/lib/storage/repos/workspace.repo";
+import { insertElement } from "@/canvas/engine/mutations/elementHierarchy";
+import { buildLinkedInstanceNode } from "@/canvas/engine/mutations/buildLinkedInstanceNode";
+import { buildMasterResolver, withResolvedInstances } from "@/canvas/engine/htmlSceneAdapter";
+import { scopeOf, sourceScopeIcon } from "@/components/component/componentSource";
+import { peekTable, TABLES } from "@/lib/storage/store";
+import type { ComponentRow, SceneRow } from "@/lib/storage/schema";
 import type { CanvasToolId } from "@/canvas/tools";
 import {
   DEFAULT_TOOLBAR_CONFIG,
@@ -26,6 +35,16 @@ import type { ZoomLimits } from "@/canvas/engine/viewport";
 type ToolbarParentTarget = {
   name: string;
   kind: "screen" | "component";
+};
+
+/** Context the "Add components" picker needs: which project's linkable components
+ * to offer, which open component to exclude (self-insertion guard), and the current
+ * scene graph/name so a freshly placed instance can be resolved into the live doc. */
+export type ComponentPickerContext = {
+  projectId: string | null;
+  openComponentId: string | null;
+  graphJSON: string | null;
+  canvasName: string;
 };
 
 export function Toolbar({
@@ -44,6 +63,7 @@ export function Toolbar({
   config = DEFAULT_TOOLBAR_CONFIG,
   onBadgeClick,
   checklistOwner = null,
+  componentPicker = null,
 }: {
   activeTool?: CanvasToolId;
   defaultTool?: CanvasToolId;
@@ -60,6 +80,7 @@ export function Toolbar({
   config?: ToolbarConfig;
   onBadgeClick?: () => void;
   checklistOwner?: ChecklistOwner | null;
+  componentPicker?: ComponentPickerContext | null;
 }) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [uncontrolledActive, setUncontrolledActive] = useState<CanvasToolId>(defaultTool);
@@ -143,6 +164,7 @@ export function Toolbar({
           aiMode={actionsAiMode}
           onAiModeChange={setActionsAiMode}
           checklistOwner={checklistOwner}
+          componentPicker={componentPicker}
         />
       )}
 
@@ -422,6 +444,7 @@ function ActionsMenuButton({
 }
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
+  "Add components":      <IconGrid size={12} strokeWidth={1.8} />,
   "Checklist":           <IconChecklist />,
   "Make an image":       <IconImage size={12} strokeWidth={1.8} />,
   "Replace content":     <IconReplace />,
@@ -513,7 +536,7 @@ const MOCK_CONVERSATION = [
   { role: "assistant" as const, content: "Here are a few options:\n\n• \"Track, plan, and deliver on time.\"\n• \"One dashboard. Every metric.\"\n• \"Your operations, simplified.\"" },
 ];
 
-function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner }: { onClose?: () => void; aiMode: boolean; onAiModeChange: (v: boolean) => void; checklistOwner: ChecklistOwner | null }) {
+function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner, componentPicker }: { onClose?: () => void; aiMode: boolean; onAiModeChange: (v: boolean) => void; checklistOwner: ChecklistOwner | null; componentPicker: ComponentPickerContext | null }) {
   const [activeTab, setActiveTab] = useState<"all" | "assets" | "plugins">("all");
   const [searchValue, setSearchValue] = useState("");
   const [checklistMode, setChecklistMode] = useState(false);
@@ -547,6 +570,66 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner }: { onC
   const [libraryMode, setLibraryMode] = useState<"images" | "icons" | "tmb" | null>(null);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
+  const [componentsMode, setComponentsMode] = useState(false);
+  const [componentItems, setComponentItems] = useState<ComponentRow[]>([]);
+  const [componentsLoading, setComponentsLoading] = useState(false);
+  const [componentSearch, setComponentSearch] = useState("");
+
+  // Load linkable components when the picker opens. Workspace is resolved from the
+  // project so workspace-global components are offered alongside project-global ones.
+  useEffect(() => {
+    if (!componentsMode) return;
+    let cancelled = false;
+    setComponentsLoading(true);
+    void (async () => {
+      const projectId = componentPicker?.projectId ?? null;
+      const workspace = projectId ? await getWorkspaceForProject(projectId) : null;
+      const rows = await listLinkableComponents({
+        projectId,
+        workspaceId: workspace?.id ?? null,
+      });
+      if (cancelled) return;
+      setComponentItems(
+        rows.filter((row) => row.id !== componentPicker?.openComponentId),
+      );
+      setComponentsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [componentsMode, componentPicker?.projectId, componentPicker?.openComponentId]);
+
+  const insertLinkedComponent = async (master: ComponentRow) => {
+    const editor = getEditor();
+    if (!editor) return;
+    const size = await getVariantFrameSize(master.activeVariantId);
+    const doc = editor.state.document;
+    const node = buildLinkedInstanceNode({
+      componentId: master.id,
+      variantId: master.activeVariantId,
+      name: master.name,
+      size,
+      canvas: doc.canvas,
+    });
+    // Resolve the bare instance into the live document so its master content is
+    // inlined immediately. Instances are otherwise only expanded at scene-load time,
+    // so a runtime insert would render empty until a remount. The scenes cache is
+    // hydrated by now, so a synchronous peek sees every master variant scene.
+    const resolveMaster = buildMasterResolver(peekTable<SceneRow>(TABLES.scenes));
+    const resolved = withResolvedInstances(
+      insertElement(doc, node),
+      componentPicker?.graphJSON ?? null,
+      componentPicker?.canvasName ?? "Canvas",
+      resolveMaster,
+    );
+    editor.dispatch({
+      type: "commitDocument",
+      document: resolved,
+      selectedIds: [node.id],
+    });
+    setComponentsMode(false);
+    onClose?.();
+  };
   const [imageSource, setImageSource] = useState(IMAGE_LIBRARY_SOURCES[0]);
   const [iconSource, setIconSource] = useState(ICON_LIBRARY_SOURCES[0]);
   const [tmbCategory, setTmbCategory] = useState(TMB_ASSET_CATEGORIES[0]);
@@ -571,6 +654,7 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner }: { onC
   ];
   const itemsByTab: Record<"all" | "assets" | "plugins", Array<{ title: string }>> = {
     all: [
+      { title: "Add components" },
       { title: "Checklist" },
       { title: "Make an image" },
       { title: "Replace content" },
@@ -687,6 +771,78 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner }: { onC
                 <IconPlus size={12} strokeWidth={2} />
               </button>
             </div>
+          </div>
+        </div>
+      ) : componentsMode ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <div className="flex h-7 shrink-0 items-center justify-between px-1">
+            <button
+              type="button"
+              aria-label="Back"
+              onClick={() => setComponentsMode(false)}
+              className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.3px] text-[#4A4A4A] transition-colors duration-100 hover:text-[#8E8E8E]"
+            >
+              <IconChevronLeft />
+              Add components
+            </button>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setComponentsMode(false)}
+              className="grid h-6 w-6 place-items-center rounded-md text-[#555] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+            >
+              <IconClose size={11} strokeWidth={2} />
+            </button>
+          </div>
+
+          <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-[#2E2E2E] bg-[#252525] px-2.5">
+            <IconSearch size={11} strokeWidth={1.8} />
+            <input
+              type="text"
+              value={componentSearch}
+              onChange={(e) => setComponentSearch(e.target.value)}
+              placeholder="Search components…"
+              className="min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#CFCFCF] outline-none placeholder:text-[#555]"
+            />
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333]">
+            {(() => {
+              const q = componentSearch.trim().toLowerCase();
+              const filtered = componentItems.filter((c) => !q || c.name.toLowerCase().includes(q));
+              if (componentsLoading) {
+                return <div className="px-2 py-2 text-[11px] text-[#555]">Loading…</div>;
+              }
+              if (filtered.length === 0) {
+                return (
+                  <div className="px-2 py-2 text-[11px] text-[#555]">
+                    {componentItems.length === 0
+                      ? "No linkable components yet. Create a project or workspace component to link it here."
+                      : "No components found."}
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-px pb-1">
+                  {filtered.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => void insertLinkedComponent(c)}
+                      className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors duration-[90ms] hover:bg-[#2A2A2A]"
+                    >
+                      <span className="grid h-4 w-4 shrink-0 place-items-center text-[#8E8E8E]">
+                        {sourceScopeIcon(scopeOf(c), { size: 12, strokeWidth: 1.8 })}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-[#CFCFCF]">{c.name}</span>
+                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-[0.3px] text-[#4A4A4A]">
+                        {scopeOf(c) === "workspace" ? "Workspace" : "Project"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
       ) : libraryMode ? (
@@ -940,7 +1096,8 @@ function ActionsPanel({ onClose, aiMode, onAiModeChange, checklistOwner }: { onC
                     key={item.title}
                     type="button"
                     onClick={() => {
-                      if (item.title === "Checklist") setChecklistMode(true);
+                      if (item.title === "Add components") { setComponentsMode(true); setComponentSearch(""); }
+                      else if (item.title === "Checklist") setChecklistMode(true);
                       else if (item.title === "Image library") { setLibraryMode("images"); setLibrarySearch(""); setLibraryExpanded(false); }
                       else if (item.title === "Icon library") { setLibraryMode("icons"); setLibrarySearch(""); setLibraryExpanded(false); }
                       else if (item.title === "TMB Assets Library") { setLibraryMode("tmb"); setLibrarySearch(""); setTmbCategory(TMB_ASSET_CATEGORIES[0]); setLibraryExpanded(false); }

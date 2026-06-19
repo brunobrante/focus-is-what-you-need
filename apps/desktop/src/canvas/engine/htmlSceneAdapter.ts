@@ -39,6 +39,30 @@ export function canvasDocumentFromHtmlGraphJSON(
   return canvasDocumentFromHtmlDocument(htmlDocument, options);
 }
 
+/**
+ * Re-resolve linked instances inside a LIVE engine document. Instance content is
+ * normally inlined only at load time (`resolveInstances` in
+ * `canvasDocumentFromHtmlGraphJSON`); a node inserted into the in-memory document at
+ * runtime (e.g. the toolbar "Add components" picker) stays bare and renders empty
+ * until a remount. Round-tripping through the adapter reproduces the load path so a
+ * freshly placed instance shows its master content immediately. The engine-only
+ * `shellBackground` is carried over since the graph form does not hold it.
+ */
+export function withResolvedInstances(
+  document: CanvasDocument,
+  previousGraphJSON: string | null | undefined,
+  fallbackName: string,
+  resolveMaster: MasterResolver,
+): CanvasDocument {
+  const json = htmlGraphJSONFromCanvasDocument(document, previousGraphJSON, fallbackName);
+  const resolved = canvasDocumentFromHtmlGraphJSON(json, {
+    promoteSubjectRoot: true,
+    resolveMaster,
+  });
+  if (!resolved) return document;
+  return { ...resolved, shellBackground: document.shellBackground };
+}
+
 export function canvasDocumentFromHtmlDocument(
   htmlDocument: HtmlCanvasDocument,
   options: HtmlSceneAdapterOptions = {},

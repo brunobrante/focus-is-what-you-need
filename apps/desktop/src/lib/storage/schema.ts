@@ -64,6 +64,12 @@ export type ComponentRow = {
   // Canvas node id this component was derived from. Used to distinguish
   // sibling canvas nodes that share the same display name.
   sourceNodeId?: string | null;
+  // Whether this component may be picked from the toolbar to insert a linked
+  // instance. Auto-true for project/workspace-global components and for child
+  // components captured as linked instances by a linked-version. Optional so
+  // existing rows / literals stay valid; normalizeComponentRow backfills it
+  // from the component's scope.
+  linkable?: boolean;
   activeVariantId: string;
   order: number;
   createdAt: number;

@@ -4,6 +4,7 @@ import {
   collectComponentTreeIds,
   listChildrenOfVariant,
   listTopLevelByScreenId,
+  markComponentsLinkable,
   setActiveVariant,
 } from "@/lib/storage/repos/components.repo";
 import { getSceneByOwner, linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
@@ -238,7 +239,12 @@ export async function duplicateVariant(input: {
           name: c.name,
         })),
       );
-      if (linked) graphJSON = linked;
+      if (linked) {
+        graphJSON = linked;
+        // The child masters are now referenced as linked instances — make them
+        // pickable from the canvas "Add components" picker.
+        await markComponentsLinkable(children.map((c) => c.id));
+      }
     }
     await upsertScene(
       { ownerType: "variant", ownerId: created.id, graphJSON },

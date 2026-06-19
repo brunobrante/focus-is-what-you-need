@@ -99,6 +99,51 @@ export async function listProjectGlobalComponents(
     .sort((a, b) => a.order - b.order);
 }
 
+/**
+ * Linkable components reachable from a project: its project-global components
+ * plus the workspace-global components of the workspace it belongs to. These are
+ * the only components offered by the canvas "Add components" picker.
+ */
+export async function listLinkableComponents(input: {
+  projectId: string | null;
+  workspaceId: string | null;
+}): Promise<ComponentRow[]> {
+  const rows = await listComponents();
+  return rows
+    .filter((r) => {
+      if (r.linkable !== true) return false;
+      const scope = componentScope(r);
+      if (scope === "project") {
+        return input.projectId != null && r.projectId === input.projectId;
+      }
+      if (scope === "workspace") {
+        return input.workspaceId != null && r.workspaceId === input.workspaceId;
+      }
+      return false;
+    })
+    .sort((a, b) => a.order - b.order);
+}
+
+/**
+ * Flip `linkable` to true on the given components (idempotent). Used when a
+ * linked version captures child components as linked instances — those masters
+ * become available to the picker.
+ */
+export async function markComponentsLinkable(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const components = await listTable<ComponentRow>(KEY);
+  let changed = false;
+  const next = components.map((c) => {
+    if (!idSet.has(c.id) || c.linkable === true) return c;
+    changed = true;
+    return { ...c, linkable: true, updatedAt: now() };
+  });
+  if (!changed) return;
+  await replaceTable<ComponentRow>(KEY, next);
+  notify(KEY);
+}
+
 export async function getComponent(id: string): Promise<ComponentRow | null> {
   const rows = await listComponents();
   return rows.find((r) => r.id === id) ?? null;
@@ -256,6 +301,9 @@ export async function createComponent(input: {
     description: null,
     assignedScreenIds: Array.from(new Set(input.assignedScreenIds ?? [])),
     sourceNodeId: input.sourceNodeId ?? null,
+    // Global components (project or workspace scope) are linkable on creation.
+    linkable:
+      input.parent.kind === "project" || input.parent.kind === "workspace",
     activeVariantId: variantId,
     order,
     createdAt: t,
@@ -272,7 +320,7 @@ export async function createComponent(input: {
 
 export async function updateComponent(
   componentId: string,
-  patch: Partial<Pick<ComponentRow, "assignedScreenIds" | "category" | "description" | "kind" | "name" | "screenId" | "sourceNodeId">>,
+  patch: Partial<Pick<ComponentRow, "assignedScreenIds" | "category" | "description" | "kind" | "linkable" | "name" | "screenId" | "sourceNodeId">>,
 ): Promise<ComponentRow | null> {
   const components = await listTable<ComponentRow>(KEY);
   const idx = components.findIndex((component) => component.id === componentId);
