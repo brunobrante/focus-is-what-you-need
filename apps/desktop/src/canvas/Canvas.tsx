@@ -836,6 +836,7 @@ function CanvasPageContent() {
           onToggle={togglePreview}
           settings={previewSettings}
           onSettingsChange={setPreviewSettings}
+          projectType={projectType}
         />
         <div className="flex min-h-0 flex-1">
         <Inspector

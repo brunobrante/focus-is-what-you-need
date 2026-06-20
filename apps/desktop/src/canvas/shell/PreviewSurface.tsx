@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { ElementRenderer } from "@/canvas/stage/ElementRenderer";
 import { getStageBoxShadow } from "@/canvas/stage/canvasShellStyle";
 import { IconClose, IconOpenCanvas } from "@/components/icons";
+import { DeviceMockup, deviceOuterSize, getDevicePreset } from "@/canvas/devices";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 import type { PreviewSettings } from "../canvasUtils";
@@ -55,13 +56,26 @@ export function CanvasPreviewSurface({
   const docWidth = Math.max(1, document.canvas.width);
   const docHeight = Math.max(1, document.canvas.height);
 
-  // Outer (bezel-inclusive) dimensions used to compute the fit scale.
+  // Mobile screens get a realistic phone mockup (iPhone / Android); desktop and
+  // tablet keep the lightweight browser-chrome / bezel frame.
   const isBrowser = projectType === "desktop";
-  const padX = settings.deviceFrame ? (isBrowser ? 0 : BEZEL_PAD) : 0;
-  const padTop = settings.deviceFrame ? (isBrowser ? BROWSER_CHROME : BEZEL_PAD) : 0;
-  const padBottom = settings.deviceFrame ? (isBrowser ? 0 : BEZEL_PAD) : 0;
-  const outerWidth = docWidth + padX * 2;
-  const outerHeight = docHeight + padTop + padBottom;
+  const usePhoneMockup = settings.deviceFrame && projectType === "mobile";
+  const device = usePhoneMockup ? getDevicePreset(settings.deviceId) : null;
+
+  // Outer (frame-inclusive) dimensions used to compute the fit scale.
+  let outerWidth = docWidth;
+  let outerHeight = docHeight;
+  if (device) {
+    const outer = deviceOuterSize(device, docWidth, docHeight);
+    outerWidth = outer.width;
+    outerHeight = outer.height;
+  } else if (settings.deviceFrame) {
+    const padX = isBrowser ? 0 : BEZEL_PAD;
+    const padTop = isBrowser ? BROWSER_CHROME : BEZEL_PAD;
+    const padBottom = isBrowser ? 0 : BEZEL_PAD;
+    outerWidth = docWidth + padX * 2;
+    outerHeight = docHeight + padTop + padBottom;
+  }
 
   const FIT_MARGIN = 24;
   const fitScale =
@@ -87,8 +101,8 @@ export function CanvasPreviewSurface({
         width: docWidth,
         height: docHeight,
         background: document.canvas.background || undefined,
-        borderRadius: document.canvas.borderRadius,
-        boxShadow: getStageBoxShadow(document.canvas, 1),
+        borderRadius: device ? 0 : document.canvas.borderRadius,
+        boxShadow: device ? undefined : getStageBoxShadow(document.canvas, 1),
         opacity: document.canvas.opacity ?? undefined,
         overflow: "hidden",
         flex: "none",
@@ -102,13 +116,25 @@ export function CanvasPreviewSurface({
     </div>
   );
 
-  const framed = settings.deviceFrame ? (
-    <DeviceFrame isBrowser={isBrowser} docBorderRadius={document.canvas.borderRadius ?? 0}>
-      {stage}
-    </DeviceFrame>
-  ) : (
-    stage
-  );
+  let framed = stage;
+  if (device) {
+    framed = (
+      <DeviceMockup
+        device={device}
+        screenWidth={docWidth}
+        screenHeight={docHeight}
+        screenBackground={document.canvas.background || undefined}
+      >
+        {stage}
+      </DeviceMockup>
+    );
+  } else if (settings.deviceFrame) {
+    framed = (
+      <DeviceFrame isBrowser={isBrowser} docBorderRadius={document.canvas.borderRadius ?? 0}>
+        {stage}
+      </DeviceFrame>
+    );
+  }
 
   return (
     <div

@@ -6,20 +6,16 @@ import { ZOOM_DEFAULT_IDX, ZoomControls } from "./ZoomControls";
 import { useStepZoom } from "./useStepZoom";
 import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
 import { IconChevronDown, IconChevronLeft, IconChevronRight, IconFastEdit, IconOpenCanvas } from "@/components/icons";
+import {
+  DEFAULT_DEVICE_ID,
+  DeviceMockup,
+  deviceOuterSize,
+  deviceResolutionLabel,
+  devicesByPlatform,
+  getDevicePreset,
+} from "@/canvas/devices";
 
 type NeighborScreen = { name: string; details?: string[]; href?: string; screenId?: string };
-
-type DeviceOption = {
-  id: string;
-  label: string;
-  note: string;
-};
-
-const DEVICE_OPTIONS: DeviceOption[] = [
-  { id: "iphone-15", label: "iPhone 15", note: "390 × 844" },
-  { id: "iphone-xr", label: "iPhone XR", note: "414 × 896" },
-  { id: "iphone-se", label: "iPhone SE", note: "320 × 568" },
-];
 
 type Props = {
   children: ReactNode;
@@ -27,7 +23,12 @@ type Props = {
   canvasHref?: string;
   prev?: NeighborScreen;
   next?: NeighborScreen;
+  /** Show the device-frame switch (only meaningful for full screens). */
+  showDevice?: boolean;
 };
+
+// Cap the device render so the whole phone body fits comfortably in the pane.
+const DEVICE_FIT_MARGIN = 80;
 
 export function PreviewShell({
   children,
@@ -35,15 +36,17 @@ export function PreviewShell({
   canvasHref,
   prev,
   next,
+  showDevice = true,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const zoomCtl = useStepZoom(stageRef, { keyboard: true, contentRef });
   const [paneHover, setPaneHover] = useState(false);
   const [deviceActive, setDeviceActive] = useState(false);
-  const [deviceId, setDeviceId] = useState(DEVICE_OPTIONS[0]?.id ?? "iphone-15");
+  const [deviceId, setDeviceId] = useState(DEFAULT_DEVICE_ID);
   const [deviceMenuOpen, setDeviceMenuOpen] = useState(false);
   const [deviceMenuPos, setDeviceMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const deviceTriggerRef = useRef<HTMLButtonElement>(null);
   const deviceMenuRef = useRef<HTMLDivElement>(null);
   const isZoomed = zoomCtl.index !== ZOOM_DEFAULT_IDX;
@@ -52,7 +55,31 @@ export function PreviewShell({
     "transition-opacity duration-[180ms]",
     overlayHidden ? "pointer-events-none opacity-0" : "opacity-100",
   ].join(" ");
-  const activeDevice = DEVICE_OPTIONS.find((device) => device.id === deviceId) ?? DEVICE_OPTIONS[0] ?? null;
+  const deviceGroups = devicesByPlatform();
+  const activeDevice = getDevicePreset(deviceId);
+  const frameOn = showDevice && deviceActive;
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) setStageSize({ width: rect.width, height: rect.height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Scale the phone body to fit the pane (multiplied by the user zoom transform).
+  const deviceBody = deviceOuterSize(activeDevice, activeDevice.screen.width, activeDevice.screen.height);
+  const deviceFitScale =
+    frameOn && stageSize.width > 0 && stageSize.height > 0
+      ? Math.min(
+          (stageSize.width - DEVICE_FIT_MARGIN) / deviceBody.width,
+          (stageSize.height - DEVICE_FIT_MARGIN) / deviceBody.height,
+          1,
+        )
+      : 1;
 
   useEffect(() => {
     if (!deviceMenuOpen) return;
@@ -102,25 +129,40 @@ export function PreviewShell({
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-16 py-20">
         <div
           ref={contentRef}
-          className="pointer-events-auto flex min-h-0 min-w-0 origin-center items-center justify-center max-h-full max-w-full [&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[72vh] [&_img]:max-w-full [&_img]:object-contain"
+          className={[
+            "pointer-events-auto flex min-h-0 min-w-0 origin-center items-center justify-center max-h-full max-w-full",
+            frameOn
+              ? ""
+              : "[&_img]:h-auto [&_img]:w-auto [&_img]:max-h-[72vh] [&_img]:max-w-full [&_img]:object-contain",
+          ].join(" ")}
           style={{
             transform: zoomCtl.transform,
             transition: zoomCtl.isPanning ? "none" : "transform 180ms",
           }}
         >
-          {children}
+          {frameOn ? (
+            <div style={{ transform: `scale(${deviceFitScale})`, transformOrigin: "center center", flex: "none" }}>
+              <DeviceMockup device={activeDevice} stretchContent>
+                {children}
+              </DeviceMockup>
+            </div>
+          ) : (
+            children
+          )}
         </div>
       </div>
 
       {/* device switch top-left */}
+      {showDevice ? (
+      <>
       <div className={["absolute left-4 top-4 z-[6]", overlayClass].join(" ")}>
         <div className="inline-flex items-center">
           <button
             ref={deviceTriggerRef}
             type="button"
-            aria-label={activeDevice ? `Dispositivo ativo: ${activeDevice.label}` : "Dispositivo ativo"}
+            aria-label={`Dispositivo ativo: ${activeDevice.label}`}
             aria-pressed={deviceActive}
-            title={activeDevice ? activeDevice.label : "Dispositivo"}
+            title={activeDevice.label}
             onClick={() => setDeviceActive((current) => !current)}
             className={[
               "grid h-[34px] w-[38px] cursor-pointer place-items-center rounded-l-md border border-[var(--border-strong)] bg-[var(--surface-2)] transition-colors hover:border-[var(--blue)] hover:bg-[rgba(31,122,224,0.08)]",
@@ -170,38 +212,47 @@ export function PreviewShell({
                 <div className="text-[12px] font-semibold text-[var(--text)]">Dispositivos</div>
                 <div className="mt-1 text-[11px] text-[var(--text-faint)]">Escolha o modelo para o preview</div>
               </div>
-              <div className="py-1">
-                {DEVICE_OPTIONS.map((device) => {
-                  const active = device.id === deviceId;
-                  return (
-                    <button
-                      key={device.id}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={active}
-                      onClick={() => {
-                        setDeviceId(device.id);
-                        setDeviceActive(true);
-                        setDeviceMenuOpen(false);
-                        setDeviceMenuPos(null);
-                      }}
-                      className={[
-                        "flex h-9 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] transition-colors",
-                        active
-                          ? "bg-[var(--surface)] text-[var(--text)]"
-                          : "text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
-                      ].join(" ")}
-                    >
-                      <span>{device.label}</span>
-                      <span className="text-[11px] text-[var(--text-faint)]">{device.note}</span>
-                    </button>
-                  );
-                })}
+              <div className="max-h-[320px] overflow-y-auto py-1">
+                {deviceGroups.map((group) => (
+                  <div key={group.platform} className="mb-1 last:mb-0">
+                    <div className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-faint)]">
+                      {group.label}
+                    </div>
+                    {group.devices.map((device) => {
+                      const active = device.id === deviceId;
+                      return (
+                        <button
+                          key={device.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={active}
+                          onClick={() => {
+                            setDeviceId(device.id);
+                            setDeviceActive(true);
+                            setDeviceMenuOpen(false);
+                            setDeviceMenuPos(null);
+                          }}
+                          className={[
+                            "flex h-9 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] transition-colors",
+                            active
+                              ? "bg-[var(--surface)] text-[var(--text)]"
+                              : "text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
+                          ].join(" ")}
+                        >
+                          <span>{device.label}</span>
+                          <span className="text-[11px] text-[var(--text-faint)]">{deviceResolutionLabel(device)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>,
             document.body,
           )
         : null}
+      </>
+      ) : null}
 
       {/* preview-actions top-right */}
       <div className={["absolute right-4 top-4 z-[6] flex items-center gap-2", overlayClass].join(" ")}>

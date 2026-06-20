@@ -315,7 +315,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
       </header>
 
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
-        <PreviewShell onFastEdit={() => setFastEditOpen(true)} canvasHref={canvasHref}>
+        <PreviewShell onFastEdit={() => setFastEditOpen(true)} canvasHref={canvasHref} showDevice={false}>
           <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
             {displayVariant ? (
               <Snapshot kind="component" ownerType="variant" ownerId={displayVariant.id} seedKey={displayVariant.seedKey} type={type} emptyMode="preview" display="natural" />

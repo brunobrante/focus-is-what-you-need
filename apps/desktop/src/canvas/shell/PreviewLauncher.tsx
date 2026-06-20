@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconChevronDown, IconPlay } from "@/components/icons";
+import { devicesByPlatform, deviceResolutionLabel } from "@/canvas/devices";
+import type { ProjectType } from "@/lib/data/types";
 import type { PreviewSettings } from "../canvasUtils";
 
 /**
@@ -12,11 +14,13 @@ export function PreviewLauncher({
   onToggle,
   settings,
   onSettingsChange,
+  projectType,
 }: {
   previewOpen: boolean;
   onToggle: () => void;
   settings: PreviewSettings;
   onSettingsChange: (next: PreviewSettings) => void;
+  projectType: ProjectType;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -92,6 +96,14 @@ export function PreviewLauncher({
               checked={settings.deviceFrame}
               onChange={(deviceFrame) => onSettingsChange({ ...settings, deviceFrame })}
             />
+            {settings.deviceFrame && projectType === "mobile" ? (
+              <div className="mt-2">
+                <DeviceSelect
+                  value={settings.deviceId}
+                  onChange={(deviceId) => onSettingsChange({ ...settings, deviceId })}
+                />
+              </div>
+            ) : null}
           </Section>
 
           <Section title="Background" last>
@@ -149,6 +161,41 @@ function Segmented<T extends string>({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function DeviceSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const groups = devicesByPlatform();
+  return (
+    <div className="max-h-[220px] overflow-y-auto rounded-md border border-[#2C2C2C] bg-[#141414] p-1">
+      {groups.map((group) => (
+        <div key={group.platform} className="mb-1 last:mb-0">
+          <div className="px-2 pb-1 pt-1.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">
+            {group.label}
+          </div>
+          {group.devices.map((device) => {
+            const active = device.id === value;
+            return (
+              <button
+                key={device.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                onClick={() => onChange(device.id)}
+                className="flex h-7 w-full items-center justify-between gap-2 rounded-[5px] px-2 text-left text-[11px] transition-colors duration-100"
+                style={{
+                  background: active ? "rgba(13,153,255,0.18)" : "transparent",
+                  color: active ? "#7CC4FF" : "#B8B8B8",
+                }}
+              >
+                <span className="truncate">{device.label}</span>
+                <span className="shrink-0 text-[10px] text-[#6B6B6B]">{deviceResolutionLabel(device)}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

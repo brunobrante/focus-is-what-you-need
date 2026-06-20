@@ -10,6 +10,7 @@ import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
 import type { MockComponentSeed } from "@/components/mocks/data/canvasMocks";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 import type { ProjectType } from "@/lib/data/types";
+import { DEFAULT_DEVICE_ID } from "@/canvas/devices";
 
 export type SplitMode = "none" | "vertical" | "horizontal" | "grid";
 export type CanvasWindowType = "current" | "drafts" | "references" | "versions" | "preview";
@@ -30,12 +31,15 @@ export type CanvasSplitWindows = CanvasWindowKey[];
 export type PreviewSettings = {
   fit: "fit" | "actual";
   deviceFrame: boolean;
+  /** Selected device-mockup preset id (see canvas/devices). */
+  deviceId: string;
   background: "dark" | "light" | "scene";
 };
 
 export const DEFAULT_PREVIEW_SETTINGS: PreviewSettings = {
   fit: "fit",
   deviceFrame: false,
+  deviceId: DEFAULT_DEVICE_ID,
   background: "dark",
 };
 

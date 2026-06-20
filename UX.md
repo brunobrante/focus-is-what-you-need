@@ -354,8 +354,13 @@ Full-screen visual editor with floating UI layers.
   **open-in-new-window** button (present but inert for now).
 - Settings live in a **dropdown** next to the play button (Figma-style):
   - **Size**: Fit (scale to the window) or Actual size (1×, scrollable on overflow).
-  - **Device frame**: wrap the screen in a device bezel (phone/tablet) or browser
-    chrome (desktop).
+  - **Device frame**: wrap the screen in a device mockup. For **mobile** projects
+    this is a realistic phone (`DeviceMockup` from `src/canvas/devices`) and a
+    **device picker** appears below the toggle — presets grouped by platform
+    (iPhone / Android), each with its resolution; the chosen model's bezel, corner
+    radius, camera cutout (notch / Dynamic Island / punch-hole), side buttons, and
+    home indicator/button are drawn around the live screen. For **tablet** projects
+    it is a simple bezel and for **desktop** it is browser chrome.
   - **Background**: Dark, Light, or Scene (the document's shell background).
 - It respects the split/grid like the other windows (selectable in the Panels menu
   and laid out under None/Vertical/Horizontal/Quadrants).
@@ -992,7 +997,16 @@ Container for screen or component previews with controls.
 
 **Controls** (floating over the preview area):
 - Zoom in `+`, reset, zoom out `−`
-- Device selector dropdown: iPhone 15 / XR / SE
+- **Device frame switcher** (top-left, only for full screens — hidden via
+  `showDevice={false}` on the component-detail preview): a two-part control — a
+  toggle button that turns the device mockup on/off, and a caret that opens a
+  dropdown of presets **grouped by platform (iPhone / Android)**, each row showing
+  the model name and resolution. Picking a model both selects it and turns the
+  frame on. When active, the screen snapshot is wrapped in the selected
+  `DeviceMockup` (realistic bezel, corner radius, camera cutout, side buttons,
+  home indicator/button) sourced from the shared device catalog
+  (`src/canvas/devices`). The mockup is scaled to fit the pane and still respects
+  the zoom/pan controls.
 - Previous / Next navigation arrows with tooltips showing the adjacent item name
 - FastEdit button
 - "Open in Canvas" button
