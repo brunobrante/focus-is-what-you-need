@@ -1,29 +1,14 @@
 import type { SavedComponent, ComponentTreeNode } from "./types";
+import { buildForest, type ForestNode } from "@/lib/tree";
 
 export function buildComponentTree(items: SavedComponent[], rootId: string): ComponentTreeNode[] {
-  const root = items.find((entry) => entry.id === rootId);
-  if (!root) return [];
-
-  const byParent = new Map<string, SavedComponent[]>();
-  for (const item of items) {
-    if (!item.parentId) continue;
-    const siblings = byParent.get(item.parentId) ?? [];
-    siblings.push(item);
-    byParent.set(item.parentId, siblings);
-  }
-
-  const visit = (component: SavedComponent, depth: number, seen: Set<string>): ComponentTreeNode => {
-    if (seen.has(component.id)) return { component, depth, children: [] };
-    const nextSeen = new Set(seen);
-    nextSeen.add(component.id);
-    return {
-      component,
-      depth,
-      children: (byParent.get(component.id) ?? []).map((child) => visit(child, depth + 1, nextSeen)),
-    };
-  };
-
-  return [visit(root, 0, new Set())];
+  const toNode = (node: ForestNode<SavedComponent>): ComponentTreeNode => ({
+    component: node.item,
+    depth: node.depth,
+    children: node.children.map(toNode),
+  });
+  // `|| null` matches the original `!item.parentId` (a falsy/"" parent = a root).
+  return buildForest(items, (c) => c.id, (c) => c.parentId || null, rootId).map(toNode);
 }
 
 export function flattenComponentTree(nodes: ComponentTreeNode[]): SavedComponent[] {

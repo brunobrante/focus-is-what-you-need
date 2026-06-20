@@ -504,13 +504,11 @@ If only a handful of things get fixed, fix these:
 
 Ranked by code volume × divergence risk:
 
-- 🟠 **DUP-02 — "Group children by parentId + recursive cycle-guarded tree build" reimplemented
-  3×.** `generate/engine/componentTree.ts:3` (`buildComponentTree`),
-  `components/modals/AddReferenceModal.tsx:92` (`groupCutsByParent`),
-  `components/screen/SceneCanvasInspector.tsx:327` (`flattenSceneTree`). Same `Set`-cloning cycle
-  guard copied verbatim, same `{id,parentId,box}` node shape. Extract a generic
-  `buildForest<T>(items, getId, getParentId, rootId?)` into `src/lib/tree.ts`. (`componentTree.ts`
-  has the cleanest version to promote.)
+- 🟡 **DUP-02 (partial) — the generic `buildForest<T>` now lives in `src/lib/tree.ts` and
+  `buildComponentTree` uses it.** The other two cited sites are NOT a clean fit and were left as-is:
+  `AddReferenceModal.groupCutsByParent`/`collectCuts` carries a `"__root__"` sentinel + rootId
+  exclusion, and `SceneCanvasInspector.flattenSceneTree` flattens an already-nested tree (no
+  parent grouping, no cycle guard) — forcing them onto `buildForest` would add risk, not clarity.
 - 🟠 **DUP-03 — File-extension → format/type parsing reimplemented 4×.**
   `generate/engine/image.ts:54` (`inferType`), `routes/references/lib/utils.ts:66` (`inferType`,
   diverges on return type), `lib/utils.ts:23` (`fileFormatLabel`),
