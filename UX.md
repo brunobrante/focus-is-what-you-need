@@ -202,11 +202,11 @@ the project's own tokens shown together — see section 8a.
 
 **Modals triggered from this page**:
 - `NewScreenModal` — form with name field and template selector
-- `NewComponentModal` — form with name field and kind selector
+- `NewComponentModal` — form with name field, optional **Size (W×H)** inputs, and kind selector. When both width and height are filled, the component is seeded with a blank frame at exactly that size; left blank, it uses the project-type default size.
 - `ProjectPreviewModal` — full-screen preview of project screens
 - `AddReferenceModal` — searchable stack tree for attaching references
 - `ReferencesModal` — lightbox preview of a project reference (opened from a card)
-- `ConfirmActionModal` — confirmation dialog with Cancel / Delete buttons
+- `ConfirmActionModal` — confirmation dialog with Cancel / Delete buttons. Works both imperatively (via `ref.open(...)`) and as a controlled component (via `open` + `onConfirm` props).
 
 ---
 
@@ -723,6 +723,8 @@ Workspace-level shared component library.
 - Search bar + kind filter dropdown
 - Responsive grid of WorkspaceComponentCard
 - AddComponentCard with dashed border at the end of the grid
+
+"Add component" / AddComponentCard open `NewComponentModal` in workspace scope (name, optional Size W×H, kind). Deleting a card → CardMenu → Delete opens `ConfirmActionModal` (controlled mode) and removes the component tree on confirm.
 
 **WorkspaceComponentCard**:
 - Snapshot preview

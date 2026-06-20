@@ -31,6 +31,7 @@ export {
   ensureHtmlCanvasSubjectRoot,
   ensureHtmlCanvasSubjectRootJSON,
   createDefaultHtmlCanvasDocument,
+  createBlankHtmlCanvasDocument,
 } from "./htmlScene/document";
 
 export { htmlCanvasDocumentFromMockTree } from "./htmlScene/mockTree";

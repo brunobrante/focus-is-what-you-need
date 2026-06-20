@@ -44,6 +44,8 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
     const [name, setName] = useState("");
     const [category, setCategory] = useState("");
     const [kind, setKind] = useState<ComponentKind>("Custom");
+    const [width, setWidth] = useState("");
+    const [height, setHeight] = useState("");
     const [assignedScreenIds, setAssignedScreenIds] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
@@ -55,6 +57,8 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
         setName("");
         setCategory("");
         setKind("Custom");
+        setWidth("");
+        setHeight("");
         setAssignedScreenIds([]);
         setError(null);
         setSubmitting(false);
@@ -96,6 +100,9 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
           setSubmitting(false);
           return;
         }
+        const w = Math.round(Number(width));
+        const h = Math.round(Number(height));
+        const hasSize = Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0;
         const result = await createComponent({
           projectId: parent.kind !== "workspace" ? (projectId ?? null) : null,
           parent,
@@ -103,6 +110,8 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
           category: parent.kind !== "workspace" ? (category.trim() || null) : null,
           kind: parent.kind === "workspace" ? kind : null,
           assignedScreenIds: parent.kind !== "workspace" ? assignedScreenIds : [],
+          width: hasSize ? w : null,
+          height: hasSize ? h : null,
         });
         setOpen(false);
         onCreated?.(result);
@@ -152,6 +161,34 @@ export const NewComponentModal = forwardRef<NewComponentModalHandle, Props>(
                 className="h-11 rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors duration-[100ms] placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
               />
             </label>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[12px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+                Size
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                  placeholder="W"
+                  className="h-11 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors duration-[100ms] placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+                />
+                <span className="text-[13px] text-[var(--text-faint)]">×</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  placeholder="H"
+                  className="h-11 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors duration-[100ms] placeholder:text-[var(--text-faint)] focus:border-[var(--text)]"
+                />
+              </div>
+              <span className="text-[12px] text-[var(--text-faint)]">
+                Optional. Leave blank to use the default size.
+              </span>
+            </div>
 
             {isWorkspace ? (
               <div className="flex flex-col gap-2">

@@ -10,7 +10,12 @@ import {
   detachInstancesOfComponents,
   removeComponentSubtreeFromParentScene,
   removeInstancesOfComponents,
+  upsertScene,
 } from "@/lib/storage/repos/scenes.repo";
+import {
+  createBlankHtmlCanvasDocument,
+  serializeHtmlCanvasDocument,
+} from "@/lib/canvas/htmlScene";
 
 export type InstanceDeleteStrategy = "detach" | "cascade";
 import type {
@@ -226,6 +231,11 @@ export async function createComponent(input: {
   category?: string | null;
   assignedScreenIds?: string[];
   sourceNodeId?: string | null;
+  // Optional initial frame size (W×H). When both are provided, the component's
+  // Default variant is seeded with a blank scene at exactly that size, so it
+  // opens at the chosen dimensions instead of a project-type default.
+  width?: number | null;
+  height?: number | null;
 }): Promise<{ component: ComponentRow; defaultVariant: VariantRow }> {
   const trimmedName = input.name.trim();
   if (!trimmedName) {
@@ -312,6 +322,17 @@ export async function createComponent(input: {
   await replaceTable<ComponentRow>(KEY, [component, ...components]);
   notify(VARIANTS_KEY);
   notify(KEY);
+
+  // Seed a blank scene at the chosen size so the component opens at exactly W×H.
+  const width = input.width ?? null;
+  const height = input.height ?? null;
+  if (width && height && width > 0 && height > 0) {
+    const doc = createBlankHtmlCanvasDocument({ name: trimmedName, width, height });
+    await upsertScene(
+      { ownerType: "variant", ownerId: variantId, graphJSON: serializeHtmlCanvasDocument(doc) },
+      { propagate: false },
+    );
+  }
 
   return { component, defaultVariant };
 }

@@ -388,6 +388,29 @@ export function createDefaultHtmlCanvasDocument(input: {
   });
 }
 
+/**
+ * A blank component document: a single root frame at an explicit width/height and
+ * no boilerplate children. Used when the user creates a component with a chosen
+ * size (W×H), so it opens at exactly that frame size instead of a project default.
+ */
+export function createBlankHtmlCanvasDocument(input: {
+  name: string;
+  width: number;
+  height: number;
+}): HtmlCanvasDocument {
+  const rootId = "node-root";
+  const size = { width: Math.round(input.width), height: Math.round(input.height) };
+  const root = makeNode({
+    id: rootId, parentId: null, name: input.name || "Frame", type: "frame", order: 0,
+    bounds: { x: 0, y: 0, width: size.width, height: size.height },
+    props: { name: input.name || "Frame", bg: "#FFFFFF", rounded: 0, overflow: "hidden" },
+  });
+  return normalizeHtmlCanvasDocument({
+    format: HTML_CANVAS_FORMAT, version: HTML_CANVAS_VERSION, rootId,
+    viewport: size, nodes: [root], updatedAt: Date.now(),
+  });
+}
+
 function isSubjectWrapperRoot(root: HtmlCanvasNode, children: HtmlCanvasNode[]): boolean {
   if (!root.name.endsWith(" Canvas") || children.length !== 1) return false;
   const child = children[0]!;
