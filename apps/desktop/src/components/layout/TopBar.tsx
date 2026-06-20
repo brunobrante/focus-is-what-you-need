@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { Wand2 } from "lucide-react";
 import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
-import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPlus, IconSettings, IconTrash } from "@/components/icons";
+import { WorkspaceEditPanel, type WorkspaceEditPanelHandle } from "@/components/layout/WorkspaceEditPanel";
+import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { createWorkspace } from "@/lib/storage/repos/workspace.repo";
@@ -20,6 +21,7 @@ export function TopBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const settingsRef = useRef<AppSettingsModalHandle>(null);
+  const workspaceEditRef = useRef<WorkspaceEditPanelHandle>(null);
   const [wsOpen, setWsOpen] = useState(false);
   const [wsPosition, setWsPosition] = useState<{ top: number; left: number } | null>(null);
   const { data: workspaces } = useWorkspaces();
@@ -182,10 +184,6 @@ export function TopBar({
           <IconColorStyles size={14} strokeWidth={1.7} className="opacity-85" />
           System
         </TopNavLink>
-        <TopNavLink to="/element-defaults">
-          <IconSettings size={14} strokeWidth={1.7} className="opacity-85" />
-          Elements
-        </TopNavLink>
         <TopNavLink to="/references">
           <IconImage size={14} strokeWidth={1.7} className="opacity-85" />
           References
@@ -248,9 +246,22 @@ export function TopBar({
                 onClick={() => {
                   setMenuOpen(false);
                   setMenuPosition(null);
-                  settingsRef.current?.open();
+                  workspaceEditRef.current?.open();
                 }}
                 className="mt-1 flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+              >
+                <IconPencil size={13} />
+                <span>Edit workspace</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMenuPosition(null);
+                  settingsRef.current?.open();
+                }}
+                className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
               >
                 <IconSettings size={13} />
                 <span>Settings</span>
@@ -280,6 +291,7 @@ export function TopBar({
         : null}
     </header>
     <AppSettingsModal ref={settingsRef} />
+    <WorkspaceEditPanel ref={workspaceEditRef} />
     </>
   );
 }

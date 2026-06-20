@@ -7,7 +7,6 @@ import { DetailPage } from "@/pages/DetailPage";
 import { CanvasPage } from "@/canvas/Canvas";
 import { References } from "@/routes/References";
 import { SystemDesignPage } from "@/pages/SystemDesignPage";
-import { WorkspaceElementDefaultsPage } from "@/pages/WorkspaceElementDefaultsPage";
 import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
@@ -31,7 +30,6 @@ export default function App() {
       <Route path="/canvas" element={<CanvasPage />} />
       <Route path="/references" element={<References />} />
       <Route path="/system-design" element={<SystemDesignPage />} />
-      <Route path="/element-defaults" element={<WorkspaceElementDefaultsPage />} />
       <Route path="/components" element={<GlobalComponentsPage />} />
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />

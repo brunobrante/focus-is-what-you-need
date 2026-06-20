@@ -244,6 +244,15 @@ Two-column layout for inspecting and editing a screen.
     main/active variant. The freshly created version is only previewed; the screen's main
     and the projects gallery stay unchanged. Promoting a version to main will be a
     separate, explicit action (not yet implemented).
+  - **Compare** opens the `CompareVersionsModal`, which renders the versions' **real
+    stored snapshots** (`Snapshot`, not template mocks) in two modes, toggled in its
+    toolbar:
+    - **Grid** — N panels (Columns/Rows layout) each with a version select, open-in-canvas
+      and remove; an **"+ Add version"** dashed card appends another panel (up to 6 / the
+      number of versions). Each panel header carries the green/purple version tag badge.
+    - **Slider** — a before/after comparison: pick **A** and **B**, then drag the divider
+      (pointer-captured) to scrub one version over the other; corner chips label each side.
+    "Open in canvas" sends the visible versions (the grid selection, or A+B) to the canvas.
 - **Tab bar**: Sub Components | References (the former Versions tab is replaced by the
   top switcher)
   - Each tab: search bar + kind filter + "New" button + card grid
@@ -851,7 +860,26 @@ Global navigation header present on all non-canvas pages.
 **Right side**:
 - "Builder" button (primary style)
 - User avatar button with initials
-- User menu (portal overlay): Settings | Factory Reset
+- User menu (portal overlay): **Edit workspace** | Settings | Factory Reset
+  - **Edit workspace** opens the full-page **WorkspaceEditPanel** (see Workspace Edit below)
+  - **Settings** opens the global Settings modal
+
+### Workspace Edit
+
+Opened from the avatar menu → **Edit workspace**. A full-page editor (portaled
+overlay, no routing) that fills everything below the TopBar — the same shape as the
+project Edit. It edits the **active workspace** (from the workspace switcher) with a
+sticky action bar (Close × · "Edit workspace" · Cancel / Save changes; Esc closes)
+and a scrollable, centered body of two sections:
+- **Details** — workspace **name** (saved by **Save changes**), plus a read-only
+  project count and creation date.
+- **Toolbar config** — the canvas element defaults, with a **Global / Workspace**
+  scope toggle. **Global** edits the base; **Workspace** overrides it for this
+  workspace. Both persist **immediately** (independent of Save changes). Each project
+  overrides these again in its own Edit page. This section was moved here out of the
+  global Settings modal.
+
+With no workspace selected, the body shows a hint to create or pick one.
 
 ---
 
@@ -885,20 +913,30 @@ Opened from the user menu (TopBar → avatar → Settings). Wide modal with a to
 
 **Tabs**:
 - **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, reveal selected layers)
-- **Element defaults**: global default styles for new canvas elements (see below)
 - **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
 - **Keyboard shortcuts**: rebindable canvas commands
 - **Save location**: workspace base folder and storage details
 
-**Element defaults tab** (global scope):
+The Settings modal no longer hosts element defaults — there is no "Element defaults"
+tab. They moved to scoped Edit surfaces (see **Element defaults editor** below).
+
+**Element defaults editor** (shared component):
 
 Sets the default appearance new canvas elements get when dropped (Text, Rectangle,
 Wrapper, Image, Icon, Ellipse, Line, Arrow, Polygon, Star). These defaults are a
-three-level cascade — **Global → Workspace → Project** — and this tab edits the
-**Global** base. The **workspace** level is edited on its own screen
-(`/element-defaults`); the **project** level is edited in the project's **Edit**
-page (Gallery → Edit → Element defaults section).
+three-level cascade — **Global → Workspace → Project** — and the same editor is
+reused at every scope:
+- **Global** and **Workspace** are edited in the **Workspace Edit** page's
+  "Toolbar config" section (avatar menu → Edit workspace), via its Global/Workspace
+  toggle. Both persist immediately.
+- **Project** is edited in the project's **Edit** page (Gallery → Edit → Element
+  defaults section).
+
+There is no longer a standalone "Element defaults" tab in the Settings modal, nor a
+top-nav "Elements" page — both folded into the scoped Edit surfaces above.
+
+The editor's fields:
 
 - **Adaptive sizing** (global only): Reference size (the frame size that maps to
   1× scale) plus min/max scale. New elements scale their default size toward the
@@ -910,8 +948,6 @@ page (Gallery → Edit → Element defaults section).
   **Font size mode** (Auto/Fixed), and **Snap to design system** — when the font
   size is auto-computed it rounds to the nearest typography size in the project's
   design system (e.g. a computed 11.46px becomes 12px) instead of the raw value.
-
-Changes are saved with the modal's Save button.
 
 **Project thumbnails tab**:
 

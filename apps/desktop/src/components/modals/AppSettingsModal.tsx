@@ -16,7 +16,6 @@ import type {
   ProcessingFeatureKey,
 } from "@/domain/settings/types";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
-import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 import {
   putGlobalSettings,
   setAutoGenerateProjectThumbnails,
@@ -50,7 +49,6 @@ import { FEATURES, modelsForFeature } from "@/lib/models/modelCatalog";
 
 type AppSettingsTab =
   | "canvas"
-  | "elements"
   | "projects"
   | "processing"
   | "shortcuts"
@@ -131,7 +129,6 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
               {(
                 [
                   { id: "canvas", label: "Canvas" },
-                  { id: "elements", label: "Element defaults" },
                   { id: "projects", label: "Project thumbnails" },
                   { id: "processing", label: "Processing Features" },
                   { id: "shortcuts", label: "Keyboard shortcuts" },
@@ -164,8 +161,6 @@ export const AppSettingsModal = forwardRef<AppSettingsModalHandle>(
           <div className="flex-1 overflow-y-auto">
             {tab === "canvas" ? (
               <CanvasTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
-            ) : tab === "elements" ? (
-              <ElementDefaultsTab settings={settingsDraft} onSettingsChange={setSettingsDraft} />
             ) : tab === "projects" ? (
               <ProjectThumbnailsTab />
             ) : tab === "processing" ? (
@@ -281,38 +276,6 @@ function CanvasTab({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ElementDefaultsTab({
-  settings,
-  onSettingsChange,
-}: {
-  settings: GlobalSettings;
-  onSettingsChange: (settings: GlobalSettings) => void;
-}) {
-  return (
-    <div className="px-[22px] py-5">
-      <ElementDefaultsEditor
-        scope="global"
-        inherited={DEFAULT_GLOBAL_SETTINGS.canvas.elementDefaults}
-        override={settings.canvas.elementDefaults}
-        parentLabel="default"
-        onChange={(next) =>
-          onSettingsChange({
-            ...settings,
-            canvas: {
-              ...settings.canvas,
-              // At global scope the editor emits the full element-defaults tree.
-              elementDefaults: {
-                ...settings.canvas.elementDefaults,
-                ...next,
-              } as GlobalSettings["canvas"]["elementDefaults"],
-            },
-          })
-        }
-      />
     </div>
   );
 }
