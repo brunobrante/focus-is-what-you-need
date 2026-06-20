@@ -411,7 +411,31 @@ Example:
 This propagation is required because parent previews are visual compositions of their children.
 If a child component changes but the parent snapshot still shows the old child, the hierarchy is broken.
 
-Schema migrations should also be used when needed to repair older local storage rows whose scenes and thumbnails were created before connected snapshot propagation existed.
+See "Data Lifecycle & Migrations" below: stale local rows are handled by
+nuke-and-reseed on a schema bump, not by repair migrations.
+
+## Data Lifecycle & Migrations
+
+This app is **local-only and pre-release** — it has no production deployment and
+no real user data on any machine. Because of that, **do not build data-transition
+adapters or incremental schema migrations.** There is nothing to preserve.
+
+When you make a structural change to the database, the persisted shape, or the
+seed, just bump `SCHEMA_VERSION`. `ensureSeededAndMigrated` in
+`src/lib/storage/seed.ts` will nuke and reseed on any version mismatch — that is
+the intended behavior, not a bug.
+
+Rules:
+
+- Do **not** write migration code that reads old rows and rewrites them to a new
+  shape. Bump the schema version and let it reseed.
+- Do **not** add backward-compatibility shims, version-detection branches, or
+  "repair" passes for older local rows.
+- A full reseed discarding existing local projects/scenes/edits is acceptable and
+  expected during development.
+
+If and when the app ever ships to real users with data worth keeping, this
+section must be revisited — at that point real migrations become necessary.
 
 ## Data Modeling Rules
 
@@ -651,23 +675,23 @@ run off the critical path, at idle, after the row is already written.
 #### Rust backend — `src-tauri/src/db.rs`
 
 A single `Connection` lives in `tauri::State<Db>` (wrapped in `Arc<Mutex<>>`).
-`open_and_migrate` runs once at setup, creates all tables, and sets WAL + NORMAL
-sync. The old `open_kv_connection` (open + `CREATE TABLE` on every single
-`kv_get`/`kv_set` call) is gone.
+`open_and_migrate` runs once at setup, creates the `records` table, and sets WAL
++ NORMAL sync.
+
+Every entity — including scenes and thumbnails — is one row in the generic
+`records(tbl, id, json)` table. A scene graph is JSON, a thumbnail is base64,
+both stored in the `json` column like any other record. There is **no** typed
+per-node/per-scene table or node-delta path: the TS side only ever emits
+`upsert_record` / `delete_records`, so that is all the backend implements.
 
 | Command | What it does |
 | --- | --- |
-| `db_apply(batch)` | Applies an entire coalesced batch in **one** `BEGIN…COMMIT` transaction. Handles `upsert_record`, `delete_records`, `upsert_scene`, `upsert_node`, `delete_node`, `delete_scene_nodes`, `upsert_thumbnail`, `delete_thumbnail`. Scene upserts use `WHERE excluded.scene_version > scenes.scene_version` (optimistic guard). Returns `ApplyAck { applied, scene_versions }`. |
+| `db_apply(batch)` | Applies an entire coalesced batch in **one** `BEGIN…COMMIT` transaction. Handles `upsert_record` and `delete_records`. Returns `ApplyAck { applied }`. |
 | `db_get_record(table, id)` | Single-row read from the `records` table. |
 | `db_list_records(table)` | All JSON strings for one table from `records`. |
-| `db_get_scene(owner_type, owner_id)` | Reads from the typed `scenes` table. |
-| `db_load_scene_nodes(owner_type, owner_id)` | All nodes for a scene from `nodes`, ordered by `order_index`. |
-| `db_get_thumbnail(owner_type, owner_id)` | Reads from the typed `thumbnails` table. |
-| `kv_get` / `kv_set` | Still exist for the legacy blob KV path, but now use the **same pooled connection** (no more per-call open + CREATE TABLE). |
 
-SQLite schema created in `open_and_migrate`: `kv_store`, `scenes`, `thumbnails`,
-`nodes` (with `idx_nodes_owner` index), and `records` (with `idx_records_tbl`
-index).
+SQLite schema created in `open_and_migrate`: only `records` (with the
+`idx_records_tbl` index).
 
 #### Ancestor propagation
 

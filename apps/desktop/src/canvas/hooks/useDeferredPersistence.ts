@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
 import { saveScene } from "@/application/scenes/saveScene";
 import { materializeComponentsFromCanvasDocument } from "../canvasMaterializer";
@@ -55,14 +55,6 @@ export function useDeferredPersistence({
   const skipInitialSaveRef = useRef(true);
   const materializedStructureKeyRef = useRef<string | null>(null);
 
-  // Reset refs synchronously when the canvas owner changes (runs during render)
-  if (latestOwnerKeyRef.current !== currentOwnerKey) {
-    latestOwnerKeyRef.current = currentOwnerKey;
-    latestGraphJSONRef.current = resolvedSceneGraphJSON;
-    pendingSaveRef.current = null;
-    skipInitialSaveRef.current = true;
-  }
-
   const flushPendingSave = useCallback((): Promise<void> => {
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
@@ -93,6 +85,17 @@ export function useDeferredPersistence({
       screen: pending.screen,
     });
   }, []);
+
+  // Reset refs synchronously when the canvas owner changes (runs during render).
+  // We deliberately do NOT null pendingSaveRef here: the previous owner's pending
+  // edit is flushed by the layout effect below so a fast navigation inside the
+  // debounce window doesn't drop it. flushPendingSave reads the pending entry's
+  // own owner, so flushing after this reset still persists to the correct owner.
+  if (latestOwnerKeyRef.current !== currentOwnerKey) {
+    latestOwnerKeyRef.current = currentOwnerKey;
+    latestGraphJSONRef.current = resolvedSceneGraphJSON;
+    skipInitialSaveRef.current = true;
+  }
 
   const handleCurrentDocumentChange = useCallback(
     (document: CanvasDocument) => {
@@ -178,6 +181,15 @@ export function useDeferredPersistence({
     sceneOwner,
     screen,
   ]);
+
+  // Flush the previous owner's pending save when the owner changes. Runs in the
+  // layout phase (after commit, before paint / any new interaction) so it never
+  // fires a save synchronously during render, and the new owner can't have
+  // queued its own pending save yet. pendingSaveRef still holds the old owner's
+  // edit because the render-time reset above no longer nulls it.
+  useLayoutEffect(() => {
+    void flushPendingSave();
+  }, [currentOwnerKey, flushPendingSave]);
 
   // Flush on unmount
   useEffect(() => {

@@ -76,8 +76,6 @@ export interface ComponentDetailState {
   setQuery: (q: string) => void;
   filter: CmpKindFilter;
   setFilter: (f: CmpKindFilter) => void;
-  fastEditOpen: boolean;
-  setFastEditOpen: (open: boolean) => void;
   creatingVariant: boolean;
   pendingChildDelete: ComponentRow | null;
   setPendingChildDelete: (c: ComponentRow | null) => void;
@@ -214,7 +212,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const [sideTab, setSideTab] = useState<SideTab>("components");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
-  const [fastEditOpen, setFastEditOpen] = useState(false);
   const [creatingVariant, setCreatingVariant] = useState(false);
   const [pendingChildDelete, setPendingChildDelete] = useState<ComponentRow | null>(null);
   // Preview-only selection: which version the preview pane shows. Null falls back
@@ -398,8 +395,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     setQuery,
     filter,
     setFilter,
-    fastEditOpen,
-    setFastEditOpen,
     creatingVariant,
     pendingChildDelete,
     setPendingChildDelete,

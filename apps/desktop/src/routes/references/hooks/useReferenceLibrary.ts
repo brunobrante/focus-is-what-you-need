@@ -93,7 +93,6 @@ export function useReferenceLibrary() {
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterSort, setFilterSort] = useState<FilterSort>("recent");
   const [selectedSubject, setSelectedSubject] = useState<SelectedSubject>(null);
-  const [lightboxItem, setLightboxItem] = useState<ReferenceItem | null>(null);
   const [stackThumbnailUrls, setStackThumbnailUrls] = useState<Record<string, string>>({});
   const [frameVideo, setFrameVideo] = useState<FramePickerVideo | null>(null);
   const [frameBusy, setFrameBusy] = useState(false);
@@ -515,8 +514,6 @@ export function useReferenceLibrary() {
     typeOptions,
     selectedSubject,
     setSelectedSubject,
-    lightboxItem,
-    setLightboxItem,
     stackThumbnailUrls,
     frameVideo,
     setFrameVideo,

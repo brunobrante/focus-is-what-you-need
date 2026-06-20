@@ -1,0 +1,612 @@
+# BETTER.md — Improvement Backlog for `apps/desktop`
+
+> Audit of the whole `apps/desktop` codebase (~74k LOC, React 19 + TypeScript + Tauri + Skia).
+> Findings are grouped **by type**: Bugs, Performance, Gambiarras (hacky workarounds that
+> "work" but mask the real problem), Inconsistencies, Organization / Clean Architecture, and
+> Code Duplication across the multiple canvases (main editor, builder, references viewer,
+> snapshot viewers).
+>
+> Each item cites a concrete `file:line` so it can be acted on directly. Severity tags:
+> 🔴 high (correctness / data loss / user-visible regression), 🟠 medium, 🟡 low / cleanup.
+
+---
+
+## Resolved (2026-06-20)
+
+These items have been fixed or deliberately dropped and were removed from the backlog below:
+
+- **BUG-01** ✅ FastEdit on the component-detail view now uses the imperative
+  `ref.open(...)` API (`DetailPage` `ComponentContent`); the orphaned `fastEditOpen` state was
+  removed from `useComponentDetail`. (`ConfirmActionModal` was already fixed with a dual API.)
+- **BUG-03 / BUG-04** ✅ The deferred-persistence hooks no longer drop the previous owner's
+  pending edit on a fast owner switch: `useDeferredPersistence` flushes in a layout effect (not
+  during render), and `useHtmlCanvasDocument` keeps a `pendingRef` flushed on owner-change/unmount.
+- **BUG-05** ✅ `commitDocument` now clears `editingTextId` in both branches.
+- **BUG-13** ⛔ **Won't fix — by design.** The app is local-only and pre-release with no data to
+  preserve, so nuke-and-reseed on a schema bump is the intended behavior. No migrations. (See the
+  "Data Lifecycle & Migrations" section in `CLAUDE.md`.)
+- **ARCH-01 / PERF-ARCH-01 / INC-ARCH-1** ✅ The dead typed-delta SQLite path (the
+  `scenes`/`nodes`/`thumbnails` tables, the `upsert_scene`/`upsert_node`/`upsert_thumbnail` Rust
+  arms, `db_get_scene`/`db_load_scene_nodes`/`db_get_thumbnail`, and the `scene_versions` ack
+  field) was **deleted**. Scenes/thumbnails are JSON/base64 rows in `records`; the backend only
+  implements `upsert_record` / `delete_records`. `CLAUDE.md` was corrected to match.
+- **ORG-12** ✅ The ~1300 lines of dead reference-viewer UI (`Lightbox`, `Inspector`,
+  `InspectorPanel`) and the orphaned `lightboxItem` state were deleted.
+
+---
+
+## 0. Top Priorities (read this first)
+
+If only a handful of things get fixed, fix these:
+
+1. 🔴 **Whole-document `JSON.stringify` on every edit** for history + draft cache — the exact
+   blob-serialization cost the Save rewrite set out to kill, here on the in-memory interaction
+   path. — `PERF-08`
+2. 🔴 **Ancestor propagation runs synchronously on the save critical path**; the documented
+   off-critical-path `propagateSceneToParents` has zero callers. — `PERF-ARCH-02`
+3. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
+4. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
+   returns the correct (deepest containing) child, so low priority. — `BUG-02`
+
+---
+
+## 1. Bugs
+
+### Canvas editor
+- 🟡 **BUG-02 — `findChildAtPoint` recurses into non-containing branches.**
+  `src/canvas/stage/canvasHitTesting.ts:14-34`. `walk` recurses into all children
+  unconditionally instead of gating `walk(node.children)` behind the `isPointInElement` check
+  (as `findDropTarget` does). In practice the deepest *containing* child still wins, so this is a
+  cleanliness issue, not an active wrong-click bug — low priority.
+- 🟠 **BUG-06 — `pasteElements` cascades elements off-canvas with no bound.**
+  `src/canvas/engine/clipboard.ts:97-102`. Pasted roots get `+24` offset with no clamp, then
+  are re-copied from the unconstrained document, so repeated pastes drift off-frame forever.
+  Run through `constrainAll` before returning and before re-copying.
+- 🟠 **BUG-07 — `setZoom` early-return can skip a needed recenter/clamp.**
+  `src/canvas/engine/store.tsx:~210-213`. `if (state.zoom === zoom) return state;` returns before
+  `zoomViewportAroundCenter` re-clamps offsets, leaving offsets unclamped at min/max while panned.
+  Short-circuit only when zoom **and** offsets are unchanged.
+- 🟡 **BUG-08 — Stuck radius/bend cursor when text editing begins mid-hover.**
+  `src/canvas/stage/hooks/useCanvasPointerEvents.ts:329-339`. `RADIUS_CURSOR` is only cleared in
+  the tooling branch. Clear `viewport.style.cursor` unconditionally at the top of the
+  no-interaction branch.
+- 🟠 **BUG-09 — Skia context-restore reuses stale backing dimensions.**
+  `src/canvas/stage/skiaToolingAdapter.ts:172-175,397`. `this.size` is not reset on context loss,
+  so a same-size restored frame keeps clobbered `canvas.width/height`. Reset
+  `this.size = {0,0,1}` in `handleContextLost`.
+- 🟠 **BUG-10 — Context-lost listeners + canvas leak on a typeface-load race.**
+  `src/canvas/stage/skiaToolingAdapter.ts:210-214`. If `destroyed` flips during
+  `loadToolingTypeface`, the early return never removes `webglcontextlost/restored` listeners or
+  detaches the canvas. Route both early-returns through the same `destroy()` cleanup.
+
+### Builder (`generate`)
+- 🟠 **BUG-11 — `waitForImage` never rejects on image error → crop save can hang forever.**
+  `src/generate/engine/image.ts:35-43`. No `error` handler / timeout; a broken `dataUrl` with
+  `complete===true` && `naturalWidth===0` falls through to a `load` listener that never fires, so
+  `await waitForImage` in `saveSelection` (`useToolsEditor.ts:870`) hangs. Resolve/reject on
+  `error` too (mirror `measureImage`).
+- 🟠 **BUG-12 — Radius coordinate conversion inconsistent across the three transforms.**
+  Edit-projection divides radius by average scale `(sx+sy)/2`
+  (`useBuilderInteraction.ts:200-208`), `selectionToSubjectCoords` multiplies by `(sx+sy)/2`
+  (`:241-245`), but `paintCropsCanvas` uses only the X-axis ratio (`drawing.ts:237-240`). On a
+  non-uniformly scaled image the painted radius won't match the saved one. Use one shared radius
+  helper.
+- 🟡 **BUG-Bld-1 — `selectStackComponent` defined twice with divergent behavior.**
+  `src/generate/hooks/useToolsEditor.ts:387-397` vs the `onSelectStackComponent` copy at
+  `:458-465` (one calls `cancelSelection`, the other `cancelSelectionStable`). Collapse to one.
+- 🟡 **BUG-Bld-2 — Stale-closure `referenceId` in the loader effect.**
+  `useToolsEditor.ts:1177-1252`, deps `[item.id]` only (eslint-disabled). If `referenceId`
+  changes without `item.id`, the stale value is used for the whole async load. Add it to deps.
+
+### References / blobs
+- 🟠 **BUG-Ref-1 — Object-URL lifecycle split across two effects → double-revoke / transient
+  broken images.** `Lightbox.tsx:52-54` & `:29-50`, `ReferenceDetailModal.tsx:152`,
+  `useReferenceLibrary.ts:147-205`. The same URLs can be revoked twice (harmless) and a replaced
+  cover URL can be revoked while an `<img>` still points at it for a frame. Own each URL's
+  lifecycle in one place; defer revocation of replaced URLs by a microtask.
+- 🟠 **BUG-13b — `useReferenceUrl` never revokes; relies on a session cache cleared only on route
+  exit → unbounded memory growth.** `useReferenceUrl.ts` + `referenceUrlCache.ts:75`. Add an LRU
+  cap that revokes least-recently-used URLs past N entries.
+- 🟡 **BUG-Ref-2 — `IntersectionObserver` observes a possibly-null element captured at effect
+  time.** `useReferenceUrl.ts:62-83`. Ref callbacks fire during commit, effects after; first
+  render falls back to eager load. Use `useLayoutEffect` keyed on the element, or store it in state.
+- 🟡 **BUG-Ref-3 — `measureImage`/`measureVideo` never release the element.**
+  `fileHelpers.ts:114-138`. `video.src` keeps the element alive holding a decode during
+  multi-file import. Null out `.src` / remove handlers on settle.
+
+### Shared UI / pages
+- 🟠 **BUG-15 — `ReferencesModal` keydown effect has no dependency array.**
+  `src/components/modals/ReferencesModal.tsx:52-60`. Re-registers the window listener and rebinds
+  `next/prev` closures every render. Add `}, [open, total])`.
+- 🟠 **BUG-16 — LandingPage export-toast timer has no cleanup / clobbers newer notices.**
+  `src/pages/LandingPage.tsx:50`. `setTimeout(...4000)` stores no handle; fires after unmount and
+  stacks. Store the id in a ref, clear per export and on unmount.
+- 🟡 **BUG-17 — `justPannedRef` click-suppression flag can leak across interactions.**
+  `src/components/screen/useStepZoom.ts:162-199`. Only cleared in `onClickCapture`; a pan with no
+  following click leaves it true and swallows the next legit click. Also reset on `pointerdown`.
+- 🟡 **BUG-18 — `SceneCanvasViewer` stored-image branch has no size clamp.**
+  `src/components/screen/SceneCanvasViewer.tsx:50-53`. Apply the sibling's
+  `max-h-[60vh] max-w-full object-contain`.
+
+### Architecture / persistence
+- 🟠 **BUG-ARCH-2 — `getSceneByOwner`/`getThumbnailByOwner` do a full table scan per lookup.**
+  `scenes.repo.ts:33-41`, `thumbnails.repo.ts:12-20`. `listScenes().find(...)` runs N times per
+  propagation pass. Read the single row by deterministic id via `getRecordById`.
+- 🟠 **BUG-ARCH-3 — `setMeta` does not notify subscribers.**
+  `src/lib/storage/recordStore.ts:154-163`. `putRecord` calls `notify`, `setMeta` does not; seed
+  works around it by calling `notify(TABLES.meta)` manually in one path but not `writeMeta`. Call
+  `notify(META_TABLE)` inside `setMeta`.
+- 🟡 **BUG-ARCH-4 — Optimistic guard asymmetry: nodes use `>=`, scenes use `>`.**
+  `src-tauri/src/db.rs:254` vs `:214`. Node upsert accepts an equal rev (last-writer-wins);
+  scenes reject equal versions. Latent clobber bug if the node path is ever wired up. Make them
+  consistent (`>`).
+- 🟡 **BUG-ARCH-5 — IndexedDB `listRecords` upper bound is fragile.**
+  `src/infrastructure/persistence/indexedDbPersistence.ts:42`. `IDBKeyRange.bound([table],
+  [table, []])` relies on array-sorts-after-string key ordering — works today, undocumented,
+  breaks on any non-string id. Use an explicit `"￿"` sentinel and add a conformance test.
+
+---
+
+## 2. Performance
+
+### Canvas Skia render / drag loop (hottest path)
+- 🟠 **PERF-01 — `framesEqual` early-out is effectively dead; re-renders every frame.**
+  `src/canvas/stage/skiaToolingAdapter.ts:85-103` (used `:224`). It compares
+  `outlines/ghosts/guides` by reference, but `CanvasToolingLayer.renderData`
+  (`CanvasToolingLayer.tsx:319`) rebuilds those as fresh literals every memo recompute, so the
+  skip-identical-frame guard never fires during interaction. Compare label/box fields by value,
+  or pass stable references.
+- 🟠 **PERF-02 — New `Font` (WASM) allocated and deleted every frame in
+  `drawParentDistances`.** `skiaToolingAdapter.ts:734,783`. Cache a `parentDistanceFont` field
+  like the existing `valueLabelFont`.
+- 🟠 **PERF-03 — Redundant per-frame glyph/width measurement for labels.**
+  `skiaToolingAdapter.ts:890-894,909,976`. `measureTextWidth` allocates two arrays per label per
+  frame; the size-label width is measured then re-measured for identical text in `drawValuePill`.
+  Measure once, pass the width in.
+- 🟠 **PERF-04 — `renderData` memo keyed on array identity, not content.**
+  `CanvasToolingLayer.tsx:560-573`. Deps include `props.selectedIds` (array ref) + a fresh
+  `viewportTransform`; a same-contents `selectedIds` rebuilds all outline geometry. Depend on the
+  already-computed `selectedIdsKey` (`:273`).
+- 🟠 **PERF-05 — `draftContentBounds` recomputes a full-document AABB every transient drag
+  frame.** `CanvasStage.tsx:359-362`, deps `[draftMode, state.document]` (changes ~60fps via
+  `setDocumentTransient`) — purely for scroll indicators. Depend on `rootIds` + a content-bounds
+  signal, or skip while interacting.
+
+### Canvas tree / inspector / equality
+- 🟠 **PERF-06 — Tree re-serializes selection + whole structure every render.**
+  `src/canvas/shell/Tree.tsx:266` (`JSON.stringify(selectedIds)` per render) and `:200-204` +
+  `treeHelpers.ts:241-292` (`structureKey` serializes the entire tree as effect deps), on
+  drag-hover and every search keystroke. Use reference comparison for selection; a cheap
+  incremental structural hash for structure.
+- 🟠 **PERF-07 — `TreeRow` recursive component is not memoized + gets fresh inline closures.**
+  `src/canvas/shell/tree/TreeRow.tsx:10`, `Tree.tsx:318,536`. Every `Tree` render re-renders the
+  whole visible subtree. `React.memo` + `useCallback` the row callbacks.
+- 🔴 **PERF-08 — Whole-document `JSON.stringify` per edit for history + draft cache.**
+  `useCanvasHistory.ts:43,58,76,115-121` (`stripUpdatedAt` stringifies the whole doc on every
+  update/commit) and `engine/store.tsx:509-523` (localStorage draft). This is the exact
+  blob-serialization cost the Save rewrite set out to kill, here on the in-memory interaction
+  path. Use a structural hash / dirty flag / version counter.
+- 🟠 **PERF-09 — `isFactoryMockGraphJSON` / `shouldUseMockGraph` fully parse graph JSON,
+  unmemoized, every render.** `Canvas.tsx:231-234`. Memoize `effectiveSceneGraphJSON`, parse once.
+- 🟠 **PERF-10 — `Inspector` registers six separate bridge subscriptions.**
+  `src/canvas/shell/Inspector.tsx:81-86`. Six `useEditorBridge` selectors each run equality on
+  every ~60Hz publish during drag. Collapse into one selector returning a stable tuple with a
+  custom `isEqual`.
+- 🟡 **PERF-11 — `buildSnapCandidates` scans all nodes when `parentId` is undefined.**
+  `engine/snapping.ts:74-83`. Computes an AABB (ancestor walk) per node, O(n) per snap build.
+  Require an explicit parent scope or memoize AABBs.
+- 🟠 **PERF-12 — Materialization does an awaited DB scene read per component node on the editing
+  path.** `canvasMaterializer.ts:19-28,159-170` + `useDeferredPersistence.ts:87-94`.
+  `flushPendingSave` always re-materializes (no structure-key guard) and awaits
+  `readSceneByOwner` sequentially per node. Batch-load or compare against the synchronous
+  `recordStore` cache; drop materialization from `flushPendingSave`.
+
+### Architecture / storage
+- 🔴 **PERF-ARCH-02 — Ancestor propagation runs synchronously on the save critical path.**
+  `saveScene.ts:15-17`, `scenes.repo.ts:43-78`. `saveScene()` calls `upsertScene` with
+  `propagate` defaulting to `true`, walking the full ancestor chain (each hop = full table scan)
+  on every keystroke-driven save. The documented off-critical-path `propagateSceneToParents` has
+  **zero callers**. Enqueue the row, then schedule propagation at idle.
+- 🟠 **PERF-ARCH-03 — `replaceTable` on scenes/thumbnails/history reintroduces O(table × blob).**
+  `components.repo.ts:381-393` (`deleteTree`), `variants.repo.ts:133-142` (`deleteVariant`),
+  `history.repo.ts:48-59` (`recordHistoryEntry`/`bulkInsertHistory`). `replaceTable`
+  `JSON.stringify`s every surviving large blob to diff, just to delete/append a few. The code's
+  own comment (`recordStore.ts:108-110`) warns against this. Use `removeRecords([ids])` /
+  `putRecord(created)`.
+- 🟠 **PERF-ARCH-04 — Dependency index rebuilt from full table scans on every propagation.**
+  `scenes.repo.ts:170-173`. `createSceneDependencyIndex` from `listTable(variants)+components`
+  per save when no `preloadedIndex`. Memoize / always pass the preloaded index.
+- 🟡 **PERF-ARCH-05 — Redundant `idx_records_tbl` index.** `db.rs:72-78`. The PK `(tbl,id)`
+  already covers the `tbl` prefix; the extra index is write amplification.
+
+### Shared UI / pages
+- 🟠 **PERF-UI-01 — No route-level code splitting.** `src/App.tsx:3-12`. Every page (canvas,
+  builder, system-design…) is statically imported; their engine trees load on the Landing page.
+  `React.lazy` + `Suspense`; canvas and Generate are the highest-value splits.
+- 🟠 **PERF-UI-02 — ~2000-line mock-data builder ships in the runtime bundle.**
+  `canvasMocks.ts` (480) statically imports `screenMockHierarchy.ts` (1043), pulled in by
+  `seed.ts`, `useMockScene.ts`, `CompareVersionsModal`, `VersionSideCard`. Dynamic `import()` to
+  keep it out of the editing runtime.
+- 🟠 **PERF-UI-03 — Project thumbnail rasterization runs on the main thread, sequentially.**
+  `projectThumbnail.ts:39-43,88-93`. `renderProjectThumbnailDataUrl` (`toDataURL`) is sync and
+  looped with `await` per project — a settings toggle stalls the UI proportional to project
+  count. OffscreenCanvas/worker or at least `requestIdleCallback` between projects.
+- 🟡 **PERF-UI-04 — `ReferenceGrid` injects a `<style>` tag on every render.**
+  `ReferenceGrid.tsx:38-50`. Move to a static CSS class/module.
+- 🟠 **PERF-UI-05 — `CanvasScrollbars` rAF settle loop re-measures for 220ms every pan frame.**
+  `CanvasScrollbars.tsx:101-111`. `signal` changes each frame during pan, restarting the loop —
+  a permanent measure loop. Only run on zoom-step changes.
+- 🟡 **PERF-UI-06 — Inline `allScreens.filter` in JSX every LandingPage render.**
+  `LandingPage.tsx:95`. Filters the whole list even when the edit modal is closed. `useMemo`.
+
+### Builder / references
+- 🟠 **PERF-Bld-1 — `useToolsEditor` returns a fresh 100+-key object every render.**
+  `useToolsEditor.ts:1308-1440` + unmemoized derived values (`:1293-1304`). Any state change
+  re-runs the whole view. Memoize derived values; consider splitting the returned surface.
+- 🟠 **PERF-Bld-2 — Painter effects depend on `toolPan` but read pan from the DOM.**
+  `useBuilderCanvasPainter.ts:128-148,168-182` vs `drawing.ts:154-182` (`getBoundingClientRect`).
+  Every pan tick triggers a full repaint of both canvases. Drive repaint off a resize signal.
+- 🟡 **PERF-Bld-3 — Component image cache compares full base64 `dataUrl` strings.**
+  `useBuilderCanvasPainter.ts:85-103`. Key by a cheap version token (`id+variantId`) instead.
+- 🟡 **PERF-Ref-1 — No virtualization on the catalog grid.** `ReferenceGrid.tsx:51-84`. Every
+  `ReferenceCard` (458-line component) mounts. Virtualize / render-on-visible.
+- 🟡 **PERF-Ref-2 — Stack preview decodes every cut blob up-front.**
+  `ReferenceDetailModal.tsx:1223-1250`, `Lightbox.tsx:238-254`. N blob reads before anything
+  shows. Load background + selected cut first; lazy-load the rest.
+
+---
+
+## 3. Gambiarras (hacky workarounds that mask the real problem)
+
+- 🟠 **GAMB-01 — Dead Canvas2D tooling-draw functions hand-synced with the Skia path.**
+  `canvasToolingRenderer.ts:293-381` (`drawOutlineRect`, `drawOutline`, `drawResizeHandles`,
+  `drawRadiusHandles`). The factory only ever builds Skia (`toolingRendererFactory.ts` ignores its
+  `_kind` and returns `createSkiaToolingAdapter()`; `ToolingRendererKind` is single-member
+  `"skia"`), and `skiaToolingAdapter.ts` has its own `drawOutline`/`drawResizeHandles`/
+  `drawRadiusHandles`. The Canvas2D draw fns are referenced only by their own unit test — they have
+  drifted from the live Skia ones. **Note:** the *geometry* helpers in the same file
+  (`getRadiusHandlePositions`, `elementToViewportBox`, etc.) ARE live and shared — delete only the
+  dead `draw*` functions (and their test), not the whole file. (See also DUP-04, INC-03.)
+- 🟠 **GAMB-02 — `canContainChildren` hardcodes `type === "rect"` instead of element-definition
+  capabilities.** `canvasHitTesting.ts:36-38` (and the drop logic in `canvasToolingRenderer`).
+  Bypasses `getElementDefinition(type).capabilities` used elsewhere; any new container type
+  silently can't accept drops.
+- 🟠 **GAMB-03 — Legacy data migrations buried in the per-node hot constrain path.**
+  `engine/mutations/elementHierarchy.ts:59-64`. `constrainAll` rewrites the hardcoded hex
+  `"#e9edf3"` and coerces `"container"` → `"rect"` (`as string` cast for a removed enum variant)
+  on every hydrate/undo. Move to real schema migrations.
+- 🟠 **GAMB-04 — DOM querying by `data-*` instead of a ref registry (+ reimplemented
+  `CSS.escape`).** `Tree.tsx:88-103` (`querySelector('[data-tree-node-id=…]')` +
+  `escapeCssAttributeValue`) and `canvasAlignmentLog.ts:94-99` (`querySelectorAll` linear scan +
+  `getComputedStyle` per element). Maintain a `Map<id, HTMLElement>` ref registry.
+- 🟡 **GAMB-05 — Double-rAF / `setTimeout(0)` timing hacks to wait for layout.**
+  `Tree.tsx:305-310` (nested rAF to scroll after open-set flush), `CanvasStage.tsx:237-242`
+  (nested rAF then `setTimeout(run,0)` fallback). Use a layout effect keyed on the relevant state.
+- 🟡 **GAMB-06 — Toolbar subtree remounted via a stringified-boolean `key` to replay a CSS
+  animation.** `CanvasToolingLayer.tsx:938`. Throws away the subtree (and its focus/state) just
+  to re-trigger an entrance animation. Use a CSS class toggle / Web Animations API.
+- 🟠 **GAMB-07 — Hand-rolled color parser silently returns black on unrecognized input.**
+  `skiaToolingAdapter.ts:1118-1142`. Ignores hsl/named/8-digit hex, paints wrong-colored chrome
+  rather than failing. Use `ck.parseColorString`.
+- 🟠 **GAMB-08 — Unpersisted "render mode" UI toggles disconnected from settings.**
+  `Toolbar.tsx:193,287-296` and `inspector/ShellTab.tsx:75-77,193-205` (`shapeRenderModes`) are
+  throwaway local state that write nowhere; per CLAUDE.md they belong in `canvas.toolDefaults`.
+  Wire to settings or remove.
+- 🟡 **GAMB-09 — Hardcoded layout magic numbers that don't match the file's own constants.**
+  `CanvasRender.tsx:139-143` uses `window.innerWidth - 320 - 280 - 100` while the same file
+  defines `TREE_WIDTH=300`/`INSPECTOR_WIDTH=280`. Scattered offsets in `CanvasToolingLayer.tsx`
+  (`38`, `126/150`, `CONTEXT_TOOLBAR_HEIGHT=36` declared inside render). Derive from constants.
+- 🟡 **GAMB-10 — Unmemoized inline search-source closures + non-`useCallback` zoom setter.**
+  `Canvas.tsx:597-617,620-640,660-665`. Rebuild the entire element/tool search list and recreate
+  `setActiveZoom` each render. Memoize.
+- 🟡 **GAMB-Bld-1 — Magic zoom multiplier `1.14` hardcoded.** `useBuilderViewport.ts:57`. The main
+  canvas drives zoom steps from settings; extract a named constant at minimum.
+- 🟡 **GAMB-Bld-2 — `setTimeout(250)` persist debounce + `4000`ms message timer as raw
+  literals.** `useBuilderComponents.ts:116`, `useToolsEditor.ts:1012`. The 250ms debounce
+  reimplements the coalescing-save concept `SaveQueue` already solves. Name the constants;
+  consider `requestIdleCallback`.
+- 🟡 **GAMB-Bld-3 — Inline SVG data-URL cursors with magic hotspots.**
+  `ToolsEditorView.tsx:71-76` (`LAMA_BRUSH_CURSOR`), `useBuilderInteraction.ts:45`
+  (`RADIUS_CURSOR`). Centralize cursor constants (the bend-cursor hotspot is duplicated knowledge
+  from the main canvas).
+- 🟡 **GAMB-Bld-4 — Inline id generation `Math.random().toString(36).slice(2,9)` ×4.**
+  `useToolsEditor.ts:930,1083`, `componentModel.ts:38`, `variants.ts:16`. One `makeId(prefix)`.
+- 🟡 **GAMB-Ref-1 — `requestIdle` falls back to `setTimeout(cb,1)` with inline `window` casts in
+  two places.** `routes/references/lib/utils.ts:11-22`. One typed `idle.ts` util.
+- 🟡 **GAMB-Ref-2 — `'￿'` sentinel for IndexedDB range delete.**
+  `indexedDbReferenceBlobStore.ts:148-152`. Classic max-code-unit trick; breaks on higher
+  surrogates. (Same class as BUG-ARCH-5.)
+- 🟠 **GAMB-Ref-3 — Business logic encoded as a 5-level `??` ladder in the render body.**
+  `ReferenceDetailModal.tsx:187-192` (`effectiveStackId`) + `:206-209`. Extract to a pure helper
+  in `stackHelpers.ts` (which already has `defaultStackSelectionId`).
+- 🟠 **GAMB-UI-1 — Hardcoded `type="desktop"` for every global component (violates the
+  snapshot-size rule).** `GlobalComponentsPage.tsx:116,164,173-180`. `canvasHref`, `Snapshot`,
+  `FastEditModal` force a desktop frame onto possibly mobile/tablet components. Derive `type`
+  from the source project/screen.
+- 🟡 **GAMB-UI-2 — Four different focus-delay timers.** `NewComponentModal.tsx:68` (60),
+  `NewScreenModal.tsx:47` (60), `ProjectSettingsModal.tsx:52` (80), `AddReferenceModal.tsx:199`
+  (rAF). Standardize on a shared `useAutoFocus(ref, isOpen)`.
+- 🟡 **GAMB-UI-3 — `FastEditModal` reads `getBoundingClientRect()` during render to position a
+  dropdown (+ `zIndex:9999`, hover via `style.background` mutation).**
+  `FastEditModal.tsx:394-409,442-447`. Compute position in a layout effect into state; use a
+  `hover:` class.
+- 🟠 **GAMB-UI-4 — `" Canvas"` name-suffix magic special-case to pick the scene subject.**
+  `FastEditModal.tsx:328` and `scenes.repo.ts:532-548` (`subjectNodeForDocument` via
+  `root.name.endsWith(" Canvas")`). Propagation correctness hinges on a display-name suffix —
+  rename/locale-fragile. Use an explicit structural flag on the node.
+- 🟡 **GAMB-UI-5 — `Modal` scroll-lock via module-level mutable globals.**
+  `Modal.tsx:5-9,20-46`. Shared `let openModalCount/previousBodyOverflow` + scrollbar-comp magic;
+  fragile if two modals mount in the same tick. Guard the 0→1 transition or use a scroll-lock hook.
+- 🟡 **GAMB-UI-6 — Dead device-switcher control + unused `mock` field.**
+  `PreviewShell.tsx:18-22,42-44` (`deviceId`/`deviceActive` never change the preview size),
+  `NewProjectPage.tsx:147-151` (`mock` duplicates `value`, never read). Wire or remove.
+- 🟠 **GAMB-ARCH-1 — `setTimeout(120ms)` thumbnail debounce is a second uncoordinated scheduler.**
+  `thumbnailQueue.ts:12-33`, `projectThumbnail.ts:19-56`. Parallel to the SaveQueue; can race
+  with shutdown and drop a final thumbnail. Reconcile with the single idle drain.
+- 🟠 **GAMB-ARCH-2 — Toolbar layout force-overridden inside the settings resolver.**
+  `domain/settings/resolve.ts:58-64`. `resolveSettingsLayers` unconditionally replaces
+  `canvas.tools.toolbar` with defaults ("never let stale persisted data override it") — silently
+  discarding any customized layout the user saved. Migrate stale rows instead of clobbering.
+
+---
+
+## 4. Inconsistencies
+
+- 🟠 **INC-01 — Three divergent scene-persistence hooks with different flush contracts.**
+  `useDeferredPersistence.ts`, `useVersionScenePersistence.ts`, `useHtmlCanvasDocument.ts`. Each
+  hand-rolls a debounced fire-and-forget `saveScene` with different debounce values (300 vs 350)
+  and its own owner-change/flush semantics. BUG-03/BUG-04 (the dropped-edit symptoms) were patched
+  individually in two of them, but the duplication remains: consolidate into one parameterized hook
+  with a single flush-on-owner-change-and-unmount contract so the third hook
+  (`useVersionScenePersistence`, whose own comment calls it "a thin clone of the Current window's
+  save path") can't drift again.
+- 🟠 **INC-02 — Four copies of `cloneDocument`; reparent geometry duplicated verbatim.**
+  `engine/mutations/coreUtils.ts:12` exports it, yet `elementOrder.ts`, `elementContent.ts`,
+  `elementGeometry.ts` each redefine a local copy; the "re-derive local center after reparent"
+  math is copy-pasted between `reparentElements` and `moveElementToParent`
+  (`elementHierarchy.ts`). Import the shared one; extract `computeLocalPositionAfterReparent`.
+- 🟠 **INC-03 — Three independent copies of handle-point geometry that must stay in sync.**
+  `skiaToolingAdapter.ts:566-578` (`resolveSkiaHandlePoints`), `canvasToolingRenderer.ts:335-347`
+  (`resolveHandlePoints`), `canvasHitTesting.ts:240-256` (edge midpoints). If they drift, handles
+  render where they can't be grabbed. Extract a single `handlePointsForBox(box)`.
+- 🟡 **INC-04 — Inspector prop-or-bridge resolution copied ~14×; rest of shell uses bridge
+  only.** `Inspector.tsx:89-95`. Extract a `useResolvedEditor(editorProp)` hook.
+- 🟡 **INC-05 — Element-creation options assembled two different ways.**
+  `useCanvasPointerEvents.ts:229-244` inlines what `elementCreationOptions()`
+  (`canvasInteractionHandlers.ts:79-88`) already builds. Reuse the helper.
+- 🟠 **INC-06 — Mixed Portuguese / English UI copy, arbitrary per-string** (across the whole app).
+  Canvas: `Inspector.tsx` ("Inspetor"/"Tamanho"), `CanvasRender.tsx:706` ("Carregando cena…"),
+  `ElementTab.tsx` flips "Position"/"Tamanho" in one component. References:
+  `Inspector.tsx`/`ImportModal.tsx` ("URL de origem", "Voltar", "Manter os dois") vs English in
+  `ReferenceDetailModal`. Pages: `NewProjectPage` ("Etapa…", "Como vai se chamar?"),
+  `DetailPage` ("Comparar", "Componente"), PT in `aria-label`s (`PreviewShell.tsx`). CLAUDE.md
+  permits PT only for **visible** copy and requires consistency. Pick one interface language; keep
+  non-visible attributes English.
+- 🟡 **INC-07 — `InstanceDeleteModal` still uses the controlled `open`-prop pattern**
+  (`InstanceDeleteModal.tsx:24`) while most modals are forwardRef/imperative. Minor: a controlled
+  modal is fine; only flagged for consistency. (The previously broken-by-usage `FastEditModal`/
+  `ConfirmActionModal` call sites are fixed — see the Resolved section.)
+- 🟡 **INC-08 — Two parallel design systems / token sets.** `components/ui/button.tsx` + `card.tsx`
+  (shadcn/cva, `bg-card`, `data-slot`) appear unused by feature code; everything else hand-writes
+  buttons/cards with `var(--surface)`/raw `rgba`/`text-[12px]`. Pick one; adopt the primitives or
+  delete them.
+- 🟡 **INC-09 — Icon sourcing split** between the 88-component custom registry
+  (`components/icons/index.tsx`) and ad-hoc `lucide-react` imports (`FilterButton`, `TopBar`,
+  `ReferenceCard`) and raw inline `<svg>` (`PreviewShell.tsx:132-143`). One icon source.
+- 🟡 **INC-10 — `Tab` union missing the used `"elements"` value.**
+  `application/gallery/useGallery.ts:30` vs `GalleryPage.tsx:195` branching on `tab ===
+  "elements"`. Add it to the union.
+- 🟡 **INC-Bld-1 — Pointer handlers are plain functions, viewport handlers are `useCallback`** in
+  the same file. `useBuilderInteraction.ts:282-522` vs `cancelSelection`/`toOriginalCoords`. Also
+  two different "tool requires crop → fall back to move" implementations
+  (`useToolsEditor.ts:503-514` vs `useBuilderInteraction.ts:163-168`).
+- 🟡 **INC-Bld-2 — Naming: `toolZoom`/`toolPan` (builder) vs `zoom`/`offsetX/offsetY` (canvas)** for
+  the same concept — makes the shared-helper boundary harder to follow.
+- 🟡 **INC-Ref-1 — Three parallel "inspector" implementations with divergent draft-reset logic.**
+  `Inspector.tsx` & `InspectorPanel.tsx:174-182` (effect keyed on id) vs
+  `ReferenceDetailModal.tsx:494-499` (`prevIdRef` guard). One shared `useDraftField` hook.
+- 🟡 **INC-ARCH-2 — Adapters have no shared conformance suite; only `memoryPersistence.test.ts`
+  exists.** The "reference implementation the other adapters must match" is only spot-checked.
+  Add a shared adapter conformance test parameterized over memory/indexeddb/sqlite.
+- 🟡 **INC-ARCH-3 — `SceneOwnerType` is `"variant"` only, but `OwnerType` still models
+  `"project"|"screen"|"component"`** with dead `if (parentOwner.ownerType !== "variant") return`
+  branches. `schema.ts:112-116`, `dependencyIndex.ts:49-65`. Trim the vestigial branches.
+
+---
+
+## 5. Organization / Clean Architecture
+
+### Oversized files mixing responsibilities
+- 🟠 **ORG-01 — `Toolbar.tsx` (1294 lines) embeds an entire unrelated "Actions" app.**
+  `canvas/shell/Toolbar.tsx:424-1146`. Tool selection + zoom also contains large mock datasets
+  (`MOCK_TMB_ASSETS`, `MOCK_IMAGES`, `MOCK_ICONS`, `MOCK_CONVERSATION`), an asset/icon library
+  browser, an AI chat panel with voice-recording UI, and a checklist editor. Extract
+  `ActionsPanel` + mock data.
+- 🟠 **ORG-02 — `CanvasRender.tsx` (1028 lines) bundles 10+ surface variants + the zoom control;
+  `ZoomControl` is re-imported back into `Toolbar.tsx`** (near-circular shell dependency). Split
+  surfaces into `shell/surfaces/`; move `ZoomControl` out.
+- 🟠 **ORG-03 — `skiaToolingAdapter.ts` (1154 lines) is a god-file** mixing WebGL lifecycle,
+  surface/paint/font pooling, color parsing, label-geometry constants, and ~15 free draw
+  functions. Split pure drawers into `skiaPrimitives.ts` and color into `skiaColor.ts`.
+- 🟠 **ORG-04 — `CanvasToolingLayer.tsx` (1154 lines): editor business logic bolted onto the
+  geometry/render layer.** `:637-795` embeds the full context-toolbar UI, rename state, and engine
+  actions (`duplicateElements`, `deleteElements`, `updateElementStyles`,
+  `fitTextElementToContent`). Extract a `ContextToolbar` fed by props.
+- 🟠 **ORG-05 — Command/mutation logic lives directly inside the Tree component.**
+  `Tree.tsx:702-803` (`TreeContextMenu`) calls engine mutations and dispatches `commitDocument`
+  inline. Move behind a `useCanvasCommands(editor)` application hook.
+- 🟠 **ORG-06 — `useToolsEditor.ts` (1441 lines) is a god-hook.** Owns navigation, persistence
+  orchestration, crop rasterization, auto-detect ML orchestration, upload, keyboard shortcuts, and
+  the whole returned surface. Heavy logic (`saveSelection:859-975`, `autoDetect:1024-1133`,
+  `promoteToRoot:630-691`) belongs in the engine. Extract `useBuilderNavigation` +
+  `useBuilderCutOperations`; keep `useToolsEditor` a thin composition root.
+- 🟠 **ORG-07 — `ToolsEditorView.tsx` (932 lines) mixes ML orchestration with layout.**
+  `runProcessing`, `applyLamaMask`, `commitDraw` (`:256-306`) are async business logic inside the
+  view. Lift into `useBuilderProcessing`.
+- 🟠 **ORG-08 — `ReferenceDetailModal.tsx` (1293 lines) does 8 jobs** (modal shell, group gallery,
+  carousel, stack composite, roots gallery, tree, 3 detail panels, + pure helpers). Extract
+  `StackCompositeView`, `StackRootsGallery`, `StackTreeRows`, the detail panels, and reuse the
+  helpers already in `stackHelpers.ts`.
+- 🟠 **ORG-09 — `DetailPage.tsx` (839 lines) mixes two pages + 10 sub-components + inline business
+  logic** (FastEdit href `:209-214`, canvas-link `:686-688`), and the two views duplicate ~120
+  lines of aside/tab/search/grid scaffolding. Extract a shared `DetailSidebar`; split the two
+  route bodies; move href building into the hooks.
+- 🟡 **ORG-10 — `icons/index.tsx` (826 lines): 83/88 icons repeat identical SVG boilerplate.** A
+  single `<BaseIcon>` taking path-data children halves the file.
+- 🟠 **ORG-11 — `AppSettingsModal.tsx` (886 lines): 6 tabs + settings-tree reducers in a modal
+  file.** `:625-708` (`updateInheritParentBackground`, `updateKeyCommand`…) is domain logic that
+  belongs in `src/domain/settings/`. Split tabs; move reducers.
+
+### Dead code
+- 🟡 **ORG-13 — Misc dead code.** `CatalogGrid.tsx` is a one-line re-export of `ReferenceGrid`;
+  dead returned state `previewOpen`/`projectSettingsOpen` (`useGallery.ts:121,157`); aspirational
+  `contracts.ts` repository interfaces (`SceneRepository`, `UnitOfWork`, `ScenePatch`) that
+  nothing implements (`domain/persistence/contracts.ts:19-101`).
+
+### Layering / boundary violations (vs the clean architecture CLAUDE.md describes)
+- 🟠 **ORG-14 — Domain imports framework/UI and storage layers.** `domain/settings/types.ts:1,6`
+  & `commands.ts:1` import `@/canvas/tools` + `@/canvas/engine/types`; `domain/persistence/
+  contracts.ts:1-10`, `system-design/resolve.ts:4`, `defaults.ts:11` import `@/lib/storage/
+  schema`. Domain is supposed to be zero-I/O / no-framework. Move the shared types into `domain`
+  and have storage/canvas import **from** domain.
+- 🟠 **ORG-15 — Engine store performs `localStorage`/`window` I/O directly inside the
+  reducer/effects.** `engine/store.tsx:483-495,509-522` reads/writes `localStorage` +
+  `window.dispatchEvent` on hydrate/commit — untestable without a DOM. Inject a draft-cache port.
+- 🟠 **ORG-16 — "Pure" engine geometry mutations depend on live DOM text measurement.**
+  `engine/mutations/elementGeometry.ts:85-90`. `getTextMeasureContext()` creates a real
+  `<canvas>` from within mutations and silently falls back to a `length*fontSize*0.55` heuristic
+  in Bun — so results differ between browser and tests. Inject the measurement function.
+- 🟠 **ORG-17 — Canvas hook reaches directly into the storage cache; materializer is an
+  orchestration use-case living in the UI folder.** `useSubjectCanvasWindow.ts:4,47-50` &
+  `Canvas.tsx:283,367` copy the whole scenes table via `peekTable`; `canvasMaterializer.ts`
+  orchestrates `saveScene`+`readSceneByOwner`+4 component-repo writes from `canvas/`. Move storage
+  access behind an application hook; relocate the materializer to `application/`.
+- 🟠 **ORG-18 — Navigation is gated on awaited materialization, contradicting fire-and-forget
+  persistence.** `useDeferredPersistence.ts:66-95` returns the materialization promise;
+  `useCanvasNavigation.ts:40,117` & `Canvas.tsx:697` do `flushPendingSave().finally(navigate)`,
+  delaying route changes behind a tree walk. Navigate immediately; let the queue handle it.
+- 🟠 **ORG-19 — SaveQueue construction (an application concern) lives in infrastructure.**
+  `infrastructure/persistence/createPersistence.ts:30-43` instantiates the `SaveQueue` class
+  (which lives in `application/`), and `recordStore.ts` (lib/storage) reaches into infrastructure
+  to get it. Own the queue singleton in `application/persistence`; let infrastructure only provide
+  the port.
+- 🟠 **ORG-20 — Graph subtree merge/linkify/materialize (Versioning.md domain logic) lives in a
+  storage repo.** `scenes.repo.ts:234-435` (`replaceComponentSubtreeInGraph`,
+  `linkifyChildComponentsInGraph`, `materializeInstancesInGraph`). These are pure graph transforms
+  — move into `domain/`, leaving the repo to orchestrate persistence.
+- 🟠 **ORG-21 — Business logic in UI components.** `FastEditModal.tsx:311-384`
+  (`buildSceneFromHtmlCanvas` scene-graph transform → move to `lib/canvas/`);
+  `useReferenceLibrary.ts:332-412` (`createFrameGroup` does file extraction + blob save + measure
+  + group construction → move to an application use-case).
+- 🟡 **ORG-22 — UI-state persistence bypasses the records layer.** `useGallery.ts:39-76` writes
+  gallery section layout straight to `localStorage` (`fwyn:gallery-sections:…`); CLAUDE.md
+  mandates `records`/`putRecord` for new data. Route through a repo. Also: `useStepZoom.ts:28-29`
+  doc says "clamp to 1x..25x" but max is 256x (stale comment).
+
+### Duplicated UI primitives (shared layer)
+- 🟡 **ORG-23 — Five reimplementations of click-outside + Escape dismiss:** `CardMenu.tsx:19-43`,
+  `TopBar.tsx:34-72`, `FilterButton.tsx:26-42`, `PreviewShell.tsx:57-78`, `ReferencesModal`.
+  Extract `useDismissable`. Plus: byte-identical empty-state placeholder
+  (`Snapshot.tsx:186-208` vs `SceneCanvasViewer.tsx:152-164`), duplicated "dashed add tile"
+  (`LandingPage.tsx:339-356` vs `GlobalComponentsPage.tsx:239-262`), duplicated delete-confirm
+  copy across DetailPage/Gallery/GlobalComponents (`useConfirmDelete`).
+
+---
+
+## 6. Code Duplication Across the Canvases / Viewers
+
+> Context: the codebase already extracted real shared layers — `@/domain/zoom` (zoom range,
+> `zoomToCursorOffset`, `clampPanToCenter`), `@/domain/canvas/geometry` (`clamp`, `intersectBox`,
+> `boxFromPoints`, `boundsOfPoints`), and the `useStepZoom` hook shared by all snapshot viewers.
+> The builder and snapshot viewers already consume these, so the **core scalar/box/pan math is
+> NOT duplicated**. What remains is duplication in the higher-level DOM/canvas layers.
+
+Ranked by code volume × divergence risk:
+
+- 🟠 **DUP-01 — Image/blob → data-URL & object-URL helpers reimplemented 5×.**
+  `generate/engine/image.ts:1` (`blobToDataUrl`), `lib/references/referenceThumbnails.ts:17`
+  (`blobToDataUrl`, byte-identical), `lib/utils.ts:8` (`readFileAsDataUrl`),
+  `lib/references/blobStore/codec.ts:3` (`blobToBase64`, already drifted — strips the `data:`
+  prefix), `routes/Gallery/ProjectEditPanel.tsx:60` (inline). Plus `image.ts`'s generic
+  `canvasToBlob`/`canvasToDataUrl`/`waitForImage`/`measureImage` have no builder specificity. Move
+  into a single `src/lib/image/` module.
+- 🟠 **DUP-02 — "Group children by parentId + recursive cycle-guarded tree build" reimplemented
+  3×.** `generate/engine/componentTree.ts:3` (`buildComponentTree`),
+  `components/modals/AddReferenceModal.tsx:92` (`groupCutsByParent`),
+  `components/screen/SceneCanvasInspector.tsx:327` (`flattenSceneTree`). Same `Set`-cloning cycle
+  guard copied verbatim, same `{id,parentId,box}` node shape. Extract a generic
+  `buildForest<T>(items, getId, getParentId, rootId?)` into `src/lib/tree.ts`. (`componentTree.ts`
+  has the cleanest version to promote.)
+- 🟠 **DUP-03 — File-extension → format/type parsing reimplemented 4×.**
+  `generate/engine/image.ts:54` (`inferType`), `routes/references/lib/utils.ts:66` (`inferType`,
+  diverges on return type), `lib/utils.ts:23` (`fileFormatLabel`),
+  `lib/references/mediaTypes.ts:19` (`extFromName`). One `extFromName` + one `inferImageType` in
+  `mediaTypes.ts`.
+- 🟠 **DUP-04 — Canvas-overlay drawing primitives split between two Canvas2D toolkits.**
+  `generate/engine/drawing.ts` (`roundedRectPath` hand-rolled, `drawCircleHandle`,
+  `drawSquareHandle`, `drawLabelBadge`, `drawSizeBadge`, `hexToRgba`) vs
+  `canvas/stage/canvasToolingRenderer.ts:291-381` (`drawResizeHandles` via native `ctx.roundRect`,
+  `drawRadiusHandles`, `drawOutlineRect`). Same intent (square/circle handles, rounded rect, size
+  badge, stroke ÷ zoom). Share the primitives in `src/lib/canvas2d/draw.ts`; keep styling local.
+  (Related: GAMB-01's dead 2D renderer is a third copy.)
+- 🟠 **DUP-05 — Selection hit-testing duplicates handle hit logic.**
+  `generate/engine/hitTesting.ts:16-59` (`selectionHitTest`: radius→corners→edges→body,
+  `HANDLE_HIT_AREA/2/zoom`) mirrors the canvas tooling hit-test order; the handle-center math
+  (`geometry.ts:68-93`) overlaps `resolveHandlePoints`/`edgeMidpoint`
+  (`canvasToolingRenderer.ts:331-347`). Unify the handle-position model (ties into INC-03).
+- 🟠 **DUP-06 — Inline scene-tree DOM renderer duplicated between viewer and inspector.**
+  `components/screen/SceneCanvasViewer.tsx` (`SceneView:94`) vs `SceneCanvasInspector.tsx`
+  (`SceneRenderer:95`) render the same `SceneNode` tree to absolutely-positioned divs with
+  identical style mapping; `StackView`/`StackRenderer` likewise share the `%`-positioned mapping.
+  Extract `<SceneNodeBox>` / `<StackLayerBox>` presentational components; the read-only viewer
+  composes the interactive one with handlers disabled.
+- 🟡 **DUP-07 — `loadStackPreview` / `buildStackTree` / `releaseStackUrls` still duplicated in
+  `ReferenceDetailModal`.** `ReferenceDetailModal.tsx:1223-1293` keeps in-file copies of
+  preview-loading, tree-build, and URL release that diverge from the canonical
+  `stackHelpers.ts:61-168`. Delete the in-file copies; import from `stackHelpers`. (The dead
+  `Lightbox` copy was already removed — see Resolved.)
+- 🟡 **DUP-08 — Two viewport pan/zoom orchestration hooks over the same shared math.**
+  `generate/hooks/useBuilderViewport.ts` (continuous multiplicative) vs
+  `components/screen/useStepZoom.ts` (discrete steps) — the main canvas has a third
+  (`useViewportControls`/`useCanvasPointerEvents`). Both anchor wheel-zoom at the cursor, gate pan
+  on overflow, re-clamp on resize. Extract a `useCursorAnchoredWheelZoom`/`usePanGesture`
+  primitive both compose (full hook merge is hard due to the deliberate continuous-vs-discrete
+  split).
+- 🟡 **DUP-09 — `hexToRgba` / `hexToRgb` hex parsing duplicated.** `generate/engine/drawing.ts:16`
+  vs `canvas/stage/CanvasGridOverlay.tsx:24`. Neither handles 3-char shorthand. One
+  `parseHexColor` in the shared canvas2d/color module.
+- 🟡 **DUP-10 — Rect-intersection / axis-overlap math reimplemented in the canvas engine instead
+  of `@/domain/canvas/geometry.intersectBox`.** `canvas/stage/canvasToolingUtils.ts:59`
+  (`rectsIntersect`), `canvas/editorEngines.ts:258-262` (`verticalOverlap`/`horizontalOverlap`).
+  Blocked by the `{width,height}` vs `{w,h}` shape divide — see DUP-11.
+- 🟡 **DUP-11 — Multiple `Rect`/`Box`/`Vec2`/`Point` vocabularies (structural root cause).**
+  canvas `Rect{width,height}`, domain `Box{w,h}`, builder `CropBox{w,h,r}`, `HtmlCanvasBounds`.
+  This is **why** DUP-01/04/05/10 can't trivially share code — every shared helper must pick a
+  vocabulary or convert. Long-term: one canonical `Rect`/`Vec2` in `@/domain/canvas/geometry`
+  with thin adapters.
+
+### Explicitly verified NOT duplicated (avoid false positives)
+- Viewport **clamp** math is already shared (`clampPanToCenter`, `zoomToCursorOffset` in
+  `@/domain/zoom`); the canvas's `clampAxisOffset` is the documented center-origin counterpart.
+- Zoom range constants have a single source (`@/domain/zoom`).
+- The references **Lightbox is a plain `object-contain` `<img>` viewer** with no pan/zoom canvas —
+  it does not duplicate viewport math (only the tree-build pattern, DUP-02).
+- Canvas vs builder **hit-testing** share intent but are genuinely different (rotated
+  `ToolingBox` + cursor generation vs axis-aligned `CropBox`) — not worth merging.
+- Snapshot/thumbnail **propagation** is a single pipeline (the issue there is ARCH, not duplication).
+
+---
+
+## 7. Suggested Sequencing
+
+1. **Correctness first (low effort, high impact):** INC-01 (consolidate the remaining persistence
+   hooks into one), BUG-15/16, then BUG-02 (low).
+2. **Architecture — propagation off the critical path:** PERF-ARCH-02 + PERF-ARCH-03
+   (`removeRecords`). (The typed-delta-path decision is done — it was deleted; see Resolved.)
+3. **Delete remaining dead weight:** ORG-13.
+4. **Hot-loop perf:** PERF-01..05, PERF-08 (stop stringifying whole documents).
+5. **Extract shared utilities (mechanical, well-scoped):** DUP-01, DUP-02, DUP-03, then DUP-06,
+   DUP-09, ORG-23.
+6. **Layering / god-file splits (larger refactors):** ORG-01..11, ORG-14..21.
+7. **Polish:** INC-06 (language), GAMB cleanup, the `Rect`-vocabulary unification (DUP-11) that
+   unblocks the remaining geometry sharing.

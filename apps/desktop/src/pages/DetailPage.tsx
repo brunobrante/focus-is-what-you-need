@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import {
@@ -20,7 +20,7 @@ import { CardSourceIcon, scopeOf } from "@/components/component/componentSource"
 import { PreviewMockImage, VersionTagBadge, versionCardButtons } from "@/components/screen/VersionSideCard";
 import { VersionSwitcher } from "@/components/screen/VersionSwitcher";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
-import { FastEditModal } from "@/components/screen/FastEditModal";
+import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
 import { PreviewShell } from "@/components/screen/PreviewShell";
 import { HistoryModal } from "@/components/modals/HistoryModal";
@@ -279,7 +279,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
     children, linkedChildIds, childVariants, projectComponents, references, type, projectId,
     projectName, variantCount, canvasHref, filteredChildren, filteredVariants,
     filteredReferences, history, sideTab, setSideTab, query, setQuery,
-    filter, setFilter, fastEditOpen, setFastEditOpen, pendingChildDelete,
+    filter, setFilter, pendingChildDelete,
     setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef,
     openNewChild, addVariant, removeLinkedReference, handleChildDeleteConfirm,
     handleComponentCreated, handleOpenCanvas, handleOpenVersionCanvas, handleAddReference, handleSelectVariant,
@@ -287,6 +287,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
   } = useComponentDetail(componentId);
 
   const [infoOpen, setInfoOpen] = useState(false);
+  const fastEditRef = useRef<FastEditModalHandle>(null);
 
   if (!component) {
     return (
@@ -315,7 +316,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
       </header>
 
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
-        <PreviewShell onFastEdit={() => setFastEditOpen(true)} canvasHref={canvasHref} showDevice={false}>
+        <PreviewShell onFastEdit={() => fastEditRef.current?.open({ mode: "component", component, variant: activeVariant ?? null, type, canvasHref })} canvasHref={canvasHref} showDevice={false}>
           <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
             {displayVariant ? (
               <Snapshot kind="component" ownerType="variant" ownerId={displayVariant.id} seedKey={displayVariant.seedKey} type={type} emptyMode="preview" display="natural" />
@@ -443,7 +444,7 @@ function ComponentContent({ componentId }: { componentId: string }) {
 
       <HistoryModal ref={historyRef} title="Component history" subtitle={`Changes made to "${component.name}" over time.`} commits={history} />
       <ReferencesModal ref={referencesRef} references={filteredReferences} onRemove={(ref) => removeLinkedReference(ref.id)} />
-      <FastEditModal mode="component" open={fastEditOpen} onClose={() => setFastEditOpen(false)} component={component} variant={activeVariant} type={type} canvasHref={canvasHref} />
+      <FastEditModal ref={fastEditRef} />
       <NewComponentModal ref={newComponentRef} projectId={project?.id ?? null} screens={screens} onCreated={handleComponentCreated} />
       <ConfirmActionModal
         open={Boolean(pendingChildDelete)}

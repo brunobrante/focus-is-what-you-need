@@ -31,6 +31,9 @@ export function useHtmlCanvasDocument(
   const [status, setStatus] = useState<HtmlCanvasDocumentState["status"]>("idle");
   const [error, setError] = useState<string | null>(null);
   const lastSavedRef = useRef<string | null>(null);
+  // The latest serialized document not yet persisted, with the owner it belongs
+  // to. Lets the owner-change/unmount effect flush it instead of dropping it.
+  const pendingRef = useRef<{ ownerId: string; graphJSON: string } | null>(null);
 
   const ownerKey = useMemo(() => {
     if (!target) return null;
@@ -78,22 +81,41 @@ export function useHtmlCanvasDocument(
     if (!target || !document || status !== "ready" || !ownerKey) return;
 
     const serialized = serializeHtmlCanvasDocument(document);
-    if (serialized === lastSavedRef.current) return;
+    if (serialized === lastSavedRef.current) {
+      pendingRef.current = null;
+      return;
+    }
+
+    const ownerId = target.kind === "screen" ? target.row.activeVariantId : target.row.id;
+    pendingRef.current = { ownerId, graphJSON: serialized };
 
     const timeout = window.setTimeout(() => {
       // Fire-and-forget into the save queue. Persistence failure becomes queue
       // state (retry/backoff) — it must never surface as a document error. A
       // screen's scene lives on its active variant.
-      saveScene({
-        ownerType: "variant",
-        ownerId: target.kind === "screen" ? target.row.activeVariantId : target.row.id,
-        graphJSON: serialized,
-      });
+      saveScene({ ownerType: "variant", ownerId, graphJSON: serialized });
       lastSavedRef.current = serialized;
+      pendingRef.current = null;
     }, 350);
 
+    // Clearing on every document edit is what makes the debounce work; the
+    // pending edit is preserved in pendingRef and flushed by the effect below
+    // only when the owner actually changes or the hook unmounts.
     return () => window.clearTimeout(timeout);
   }, [document, ownerKey, status, target]);
+
+  // Flush the last unsaved edit when the owner changes or on unmount, so a fast
+  // navigation inside the 350ms debounce window doesn't silently drop it.
+  useEffect(() => {
+    return () => {
+      const pending = pendingRef.current;
+      if (pending && pending.graphJSON !== lastSavedRef.current) {
+        saveScene({ ownerType: "variant", ownerId: pending.ownerId, graphJSON: pending.graphJSON });
+        lastSavedRef.current = pending.graphJSON;
+      }
+      pendingRef.current = null;
+    };
+  }, [ownerKey]);
 
   return { status, error, document, setDocument };
 }

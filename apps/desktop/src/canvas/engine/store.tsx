@@ -371,7 +371,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const selectedIds = sanitizeSelection(action.document, action.selectedIds ?? state.selectedIds);
     const isolatedParentId = sanitizeIsolatedParent(action.document, state.isolatedParentId, selectedIds);
     if (documentsEqual(beforeDocument, action.document)) {
-      return { ...state, document: action.document, selectedIds, isolatedParentId, guides: [] };
+      return { ...state, document: action.document, selectedIds, isolatedParentId, editingTextId: null, guides: [] };
     }
     return {
       ...state,
