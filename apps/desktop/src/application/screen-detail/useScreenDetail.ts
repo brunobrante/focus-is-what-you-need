@@ -18,6 +18,7 @@ import {
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
 import { createScreenVersion, updateScreen } from "@/lib/storage/repos/screens.repo";
+import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { deleteVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
@@ -363,12 +364,15 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     navigate(`/project/${encodeURIComponent(r.component.projectId)}/c/${r.component.id}`);
   };
 
+  // Open a compared version in the canvas: the main opens the screen itself in Current
+  // (?screen=), a version opens that variant in the Versions window (&versionVariant=).
   const handleCompareOpenInCanvas = (ids: string[]) => {
-    if (screen) {
-      navigate(
-        `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}&compare=${ids.join(",")}`,
-      );
-    }
+    if (!screen) return;
+    const id = ids[0];
+    if (!id) return;
+    const mainId = mainVariantIdForScreen(screenVariants, screen.id);
+    const base = `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}`;
+    navigate(id === mainId ? base : `${base}&versionVariant=${encodeURIComponent(id)}`);
   };
 
   const handleAddReference = async (input: Parameters<typeof createOrAttachReference>[0]) => {

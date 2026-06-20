@@ -1,6 +1,6 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Modal, ModalHeader } from "./Modal";
-import { IconClose, IconLayoutHorizontal, IconLayoutVertical, IconOpenCanvas, IconPlus } from "@/components/icons";
+import { IconClose, IconGrid, IconLayoutHorizontal, IconLayoutVertical, IconOpenCanvas, IconPlus } from "@/components/icons";
 import { Snapshot } from "@/components/Snapshot";
 import { VersionTagBadge } from "@/components/screen/VersionSideCard";
 import type { ScreenVersion } from "@/lib/data/screenVersions";
@@ -19,9 +19,10 @@ type Props = {
 };
 
 type Mode = "grid" | "slider";
-type Direction = "cols" | "rows";
+type Direction = "cols" | "rows" | "grid";
 
-const MAX_PANELS = 6;
+// Comparing more than a handful of screens at once is unreadable — cap the panels.
+const MAX_PANELS = 4;
 
 function isMain(v: ScreenVersion | undefined | null): boolean {
   return !!v && (v.tag === "main" || !v.tag);
@@ -56,12 +57,18 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
 
     const byId = useMemo(() => new Map(versions.map((v) => [v.id, v] as const)), [versions]);
     const maxPanels = Math.min(MAX_PANELS, Math.max(1, versions.length));
-    const firstUnused = versions.find((v) => !selection.includes(v.id)) ?? null;
-    const canAdd = selection.length < maxPanels && firstUnused != null;
+    const unused = useMemo(
+      () => versions.filter((v) => !selection.includes(v.id)),
+      [versions, selection],
+    );
+    const canAdd = selection.length < maxPanels && unused.length > 0;
 
-    const addPanel = () => {
-      if (!canAdd || !firstUnused) return;
-      setSelection((prev) => [...prev, firstUnused.id]);
+    // Add a SPECIFIC version chosen from the picker (not just the next free one) so you
+    // pick exactly what to compare even with many versions.
+    const addPanel = (id: string) => {
+      setSelection((prev) =>
+        prev.length >= maxPanels || prev.includes(id) ? prev : [...prev, id],
+      );
     };
     const setSlot = (slot: number, id: string) =>
       setSelection((prev) => prev.map((p, i) => (i === slot ? id : p)));
@@ -106,6 +113,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
                   options={[
                     { id: "cols", label: "Columns", icon: <IconLayoutVertical size={12} strokeWidth={1.8} /> },
                     { id: "rows", label: "Rows", icon: <IconLayoutHorizontal size={12} strokeWidth={1.8} /> },
+                    { id: "grid", label: "Grid", icon: <IconGrid size={12} strokeWidth={1.8} /> },
                   ]}
                   value={direction}
                   onChange={(d) => setDirection(d as Direction)}
@@ -133,7 +141,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
               byId={byId}
               versions={versions}
               type={type}
-              canAdd={canAdd}
+              unused={canAdd ? unused : []}
               onAdd={addPanel}
               onSetSlot={setSlot}
               onRemoveSlot={removeSlot}
@@ -228,7 +236,7 @@ function GridStage({
   byId,
   versions,
   type,
-  canAdd,
+  unused,
   onAdd,
   onSetSlot,
   onRemoveSlot,
@@ -239,8 +247,8 @@ function GridStage({
   byId: Map<string, ScreenVersion>;
   versions: ScreenVersion[];
   type: ProjectType;
-  canAdd: boolean;
-  onAdd: () => void;
+  unused: ScreenVersion[];
+  onAdd: (id: string) => void;
   onSetSlot: (slot: number, id: string) => void;
   onRemoveSlot: (slot: number) => void;
   onOpenCanvas: (slot: number) => void;
@@ -248,7 +256,10 @@ function GridStage({
   const gridStyle: React.CSSProperties =
     direction === "cols"
       ? { gridAutoFlow: "column", gridAutoColumns: "minmax(0, 1fr)", gridTemplateRows: "1fr" }
-      : { gridAutoFlow: "row", gridAutoRows: "minmax(160px, 1fr)", gridTemplateColumns: "1fr" };
+      : direction === "rows"
+        ? { gridAutoFlow: "row", gridAutoRows: "minmax(160px, 1fr)", gridTemplateColumns: "1fr" }
+        : // "grid": wrap into 2 columns → 2×2 for four panels, beside AND below.
+          { gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gridAutoRows: "minmax(180px, 1fr)" };
 
   return (
     <div className="flex-1 overflow-auto bg-[#0E0E0E] p-[18px]">
@@ -267,21 +278,69 @@ function GridStage({
             onOpenCanvas={() => onOpenCanvas(slotIdx)}
           />
         ))}
-        {canAdd ? (
-          <button
-            type="button"
-            onClick={onAdd}
-            className="group grid min-h-[160px] min-w-[120px] cursor-pointer place-items-center rounded-[10px] border border-dashed border-[var(--border-strong)] bg-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
-          >
-            <span className="flex flex-col items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-strong)] transition-colors group-hover:border-[var(--text)]">
-                <IconPlus size={15} strokeWidth={1.8} />
-              </span>
-              <span className="text-[12px] font-medium">Add version</span>
-            </span>
-          </button>
-        ) : null}
+        {unused.length > 0 ? <AddPanel unused={unused} onAdd={onAdd} /> : null}
       </div>
+    </div>
+  );
+}
+
+function AddPanel({ unused, onAdd }: { unused: ScreenVersion[]; onAdd: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative min-h-[180px] min-w-[120px]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="group grid h-full w-full cursor-pointer place-items-center rounded-[10px] border border-dashed border-[var(--border-strong)] bg-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
+      >
+        <span className="flex flex-col items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-strong)] transition-colors group-hover:border-[var(--text)]">
+            <IconPlus size={15} strokeWidth={1.8} />
+          </span>
+          <span className="text-[12px] font-medium">Add version</span>
+        </span>
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute left-1/2 top-1/2 z-[20] max-h-[220px] w-[180px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[10px] border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.6)] backdrop-blur-md"
+        >
+          <div className="px-2 py-1 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Add to compare</div>
+          {unused.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              role="menuitem"
+              onClick={() => { onAdd(v.id); setOpen(false); }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+            >
+              <span
+                className="h-[7px] w-[7px] shrink-0 rounded-full"
+                style={{ background: isMain(v) ? "#3FB950" : "#9b6dff" }}
+              />
+              {labelOf(v)}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
