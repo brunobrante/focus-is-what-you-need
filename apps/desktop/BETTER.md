@@ -94,6 +94,13 @@ These items have been fixed or deliberately dropped and were removed from the ba
   collapsed into one (using the stable `cancelSelectionStable` forward-ref, no eslint-disable).
 - **BUG-Ref-3** ✅ `measureImage`/`measureVideo` capture the size then release the element
   (clear handlers, drop `src`, `video.load()`) so a multi-file import doesn't hold decodes alive.
+- **PERF-09** ✅ `effectiveSceneGraphJSON` is memoized, so `isFactoryMockGraphJSON` parses the
+  graph only when it changes (not every Canvas render), which also stabilizes the ref feeding the
+  `resolvedSceneGraphJSON` memo.
+- **PERF-UI-04** ✅ `ReferenceGrid`'s grid CSS string is hoisted to a module constant (no longer
+  rebuilt per render).
+- **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
+  `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
 - **DUP-01** ✅ The blob→data-URL helpers (byte-identical `blobToDataUrl` in
   `generate/engine/image.ts` + `referenceThumbnails.ts`, `readFileAsDataUrl` in `lib/utils.ts`,
   `blobToBase64` in `blobStore/codec.ts`, and the inline reader in `ProjectEditPanel`) now all
@@ -181,8 +188,6 @@ If only a handful of things get fixed, fix these:
 - 🟠 **PERF-07 — `TreeRow` recursive component is not memoized + gets fresh inline closures.**
   `src/canvas/shell/tree/TreeRow.tsx:10`, `Tree.tsx:318,536`. Every `Tree` render re-renders the
   whole visible subtree. `React.memo` + `useCallback` the row callbacks.
-- 🟠 **PERF-09 — `isFactoryMockGraphJSON` / `shouldUseMockGraph` fully parse graph JSON,
-  unmemoized, every render.** `Canvas.tsx:231-234`. Memoize `effectiveSceneGraphJSON`, parse once.
 - 🟠 **PERF-10 — `Inspector` registers six separate bridge subscriptions.**
   `src/canvas/shell/Inspector.tsx:81-86`. Six `useEditorBridge` selectors each run equality on
   every ~60Hz publish during drag. Collapse into one selector returning a stable tuple with a
@@ -212,13 +217,9 @@ If only a handful of things get fixed, fix these:
   `projectThumbnail.ts:39-43,88-93`. `renderProjectThumbnailDataUrl` (`toDataURL`) is sync and
   looped with `await` per project — a settings toggle stalls the UI proportional to project
   count. OffscreenCanvas/worker or at least `requestIdleCallback` between projects.
-- 🟡 **PERF-UI-04 — `ReferenceGrid` injects a `<style>` tag on every render.**
-  `ReferenceGrid.tsx:38-50`. Move to a static CSS class/module.
 - 🟠 **PERF-UI-05 — `CanvasScrollbars` rAF settle loop re-measures for 220ms every pan frame.**
   `CanvasScrollbars.tsx:101-111`. `signal` changes each frame during pan, restarting the loop —
   a permanent measure loop. Only run on zoom-step changes.
-- 🟡 **PERF-UI-06 — Inline `allScreens.filter` in JSX every LandingPage render.**
-  `LandingPage.tsx:95`. Filters the whole list even when the edit modal is closed. `useMemo`.
 
 ### Builder / references
 - 🟠 **PERF-Bld-1 — `useToolsEditor` returns a fresh 100+-key object every render.**

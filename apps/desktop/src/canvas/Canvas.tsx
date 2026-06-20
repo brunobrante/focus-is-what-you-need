@@ -178,10 +178,15 @@ function CanvasPageContent() {
     ? `desktop-canvas-editor:${sceneOwner.ownerType}:${sceneOwner.ownerId}:v1`
     : "desktop-canvas-editor:detached:v1";
   const currentSceneGraphJSON = scene?.graphJSON ?? null;
-  const effectiveSceneGraphJSON =
-    !canUseFactoryMocks && isFactoryMockGraphJSON(currentSceneGraphJSON)
-      ? null
-      : currentSceneGraphJSON;
+  // Memoized so isFactoryMockGraphJSON parses the graph only when it actually
+  // changes, not on every Canvas render (and so the ref stays stable downstream).
+  const effectiveSceneGraphJSON = useMemo(
+    () =>
+      !canUseFactoryMocks && isFactoryMockGraphJSON(currentSceneGraphJSON)
+        ? null
+        : currentSceneGraphJSON,
+    [canUseFactoryMocks, currentSceneGraphJSON],
+  );
 
   const currentMockTargetKey = useMemo(
     () => mockTargetKey({ canUseFactoryMocks, component, projectType, screen, projectComponents, projectScreens, variants: allVariants }),
