@@ -75,6 +75,18 @@ These items have been fixed or deliberately dropped and were removed from the ba
   `removeRecords([ids])` and `recordHistoryEntry` appends with `putRecord`, instead of
   `replaceTable(survivors)` which re-stringified every surviving large blob to diff.
   (`bulkInsertHistory` was found to be dead code — left untouched.)
+- **BUG-06** ✅ `pasteElements` runs the result through `constrainAll` before re-copying and
+  returning, so the `+24` offset clamps back inside the frame instead of cascading off-canvas on
+  repeated pastes. (Also removed two dead imports in the file.)
+- **BUG-09** ✅ `handleContextLost` resets `this.size` so `ensureSurface` rebuilds the backing
+  dimensions after a same-size context restore.
+- **BUG-10** ✅ Both `mount()` early-returns (destroyed mid-load) route through `destroy()`, so the
+  context-loss listeners and the canvas are always removed/detached (the loaded-but-unassigned
+  typeface is freed first).
+- **BUG-17** ✅ `useStepZoom` clears `justPannedRef` at the top of `onPointerDown` (before the
+  guards), so a pan whose trailing click never fired can't swallow the next legitimate click.
+- **BUG-18** ✅ The `SceneCanvasViewer` stored-image `<img>` got the sibling's
+  `max-h-[60vh] max-w-full object-contain` clamp.
 
 ---
 
@@ -98,10 +110,6 @@ If only a handful of things get fixed, fix these:
   unconditionally instead of gating `walk(node.children)` behind the `isPointInElement` check
   (as `findDropTarget` does). In practice the deepest *containing* child still wins, so this is a
   cleanliness issue, not an active wrong-click bug — low priority.
-- 🟠 **BUG-06 — `pasteElements` cascades elements off-canvas with no bound.**
-  `src/canvas/engine/clipboard.ts:97-102`. Pasted roots get `+24` offset with no clamp, then
-  are re-copied from the unconstrained document, so repeated pastes drift off-frame forever.
-  Run through `constrainAll` before returning and before re-copying.
 - 🟠 **BUG-07 — `setZoom` early-return can skip a needed recenter/clamp.**
   `src/canvas/engine/store.tsx:~210-213`. `if (state.zoom === zoom) return state;` returns before
   `zoomViewportAroundCenter` re-clamps offsets, leaving offsets unclamped at min/max while panned.
@@ -110,15 +118,6 @@ If only a handful of things get fixed, fix these:
   `src/canvas/stage/hooks/useCanvasPointerEvents.ts:329-339`. `RADIUS_CURSOR` is only cleared in
   the tooling branch. Clear `viewport.style.cursor` unconditionally at the top of the
   no-interaction branch.
-- 🟠 **BUG-09 — Skia context-restore reuses stale backing dimensions.**
-  `src/canvas/stage/skiaToolingAdapter.ts:172-175,397`. `this.size` is not reset on context loss,
-  so a same-size restored frame keeps clobbered `canvas.width/height`. Reset
-  `this.size = {0,0,1}` in `handleContextLost`.
-- 🟠 **BUG-10 — Context-lost listeners + canvas leak on a typeface-load race.**
-  `src/canvas/stage/skiaToolingAdapter.ts:210-214`. If `destroyed` flips during
-  `loadToolingTypeface`, the early return never removes `webglcontextlost/restored` listeners or
-  detaches the canvas. Route both early-returns through the same `destroy()` cleanup.
-
 ### Builder (`generate`)
 - 🟠 **BUG-12 — Radius coordinate conversion inconsistent across the three transforms.**
   Edit-projection divides radius by average scale `(sx+sy)/2`
@@ -148,14 +147,6 @@ If only a handful of things get fixed, fix these:
 - 🟡 **BUG-Ref-3 — `measureImage`/`measureVideo` never release the element.**
   `fileHelpers.ts:114-138`. `video.src` keeps the element alive holding a decode during
   multi-file import. Null out `.src` / remove handlers on settle.
-
-### Shared UI / pages
-- 🟡 **BUG-17 — `justPannedRef` click-suppression flag can leak across interactions.**
-  `src/components/screen/useStepZoom.ts:162-199`. Only cleared in `onClickCapture`; a pan with no
-  following click leaves it true and swallows the next legit click. Also reset on `pointerdown`.
-- 🟡 **BUG-18 — `SceneCanvasViewer` stored-image branch has no size clamp.**
-  `src/components/screen/SceneCanvasViewer.tsx:50-53`. Apply the sibling's
-  `max-h-[60vh] max-w-full object-contain`.
 
 ### Architecture / persistence
 - 🟡 **BUG-ARCH-5 — IndexedDB `listRecords` upper bound is fragile.**

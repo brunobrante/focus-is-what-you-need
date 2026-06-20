@@ -49,7 +49,14 @@ function StoredView({
 }) {
   const { data } = useThumbnail(ownerType, ownerId);
   if (!data) return <EmptyPlaceholder kind={kind} />;
-  return <img src={data.dataUrl} alt="" draggable={false} />;
+  return (
+    <img
+      src={data.dataUrl}
+      alt=""
+      draggable={false}
+      className="block max-h-[60vh] max-w-full object-contain"
+    />
+  );
 }
 
 // ─── Stack renderer ───────────────────────────────────────────────────────────

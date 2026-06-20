@@ -1,6 +1,6 @@
 import type { CanvasDocument, ElementNode } from "./types";
-import { cloneDocument, createId, duplicateElements } from "./actions";
-import { filterTopLevelIds, getDescendantIds } from "./geometry";
+import { cloneDocument, constrainAll, createId } from "./actions";
+import { filterTopLevelIds } from "./geometry";
 
 type ClipboardData = {
   elements: Record<string, ElementNode>;
@@ -98,11 +98,15 @@ export function pasteElements(
     newSelectedIds.push(newId);
   }
 
-  // Update clipboard to the new positions so subsequent pastes cascade
-  copyElements(next, newSelectedIds);
+  // Clamp the +24-offset pasted roots back inside the frame, otherwise repeated
+  // pastes (which re-copy from the document below) cascade off-canvas forever.
+  const constrained = constrainAll(next);
+
+  // Update clipboard to the new (constrained) positions so subsequent pastes cascade
+  copyElements(constrained, newSelectedIds);
 
   return {
-    document: next,
+    document: constrained,
     selectedIds: newSelectedIds
   };
 }

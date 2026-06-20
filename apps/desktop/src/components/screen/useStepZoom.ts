@@ -161,13 +161,16 @@ export function useStepZoom(
   // the cursor; once it is a pan we swallow the trailing click in capture phase.
   const onPointerDown = useCallback(
     (event: ReactPointerEvent) => {
+      // Clear before the guards: a pan whose trailing click never fired (e.g. the
+      // pointer left the element, or the content stopped overflowing) would leave
+      // the flag set and swallow the next legitimate click otherwise.
+      justPannedRef.current = false;
       if (!enabled || !contentRef || event.button !== 0) return;
       if (!overflowsNow(zoomRef.current)) return;
       const startX = event.clientX;
       const startY = event.clientY;
       const startPan = panRef.current;
       let moved = false;
-      justPannedRef.current = false;
       const onMove = (ev: PointerEvent) => {
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;

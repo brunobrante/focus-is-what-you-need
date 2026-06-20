@@ -169,6 +169,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     event.preventDefault();
     this.contextLost = true;
     this.lastRenderedFrame = null;
+    // Reset the cached backing size so ensureSurface rebuilds the surface and
+    // canvas dimensions on restore even when the restored frame is the same size
+    // — the lost context clobbered canvas.width/height.
+    this.size = { width: 0, height: 0, resolution: 1 };
     this.disposeSurface();
   };
 
@@ -202,9 +206,9 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
     const canvasKit = await loadCanvasKit();
     if (this.destroyed) {
-      canvas.removeEventListener("webglcontextlost", this.handleContextLost);
-      canvas.removeEventListener("webglcontextrestored", this.handleContextRestored);
-      detachCanvas(canvas);
+      // Race: destroyed mid-load. Route through the single cleanup path so the
+      // context-loss listeners and the canvas are always removed/detached.
+      this.destroy();
       return;
     }
 
@@ -212,7 +216,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.paintPool = new PaintPool(canvasKit);
     const loadedTypeface = await loadToolingTypeface(canvasKit);
     if (this.destroyed) {
+      // The typeface isn't assigned to the field yet, so free it before destroy()
+      // (which only knows about this.parentDistanceTypeface) tears down the rest.
       if (loadedTypeface.owned) loadedTypeface.typeface?.delete();
+      this.destroy();
       return;
     }
     this.parentDistanceTypeface = loadedTypeface.typeface;
