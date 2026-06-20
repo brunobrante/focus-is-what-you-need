@@ -1,13 +1,10 @@
+// `Tool`, `InsertTool`, `ShellGridType` and `ElementStyles` are shared with the
+// domain layer (settings), so they're defined in `@/domain/canvas/types` and
+// re-exported here — canvas call sites keep importing them from this module.
+import type { Tool, InsertTool, ShellGridType, ElementStyles } from "@/domain/canvas/types";
+export type { Tool, InsertTool, ShellGridType, ElementStyles };
+
 export type ElementType = "rect" | "ellipse" | "text" | "image" | "icon" | "line" | "arrow" | "polygon" | "star";
-
-export type Tool = "select" | "hand" | "scale" | "rect" | "ellipse" | "text" | "image" | "icon" | "wrapper" | "line" | "arrow" | "polygon" | "star";
-
-/**
- * Tools that insert a new element on the canvas. Excludes the non-inserting
- * "select", "scale" (a selection variant that resizes proportionally), and
- * "hand" (pan) tools.
- */
-export type InsertTool = Exclude<Tool, "select" | "hand" | "scale">;
 
 /** Selection-style tools: they pick/move existing elements rather than insert. */
 export function isSelectionTool(tool: Tool): boolean {
@@ -19,29 +16,7 @@ export function isInsertTool(tool: Tool): tool is InsertTool {
   return tool !== "select" && tool !== "hand" && tool !== "scale";
 }
 
-export type ShellGridType = "dots" | "squares";
-
 export type ViewportMode = "frame" | "draft";
-
-export type ElementStyles = {
-  background?: string;
-  color?: string;
-  fontFamily?: string;
-  fontSize?: number;
-  fontWeight?: string;
-  textAlign?: "left" | "center" | "right";
-  borderRadius?: number;
-  borderWidth?: number;
-  borderColor?: string;
-  opacity?: number;
-  display?: "block" | "flex";
-  justifyContent?: string;
-  alignItems?: string;
-  gap?: number;
-  padding?: number;
-  overflow?: "visible" | "hidden";
-  objectFit?: "fill" | "contain" | "cover" | "none" | "scale-down";
-};
 
 export type ElementSizingMode = "fixed" | "fit";
 

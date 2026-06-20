@@ -101,6 +101,13 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-14** ✅ The domain layer no longer imports `@/canvas/*` or `@/lib/storage/*`. The shared
+  canvas value types (`Tool`, `InsertTool`, `ShellGridType`, `ElementStyles`, `CanvasToolId`) moved
+  to `domain/canvas/types.ts` and the system-design token types (`SystemDesignRow`, the token
+  types, `SystemDesignTokens`/`Exclusions`/`Category`/`OwnerScope`) moved to
+  `domain/system-design/types.ts`. `@/canvas/engine/types`, `@/canvas/tools` and
+  `@/lib/storage/schema` re-export them, so every existing call site is unchanged; the domain files
+  now import from domain. Dependency direction is one-way (canvas/storage → domain).
 - **ORG-23** ✅ (partial — see ORG-23b for the leftover) The five click-outside+Escape dismiss
   reimplementations (`CardMenu`, `TopBar` ×2, `FilterButton`, `PreviewShell`) now share one
   `useDismissable(enabled, onDismiss, refs)` hook (`src/lib/hooks/useDismissable.ts`);
@@ -485,11 +492,6 @@ If only a handful of things get fixed, fix these:
 
 
 ### Layering / boundary violations (vs the clean architecture CLAUDE.md describes)
-- 🟠 **ORG-14 — Domain imports framework/UI and storage layers.** `domain/settings/types.ts:1,6`
-  & `commands.ts:1` import `@/canvas/tools` + `@/canvas/engine/types`; `domain/persistence/
-  contracts.ts:1-10`, `system-design/resolve.ts:4`, `defaults.ts:11` import `@/lib/storage/
-  schema`. Domain is supposed to be zero-I/O / no-framework. Move the shared types into `domain`
-  and have storage/canvas import **from** domain.
 - 🟠 **ORG-15 — Engine store performs `localStorage`/`window` I/O directly inside the
   reducer/effects.** `engine/store.tsx:483-495,509-522` reads/writes `localStorage` +
   `window.dispatchEvent` on hydrate/commit — untestable without a DOM. Inject a draft-cache port.

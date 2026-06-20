@@ -8,7 +8,7 @@ import type {
   SystemDesignExclusions,
   SystemDesignTokens,
   TypeStyleToken,
-} from "@/lib/storage/schema";
+} from "@/domain/system-design/types";
 
 // ─── Category metadata ──────────────────────────────────────────────────────
 // Single source of truth for the order and labelling of the token categories,

@@ -1,4 +1,4 @@
-import type { CanvasToolId } from "@/canvas/tools";
+import type { CanvasToolId } from "@/domain/canvas/types";
 import type {
   CanvasKeyCommandId,
   CanvasModifierCommandId,

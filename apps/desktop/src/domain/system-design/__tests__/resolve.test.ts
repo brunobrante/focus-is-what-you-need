@@ -6,7 +6,7 @@ import {
   excludeAllShared,
 } from "@/domain/system-design/defaults";
 import { resolveSystemDesign } from "@/domain/system-design/resolve";
-import type { SystemDesignRow } from "@/lib/storage/schema";
+import type { SystemDesignRow } from "@/domain/system-design/types";
 
 function makeDesign(over: Partial<SystemDesignRow>): SystemDesignRow {
   return {

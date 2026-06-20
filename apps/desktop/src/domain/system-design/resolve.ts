@@ -1,7 +1,7 @@
 import type {
   SystemDesignCategory,
   SystemDesignRow,
-} from "@/lib/storage/schema";
+} from "@/domain/system-design/types";
 import { SYSTEM_DESIGN_CATEGORIES } from "@/domain/system-design/defaults";
 
 export type TokenSource = "workspace" | "project";

@@ -1,9 +1,9 @@
-import type { CanvasToolId } from "@/canvas/tools";
 import type {
+  CanvasToolId,
   ElementStyles,
   InsertTool,
   ShellGridType,
-} from "@/canvas/engine/types";
+} from "@/domain/canvas/types";
 
 export type SettingsScope = "global" | "workspace" | "project";
 
