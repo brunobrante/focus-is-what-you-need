@@ -247,18 +247,9 @@
     0 1px 0 rgba(255, 255, 255, 0.04) inset;
   pointer-events: auto;
   user-select: none;
-  animation: context-toolbar-in 110ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes context-toolbar-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(4px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0px) scale(1);
-  }
+  /* Entrance animation is driven via the Web Animations API in
+     CanvasToolingLayer.tsx so mode swaps don't remount (and refocus) the
+     toolbar — see GAMB-06. */
 }
 
 .context-toolbar-btn {

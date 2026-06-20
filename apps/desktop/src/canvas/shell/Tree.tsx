@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -219,6 +219,13 @@ export function Tree({
   const treeStructureKey = useMemo(() => structureKey(tree.root), [tree]);
 
   const [openSet, setOpenSet] = useState<Set<string>>(() => initiallyOpen(tree.root));
+  // Mirror of the latest open-set so the reveal effect can test "is this ancestor
+  // already expanded?" without depending on `openSet` (which would re-run it — and
+  // re-scroll to the selection — on every unrelated manual expand/collapse).
+  const openSetRef = useRef(openSet);
+  openSetRef.current = openSet;
+  // Node whose scroll-into-view is deferred until an ancestor expansion commits.
+  const pendingRevealRef = useRef<string | null>(null);
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
 
   // Layers footer: text + type filtering and the 3-state expand/collapse control.
@@ -296,39 +303,48 @@ export function Tree({
     setOpenSet(initiallyOpen(tree.root));
   }, [tree.root.id, treeStructureKey]);
 
-  useEffect(() => {
+  // On selection change, reveal the selected node. If its ancestors are already
+  // open the node is in the DOM now, so scroll synchronously. If an ancestor is
+  // collapsed, expand it and arm `pendingRevealRef`; the layout effect below
+  // scrolls once that expansion is committed — no double-rAF "wait for layout".
+  useLayoutEffect(() => {
     if (!autoRevealSelection || selectedIds.length === 0) return;
 
     const revealTargetId = selectedIds.find((id) => findNode(tree.root, id));
     if (!revealTargetId) return;
 
     const ancestorIds = ancestorIdsForNodeIds(tree.root, selectedIds);
-    if (ancestorIds.size > 0) {
-      setOpenSet((current) => {
-        const next = new Set(current);
-        let changed = false;
-        for (const id of ancestorIds) {
-          if (!next.has(id)) {
-            next.add(id);
-            changed = true;
-          }
-        }
-        return changed ? next : current;
-      });
+    const currentOpen = openSetRef.current;
+    let needsExpand = false;
+    for (const id of ancestorIds) {
+      if (!currentOpen.has(id)) {
+        needsExpand = true;
+        break;
+      }
     }
 
-    let secondFrame = 0;
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        scrollTreeNodeIntoView(layerTreeRef.current, revealTargetId);
-      });
-    });
+    if (!needsExpand) {
+      scrollTreeNodeIntoView(layerTreeRef.current, revealTargetId);
+      return;
+    }
 
-    return () => {
-      window.cancelAnimationFrame(firstFrame);
-      if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    };
+    pendingRevealRef.current = revealTargetId;
+    setOpenSet((current) => {
+      const next = new Set(current);
+      for (const id of ancestorIds) next.add(id);
+      return next;
+    });
   }, [autoRevealSelection, selectedIdsKey, tree.root, treeStructureKey]);
+
+  // Runs after an ancestor expansion is committed to the DOM (layout effect →
+  // after mutation, before paint), so the just-revealed row already exists. The
+  // ref guard keeps unrelated open/collapse toggles from re-scrolling.
+  useLayoutEffect(() => {
+    const targetId = pendingRevealRef.current;
+    if (!targetId) return;
+    pendingRevealRef.current = null;
+    scrollTreeNodeIntoView(layerTreeRef.current, targetId);
+  }, [rowsOpenSet]);
 
   const selectLayer = (nodeId: string | null) => {
     setLocalSelectedId(nodeId);

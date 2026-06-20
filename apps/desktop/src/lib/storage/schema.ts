@@ -9,7 +9,10 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // v18: scene/thumbnail rows are keyed deterministically by `ownerType:ownerId`
 // (was a random id) for O(1) owner lookups. Local-only app → bump reseeds; no
 // migration (see "Data Lifecycle & Migrations" in CLAUDE.md).
-export const SCHEMA_VERSION = 18;
+// v19: dropped the in-hot-path legacy coercions in `constrainAll` (old
+// "#e9edf3" shell background + removed "container" element type). Reseed clears
+// any stale rows carrying those shapes.
+export const SCHEMA_VERSION = 19;
 
 export type Meta = {
   schemaVersion: number;

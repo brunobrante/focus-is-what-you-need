@@ -49,6 +49,7 @@ const INSPECTOR_WIDTH = 280;
 const PANEL_MARGIN = 12;
 
 const HEADER_HEIGHT = 64;
+const BOTTOM_BAR_HEIGHT = 88;
 
 type CanvasParentTarget = {
   name: string;
@@ -129,7 +130,7 @@ export function CanvasRender({
   const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + TREE_WIDTH + GAP      : PANEL_MARGIN);
   const right  = expanded ? 0 : (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP : PANEL_MARGIN);
   const top    = expanded ? 0 : HEADER_HEIGHT;
-  const bottom = expanded ? 0 : 88;
+  const bottom = expanded ? 0 : BOTTOM_BAR_HEIGHT;
 
   const btnTop   = expanded ? HEADER_HEIGHT + PANEL_MARGIN : PANEL_MARGIN;
   const btnRight = expanded
@@ -137,8 +138,13 @@ export function CanvasRender({
     : PANEL_MARGIN;
 
   const draftsFallbackDoc = useMemo(() => {
-    const w = Math.floor(window.innerWidth - 320 - 280 - 100);
-    const h = Math.floor(window.innerHeight - 150);
+    // Approximate visible-canvas size with both panels open — derived from the
+    // shell layout constants rather than hardcoded offsets. It's only a fallback
+    // extent for a brand-new draft, so the Math.max floors keep it sane.
+    const horizontalChrome = TREE_WIDTH + INSPECTOR_WIDTH + GAP * 2 + PANEL_MARGIN * 2;
+    const verticalChrome = HEADER_HEIGHT + BOTTOM_BAR_HEIGHT;
+    const w = Math.floor(window.innerWidth - horizontalChrome);
+    const h = Math.floor(window.innerHeight - verticalChrome);
     return createDraftDocument(Math.max(400, w), Math.max(300, h));
   }, []);
 

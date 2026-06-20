@@ -234,6 +234,11 @@ export function CanvasStage({
           canvasStageElement: canvasStageRef.current,
           viewportSize: getCurrentViewportSize(),
         });
+      // Debug-only: the alignment log measures rendered DOM rects, so it must run
+      // *after* the new viewport has painted — a double-rAF is the correct
+      // post-paint idiom here (not a "wait for layout" hack like the pre-paint
+      // scroll in Tree.tsx, which is now a layout effect). `setTimeout(run, 0)` is
+      // the fallback for rAF-less environments (Bun tests).
       if (typeof globalThis.requestAnimationFrame === "function") {
         globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(run));
         return;

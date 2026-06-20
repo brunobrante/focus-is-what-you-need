@@ -56,12 +56,11 @@ export function constrainElement(document: CanvasDocument, id: string): CanvasDo
 
 export function constrainAll(document: CanvasDocument): CanvasDocument {
   const next = cloneDocument(document);
-  if (!next.shellBackground || next.shellBackground === "#e9edf3") {
-    next.shellBackground = DEFAULT_SHELL_BACKGROUND;
-  }
-  for (const node of Object.values(next.elements)) {
-    if ((node.type as string) === "container") node.type = "rect";
-  }
+  // Defensive default for a genuinely missing field — not a value migration.
+  // Legacy data shapes (old shell-background hex, the removed "container" type)
+  // are handled by nuke-and-reseed on a SCHEMA_VERSION bump, not here. See the
+  // "Data Lifecycle & Migrations" section in CLAUDE.md.
+  if (!next.shellBackground) next.shellBackground = DEFAULT_SHELL_BACKGROUND;
   // Clone once, then clamp every node in place. Parents are only clamped within
   // their own parent (never resized), so clamping children after parents matches
   // the previous per-call behavior.

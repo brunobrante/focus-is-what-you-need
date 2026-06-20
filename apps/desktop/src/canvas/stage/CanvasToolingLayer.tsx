@@ -84,15 +84,29 @@ function formatSizeValue(value: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
+// Context-toolbar / size-label layout geometry, all in CSS px. Hoisted out of the
+// render body so the magic offsets live in one labelled place.
+const CONTEXT_TOOLBAR_HEIGHT = 36;
+const CONTEXT_TOOLBAR_HALF_WIDTH = 126; // half the default toolbar width
+const CONTEXT_TOOLBAR_HALF_WIDTH_RENAME = 150; // wider while the rename field is shown
+const CONTEXT_TOOLBAR_GAP = 10; // vertical gap between the toolbar and the size label
+const CONTEXT_TOOLBAR_MIN_TOP = 4; // flip the toolbar below the label if it would clip the top edge
+const TOOLBAR_VIEWPORT_PAD = 8; // min horizontal gap from the viewport edge
+const SIZE_LABEL_EDGE_MARGIN = 38; // size-label clamp margin from the viewport edge
+
 function clampLabelCenter(x: number, width: number): number {
-  const margin = 38;
+  const margin = SIZE_LABEL_EDGE_MARGIN;
   if (width <= margin * 2) return width / 2;
   return Math.min(Math.max(x, margin), width - margin);
 }
 
-function clampToolbarCenter(x: number, viewportWidth: number, halfWidth = 126): number {
+function clampToolbarCenter(
+  x: number,
+  viewportWidth: number,
+  halfWidth = CONTEXT_TOOLBAR_HALF_WIDTH,
+): number {
   const halfW = halfWidth;
-  const pad = 8;
+  const pad = TOOLBAR_VIEWPORT_PAD;
   if (viewportWidth <= (halfW + pad) * 2) return viewportWidth / 2;
   return Math.min(Math.max(x, halfW + pad), viewportWidth - halfW - pad);
 }
@@ -812,27 +826,31 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       setOpenPanel(null);
     };
 
-    const CONTEXT_TOOLBAR_HEIGHT = 36;
-    const contextualToolbar = useMemo(() => (
-      toolbarActive &&
-      !props.canvasStageActive &&
-      !renderData.isDragging &&
-      !renderData.isEditingText &&
-      renderData.transformIds.length === 1 &&
-      renderData.sizeLabelViewportRect
-        ? {
-            left: clampToolbarCenter(
-              renderData.sizeLabelViewportRect.x + renderData.sizeLabelViewportRect.width / 2,
-              overlaySize.width,
-              isRenamingSelection ? 150 : 126,
-            ),
-            top:
-              renderData.sizeLabelViewportRect.y - CONTEXT_TOOLBAR_HEIGHT - 10 >= 4
-                ? renderData.sizeLabelViewportRect.y - CONTEXT_TOOLBAR_HEIGHT - 10
-                : renderData.sizeLabelViewportRect.y + renderData.sizeLabelViewportRect.height + 10,
-          }
-        : null
-    ), [
+    const contextualToolbar = useMemo(() => {
+      if (
+        !toolbarActive ||
+        props.canvasStageActive ||
+        renderData.isDragging ||
+        renderData.isEditingText ||
+        renderData.transformIds.length !== 1 ||
+        !renderData.sizeLabelViewportRect
+      ) {
+        return null;
+      }
+      const labelRect = renderData.sizeLabelViewportRect;
+      const above = labelRect.y - CONTEXT_TOOLBAR_HEIGHT - CONTEXT_TOOLBAR_GAP;
+      return {
+        left: clampToolbarCenter(
+          labelRect.x + labelRect.width / 2,
+          overlaySize.width,
+          isRenamingSelection ? CONTEXT_TOOLBAR_HALF_WIDTH_RENAME : CONTEXT_TOOLBAR_HALF_WIDTH,
+        ),
+        top:
+          above >= CONTEXT_TOOLBAR_MIN_TOP
+            ? above
+            : labelRect.y + labelRect.height + CONTEXT_TOOLBAR_GAP,
+      };
+    }, [
       overlaySize.width,
       isRenamingSelection,
       toolbarActive,
@@ -842,6 +860,24 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       renderData.sizeLabelViewportRect,
       renderData.transformIds.length,
     ]);
+
+    // Replay the toolbar's entrance animation when it appears or when it swaps
+    // between its normal and rename modes. Previously the subtree was remounted via
+    // a stringified-boolean `key` purely to restart a CSS `animation` — which threw
+    // away the input's focus/state every toggle. Driving it through the Web
+    // Animations API keeps the element (and the rename field's focus) intact.
+    const toolbarVisible = contextualToolbar !== null;
+    useEffect(() => {
+      const el = toolbarRef.current;
+      if (!toolbarVisible || !el || typeof el.animate !== "function") return;
+      el.animate(
+        [
+          { opacity: 0, transform: "translateX(-50%) translateY(4px) scale(0.9)" },
+          { opacity: 1, transform: "translateX(-50%) translateY(0) scale(1)" },
+        ],
+        { duration: 110, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+      );
+    }, [toolbarVisible, isRenamingSelection, contextToolbarModifierDown]);
 
     useEffect(() => {
       const host = hostRef.current;
@@ -953,7 +989,6 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       >
         {contextualToolbar ? (
           <div
-            key={isRenamingSelection ? "rename" : String(contextToolbarModifierDown)} // remount on toggle to replay animation
             ref={toolbarRef}
             className={`context-toolbar${isRenamingSelection ? " context-toolbar--rename" : ""}`}
             style={{

@@ -101,6 +101,30 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **GAMB-03** ✅ The legacy data coercions were removed from the per-node hot constrain path:
+  `constrainAll` no longer rewrites the hardcoded `"#e9edf3"` shell background or coerces the
+  removed `"container"` type → `"rect"` on every hydrate/undo. Per CLAUDE.md (local-only, no
+  migrations) `SCHEMA_VERSION` was bumped 18 → 19 so any stale rows carrying those shapes are
+  nuke-and-reseeded. The genuinely-defensive `!shellBackground` default (a missing field, not a
+  value migration) was kept.
+- **GAMB-05** ✅ The Tree's double-rAF "scroll-after-open-set-flush" is now two layout effects: a
+  reveal effect that scrolls synchronously when the node is already visible, else expands ancestors
+  and arms a ref; and a second layout effect (keyed on the open set) that scrolls once the
+  expansion is committed to the DOM — no rAF needed. (The `CanvasStage` double-rAF is debug-only
+  and *correctly* post-paint — it measures rendered DOM rects for alignment logging — so it was
+  kept and documented as intentional, not a hack.)
+- **GAMB-06** ✅ The context toolbar no longer remounts via a stringified-boolean `key` to replay
+  its entrance animation (which threw away the rename field's focus/state). The CSS `animation` +
+  `@keyframes context-toolbar-in` were removed; the entrance is driven through the Web Animations
+  API in `CanvasToolingLayer.tsx`, replayed on appear / rename-mode swap while keeping the element
+  (and its focus) intact.
+- **GAMB-09** ✅ Hardcoded layout magic numbers were hoisted to named constants. `CanvasRender.tsx`
+  derives the draft-fallback size from `TREE_WIDTH`/`INSPECTOR_WIDTH`/`GAP`/`PANEL_MARGIN`/
+  `HEADER_HEIGHT`/new `BOTTOM_BAR_HEIGHT` instead of `window.innerWidth - 320 - 280 - 100`; the
+  `bottom = 88` literal now uses `BOTTOM_BAR_HEIGHT`. `CanvasToolingLayer.tsx`'s scattered offsets
+  (`36`, `126`/`150`, `38`, `8`, `10`, `4`) are now module-level `CONTEXT_TOOLBAR_*` /
+  `SIZE_LABEL_EDGE_MARGIN` / `TOOLBAR_VIEWPORT_PAD` constants (the height no longer redeclared
+  inside render).
 - **DUP-01** ✅ The blob→data-URL helpers (byte-identical `blobToDataUrl` in
   `generate/engine/image.ts` + `referenceThumbnails.ts`, `readFileAsDataUrl` in `lib/utils.ts`,
   `blobToBase64` in `blobStore/codec.ts`, and the inline reader in `ProjectEditPanel`) now all
@@ -253,20 +277,10 @@ If only a handful of things get fixed, fix these:
   capabilities.** `canvasHitTesting.ts:36-38` (and the drop logic in `canvasToolingRenderer`).
   Bypasses `getElementDefinition(type).capabilities` used elsewhere; any new container type
   silently can't accept drops.
-- 🟠 **GAMB-03 — Legacy data migrations buried in the per-node hot constrain path.**
-  `engine/mutations/elementHierarchy.ts:59-64`. `constrainAll` rewrites the hardcoded hex
-  `"#e9edf3"` and coerces `"container"` → `"rect"` (`as string` cast for a removed enum variant)
-  on every hydrate/undo. Move to real schema migrations.
 - 🟠 **GAMB-04 — DOM querying by `data-*` instead of a ref registry (+ reimplemented
   `CSS.escape`).** `Tree.tsx:88-103` (`querySelector('[data-tree-node-id=…]')` +
   `escapeCssAttributeValue`) and `canvasAlignmentLog.ts:94-99` (`querySelectorAll` linear scan +
   `getComputedStyle` per element). Maintain a `Map<id, HTMLElement>` ref registry.
-- 🟡 **GAMB-05 — Double-rAF / `setTimeout(0)` timing hacks to wait for layout.**
-  `Tree.tsx:305-310` (nested rAF to scroll after open-set flush), `CanvasStage.tsx:237-242`
-  (nested rAF then `setTimeout(run,0)` fallback). Use a layout effect keyed on the relevant state.
-- 🟡 **GAMB-06 — Toolbar subtree remounted via a stringified-boolean `key` to replay a CSS
-  animation.** `CanvasToolingLayer.tsx:938`. Throws away the subtree (and its focus/state) just
-  to re-trigger an entrance animation. Use a CSS class toggle / Web Animations API.
 - 🟠 **GAMB-07 — Hand-rolled color parser silently returns black on unrecognized input.**
   `skiaToolingAdapter.ts:1118-1142`. Ignores hsl/named/8-digit hex, paints wrong-colored chrome
   rather than failing. Use `ck.parseColorString`.
@@ -274,10 +288,6 @@ If only a handful of things get fixed, fix these:
   `Toolbar.tsx:193,287-296` and `inspector/ShellTab.tsx:75-77,193-205` (`shapeRenderModes`) are
   throwaway local state that write nowhere; per CLAUDE.md they belong in `canvas.toolDefaults`.
   Wire to settings or remove.
-- 🟡 **GAMB-09 — Hardcoded layout magic numbers that don't match the file's own constants.**
-  `CanvasRender.tsx:139-143` uses `window.innerWidth - 320 - 280 - 100` while the same file
-  defines `TREE_WIDTH=300`/`INSPECTOR_WIDTH=280`. Scattered offsets in `CanvasToolingLayer.tsx`
-  (`38`, `126/150`, `CONTEXT_TOOLBAR_HEIGHT=36` declared inside render). Derive from constants.
 - 🟡 **GAMB-10 — Unmemoized inline search-source closures + non-`useCallback` zoom setter.**
   `Canvas.tsx:597-617,620-640,660-665`. Rebuild the entire element/tool search list and recreate
   `setActiveZoom` each render. Memoize.
@@ -584,4 +594,7 @@ Ranked by code volume × divergence risk:
    DUP-09, ORG-23.
 6. **Layering / god-file splits (larger refactors):** ORG-01..11, ORG-14..21.
 7. **Polish:** INC-06 (language), GAMB cleanup, the `Rect`-vocabulary unification (DUP-11) that
-   unblocks the remaining geometry sharing.
+   unblocks the remaining geometry sharing. (GAMB-03/05/06/09 — legacy migrations in the hot path,
+   timing-hack layout effects, the remount-to-replay-animation key, and the hardcoded layout magic
+   numbers — are done; see Resolved. Remaining GAMB polish: 04, 07, 08, 10, the Bld/Ref/UI/ARCH
+   sub-items.)
