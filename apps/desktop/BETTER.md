@@ -101,6 +101,11 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-18** ✅ Canvas navigation no longer awaits materialization. The two
+  `flushPendingSave().finally(navigate)` sites in `useCanvasNavigation.ts` now fire the flush
+  (save is queued + durable; materialization runs off the critical path) and `navigate()`
+  immediately, instead of gating the route change behind an awaited DB tree-walk. (The other
+  `flushPendingSave` call sites were already fire-and-forget.)
 - **ORG-14** ✅ The domain layer no longer imports `@/canvas/*` or `@/lib/storage/*`. The shared
   canvas value types (`Tool`, `InsertTool`, `ShellGridType`, `ElementStyles`, `CanvasToolId`) moved
   to `domain/canvas/types.ts` and the system-design token types (`SystemDesignRow`, the token
@@ -500,10 +505,6 @@ If only a handful of things get fixed, fix these:
   `Canvas.tsx:283,367` copy the whole scenes table via `peekTable`; `canvasMaterializer.ts`
   orchestrates `saveScene`+`readSceneByOwner`+4 component-repo writes from `canvas/`. Move storage
   access behind an application hook; relocate the materializer to `application/`.
-- 🟠 **ORG-18 — Navigation is gated on awaited materialization, contradicting fire-and-forget
-  persistence.** `useDeferredPersistence.ts:66-95` returns the materialization promise;
-  `useCanvasNavigation.ts:40,117` & `Canvas.tsx:697` do `flushPendingSave().finally(navigate)`,
-  delaying route changes behind a tree walk. Navigate immediately; let the queue handle it.
 - 🟠 **ORG-20 — Graph subtree merge/linkify/materialize (Versioning.md domain logic) lives in a
   storage repo.** `scenes.repo.ts:234-435` (`replaceComponentSubtreeInGraph`,
   `linkifyChildComponentsInGraph`, `materializeInstancesInGraph`). These are pure graph transforms

@@ -39,11 +39,13 @@ export function useCanvasNavigation({
   const openCanvasForComponent = useCallback(
     (target: ComponentRow | null | undefined) => {
       if (!target) return;
-      void flushPendingSave().finally(() => {
-        navigate(
-          `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&variant=${target.activeVariantId}`,
-        );
-      });
+      // Fire-and-forget the flush (save is queued + durable, materialization runs
+      // off the critical path) and navigate immediately — don't gate the route
+      // change on an awaited DB walk. See ORG-18.
+      void flushPendingSave();
+      navigate(
+        `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&variant=${target.activeVariantId}`,
+      );
     },
     [flushPendingSave, navigate, projectId, projectType],
   );
@@ -118,11 +120,10 @@ export function useCanvasNavigation({
   const openProjectNodeCanvas = useCallback(
     (node: ProjectTreeNode) => {
       if (node.kind === "screen") {
-        void flushPendingSave().finally(() => {
-          navigate(
-            `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&screen=${node.id}`,
-          );
-        });
+        void flushPendingSave();
+        navigate(
+          `/canvas?project=${encodeURIComponent(projectId)}&type=${projectType}&screen=${node.id}`,
+        );
         return;
       }
       openCanvasForComponent(projectComponents.find((c) => c.id === node.id));
