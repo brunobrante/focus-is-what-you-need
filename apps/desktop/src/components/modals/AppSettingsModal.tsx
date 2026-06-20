@@ -16,6 +16,7 @@ import type {
   ProcessingFeatureKey,
 } from "@/domain/settings/types";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
+import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 import {
   putGlobalSettings,
   setAutoGenerateProjectThumbnails,
@@ -275,6 +276,34 @@ function CanvasTab({
             />
           </div>
         </div>
+      </div>
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
+          Toolbar config
+        </div>
+        <p className="m-0 mb-3 max-w-[560px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+          Global default styles new canvas elements get when created from the toolbar.
+          A workspace overrides these in its Edit page, and each project again in its own.
+        </p>
+        <ElementDefaultsEditor
+          scope="global"
+          inherited={DEFAULT_GLOBAL_SETTINGS.canvas.elementDefaults}
+          override={settings.canvas.elementDefaults}
+          parentLabel="default"
+          onChange={(next) =>
+            onSettingsChange({
+              ...settings,
+              canvas: {
+                ...settings.canvas,
+                // At global scope the editor emits the full element-defaults tree.
+                elementDefaults: {
+                  ...settings.canvas.elementDefaults,
+                  ...next,
+                } as GlobalSettings["canvas"]["elementDefaults"],
+              },
+            })
+          }
+        />
       </div>
     </div>
   );

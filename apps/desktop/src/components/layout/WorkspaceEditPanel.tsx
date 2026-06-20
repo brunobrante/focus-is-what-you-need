@@ -4,12 +4,8 @@ import { IconClose } from "@/components/icons";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { updateWorkspace } from "@/lib/storage/repos/workspace.repo";
-import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
-import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { useWorkspaceElementDefaults } from "@/application/settings/useScopedElementDefaults";
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
-import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
-import type { GlobalSettings } from "@/domain/settings/types";
 
 export interface WorkspaceEditPanelHandle {
   open: () => void;
@@ -168,10 +164,7 @@ function WorkspaceEditOverlay({ onClose }: { onClose: () => void }) {
               <div className="border-t border-[var(--border)]" />
 
               {/* Toolbar config (element defaults) */}
-              <ToolbarConfigSection
-                workspaceId={workspaceId}
-                workspaceName={workspace?.name ?? "Workspace"}
-              />
+              <ToolbarConfigSection workspaceId={workspaceId} />
             </>
           ) : (
             <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-6 text-center text-[13px] text-[var(--text-muted)]">
@@ -185,78 +178,26 @@ function WorkspaceEditOverlay({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Canvas element defaults, with a Global / Workspace scope toggle. Global edits
- * the base; Workspace overrides it for this workspace. Both persist immediately
- * (the project scope is edited in the project's Edit page).
+ * This workspace's canvas element defaults. They override the Global base (edited
+ * in the Settings modal) and are overridden again per project in the project's Edit
+ * page. Changes persist immediately.
  */
-function ToolbarConfigSection({
-  workspaceId,
-  workspaceName,
-}: {
-  workspaceId: string;
-  workspaceName: string;
-}) {
-  const [scope, setScope] = useState<"global" | "workspace">("workspace");
-  const { settings: globalSettings } = useGlobalSettings();
+function ToolbarConfigSection({ workspaceId }: { workspaceId: string }) {
   const ws = useWorkspaceElementDefaults(workspaceId);
 
   return (
     <section className="flex flex-col gap-6">
       <SectionHeading
         title="Toolbar config"
-        subtitle="Default styles new canvas elements get when created from the toolbar. Edit the Global base, or override them for this workspace — each project can override these again in its own Edit page."
+        subtitle="Default styles new canvas elements get when created from the toolbar in this workspace. They override the Global defaults; each project can override them again in its own Edit page."
       />
-
-      <div className="inline-flex w-fit rounded-[9px] border border-[var(--border)] bg-[var(--surface)] p-0.5">
-        {(["global", "workspace"] as const).map((s) => {
-          const active = scope === s;
-          return (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setScope(s)}
-              className={[
-                "rounded-[7px] px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-                active
-                  ? "bg-[var(--bg)] text-[var(--text)] shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text)]",
-              ].join(" ")}
-            >
-              {s === "global" ? "Global" : workspaceName}
-            </button>
-          );
-        })}
-      </div>
-
-      {scope === "global" ? (
-        <ElementDefaultsEditor
-          scope="global"
-          inherited={DEFAULT_GLOBAL_SETTINGS.canvas.elementDefaults}
-          override={globalSettings.canvas.elementDefaults}
-          parentLabel="default"
-          onChange={(next) =>
-            putGlobalSettings({
-              ...globalSettings,
-              canvas: {
-                ...globalSettings.canvas,
-                // At global scope the editor emits the full element-defaults tree.
-                elementDefaults: {
-                  ...globalSettings.canvas.elementDefaults,
-                  ...next,
-                } as GlobalSettings["canvas"]["elementDefaults"],
-              },
-            })
-          }
-        />
-      ) : (
-        <ElementDefaultsEditor
-          scope="workspace"
-          inherited={ws.inherited}
-          override={ws.override}
-          parentLabel="Global"
-          onChange={ws.save}
-        />
-      )}
+      <ElementDefaultsEditor
+        scope="workspace"
+        inherited={ws.inherited}
+        override={ws.override}
+        parentLabel="Global"
+        onChange={ws.save}
+      />
     </section>
   );
 }

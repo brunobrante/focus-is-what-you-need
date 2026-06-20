@@ -247,12 +247,17 @@ Two-column layout for inspecting and editing a screen.
   - **Compare** opens the `CompareVersionsModal`, which renders the versions' **real
     stored snapshots** (`Snapshot`, not template mocks) in two modes, toggled in its
     toolbar:
-    - **Grid** — N panels (Columns/Rows layout) each with a version select, open-in-canvas
-      and remove; an **"+ Add version"** dashed card appends another panel (up to 6 / the
-      number of versions). Each panel header carries the green/purple version tag badge.
+    - **Grid** — up to **4** panels (you don't render 10 at once); layout is **Columns**
+      (one row), **Rows** (one column), or **Grid** (2-column wrap → 2×2 for four, beside
+      AND below). Each panel has a version select, open-in-canvas, remove, and a
+      green/purple tag badge. The **"+ Add version"** dashed card opens a **picker
+      dropdown** of the not-yet-shown versions so you choose exactly what to add (disabled
+      at 4 / when none are left).
     - **Slider** — a before/after comparison: pick **A** and **B**, then drag the divider
       (pointer-captured) to scrub one version over the other; corner chips label each side.
-    "Open in canvas" sends the visible versions (the grid selection, or A+B) to the canvas.
+    - **Open in canvas** opens a version correctly: a panel's button (or the header's, for
+      the primary) routes the **main** to `?screen=` and a **version** to
+      `?screen=…&versionVariant=…` (the Versions window).
 - **Tab bar**: Sub Components | References (the former Versions tab is replaced by the
   top switcher)
   - Each tab: search bar + kind filter + "New" button + card grid
@@ -873,11 +878,9 @@ sticky action bar (Close × · "Edit workspace" · Cancel / Save changes; Esc cl
 and a scrollable, centered body of two sections:
 - **Details** — workspace **name** (saved by **Save changes**), plus a read-only
   project count and creation date.
-- **Toolbar config** — the canvas element defaults, with a **Global / Workspace**
-  scope toggle. **Global** edits the base; **Workspace** overrides it for this
-  workspace. Both persist **immediately** (independent of Save changes). Each project
-  overrides these again in its own Edit page. This section was moved here out of the
-  global Settings modal.
+- **Toolbar config** — this **workspace's** canvas element defaults. They override
+  the Global base (edited in the Settings modal) and are overridden again per project
+  in the project's Edit page. Persists **immediately** (independent of Save changes).
 
 With no workspace selected, the body shows a hint to create or pick one.
 
@@ -912,14 +915,11 @@ All modals share a consistent structure.
 Opened from the user menu (TopBar → avatar → Settings). Wide modal with a top tab bar and a sticky footer (Cancel / Save changes).
 
 **Tabs**:
-- **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, reveal selected layers)
+- **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, reveal selected layers), plus the **Toolbar config** section — the **Global** element defaults (see below)
 - **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
 - **Keyboard shortcuts**: rebindable canvas commands
 - **Save location**: workspace base folder and storage details
-
-The Settings modal no longer hosts element defaults — there is no "Element defaults"
-tab. They moved to scoped Edit surfaces (see **Element defaults editor** below).
 
 **Element defaults editor** (shared component):
 
@@ -927,14 +927,15 @@ Sets the default appearance new canvas elements get when dropped (Text, Rectangl
 Wrapper, Image, Icon, Ellipse, Line, Arrow, Polygon, Star). These defaults are a
 three-level cascade — **Global → Workspace → Project** — and the same editor is
 reused at every scope:
-- **Global** and **Workspace** are edited in the **Workspace Edit** page's
-  "Toolbar config" section (avatar menu → Edit workspace), via its Global/Workspace
-  toggle. Both persist immediately.
+- **Global** lives in this Settings modal's **Canvas → Toolbar config** section,
+  saved with the modal's **Save changes** button.
+- **Workspace** is edited in the **Workspace Edit** page's "Toolbar config" section
+  (avatar menu → Edit workspace); persists immediately.
 - **Project** is edited in the project's **Edit** page (Gallery → Edit → Element
   defaults section).
 
 There is no longer a standalone "Element defaults" tab in the Settings modal, nor a
-top-nav "Elements" page — both folded into the scoped Edit surfaces above.
+top-nav "Elements" page.
 
 The editor's fields:
 
