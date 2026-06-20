@@ -16,7 +16,7 @@ import type {
   VariantOwnerKind,
   VariantRow,
 } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, removeRecords, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.variants;
 
@@ -131,15 +131,17 @@ export async function deleteVariant(variantId: string): Promise<void> {
     );
   }
 
+  // Delete only the affected scene/thumbnail rows; removeRecords enqueues
+  // O(deleted) deletes instead of re-stringifying every surviving large blob.
   const scenes = await listTable<SceneRow>(TABLES.scenes);
-  await replaceTable<SceneRow>(
+  removeRecords(
     TABLES.scenes,
-    scenes.filter((s) => !deletedVariantIds.has(s.ownerId)),
+    scenes.filter((s) => deletedVariantIds.has(s.ownerId)).map((s) => s.id),
   );
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
-  await replaceTable<ThumbnailRow>(
+  removeRecords(
     TABLES.thumbnails,
-    thumbnails.filter((t) => !deletedVariantIds.has(t.ownerId)),
+    thumbnails.filter((t) => deletedVariantIds.has(t.ownerId)).map((t) => t.id),
   );
 
   notify(KEY);

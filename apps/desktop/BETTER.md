@@ -71,6 +71,10 @@ These items have been fixed or deliberately dropped and were removed from the ba
   instead of the `props.selectedIds` array ref, so a same-contents selection no longer rebuilds
   all outline geometry. (`viewportTransform` was already memoized in `CanvasStage`, so PERF-04's
   "fresh viewportTransform" no longer applied.)
+- **PERF-ARCH-03** ✅ `deleteTree`/`deleteVariant` delete scene/thumbnail rows with
+  `removeRecords([ids])` and `recordHistoryEntry` appends with `putRecord`, instead of
+  `replaceTable(survivors)` which re-stringified every surviving large blob to diff.
+  (`bulkInsertHistory` was found to be dead code — left untouched.)
 
 ---
 
@@ -78,10 +82,9 @@ These items have been fixed or deliberately dropped and were removed from the ba
 
 If only a handful of things get fixed, fix these:
 
-1. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
-   delete-variant — use `removeRecords`/`putRecord`. — `PERF-ARCH-03`
-2. 🟠 **`draftContentBounds` recomputes a full-document AABB every transient drag frame** (scroll
+1. 🟠 **`draftContentBounds` recomputes a full-document AABB every transient drag frame** (scroll
    indicators only) — depend on a content-bounds signal or skip while interacting. — `PERF-05`
+2. 🟠 **`useToolsEditor` returns a fresh 100+-key object every render** — memoize derived values. — `PERF-Bld-1`
 3. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
    returns the correct (deepest containing) child, so low priority. — `BUG-02`
 
@@ -200,12 +203,6 @@ If only a handful of things get fixed, fix these:
   `recordStore` cache; drop materialization from `flushPendingSave`.
 
 ### Architecture / storage
-- 🟠 **PERF-ARCH-03 — `replaceTable` on scenes/thumbnails/history reintroduces O(table × blob).**
-  `components.repo.ts:381-393` (`deleteTree`), `variants.repo.ts:133-142` (`deleteVariant`),
-  `history.repo.ts:48-59` (`recordHistoryEntry`/`bulkInsertHistory`). `replaceTable`
-  `JSON.stringify`s every surviving large blob to diff, just to delete/append a few. The code's
-  own comment (`recordStore.ts:108-110`) warns against this. Use `removeRecords([ids])` /
-  `putRecord(created)`.
 - 🟡 **PERF-ARCH-05 — Redundant `idx_records_tbl` index.** `db.rs:72-78`. The PK `(tbl,id)`
   already covers the `tbl` prefix; the extra index is write amplification.
 

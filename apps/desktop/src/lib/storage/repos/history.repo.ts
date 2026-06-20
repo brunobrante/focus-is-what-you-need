@@ -4,7 +4,7 @@ import type {
   HistoryTargetType,
   Patch,
 } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, putRecord, removeRecords, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.history;
 
@@ -45,7 +45,6 @@ export async function recordHistoryEntry(input: {
   snapshot?: string | null;
   diff?: Patch[];
 }): Promise<HistoryEntryRow> {
-  const rows = await listHistory();
   const created: HistoryEntryRow = {
     id: newId(),
     targetId: input.targetId,
@@ -56,16 +55,16 @@ export async function recordHistoryEntry(input: {
     snapshot: input.snapshot ?? null,
     diff: input.diff ?? [],
   };
-  await replaceTable<HistoryEntryRow>(KEY, [created, ...rows]);
-  notify(KEY);
+  // Append a single row instead of re-serializing the whole history table to diff.
+  putRecord<HistoryEntryRow>(KEY, created);
   return created;
 }
 
 export async function deleteHistoryByTarget(targetId: string): Promise<void> {
   const rows = await listHistory();
-  await replaceTable<HistoryEntryRow>(
+  removeRecords(
     KEY,
-    rows.filter((r) => r.targetId !== targetId),
+    rows.filter((r) => r.targetId === targetId).map((r) => r.id),
   );
   notify(KEY);
 }

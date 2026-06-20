@@ -25,7 +25,7 @@ import type {
   ThumbnailRow,
   VariantRow,
 } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
+import { TABLES, listTable, notify, removeRecords, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.components;
 const VARIANTS_KEY = TABLES.variants;
@@ -445,18 +445,18 @@ export async function deleteComponentTree(
       .filter((reference) => reference.projectIds.length > 0),
   );
 
+  // Delete only the affected scene/thumbnail rows. replaceTable would re-stringify
+  // every surviving large blob to diff; removeRecords enqueues O(deleted) deletes.
   const scenes = await listTable<SceneRow>(TABLES.scenes);
-  await replaceTable<SceneRow>(
+  removeRecords(
     TABLES.scenes,
-    scenes.filter((s) => !(s.ownerType === "variant" && variantIds.has(s.ownerId))),
+    scenes.filter((s) => s.ownerType === "variant" && variantIds.has(s.ownerId)).map((s) => s.id),
   );
 
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
-  await replaceTable<ThumbnailRow>(
+  removeRecords(
     TABLES.thumbnails,
-    thumbnails.filter(
-      (t) => !(t.ownerType === "variant" && variantIds.has(t.ownerId)),
-    ),
+    thumbnails.filter((t) => t.ownerType === "variant" && variantIds.has(t.ownerId)).map((t) => t.id),
   );
 
   notify(KEY);
