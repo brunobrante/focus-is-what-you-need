@@ -101,6 +101,13 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-23** ✅ (partial — see ORG-23b for the leftover) The five click-outside+Escape dismiss
+  reimplementations (`CardMenu`, `TopBar` ×2, `FilterButton`, `PreviewShell`) now share one
+  `useDismissable(enabled, onDismiss, refs)` hook (`src/lib/hooks/useDismissable.ts`);
+  `ReferencesModal` was Escape-only (no outside-click) so it was left as-is. The byte-identical
+  empty-state placeholder in `Snapshot` + `SceneCanvasViewer` was extracted to a shared
+  `EmptyPreviewPlaceholder`. The two remaining presentational dedups (dashed add tile,
+  `useConfirmDelete`) are tracked as ORG-23b.
 - **ORG-10** ✅ The 67 dominant 24×24 stroke icons in `icons/index.tsx` now share a single
   `BaseIcon` wrapper instead of each repeating the identical `<svg>` boilerplate (the 22 icons with
   a different viewBox/fill/stroke setup keep their own raw `<svg>`). The conversion was verified by
@@ -505,12 +512,12 @@ If only a handful of things get fixed, fix these:
   + group construction → move to an application use-case).
 
 ### Duplicated UI primitives (shared layer)
-- 🟡 **ORG-23 — Five reimplementations of click-outside + Escape dismiss:** `CardMenu.tsx:19-43`,
-  `TopBar.tsx:34-72`, `FilterButton.tsx:26-42`, `PreviewShell.tsx:57-78`, `ReferencesModal`.
-  Extract `useDismissable`. Plus: byte-identical empty-state placeholder
-  (`Snapshot.tsx:186-208` vs `SceneCanvasViewer.tsx:152-164`), duplicated "dashed add tile"
-  (`LandingPage.tsx:339-356` vs `GlobalComponentsPage.tsx:239-262`), duplicated delete-confirm
-  copy across DetailPage/Gallery/GlobalComponents (`useConfirmDelete`).
+- 🟡 **ORG-23b — Remaining shared-UI dedup.** Two presentational duplicates left after the
+  `useDismissable` + empty-state extraction (ORG-23, Resolved): the "dashed add tile"
+  (`LandingPage` `AddProjectCard` vs `GlobalComponentsPage` `AddComponentCard` — they share the
+  inner dashed tile but differ in wrapper `Link`/`button` + caption block) and the duplicated
+  delete-confirm copy across DetailPage/Gallery/GlobalComponents (`useConfirmDelete`). Both carry
+  visual/behavioral risk, so they're left for a focused pass.
 
 ---
 

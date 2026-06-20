@@ -1,4 +1,4 @@
-import { IconWindow } from "@/components/icons";
+import { EmptyPreviewPlaceholder } from "./EmptyPreviewPlaceholder";
 import { useThumbnail } from "@/lib/storage/hooks";
 import type { SceneOwnerType } from "@/lib/storage/schema";
 import { flattenSceneTree } from "./SceneCanvasInspector";
@@ -24,7 +24,7 @@ export function SceneCanvasViewer(props: SceneCanvasViewerProps) {
         className="block max-h-[60vh] max-w-full object-contain"
       />
     ) : (
-      <EmptyPlaceholder kind="screen" />
+      <EmptyPreviewPlaceholder kind="screen" />
     );
   }
   if (props.source === "stored") {
@@ -48,7 +48,7 @@ function StoredView({
   kind: "screen" | "component";
 }) {
   const { data } = useThumbnail(ownerType, ownerId);
-  if (!data) return <EmptyPlaceholder kind={kind} />;
+  if (!data) return <EmptyPreviewPlaceholder kind={kind} />;
   return (
     <img
       src={data.dataUrl}
@@ -150,23 +150,6 @@ function SceneView({ scene }: { scene: Scene }) {
           ) : null}
         </div>
       ))}
-    </div>
-  );
-}
-
-// ─── Empty state ─────────────────────────────────────────────────────────────
-
-function EmptyPlaceholder({ kind }: { kind: "screen" | "component" }) {
-  return (
-    <div className="grid h-full w-full place-items-center text-center">
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-5">
-        <span className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-strong)] text-[var(--text-faint)]">
-          <IconWindow size={16} strokeWidth={1.6} />
-        </span>
-        <span className="text-[13px] font-medium text-[var(--text-muted)]">
-          {kind === "screen" ? "Empty screen" : "Empty component"}
-        </span>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { NavTooltip } from "./NavTooltip";
 import { ZOOM_DEFAULT_IDX, ZoomControls } from "./ZoomControls";
 import { useStepZoom } from "./useStepZoom";
@@ -81,28 +82,14 @@ export function PreviewShell({
         )
       : 1;
 
-  useEffect(() => {
-    if (!deviceMenuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!deviceTriggerRef.current?.contains(target) && !deviceMenuRef.current?.contains(target)) {
-        setDeviceMenuOpen(false);
-        setDeviceMenuPos(null);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setDeviceMenuOpen(false);
-        setDeviceMenuPos(null);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [deviceMenuOpen]);
+  useDismissable(
+    deviceMenuOpen,
+    () => {
+      setDeviceMenuOpen(false);
+      setDeviceMenuPos(null);
+    },
+    [deviceTriggerRef, deviceMenuRef],
+  );
 
   const openDeviceMenu = (rect: DOMRect) => {
     const width = 240;

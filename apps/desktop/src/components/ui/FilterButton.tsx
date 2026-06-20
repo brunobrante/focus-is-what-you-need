@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { ListFilter } from "lucide-react";
 
 /**
@@ -23,23 +24,7 @@ export function FilterButton({
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissable(open, () => setOpen(false), [containerRef]);
 
   const isActive = activeCount > 0;
 

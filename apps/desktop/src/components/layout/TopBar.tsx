@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { Wand2 } from "lucide-react";
 import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
 import { WorkspaceEditPanel, type WorkspaceEditPanelHandle } from "@/components/layout/WorkspaceEditPanel";
@@ -33,45 +34,23 @@ export function TopBar({
   const wsTriggerRef = useRef<HTMLButtonElement>(null);
   const wsMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
-        setMenuOpen(false);
-        setMenuPosition(null);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setMenuOpen(false); setMenuPosition(null); }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuOpen]);
+  useDismissable(
+    menuOpen,
+    () => {
+      setMenuOpen(false);
+      setMenuPosition(null);
+    },
+    [triggerRef, menuRef],
+  );
 
-  useEffect(() => {
-    if (!wsOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!wsTriggerRef.current?.contains(target) && !wsMenuRef.current?.contains(target)) {
-        setWsOpen(false);
-        setWsPosition(null);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setWsOpen(false); setWsPosition(null); }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [wsOpen]);
+  useDismissable(
+    wsOpen,
+    () => {
+      setWsOpen(false);
+      setWsPosition(null);
+    },
+    [wsTriggerRef, wsMenuRef],
+  );
 
   const currentWs =
     workspaces.find((w) => w.id === activeWsId) ?? workspaces[0] ?? null;
