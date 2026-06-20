@@ -32,6 +32,18 @@ These items have been fixed or deliberately dropped and were removed from the ba
   implements `upsert_record` / `delete_records`. `CLAUDE.md` was corrected to match.
 - **ORG-12** ✅ The ~1300 lines of dead reference-viewer UI (`Lightbox`, `Inspector`,
   `InspectorPanel`) and the orphaned `lightboxItem` state were deleted.
+- **BUG-ARCH-2** ✅ Scene/thumbnail rows are now keyed deterministically by
+  `ownerType:ownerId` (`sceneRecordId`/`thumbnailRecordId`), so `getSceneByOwner`/
+  `getThumbnailByOwner` are an O(1) `getRecordById` cache hit instead of a full table scan.
+  `SCHEMA_VERSION` 17 → 18 (reseed handles old random-id rows).
+- **PERF-ARCH-02** ✅ Ancestor propagation no longer runs on the save critical path: `saveScene`
+  writes the row with `{ propagate: false }` and enqueues the walk on a new idle
+  `propagationQueue` (coalesced per owner, mirrors `thumbnailQueue`).
+- **PERF-ARCH-04** ✅ The scene dependency index is memoized (`sceneDependencyIndexCache`),
+  dropped only when the variants/components tables change, instead of being rebuilt from full
+  table scans on every propagation.
+- **BUG-ARCH-4** ⛔ Moot — the typed node upsert path (the `>=` vs `>` guard asymmetry) was
+  deleted with the rest of the dead typed-delta machinery (see ARCH-01 above).
 
 ---
 
@@ -42,9 +54,9 @@ If only a handful of things get fixed, fix these:
 1. 🔴 **Whole-document `JSON.stringify` on every edit** for history + draft cache — the exact
    blob-serialization cost the Save rewrite set out to kill, here on the in-memory interaction
    path. — `PERF-08`
-2. 🔴 **Ancestor propagation runs synchronously on the save critical path**; the documented
-   off-critical-path `propagateSceneToParents` has zero callers. — `PERF-ARCH-02`
-3. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
+2. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
+3. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
+   delete-variant — use `removeRecords`/`putRecord`. — `PERF-ARCH-03`
 4. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
    returns the correct (deepest containing) child, so low priority. — `BUG-02`
 
@@ -129,17 +141,10 @@ If only a handful of things get fixed, fix these:
   `max-h-[60vh] max-w-full object-contain`.
 
 ### Architecture / persistence
-- 🟠 **BUG-ARCH-2 — `getSceneByOwner`/`getThumbnailByOwner` do a full table scan per lookup.**
-  `scenes.repo.ts:33-41`, `thumbnails.repo.ts:12-20`. `listScenes().find(...)` runs N times per
-  propagation pass. Read the single row by deterministic id via `getRecordById`.
 - 🟠 **BUG-ARCH-3 — `setMeta` does not notify subscribers.**
   `src/lib/storage/recordStore.ts:154-163`. `putRecord` calls `notify`, `setMeta` does not; seed
   works around it by calling `notify(TABLES.meta)` manually in one path but not `writeMeta`. Call
   `notify(META_TABLE)` inside `setMeta`.
-- 🟡 **BUG-ARCH-4 — Optimistic guard asymmetry: nodes use `>=`, scenes use `>`.**
-  `src-tauri/src/db.rs:254` vs `:214`. Node upsert accepts an equal rev (last-writer-wins);
-  scenes reject equal versions. Latent clobber bug if the node path is ever wired up. Make them
-  consistent (`>`).
 - 🟡 **BUG-ARCH-5 — IndexedDB `listRecords` upper bound is fragile.**
   `src/infrastructure/persistence/indexedDbPersistence.ts:42`. `IDBKeyRange.bound([table],
   [table, []])` relies on array-sorts-after-string key ordering — works today, undocumented,
@@ -202,20 +207,12 @@ If only a handful of things get fixed, fix these:
   `recordStore` cache; drop materialization from `flushPendingSave`.
 
 ### Architecture / storage
-- 🔴 **PERF-ARCH-02 — Ancestor propagation runs synchronously on the save critical path.**
-  `saveScene.ts:15-17`, `scenes.repo.ts:43-78`. `saveScene()` calls `upsertScene` with
-  `propagate` defaulting to `true`, walking the full ancestor chain (each hop = full table scan)
-  on every keystroke-driven save. The documented off-critical-path `propagateSceneToParents` has
-  **zero callers**. Enqueue the row, then schedule propagation at idle.
 - 🟠 **PERF-ARCH-03 — `replaceTable` on scenes/thumbnails/history reintroduces O(table × blob).**
   `components.repo.ts:381-393` (`deleteTree`), `variants.repo.ts:133-142` (`deleteVariant`),
   `history.repo.ts:48-59` (`recordHistoryEntry`/`bulkInsertHistory`). `replaceTable`
   `JSON.stringify`s every surviving large blob to diff, just to delete/append a few. The code's
   own comment (`recordStore.ts:108-110`) warns against this. Use `removeRecords([ids])` /
   `putRecord(created)`.
-- 🟠 **PERF-ARCH-04 — Dependency index rebuilt from full table scans on every propagation.**
-  `scenes.repo.ts:170-173`. `createSceneDependencyIndex` from `listTable(variants)+components`
-  per save when no `preloadedIndex`. Memoize / always pass the preloaded index.
 - 🟡 **PERF-ARCH-05 — Redundant `idx_records_tbl` index.** `db.rs:72-78`. The PK `(tbl,id)`
   already covers the `tbl` prefix; the extra index is write amplification.
 
@@ -601,8 +598,9 @@ Ranked by code volume × divergence risk:
 
 1. **Correctness first (low effort, high impact):** INC-01 (consolidate the remaining persistence
    hooks into one), BUG-15/16, then BUG-02 (low).
-2. **Architecture — propagation off the critical path:** PERF-ARCH-02 + PERF-ARCH-03
-   (`removeRecords`). (The typed-delta-path decision is done — it was deleted; see Resolved.)
+2. **Architecture — finish the save-path cleanup:** PERF-ARCH-03 (`removeRecords`/`putRecord` on
+   delete-tree/delete-variant). (Propagation off the critical path + deterministic O(1) lookups +
+   memoized index are done — see Resolved.)
 3. **Delete remaining dead weight:** ORG-13.
 4. **Hot-loop perf:** PERF-01..05, PERF-08 (stop stringifying whole documents).
 5. **Extract shared utilities (mechanical, well-scoped):** DUP-01, DUP-02, DUP-03, then DUP-06,
