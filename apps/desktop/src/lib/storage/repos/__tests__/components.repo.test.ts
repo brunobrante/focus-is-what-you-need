@@ -141,7 +141,7 @@ test("deleteComponentTree removes a component, descendants, and their variants",
   );
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
-      id: "scene-screen",
+      id: "variant:variant-screen-1",
       ownerType: "variant",
       ownerId: "variant-screen-1",
       graphJSON: serializeHtmlCanvasDocument(screenDocument),

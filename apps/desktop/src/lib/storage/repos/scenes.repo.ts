@@ -7,11 +7,21 @@ import {
 import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/application/scenes/dependencyIndex";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
 import { scheduleThumbnailRefresh } from "@/application/thumbnails/thumbnailQueue";
-import { newId, now } from "@/lib/storage/ids";
+import { now } from "@/lib/storage/ids";
 import type { ComponentRow, SceneOwnerType, SceneRow, VariantRow } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, putRecord } from "@/lib/storage/store";
+import { TABLES, getRecordById, listTable, notify, putRecord } from "@/lib/storage/store";
 
 const KEY = TABLES.scenes;
+
+/**
+ * Scene rows are keyed deterministically by their owner (`ownerType:ownerId`), so
+ * a lookup is an O(1) record-store cache hit (`getRecordById`) instead of a full
+ * table scan. There is exactly one scene per owner, so the owner pair is a natural
+ * primary key.
+ */
+export function sceneRecordId(ownerType: SceneOwnerType, ownerId: string): string {
+  return `${ownerType}:${ownerId}`;
+}
 
 /**
  * Intrinsic size of a variant's frame (its root bounds) read from the stored
@@ -51,10 +61,7 @@ export async function getSceneByOwner(
   ownerType: SceneOwnerType,
   ownerId: string,
 ): Promise<SceneRow | null> {
-  const rows = await listScenes();
-  return (
-    rows.find((r) => r.ownerType === ownerType && r.ownerId === ownerId) ?? null
-  );
+  return getRecordById<SceneRow>(KEY, sceneRecordId(ownerType, ownerId));
 }
 
 export async function upsertScene(input: {
@@ -71,7 +78,7 @@ export async function upsertScene(input: {
   const row: SceneRow = existing
     ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: t }
     : {
-        id: newId(),
+        id: sceneRecordId(input.ownerType, input.ownerId),
         ownerType: input.ownerType,
         ownerId: input.ownerId,
         graphJSON: input.graphJSON,
@@ -232,7 +239,7 @@ async function upsertSceneRowWithoutPropagation(input: {
   const row: SceneRow = existing
     ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: input.t }
     : {
-        id: newId(),
+        id: sceneRecordId(input.ownerType, input.ownerId),
         ownerType: input.ownerType,
         ownerId: input.ownerId,
         graphJSON: input.graphJSON,

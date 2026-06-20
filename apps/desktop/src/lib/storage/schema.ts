@@ -6,7 +6,10 @@ import type {
 } from "@/lib/data/types";
 import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 
-export const SCHEMA_VERSION = 17;
+// v18: scene/thumbnail rows are keyed deterministically by `ownerType:ownerId`
+// (was a random id) for O(1) owner lookups. Local-only app → bump reseeds; no
+// migration (see "Data Lifecycle & Migrations" in CLAUDE.md).
+export const SCHEMA_VERSION = 18;
 
 export type Meta = {
   schemaVersion: number;

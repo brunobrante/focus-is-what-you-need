@@ -1,9 +1,18 @@
-import { newId, now } from "@/lib/storage/ids";
+import { now } from "@/lib/storage/ids";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
 import type { SceneOwnerType, ThumbnailRow } from "@/lib/storage/schema";
-import { TABLES, listTable, notify, putRecord, removeRecords } from "@/lib/storage/store";
+import { TABLES, getRecordById, listTable, notify, putRecord, removeRecords } from "@/lib/storage/store";
 
 const KEY = TABLES.thumbnails;
+
+/**
+ * Thumbnail rows are keyed deterministically by their owner (`ownerType:ownerId`),
+ * matching the scene scheme — one thumbnail per owner, so a lookup is an O(1)
+ * record-store cache hit instead of a full table scan.
+ */
+export function thumbnailRecordId(ownerType: SceneOwnerType, ownerId: string): string {
+  return `${ownerType}:${ownerId}`;
+}
 
 export async function listThumbnails(): Promise<ThumbnailRow[]> {
   return listTable<ThumbnailRow>(KEY);
@@ -13,10 +22,7 @@ export async function getThumbnailByOwner(
   ownerType: SceneOwnerType,
   ownerId: string,
 ): Promise<ThumbnailRow | null> {
-  const rows = await listThumbnails();
-  return (
-    rows.find((r) => r.ownerType === ownerType && r.ownerId === ownerId) ?? null
-  );
+  return getRecordById<ThumbnailRow>(KEY, thumbnailRecordId(ownerType, ownerId));
 }
 
 export async function upsertThumbnail(input: {
@@ -30,7 +36,7 @@ export async function upsertThumbnail(input: {
   const row: ThumbnailRow = existing
     ? { ...existing, dataUrl: input.dataUrl, capturedAt: t }
     : {
-        id: newId(),
+        id: thumbnailRecordId(input.ownerType, input.ownerId),
         ownerType: input.ownerType,
         ownerId: input.ownerId,
         dataUrl: input.dataUrl,
@@ -46,9 +52,10 @@ export async function deleteThumbnailByOwner(
   ownerType: SceneOwnerType,
   ownerId: string,
 ): Promise<void> {
-  const existing = await getThumbnailByOwner(ownerType, ownerId);
+  const id = thumbnailRecordId(ownerType, ownerId);
+  const existing = await getRecordById<ThumbnailRow>(KEY, id);
   if (!existing) return;
-  removeRecords(KEY, [existing.id]);
+  removeRecords(KEY, [id]);
   notifyInvalidation(ownerInvalidationKey("thumbnail", ownerType, ownerId));
   notify(KEY);
 }

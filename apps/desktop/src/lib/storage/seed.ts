@@ -23,6 +23,8 @@ import {
   type WorkspaceRow,
 } from "@/lib/storage/schema";
 import { TABLES, getMeta, listTable, notify, replaceTable, setMeta } from "@/lib/storage/store";
+import { sceneRecordId } from "@/lib/storage/repos/scenes.repo";
+import { thumbnailRecordId } from "@/lib/storage/repos/thumbnails.repo";
 
 async function readMeta(): Promise<Meta> {
   return (
@@ -317,7 +319,7 @@ function createMockSceneRow(
   t: number,
 ): SceneRow {
   return {
-    id: newId(),
+    id: sceneRecordId(ownerType, ownerId),
     ownerType,
     ownerId,
     graphJSON: mock.graphJSON,
@@ -333,7 +335,7 @@ function createMockThumbnailRow(
   t: number,
 ): ThumbnailRow {
   return {
-    id: newId(),
+    id: thumbnailRecordId(ownerType, ownerId),
     ownerType,
     ownerId,
     dataUrl: mock.snapshot,

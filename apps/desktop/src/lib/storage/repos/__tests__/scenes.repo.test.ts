@@ -112,7 +112,7 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   ]);
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
-      id: "scene-home",
+      id: "variant:variant-home",
       ownerType: "variant",
       ownerId: "variant-home",
       graphJSON: bundle!.screen.graphJSON,
@@ -120,7 +120,7 @@ test("upsertScene propagates connected component snapshots to parent screen", as
       updatedAt: 1,
     },
     {
-      id: "scene-header",
+      id: "variant:variant-header",
       ownerType: "variant",
       ownerId: "variant-header",
       graphJSON: header.canvas.graphJSON,
@@ -231,7 +231,7 @@ test("upsertScene propagates connected nested component snapshots through every 
   ]);
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
-      id: "scene-home",
+      id: "variant:variant-home",
       ownerType: "variant",
       ownerId: "variant-home",
       graphJSON: bundle!.screen.graphJSON,
@@ -239,7 +239,7 @@ test("upsertScene propagates connected nested component snapshots through every 
       updatedAt: 1,
     },
     {
-      id: "scene-header",
+      id: "variant:variant-header",
       ownerType: "variant",
       ownerId: "variant-header",
       graphJSON: header.canvas.graphJSON,
@@ -247,7 +247,7 @@ test("upsertScene propagates connected nested component snapshots through every 
       updatedAt: 1,
     },
     {
-      id: "scene-logo",
+      id: "variant:variant-logo",
       ownerType: "variant",
       ownerId: "variant-logo",
       graphJSON: logo.canvas.graphJSON,
@@ -336,7 +336,7 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
 
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
-      id: "scene-screen",
+      id: "variant:variant-screen-1",
       ownerType: "variant",
       ownerId: "variant-screen-1",
       graphJSON: duplicateRectangleScreenGraph(),
@@ -344,7 +344,7 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
       updatedAt: 1,
     },
     {
-      id: "scene-green",
+      id: "variant:variant-green",
       ownerType: "variant",
       ownerId: "variant-green",
       graphJSON: duplicateRectangleComponentGraph("#74BF3F"),
