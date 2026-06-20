@@ -8,20 +8,14 @@ import {
   loadReferenceFile,
   loadReferenceStackFile,
 } from "@/lib/tauri/referenceStorage";
+import { blobToDataUrl } from "@/lib/image/dataUrl";
+
+export { blobToDataUrl };
 
 // Originals above this size stay unbaked (the card shows its placeholder),
 // matching the prior whole-image behaviour. Crops are always small, so they are
 // baked regardless.
 const MAX_ORIGINAL_THUMB_BYTES = 1024 * 1024;
-
-export async function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
-  });
-}
 
 /**
  * Returns a data URL for a stack node's crop. When `file` is null (the implicit

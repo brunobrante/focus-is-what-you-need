@@ -6,6 +6,7 @@ import { IconClose } from "@/components/icons";
 import { useProjectElementDefaults } from "@/application/settings/useScopedElementDefaults";
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 import { useWorkspaces } from "@/lib/storage/hooks";
+import { readFileAsDataUrl } from "@/lib/utils";
 import { projectLogoColor } from "./utils";
 
 const ICON_EMOJIS = [
@@ -83,9 +84,9 @@ export function ProjectEditPanel({
   }, []);
 
   function handleThumbFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = (e) => setPendingThumb((e.target?.result as string) ?? null);
-    reader.readAsDataURL(file);
+    readFileAsDataUrl(file)
+      .then((dataUrl) => setPendingThumb(dataUrl))
+      .catch(() => setPendingThumb(null));
   }
 
   async function save() {

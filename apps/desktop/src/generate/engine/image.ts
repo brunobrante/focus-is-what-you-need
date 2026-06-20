@@ -1,11 +1,6 @@
-export function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read blob"));
-    reader.readAsDataURL(blob);
-  });
-}
+import { blobToDataUrl } from "@/lib/image/dataUrl";
+
+export { blobToDataUrl };
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/png"): Promise<Blob> {
   return new Promise((resolve, reject) => {

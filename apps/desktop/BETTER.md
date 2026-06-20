@@ -94,6 +94,12 @@ These items have been fixed or deliberately dropped and were removed from the ba
   collapsed into one (using the stable `cancelSelectionStable` forward-ref, no eslint-disable).
 - **BUG-Ref-3** ✅ `measureImage`/`measureVideo` capture the size then release the element
   (clear handlers, drop `src`, `video.load()`) so a multi-file import doesn't hold decodes alive.
+- **DUP-01** ✅ The blob→data-URL helpers (byte-identical `blobToDataUrl` in
+  `generate/engine/image.ts` + `referenceThumbnails.ts`, `readFileAsDataUrl` in `lib/utils.ts`,
+  `blobToBase64` in `blobStore/codec.ts`, and the inline reader in `ProjectEditPanel`) now all
+  route through a single `src/lib/image/dataUrl.ts`; the old export names are preserved as
+  re-exports/delegations so no call site changed. (`image.ts`'s `canvasToBlob`/`measureImage`/etc.
+  left in place — builder-adjacent, lower value to move.)
 
 ---
 
@@ -498,13 +504,6 @@ If only a handful of things get fixed, fix these:
 
 Ranked by code volume × divergence risk:
 
-- 🟠 **DUP-01 — Image/blob → data-URL & object-URL helpers reimplemented 5×.**
-  `generate/engine/image.ts:1` (`blobToDataUrl`), `lib/references/referenceThumbnails.ts:17`
-  (`blobToDataUrl`, byte-identical), `lib/utils.ts:8` (`readFileAsDataUrl`),
-  `lib/references/blobStore/codec.ts:3` (`blobToBase64`, already drifted — strips the `data:`
-  prefix), `routes/Gallery/ProjectEditPanel.tsx:60` (inline). Plus `image.ts`'s generic
-  `canvasToBlob`/`canvasToDataUrl`/`waitForImage`/`measureImage` have no builder specificity. Move
-  into a single `src/lib/image/` module.
 - 🟠 **DUP-02 — "Group children by parentId + recursive cycle-guarded tree build" reimplemented
   3×.** `generate/engine/componentTree.ts:3` (`buildComponentTree`),
   `components/modals/AddReferenceModal.tsx:92` (`groupCutsByParent`),
