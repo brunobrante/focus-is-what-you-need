@@ -5,6 +5,7 @@ import {
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
 import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/application/scenes/dependencyIndex";
+import { getCachedSceneDependencyIndex } from "@/application/scenes/sceneDependencyIndexCache";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
 import { scheduleThumbnailRefresh } from "@/application/thumbnails/thumbnailQueue";
 import { now } from "@/lib/storage/ids";
@@ -191,10 +192,7 @@ async function propagateVariantSceneToParents(
   let currentGraphJSON = input.graphJSON;
   const visited = new Set<string>();
 
-  const dependencyIndex = preloadedIndex ?? createSceneDependencyIndex({
-    variants: await listTable<VariantRow>(TABLES.variants),
-    components: await listTable<ComponentRow>(TABLES.components),
-  });
+  const dependencyIndex = preloadedIndex ?? (await getCachedSceneDependencyIndex());
 
   for (let depth = 0; currentVariantId && depth < 64; depth += 1) {
     if (visited.has(currentVariantId)) return;
