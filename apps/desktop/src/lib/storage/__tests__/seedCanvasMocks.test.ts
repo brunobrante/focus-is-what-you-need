@@ -6,7 +6,7 @@ import {
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache, setMeta } from "@/lib/storage/store";
-import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
+import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type {
   ComponentRow,
   Meta,

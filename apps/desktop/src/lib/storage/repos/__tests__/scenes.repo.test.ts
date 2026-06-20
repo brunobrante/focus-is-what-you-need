@@ -9,7 +9,7 @@ import { getCanvasMockBundleForScreen } from "@/components/mocks/data/canvasMock
 import { flushThumbnailJobs } from "@/application/thumbnails/thumbnailQueue";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
-import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
+import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
 class MemoryStorage {

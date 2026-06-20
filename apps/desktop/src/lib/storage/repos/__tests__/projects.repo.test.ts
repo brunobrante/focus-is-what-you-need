@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { createProject, deleteProject, findProjectByName } from "@/lib/storage/repos/projects.repo";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
-import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
+import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type {
   ComponentRow,
   ProjectRow,

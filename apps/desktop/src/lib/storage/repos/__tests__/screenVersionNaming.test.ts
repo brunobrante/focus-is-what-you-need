@@ -9,7 +9,7 @@ import {
   variantVersionLabel,
 } from "@/lib/storage/repos/variants.repo";
 import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
-import { resetPersistenceSingletons } from "@/infrastructure/persistence/createPersistence";
+import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type { ComponentRow, SceneRow, ScreenRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
 class MemoryStorage {

@@ -1,4 +1,4 @@
-import { getSaveQueue } from "@/infrastructure/persistence/createPersistence";
+import { getSaveQueue } from "@/application/persistence/saveQueueProvider";
 import {
   notifyInvalidation,
   tableInvalidationKey,

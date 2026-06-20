@@ -101,6 +101,11 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-19** ✅ The `SaveQueue` singleton now lives in `application/persistence/saveQueueProvider.ts`
+  (`getSaveQueue` + outbox/runtime wiring + `resetPersistenceSingletons`); infrastructure's
+  `createPersistence.ts` only provides the port (`createPersistencePort`/`getPersistencePort` +
+  `resetPersistencePort`). `recordStore.ts` and the test seams import from the application provider.
+  Dependency direction is now one-way (application → infrastructure), no cycle.
 - **ORG-13** ✅ Dead code removed: the `CatalogGrid` one-line re-export was deleted and
   `References.tsx` imports `ReferenceGrid` directly; the unused `previewOpen`/`projectSettingsOpen`
   state (+ setters and the no-op `setProjectSettingsOpen(false)` call) was dropped from
@@ -479,11 +484,6 @@ If only a handful of things get fixed, fix these:
   persistence.** `useDeferredPersistence.ts:66-95` returns the materialization promise;
   `useCanvasNavigation.ts:40,117` & `Canvas.tsx:697` do `flushPendingSave().finally(navigate)`,
   delaying route changes behind a tree walk. Navigate immediately; let the queue handle it.
-- 🟠 **ORG-19 — SaveQueue construction (an application concern) lives in infrastructure.**
-  `infrastructure/persistence/createPersistence.ts:30-43` instantiates the `SaveQueue` class
-  (which lives in `application/`), and `recordStore.ts` (lib/storage) reaches into infrastructure
-  to get it. Own the queue singleton in `application/persistence`; let infrastructure only provide
-  the port.
 - 🟠 **ORG-20 — Graph subtree merge/linkify/materialize (Versioning.md domain logic) lives in a
   storage repo.** `scenes.repo.ts:234-435` (`replaceComponentSubtreeInGraph`,
   `linkifyChildComponentsInGraph`, `materializeInstancesInGraph`). These are pure graph transforms
