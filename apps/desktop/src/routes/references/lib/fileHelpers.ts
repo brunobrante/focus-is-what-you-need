@@ -114,8 +114,20 @@ export { extFromName, inferType };
 export function measureImage(src: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth || 0, h: img.naturalHeight || 0 });
-    img.onerror = () => reject(new Error("Cannot measure image"));
+    const release = () => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = "";
+    };
+    img.onload = () => {
+      const size = { w: img.naturalWidth || 0, h: img.naturalHeight || 0 };
+      release();
+      resolve(size);
+    };
+    img.onerror = () => {
+      release();
+      reject(new Error("Cannot measure image"));
+    };
     img.src = src;
   });
 }
@@ -125,14 +137,27 @@ export function measureVideo(src: string): Promise<{ w: number; h: number; durat
     const video = document.createElement("video");
     video.preload = "metadata";
     video.muted = true;
+    // Release the element on settle so it doesn't hold a decode alive (notably
+    // during a multi-file import that measures many videos in sequence).
+    const release = () => {
+      video.onloadedmetadata = null;
+      video.onerror = null;
+      video.removeAttribute("src");
+      video.load();
+    };
     video.onloadedmetadata = () => {
-      resolve({
+      const result = {
         w: video.videoWidth || 0,
         h: video.videoHeight || 0,
         duration: isFinite(video.duration) ? video.duration : 0,
-      });
+      };
+      release();
+      resolve(result);
     };
-    video.onerror = () => reject(new Error("Cannot measure video"));
+    video.onerror = () => {
+      release();
+      reject(new Error("Cannot measure video"));
+    };
     video.src = src;
   });
 }

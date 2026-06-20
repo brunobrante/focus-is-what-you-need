@@ -381,24 +381,21 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   // --- Interaction ---------------------------------------------------------
 
-  const selectStackComponent = useCallback(
-    (id: string) => {
-      cancelSelection();
-      expandComponentPath(id);
-      setSelectedComponentId(id);
-    },
-    // cancelSelection is defined below — React guarantees stable refs for setState,
-    // so we reference the stable expandComponentPath + setSelectedComponentId.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [expandComponentPath],
-  );
-
-  // cancelSelection is returned from the interaction hook; we need a stable
-  // forward-ref so it can be used in onSelectStackComponent without a cycle.
+  // cancelSelection is returned from the interaction hook (defined below); a
+  // stable forward-ref lets selectStackComponent call it without a cycle.
   const cancelSelectionRef = useRef<(() => void) | null>(null);
   const cancelSelectionStable = useCallback(() => {
     cancelSelectionRef.current?.();
   }, []);
+
+  const selectStackComponent = useCallback(
+    (id: string) => {
+      cancelSelectionStable();
+      expandComponentPath(id);
+      setSelectedComponentId(id);
+    },
+    [cancelSelectionStable, expandComponentPath],
+  );
 
   const {
     selection,
@@ -452,14 +449,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     rootComponentId,
     components,
     imagePaintVersion,
-    onSelectStackComponent: useCallback(
-      (id: string) => {
-        cancelSelectionStable();
-        expandComponentPath(id);
-        setSelectedComponentId(id);
-      },
-      [cancelSelectionStable, expandComponentPath],
-    ),
+    onSelectStackComponent: selectStackComponent,
   });
 
   // Wire the stable forward-ref now that the real cancelSelection is available.

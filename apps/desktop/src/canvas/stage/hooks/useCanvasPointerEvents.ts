@@ -330,6 +330,9 @@ export function useCanvasPointerEvents({
     const interaction = interactionRef.current;
     if (!interaction) {
       const viewport = viewportRef.current;
+      // Reset unconditionally: if text editing begins mid-hover the tooling branch
+      // below is skipped, which would otherwise leave a stuck RADIUS_CURSOR.
+      if (viewport) viewport.style.cursor = "";
       if (viewport && toolingRef.current && !state.editingTextId) {
         const vpRect = getCurrentViewportRect();
         const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
@@ -338,7 +341,6 @@ export function useCanvasPointerEvents({
           if (hit.type !== "radius") hoverStore.set(null);
           return;
         }
-        viewport.style.cursor = "";
       }
       hoverStore.set(getInteractiveElementId(event.target));
       return;

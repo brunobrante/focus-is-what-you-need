@@ -87,6 +87,13 @@ These items have been fixed or deliberately dropped and were removed from the ba
   guards), so a pan whose trailing click never fired can't swallow the next legitimate click.
 - **BUG-18** ✅ The `SceneCanvasViewer` stored-image `<img>` got the sibling's
   `max-h-[60vh] max-w-full object-contain` clamp.
+- **BUG-08** ✅ `useCanvasPointerEvents` clears `viewport.style.cursor` unconditionally at the top
+  of the no-interaction branch, so a `RADIUS_CURSOR` doesn't stick when text editing begins
+  mid-hover (which skips the tooling branch).
+- **BUG-Bld-1** ✅ `selectStackComponent` and the duplicate inline `onSelectStackComponent` are
+  collapsed into one (using the stable `cancelSelectionStable` forward-ref, no eslint-disable).
+- **BUG-Ref-3** ✅ `measureImage`/`measureVideo` capture the size then release the element
+  (clear handlers, drop `src`, `video.load()`) so a multi-file import doesn't hold decodes alive.
 
 ---
 
@@ -114,10 +121,6 @@ If only a handful of things get fixed, fix these:
   `src/canvas/engine/store.tsx:~210-213`. `if (state.zoom === zoom) return state;` returns before
   `zoomViewportAroundCenter` re-clamps offsets, leaving offsets unclamped at min/max while panned.
   Short-circuit only when zoom **and** offsets are unchanged.
-- 🟡 **BUG-08 — Stuck radius/bend cursor when text editing begins mid-hover.**
-  `src/canvas/stage/hooks/useCanvasPointerEvents.ts:329-339`. `RADIUS_CURSOR` is only cleared in
-  the tooling branch. Clear `viewport.style.cursor` unconditionally at the top of the
-  no-interaction branch.
 ### Builder (`generate`)
 - 🟠 **BUG-12 — Radius coordinate conversion inconsistent across the three transforms.**
   Edit-projection divides radius by average scale `(sx+sy)/2`
@@ -125,9 +128,6 @@ If only a handful of things get fixed, fix these:
   (`:241-245`), but `paintCropsCanvas` uses only the X-axis ratio (`drawing.ts:237-240`). On a
   non-uniformly scaled image the painted radius won't match the saved one. Use one shared radius
   helper.
-- 🟡 **BUG-Bld-1 — `selectStackComponent` defined twice with divergent behavior.**
-  `src/generate/hooks/useToolsEditor.ts:387-397` vs the `onSelectStackComponent` copy at
-  `:458-465` (one calls `cancelSelection`, the other `cancelSelectionStable`). Collapse to one.
 - 🟡 **BUG-Bld-2 — Stale-closure `referenceId` in the loader effect.**
   `useToolsEditor.ts:1177-1252`, deps `[item.id]` only (eslint-disabled). If `referenceId`
   changes without `item.id`, the stale value is used for the whole async load. Add it to deps.
@@ -144,9 +144,6 @@ If only a handful of things get fixed, fix these:
 - 🟡 **BUG-Ref-2 — `IntersectionObserver` observes a possibly-null element captured at effect
   time.** `useReferenceUrl.ts:62-83`. Ref callbacks fire during commit, effects after; first
   render falls back to eager load. Use `useLayoutEffect` keyed on the element, or store it in state.
-- 🟡 **BUG-Ref-3 — `measureImage`/`measureVideo` never release the element.**
-  `fileHelpers.ts:114-138`. `video.src` keeps the element alive holding a decode during
-  multi-file import. Null out `.src` / remove handlers on settle.
 
 ### Architecture / persistence
 - 🟡 **BUG-ARCH-5 — IndexedDB `listRecords` upper bound is fragile.**
