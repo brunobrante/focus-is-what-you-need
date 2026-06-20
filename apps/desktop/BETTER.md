@@ -101,6 +101,12 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-16** ✅ The engine's text-fit measurement is now injectable. A new
+  `engine/mutations/textMeasurement.ts` owns the measurer (`measureTextWidth` + `fontForNode`)
+  with a `defaultTextWidthMeasurer` (cached offscreen `<canvas>` when a DOM exists, else the
+  character-width heuristic) and a `setTextWidthMeasurer` seam so tests get deterministic widths
+  instead of silently diverging from the browser. `elementGeometry.ts` consumes it; the mutation
+  signatures are unchanged (no caller ripple).
 - **ORG-22** ✅ Gallery section layout no longer writes straight to `localStorage`: it persists
   through the records layer via a new `galleryLayout.repo.ts` (`getGalleryLayout`/
   `saveGalleryLayout`, `gallery_layout` table keyed by `projectId:kind`, read through
@@ -477,10 +483,6 @@ If only a handful of things get fixed, fix these:
 - 🟠 **ORG-15 — Engine store performs `localStorage`/`window` I/O directly inside the
   reducer/effects.** `engine/store.tsx:483-495,509-522` reads/writes `localStorage` +
   `window.dispatchEvent` on hydrate/commit — untestable without a DOM. Inject a draft-cache port.
-- 🟠 **ORG-16 — "Pure" engine geometry mutations depend on live DOM text measurement.**
-  `engine/mutations/elementGeometry.ts:85-90`. `getTextMeasureContext()` creates a real
-  `<canvas>` from within mutations and silently falls back to a `length*fontSize*0.55` heuristic
-  in Bun — so results differ between browser and tests. Inject the measurement function.
 - 🟠 **ORG-17 — Canvas hook reaches directly into the storage cache; materializer is an
   orchestration use-case living in the UI folder.** `useSubjectCanvasWindow.ts:4,47-50` &
   `Canvas.tsx:283,367` copy the whole scenes table via `peekTable`; `canvasMaterializer.ts`

@@ -11,6 +11,7 @@ import {
   roundAngle,
   roundPixel,
 } from "../geometry";
+import { fontForNode, measureTextWidth } from "./textMeasurement";
 
 export function cloneDocument(document: CanvasDocument): CanvasDocument {
   if (typeof structuredClone === "function") return structuredClone(document);
@@ -82,26 +83,6 @@ export function updateElementStyles(
   return next;
 }
 
-let textMeasureCanvas: HTMLCanvasElement | null = null;
-
-function getTextMeasureContext(): CanvasRenderingContext2D | null {
-  if (!globalThis.document) return null;
-  textMeasureCanvas ??= globalThis.document.createElement("canvas");
-  return textMeasureCanvas.getContext("2d");
-}
-
-function fontForNode(node: ElementNode): string {
-  const fontWeight = node.styles.fontWeight ?? "400";
-  const fontSize = node.styles.fontSize ?? 16;
-  const fontFamily = node.styles.fontFamily || "Inter, system-ui, sans-serif";
-  return `${fontWeight} ${fontSize}px ${fontFamily}`;
-}
-
-function measureTextLineWidth(line: string, fontSize: number, context: CanvasRenderingContext2D | null): number {
-  if (context) return context.measureText(line).width;
-  return line.length * fontSize * 0.55;
-}
-
 function isTextFit(node: ElementNode, axis: keyof ElementSizing): boolean {
   return node.type === "text" && node.sizing?.[axis] === "fit";
 }
@@ -149,11 +130,9 @@ type TextFitMetrics = {
 function getTextFitMetrics(node: ElementNode): TextFitMetrics {
   const fontSize = node.styles.fontSize ?? 16;
   const lineHeight = fontSize * 1.12;
-  const context = getTextMeasureContext();
-  if (context) context.font = fontForNode(node);
-
+  const font = fontForNode(node);
   const lines = (node.content ?? "").split("\n");
-  const measure = (line: string) => measureTextLineWidth(line, fontSize, context);
+  const measure = (line: string) => measureTextWidth(line, font, fontSize);
   const padding = node.styles.padding ?? 0;
   const borderWidth = node.styles.borderWidth ?? 0;
   const contentInset = (padding + borderWidth) * 2;
