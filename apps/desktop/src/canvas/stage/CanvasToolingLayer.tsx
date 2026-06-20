@@ -570,6 +570,11 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         isDragging,
         isEditingText,
       };
+      // Depend on selectedIdsKey (the joined-content string) instead of the
+      // props.selectedIds array ref: the store can hand back a new array with the
+      // same contents, and that should not rebuild all the outline geometry. The
+      // body reads props.selectedIds, but its content is fully captured by the key.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
       doc,
       hoveredId,
@@ -578,7 +583,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.editingTextId,
       props.interactionType,
       props.radiusDragCorner,
-      props.selectedIds,
+      selectedIdsKey,
       props.suppressHover,
       parentDistanceModifierDown,
       settings.canvas.shell.invisibleDragGhost,

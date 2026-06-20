@@ -153,6 +153,9 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
   private valueLabelShadowPaint: Paint | null = null;
   // Bold 11px Geist font for the value tags, matching the DOM `font-weight: 700`.
   private valueLabelFont: Font | null = null;
+  // 11px font for the parent-distance labels, cached like valueLabelFont so the
+  // drag loop doesn't allocate + free a WASM Font every rendered frame.
+  private parentDistanceFont: Font | null = null;
   private parentDistanceTypeface: Typeface | null = null;
   private ownsParentDistanceTypeface = false;
   private ready = false;
@@ -256,7 +259,7 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
       }
 
       if (frame.parentDistances) {
-        drawParentDistances(ck, canvas, pool, frame.parentDistances, frame, this.parentDistanceTypeface);
+        drawParentDistances(ck, canvas, pool, frame.parentDistances, frame, this.getParentDistanceFont(ck));
       }
 
       if (frame.marqueeRect) {
@@ -321,6 +324,8 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
     this.valueLabelShadowPaint = null;
     this.valueLabelFont?.delete();
     this.valueLabelFont = null;
+    this.parentDistanceFont?.delete();
+    this.parentDistanceFont = null;
     if (this.ownsParentDistanceTypeface) this.parentDistanceTypeface?.delete();
     this.parentDistanceTypeface = null;
     this.ownsParentDistanceTypeface = false;
@@ -363,6 +368,18 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
       this.valueLabelShadowPaint = paint;
     }
     return this.valueLabelShadowPaint;
+  }
+
+  private getParentDistanceFont(ck: CanvasKit): Font {
+    if (!this.parentDistanceFont) {
+      const font = new ck.Font(
+        this.parentDistanceTypeface ?? ck.Typeface.GetDefault(),
+        PARENT_DISTANCE_LABEL_FONT_SIZE,
+      );
+      font.setSubpixel(true);
+      this.parentDistanceFont = font;
+    }
+    return this.parentDistanceFont;
   }
 
   private getValueLabelFont(ck: CanvasKit): Font {
@@ -716,7 +733,7 @@ function drawParentDistances(
   pool: PaintPool,
   command: ToolingRenderFrame["parentDistances"],
   frame: ToolingRenderFrame,
-  typeface: Typeface | null,
+  font: Font,
 ): void {
   if (!command) return;
 
@@ -731,57 +748,51 @@ function drawParentDistances(
   const stroke = pool.getStroke(PARENT_DISTANCE_COLOR, 1);
   const fill = pool.getFill(PARENT_DISTANCE_COLOR);
   const textPaint = pool.getFill(PARENT_DISTANCE_TEXT_COLOR);
-  const font = new ck.Font(typeface ?? ck.Typeface.GetDefault(), PARENT_DISTANCE_LABEL_FONT_SIZE);
-  font.setSubpixel(true);
 
-  try {
-    drawParentDistanceSegment(ck, canvas, {
-      from: { x: childCenterX, y: child.y },
-      to: { x: childCenterX, y: parent.y },
-      value: command.distances.top,
-      orientation: "vertical",
-      frame,
-      stroke,
-      fill,
-      textPaint,
-      font,
-    });
-    drawParentDistanceSegment(ck, canvas, {
-      from: { x: childRight, y: childCenterY },
-      to: { x: parentRight, y: childCenterY },
-      value: command.distances.right,
-      orientation: "horizontal",
-      frame,
-      stroke,
-      fill,
-      textPaint,
-      font,
-    });
-    drawParentDistanceSegment(ck, canvas, {
-      from: { x: childCenterX, y: childBottom },
-      to: { x: childCenterX, y: parentBottom },
-      value: command.distances.bottom,
-      orientation: "vertical",
-      frame,
-      stroke,
-      fill,
-      textPaint,
-      font,
-    });
-    drawParentDistanceSegment(ck, canvas, {
-      from: { x: child.x, y: childCenterY },
-      to: { x: parent.x, y: childCenterY },
-      value: command.distances.left,
-      orientation: "horizontal",
-      frame,
-      stroke,
-      fill,
-      textPaint,
-      font,
-    });
-  } finally {
-    font.delete();
-  }
+  drawParentDistanceSegment(ck, canvas, {
+    from: { x: childCenterX, y: child.y },
+    to: { x: childCenterX, y: parent.y },
+    value: command.distances.top,
+    orientation: "vertical",
+    frame,
+    stroke,
+    fill,
+    textPaint,
+    font,
+  });
+  drawParentDistanceSegment(ck, canvas, {
+    from: { x: childRight, y: childCenterY },
+    to: { x: parentRight, y: childCenterY },
+    value: command.distances.right,
+    orientation: "horizontal",
+    frame,
+    stroke,
+    fill,
+    textPaint,
+    font,
+  });
+  drawParentDistanceSegment(ck, canvas, {
+    from: { x: childCenterX, y: childBottom },
+    to: { x: childCenterX, y: parentBottom },
+    value: command.distances.bottom,
+    orientation: "vertical",
+    frame,
+    stroke,
+    fill,
+    textPaint,
+    font,
+  });
+  drawParentDistanceSegment(ck, canvas, {
+    from: { x: child.x, y: childCenterY },
+    to: { x: parent.x, y: childCenterY },
+    value: command.distances.left,
+    orientation: "horizontal",
+    frame,
+    stroke,
+    fill,
+    textPaint,
+    font,
+  });
 }
 
 function drawParentDistanceSegment(
@@ -922,6 +933,7 @@ function drawSizeLabel(
     background: command.color,
     font,
     shadowPaint,
+    textWidth,
   });
 }
 
@@ -944,6 +956,7 @@ function drawRadiusLabel(
     background: SELECTION_COLOR,
     font,
     shadowPaint,
+    textWidth,
   });
 }
 
@@ -960,6 +973,9 @@ function drawValuePill(
     background: string;
     font: Font;
     shadowPaint: Paint;
+    // Pre-measured by the caller (which already needs it to size the pill), so the
+    // glyph-width measurement isn't repeated for the same text+font every frame.
+    textWidth: number;
   },
 ): void {
   const rect = { x: input.x, y: input.y, width: input.width, height: input.height };
@@ -973,12 +989,11 @@ function drawValuePill(
   );
   drawRoundRectWithPaint(ck, canvas, rect, VALUE_LABEL_RADIUS, pool.getFill(input.background));
 
-  const textWidth = measureTextWidth(input.font, input.text);
   const metrics = input.font.getMetrics();
   const baseline = rect.y + (rect.height - metrics.ascent - metrics.descent) / 2;
   canvas.drawText(
     input.text,
-    rect.x + (rect.width - textWidth) / 2,
+    rect.x + (rect.width - input.textWidth) / 2,
     baseline,
     pool.getFill(VALUE_LABEL_TEXT_COLOR),
     input.font,

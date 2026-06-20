@@ -63,6 +63,14 @@ These items have been fixed or deliberately dropped and were removed from the ba
   imperative modal rendered with `open`/`project`/… props (all silently dropped — the same class
   as BUG-01), so project settings could not be opened from the Landing page. Fixed to use a `ref`
   + `.open(project, screens, onSaved)`.
+- **PERF-02** ✅ `drawParentDistances` no longer allocates + frees a WASM `Font` every frame; it
+  uses a cached `parentDistanceFont` field (mirrors `valueLabelFont`).
+- **PERF-03** ✅ `drawValuePill` takes the caller's already-measured `textWidth` instead of
+  re-running `measureTextWidth` (two array allocations) for the same text+font each frame.
+- **PERF-04** ✅ The `renderData` memo now depends on `selectedIdsKey` (joined content string)
+  instead of the `props.selectedIds` array ref, so a same-contents selection no longer rebuilds
+  all outline geometry. (`viewportTransform` was already memoized in `CanvasStage`, so PERF-04's
+  "fresh viewportTransform" no longer applied.)
 
 ---
 
@@ -70,9 +78,10 @@ These items have been fixed or deliberately dropped and were removed from the ba
 
 If only a handful of things get fixed, fix these:
 
-1. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
-2. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
+1. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
    delete-variant — use `removeRecords`/`putRecord`. — `PERF-ARCH-03`
+2. 🟠 **`draftContentBounds` recomputes a full-document AABB every transient drag frame** (scroll
+   indicators only) — depend on a content-bounds signal or skip while interacting. — `PERF-05`
 3. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
    returns the correct (deepest containing) child, so low priority. — `BUG-02`
 
@@ -156,23 +165,11 @@ If only a handful of things get fixed, fix these:
 ## 2. Performance
 
 ### Canvas Skia render / drag loop (hottest path)
-- 🟠 **PERF-01 — `framesEqual` early-out is effectively dead; re-renders every frame.**
-  `src/canvas/stage/skiaToolingAdapter.ts:85-103` (used `:224`). It compares
-  `outlines/ghosts/guides` by reference, but `CanvasToolingLayer.renderData`
-  (`CanvasToolingLayer.tsx:319`) rebuilds those as fresh literals every memo recompute, so the
-  skip-identical-frame guard never fires during interaction. Compare label/box fields by value,
-  or pass stable references.
-- 🟠 **PERF-02 — New `Font` (WASM) allocated and deleted every frame in
-  `drawParentDistances`.** `skiaToolingAdapter.ts:734,783`. Cache a `parentDistanceFont` field
-  like the existing `valueLabelFont`.
-- 🟠 **PERF-03 — Redundant per-frame glyph/width measurement for labels.**
-  `skiaToolingAdapter.ts:890-894,909,976`. `measureTextWidth` allocates two arrays per label per
-  frame; the size-label width is measured then re-measured for identical text in `drawValuePill`.
-  Measure once, pass the width in.
-- 🟠 **PERF-04 — `renderData` memo keyed on array identity, not content.**
-  `CanvasToolingLayer.tsx:560-573`. Deps include `props.selectedIds` (array ref) + a fresh
-  `viewportTransform`; a same-contents `selectedIds` rebuilds all outline geometry. Depend on the
-  already-computed `selectedIdsKey` (`:273`).
+- 🟡 **PERF-01 — `framesEqual` compares the rebuilt fields by reference.**
+  `src/canvas/stage/skiaToolingAdapter.ts:85-103` (used `:224`). Deliberately left as a cheap
+  reference-comparison safety net: now that `renderData` keeps a stable ref when its content is
+  unchanged (PERF-04), the render effect doesn't fire on unrelated re-renders, so the guard is
+  effective without a deep-value comparison (which would add cost on every drag frame).
 - 🟠 **PERF-05 — `draftContentBounds` recomputes a full-document AABB every transient drag
   frame.** `CanvasStage.tsx:359-362`, deps `[draftMode, state.document]` (changes ~60fps via
   `setDocumentTransient`) — purely for scroll indicators. Depend on `rootIds` + a content-bounds
