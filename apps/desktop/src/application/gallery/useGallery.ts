@@ -16,6 +16,7 @@ import {
 } from "@/lib/storage/hooks";
 import { deleteComponentTree, type InstanceDeleteStrategy } from "@/lib/storage/repos/components.repo";
 import { deleteScreen } from "@/lib/storage/repos/screens.repo";
+import { getGalleryLayout, saveGalleryLayout } from "@/lib/storage/repos/galleryLayout.repo";
 import type { NewScreenModalHandle } from "@/components/modals/NewScreenModal";
 import type { NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
@@ -31,46 +32,43 @@ export type Tab = "screens" | "components" | "references" | "system";
 export type CmpKindFilter = "all" | ComponentKind;
 export type SectionState = { id: string; name: string };
 
-type SectionPersistedState = {
-  sections: SectionState[];
-  sectionById: Record<string, string | null>;
-};
-
 function usePersistentSectionState(
   projectId: string | null | undefined,
   kind: "screens" | "components",
 ) {
-  const storageKey = projectId ? `fwyn:gallery-sections:${projectId}:${kind}` : null;
   const [sections, setSections] = useState<SectionState[]>([]);
   const [sectionById, setSectionById] = useState<Record<string, string | null>>({});
+  // Tracks which project/kind the current state was loaded for. The write effect
+  // skips persisting until the async load has populated state, so the empty
+  // initial state can't clobber the stored layout.
+  const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!storageKey) {
+    if (!projectId) {
       setSections([]);
       setSectionById({});
+      loadedKeyRef.current = null;
       return;
     }
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) {
-      setSections([]);
-      setSectionById({});
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw) as Partial<SectionPersistedState>;
-      setSections(Array.isArray(parsed.sections) ? parsed.sections : []);
-      setSectionById(parsed.sectionById && typeof parsed.sectionById === "object" ? parsed.sectionById : {});
-    } catch {
-      setSections([]);
-      setSectionById({});
-    }
-  }, [storageKey]);
+    const key = `${projectId}:${kind}`;
+    loadedKeyRef.current = null;
+    let cancelled = false;
+    void getGalleryLayout(projectId, kind).then((row) => {
+      if (cancelled) return;
+      setSections(row?.sections ?? []);
+      setSectionById(row?.sectionById ?? {});
+      loadedKeyRef.current = key;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, kind]);
 
   useEffect(() => {
-    if (!storageKey) return;
-    const payload: SectionPersistedState = { sections, sectionById };
-    localStorage.setItem(storageKey, JSON.stringify(payload));
-  }, [storageKey, sections, sectionById]);
+    if (!projectId) return;
+    if (loadedKeyRef.current !== `${projectId}:${kind}`) return;
+    saveGalleryLayout(projectId, kind, { sections, sectionById });
+  }, [projectId, kind, sections, sectionById]);
 
   return { sections, setSections, sectionById, setSectionById };
 }

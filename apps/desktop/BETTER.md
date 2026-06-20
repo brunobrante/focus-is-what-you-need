@@ -101,6 +101,12 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-22** ✅ Gallery section layout no longer writes straight to `localStorage`: it persists
+  through the records layer via a new `galleryLayout.repo.ts` (`getGalleryLayout`/
+  `saveGalleryLayout`, `gallery_layout` table keyed by `projectId:kind`, read through
+  `getRecordById`/`putRecord`). The async load is guarded by a `loadedKeyRef` so the empty initial
+  state can't clobber stored layout. Also fixed the stale `useStepZoom` doc comment ("1x..25x" →
+  the real `USER_MIN_ZOOM`..`USER_MAX_ZOOM` = 1x..256x).
 - **ORG-19** ✅ The `SaveQueue` singleton now lives in `application/persistence/saveQueueProvider.ts`
   (`getSaveQueue` + outbox/runtime wiring + `resetPersistenceSingletons`); infrastructure's
   `createPersistence.ts` only provides the port (`createPersistencePort`/`getPersistencePort` +
@@ -492,10 +498,6 @@ If only a handful of things get fixed, fix these:
   (`buildSceneFromHtmlCanvas` scene-graph transform → move to `lib/canvas/`);
   `useReferenceLibrary.ts:332-412` (`createFrameGroup` does file extraction + blob save + measure
   + group construction → move to an application use-case).
-- 🟡 **ORG-22 — UI-state persistence bypasses the records layer.** `useGallery.ts:39-76` writes
-  gallery section layout straight to `localStorage` (`fwyn:gallery-sections:…`); CLAUDE.md
-  mandates `records`/`putRecord` for new data. Route through a repo. Also: `useStepZoom.ts:28-29`
-  doc says "clamp to 1x..25x" but max is 256x (stale comment).
 
 ### Duplicated UI primitives (shared layer)
 - 🟡 **ORG-23 — Five reimplementations of click-outside + Escape dismiss:** `CardMenu.tsx:19-43`,

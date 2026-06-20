@@ -29,8 +29,9 @@ type Pan = { x: number; y: number };
  * (native + non-passive, so the browser's own zoom is suppressed) and, when
  * `keyboard` is set, `Cmd`+`=` / `Cmd`+`-` / `Cmd`+`0` shortcuts.
  *
- * The viewers all clamp to 1x..25x via the shared `ZOOM_STEPS`, so they can never
- * drift from the canvas/Builder range.
+ * The viewers all clamp to the shared `ZOOM_STEPS` range (`USER_MIN_ZOOM`..
+ * `USER_MAX_ZOOM`, i.e. 1x..256x), so they can never drift from the canvas/Builder
+ * range.
  *
  * When a `contentRef` is supplied the hook also owns the pan: drag-to-pan, plain
  * wheel-pan, and an edge-to-center over-scroll clamp shared with the canvas and

@@ -14,6 +14,7 @@ export const TABLES = {
   systemDesigns: "system_designs",
   history: "history",
   checklists: "checklists",
+  galleryLayout: "gallery_layout",
 } as const;
 
 export type TableKey = (typeof TABLES)[keyof typeof TABLES];
