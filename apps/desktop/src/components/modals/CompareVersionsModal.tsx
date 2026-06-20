@@ -118,6 +118,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
                   value={direction}
                   onChange={(d) => setDirection(d as Direction)}
                 />
+                <AddVersionPicker unused={unused} onAdd={addPanel} variant="button" disabled={!canAdd} />
                 <div className="flex-1" />
                 <span className="text-[11px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
                   {selection.length} of {versions.length}
@@ -278,13 +279,23 @@ function GridStage({
             onOpenCanvas={() => onOpenCanvas(slotIdx)}
           />
         ))}
-        {unused.length > 0 ? <AddPanel unused={unused} onAdd={onAdd} /> : null}
+        {unused.length > 0 ? <AddVersionPicker unused={unused} onAdd={onAdd} variant="card" /> : null}
       </div>
     </div>
   );
 }
 
-function AddPanel({ unused, onAdd }: { unused: ScreenVersion[]; onAdd: (id: string) => void }) {
+function AddVersionPicker({
+  unused,
+  onAdd,
+  variant,
+  disabled = false,
+}: {
+  unused: ScreenVersion[];
+  onAdd: (id: string) => void;
+  variant: "card" | "button";
+  disabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -302,6 +313,54 @@ function AddPanel({ unused, onAdd }: { unused: ScreenVersion[]; onAdd: (id: stri
     };
   }, [open]);
 
+  const menu = (
+    <div
+      role="menu"
+      className={[
+        "absolute z-[20] max-h-[220px] w-[180px] overflow-y-auto rounded-[10px] border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.6)] backdrop-blur-md",
+        variant === "card"
+          ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          : "right-0 top-full mt-1",
+      ].join(" ")}
+    >
+      <div className="px-2 py-1 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Add to compare</div>
+      {unused.map((v) => (
+        <button
+          key={v.id}
+          type="button"
+          role="menuitem"
+          onClick={() => { onAdd(v.id); setOpen(false); }}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+        >
+          <span
+            className="h-[7px] w-[7px] shrink-0 rounded-full"
+            style={{ background: isMain(v) ? "#3FB950" : "#9b6dff" }}
+          />
+          {labelOf(v)}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (variant === "button") {
+    return (
+      <div ref={rootRef} className="relative shrink-0">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen((o) => !o)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-2.5 text-[12px] font-medium text-[var(--text-soft)] transition-colors hover:border-white hover:bg-white hover:text-[#111] disabled:cursor-default disabled:opacity-40 disabled:hover:border-[var(--border-strong)] disabled:hover:bg-[var(--surface-2)] disabled:hover:text-[var(--text-soft)]"
+        >
+          <IconPlus size={13} strokeWidth={1.8} />
+          Add window
+        </button>
+        {open && !disabled ? menu : null}
+      </div>
+    );
+  }
+
   return (
     <div ref={rootRef} className="relative min-h-[180px] min-w-[120px]">
       <button
@@ -315,32 +374,10 @@ function AddPanel({ unused, onAdd }: { unused: ScreenVersion[]; onAdd: (id: stri
           <span className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-strong)] transition-colors group-hover:border-[var(--text)]">
             <IconPlus size={15} strokeWidth={1.8} />
           </span>
-          <span className="text-[12px] font-medium">Add version</span>
+          <span className="text-[12px] font-medium">Add window</span>
         </span>
       </button>
-      {open ? (
-        <div
-          role="menu"
-          className="absolute left-1/2 top-1/2 z-[20] max-h-[220px] w-[180px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[10px] border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.6)] backdrop-blur-md"
-        >
-          <div className="px-2 py-1 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Add to compare</div>
-          {unused.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="menuitem"
-              onClick={() => { onAdd(v.id); setOpen(false); }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-            >
-              <span
-                className="h-[7px] w-[7px] shrink-0 rounded-full"
-                style={{ background: isMain(v) ? "#3FB950" : "#9b6dff" }}
-              />
-              {labelOf(v)}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {open ? menu : null}
     </div>
   );
 }
