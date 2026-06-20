@@ -114,12 +114,6 @@ export interface GalleryState {
   pendingComponentDelete: ComponentRow | null;
   setPendingComponentDelete: (component: ComponentRow | null) => void;
 
-  // modal open state
-  projectSettingsOpen: boolean;
-  setProjectSettingsOpen: (open: boolean) => void;
-  previewOpen: boolean;
-  setPreviewOpen: (open: boolean) => void;
-
   // modal refs
   newScreenRef: RefObject<NewScreenModalHandle | null>;
   newComponentRef: RefObject<NewComponentModalHandle | null>;
@@ -153,8 +147,6 @@ export function useGallery(projectId: string): GalleryState {
 
   const [pendingScreenDelete, setPendingScreenDelete] = useState<ScreenRow | null>(null);
   const [pendingComponentDelete, setPendingComponentDelete] = useState<ComponentRow | null>(null);
-  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   const newScreenRef = useRef<NewScreenModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
@@ -175,7 +167,6 @@ export function useGallery(projectId: string): GalleryState {
   };
 
   const handleSettingsSaved = (updatedProject: ProjectRow) => {
-    setProjectSettingsOpen(false);
     navigate(`/project/${encodeURIComponent(updatedProject.id)}`, { replace: true });
   };
 
@@ -222,10 +213,6 @@ export function useGallery(projectId: string): GalleryState {
     setPendingScreenDelete,
     pendingComponentDelete,
     setPendingComponentDelete,
-    projectSettingsOpen,
-    setProjectSettingsOpen,
-    previewOpen,
-    setPreviewOpen,
     newScreenRef,
     newComponentRef,
     openNewScreen,

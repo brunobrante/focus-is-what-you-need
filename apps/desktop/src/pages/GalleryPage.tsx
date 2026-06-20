@@ -57,8 +57,6 @@ export function GalleryPage() {
     setPendingScreenDelete,
     pendingComponentDelete,
     setPendingComponentDelete,
-    projectSettingsOpen,
-    setProjectSettingsOpen,
     newScreenRef,
     newComponentRef,
     openNewScreen,

@@ -7,7 +7,7 @@ import { extFromName, deleteReferenceFrames } from "@/lib/tauri/referenceStorage
 import { typeOptionsForKind } from "./lib/utils";
 import { VideoFramePicker } from "../import/VideoFramePicker";
 import { useReferenceLibrary } from "./hooks/useReferenceLibrary";
-import { CatalogGrid } from "./components/CatalogGrid";
+import { ReferenceGrid } from "@/components/references/ReferenceGrid";
 import { ImportModal, type ImportModalHandle } from "./components/ImportModal";
 import { ReferenceGroupModal, type ReferenceGroupModalHandle, DeleteGroupModal, type DeleteGroupModalHandle } from "./components/GroupDialogs";
 import { ReferenceDetailModal, type ReferenceDetailSubject } from "./components/ReferenceDetailModal";
@@ -139,7 +139,7 @@ export function References() {
                 }}
               />
             ) : (
-              <CatalogGrid
+              <ReferenceGrid
                 groups={lib.visibleGroups}
                 references={lib.visible}
                 allReferences={lib.library}

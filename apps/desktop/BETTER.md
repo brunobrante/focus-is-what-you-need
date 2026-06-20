@@ -101,6 +101,13 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-13** ✅ Dead code removed: the `CatalogGrid` one-line re-export was deleted and
+  `References.tsx` imports `ReferenceGrid` directly; the unused `previewOpen`/`projectSettingsOpen`
+  state (+ setters and the no-op `setProjectSettingsOpen(false)` call) was dropped from
+  `useGallery`; and `domain/persistence/contracts.ts` (aspirational `*Repository`/`UnitOfWork`/
+  `ScenePatch`/`DependencyEdge` interfaces nothing implemented) was deleted — its only live export,
+  `PersistenceRuntime`, now lives in `infrastructure/persistence/runtime.ts` beside
+  `detectPersistenceRuntime`.
 - **GAMB-03** ✅ The legacy data coercions were removed from the per-node hot constrain path:
   `constrainAll` no longer rewrites the hardcoded `"#e9edf3"` shell background or coerces the
   removed `"container"` type → `"rect"` on every hydrate/undo. Per CLAUDE.md (local-only, no
@@ -449,11 +456,6 @@ If only a handful of things get fixed, fix these:
   file.** `:625-708` (`updateInheritParentBackground`, `updateKeyCommand`…) is domain logic that
   belongs in `src/domain/settings/`. Split tabs; move reducers.
 
-### Dead code
-- 🟡 **ORG-13 — Misc dead code.** `CatalogGrid.tsx` is a one-line re-export of `ReferenceGrid`;
-  dead returned state `previewOpen`/`projectSettingsOpen` (`useGallery.ts:121,157`); aspirational
-  `contracts.ts` repository interfaces (`SceneRepository`, `UnitOfWork`, `ScenePatch`) that
-  nothing implements (`domain/persistence/contracts.ts:19-101`).
 
 ### Layering / boundary violations (vs the clean architecture CLAUDE.md describes)
 - 🟠 **ORG-14 — Domain imports framework/UI and storage layers.** `domain/settings/types.ts:1,6`

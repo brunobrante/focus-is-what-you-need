@@ -1,4 +1,4 @@
-import type { PersistenceRuntime } from "@/domain/persistence/contracts";
+export type PersistenceRuntime = "desktop" | "web" | "memory";
 
 type TauriWindow = Window &
   typeof globalThis & {
