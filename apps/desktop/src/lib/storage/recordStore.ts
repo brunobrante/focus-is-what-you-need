@@ -160,6 +160,9 @@ export function setMeta<T>(value: T): void {
     id: META_ID,
     json: JSON.stringify(row),
   });
+  // Like putRecord, notify subscribers so meta-driven UI (seed/migration state)
+  // re-reads instead of going stale until the next unrelated notify.
+  notify(META_TABLE);
 }
 
 // ---------------------------------------------------------------------------

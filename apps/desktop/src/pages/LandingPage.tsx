@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
 import { exportLocalProjectToFigx, isLocalProject } from "@/lib/storage/localProjects";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
-import { ProjectSettingsModal } from "@/components/modals/ProjectSettingsModal";
+import { ProjectSettingsModal, type ProjectSettingsModalHandle } from "@/components/modals/ProjectSettingsModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { CardMoreMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
@@ -22,8 +22,6 @@ export function LandingPage() {
     setFilter,
     pendingDelete,
     setPendingDelete,
-    editingProject,
-    setEditingProject,
     isResettingFactory,
     allScreens,
     projects,
@@ -35,6 +33,18 @@ export function LandingPage() {
   } = useLanding();
 
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const exportNoticeTimerRef = useRef<number | null>(null);
+  const projectSettingsRef = useRef<ProjectSettingsModalHandle>(null);
+
+  // Clear any pending dismiss timer on unmount so it can't fire after the page
+  // is gone (and can't clobber a fresh notice from a later export).
+  useEffect(() => {
+    return () => {
+      if (exportNoticeTimerRef.current !== null) {
+        window.clearTimeout(exportNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   const onRequestExport = async (project: ProjectRow) => {
     try {
@@ -47,7 +57,13 @@ export function LandingPage() {
     } catch {
       setExportNotice(`Failed to export "${project.name}".`);
     }
-    window.setTimeout(() => setExportNotice(null), 4000);
+    if (exportNoticeTimerRef.current !== null) {
+      window.clearTimeout(exportNoticeTimerRef.current);
+    }
+    exportNoticeTimerRef.current = window.setTimeout(() => {
+      setExportNotice(null);
+      exportNoticeTimerRef.current = null;
+    }, 4000);
   };
 
   return (
@@ -66,7 +82,13 @@ export function LandingPage() {
           onQueryChange={setQuery}
           filter={filter}
           onFilterChange={setFilter}
-          onRequestEdit={setEditingProject}
+          onRequestEdit={(project) =>
+            projectSettingsRef.current?.open(
+              project,
+              allScreens.filter((screen) => screen.projectId === project.id),
+              onSavedProject,
+            )
+          }
           onRequestDelete={setPendingDelete}
           onRequestExport={onRequestExport}
         />}
@@ -89,13 +111,7 @@ export function LandingPage() {
         onClose={() => setPendingDelete(null)}
         onConfirm={onConfirmDelete}
       />
-      <ProjectSettingsModal
-        open={Boolean(editingProject)}
-        project={editingProject}
-        screens={allScreens.filter((screen) => screen.projectId === editingProject?.id)}
-        onClose={() => setEditingProject(null)}
-        onSaved={onSavedProject}
-      />
+      <ProjectSettingsModal ref={projectSettingsRef} />
 
       <PageFooter />
     </div>

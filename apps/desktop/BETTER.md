@@ -50,6 +50,19 @@ These items have been fixed or deliberately dropped and were removed from the ba
   new unit test. The other two cited spots were already fine: the Skia engine's `documentsEqual`
   is already structural, and the `store.tsx` localStorage draft already skips transient frames and
   debounces (one stringify per settled commit, not per frame).
+- **BUG-15** ✅ `ReferencesModal` keydown effect now has a `[open, total]` deps array (and inlines
+  the `setIdx` logic so it no longer closes over unstable `next`/`prev`).
+- **BUG-16** ✅ The `LandingPage` export-toast timer is stored in a ref, cleared per export and on
+  unmount, so it can't fire after unmount or stack across exports.
+- **BUG-ARCH-3** ✅ `setMeta` now calls `notify(META_TABLE)` like `putRecord`, so meta-driven UI
+  re-reads instead of going stale.
+- **BUG-11** ✅ `waitForImage` now rejects on `error` and on an already-`complete` broken image
+  (`naturalWidth === 0`), so a broken crop image can't hang the Builder save (the caller already
+  falls back to the original URL on rejection).
+- **BUG-01b** ✅ Found in passing: the `ProjectSettingsModal` on `LandingPage` was a forwardRef
+  imperative modal rendered with `open`/`project`/… props (all silently dropped — the same class
+  as BUG-01), so project settings could not be opened from the Landing page. Fixed to use a `ref`
+  + `.open(project, screens, onSaved)`.
 
 ---
 
@@ -60,10 +73,7 @@ If only a handful of things get fixed, fix these:
 1. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
 2. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
    delete-variant — use `removeRecords`/`putRecord`. — `PERF-ARCH-03`
-3. 🟠 **Quick correctness wins:** `ReferencesModal` keydown effect missing a deps array, the
-   `LandingPage` export-toast timer with no cleanup, `setMeta` not notifying, and `waitForImage`
-   with no error path (a broken crop image can hang the Builder save). — `BUG-15/16`, `BUG-ARCH-3`, `BUG-11`
-4. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
+3. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
    returns the correct (deepest containing) child, so low priority. — `BUG-02`
 
 ---
@@ -98,11 +108,6 @@ If only a handful of things get fixed, fix these:
   detaches the canvas. Route both early-returns through the same `destroy()` cleanup.
 
 ### Builder (`generate`)
-- 🟠 **BUG-11 — `waitForImage` never rejects on image error → crop save can hang forever.**
-  `src/generate/engine/image.ts:35-43`. No `error` handler / timeout; a broken `dataUrl` with
-  `complete===true` && `naturalWidth===0` falls through to a `load` listener that never fires, so
-  `await waitForImage` in `saveSelection` (`useToolsEditor.ts:870`) hangs. Resolve/reject on
-  `error` too (mirror `measureImage`).
 - 🟠 **BUG-12 — Radius coordinate conversion inconsistent across the three transforms.**
   Edit-projection divides radius by average scale `(sx+sy)/2`
   (`useBuilderInteraction.ts:200-208`), `selectionToSubjectCoords` multiplies by `(sx+sy)/2`
@@ -133,12 +138,6 @@ If only a handful of things get fixed, fix these:
   multi-file import. Null out `.src` / remove handlers on settle.
 
 ### Shared UI / pages
-- 🟠 **BUG-15 — `ReferencesModal` keydown effect has no dependency array.**
-  `src/components/modals/ReferencesModal.tsx:52-60`. Re-registers the window listener and rebinds
-  `next/prev` closures every render. Add `}, [open, total])`.
-- 🟠 **BUG-16 — LandingPage export-toast timer has no cleanup / clobbers newer notices.**
-  `src/pages/LandingPage.tsx:50`. `setTimeout(...4000)` stores no handle; fires after unmount and
-  stacks. Store the id in a ref, clear per export and on unmount.
 - 🟡 **BUG-17 — `justPannedRef` click-suppression flag can leak across interactions.**
   `src/components/screen/useStepZoom.ts:162-199`. Only cleared in `onClickCapture`; a pan with no
   following click leaves it true and swallows the next legit click. Also reset on `pointerdown`.
@@ -147,10 +146,6 @@ If only a handful of things get fixed, fix these:
   `max-h-[60vh] max-w-full object-contain`.
 
 ### Architecture / persistence
-- 🟠 **BUG-ARCH-3 — `setMeta` does not notify subscribers.**
-  `src/lib/storage/recordStore.ts:154-163`. `putRecord` calls `notify`, `setMeta` does not; seed
-  works around it by calling `notify(TABLES.meta)` manually in one path but not `writeMeta`. Call
-  `notify(META_TABLE)` inside `setMeta`.
 - 🟡 **BUG-ARCH-5 — IndexedDB `listRecords` upper bound is fragile.**
   `src/infrastructure/persistence/indexedDbPersistence.ts:42`. `IDBKeyRange.bound([table],
   [table, []])` relies on array-sorts-after-string key ordering — works today, undocumented,

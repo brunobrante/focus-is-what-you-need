@@ -33,12 +33,17 @@ export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 }
 
 export function waitForImage(img: HTMLImageElement): Promise<void> {
-  return new Promise((resolve) => {
-    if (img.complete && img.naturalWidth) {
-      resolve();
+  return new Promise((resolve, reject) => {
+    // An already-settled image: resolve if it decoded, reject if it's broken.
+    // A broken image with `complete === true` && `naturalWidth === 0` would never
+    // fire `load`, so without this the caller's `await` hangs forever.
+    if (img.complete) {
+      if (img.naturalWidth) resolve();
+      else reject(new Error("Image failed to load"));
       return;
     }
     img.addEventListener("load", () => resolve(), { once: true });
+    img.addEventListener("error", () => reject(new Error("Image failed to load")), { once: true });
   });
 }
 

@@ -52,12 +52,12 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") next();
-      else if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") setIdx((i) => (total === 0 ? 0 : (i + 1) % total));
+      else if (e.key === "ArrowLeft") setIdx((i) => (total === 0 ? 0 : (i - 1 + total) % total));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, [open, total]);
 
   const r = references[idx];
 
