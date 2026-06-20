@@ -101,6 +101,11 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-10** ✅ The 67 dominant 24×24 stroke icons in `icons/index.tsx` now share a single
+  `BaseIcon` wrapper instead of each repeating the identical `<svg>` boilerplate (the 22 icons with
+  a different viewBox/fill/stroke setup keep their own raw `<svg>`). The conversion was verified by
+  snapshotting every icon's `renderToStaticMarkup` output with two prop sets before and after — the
+  diff is byte-identical, so no icon's rendering changed.
 - **ORG-16** ✅ The engine's text-fit measurement is now injectable. A new
   `engine/mutations/textMeasurement.ts` owns the measurer (`measureTextWidth` + `fontForNode`)
   with a `defaultTextWidthMeasurer` (cached offscreen `<canvas>` when a DOM exists, else the
@@ -467,8 +472,6 @@ If only a handful of things get fixed, fix these:
   logic** (FastEdit href `:209-214`, canvas-link `:686-688`), and the two views duplicate ~120
   lines of aside/tab/search/grid scaffolding. Extract a shared `DetailSidebar`; split the two
   route bodies; move href building into the hooks.
-- 🟡 **ORG-10 — `icons/index.tsx` (826 lines): 83/88 icons repeat identical SVG boilerplate.** A
-  single `<BaseIcon>` taking path-data children halves the file.
 - 🟠 **ORG-11 — `AppSettingsModal.tsx` (886 lines): 6 tabs + settings-tree reducers in a modal
   file.** `:625-708` (`updateInheritParentBackground`, `updateKeyCommand`…) is domain logic that
   belongs in `src/domain/settings/`. Split tabs; move reducers.
