@@ -44,6 +44,12 @@ These items have been fixed or deliberately dropped and were removed from the ba
   table scans on every propagation.
 - **BUG-ARCH-4** ⛔ Moot — the typed node upsert path (the `>=` vs `>` guard asymmetry) was
   deleted with the rest of the dead typed-delta machinery (see ARCH-01 above).
+- **PERF-08** ✅ `useCanvasHistory.sameDocumentShape` no longer `JSON.stringify`s the whole
+  document twice per edit; it walks the fields with a short-circuiting, allocation-free
+  `deepEqual` that ignores `updatedAt` (mirrors the Skia engine's `documentsEqual`). Covered by a
+  new unit test. The other two cited spots were already fine: the Skia engine's `documentsEqual`
+  is already structural, and the `store.tsx` localStorage draft already skips transient frames and
+  debounces (one stringify per settled commit, not per frame).
 
 ---
 
@@ -51,12 +57,12 @@ These items have been fixed or deliberately dropped and were removed from the ba
 
 If only a handful of things get fixed, fix these:
 
-1. 🔴 **Whole-document `JSON.stringify` on every edit** for history + draft cache — the exact
-   blob-serialization cost the Save rewrite set out to kill, here on the in-memory interaction
-   path. — `PERF-08`
-2. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
-3. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
+1. 🟠 **Per-frame WASM allocations in the Skia drag loop** (new `Font`/arrays every frame). — `PERF-01`..`PERF-04`
+2. 🟠 **`replaceTable` on scenes/thumbnails reintroduces O(table × blob)** on delete-tree /
    delete-variant — use `removeRecords`/`putRecord`. — `PERF-ARCH-03`
+3. 🟠 **Quick correctness wins:** `ReferencesModal` keydown effect missing a deps array, the
+   `LandingPage` export-toast timer with no cleanup, `setMeta` not notifying, and `waitForImage`
+   with no error path (a broken crop image can hang the Builder save). — `BUG-15/16`, `BUG-ARCH-3`, `BUG-11`
 4. 🟡 **`findChildAtPoint` recurses into non-containing branches** — inelegant but currently
    returns the correct (deepest containing) child, so low priority. — `BUG-02`
 
@@ -186,11 +192,6 @@ If only a handful of things get fixed, fix these:
 - 🟠 **PERF-07 — `TreeRow` recursive component is not memoized + gets fresh inline closures.**
   `src/canvas/shell/tree/TreeRow.tsx:10`, `Tree.tsx:318,536`. Every `Tree` render re-renders the
   whole visible subtree. `React.memo` + `useCallback` the row callbacks.
-- 🔴 **PERF-08 — Whole-document `JSON.stringify` per edit for history + draft cache.**
-  `useCanvasHistory.ts:43,58,76,115-121` (`stripUpdatedAt` stringifies the whole doc on every
-  update/commit) and `engine/store.tsx:509-523` (localStorage draft). This is the exact
-  blob-serialization cost the Save rewrite set out to kill, here on the in-memory interaction
-  path. Use a structural hash / dirty flag / version counter.
 - 🟠 **PERF-09 — `isFactoryMockGraphJSON` / `shouldUseMockGraph` fully parse graph JSON,
   unmemoized, every render.** `Canvas.tsx:231-234`. Memoize `effectiveSceneGraphJSON`, parse once.
 - 🟠 **PERF-10 — `Inspector` registers six separate bridge subscriptions.**
@@ -602,7 +603,8 @@ Ranked by code volume × divergence risk:
    delete-tree/delete-variant). (Propagation off the critical path + deterministic O(1) lookups +
    memoized index are done — see Resolved.)
 3. **Delete remaining dead weight:** ORG-13.
-4. **Hot-loop perf:** PERF-01..05, PERF-08 (stop stringifying whole documents).
+4. **Hot-loop perf:** PERF-01..05 (Skia per-frame allocations). (PERF-08 — stop stringifying whole
+   documents — is done; see Resolved.)
 5. **Extract shared utilities (mechanical, well-scoped):** DUP-01, DUP-02, DUP-03, then DUP-06,
    DUP-09, ORG-23.
 6. **Layering / god-file splits (larger refactors):** ORG-01..11, ORG-14..21.

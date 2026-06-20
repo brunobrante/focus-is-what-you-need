@@ -112,10 +112,49 @@ export function useCanvasHistory({ documentKey, setDocument }: UseCanvasHistoryI
   };
 }
 
-function sameDocumentShape(a: HtmlCanvasDocument, b: HtmlCanvasDocument): boolean {
-  return stripUpdatedAt(a) === stripUpdatedAt(b);
+// Structural equality ignoring `updatedAt`, used on every edit (per drag frame).
+// A field-by-field walk that short-circuits on the first difference — it replaces
+// a `JSON.stringify` of the whole document (twice per call), whose multi-KB string
+// allocation + GC pressure dominated the in-memory interaction path (PERF-08).
+export function sameDocumentShape(a: HtmlCanvasDocument, b: HtmlCanvasDocument): boolean {
+  if (a === b) return true;
+  return (
+    a.rootId === b.rootId &&
+    a.format === b.format &&
+    a.version === b.version &&
+    a.viewport.width === b.viewport.width &&
+    a.viewport.height === b.viewport.height &&
+    deepEqual(a.nodes, b.nodes)
+  );
 }
 
-function stripUpdatedAt(document: HtmlCanvasDocument): string {
-  return JSON.stringify({ ...document, updatedAt: 0 });
+/**
+ * Allocation-free deep equality for plain JSON-shaped values (the canvas nodes are
+ * plain objects/arrays from spreads or `JSON.parse`, with no class instances,
+ * functions, Dates, or Maps). Uses `for…in` so it never allocates a keys array.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
+    return false;
+  }
+  const aArray = Array.isArray(a);
+  const bArray = Array.isArray(b);
+  if (aArray || bArray) {
+    if (!aArray || !bArray || a.length !== b.length) return false;
+    for (let index = 0; index < a.length; index += 1) {
+      if (!deepEqual(a[index], b[index])) return false;
+    }
+    return true;
+  }
+  const aRecord = a as Record<string, unknown>;
+  const bRecord = b as Record<string, unknown>;
+  let aCount = 0;
+  for (const key in aRecord) {
+    aCount += 1;
+    if (!deepEqual(aRecord[key], bRecord[key])) return false;
+  }
+  let bCount = 0;
+  for (const _key in bRecord) bCount += 1;
+  return aCount === bCount;
 }
