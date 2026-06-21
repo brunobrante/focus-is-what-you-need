@@ -83,6 +83,11 @@ export interface ScreenDetailState {
   activeVersion: ScreenVersion | undefined;
   activeTpl: ReturnType<typeof templateForScreenName>;
   isPreviewingVersion: boolean;
+  // The variant id the preview's Open in canvas / Fast edit follow: the previewed
+  // version when one is shown, otherwise null (the screen itself).
+  previewVariantId: string | null;
+  // canvasHref scoped to the previewed version (or the plain canvasHref for the main).
+  previewCanvasHref: string;
 
   // modal refs
   versionModeRef: React.RefObject<VersionModeModalHandle | null>;
@@ -100,6 +105,9 @@ export interface ScreenDetailState {
 
   // handlers
   buildScreenHref: (id: string) => string;
+  // Builds the Fast edit canvas href for one of the screen's subcomponents: opens
+  // that component's own variant when it has one, else falls back to the screen href.
+  buildComponentFastEditHref: (component: ComponentRow) => string;
   openNewComponent: () => void;
   addVersion: () => void;
   removeLinkedReference: (referenceId: string) => void;
@@ -246,6 +254,19 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
   const canvasHref = screen
     ? `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&screen=${screen.id}`
     : `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}`;
+
+  // The preview's "Open in canvas" and "Fast edit" follow the selected version: a
+  // previewed version opens/edits that variant (its linked subcomponents are read-only
+  // in Fast edit); the main opens/edits the screen itself.
+  const previewVariantId = isPreviewingVersion ? activeVersionId : null;
+  const previewCanvasHref = previewVariantId
+    ? `${canvasHref}&versionVariant=${encodeURIComponent(previewVariantId)}`
+    : canvasHref;
+
+  const buildComponentFastEditHref = (component: ComponentRow) =>
+    component.activeVariantId
+      ? `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&variant=${component.activeVariantId}`
+      : canvasHref;
 
   const filteredComponents = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -412,6 +433,8 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     activeVersion,
     activeTpl,
     isPreviewingVersion,
+    previewVariantId,
+    previewCanvasHref,
     versionModeRef,
     historyRef,
     compareRef,
@@ -423,6 +446,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     defaultHistory: DEFAULT_HISTORY,
     projectDims: PROJECT_TYPE_DIMS,
     buildScreenHref,
+    buildComponentFastEditHref,
     openNewComponent,
     addVersion,
     removeLinkedReference,
