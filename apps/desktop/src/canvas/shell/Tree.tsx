@@ -19,18 +19,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
+import { hasClipboard } from "@/canvas/engine/clipboard";
 import {
-  bringToFront,
-  deleteElements,
-  duplicateElements,
-  reorderElement,
-  sendToBack,
-  setElementLocked,
-  setElementVisible,
-} from "@/canvas/engine/actions";
-import { copyElements, hasClipboard, pasteElements } from "@/canvas/engine/clipboard";
-import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
+  useEditorBridge,
+  useEditorBridgeReader,
+  type EditorBridgeValue,
+} from "@/canvas/engine/bridge";
 import type { CanvasDocument } from "@/canvas/engine/types";
+import { useCanvasCommands } from "./useCanvasCommands";
 import { isCurrentKey, windowKeyLabel, type CanvasWindowKey, type CanvasWindowType } from "@/canvas/canvasUtils";
 
 import type { DeviceType, DropMode, ProjectTreeNode } from "./tree/treeTypes";
@@ -787,33 +783,43 @@ function TreeContextMenu({
   }, [menu.x, menu.y]);
 
   if (!editor) return null;
-  const { state, dispatch } = editor;
+  return <TreeContextMenuContent menu={menu} onClose={onClose} editor={editor} menuRef={menuRef} />;
+}
+
+function TreeContextMenuContent({
+  menu,
+  onClose,
+  editor,
+  menuRef,
+}: {
+  menu: NonNullable<TreeContextMenuState>;
+  onClose: () => void;
+  editor: EditorBridgeValue;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const { state } = editor;
+  const commands = useCanvasCommands(editor, onClose);
   const selectedIds = state.selectedIds;
   const hasSelection = selectedIds.length > 0;
   const singleId = selectedIds.length === 1 ? selectedIds[0] : null;
   const singleNode = singleId ? state.document.elements[singleId] : null;
 
-  const commit = (document: CanvasDocument, ids?: string[]) => {
-    dispatch({ type: "commitDocument", document, selectedIds: ids ?? state.selectedIds });
-    onClose();
-  };
-
   const items: TreeContextMenuItem[] = [
-    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: () => { copyElements(state.document, selectedIds); onClose(); } },
-    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !hasClipboard(), action: () => { const result = pasteElements(state.document); if (result) commit(result.document, result.selectedIds); else onClose(); } },
-    { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: () => { const result = duplicateElements(state.document, selectedIds); commit(result.document, result.selectedIds); } },
+    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: commands.copy },
+    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !hasClipboard(), action: commands.paste },
+    { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: commands.duplicate },
     { type: "separator" },
-    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: () => { if (singleId) commit(bringToFront(state.document, singleId)); } },
-    { type: "action", label: "Bring Forward", disabled: !singleNode, action: () => { if (singleId) commit(reorderElement(state.document, singleId, "forward")); } },
-    { type: "action", label: "Send Backward", disabled: !singleNode, action: () => { if (singleId) commit(reorderElement(state.document, singleId, "backward")); } },
-    { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: () => { if (singleId) commit(sendToBack(state.document, singleId)); } },
+    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: commands.bringToFront },
+    { type: "action", label: "Bring Forward", disabled: !singleNode, action: commands.bringForward },
+    { type: "action", label: "Send Backward", disabled: !singleNode, action: commands.sendBackward },
+    { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: commands.sendToBack },
     { type: "separator" },
     ...(singleNode ? [
-      { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commit(setElementLocked(state.document, singleId!, !singleNode.locked)) },
-      { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commit(setElementVisible(state.document, singleId!, singleNode.visible === false)) },
+      { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commands.setLocked(!singleNode.locked) },
+      { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commands.setVisible(singleNode.visible === false) },
       { type: "separator" as const },
     ] : []),
-    { type: "action", label: "Delete", shortcut: "Del", disabled: !hasSelection, action: () => commit(deleteElements(state.document, selectedIds), []) },
+    { type: "action", label: "Delete", shortcut: "Del", disabled: !hasSelection, action: commands.remove },
   ];
 
   return (
