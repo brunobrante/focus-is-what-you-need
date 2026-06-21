@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { Snapshot } from "@/components/Snapshot";
 import { AddCard } from "@/components/screen/AddCard";
-import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
-import { CardSourceIcon, scopeOf } from "@/components/component/componentSource";
+import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
 import { VersionTagBadge } from "@/components/screen/VersionSideCard";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
@@ -14,8 +12,8 @@ import { CompareVersionsModal, type CompareVersionsModalHandle } from "@/compone
 import { NewComponentModal } from "@/components/modals/NewComponentModal";
 import { ReferencesModal } from "@/components/modals/ReferencesModal";
 import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
-import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
-import type { ComponentKind, ProjectType } from "@/lib/data/types";
+import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
+import type { ComponentKind } from "@/lib/data/types";
 import type { ScreenVersion } from "@/lib/data/screenVersions";
 import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { updateComponent } from "@/lib/storage/repos/components.repo";
@@ -167,7 +165,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
       cardGrid={
         <>
           {filteredChildren.map((c) => (
-            <ChildCard
+            <ComponentSideCard
               key={c.id}
               component={c}
               variant={childVariants.get(c.id) ?? null}
@@ -176,6 +174,15 @@ export function ComponentContent({ componentId }: { componentId: string }) {
               linked={linkedChildIds.has(c.id)}
               onRequestDelete={setPendingChildDelete}
               onOpenCanvas={handleOpenCanvas}
+              onFastEdit={(cmp) => {
+                const variant = childVariants.get(cmp.id) ?? null;
+                const href = variant
+                  ? `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&variant=${variant.id}`
+                  : canvasHref;
+                fastEditRef.current?.open({ mode: "component", component: cmp, variant, type, canvasHref: href });
+              }}
+              onMoveTo={() => {}}
+              onMakeGlobal={() => {}}
             />
           ))}
           {filteredChildren.length === 0 && (
@@ -216,51 +223,6 @@ function componentParentHref(projectId: string, trail: ComponentRow[], screen: S
   if (trail.length > 0) return `/project/${encodeURIComponent(projectId)}/c/${trail[trail.length - 1].id}`;
   if (screen) return `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`;
   return `/project/${encodeURIComponent(projectId)}`;
-}
-
-// ── Child card ────────────────────────────────────────────────────────────────
-
-function ChildCard({
-  component, variant, projectId, type, linked = false, onRequestDelete, onOpenCanvas,
-}: {
-  component: ComponentRow;
-  variant: VariantRow | null;
-  projectId: string;
-  type: ProjectType;
-  linked?: boolean;
-  onRequestDelete: (c: ComponentRow) => void;
-  onOpenCanvas: (variantId: string) => void;
-}) {
-  const navigate = useNavigate();
-  const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
-  return (
-    <Link to={href} className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5">
-      <div className={["preview-dotgrid relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border p-4 transition-colors", linked ? "border-[#9b6dff] group-hover:border-[#b69cff]" : "border-[var(--border)] group-hover:border-[var(--border-strong)]"].join(" ")}>
-        {variant ? <Snapshot kind="component" ownerType="variant" ownerId={variant.id} seedKey={variant.seedKey} type={type} display="card" /> : null}
-        <CardSourceIcon
-          scope={linked ? "screen" : scopeOf(component)}
-          className={linked ? "border-[#9b6dff] text-[#c9b3ff]" : undefined}
-        />
-        <CardMenu
-          buttons={[
-            { key: "open", label: "Open component", icon: CardMenuIcons.Open, onClick: () => navigate(href) },
-            { key: "canvas", label: "Open in canvas", icon: CardMenuIcons.Canvas, onClick: () => { if (variant) onOpenCanvas(variant.id); } },
-            ...(linked ? [] : [{ key: "more", label: "More", icon: CardMenuIcons.More, menuItems: [{ key: "delete", label: "Delete component", icon: CardMenuIcons.Trash, destructive: true, onClick: () => onRequestDelete(component) }] }]),
-          ]}
-        />
-      </div>
-      <div className="flex min-w-0 flex-col gap-1 px-0.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className={["min-w-0 flex-1 truncate text-[13px] font-medium", linked ? "text-[#c9b3ff]" : "text-[var(--text)]"].join(" ")}>{component.name}</span>
-          {linked ? (
-            <span className="flex-shrink-0 rounded border border-[#9b6dff] bg-[rgba(155,109,255,0.1)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[#c9b3ff]">linked</span>
-          ) : component.kind ? (
-            <span className="flex-shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase leading-[14px] tracking-[0.5px] text-[var(--text-faint)]">{component.kind}</span>
-          ) : null}
-        </div>
-      </div>
-    </Link>
-  );
 }
 
 // ── Component info panel ──────────────────────────────────────────────────────

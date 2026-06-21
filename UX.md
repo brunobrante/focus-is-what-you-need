@@ -296,10 +296,12 @@ The screen detail and component detail pages render through **one shared view**
 (`detail/DetailView.tsx`): same frame, header, preview pane, version switcher, tabs,
 search/filter row, and References tab. Each subject feeds that view through its own
 data hook (`useScreenDetail` / `useComponentDetail`); only the genuinely per-subject
-pieces differ (breadcrumb trail data, preview primitive, meta line, info panel, the Sub
-Components cards, and the modal set). The breadcrumb itself renders through one shared
-`detail/DetailBreadcrumb.tsx` (back chevron + ancestor trail + current label + type
-badge); each view only supplies its back target and trail segments.
+pieces differ (breadcrumb trail data, preview primitive, meta line, info panel, and the
+modal set). The breadcrumb itself renders through one shared `detail/DetailBreadcrumb.tsx`
+(back chevron + ancestor trail + current label + type badge); each view only supplies its
+back target and trail segments. The Sub Components grid uses the same `ComponentSideCard`
+in both views (Canvas / Fast edit / More » Move to · Make global · Delete; linked instances
+get the purple component-link badge), so the cards never diverge.
 
 Differences from Screen Detail:
 
