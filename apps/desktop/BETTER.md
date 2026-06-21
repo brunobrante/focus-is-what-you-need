@@ -101,6 +101,20 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-15** ✅ The engine store's `localStorage`/`window` I/O is behind a `DraftCachePort`
+  (`canvas/engine/draftCachePort.ts`): `readDraft`/`writeDraft`/`emitSaved` with a default
+  DOM-backed implementation reproducing the prior behavior byte-for-byte (same storage keys, same
+  `CANVAS_DOCUMENT_SAVED_EVENT` payload), plus a `setDraftCachePort` test seam mirroring
+  `setTextWidthMeasurer`. The store's three I/O sites route through the port; behavior unchanged.
+- **ORG-20** ✅ The three pure graph transforms (`replaceComponentSubtreeInGraph`,
+  `linkifyChildComponentsInGraph`, `materializeInstancesInGraph`) + their pure helpers moved from
+  `scenes.repo.ts` into `domain/canvas/graphTransforms.ts`; the repo (and `canvasMaterializer`,
+  `variants.repo`, tests) import them from domain. The repo keeps orchestrating persistence around
+  them. All graph tests green.
+- **ORG-21** ✅ Two business-logic functions moved out of UI: `buildSceneFromHtmlCanvas` →
+  `lib/canvas/buildSceneFromHtmlCanvas.ts` (imported back into `FastEditModal`), and
+  `createFrameGroup` → `application/references/createFrameGroup.ts` as a standalone use-case taking
+  the previously-closed-over hook state/setters as a `deps` parameter (the hook now just forwards).
 - **ORG-18** ✅ Canvas navigation no longer awaits materialization. The two
   `flushPendingSave().finally(navigate)` sites in `useCanvasNavigation.ts` now fire the flush
   (save is queued + durable; materialization runs off the critical path) and `navigate()`
@@ -497,22 +511,11 @@ If only a handful of things get fixed, fix these:
 
 
 ### Layering / boundary violations (vs the clean architecture CLAUDE.md describes)
-- 🟠 **ORG-15 — Engine store performs `localStorage`/`window` I/O directly inside the
-  reducer/effects.** `engine/store.tsx:483-495,509-522` reads/writes `localStorage` +
-  `window.dispatchEvent` on hydrate/commit — untestable without a DOM. Inject a draft-cache port.
 - 🟠 **ORG-17 — Canvas hook reaches directly into the storage cache; materializer is an
   orchestration use-case living in the UI folder.** `useSubjectCanvasWindow.ts:4,47-50` &
   `Canvas.tsx:283,367` copy the whole scenes table via `peekTable`; `canvasMaterializer.ts`
   orchestrates `saveScene`+`readSceneByOwner`+4 component-repo writes from `canvas/`. Move storage
   access behind an application hook; relocate the materializer to `application/`.
-- 🟠 **ORG-20 — Graph subtree merge/linkify/materialize (Versioning.md domain logic) lives in a
-  storage repo.** `scenes.repo.ts:234-435` (`replaceComponentSubtreeInGraph`,
-  `linkifyChildComponentsInGraph`, `materializeInstancesInGraph`). These are pure graph transforms
-  — move into `domain/`, leaving the repo to orchestrate persistence.
-- 🟠 **ORG-21 — Business logic in UI components.** `FastEditModal.tsx:311-384`
-  (`buildSceneFromHtmlCanvas` scene-graph transform → move to `lib/canvas/`);
-  `useReferenceLibrary.ts:332-412` (`createFrameGroup` does file extraction + blob save + measure
-  + group construction → move to an application use-case).
 
 ### Duplicated UI primitives (shared layer)
 - 🟡 **ORG-23b — Remaining shared-UI dedup.** Two presentational duplicates left after the
