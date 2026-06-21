@@ -25,10 +25,12 @@ function VersionPreviewCard({
   version,
   rect,
   type,
+  previewKind,
 }: {
   version: ScreenVersion;
   rect: DOMRect;
   type: ProjectType;
+  previewKind: "screen" | "component";
 }) {
   const left = Math.max(
     8,
@@ -45,14 +47,11 @@ function VersionPreviewCard({
         style={{ height: 224 }}
       >
         {version.variantId ? (
-          <Snapshot
-            kind="screen"
-            ownerType="variant"
-            ownerId={version.variantId}
-            variant={version.tpl}
-            type={type}
-            display="card"
-          />
+          previewKind === "component" ? (
+            <Snapshot kind="component" ownerType="variant" ownerId={version.variantId} seedKey={null} type={type} display="card" />
+          ) : (
+            <Snapshot kind="screen" ownerType="variant" ownerId={version.variantId} variant={version.tpl} type={type} display="card" />
+          )
         ) : null}
       </div>
       <div className="mt-2 flex items-center gap-1.5 px-0.5">
@@ -84,6 +83,7 @@ export function VersionSwitcher({
   versions,
   activeId,
   type,
+  previewKind = "screen",
   onSelect,
   onAdd,
   onOpenCanvas,
@@ -93,6 +93,9 @@ export function VersionSwitcher({
   versions: ScreenVersion[];
   activeId: string | null;
   type: ProjectType;
+  /** Snapshot kind for the hover preview card — "screen" for screen versions,
+   *  "component" when the switcher drives a component's variants. */
+  previewKind?: "screen" | "component";
   onSelect: (id: string) => void;
   onAdd: () => void;
   onOpenCanvas: (v: ScreenVersion) => void;
@@ -213,7 +216,7 @@ export function VersionSwitcher({
         </button>
       </div>
 
-      {preview ? <VersionPreviewCard version={preview.version} rect={preview.rect} type={type} /> : null}
+      {preview ? <VersionPreviewCard version={preview.version} rect={preview.rect} type={type} previewKind={previewKind} /> : null}
     </div>
   );
 }

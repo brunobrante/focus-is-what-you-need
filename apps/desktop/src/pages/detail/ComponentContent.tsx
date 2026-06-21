@@ -1,36 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { IconOpenCanvas } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { Snapshot } from "@/components/Snapshot";
 import { AddCard } from "@/components/screen/AddCard";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { CardSourceIcon, scopeOf } from "@/components/component/componentSource";
-import { VersionTagBadge, versionCardButtons } from "@/components/screen/VersionSideCard";
+import { VersionTagBadge } from "@/components/screen/VersionSideCard";
 import { SideEmptyState } from "@/components/screen/SideEmptyState";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
-import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
-import { PreviewShell } from "@/components/screen/PreviewShell";
 import { HistoryModal } from "@/components/modals/HistoryModal";
+import { CompareVersionsModal, type CompareVersionsModalHandle } from "@/components/modals/CompareVersionsModal";
 import { NewComponentModal } from "@/components/modals/NewComponentModal";
 import { ReferencesModal } from "@/components/modals/ReferencesModal";
 import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
+import type { ScreenVersion } from "@/lib/data/screenVersions";
 import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { updateComponent } from "@/lib/storage/repos/components.repo";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
-import { DetailSidebar } from "./DetailSidebar";
+import { DetailView } from "./DetailView";
 
 export function ComponentContent({ componentId }: { componentId: string }) {
   const {
     component, project, screens, variants, activeVariant, displayVariant, screen, trail,
     children, linkedChildIds, childVariants, projectComponents, references, type, projectId,
-    projectName, variantCount, canvasHref, filteredChildren, filteredVariants,
+    projectName, variantCount, canvasHref, filteredChildren,
     filteredReferences, history, sideTab, setSideTab, query, setQuery,
     filter, setFilter, pendingChildDelete,
-    setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef,
+    setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef, confirmRef,
     openNewChild, addVariant, removeLinkedReference, handleChildDeleteConfirm,
     handleComponentCreated, handleOpenCanvas, handleOpenVersionCanvas, handleAddReference, handleSelectVariant,
     handleDeleteVariant, handleRename, handleUpdate,
@@ -38,6 +37,35 @@ export function ComponentContent({ componentId }: { componentId: string }) {
 
   const [infoOpen, setInfoOpen] = useState(false);
   const fastEditRef = useRef<FastEditModalHandle>(null);
+  const compareRef = useRef<CompareVersionsModalHandle>(null);
+
+  // A component is a master that owns a variant chain exactly like a screen, so its
+  // versions feed the same VersionSwitcher + Compare model — mapped to the shared
+  // ScreenVersion shape (tpl is unused for component snapshots, which key by ownerId).
+  const versions = useMemo<ScreenVersion[]>(
+    () =>
+      variants.map((v) => ({
+        id: v.id,
+        variantId: v.id,
+        title: component?.name ?? "Component",
+        tag: variantVersionLabel(v),
+        tpl: "detail",
+        updated: "",
+        author: "You",
+        initials: "VC",
+      })),
+    [variants, component?.name],
+  );
+
+  // Open a compared version in the canvas: the main opens the component itself in
+  // Current, a version opens through the persistent Versions window.
+  const handleCompareOpenInCanvas = (ids: string[]) => {
+    const id = ids[0];
+    if (!id) return;
+    const mainV = variants.find((v) => v.order <= 0) ?? activeVariant ?? null;
+    if (mainV && id === mainV.id) handleOpenCanvas(id);
+    else handleOpenVersionCanvas(id);
+  };
 
   if (!component) {
     return (
@@ -49,140 +77,123 @@ export function ComponentContent({ componentId }: { componentId: string }) {
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: children.length },
-    { id: "versions" as const, label: "Versions", count: Math.max(0, variants.length - 1) },
     { id: "references" as const, label: "References", count: references.length ?? 0 },
   ] as const;
 
+  // Versions left the tab strip (now the top switcher), so the only tabs are
+  // components + references; coerce any stale value back to a real tab.
+  const displayTab: "components" | "references" =
+    sideTab === "references" ? "references" : "components";
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]" data-type={type}>
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
+    <DetailView
+      type={type}
+      breadcrumb={
         <ComponentBreadcrumb projectId={projectId} projectName={projectName} trail={trail} screen={screen} current={component} type={type} />
-        <div className="flex items-center gap-2">
-          <Link to={canvasHref} className="btn btn-ghost">
-            <IconOpenCanvas size={14} strokeWidth={1.6} />
-            Edit in canvas
-          </Link>
-        </div>
-      </header>
-
-      <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
-        <PreviewShell onFastEdit={() => fastEditRef.current?.open({ mode: "component", component, variant: activeVariant ?? null, type, canvasHref })} canvasHref={canvasHref} showDevice={false}>
-          <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
-            {displayVariant ? (
-              <Snapshot kind="component" ownerType="variant" ownerId={displayVariant.id} seedKey={displayVariant.seedKey} type={type} emptyMode="preview" display="natural" />
-            ) : null}
-          </div>
-        </PreviewShell>
-
-        <DetailSidebar
-          title={component.name}
-          titleLabel="Edit component name"
-          onTitleSave={handleRename}
-          tagBadge={displayVariant && !isMainVariant(displayVariant) ? (
-            <span className="mb-1.5">
-              <VersionTagBadge tag={variantVersionLabel(displayVariant)} isMain={false} />
-            </span>
+      }
+      canvasHref={canvasHref}
+      canvasLabel="Edit in canvas"
+      preview={
+        <div className="relative flex h-full max-h-full min-h-0 w-full max-w-full min-w-0 items-center justify-center">
+          {displayVariant ? (
+            <Snapshot kind="component" ownerType="variant" ownerId={displayVariant.id} seedKey={displayVariant.seedKey} type={type} emptyMode="preview" display="natural" />
           ) : null}
-          meta={
-            <>
-              {component.kind ? <span>{component.kind}</span> : <span>Componente</span>}
-              <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-              <span>{variantCount} {variantCount === 1 ? "variante" : "variantes"}</span>
-              <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-              <span>{children.length} {children.length === 1 ? "child component" : "child components"}</span>
-            </>
-          }
-          onOpenHistory={() => historyRef.current?.open()}
-          count={children.length}
-          infoOpen={infoOpen}
-          onOpenInfo={() => setInfoOpen(true)}
-          onCloseInfo={() => setInfoOpen(false)}
-          infoTitle="Component information"
-          infoPanel={<ComponentInfoPanel component={component} onSave={handleUpdate} />}
-          tabs={tabs}
-          sideTab={sideTab}
-          onTabChange={setSideTab}
-          query={query}
-          onQueryChange={setQuery}
-          showKindFilter={sideTab === "components"}
-          filter={filter}
-          onFilterChange={setFilter}
-        >
-          {sideTab === "components" && (
-            <>
-              {filteredChildren.map((c) => (
-                <ChildCard
-                  key={c.id}
-                  component={c}
-                  variant={childVariants.get(c.id) ?? null}
-                  projectId={projectId}
-                  type={type}
-                  linked={linkedChildIds.has(c.id)}
-                  onRequestDelete={setPendingChildDelete}
-                  onOpenCanvas={handleOpenCanvas}
-                />
-              ))}
-              {filteredChildren.length === 0 && (
-                <SideEmptyState title="No sub component found" description="Children of this component will appear here when created." actionLabel="New component" onAction={children.length === 0 ? openNewChild : undefined} />
-              )}
-              {filteredChildren.length > 0 ? <AddCard label="New component" onClick={openNewChild} /> : null}
-            </>
-          )}
-          {sideTab === "versions" && (
-            <>
-              {variants.length > 1 && filteredVariants.map((v) => (
-                <VariantSideCard
-                  key={v.id}
-                  variant={v}
-                  active={v.id === displayVariant?.id}
-                  type={type}
-                  onSelect={() => handleSelectVariant(v.id)}
-                  onOpenCanvas={() =>
-                    // The main variant is the component itself, not a version —
-                    // open it in Current, never through the Versions window.
-                    v.order <= 0 ? handleOpenCanvas(v.id) : handleOpenVersionCanvas(v.id)
-                  }
-                  onFastEdit={() => {}}
-                  onDelete={() => handleDeleteVariant(v.id)}
-                />
-              ))}
-              {variants.length <= 1 && (
-                <SideEmptyState
-                  title="No versions yet"
-                  description="Save a copy of this component's current canvas state to create a version."
-                  actionLabel="New version"
-                  onAction={() => void addVariant()}
-                />
-              )}
-              {variants.length > 1 && <AddCard label="New version" onClick={() => void addVariant()} />}
-            </>
-          )}
-          {sideTab === "references" && (
-            <SideReferencesTab
-              references={filteredReferences}
-              query={query}
-              onAdd={() => addRefModalRef.current?.open()}
-              onOpen={(i) => referencesRef.current?.open(i)}
-              onRemove={(ref) => removeLinkedReference(ref.id)}
+        </div>
+      }
+      onPreviewFastEdit={() => fastEditRef.current?.open({ mode: "component", component, variant: activeVariant ?? null, type, canvasHref })}
+      previewCanvasHref={canvasHref}
+      previewShowDevice={false}
+      title={component.name}
+      titleLabel="Edit component name"
+      onTitleSave={handleRename}
+      tagBadge={displayVariant && !isMainVariant(displayVariant) ? (
+        <span className="mb-1.5">
+          <VersionTagBadge tag={variantVersionLabel(displayVariant)} isMain={false} />
+        </span>
+      ) : null}
+      meta={
+        <>
+          {component.kind ? <span>{component.kind}</span> : <span>Componente</span>}
+          <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
+          <span>{variantCount} {variantCount === 1 ? "variante" : "variantes"}</span>
+          <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
+          <span>{children.length} {children.length === 1 ? "child component" : "child components"}</span>
+        </>
+      }
+      onOpenHistory={() => historyRef.current?.open()}
+      count={children.length}
+      infoOpen={infoOpen}
+      onOpenInfo={() => setInfoOpen(true)}
+      onCloseInfo={() => setInfoOpen(false)}
+      infoTitle="Component information"
+      infoPanel={<ComponentInfoPanel component={component} onSave={handleUpdate} />}
+      versions={versions}
+      activeVersionId={displayVariant?.id ?? null}
+      versionPreviewKind="component"
+      onSelectVersion={handleSelectVariant}
+      onAddVersion={() => void addVariant()}
+      onCompare={() => compareRef.current?.open()}
+      onOpenVersionCanvas={(v) => {
+        if (!v.variantId) return;
+        // The main variant is the component itself — open it in Current, never
+        // through the Versions window.
+        if (v.tag === "main") handleOpenCanvas(v.variantId);
+        else handleOpenVersionCanvas(v.variantId);
+      }}
+      onDeleteVersion={(v) => { if (v.variantId) handleDeleteVariant(v.variantId); }}
+      tabs={tabs}
+      sideTab={displayTab}
+      onTabChange={setSideTab}
+      query={query}
+      onQueryChange={setQuery}
+      showKindFilter={displayTab === "components"}
+      filter={filter}
+      onFilterChange={setFilter}
+      references={filteredReferences}
+      onAddReference={() => addRefModalRef.current?.open()}
+      onOpenReference={(i) => referencesRef.current?.open(i)}
+      onRemoveReference={(ref) => removeLinkedReference(ref.id)}
+      cardGrid={
+        <>
+          {filteredChildren.map((c) => (
+            <ChildCard
+              key={c.id}
+              component={c}
+              variant={childVariants.get(c.id) ?? null}
+              projectId={projectId}
+              type={type}
+              linked={linkedChildIds.has(c.id)}
+              onRequestDelete={setPendingChildDelete}
+              onOpenCanvas={handleOpenCanvas}
             />
+          ))}
+          {filteredChildren.length === 0 && (
+            <SideEmptyState title="No sub component found" description="Children of this component will appear here when created." actionLabel="New component" onAction={children.length === 0 ? openNewChild : undefined} />
           )}
-        </DetailSidebar>
-      </div>
-
-      <HistoryModal ref={historyRef} title="Component history" subtitle={`Changes made to "${component.name}" over time.`} commits={history} />
-      <ReferencesModal ref={referencesRef} references={filteredReferences} onRemove={(ref) => removeLinkedReference(ref.id)} />
-      <FastEditModal ref={fastEditRef} />
-      <NewComponentModal ref={newComponentRef} projectId={project?.id ?? null} screens={screens} onCreated={handleComponentCreated} />
-      <ConfirmActionModal
-        open={Boolean(pendingChildDelete)}
-        title="Delete component"
-        message={pendingChildDelete ? `The component "${pendingChildDelete.name}" will be removed along with subcomponents and variants.` : ""}
-        onClose={() => setPendingChildDelete(null)}
-        onConfirm={handleChildDeleteConfirm}
-      />
-      <AddReferenceModal ref={addRefModalRef} projectId={project?.id ?? null} screens={screens} components={projectComponents} existingReferences={references} defaultComponentId={component.id} onAdd={handleAddReference} />
-      <VersionModeModal ref={versionModeRef} />
-    </div>
+          {filteredChildren.length > 0 ? <AddCard label="New component" onClick={openNewChild} /> : null}
+        </>
+      }
+      modals={
+        <>
+          <HistoryModal ref={historyRef} title="Component history" subtitle={`Changes made to "${component.name}" over time.`} commits={history} />
+          <CompareVersionsModal ref={compareRef} versions={versions} type={type} kind="component" onOpenInCanvas={handleCompareOpenInCanvas} />
+          <ReferencesModal ref={referencesRef} references={filteredReferences} onRemove={(ref) => removeLinkedReference(ref.id)} />
+          <FastEditModal ref={fastEditRef} />
+          <NewComponentModal ref={newComponentRef} projectId={project?.id ?? null} screens={screens} onCreated={handleComponentCreated} />
+          <ConfirmActionModal
+            open={Boolean(pendingChildDelete)}
+            title="Delete component"
+            message={pendingChildDelete ? `The component "${pendingChildDelete.name}" will be removed along with subcomponents and variants.` : ""}
+            onClose={() => setPendingChildDelete(null)}
+            onConfirm={handleChildDeleteConfirm}
+          />
+          {/* Version deletes (from the switcher) confirm via the imperative API, matching the screen. */}
+          <ConfirmActionModal ref={confirmRef} />
+          <AddReferenceModal ref={addRefModalRef} projectId={project?.id ?? null} screens={screens} components={projectComponents} existingReferences={references} defaultComponentId={component.id} onAdd={handleAddReference} />
+          <VersionModeModal ref={versionModeRef} />
+        </>
+      }
+    />
   );
 }
 
@@ -228,36 +239,7 @@ function ComponentBreadcrumb({
   );
 }
 
-// ── Component-specific side cards ─────────────────────────────────────────────
-
-function VariantSideCard({
-  variant, active, type, onSelect, onOpenCanvas, onFastEdit, onDelete,
-}: {
-  variant: VariantRow;
-  active: boolean;
-  type: ProjectType;
-  onSelect: () => void;
-  onOpenCanvas: () => void;
-  onFastEdit?: () => void;
-  onDelete: () => void;
-}) {
-  const label = variantVersionLabel(variant);
-  const isMain = label === "main";
-  return (
-    <div className="group flex flex-col gap-2.5 text-inherit transition-transform duration-[120ms] hover:-translate-y-0.5">
-      <div className={["relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[10px] border bg-[var(--bg)] p-3 transition-colors", active ? "border-[var(--text-muted)]" : "border-[var(--border)] group-hover:border-[var(--border-strong)]"].join(" ")}>
-        <button type="button" onClick={onSelect} aria-label={`Select version ${label}`} className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0 text-left text-inherit" />
-        <div className="h-full w-full overflow-hidden">
-          <Snapshot kind="component" ownerType="variant" ownerId={variant.id} seedKey={variant.seedKey} type={type} display="card" />
-        </div>
-        <CardMenu buttons={versionCardButtons({ isMain, onOpenCanvas, onFastEdit, onDelete })} />
-      </div>
-      <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <VersionTagBadge tag={label} isMain={isMain} />
-      </div>
-    </div>
-  );
-}
+// ── Child card ────────────────────────────────────────────────────────────────
 
 function ChildCard({
   component, variant, projectId, type, linked = false, onRequestDelete, onOpenCanvas,
@@ -366,7 +348,7 @@ function ComponentInfoPanel({
         </div>
         <div className="flex min-w-0 items-center justify-between gap-3 py-1.5">
           <span className="text-[11.5px] text-[var(--text-faint)]">Variants</span>
-          <span className="text-[11.5px] text-[var(--text-muted)]">Managed in the Variants tab</span>
+          <span className="text-[11.5px] text-[var(--text-muted)]">Managed in the version switcher</span>
         </div>
       </div>
     </div>

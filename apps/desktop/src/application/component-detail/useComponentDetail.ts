@@ -5,7 +5,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { deleteVariant, duplicateVariant, getVariant, isMainVariant } from "@/lib/storage/repos/variants.repo";
+import { deleteVariant, duplicateVariant, getVariant, isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
   useActiveVariants,
@@ -26,6 +26,7 @@ import type { NewComponentModalHandle } from "@/components/modals/NewComponentMo
 import type { ReferencesModalHandle } from "@/components/modals/ReferencesModal";
 import type { AddReferenceModalHandle } from "@/components/modals/AddReferenceModal";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
+import type { ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 
 type SideTab = "components" | "info" | "versions" | "references";
 type CmpKindFilter = "all" | ComponentKind;
@@ -86,6 +87,7 @@ export interface ComponentDetailState {
   referencesRef: React.RefObject<ReferencesModalHandle | null>;
   newComponentRef: React.RefObject<NewComponentModalHandle | null>;
   addRefModalRef: React.RefObject<AddReferenceModalHandle | null>;
+  confirmRef: React.RefObject<ConfirmActionModalHandle | null>;
 
   // Handlers
   openNewChild: () => void;
@@ -234,6 +236,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const referencesRef = useRef<ReferencesModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
   const addRefModalRef = useRef<AddReferenceModalHandle>(null);
+  const confirmRef = useRef<ConfirmActionModalHandle>(null);
 
   const filteredChildren = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -351,7 +354,16 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   };
 
   const handleDeleteVariant = (variantId: string) => {
-    void deleteVariant(variantId);
+    const target = variants.find((v) => v.id === variantId);
+    const label = target ? variantVersionLabel(target) : "";
+    confirmRef.current?.open({
+      title: "Delete version",
+      message: `Version "${label}" of "${component?.name ?? "component"}" will be removed.`,
+      onConfirm: async () => {
+        // deleteVariant switches the component's active variant to a sibling if needed.
+        await deleteVariant(variantId);
+      },
+    });
   };
 
   const handleRename = (name: string) => {
@@ -403,6 +415,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     referencesRef,
     newComponentRef,
     addRefModalRef,
+    confirmRef,
     openNewChild,
     addVariant,
     removeLinkedReference,

@@ -15,6 +15,8 @@ type Props = {
   versions: ScreenVersion[];
   type: ProjectType;
   allowMock?: boolean;
+  /** Snapshot kind for the compared previews — "screen" or "component". */
+  kind?: "screen" | "component";
   onOpenInCanvas?: (selectedIds: string[]) => void;
 };
 
@@ -33,7 +35,7 @@ function labelOf(v: ScreenVersion | undefined | null): string {
 }
 
 export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props>(
-  function CompareVersionsModal({ versions, type, onOpenInCanvas }, ref) {
+  function CompareVersionsModal({ versions, type, kind = "screen", onOpenInCanvas }, ref) {
     const [open, setOpen] = useState(false);
     const [mode, setMode] = useState<Mode>("grid");
     const [direction, setDirection] = useState<Direction>("cols");
@@ -142,6 +144,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
               byId={byId}
               versions={versions}
               type={type}
+              kind={kind}
               unused={canAdd ? unused : []}
               onAdd={addPanel}
               onSetSlot={setSlot}
@@ -149,7 +152,7 @@ export const CompareVersionsModal = forwardRef<CompareVersionsModalHandle, Props
               onOpenCanvas={(slot) => onOpenInCanvas?.([selection[slot]!])}
             />
           ) : (
-            <SliderStage a={byId.get(sliderA) ?? null} b={byId.get(sliderB) ?? null} type={type} />
+            <SliderStage a={byId.get(sliderA) ?? null} b={byId.get(sliderB) ?? null} type={type} kind={kind} />
           )}
         </div>
       </Modal>
@@ -237,6 +240,7 @@ function GridStage({
   byId,
   versions,
   type,
+  kind,
   unused,
   onAdd,
   onSetSlot,
@@ -248,6 +252,7 @@ function GridStage({
   byId: Map<string, ScreenVersion>;
   versions: ScreenVersion[];
   type: ProjectType;
+  kind: "screen" | "component";
   unused: ScreenVersion[];
   onAdd: (id: string) => void;
   onSetSlot: (slot: number, id: string) => void;
@@ -273,6 +278,7 @@ function GridStage({
             current={byId.get(id) ?? null}
             currentId={id}
             type={type}
+            kind={kind}
             canRemove={selection.length > 1}
             onSetSlot={onSetSlot}
             onRemove={() => onRemoveSlot(slotIdx)}
@@ -388,6 +394,7 @@ function Panel({
   current,
   currentId,
   type,
+  kind,
   canRemove,
   onSetSlot,
   onRemove,
@@ -398,6 +405,7 @@ function Panel({
   current: ScreenVersion | null;
   currentId: string;
   type: ProjectType;
+  kind: "screen" | "component";
   canRemove: boolean;
   onSetSlot: (slot: number, id: string) => void;
   onRemove: () => void;
@@ -441,7 +449,7 @@ function Panel({
         ) : null}
       </div>
       <div className="flex flex-1 items-center justify-center overflow-hidden bg-[var(--bg)] p-3.5">
-        <VersionShot v={current} type={type} />
+        <VersionShot v={current} type={type} kind={kind} />
       </div>
     </div>
   );
@@ -449,7 +457,7 @@ function Panel({
 
 // ── slider mode ──────────────────────────────────────────────────────────────
 
-function SliderStage({ a, b, type }: { a: ScreenVersion | null; b: ScreenVersion | null; type: ProjectType }) {
+function SliderStage({ a, b, type, kind }: { a: ScreenVersion | null; b: ScreenVersion | null; type: ProjectType; kind: "screen" | "component" }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const [pos, setPos] = useState(50);
@@ -480,14 +488,14 @@ function SliderStage({ a, b, type }: { a: ScreenVersion | null; b: ScreenVersion
       >
         {/* base: B (right side) */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-5">
-          <VersionShot v={b} type={type} />
+          <VersionShot v={b} type={type} kind={kind} />
         </div>
         {/* overlay: A (left side), clipped to the divider */}
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center p-5"
           style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
         >
-          <VersionShot v={a} type={type} />
+          <VersionShot v={a} type={type} kind={kind} />
         </div>
 
         {/* labels */}
@@ -514,22 +522,17 @@ function SliderStage({ a, b, type }: { a: ScreenVersion | null; b: ScreenVersion
 
 // ── preview ──────────────────────────────────────────────────────────────────
 
-function VersionShot({ v, type }: { v: ScreenVersion | null; type: ProjectType }) {
+function VersionShot({ v, type, kind }: { v: ScreenVersion | null; type: ProjectType; kind: "screen" | "component" }) {
   if (!v?.variantId) {
     return (
       <div className="grid h-full w-full place-items-center text-[13px] text-[var(--text-faint)]">
-        Empty screen
+        {kind === "component" ? "Empty component" : "Empty screen"}
       </div>
     );
   }
-  return (
-    <Snapshot
-      kind="screen"
-      ownerType="variant"
-      ownerId={v.variantId}
-      variant={v.tpl}
-      type={type}
-      display="fit"
-    />
+  return kind === "component" ? (
+    <Snapshot kind="component" ownerType="variant" ownerId={v.variantId} seedKey={null} type={type} display="fit" />
+  ) : (
+    <Snapshot kind="screen" ownerType="variant" ownerId={v.variantId} variant={v.tpl} type={type} display="fit" />
   );
 }

@@ -240,6 +240,11 @@ Two-column layout for inspecting and editing a screen.
   projects gallery shows. Main's chip is green; version chips are purple (matching the
   version badge). "Open in canvas" routes the **main** to Current (`?screen=`) and a
   **version** to the Versions window; "Delete" is disabled on the main.
+  - **Hover preview**: resting the mouse on a **version** chip (never the main) for ~600ms
+    reveals a floating card — pinned below the chip via a portal so the chips' scroll
+    container can't clip it — showing that version's screen snapshot plus its tag and the
+    screen title. Moving off the chip dismisses it. Mirrors the canvas prev/next preview
+    tooltips.
   - **Creating a version** ("+") does **not** promote the new version to the screen's
     main/active variant. The freshly created version is only previewed; the screen's main
     and the projects gallery stay unchanged. Promoting a version to main will be a
@@ -250,9 +255,9 @@ Two-column layout for inspecting and editing a screen.
     - **Grid** — up to **4** panels (you don't render 10 at once); layout is **Columns**
       (one row), **Rows** (one column), or **Grid** (2-column wrap → 2×2 for four, beside
       AND below). Each panel has a version select, open-in-canvas, remove, and a
-      green/purple tag badge. The **"+ Add version"** dashed card opens a **picker
-      dropdown** of the not-yet-shown versions so you choose exactly what to add (disabled
-      at 4 / when none are left).
+      green/purple tag badge. A **"+ Add window"** toolbar button **and** the in-grid
+      dashed card both open the same **picker dropdown** of the not-yet-shown versions so
+      you choose exactly what to add (disabled at 4 / when none are left).
     - **Slider** — a before/after comparison: pick **A** and **B**, then drag the divider
       (pointer-captured) to scrub one version over the other; corner chips label each side.
     - **Open in canvas** opens a version correctly: a panel's button (or the header's, for
@@ -287,21 +292,29 @@ Two-column layout for inspecting and editing a screen.
 
 ### 5. Component Detail Page `/project/:id/c/:id`
 
-Same structure as Screen Detail with these differences:
+The screen detail and component detail pages render through **one shared view**
+(`detail/DetailView.tsx`): same frame, header, preview pane, version switcher, tabs,
+search/filter row, and References tab. Each subject feeds that view through its own
+data hook (`useScreenDetail` / `useComponentDetail`); only the genuinely per-subject
+pieces differ (breadcrumb, preview primitive, meta line, info panel, the Sub
+Components cards, and the modal set).
 
-- **Full breadcrumb**: Projects > Project > Screen > Component
-- **Preview** shows the active variant snapshot (or the previewed version), zoomed proportionally to the component's intrinsic size
+Differences from Screen Detail:
+
+- **Full breadcrumb**: Projects > Project > Screen > Component (with the ancestor trail)
+- **Preview** shows the active variant snapshot (or the previewed version), zoomed proportionally to the component's intrinsic size; no device frame
 - **Inspector** differences:
   - Component name (editable)
   - Metadata: kind, variant count, sub-component count
-  - Additional button: Compare versions
   - InfoPanel fields: description textarea, kind dropdown, category input
-- **Versions tab**: clicking a `VariantSideCard` is **preview-only**, exactly like
-  the screen detail page — it shows that variant in the preview pane and highlights
-  the card, but never persists it as the component's active/main variant and never
-  changes what the projects gallery shows. **Creating a version** also stays
-  preview-only: the new version is shown in the preview pane but is not promoted to
-  the component's main/active variant.
+- **Versioning uses the same model as the screen** — a **version switcher above the
+  tab bar** (not a Versions tab), with the right-aligned **Compare / Open in canvas /
+  Delete** cluster and a **"+"** to create a version. The tab bar is therefore just
+  **Sub Components | References**. Selecting a version is **preview-only**: it shows
+  that variant in the preview pane and repopulates the Sub Components grid, but never
+  persists it as the component's active/main variant and never changes what the
+  projects gallery shows. **Creating a version** also stays preview-only: the new
+  version is shown in the preview pane but is not promoted to the main/active variant.
 
 ---
 
@@ -399,16 +412,16 @@ Full-screen visual editor with floating UI layers.
   Versions window save to that variant's scene.
 - Defaults to the first version (`V1`) of the seeded subject. Switching the subject
   re-defaults the version to that subject's first.
-- **Open in canvas** on a version card (screen or component detail Versions tab) goes
-  to the **main** subject's canvas in Current and focuses the Versions window on the
-  clicked variant (URL carries `versionVariant=<variantId>` alongside the main
-  `screen=`/`variant=`). The version is therefore never rendered in Current.
-- **The main card is not a version.** The Versions tab also lists the subject's **main**
-  (the original). Opening *it* in canvas goes straight to the subject in **Current** —
+- **Open in canvas** for a selected version (the switcher's open-canvas action, screen
+  or component detail) goes to the **main** subject's canvas in Current and focuses the
+  Versions window on the chosen variant (URL carries `versionVariant=<variantId>`
+  alongside the main `screen=`/`variant=`). The version is therefore never rendered in
+  Current.
+- **The main is not a version.** The switcher also lists the subject's **main** (the
+  original). Opening *it* in canvas goes straight to the subject in **Current** —
   a screen opens via `screen=<id>`, a component via `variant=<mainVariantId>` — with **no**
-  `versionVariant` and **no** Versions window. Only `V1+` cards route through the Versions
-  window. (Previously the main card wrongly opened itself as a version in the Versions
-  window; that was a bug.)
+  `versionVariant` and **no** Versions window. Only `V1+` selections route through the
+  Versions window.
 - When the selected subject has no real versions (only its main) the Version select
   shows "No versions" and the window shows a "No versions yet" empty state.
 
@@ -1094,10 +1107,11 @@ See [`Versioning.md`](./Versioning.md) for the full model. UX surface:
 
 **Creating a version** — a `VersionModeModal` ("Linked or Copy") appears before a new
 version is created:
-- Component versions: triggered by **New version** in the Component detail Versions tab.
+- Component versions: triggered by **New version** ("+") in the Component detail
+  **version switcher** (above the side-panel tabs — the same control as the screen).
   A component's variants are its versions — they share the component's (one) name, and
   each is identified by the same purple **version tag** (`V1`, `V2`…, V1 = the default/
-  "main"), shown on the Versions-tab cards and the component detail header. Creating one
+  "main"), shown on the switcher chips and the component detail header. Creating one
   opens the same Linked/Copy modal as screens.
 - Screen versions: triggered by **New version** either in a screen card's `···` More menu
   (Gallery Screens tab) or via the **version switcher** ("+") in the screen detail page. A
@@ -1131,19 +1145,19 @@ version is created:
 **Version details (screens & components)**:
 - The original is labelled **"main"** (green badge); the versions created from it are
   **V1, V2, V3…** (purple badge) — the first version is V1, never the main.
-- **Screen detail** surfaces versions in the **version switcher** above the side-panel
-  tabs (chips: Main · V1 · V2 …); the active chip is marked by its border + a filled
-  colour dot (green main / purple version). **Component detail** still uses a **Versions
-  tab** with `VariantSideCard` cards (empty "create version" state while only the main
-  exists; grid once there is 1+ version).
-- Version actions — on the switcher these are the right-aligned cluster (**compare**,
-  **open canvas**, **delete** — delete disabled on the main); on the component Versions-tab
-  cards they are the standard hover menu (**open canvas**, **fast edit** stub, and — on
-  non-main versions — a **More** menu with **Delete version**).
+- **Screen detail and component detail** both surface versions in the **version
+  switcher** above the side-panel tabs (chips: Main · V1 · V2 …); the active chip is
+  marked by its border + a filled colour dot (green main / purple version). The
+  switcher's hover preview and the Compare modal render the subject's own snapshot
+  (screen or component).
+- Version actions — for both screen and component, the switcher's right-aligned cluster
+  (**compare**, **open canvas**, **delete** — delete disabled on the main) acts on the
+  currently selected version.
 - Inside a version's canvas scene, child components that point at the master appear as
   **linked** instances (purple border, read-only — no delete); detached/own components
-  appear normally. The screen detail **Sub Components** tab mirrors this: it follows the
-  selected version (see the version switcher), listing that variant's subcomponents.
+  appear normally. The **Sub Components** tab (screen or component) mirrors this: it
+  follows the selected version (see the version switcher), listing that variant's
+  subcomponents.
 - **Subcomponent cards** in the screen detail **Sub Components** tab (`ComponentSideCard`):
   - an **owned** child shows **no source icon**, a normal border, and its **kind** badge
     (Layout / Section / Pattern …);
