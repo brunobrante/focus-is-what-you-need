@@ -1,3 +1,5 @@
+import type { Box } from "@/domain/canvas/geometry";
+
 export const HTML_CANVAS_FORMAT = "html-css-canvas";
 export const HTML_CANVAS_VERSION = 1;
 
@@ -27,12 +29,8 @@ export type HtmlCanvasTag =
   | "h1"
   | "h2";
 
-export type HtmlCanvasBounds = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+// Canonical box vocabulary (see domain/canvas/geometry Box).
+export type HtmlCanvasBounds = Box;
 
 export type HtmlCanvasStyle = {
   background: string;

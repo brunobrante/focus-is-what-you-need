@@ -7,6 +7,7 @@ import {
   getSelectionBox,
   isInsideInstance,
 } from "@/canvas/engine/geometry";
+import { boxesIntersect } from "@/domain/canvas/geometry";
 import type { CanvasDocument, ElementNode, Rect, ViewportMode } from "@/canvas/engine/types";
 
 export function getTransformIds(document: CanvasDocument, selectedIds: string[]): string[] {
@@ -59,15 +60,6 @@ export function getDragBox(document: CanvasDocument, ids: string[]): Rect | null
   return getSelectionAABB(document, ids) ?? getSelectionBox(document, ids);
 }
 
-export function rectsIntersect(a: Rect, b: Rect): boolean {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
-}
-
 /**
  * True when a color string would paint nothing — undefined, `transparent`,
  * `none`, or any rgba()/hsla() with a zero alpha channel.
@@ -118,7 +110,7 @@ export function findElementsInMarquee(document: CanvasDocument, marquee: Rect): 
       const node = document.elements[id];
       if (!node || node.visible === false) continue;
       const aabb = getElementAABB(document, id);
-      if (aabb && rectsIntersect(marquee, aabb)) {
+      if (aabb && boxesIntersect(marquee, aabb)) {
         // Selecting a node implies its whole subtree moves with it, so we stop
         // here: never return a parent together with its descendants, and skip
         // descending into matched subtrees. A child that overflows a parent that

@@ -7,6 +7,7 @@ import type {
   HtmlCanvasStyle,
 } from "@/lib/canvas/htmlScene";
 import { getHtmlCanvasChildren, getHtmlCanvasNode } from "@/lib/canvas/htmlScene";
+import { verticalOverlap, horizontalOverlap } from "@/domain/canvas/geometry";
 
 export type CanvasSelectionState = {
   ids: string[];
@@ -253,14 +254,6 @@ function spacingGuide(
     end: Math.max(start, end),
     kind: "spacing",
   };
-}
-
-function verticalOverlap(a: HtmlCanvasBounds, b: HtmlCanvasBounds): number {
-  return Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
-}
-
-function horizontalOverlap(a: HtmlCanvasBounds, b: HtmlCanvasBounds): number {
-  return Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
 }
 
 export function getAbsoluteBounds(

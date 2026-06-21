@@ -15,6 +15,5 @@ export {
   getInteractionParentBounds,
   getResizeBox,
   getDragBox,
-  rectsIntersect,
   findElementsInMarquee,
 } from "./canvasToolingUtils";

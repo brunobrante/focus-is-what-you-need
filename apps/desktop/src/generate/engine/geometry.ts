@@ -1,4 +1,4 @@
-import { clamp, intersectBox, boxFromPoints, boundsOfPoints } from "@/domain/canvas/geometry";
+import { clamp, intersectBox, boxFromPoints, boundsOfPoints, type Box } from "@/domain/canvas/geometry";
 import { clampPanToCenter } from "@/domain/zoom";
 import type { CropBox, ActiveSubject, ResizeHandle, RadiusHandle } from "./types";
 import { RADIUS_HANDLE_MIN_INSET } from "./types";
@@ -6,12 +6,19 @@ import { MIN_TOOL_ZOOM, SELECTION_MIN_SIZE } from "../types";
 
 export { clamp };
 
+// The Builder keeps its own `CropBox { w; h; r? }` vocabulary; bridge to the
+// canonical `Box { width; height }` at the geometry boundary so the shared
+// domain helpers stay single-vocabulary (see Box's doc comment).
+const cropToBox = (c: CropBox): Box => ({ x: c.x, y: c.y, width: c.w, height: c.h });
+const boxToCrop = (b: Box): CropBox => ({ x: b.x, y: b.y, w: b.width, h: b.height });
+
 // Per-side gutter kept before a fitting axis unlocks panning (the old code baked
 // this in as a 64px total inset on the viewport).
 const TOOL_PAN_PADDING = 32;
 
 export function intersectCropBoxes(a: CropBox, b: CropBox): CropBox | null {
-  return intersectBox(a, b);
+  const result = intersectBox(cropToBox(a), cropToBox(b));
+  return result ? boxToCrop(result) : null;
 }
 
 // Edge-to-center over-scroll, shared with the canvas and the snapshot viewers
@@ -221,11 +228,12 @@ export function cropBoxFromPoints(
   start: { x: number; y: number },
   point: { x: number; y: number },
 ): CropBox {
-  return boxFromPoints(start, point);
+  return boxToCrop(boxFromPoints(start, point));
 }
 
 export function boundsFromDrawingPath(points: Array<{ x: number; y: number }>): CropBox | null {
-  return boundsOfPoints(points);
+  const result = boundsOfPoints(points);
+  return result ? boxToCrop(result) : null;
 }
 
 export function getContentPoint(

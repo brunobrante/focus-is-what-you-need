@@ -3,6 +3,7 @@
 // re-exported here — canvas call sites keep importing them from this module.
 import type { Tool, InsertTool, ShellGridType, ElementStyles } from "@/domain/canvas/types";
 export type { Tool, InsertTool, ShellGridType, ElementStyles };
+import type { Box, Vec2 } from "@/domain/canvas/geometry";
 
 export type ElementType = "rect" | "ellipse" | "text" | "image" | "icon" | "line" | "arrow" | "polygon" | "star";
 
@@ -75,17 +76,11 @@ export type CanvasDocument = {
   elements: Record<string, ElementNode>;
 };
 
-export type Rect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+// Canonical box/vector vocabulary lives in the domain; the canvas re-uses it so
+// every surface shares one shape (see domain/canvas/geometry Box doc comment).
+export type Rect = Box;
 
-export type Point = {
-  x: number;
-  y: number;
-};
+export type Point = Vec2;
 
 export type Size = {
   width: number;

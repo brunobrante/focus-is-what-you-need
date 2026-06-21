@@ -241,6 +241,18 @@ These items have been fixed or deliberately dropped and were removed from the ba
   (`36`, `126`/`150`, `38`, `8`, `10`, `4`) are now module-level `CONTEXT_TOOLBAR_*` /
   `SIZE_LABEL_EDGE_MARGIN` / `TOOLBAR_VIEWPORT_PAD` constants (the height no longer redeclared
   inside render).
+- **DUP-11 / DUP-10** ✅ The box vocabulary is unified on the DOM-aligned `width`/`height` shape,
+  with the canonical type living in `@/domain/canvas/geometry` (`Box { x, y, width, height }` +
+  `Vec2`). The canvas `Rect`/`Point` and the HTML-scene `HtmlCanvasBounds` are now **aliases** of
+  the domain types (structural identity — zero downstream type changes, no persisted-shape change,
+  no reseed). The Builder keeps its own `CropBox { w; h; r? }` and bridges at exactly its geometry
+  boundary via thin `cropToBox`/`boxToCrop` adapters (3 wrappers in `generate/engine/geometry.ts`),
+  so its storage is untouched. With one shape everywhere, the duplicated math (DUP-10) was deleted:
+  `rectsIntersect` (`canvasToolingUtils`) → domain `boxesIntersect` (allocation-free, for the
+  marquee hot path); `verticalOverlap`/`horizontalOverlap` (`editorEngines`) → canonical domain
+  helpers. Also dropped a dead `rectsIntersect` import in `canvasStageUtils`. This unblocks DUP-04 /
+  DUP-05 (the canvas-overlay primitive + handle hit-test sharing no longer needs a vocabulary
+  conversion). 171 tests green; pre-existing type-error count unchanged (117).
 - **DUP-03** ✅ Filename → format/type parsing is no longer reimplemented 4×. `mediaTypes.ts` is
   the single source: `extFromName` (unchanged) + one canonical `inferType(name): RefType` (full
   type set, videos/figx included) built on `extFromName`. `routes/references/lib/utils.ts` and
@@ -540,9 +552,11 @@ If only a handful of things get fixed, fix these:
 
 > Context: the codebase already extracted real shared layers — `@/domain/zoom` (zoom range,
 > `zoomToCursorOffset`, `clampPanToCenter`), `@/domain/canvas/geometry` (`clamp`, `intersectBox`,
-> `boxFromPoints`, `boundsOfPoints`), and the `useStepZoom` hook shared by all snapshot viewers.
-> The builder and snapshot viewers already consume these, so the **core scalar/box/pan math is
-> NOT duplicated**. What remains is duplication in the higher-level DOM/canvas layers.
+> `boxesIntersect`, `verticalOverlap`/`horizontalOverlap`, `boxFromPoints`, `boundsOfPoints`, on a
+> single canonical `Box { x, y, width, height }` / `Vec2` vocabulary — see DUP-11 in Resolved), and
+> the `useStepZoom` hook shared by all snapshot viewers. The canvas, HTML-scene, builder, and
+> snapshot viewers all consume these, so the **core scalar/box/pan math is NOT duplicated**. What
+> remains is duplication in the higher-level DOM/canvas layers.
 
 Ranked by code volume × divergence risk:
 
@@ -557,6 +571,8 @@ Ranked by code volume × divergence risk:
   `canvas/stage/canvasToolingRenderer.ts:291-381` (`drawResizeHandles` via native `ctx.roundRect`,
   `drawRadiusHandles`, `drawOutlineRect`). Same intent (square/circle handles, rounded rect, size
   badge, stroke ÷ zoom). Share the primitives in `src/lib/canvas2d/draw.ts`; keep styling local.
+  (Now unblocked — the `width/height` vs `w/h` shape divide that complicated this was removed by
+  DUP-11; the builder bridges its `CropBox` at its own boundary.)
   (Related: GAMB-01's dead 2D renderer is a third copy.)
 - 🟠 **DUP-05 — Selection hit-testing duplicates handle hit logic.**
   `generate/engine/hitTesting.ts:16-59` (`selectionHitTest`: radius→corners→edges→body,
@@ -584,16 +600,6 @@ Ranked by code volume × divergence risk:
 - 🟡 **DUP-09 — `hexToRgba` / `hexToRgb` hex parsing duplicated.** `generate/engine/drawing.ts:16`
   vs `canvas/stage/CanvasGridOverlay.tsx:24`. Neither handles 3-char shorthand. One
   `parseHexColor` in the shared canvas2d/color module.
-- 🟡 **DUP-10 — Rect-intersection / axis-overlap math reimplemented in the canvas engine instead
-  of `@/domain/canvas/geometry.intersectBox`.** `canvas/stage/canvasToolingUtils.ts:59`
-  (`rectsIntersect`), `canvas/editorEngines.ts:258-262` (`verticalOverlap`/`horizontalOverlap`).
-  Blocked by the `{width,height}` vs `{w,h}` shape divide — see DUP-11.
-- 🟡 **DUP-11 — Multiple `Rect`/`Box`/`Vec2`/`Point` vocabularies (structural root cause).**
-  canvas `Rect{width,height}`, domain `Box{w,h}`, builder `CropBox{w,h,r}`, `HtmlCanvasBounds`.
-  This is **why** DUP-01/04/05/10 can't trivially share code — every shared helper must pick a
-  vocabulary or convert. Long-term: one canonical `Rect`/`Vec2` in `@/domain/canvas/geometry`
-  with thin adapters.
-
 ### Explicitly verified NOT duplicated (avoid false positives)
 - Viewport **clamp** math is already shared (`clampPanToCenter`, `zoomToCursorOffset` in
   `@/domain/zoom`); the canvas's `clampAxisOffset` is the documented center-origin counterpart.
@@ -619,8 +625,9 @@ Ranked by code volume × divergence risk:
 5. **Extract shared utilities (mechanical, well-scoped):** DUP-02 (remainder), then DUP-06,
    DUP-09, ORG-23. (DUP-01, DUP-03 done — see Resolved.)
 6. **Layering / god-file splits (larger refactors):** ORG-01..11, ORG-14..21.
-7. **Polish:** INC-06 (language), GAMB cleanup, the `Rect`-vocabulary unification (DUP-11) that
-   unblocks the remaining geometry sharing. (GAMB-03/05/06/09 — legacy migrations in the hot path,
+7. **Polish:** INC-06 (language), GAMB cleanup. (The `Rect`-vocabulary unification (DUP-11) +
+   the duplicated-math removal (DUP-10) are done — see Resolved; DUP-04/05 are now unblocked.)
+   (GAMB-03/05/06/09 — legacy migrations in the hot path,
    timing-hack layout effects, the remount-to-replay-animation key, and the hardcoded layout magic
    numbers — are done; see Resolved. Remaining GAMB polish: 04, 07, 08, 10, the Bld/Ref/UI/ARCH
    sub-items.)
