@@ -101,6 +101,23 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-03** ✅ `skiaToolingAdapter.ts` shrank 1154 → 457 lines. The pure color parsing/paint
+  helpers (+ `PaintPool`) moved to `skiaColor.ts` and ~19 free draw primitives + 21 label-geometry
+  constants moved to `skiaPrimitives.ts`; the adapter keeps the WebGL/Skia lifecycle, pooling, and
+  class/factory and imports the rest. Pure relocation — the 6 pre-existing type errors travelled
+  verbatim with their moved code, no new ones.
+- **ORG-08** ✅ Already done in a prior session — `ReferenceDetailModal.tsx` is 427 lines with
+  `StackCompositeView`/`StackRootsGallery`/`StackTreeRows` (`StackView.tsx`), `ModalShell`,
+  `DetailPanel`, and `stackViewHelpers.ts` already extracted and wired; no in-file helper copies
+  remain. No change needed.
+- **ORG-09** ✅ `DetailPage.tsx` reduced from ~839 to a ~20-line router. The duplicated
+  aside/tab/search/grid scaffolding became a shared `detail/DetailSidebar.tsx` (+ `detailUi.tsx`),
+  the two route bodies became `detail/ScreenContent.tsx` / `detail/ComponentContent.tsx`, and the
+  inline FastEdit/canvas href building moved into `useScreenDetail`. Behavior preserved.
+- **ORG-11** ✅ `AppSettingsModal.tsx` reduced from ~886 to ~166 lines (modal shell + tab bar +
+  save/cancel). The 6 tabs were split into `components/modals/appSettings/*`, and the 5 pure
+  settings-tree reducers (`updateInheritParentBackground`, `updateKeyCommand`, …) moved to
+  `domain/settings/updates.ts`. Behavior preserved; settings tests green.
 - **ORG-15** ✅ The engine store's `localStorage`/`window` I/O is behind a `DraftCachePort`
   (`canvas/engine/draftCachePort.ts`): `readDraft`/`writeDraft`/`emitSaved` with a default
   DOM-backed implementation reproducing the prior behavior byte-for-byte (same storage keys, same
@@ -479,9 +496,6 @@ If only a handful of things get fixed, fix these:
 - 🟠 **ORG-02 — `CanvasRender.tsx` (1028 lines) bundles 10+ surface variants + the zoom control;
   `ZoomControl` is re-imported back into `Toolbar.tsx`** (near-circular shell dependency). Split
   surfaces into `shell/surfaces/`; move `ZoomControl` out.
-- 🟠 **ORG-03 — `skiaToolingAdapter.ts` (1154 lines) is a god-file** mixing WebGL lifecycle,
-  surface/paint/font pooling, color parsing, label-geometry constants, and ~15 free draw
-  functions. Split pure drawers into `skiaPrimitives.ts` and color into `skiaColor.ts`.
 - 🟠 **ORG-04 — `CanvasToolingLayer.tsx` (1154 lines): editor business logic bolted onto the
   geometry/render layer.** `:637-795` embeds the full context-toolbar UI, rename state, and engine
   actions (`duplicateElements`, `deleteElements`, `updateElementStyles`,
@@ -497,20 +511,6 @@ If only a handful of things get fixed, fix these:
 - 🟠 **ORG-07 — `ToolsEditorView.tsx` (932 lines) mixes ML orchestration with layout.**
   `runProcessing`, `applyLamaMask`, `commitDraw` (`:256-306`) are async business logic inside the
   view. Lift into `useBuilderProcessing`.
-- 🟠 **ORG-08 — `ReferenceDetailModal.tsx` (1293 lines) does 8 jobs** (modal shell, group gallery,
-  carousel, stack composite, roots gallery, tree, 3 detail panels, + pure helpers). Extract
-  `StackCompositeView`, `StackRootsGallery`, `StackTreeRows`, the detail panels, and reuse the
-  helpers already in `stackHelpers.ts`.
-- 🟠 **ORG-09 — `DetailPage.tsx` (839 lines) mixes two pages + 10 sub-components + inline business
-  logic** (FastEdit href `:209-214`, canvas-link `:686-688`), and the two views duplicate ~120
-  lines of aside/tab/search/grid scaffolding. Extract a shared `DetailSidebar`; split the two
-  route bodies; move href building into the hooks.
-- 🟠 **ORG-11 — `AppSettingsModal.tsx` (886 lines): 6 tabs + settings-tree reducers in a modal
-  file.** `:625-708` (`updateInheritParentBackground`, `updateKeyCommand`…) is domain logic that
-  belongs in `src/domain/settings/`. Split tabs; move reducers.
-
-
-### Layering / boundary violations (vs the clean architecture CLAUDE.md describes)
 - 🟠 **ORG-17 — Canvas hook reaches directly into the storage cache; materializer is an
   orchestration use-case living in the UI folder.** `useSubjectCanvasWindow.ts:4,47-50` &
   `Canvas.tsx:283,367` copy the whole scenes table via `peekTable`; `canvasMaterializer.ts`
