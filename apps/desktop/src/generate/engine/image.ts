@@ -1,6 +1,7 @@
 import { blobToDataUrl } from "@/lib/image/dataUrl";
 
 export { blobToDataUrl };
+export { inferType } from "@/lib/references/mediaTypes";
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/png"): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -49,16 +50,6 @@ export function measureImage(src: string): Promise<{ w: number; h: number }> {
     img.onerror = () => reject(new Error("Could not measure image"));
     img.src = src;
   });
-}
-
-export function inferType(name: string): string {
-  const ext = (name.split(".").pop() || "").toLowerCase();
-  if (ext === "jpg" || ext === "jpeg") return "JPG";
-  if (ext === "png") return "PNG";
-  if (ext === "webp") return "WEBP";
-  if (ext === "svg") return "SVG";
-  if (ext === "gif") return "GIF";
-  return "IMG";
 }
 
 export function shortComponentName(id: string) {

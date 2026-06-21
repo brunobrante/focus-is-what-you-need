@@ -241,6 +241,14 @@ These items have been fixed or deliberately dropped and were removed from the ba
   (`36`, `126`/`150`, `38`, `8`, `10`, `4`) are now module-level `CONTEXT_TOOLBAR_*` /
   `SIZE_LABEL_EDGE_MARGIN` / `TOOLBAR_VIEWPORT_PAD` constants (the height no longer redeclared
   inside render).
+- **DUP-03** ✅ Filename → format/type parsing is no longer reimplemented 4×. `mediaTypes.ts` is
+  the single source: `extFromName` (unchanged) + one canonical `inferType(name): RefType` (full
+  type set, videos/figx included) built on `extFromName`. `routes/references/lib/utils.ts` and
+  `generate/engine/image.ts` now re-export it (the old image-only variant that returned `string`
+  is gone — its widening to `RefType` also fixed a latent type mismatch where `createFrameGroup`
+  fed it into a `ReferenceItem.type: RefType` field), and `lib/utils.ts`'s `fileFormatLabel` reuses
+  `extFromName` (keeping its `"FILE"` no-extension fallback). All call sites unchanged via the
+  re-exports.
 - **DUP-01** ✅ The blob→data-URL helpers (byte-identical `blobToDataUrl` in
   `generate/engine/image.ts` + `referenceThumbnails.ts`, `readFileAsDataUrl` in `lib/utils.ts`,
   `blobToBase64` in `blobStore/codec.ts`, and the inline reader in `ProjectEditPanel`) now all
@@ -543,11 +551,6 @@ Ranked by code volume × divergence risk:
   `AddReferenceModal.groupCutsByParent`/`collectCuts` carries a `"__root__"` sentinel + rootId
   exclusion, and `SceneCanvasInspector.flattenSceneTree` flattens an already-nested tree (no
   parent grouping, no cycle guard) — forcing them onto `buildForest` would add risk, not clarity.
-- 🟠 **DUP-03 — File-extension → format/type parsing reimplemented 4×.**
-  `generate/engine/image.ts:54` (`inferType`), `routes/references/lib/utils.ts:66` (`inferType`,
-  diverges on return type), `lib/utils.ts:23` (`fileFormatLabel`),
-  `lib/references/mediaTypes.ts:19` (`extFromName`). One `extFromName` + one `inferImageType` in
-  `mediaTypes.ts`.
 - 🟠 **DUP-04 — Canvas-overlay drawing primitives split between two Canvas2D toolkits.**
   `generate/engine/drawing.ts` (`roundedRectPath` hand-rolled, `drawCircleHandle`,
   `drawSquareHandle`, `drawLabelBadge`, `drawSizeBadge`, `hexToRgba`) vs
@@ -613,8 +616,8 @@ Ranked by code volume × divergence risk:
 3. **Delete remaining dead weight:** ORG-13.
 4. **Hot-loop perf:** PERF-01..05 (Skia per-frame allocations). (PERF-08 — stop stringifying whole
    documents — is done; see Resolved.)
-5. **Extract shared utilities (mechanical, well-scoped):** DUP-01, DUP-02, DUP-03, then DUP-06,
-   DUP-09, ORG-23.
+5. **Extract shared utilities (mechanical, well-scoped):** DUP-02 (remainder), then DUP-06,
+   DUP-09, ORG-23. (DUP-01, DUP-03 done — see Resolved.)
 6. **Layering / god-file splits (larger refactors):** ORG-01..11, ORG-14..21.
 7. **Polish:** INC-06 (language), GAMB cleanup, the `Rect`-vocabulary unification (DUP-11) that
    unblocks the remaining geometry sharing. (GAMB-03/05/06/09 — legacy migrations in the hot path,

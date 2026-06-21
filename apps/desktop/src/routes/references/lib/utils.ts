@@ -1,4 +1,6 @@
-import type { FilterKind, RefType } from "../types";
+import type { FilterKind } from "../types";
+
+export { inferType } from "@/lib/references/mediaTypes";
 
 export const MAX_VIDEO_BYTES = 150 * 1024 * 1024;
 
@@ -60,37 +62,6 @@ export function typeOptionsForKind(kind: FilterKind): Array<{ value: string; lab
         { value: "WEBM", label: "WebM" },
         { value: "MKV", label: "MKV" },
       ];
-  }
-}
-
-export function inferType(name: string): RefType {
-  const ext = (name.split(".").pop() || "").toLowerCase();
-  switch (ext) {
-    case "jpg":
-    case "jpeg":
-      return "JPG";
-    case "png":
-      return "PNG";
-    case "webp":
-      return "WEBP";
-    case "svg":
-      return "SVG";
-    case "gif":
-      return "GIF";
-    case "mp4":
-      return "MP4";
-    case "mov":
-      return "MOV";
-    case "webm":
-      return "WEBM";
-    case "avi":
-      return "AVI";
-    case "mkv":
-      return "MKV";
-    case "figx":
-      return "FIGX";
-    default:
-      return "IMG";
   }
 }
 

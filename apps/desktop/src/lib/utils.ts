@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { blobToDataUrl } from "@/lib/image/dataUrl"
+import { extFromName } from "@/lib/references/mediaTypes"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -12,6 +13,5 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 export function fileFormatLabel(name: string): string {
-  const parts = name.split(".");
-  return (parts.length > 1 ? parts.at(-1) : "file")!.toUpperCase();
+  return name.includes(".") ? extFromName(name).toUpperCase() : "FILE";
 }

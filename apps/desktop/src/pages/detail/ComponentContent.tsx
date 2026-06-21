@@ -21,6 +21,7 @@ import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants
 import { updateComponent } from "@/lib/storage/repos/components.repo";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 import { DetailView } from "./DetailView";
+import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
 export function ComponentContent({ componentId }: { componentId: string }) {
   const {
@@ -89,7 +90,17 @@ export function ComponentContent({ componentId }: { componentId: string }) {
     <DetailView
       type={type}
       breadcrumb={
-        <ComponentBreadcrumb projectId={projectId} projectName={projectName} trail={trail} screen={screen} current={component} type={type} />
+        <DetailBreadcrumb
+          backHref={componentParentHref(projectId, trail, screen)}
+          trail={[
+            { label: "Projects", href: "/" },
+            { label: projectName, href: `/project/${encodeURIComponent(projectId)}` },
+            ...(screen ? [{ label: screen.title, href: `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}` }] : []),
+            ...trail.map((c) => ({ label: c.name, href: `/project/${encodeURIComponent(projectId)}/c/${c.id}` })),
+          ]}
+          current={component.name}
+          type={type}
+        />
       }
       canvasHref={canvasHref}
       canvasLabel="Edit in canvas"
@@ -199,44 +210,12 @@ export function ComponentContent({ componentId }: { componentId: string }) {
 
 // ── Breadcrumb ────────────────────────────────────────────────────────────────
 
-function ComponentBreadcrumb({
-  projectId, projectName, trail, screen, current, type,
-}: {
-  projectId: string;
-  projectName: string;
-  trail: ComponentRow[];
-  screen: ScreenRow | null | undefined;
-  current: ComponentRow;
-  type: ProjectType;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-      <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">Projects</Link>
-      <span className="text-[var(--text-faint)]">/</span>
-      <Link to={`/project/${encodeURIComponent(projectId)}`} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-        {projectName}
-      </Link>
-      {screen ? (
-        <>
-          <span className="text-[var(--text-faint)]">/</span>
-          <Link to={`/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-            {screen.title}
-          </Link>
-        </>
-      ) : null}
-      {trail.map((c) => (
-        <span key={c.id} className="flex items-center gap-2.5">
-          <span className="text-[var(--text-faint)]">/</span>
-          <Link to={`/project/${encodeURIComponent(projectId)}/c/${c.id}`} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-            {c.name}
-          </Link>
-        </span>
-      ))}
-      <span className="text-[var(--text-faint)]">/</span>
-      <span className="text-[13px] font-medium text-[var(--text)]">{current.name}</span>
-      <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">{type}</span>
-    </div>
-  );
+// The back chevron targets the component's immediate parent: the deepest trail
+// ancestor, else the source screen, else the project root.
+function componentParentHref(projectId: string, trail: ComponentRow[], screen: ScreenRow | null | undefined): string {
+  if (trail.length > 0) return `/project/${encodeURIComponent(projectId)}/c/${trail[trail.length - 1].id}`;
+  if (screen) return `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`;
+  return `/project/${encodeURIComponent(projectId)}`;
 }
 
 // ── Child card ────────────────────────────────────────────────────────────────

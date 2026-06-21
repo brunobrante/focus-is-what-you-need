@@ -296,12 +296,16 @@ The screen detail and component detail pages render through **one shared view**
 (`detail/DetailView.tsx`): same frame, header, preview pane, version switcher, tabs,
 search/filter row, and References tab. Each subject feeds that view through its own
 data hook (`useScreenDetail` / `useComponentDetail`); only the genuinely per-subject
-pieces differ (breadcrumb, preview primitive, meta line, info panel, the Sub
-Components cards, and the modal set).
+pieces differ (breadcrumb trail data, preview primitive, meta line, info panel, the Sub
+Components cards, and the modal set). The breadcrumb itself renders through one shared
+`detail/DetailBreadcrumb.tsx` (back chevron + ancestor trail + current label + type
+badge); each view only supplies its back target and trail segments.
 
 Differences from Screen Detail:
 
-- **Full breadcrumb**: Projects > Project > Screen > Component (with the ancestor trail)
+- **Full breadcrumb**: Projects > Project > Screen > Component (with the ancestor trail). The
+  leading back chevron targets the component's immediate parent — the deepest trail ancestor,
+  else the source screen, else the project root (the screen's chevron returns to the project).
 - **Preview** shows the active variant snapshot (or the previewed version), zoomed proportionally to the component's intrinsic size; no device frame
 - **Inspector** differences:
   - Component name (editable)

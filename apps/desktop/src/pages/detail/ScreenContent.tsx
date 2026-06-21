@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
-import { IconChevronLeft } from "@/components/icons";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { AddCard } from "@/components/screen/AddCard";
@@ -19,6 +17,7 @@ import type { ProjectType, ScreenVariant } from "@/lib/data/types";
 import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import { useScreenDetail } from "@/application/screen-detail/useScreenDetail";
 import { DetailView } from "./DetailView";
+import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
 export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string; screenId: string }) {
   const screenId = decodeURIComponent(rawScreenId);
@@ -51,20 +50,15 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
     <DetailView
       type={type}
       breadcrumb={
-        <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-          <Link to={`/project/${encodeURIComponent(project?.id ?? pid)}`} className="text-[var(--text-muted)] hover:text-[var(--text)]">
-            <IconChevronLeft size={14} strokeWidth={1.6} />
-          </Link>
-          <span className="text-[var(--text-faint)]">/</span>
-          <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">Projects</Link>
-          <span className="text-[var(--text-faint)]">/</span>
-          <Link to={`/project/${encodeURIComponent(project?.id ?? pid)}`} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-            {projectName}
-          </Link>
-          <span className="text-[var(--text-faint)]">/</span>
-          <span className="text-[13px] font-medium text-[var(--text)]">{screenName}</span>
-          <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">{type}</span>
-        </div>
+        <DetailBreadcrumb
+          backHref={`/project/${encodeURIComponent(project?.id ?? pid)}`}
+          trail={[
+            { label: "Projects", href: "/" },
+            { label: projectName, href: `/project/${encodeURIComponent(project?.id ?? pid)}` },
+          ]}
+          current={screenName}
+          type={type}
+        />
       }
       canvasHref={canvasHref}
       canvasLabel="Open canvas"
