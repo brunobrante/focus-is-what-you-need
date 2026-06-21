@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  saveReferenceFile,
   removeReferenceFile,
   extFromName,
-  extractVideoFrameFull,
-  deleteReferenceFrames,
   type ExtractedFrame,
   type StoredRefMeta,
 } from "@/lib/tauri/referenceStorage";
@@ -13,10 +10,7 @@ import {
   replaceReferenceLibraryMeta,
   replaceReferenceLibraryGroups,
 } from "@/lib/storage/repos/referenceLibrary.repo";
-import {
-  clearReferenceUrlCache,
-  primeReferenceUrl,
-} from "@/lib/references/referenceUrlCache";
+import { clearReferenceUrlCache } from "@/lib/references/referenceUrlCache";
 import { ensureWorkspaceFolders } from "@/lib/tauri/workspace";
 import {
   newReferenceGroupId,
@@ -36,21 +30,15 @@ import {
   removeReferenceFromGroups,
   moveReferenceToGroup,
 } from "../lib/groupHelpers";
-import {
-  releaseReferenceItemUrls,
-  measureImage,
-  measureVideo,
-  inferType as inferTypeHelper,
-} from "../lib/fileHelpers";
+import { releaseReferenceItemUrls } from "../lib/fileHelpers";
 import { loadStackThumbnailBatch } from "../lib/stackHelpers";
 import {
   cancelIdle,
-  formatDuration,
-  newId,
   requestIdle,
   typeOptionsForKind,
 } from "../lib/utils";
 import type { FramePickerVideo } from "../../import/VideoFramePicker";
+import { createFrameGroup as createFrameGroupUseCase } from "@/application/references/createFrameGroup";
 
 // A stable signature of the stack state a cached cover was baked from. Drifts when
 // the main screen (`primaryComponentId`) or the stack itself (`updatedAt`) changes.
@@ -329,84 +317,16 @@ export function useReferenceLibrary() {
   }, []);
 
   const createFrameGroup = useCallback(
-    async (video: FramePickerVideo, frames: ExtractedFrame[]) => {
-      if (frames.length === 0) return;
-      setFrameBusy(true);
-      try {
-        const baseName = video.name.replace(/\.[^.]+$/, "");
-        const now = new Date().toISOString();
-        const frameItems: ReferenceItem[] = [];
-
-        for (const frame of frames) {
-          const blob = await extractVideoFrameFull(video.id, video.ext, frame.timestamp_ms);
-          if (!blob) continue;
-          const id = newId();
-          let ext: string;
-          try {
-            ext = await saveReferenceFile(id, blob);
-          } catch (err) {
-            console.error("[frames] saveReferenceFile failed:", err);
-            continue;
-          }
-          const url = URL.createObjectURL(blob);
-          primeReferenceUrl(id, url);
-          const dims = await measureImage(url).catch(() => ({ w: 0, h: 0 }));
-          frameItems.push({
-            id,
-            name: `${baseName} — ${formatDuration(frame.timestamp_ms / 1000)}`,
-            mediaKind: "image",
-            type: inferTypeHelper(`frame.${ext}`),
-            w: dims.w,
-            h: dims.h,
-            size: Math.max(1, Math.round(blob.size / 1024)),
-            ext,
-            tags: ["image", "frame"],
-            added: now,
-            url,
-          });
-        }
-
-        await deleteReferenceFrames(video.id).catch(() => {});
-        if (frameItems.length === 0) return;
-
-        // A video owns a single group: extracting frames transforms the video
-        // into that group (and folds the video into it, so the catalog shows one
-        // card). Re-extracting reuses the same group instead of spawning a new
-        // one — the new frames are appended.
-        const videoItem = libraryRef.current.find((item) => item.id === video.id) ?? null;
-        const existingGroup =
-          (videoItem?.groupId
-            ? groupsRef.current.find((entry) => entry.id === videoItem.groupId)
-            : null) ?? null;
-
-        const group: ReferenceGroup = existingGroup ?? {
-          id: newReferenceGroupId(),
-          name: baseName || "Video frames",
-          referenceIds: [],
-          coverReferenceId: null,
-          createdAt: now,
-          updatedAt: now,
-        };
-        const memberIds = frameItems.map((item) => item.id);
-        const withGroup = frameItems.map((item) => ({ ...item, groupId: group.id }));
-
-        setLibrary((prev) =>
-          [...withGroup, ...prev].map((item) =>
-            item.id === video.id ? { ...item, groupId: group.id } : item,
-          ),
-        );
-        setGroups((prev) => {
-          const base = existingGroup ? prev : [group, ...prev];
-          // Frames first (so the cover defaults to a frame, not the video),
-          // video last but still a member so it stays accessible for re-extract.
-          return addReferencesToGroup(base, group.id, [...memberIds, video.id]);
-        });
-        setSelectedSubject({ kind: "group", id: group.id });
-        setFrameVideo(null);
-      } finally {
-        setFrameBusy(false);
-      }
-    },
+    (video: FramePickerVideo, frames: ExtractedFrame[]) =>
+      createFrameGroupUseCase(video, frames, {
+        libraryRef,
+        groupsRef,
+        setFrameBusy,
+        setLibrary,
+        setGroups,
+        setSelectedSubject,
+        setFrameVideo,
+      }),
     [],
   );
 
