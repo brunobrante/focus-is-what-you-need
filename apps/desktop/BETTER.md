@@ -101,6 +101,28 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-04** ✅ `CanvasToolingLayer.tsx` (1208 → 665 lines): the context-toolbar UI + its
+  rename/open-panel state + engine-action handlers (duplicate/delete/updateStyles/fitText/…) moved
+  into a props-fed `ContextToolbar.tsx`. The layer keeps the Skia overlay rendering, hit-testing,
+  geometry, and toolbar position/visibility, rendering `<ContextToolbar/>`. WAAPI entrance
+  animation + `.context-toolbar` classes preserved.
+- **ORG-05** ✅ `TreeContextMenu`'s inline engine-mutation + `commitDocument` calls moved behind a
+  `useCanvasCommands(editor, onCommit)` hook (`canvas/shell/useCanvasCommands.ts`): copy/paste/
+  duplicate/reorder/lock/visible/delete. The menu renders via a `TreeContextMenuContent` child so
+  the hook isn't called in the `if (!editor) return null` path. Behavior identical.
+- **ORG-06** ✅ `useToolsEditor.ts` (1441 → 826 lines) is now a thinner composition root: the
+  navigation/confirmation cluster moved to `useBuilderNavigation.ts` and crop rasterization/upload/
+  removal to `useBuilderCutOperations.ts`; the root forwards their returns so the public API is
+  byte-identical and `ToolsEditorView` is unchanged. Hook-call order preserved; entangled pieces
+  intentionally left in place. Also fixed a latent type bug the split surfaced: `postProcess` was
+  mistyped as `ProcessingFeatureKey` via a broken import — it actually carries model-action kinds,
+  so a `ProcessingActionKind` type was added to `modelCommands` and used in all 3 sites (net −1
+  pre-existing error).
+- **ORG-17** ✅ The materializer (`canvasMaterializer.ts`, an orchestration use-case) moved from
+  `canvas/` to `application/canvas/`; all importers updated. The direct `peekTable(scenes)` reads in
+  `useSubjectCanvasWindow`/`Canvas` now go through an application helper
+  `application/scenes/useScenesSnapshot.ts` (`getScenesSnapshot()`), preserving the synchronous
+  cache-read semantics.
 - **ORG-03** ✅ `skiaToolingAdapter.ts` shrank 1154 → 457 lines. The pure color parsing/paint
   helpers (+ `PaintPool`) moved to `skiaColor.ts` and ~19 free draw primitives + 21 label-geometry
   constants moved to `skiaPrimitives.ts`; the adapter keeps the WebGL/Skia lifecycle, pooling, and
@@ -496,28 +518,9 @@ If only a handful of things get fixed, fix these:
 - 🟠 **ORG-02 — `CanvasRender.tsx` (1028 lines) bundles 10+ surface variants + the zoom control;
   `ZoomControl` is re-imported back into `Toolbar.tsx`** (near-circular shell dependency). Split
   surfaces into `shell/surfaces/`; move `ZoomControl` out.
-- 🟠 **ORG-04 — `CanvasToolingLayer.tsx` (1154 lines): editor business logic bolted onto the
-  geometry/render layer.** `:637-795` embeds the full context-toolbar UI, rename state, and engine
-  actions (`duplicateElements`, `deleteElements`, `updateElementStyles`,
-  `fitTextElementToContent`). Extract a `ContextToolbar` fed by props.
-- 🟠 **ORG-05 — Command/mutation logic lives directly inside the Tree component.**
-  `Tree.tsx:702-803` (`TreeContextMenu`) calls engine mutations and dispatches `commitDocument`
-  inline. Move behind a `useCanvasCommands(editor)` application hook.
-- 🟠 **ORG-06 — `useToolsEditor.ts` (1441 lines) is a god-hook.** Owns navigation, persistence
-  orchestration, crop rasterization, auto-detect ML orchestration, upload, keyboard shortcuts, and
-  the whole returned surface. Heavy logic (`saveSelection:859-975`, `autoDetect:1024-1133`,
-  `promoteToRoot:630-691`) belongs in the engine. Extract `useBuilderNavigation` +
-  `useBuilderCutOperations`; keep `useToolsEditor` a thin composition root.
 - 🟠 **ORG-07 — `ToolsEditorView.tsx` (932 lines) mixes ML orchestration with layout.**
   `runProcessing`, `applyLamaMask`, `commitDraw` (`:256-306`) are async business logic inside the
   view. Lift into `useBuilderProcessing`.
-- 🟠 **ORG-17 — Canvas hook reaches directly into the storage cache; materializer is an
-  orchestration use-case living in the UI folder.** `useSubjectCanvasWindow.ts:4,47-50` &
-  `Canvas.tsx:283,367` copy the whole scenes table via `peekTable`; `canvasMaterializer.ts`
-  orchestrates `saveScene`+`readSceneByOwner`+4 component-repo writes from `canvas/`. Move storage
-  access behind an application hook; relocate the materializer to `application/`.
-
-### Duplicated UI primitives (shared layer)
 - 🟡 **ORG-23b — Remaining shared-UI dedup.** Two presentational duplicates left after the
   `useDismissable` + empty-state extraction (ORG-23, Resolved): the "dashed add tile"
   (`LandingPage` `AddProjectCard` vs `GlobalComponentsPage` `AddComponentCard` — they share the
