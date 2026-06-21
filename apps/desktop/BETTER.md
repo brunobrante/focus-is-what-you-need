@@ -101,6 +101,11 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-23b** ✅ The shared inner "dashed add tile" was extracted to `components/DashedAddTile.tsx`
+  (used by Landing's `AddProjectCard` and Global Components' `AddComponentCard`; `className`
+  passthrough keeps `w-full` on the latter, so classes are byte-equivalent). The delete-confirm
+  "duplication" turned out to already be deduped — all three pages use the shared
+  `ConfirmActionModal`; only short per-call `title` strings differ, which doesn't warrant a hook.
 - **ORG-01 / ORG-02** ✅ ORG-01 (extract the "Actions" app + mock data) and the `ZoomControl`
   extraction were already done in a prior session — `Toolbar.tsx` renders `<ActionsPanel/>` from
   `shell/actions/` and imports `ZoomControl` from `shell/ZoomControl.tsx`, resolving the
@@ -520,12 +525,6 @@ If only a handful of things get fixed, fix these:
 ## 5. Organization / Clean Architecture
 
 ### Oversized files mixing responsibilities
-- 🟡 **ORG-23b — Remaining shared-UI dedup.** Two presentational duplicates left after the
-  `useDismissable` + empty-state extraction (ORG-23, Resolved): the "dashed add tile"
-  (`LandingPage` `AddProjectCard` vs `GlobalComponentsPage` `AddComponentCard` — they share the
-  inner dashed tile but differ in wrapper `Link`/`button` + caption block) and the duplicated
-  delete-confirm copy across DetailPage/Gallery/GlobalComponents (`useConfirmDelete`). Both carry
-  visual/behavioral risk, so they're left for a focused pass.
 
 ---
 
