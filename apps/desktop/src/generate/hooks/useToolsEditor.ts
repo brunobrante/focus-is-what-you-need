@@ -6,7 +6,6 @@ import {
   useState,
   type PointerEvent,
 } from "react";
-import { readFileAsDataUrl } from "@/lib/utils";
 
 import type {
   CropBox,
@@ -28,22 +27,13 @@ import {
 } from "../types";
 
 import {
-  roundedRectPath,
-} from "../engine/drawing";
-import {
   sourceRootComponentId,
-  newRootComponentId,
   ensureRootComponent,
   readReferenceStackComponents,
 } from "../engine/componentModel";
 import {
   buildComponentTree,
-  componentSubtreeIds,
 } from "../engine/componentTree";
-import {
-  addVariant,
-  setOriginalVariantImage,
-} from "../engine/variants";
 import {
   readSavedComponents,
   writeSavedComponents,
@@ -51,26 +41,15 @@ import {
   hasDraftComponents,
   removeSavedComponents,
 } from "../engine/storage";
-import {
-  canvasToDataUrl,
-  inferType,
-  measureImage,
-  shortComponentName,
-  waitForImage,
-} from "../engine/image";
-import {
-  bytesToPngDataUrl,
-  runBirefnet,
-  runRealEsrgan,
-  urlToBytes,
-  type ProcessingFeatureKey,
-} from "@/lib/models/modelCommands";
+import type { ProcessingActionKind } from "@/lib/models/modelCommands";
 import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
+import { useBuilderNavigation } from "./useBuilderNavigation";
+import { useBuilderCutOperations } from "./useBuilderCutOperations";
 import { useAutoDetect } from "./useAutoDetect";
 import { useStackPersist } from "./useStackPersist";
 import { useCutVariants } from "./useCutVariants";
@@ -214,7 +193,7 @@ export type ToolsEditorState = {
   persistReferenceStack: () => Promise<void>;
   selectionToSubjectCoords: (box: CropBox) => CropBox | null;
   toOriginalCoords: (subjectBox: CropBox) => CropBox;
-  saveSelection: (postProcess?: ProcessingFeatureKey) => Promise<void>;
+  saveSelection: (postProcess?: ProcessingActionKind) => Promise<void>;
   addCutVariant: (cutId: string, input: { tool: CutVariantTool; dataUrl: string }) => void;
   setCutVariant: (cutId: string, variantId: string) => void;
   removeCutVariant: (cutId: string, variantId: string) => void;
@@ -234,7 +213,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const componentKey = `${COMPONENT_STORAGE_PREFIX}${item.id}`;
   const rootComponentId = sourceRootComponentId(item.id);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const stageViewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -247,9 +225,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   // original image — otherwise it flashes before the main screen replaces it.
   const [initializedKey, setInitializedKey] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [imagePaintVersion, setImagePaintVersion] = useState(0);
-  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
 
   // Coalesce repaints to one per animation frame: N async cut images settling in
   // the same tick would otherwise trigger N full canvas repaints.
@@ -503,484 +479,80 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   // --- Navigation ----------------------------------------------------------
 
-  const setTool = useCallback(
-    (tool: EditorTool) => {
-      if ((tool === "crop" || tool === "draw") && !canCrop) {
-        setCurrentTool("move");
-        cancelSelection();
-        return;
-      }
-      setCurrentTool(tool);
-      if (tool === "move") cancelSelection();
-    },
-    [canCrop, cancelSelection],
-  );
-
-  const openOriginal = useCallback(() => {
-    cancelSelection();
-    setSelectedComponentId(null);
-    setViewMode("original");
-    setCurrentTool("move");
-    resetToolViewport();
-  }, [cancelSelection, resetToolViewport]);
-
-  const openStackMode = useCallback(() => {
-    if (stackedComponents.length === 0) return;
-    cancelSelection();
-    setCurrentTool("move");
-    resetToolViewport();
-    setViewMode("stack");
-  }, [cancelSelection, resetToolViewport, stackedComponents.length]);
-
-  const openGalleryMode = useCallback(() => {
-    cancelSelection();
-    setViewMode("gallery");
-  }, [cancelSelection]);
-
-  const focusGalleryCut = useCallback((id: string | null) => {
-    setSelectedComponentId(id);
-  }, []);
-
-  const openComponent = useCallback(
-    (id: string) => {
-      const component = components.find((c) => c.id === id);
-      const rid = component
-        ? component.parentId == null
-          ? component.id
-          : component.rootId ?? rootComponentId
-        : rootComponentId;
-      cancelSelection();
-      expandComponentPath(id);
-      setActiveRootId(rid);
-      setSelectedComponentId(id);
-      setViewMode("component");
-      resetToolViewport();
-    },
-    [cancelSelection, components, expandComponentPath, resetToolViewport, rootComponentId, setActiveRootId],
-  );
-
-  const openBuilderMode = useCallback(() => {
-    // Carry the currently focused subject (e.g. the cut shown in the gallery)
-    // straight into the Builder so it renders the same item, scoped to its root.
-    if (selectedComponentId && selectedComponent) {
-      openComponent(selectedComponentId);
-      return;
-    }
-    cancelSelection();
-    setCurrentTool("move");
-    resetToolViewport();
-    setViewMode("original");
-  }, [cancelSelection, openComponent, resetToolViewport, selectedComponent, selectedComponentId]);
-
-  const selectRoot = useCallback(
-    (id: string) => {
-      const keepStack = viewMode === "stack" && (cutCountByRoot.get(id) ?? 0) > 0;
-      openComponent(id);
-      if (keepStack) setViewMode("stack");
-    },
-    [cutCountByRoot, openComponent, viewMode],
-  );
-
-  const setPrimaryRoot = useCallback(
-    (id: string) => {
-      updateComponents((current) =>
-        current.map((c) =>
-          c.parentId == null ? { ...c, isPrimaryRoot: c.id === id } : c,
-        ),
-      );
-    },
-    [updateComponents],
-  );
-
-  const beginRootCreation = useCallback(
-    (source?: NewScreenSource) => {
-      const src: NewScreenSource = source ?? {
-        url: item.url,
-        w: item.w,
-        h: item.h,
-        type: item.type,
-        name: item.name,
-      };
-      const id = newRootComponentId();
-      const newRoot: SavedComponent = {
-        id,
-        name: "New screen",
-        box: { x: 0, y: 0, w: src.w || 0, h: src.h || 0 },
-        dataUrl: src.url,
-        type: src.type || "IMG",
-        createdAt: new Date().toISOString(),
-        parentId: null,
-        kind: "root",
-        rootId: id,
-        isDefaultRoot: false,
-      };
-      cancelSelection();
-      updateComponents((current) => [...current, newRoot]);
-      setActiveRootId(id);
-      setSelectedComponentId(id);
-      setExpandedComponentIds((current) => {
-        const next = new Set(current);
-        next.add(id);
-        return next;
-      });
-      setViewMode("component");
-      setCurrentTool("crop");
-      resetToolViewport();
-    },
-    [cancelSelection, item, resetToolViewport, setActiveRootId, setExpandedComponentIds, updateComponents],
-  );
-
-  const promoteToRoot = useCallback(
-    (id: string) => {
-      const section = components.find((c) => c.id === id);
-      if (!section || section.parentId == null) return;
-      const targetRootId = section.rootId ?? activeScopeId ?? rootComponentId;
-      const subtree = componentSubtreeIds(components, id);
-      updateComponents((current) =>
-        current
-          .filter((c) => {
-            const inTargetRoot = (c.rootId ?? null) === targetRootId && c.id !== targetRootId;
-            return !inTargetRoot || subtree.has(c.id);
-          })
-          .map((c): SavedComponent | null => {
-            if (c.id === targetRootId) {
-              return {
-                ...c,
-                name: section.name,
-                box: section.box,
-                dataUrl: section.dataUrl,
-                type: section.type || "PNG",
-                parentId: null,
-                kind: "root",
-                rootId: targetRootId,
-                isDefaultRoot: false,
-              };
-            }
-            if (c.id === id) return null;
-            if (subtree.has(c.id)) {
-              return {
-                ...c,
-                parentId: c.parentId === id ? targetRootId : c.parentId,
-                rootId: targetRootId,
-              };
-            }
-            return c;
-          })
-          .filter((c): c is SavedComponent => c != null),
-      );
-      cancelSelection();
-      setEditingComponentId(null);
-      setActiveRootId(targetRootId);
-      setSelectedComponentId(targetRootId);
-      setExpandedComponentIds((current) => {
-        const next = new Set(current);
-        next.add(targetRootId);
-        return next;
-      });
-      setViewMode("component");
-      resetToolViewport();
-    },
-    [
-      activeScopeId,
-      cancelSelection,
-      components,
-      resetToolViewport,
-      rootComponentId,
-      setActiveRootId,
-      setEditingComponentId,
-      setExpandedComponentIds,
-      updateComponents,
-    ],
-  );
-
-  const startEditComponent = useCallback(
-    (id: string) => {
-      const component = components.find((c) => c.id === id);
-      if (!component || component.parentId == null) return;
-      const parentId = component.parentId;
-      cancelSelection();
-      expandComponentPath(parentId);
-      setActiveRootId(component.rootId ?? rootComponentId);
-      setSelectedComponentId(parentId);
-      setViewMode("component");
-      resetToolViewport();
-      setEditingComponentId(id);
-      setCurrentTool("crop");
-    },
-    [
-      cancelSelection,
-      components,
-      expandComponentPath,
-      resetToolViewport,
-      rootComponentId,
-      setActiveRootId,
-      setEditingComponentId,
-    ],
-  );
-
-  const resetActiveStack = useCallback(() => {
-    cancelPendingPersist();
-    const stackId = activeScopeId;
-    const isDefault = stackId === rootComponentId;
-    updateComponents((current) =>
-      current
-        .filter((c) => {
-          const belongsToStack = (c.rootId ?? null) === stackId && c.id !== stackId;
-          return !belongsToStack;
-        })
-        .map((c): SavedComponent =>
-          c.id === stackId
-            ? {
-                ...c,
-                name: isDefault ? "root" : c.name,
-                box: { x: 0, y: 0, w: item.w || 0, h: item.h || 0 },
-                dataUrl: item.url,
-                type: item.type || "IMG",
-                parentId: null,
-                kind: "root",
-                rootId: stackId,
-                isDefaultRoot: isDefault,
-              }
-            : c,
-        ),
-    );
-    setActiveRootId(stackId);
-    setExpandedComponentIds(new Set([stackId]));
-    setSelectedComponentId(isDefault ? null : stackId);
-    setCurrentTool("move");
-    setViewMode(isDefault ? "original" : "component");
-    cancelSelection();
-    resetToolViewport();
-  }, [
-    activeScopeId,
-    cancelPendingPersist,
-    cancelSelection,
+  const {
+    pendingConfirmation,
+    setPendingConfirmation,
+    setTool,
+    openOriginal,
+    openStackMode,
+    openGalleryMode,
+    focusGalleryCut,
+    openComponent,
+    openBuilderMode,
+    selectRoot,
+    setPrimaryRoot,
+    beginRootCreation,
+    promoteToRoot,
+    startEditComponent,
+    resetActiveStack,
+    openTreeComponent,
+    requestRootDeletion,
+    requestResetConfirmation,
+    confirmPendingAction,
+  } = useBuilderNavigation({
     item,
-    resetToolViewport,
     rootComponentId,
+    canCrop,
+    viewMode,
+    components,
+    roots,
+    activeScopeId,
+    cutCountByRoot,
+    stackedComponentsLength: stackedComponents.length,
+    selectedComponentId,
+    selectedComponent,
+    setCurrentTool,
+    setViewMode,
+    setSelectedComponentId,
     setActiveRootId,
+    setEditingComponentId,
     setExpandedComponentIds,
+    cancelSelection,
+    cancelPendingPersist,
+    resetToolViewport,
+    expandComponentPath,
+    selectStackComponent,
     updateComponents,
-  ]);
-
-  const openTreeComponent = useCallback(
-    (id: string) => {
-      if (viewMode === "stack") {
-        selectStackComponent(id);
-        return;
-      }
-      openComponent(id);
-    },
-    [openComponent, selectStackComponent, viewMode],
-  );
-
-  const removeRoot = useCallback(
-    (id: string) => {
-      const removedIds = componentSubtreeIds(components, id);
-      const wasActive = removedIds.has(activeScopeId);
-      const nextRoot = wasActive ? roots.find((r) => !removedIds.has(r.id)) : undefined;
-      updateComponents((current) => current.filter((c) => !removedIds.has(c.id)));
-      if (!wasActive) return;
-      if (nextRoot) {
-        openComponent(nextRoot.id);
-      } else {
-        setActiveRootId(rootComponentId);
-        openOriginal();
-      }
-    },
-    [activeScopeId, components, openComponent, openOriginal, roots, rootComponentId, setActiveRootId, updateComponents],
-  );
-
-  const requestRootDeletion = useCallback(
-    (id: string) => {
-      const root = components.find((c) => c.id === id);
-      if (!root) return;
-      setPendingConfirmation({
-        type: "delete-root",
-        rootId: id,
-        name: root.isDefaultRoot ? "Full image" : root.name,
-        cutCount: cutCountByRoot.get(id) ?? 0,
-      });
-    },
-    [components, cutCountByRoot],
-  );
-
-  const requestResetConfirmation = useCallback(() => {
-    setPendingConfirmation({ type: "reset" });
-  }, []);
-
-  const confirmPendingAction = useCallback(() => {
-    if (!pendingConfirmation) return;
-    const action = pendingConfirmation;
-    setPendingConfirmation(null);
-    if (action.type === "delete-root") {
-      removeRoot(action.rootId);
-      return;
-    }
-    resetActiveStack();
-  }, [pendingConfirmation, removeRoot, resetActiveStack]);
+  });
 
   // --- Operations ----------------------------------------------------------
 
-
-  const saveSelection = useCallback(
-    async (postProcess?: ProcessingFeatureKey) => {
-      if (!selection || !selectionLocked || !canCrop) return;
-      const img = imgRef.current;
-      const subjectBox = selectionToSubjectCoords(selection);
-      if (!subjectBox) return;
-      const sourceBox = toOriginalCoords(subjectBox);
-      let dataUrl = activeSubject.url;
-
-      if (img) {
-        try {
-          await waitForImage(img);
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.max(1, Math.round(subjectBox.w));
-          canvas.height = Math.max(1, Math.round(subjectBox.h));
-          const ctx = canvas.getContext("2d");
-          if (!ctx) throw new Error("Canvas unavailable");
-          const radius = Math.min(subjectBox.r ?? 0, canvas.width / 2, canvas.height / 2);
-          ctx.imageSmoothingEnabled = false;
-          if (radius > 0) {
-            ctx.save();
-            roundedRectPath(ctx, 0, 0, canvas.width, canvas.height, radius);
-            ctx.clip();
-          }
-          ctx.drawImage(
-            img,
-            subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h,
-            0, 0, canvas.width, canvas.height,
-          );
-          if (radius > 0) ctx.restore();
-          dataUrl = await canvasToDataUrl(canvas, "image/png");
-        } catch {
-          dataUrl = activeSubject.url;
-        }
-      }
-
-      let processed: { tool: CutVariantTool; dataUrl: string } | null = null;
-      if (postProcess) {
-        try {
-          const input = await urlToBytes(dataUrl);
-          const output =
-            postProcess === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
-          processed = { tool: postProcess as CutVariantTool, dataUrl: bytesToPngDataUrl(output) };
-        } catch (error) {
-          console.error(`Draw post-process (${postProcess}) failed`, error);
-        }
-      }
-
-      if (editingComponentId) {
-        const editedId = editingComponentId;
-        updateComponents((current) =>
-          current.map((c) => {
-            if (c.id !== editedId) return c;
-            let next = setOriginalVariantImage({ ...c, box: sourceBox }, dataUrl);
-            if (processed) next = addVariant(next, { ...processed, createdAt: new Date().toISOString() });
-            return next;
-          }),
-        );
-        setEditingComponentId(null);
-        setExpandedComponentIds((current) => {
-          const next = new Set(current);
-          next.add(editedId);
-          return next;
-        });
-        setSelectedComponentId(editedId);
-        setViewMode("component");
-        resetToolViewport();
-        cancelSelection();
-        return;
-      }
-
-      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
-      const parentId =
-        activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
-      const rootId = activeSubject.rootId ?? activeScopeId;
-      const createdAt = new Date().toISOString();
-      let cut: SavedComponent = {
-        id: nextId,
-        name: shortComponentName(nextId),
-        box: sourceBox,
-        dataUrl,
-        type: "PNG",
-        createdAt,
-        parentId,
-        kind: "cut",
-        rootId,
-      };
-      if (processed) cut = addVariant(cut, { ...processed, createdAt });
-      updateComponents((current) => [cut, ...current]);
-      setExpandedComponentIds((current) => {
-        const next = new Set(current);
-        next.add(parentId);
-        next.add(nextId);
-        return next;
-      });
-      setSelectedComponentId(nextId);
-      setViewMode("component");
-      resetToolViewport();
-      cancelSelection();
-    },
-    [
-      activeScopeId,
-      activeSubject,
-      canCrop,
-      cancelSelection,
-      editingComponentId,
-      resetToolViewport,
-      rootComponent.id,
+  const { fileInputRef, uploading, setUploading, saveSelection, uploadImage, handleRemoveComponent } =
+    useBuilderCutOperations({
+      imgRef,
       selection,
       selectionLocked,
+      canCrop,
+      activeSubject,
+      activeScopeId,
+      rootComponentId,
+      rootComponent,
+      components,
+      editingComponentId,
+      selectedComponentId,
       selectionToSubjectCoords,
-      setEditingComponentId,
-      setExpandedComponentIds,
       toOriginalCoords,
       updateComponents,
-    ],
-  );
-
-
-
-  const uploadImage = useCallback(
-    async (file: File | null | undefined) => {
-      if (!file) return;
-      setUploading(true);
-      try {
-        const url = await readFileAsDataUrl(file);
-        const dims = await measureImage(url).catch(() => ({ w: 0, h: 0 }));
-        const next: ToolReference = {
-          id: `tool-upload-${Date.now().toString(36)}`,
-          name: file.name,
-          type: inferType(file.name),
-          w: dims.w,
-          h: dims.h,
-          url,
-        };
-        writeSavedComponents(`${COMPONENT_STORAGE_PREFIX}${next.id}`, ensureRootComponent([], next));
-        onUploadedLocally(next);
-      } finally {
-        setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    },
-    [onUploadedLocally],
-  );
-
-  const handleRemoveComponent = useCallback(
-    (id: string) => {
-      const removedIds = componentSubtreeIds(components, id);
-      updateComponents((current) => current.filter((c) => !removedIds.has(c.id)));
-      if (removedIds.has(activeScopeId)) {
-        setActiveRootId(rootComponentId);
-        openOriginal();
-      } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
-        openOriginal();
-      }
-    },
-    [activeScopeId, components, openOriginal, rootComponentId, selectedComponentId, setActiveRootId, updateComponents],
-  );
+      setEditingComponentId,
+      setExpandedComponentIds,
+      setSelectedComponentId,
+      setViewMode,
+      setActiveRootId,
+      cancelSelection,
+      resetToolViewport,
+      openOriginal,
+      onUploadedLocally,
+    });
 
   // --- Effects -------------------------------------------------------------
 

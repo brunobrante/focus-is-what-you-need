@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 
+// The model-runner action a cut can be post-processed with. Distinct from the
+// user-facing `ProcessingFeatureKey` (settings toggles) — these are the actual
+// runnable model kinds (e.g. `runBirefnet`/`runRealEsrgan`).
+export type ProcessingActionKind = "birefnet" | "realEsrgan" | "lama";
+
 // Payload streamed during a download via the `model://progress` event. The
 // per-file fields only matter for multi-file packages; single-file models
 // always report `file_index: 0`.

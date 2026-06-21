@@ -61,11 +61,8 @@ import {
   runBirefnet,
   runRealEsrgan,
   runLama,
+  type ProcessingActionKind,
 } from "@/lib/models/modelCommands";
-
-// Which one-shot processor a cut action runs. These are model-level kinds
-// (each maps to a single backend command), distinct from feature keys.
-type ProcessingActionKind = "birefnet" | "realEsrgan" | "lama";
 
 // A circular brush cursor sized to the LaMa brush (20px radius / 40px diameter).
 const LAMA_BRUSH_CURSOR =
