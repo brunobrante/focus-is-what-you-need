@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import { materializeVersionNodeAsComponent } from "@/canvas/canvasMaterializer";
+import { materializeVersionNodeAsComponent } from "@/application/canvas/canvasMaterializer";
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import { listChildrenOfVariant } from "@/lib/storage/repos/components.repo";

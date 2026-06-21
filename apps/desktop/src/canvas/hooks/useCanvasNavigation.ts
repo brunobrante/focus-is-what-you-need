@@ -6,7 +6,7 @@ import {
   findComponentByCanvasNode,
   findComponentByPath,
 } from "../canvasUtils";
-import { materializeComponentFromCanvasNode } from "../canvasMaterializer";
+import { materializeComponentFromCanvasNode } from "@/application/canvas/canvasMaterializer";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";

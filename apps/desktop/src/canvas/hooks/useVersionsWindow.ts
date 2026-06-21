@@ -10,7 +10,7 @@ import type { VersionModeModalHandle } from "@/components/modals/VersionModeModa
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 import { findTreeNodeById } from "../canvasUtils";
 import { useVersionScenePersistence } from "./useVersionScenePersistence";
-import { materializeVersionNodeAsComponent } from "../canvasMaterializer";
+import { materializeVersionNodeAsComponent } from "@/application/canvas/canvasMaterializer";
 
 export function useVersionsWindow({
   allVariants,

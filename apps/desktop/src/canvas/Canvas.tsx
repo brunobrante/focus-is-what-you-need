@@ -12,8 +12,7 @@ import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementToParent, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
 import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph } from "@/canvas/engine/htmlSceneAdapter";
-import { peekTable, TABLES } from "@/lib/storage/store";
-import type { SceneRow } from "@/lib/storage/schema";
+import { getScenesSnapshot } from "@/application/scenes/useScenesSnapshot";
 import type { CanvasToolId } from "@/canvas/tools";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
@@ -235,7 +234,7 @@ function CanvasPageContent() {
   // table is hydrated by the time the current scene loads (currentReady gates the
   // editor), so a synchronous cache peek sees every master variant scene.
   const resolveMaster = useMemo(
-    () => buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)),
+    () => buildMasterResolver(getScenesSnapshot()),
     // Rebuilt whenever the current scene's graph changes — which is also when the
     // scenes table has just hydrated/updated.
     [resolvedSceneGraphJSON],

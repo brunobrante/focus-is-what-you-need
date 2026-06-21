@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
-import { peekTable, TABLES } from "@/lib/storage/store";
+import { getScenesSnapshot } from "@/application/scenes/useScenesSnapshot";
 import { useScene } from "@/lib/storage/hooks";
-import type { SceneRow } from "@/lib/storage/schema";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 import { useVersionScenePersistence } from "./useVersionScenePersistence";
@@ -44,7 +43,7 @@ export function useSubjectCanvasWindow(input: {
     : `desktop-canvas-editor:${storageKeyPrefix}:none:v1`;
 
   const resolveMaster = useMemo(
-    () => buildMasterResolver(peekTable<SceneRow>(TABLES.scenes)),
+    () => buildMasterResolver(getScenesSnapshot()),
     [graphJSON],
   );
 

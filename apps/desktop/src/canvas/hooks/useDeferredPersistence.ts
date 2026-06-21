@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
 import { saveScene } from "@/application/scenes/saveScene";
-import { materializeComponentsFromCanvasDocument } from "../canvasMaterializer";
+import { materializeComponentsFromCanvasDocument } from "@/application/canvas/canvasMaterializer";
 import { componentStructureKey } from "../canvasUtils";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ComponentRow, SceneOwnerType, ScreenRow } from "@/lib/storage/schema";
