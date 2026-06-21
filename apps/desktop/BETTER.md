@@ -101,6 +101,16 @@ These items have been fixed or deliberately dropped and were removed from the ba
   rebuilt per render).
 - **PERF-UI-06** ✅ Resolved by the BUG-01b fix — the `allScreens.filter` moved out of JSX into the
   `onRequestEdit` callback, so it only runs when the user opens project settings, not every render.
+- **ORG-01 / ORG-02** ✅ ORG-01 (extract the "Actions" app + mock data) and the `ZoomControl`
+  extraction were already done in a prior session — `Toolbar.tsx` renders `<ActionsPanel/>` from
+  `shell/actions/` and imports `ZoomControl` from `shell/ZoomControl.tsx`, resolving the
+  near-circular shell coupling. The remaining ORG-02 surfaces split is now done: the 10+ surface
+  variants moved to `shell/surfaces/CanvasSurfaces.tsx` (+ shared `shellVisibility.ts`), shrinking
+  `CanvasRender.tsx` 855 → 383 lines; it stays the orchestrator.
+- **ORG-07** ✅ `ToolsEditorView.tsx` (930 → 869 lines): the ML/processing orchestration
+  (`running`/`drawAction`/LaMa state, the cut-switch-cancels-mask effect, `runProcessing`,
+  `applyLamaMask`, `commitDraw`, and the model-runner imports) lifted into a `useBuilderProcessing`
+  hook; the view calls it and renders from its returns. Behavior preserved.
 - **ORG-04** ✅ `CanvasToolingLayer.tsx` (1208 → 665 lines): the context-toolbar UI + its
   rename/open-panel state + engine-action handlers (duplicate/delete/updateStyles/fitText/…) moved
   into a props-fed `ContextToolbar.tsx`. The layer keeps the Skia overlay rendering, hit-testing,
@@ -510,17 +520,6 @@ If only a handful of things get fixed, fix these:
 ## 5. Organization / Clean Architecture
 
 ### Oversized files mixing responsibilities
-- 🟠 **ORG-01 — `Toolbar.tsx` (1294 lines) embeds an entire unrelated "Actions" app.**
-  `canvas/shell/Toolbar.tsx:424-1146`. Tool selection + zoom also contains large mock datasets
-  (`MOCK_TMB_ASSETS`, `MOCK_IMAGES`, `MOCK_ICONS`, `MOCK_CONVERSATION`), an asset/icon library
-  browser, an AI chat panel with voice-recording UI, and a checklist editor. Extract
-  `ActionsPanel` + mock data.
-- 🟠 **ORG-02 — `CanvasRender.tsx` (1028 lines) bundles 10+ surface variants + the zoom control;
-  `ZoomControl` is re-imported back into `Toolbar.tsx`** (near-circular shell dependency). Split
-  surfaces into `shell/surfaces/`; move `ZoomControl` out.
-- 🟠 **ORG-07 — `ToolsEditorView.tsx` (932 lines) mixes ML orchestration with layout.**
-  `runProcessing`, `applyLamaMask`, `commitDraw` (`:256-306`) are async business logic inside the
-  view. Lift into `useBuilderProcessing`.
 - 🟡 **ORG-23b — Remaining shared-UI dedup.** Two presentational duplicates left after the
   `useDismissable` + empty-state extraction (ORG-23, Resolved): the "dashed add tile"
   (`LandingPage` `AddProjectCard` vs `GlobalComponentsPage` `AddComponentCard` — they share the
