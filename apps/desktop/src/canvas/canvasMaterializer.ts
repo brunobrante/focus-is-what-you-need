@@ -6,7 +6,8 @@ import {
   markComponentsLinkable,
   updateComponent,
 } from "@/lib/storage/repos/components.repo";
-import { linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
+import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";

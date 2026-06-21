@@ -1,8 +1,6 @@
 import { expect, test } from "bun:test";
-import {
-  materializeInstancesInGraph,
-  removeInstancesInGraph,
-} from "@/lib/storage/repos/scenes.repo";
+import { materializeInstancesInGraph } from "@/domain/canvas/graphTransforms";
+import { removeInstancesInGraph } from "@/lib/storage/repos/scenes.repo";
 import {
   HTML_CANVAS_FORMAT,
   HTML_CANVAS_VERSION,

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { subcomponentsForVariantScene } from "@/canvas/canvasUtils";
-import { linkifyChildComponentsInGraph } from "@/lib/storage/repos/scenes.repo";
+import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
 import {
   HTML_CANVAS_FORMAT,
   HTML_CANVAS_VERSION,

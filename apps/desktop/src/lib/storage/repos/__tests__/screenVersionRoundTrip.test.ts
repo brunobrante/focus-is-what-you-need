@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { linkifyChildComponentsInGraph } from "@/lib/storage/repos/scenes.repo";
+import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
 import {
   canvasDocumentFromHtmlGraphJSON,
   htmlGraphJSONFromCanvasDocument,

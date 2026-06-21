@@ -7,7 +7,8 @@ import {
   markComponentsLinkable,
   setActiveVariant,
 } from "@/lib/storage/repos/components.repo";
-import { getSceneByOwner, linkifyChildComponentsInGraph, upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
+import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import type {
   ComponentRow,
   SceneRow,
