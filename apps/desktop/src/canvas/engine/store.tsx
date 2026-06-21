@@ -14,7 +14,8 @@ import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
 import { createNoticeStore, type CanvasNotice, type NoticeStore } from "./noticeStore";
-import { CANVAS_DOCUMENT_SAVED_EVENT, CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
+import { getDraftCachePort } from "./draftCachePort";
+import { CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
 import { getInitialZoomForSubjectSize, getViewportZoomLimits, zoomViewportAroundCenter } from "./viewport";
 
 const STORAGE_KEY = CURRENT_CANVAS_STORAGE_KEY;
@@ -76,7 +77,7 @@ function readStoredDocument(
   const makeDefault = () => fallbackDocument ?? createDefaultDocument();
   if (!persistStorage) return makeDefault();
   try {
-    const raw = localStorage.getItem(storageKey);
+    const raw = getDraftCachePort().readDraft(storageKey);
     if (!raw) return makeDefault();
     const parsed = JSON.parse(raw) as unknown;
     if (isCanvasDocument(parsed)) return constrainAll(parsed);
@@ -480,7 +481,7 @@ export function EditorProvider({
     // it synchronously from localStorage (no IPC), matching createInitialState.
     hydratedRef.current = true;
     try {
-      const raw = localStorage.getItem(storageKey);
+      const raw = getDraftCachePort().readDraft(storageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw) as unknown;
       if (isCanvasDocument(parsed)) {
@@ -511,15 +512,11 @@ export function EditorProvider({
         // Session-draft cache → localStorage (synchronous, no IPC). The
         // database scene is saved separately through the queue, on commit.
         try {
-          localStorage.setItem(storageKey, JSON.stringify(state.document));
+          getDraftCachePort().writeDraft(storageKey, JSON.stringify(state.document));
         } catch {
           /* quota — non-fatal */
         }
-        window.dispatchEvent(
-          new CustomEvent(CANVAS_DOCUMENT_SAVED_EVENT, {
-            detail: { storageKey, document: state.document },
-          }),
-        );
+        getDraftCachePort().emitSaved(storageKey, state.document);
       }, 250);
     }
     onDocumentChange?.(state.document);
