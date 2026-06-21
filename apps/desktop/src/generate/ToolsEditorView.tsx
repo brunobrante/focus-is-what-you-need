@@ -54,15 +54,7 @@ import {
   type ImageStack,
 } from "@/components/screen/SceneCanvasInspector";
 import { useProcessingFeatures } from "@/lib/models/useProcessingFeatures";
-import { useLamaInpainting } from "@/lib/models/useLamaInpainting";
-import {
-  bytesToPngDataUrl,
-  urlToBytes,
-  runBirefnet,
-  runRealEsrgan,
-  runLama,
-  type ProcessingActionKind,
-} from "@/lib/models/modelCommands";
+import { useBuilderProcessing } from "./hooks/useBuilderProcessing";
 
 // A circular brush cursor sized to the LaMa brush (20px radius / 40px diameter).
 const LAMA_BRUSH_CURSOR =
@@ -199,11 +191,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   const autoDetectModelId = autoDetectOn ? features.autoDetect.activeModelId : null;
   const removeElementOn = features.removeElement.operational;
   const hasProcessingFeature = removeBackgroundOn || upscaleOn || removeElementOn;
-  const [running, setRunning] = useState<{ id: string; kind: ProcessingActionKind } | null>(null);
-  // LaMa "remove element" mask-drawing state. The brush paints onto an overlay
-  // canvas on the stage; Apply runs LaMa and stores the result as a new variant.
-  const lama = useLamaInpainting();
-  const masking = lama.status === "masking";
 
   // Which cut's variants panel is open in the sidebar (replaces the tree). Null
   // shows the normal component tree.
@@ -216,7 +203,20 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     activeSubject.kind === "component" && selectedComponent ? selectedComponent.id : null;
   // The open cut already renders its active variant through `activeSubject.url`.
   const displayUrl = activeSubject.url;
-  const runningKind = running && running.id === activeCutId ? running.kind : null;
+
+  // ML / image-processing orchestration (background remove, upscale, LaMa
+  // inpainting, processed draw commits) lives in its own hook so this view stays
+  // focused on layout and rendering.
+  const processing = useBuilderProcessing({
+    selectedComponent,
+    activeCutId,
+    sourceUrl: activeSubject.url,
+    addCutVariant,
+    canSaveSelection,
+    saveSelection,
+  });
+  const { running, runningKind, lama, masking, drawAction, runProcessing, applyLamaMask, commitDraw } =
+    processing;
 
   const imageStack = useMemo<ImageStack | null>(() => {
     if (viewMode !== "stack") return null;
@@ -241,66 +241,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
       setVariantsPanelCutId(null);
     }
   }, [components, variantsPanelCutId]);
-
-  // Switching to a different cut (or closing it) abandons any in-progress mask,
-  // so a mask drawn for one cut can never be applied to another.
-  useEffect(() => {
-    lama.cancel();
-    // Only re-run when the open cut changes; `lama.cancel` is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCutId]);
-
-  async function runProcessing(kind: ProcessingActionKind) {
-    if (!selectedComponent || running) return;
-    const id = selectedComponent.id;
-    // Chain onto the currently shown variant so edits stack (e.g. upscale then
-    // background-remove); the result becomes a new variant and the new main.
-    const source = activeSubject.url;
-    setRunning({ id, kind });
-    try {
-      const input = await urlToBytes(source);
-      const output = kind === "birefnet" ? await runBirefnet(input) : await runRealEsrgan(input);
-      addCutVariant(id, { tool: kind, dataUrl: bytesToPngDataUrl(output) });
-    } catch (error) {
-      console.error(`Processing (${kind}) failed`, error);
-    } finally {
-      setRunning(null);
-    }
-  }
-
-  // LaMa "remove element": reads the painted mask, runs inpainting on the open
-  // cut, and stores the result (session-local) just like the other processors.
-  async function applyLamaMask() {
-    if (!selectedComponent || running) return;
-    const id = selectedComponent.id;
-    const maskBytes = await lama.readMask();
-    // Nothing painted — keep the user in masking mode to draw a selection.
-    if (!maskBytes) return;
-    const source = activeSubject.url;
-    setRunning({ id, kind: "lama" });
-    lama.cancel();
-    try {
-      const input = await urlToBytes(source);
-      const output = await runLama(input, maskBytes);
-      addCutVariant(id, { tool: "lama", dataUrl: bytesToPngDataUrl(output) });
-    } catch (error) {
-      console.error("LaMa inpainting failed", error);
-    } finally {
-      setRunning(null);
-    }
-  }
-
-  // Draw toolbar: commit the drawn region as a cut, optionally post-processed.
-  const [drawAction, setDrawAction] = useState<"crop" | ProcessingActionKind | null>(null);
-  async function commitDraw(action: "crop" | ProcessingActionKind) {
-    if (!canSaveSelection || drawAction) return;
-    setDrawAction(action);
-    try {
-      await saveSelection(action === "crop" ? undefined : action);
-    } finally {
-      setDrawAction(null);
-    }
-  }
 
   return (
     <TooltipProvider>
