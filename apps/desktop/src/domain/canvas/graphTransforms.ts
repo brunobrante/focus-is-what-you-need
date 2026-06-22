@@ -144,14 +144,12 @@ export function linkifyChildComponentsInGraph(
  */
 export function materializeInstancesInGraph(
   graphJSON: string,
-  shouldMaterialize: (componentId: string) => boolean,
+  shouldMaterialize: (node: HtmlCanvasNode) => boolean,
   getMasterGraph: (variantId: string) => string | null,
 ): string | null {
   const doc = htmlCanvasDocumentFromJSON(graphJSON);
   if (!doc) return null;
-  const targets = doc.nodes.filter(
-    (n) => n.instanceOf && shouldMaterialize(n.instanceOf.componentId),
-  );
+  const targets = doc.nodes.filter((n) => n.instanceOf && shouldMaterialize(n));
   if (targets.length === 0) return null;
 
   let nodes = doc.nodes;

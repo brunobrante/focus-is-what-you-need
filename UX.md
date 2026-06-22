@@ -806,7 +806,19 @@ Workspace-level shared component library.
 - Snapshot preview
 - Component name + kind badge
 - Row of project-usage badges (shows which projects use this component)
-- On hover: CardMenu with Fast Edit / Canvas Edit / Delete
+- On hover: CardMenu with Fast Edit / Canvas Edit / **more** menu
+
+**Linkable toggle (card "more" menu)**: when the component is linkable the menu
+shows a **purple "Unlink"** item; otherwise a **"Make linkable"** item. Making it
+linkable just sets the flag. **Unlinking** runs a consequence check:
+- no instances use it → it's disabled silently;
+- instances exist → the **`UnlinkComponentModal`** opens, listing **every
+  placement** (one row per instance, labelled "Owner (version) — element name")
+  each with a **switch**: ON = keep an independent **local copy** (detach, the
+  default), OFF = **delete** that instance. "Copy all" / "Delete all" shortcuts and
+  a running count sit at the top. **Confirm & unlink** applies each choice across
+  all scenes, then clears the linkable flag. (Unlinking ≠ deleting the component —
+  the component stays; only its shareability and the chosen instances change.)
 
 **EmptyState**: icon + title + description + CTA button
 

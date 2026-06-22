@@ -60,7 +60,7 @@ const parentJSON = serializeHtmlCanvasDocument(
 test("materializeInstancesInGraph turns matching instances into editable own content", () => {
   const next = materializeInstancesInGraph(
     parentJSON,
-    (cid) => cid === "c1",
+    (node) => node.instanceOf?.componentId === "c1",
     (vid) => (vid === "v1" ? masterJSON : null),
   );
   expect(next).not.toBeNull();
@@ -82,19 +82,19 @@ test("materializeInstancesInGraph turns matching instances into editable own con
 test("materializeInstancesInGraph leaves non-matching instances untouched", () => {
   const next = materializeInstancesInGraph(
     parentJSON,
-    (cid) => cid === "other",
+    (node) => node.instanceOf?.componentId === "other",
     (vid) => (vid === "v1" ? masterJSON : null),
   );
   expect(next).toBeNull();
 });
 
 test("removeInstancesInGraph drops matching instance nodes (cascade)", () => {
-  const next = removeInstancesInGraph(parentJSON, (cid) => cid === "c1");
+  const next = removeInstancesInGraph(parentJSON, (node) => node.instanceOf?.componentId === "c1");
   expect(next).not.toBeNull();
   const result = htmlCanvasDocumentFromJSON(next!)!;
   expect(result.nodes.map((n) => n.id).sort()).toEqual(["p-root"]);
 });
 
 test("removeInstancesInGraph is a no-op when nothing matches", () => {
-  expect(removeInstancesInGraph(parentJSON, (cid) => cid === "other")).toBeNull();
+  expect(removeInstancesInGraph(parentJSON, (node) => node.instanceOf?.componentId === "other")).toBeNull();
 });

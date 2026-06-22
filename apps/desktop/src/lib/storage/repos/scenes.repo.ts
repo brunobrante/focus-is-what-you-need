@@ -1,6 +1,7 @@
 import {
   htmlCanvasDocumentFromJSON,
   serializeHtmlCanvasDocument,
+  type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
 import {
   collectDescendantIds,
@@ -262,13 +263,13 @@ async function upsertSceneRowWithoutPropagation(input: {
  */
 export function removeInstancesInGraph(
   graphJSON: string,
-  shouldRemove: (componentId: string) => boolean,
+  shouldRemove: (node: HtmlCanvasNode) => boolean,
 ): string | null {
   const doc = htmlCanvasDocumentFromJSON(graphJSON);
   if (!doc) return null;
   const removed = new Set(
     doc.nodes
-      .filter((n) => n.instanceOf && shouldRemove(n.instanceOf.componentId))
+      .filter((n) => n.instanceOf && shouldRemove(n))
       .map((n) => n.id),
   );
   if (removed.size === 0) return null;
@@ -322,7 +323,7 @@ export async function detachInstancesOfComponents(componentIds: Set<string>): Pr
   for (const scene of scenes) {
     const next = materializeInstancesInGraph(
       scene.graphJSON,
-      (cid) => componentIds.has(cid),
+      (node) => !!node.instanceOf && componentIds.has(node.instanceOf.componentId),
       (vid) => masterGraphByVariant.get(vid) ?? null,
     );
     if (next) {
@@ -339,10 +340,104 @@ export async function removeInstancesOfComponents(componentIds: Set<string>): Pr
   if (componentIds.size === 0) return;
   const scenes = await listScenes();
   for (const scene of scenes) {
-    const next = removeInstancesInGraph(scene.graphJSON, (cid) => componentIds.has(cid));
+    const next = removeInstancesInGraph(
+      scene.graphJSON,
+      (node) => !!node.instanceOf && componentIds.has(node.instanceOf.componentId),
+    );
     if (next) {
       await upsertScene(
         { ownerType: scene.ownerType, ownerId: scene.ownerId, graphJSON: next },
+        { propagate: false },
+      );
+    }
+  }
+}
+
+export type DetailedInstanceUsage = {
+  /** The scene (always a variant) that contains the instance node. */
+  ownerType: SceneOwnerType;
+  ownerId: string;
+  /** The instance node inside that scene. */
+  nodeId: string;
+  nodeName: string;
+  /** The master the instance points to. */
+  componentId: string;
+  variantId: string;
+};
+
+/**
+ * Every individual linked-instance occurrence of the given master components,
+ * one entry per node (not aggregated). Used by the unlink flow to list each
+ * placement so the user can copy or delete it.
+ */
+export async function listDetailedInstanceUsages(
+  componentIds: Set<string>,
+): Promise<DetailedInstanceUsage[]> {
+  if (componentIds.size === 0) return [];
+  const scenes = await listScenes();
+  const out: DetailedInstanceUsage[] = [];
+  for (const scene of scenes) {
+    const doc = htmlCanvasDocumentFromJSON(scene.graphJSON);
+    if (!doc) continue;
+    for (const node of doc.nodes) {
+      if (node.instanceOf && componentIds.has(node.instanceOf.componentId)) {
+        out.push({
+          ownerType: scene.ownerType,
+          ownerId: scene.ownerId,
+          nodeId: node.id,
+          nodeName: node.name,
+          componentId: node.instanceOf.componentId,
+          variantId: node.instanceOf.variantId,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+export type InstanceDecision = {
+  /** The variant scene id holding the instances. */
+  ownerId: string;
+  /** Instance node ids to detach into a local copy (materialize). */
+  copyNodeIds: string[];
+  /** Instance node ids to remove entirely. */
+  deleteNodeIds: string[];
+};
+
+/**
+ * Apply per-instance copy/delete decisions across scenes. "Copy" materializes the
+ * master content into the instance node (detach); "delete" removes the node and
+ * its descendants. Master graphs are snapshotted up front, so decisions resolve
+ * against the pre-change content. Scenes are written without propagation.
+ */
+export async function applyInstanceDecisions(decisions: InstanceDecision[]): Promise<void> {
+  if (decisions.length === 0) return;
+  const scenes = await listScenes();
+  const masterGraphByVariant = new Map<string, string>();
+  for (const s of scenes) {
+    if (s.ownerType === "variant") masterGraphByVariant.set(s.ownerId, s.graphJSON);
+  }
+  for (const decision of decisions) {
+    const scene = scenes.find((s) => s.ownerType === "variant" && s.ownerId === decision.ownerId);
+    if (!scene) continue;
+    const copy = new Set(decision.copyNodeIds);
+    const del = new Set(decision.deleteNodeIds);
+    let graph = scene.graphJSON;
+    if (del.size > 0) {
+      const removed = removeInstancesInGraph(graph, (node) => del.has(node.id));
+      if (removed) graph = removed;
+    }
+    if (copy.size > 0) {
+      const materialized = materializeInstancesInGraph(
+        graph,
+        (node) => copy.has(node.id),
+        (vid) => masterGraphByVariant.get(vid) ?? null,
+      );
+      if (materialized) graph = materialized;
+    }
+    if (graph !== scene.graphJSON) {
+      await upsertScene(
+        { ownerType: "variant", ownerId: decision.ownerId, graphJSON: graph },
         { propagate: false },
       );
     }

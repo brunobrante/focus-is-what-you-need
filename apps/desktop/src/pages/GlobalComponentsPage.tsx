@@ -6,7 +6,8 @@ import { Snapshot } from "@/components/Snapshot";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { NewComponentModal, type NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
-import { IconPlus, IconSearch, IconGlobe, IconDiamond } from "@/components/icons";
+import { IconPlus, IconSearch, IconGlobe, IconDiamond, IconLink, IconUnlink } from "@/components/icons";
+import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
@@ -31,6 +32,7 @@ export function GlobalComponentsPage() {
 
   const newComponentModalRef = useRef<NewComponentModalHandle>(null);
   const fastEditRef = useRef<FastEditModalHandle>(null);
+  const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
 
   const openCreateModal = () => {
     if (!workspaceId) return;
@@ -108,6 +110,7 @@ export function GlobalComponentsPage() {
                   component={c}
                   projects={workspaceProjects}
                   onRequestDelete={() => setPendingDelete(c)}
+                  onToggleLinkable={() => void requestToggle(c)}
                   onFastEdit={() =>
                     fastEditRef.current?.open({
                       mode: "component",
@@ -144,6 +147,7 @@ export function GlobalComponentsPage() {
 
       <NewComponentModal ref={newComponentModalRef} />
       <FastEditModal ref={fastEditRef} />
+      {unlinkModal}
 
       <PageFooter />
     </div>
@@ -155,11 +159,13 @@ function WorkspaceComponentCard({
   projects,
   onRequestDelete,
   onFastEdit,
+  onToggleLinkable,
 }: {
   component: ComponentRow;
   projects: ProjectRow[];
   onRequestDelete: () => void;
   onFastEdit: () => void;
+  onToggleLinkable: () => void;
 }) {
   const navigate = useNavigate();
   const canvasHref = `/canvas?variant=${encodeURIComponent(component.activeVariantId)}&type=desktop`;
@@ -198,6 +204,20 @@ function WorkspaceComponentCard({
               label: "More",
               icon: CardMenuIcons.More,
               menuItems: [
+                component.linkable
+                  ? {
+                      key: "unlink",
+                      label: "Unlink",
+                      icon: <IconUnlink size={13} strokeWidth={1.7} />,
+                      accent: true,
+                      onClick: onToggleLinkable,
+                    }
+                  : {
+                      key: "link",
+                      label: "Make linkable",
+                      icon: <IconLink size={13} strokeWidth={1.7} />,
+                      onClick: onToggleLinkable,
+                    },
                 {
                   key: "delete",
                   label: "Delete component",
