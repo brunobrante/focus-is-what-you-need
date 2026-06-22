@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
-import { Wand2 } from "lucide-react";
+import { Home, Wand2 } from "lucide-react";
 import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
 import { WorkspaceEditPanel, type WorkspaceEditPanelHandle } from "@/components/layout/WorkspaceEditPanel";
 import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
@@ -73,6 +73,15 @@ export function TopBar({
   return (
     <>
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[var(--border)] px-6 text-[13px] tracking-[0.3px] text-[var(--text-muted)]">
+      <Link
+        to="/"
+        aria-label="Home"
+        title="Home"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+      >
+        <Home size={15} strokeWidth={1.8} />
+      </Link>
+      <span aria-hidden className="h-5 w-px bg-[var(--border)]" />
       <button
         ref={wsTriggerRef}
         type="button"
@@ -151,7 +160,7 @@ export function TopBar({
 
       <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--border)]" />
       <nav aria-label="Workspace" className="inline-flex items-center gap-1">
-        <TopNavLink to="/" end>
+        <TopNavLink to="/projects">
           <IconGrid size={14} strokeWidth={1.7} className="opacity-85" />
           Projects
         </TopNavLink>

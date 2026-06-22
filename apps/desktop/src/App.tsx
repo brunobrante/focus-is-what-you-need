@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
+import { HomePage } from "@/pages/HomePage";
 import { LandingPage } from "@/pages/LandingPage";
 import { NewProjectPage } from "@/pages/NewProjectPage";
 import { GalleryPage } from "@/pages/GalleryPage";
@@ -22,7 +23,8 @@ export default function App() {
   return (
     <SearchProvider>
       <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/projects" element={<LandingPage />} />
       <Route path="/new" element={<NewProjectPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
@@ -33,7 +35,7 @@ export default function App() {
       <Route path="/components" element={<GlobalComponentsPage />} />
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />
-      <Route path="*" element={<LandingPage />} />
+      <Route path="*" element={<HomePage />} />
       </Routes>
     </SearchProvider>
   );

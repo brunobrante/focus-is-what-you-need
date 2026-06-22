@@ -10,7 +10,8 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 
 | Route | Page | Purpose |
 |-------|------|---------|
-| `/` | LandingPage | Main hub — project browser |
+| `/` | HomePage | App home — workspaces, quick links, recent items |
+| `/projects` | LandingPage | Project browser for the active workspace |
 | `/new` | NewProjectPage | Multi-step project creation wizard |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
@@ -62,7 +63,39 @@ kind badge (Element, Screen, Component, Reference, Project, Command).
 
 ## Pages
 
-### 1. Landing Page `/`
+### 0. Home Page `/`
+
+The first screen shown when the app opens — a shallow hub over the workspace. It
+is **not** the project browser (that is the Landing Page at `/projects`); from
+here the user picks a workspace, opens a recent project, or jumps to a section.
+
+**Layout**:
+- Its **own header** (`HomeHeader`), deliberately separate from the workspace
+  TopBar — product mark on the left and a primary "New project" action on the
+  right. No workspace switcher (workspace selection happens via the cards below).
+- A left **sidebar** with quick links and a main content column beside it
+- Page footer with version string
+
+**Sidebar** (`HomeSidebar`, hidden below `md`): a vertical list of links —
+**Recent Items** (→ `/`), **Drafts** (placeholder), **Local References** (→
+`/references`), **Learn** (placeholder), and, below a divider, **Settings**
+(opens the global Settings modal). Drafts and Learn are intentionally inert
+placeholders ("Coming soon") until their features exist; the others reach real
+destinations. Each row is a 36px icon+label row that highlights on hover.
+
+**Workspaces section**: a grid of light `WorkspaceTile` cards — avatar initial,
+name, an **Active** badge on the current workspace, and a project count. A card
+is deliberately minimal (the project-focused detail lives in the browser); click
+sets that workspace active and navigates to `/projects`. Empty copy when none.
+
+**Recent Items section**: a card grid of the active workspace's projects sorted
+by last-updated (capped at 8), each a `RecentThumb` (type badge + thumbnail or
+grid glyph) above name and "{N} screens · updated {relative}". A dashed
+**New project** add tile (`DashedAddTile` → `/new`) closes the grid.
+
+---
+
+### 1. Landing Page `/projects`
 
 Main project hub.
 
@@ -890,14 +923,17 @@ again, or the canvas ×, returns to the editor.
 
 ### TopBar
 
-Global navigation header present on all non-canvas pages.
+Global navigation header present on all non-canvas pages. It is **not** rendered
+on the Home page (`/`), which has its own header.
 
 **Left side**:
+- **Home icon** (→ `/`) — returns to the Home page, followed by a divider
 - Workspace selector button: avatar initial + workspace name + chevron
 - Workspace menu (portal overlay): list of workspaces + "Create new" option
 
 **Center**:
 - Navigation links: Projects | Components | System | References
+  (**Projects** → `/projects`, the project browser)
 
 **Right side**:
 - "Builder" button (primary style)

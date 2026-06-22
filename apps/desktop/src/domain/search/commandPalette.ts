@@ -38,11 +38,18 @@ export type CommandDefinition = {
 export const PALETTE_COMMANDS: CommandDefinition[] = [
   // ── Navigation ────────────────────────────────────────────────────────────
   {
-    id: "nav.workspace",
-    title: "Go to Workspace",
+    id: "nav.home",
+    title: "Go to Home",
     section: "Navigation",
-    keywords: ["home", "projects", "start"],
+    keywords: ["start", "recent", "workspaces"],
     run: (ctx) => ctx.navigate("/"),
+  },
+  {
+    id: "nav.projects",
+    title: "Go to Projects",
+    section: "Navigation",
+    keywords: ["workspace", "projects", "files"],
+    run: (ctx) => ctx.navigate("/projects"),
   },
   {
     id: "nav.canvas",

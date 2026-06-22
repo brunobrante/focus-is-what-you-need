@@ -125,11 +125,11 @@ export function ProjectOverview({
 export function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-      <Link to="/" aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
+      <Link to="/projects" aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
         <IconChevronLeft size={14} strokeWidth={1.6} />
       </Link>
       <span className="text-[var(--text-faint)]">/</span>
-      <Link to="/" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
+      <Link to="/projects" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
         Projects
       </Link>
       <span className="text-[var(--text-faint)]">/</span>

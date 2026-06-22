@@ -60,7 +60,7 @@ export function NewProjectPage() {
             </span>
           </div>
           <Link
-            to="/"
+            to="/projects"
             aria-label="Close"
             className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-lg border border-[var(--border)] bg-transparent text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
