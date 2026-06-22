@@ -22,19 +22,21 @@ export type UnlinkDecision = {
 };
 
 /**
- * Confirmation for turning OFF a component's linkable state while instances exist.
- * Lists every placement; each row is a switch — ON = keep as an independent local
- * copy (detach), OFF = delete. Defaults to copy for every row.
+ * Confirmation for turning OFF a linkable item (a component, or a System Design
+ * token) while linked instances exist. Lists every place; each row is a switch —
+ * ON = keep an independent local copy (detach), OFF = delete. Defaults to copy.
  */
 export function UnlinkComponentModal({
   open,
-  componentName,
+  title,
+  subtitle,
   items,
   onCancel,
   onConfirm,
 }: {
   open: boolean;
-  componentName: string;
+  title: string;
+  subtitle: string;
   items: UnlinkItem[];
   onCancel: () => void;
   onConfirm: (decisions: UnlinkDecision[]) => void;
@@ -52,12 +54,8 @@ export function UnlinkComponentModal({
   const deleteCount = items.length - copyCount;
 
   return (
-    <Modal open={open} onClose={onCancel} ariaLabel={`Unlink ${componentName}`}>
-      <ModalHeader
-        title={`Unlink “${componentName}”`}
-        subtitle={`${items.length} instance${items.length === 1 ? "" : "s"} use this component. Choose what happens to each, then confirm. Default keeps a local copy.`}
-        onClose={onCancel}
-      />
+    <Modal open={open} onClose={onCancel} ariaLabel={title}>
+      <ModalHeader title={title} subtitle={subtitle} onClose={onCancel} />
       <ModalBody>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11.5px] text-[var(--text-faint)]">

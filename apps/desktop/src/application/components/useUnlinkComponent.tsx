@@ -96,10 +96,12 @@ export function useUnlinkComponent() {
     [pending, busy],
   );
 
+  const count = pending?.items.length ?? 0;
   const modal = (
     <UnlinkComponentModal
       open={pending !== null}
-      componentName={pending?.name ?? ""}
+      title={`Unlink “${pending?.name ?? ""}”`}
+      subtitle={`${count === 1 ? "1 instance uses" : `${count} instances use`} this component. Choose what happens to each, then confirm. Default keeps a local copy.`}
       items={pending?.items ?? []}
       onCancel={() => (busy ? undefined : setPending(null))}
       onConfirm={(decisions) => void confirm(decisions)}

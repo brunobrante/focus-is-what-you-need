@@ -744,7 +744,12 @@ Icons | Spacing | Radius | Images. Only the active category is shown at a time.
 Token cards reveal actions on hover. On the **workspace** page each card shows a
 **linkable toggle** (a link icon, on by default) plus edit/delete — the toggle
 marks whether that token is shareable into projects, mirroring how a
-project/workspace-global component is linkable.
+project/workspace-global component is linkable. **Turning it off** runs the same
+consequence flow as components: if no project links the token it's disabled
+silently; if projects link it, the **`UnlinkComponentModal`** opens listing each
+**project** that links it, each a switch — **copy** (detach into an independent
+local token in that project, default) or **delete** — then applies the choices and
+clears the linkable flag.
 
 There is no "design system" selector and no libraries/icons name-lists — those
 belonged to the old disconnected manager and were removed. The page edits one

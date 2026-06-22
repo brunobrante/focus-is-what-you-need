@@ -4,6 +4,7 @@ import {
 } from "@/domain/system-design/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import type {
+  SystemDesignCategory,
   SystemDesignOwnerScope,
   SystemDesignRow,
   SystemDesignTokens,
@@ -151,4 +152,62 @@ export async function getSystemDesign(id: string): Promise<SystemDesignRow | nul
 
 export function deleteSystemDesign(id: string): void {
   removeRecords(KEY, [id]);
+}
+
+type LinkableToken = {
+  id: string;
+  linkable?: boolean;
+  instanceOf?: { systemDesignId: string; tokenId: string } | null;
+};
+
+export type TokenLinkUsage = { designId: string; projectId: string };
+
+/** Project designs that hold a linked instance of a given workspace token. */
+export async function listTokenLinkUsages(
+  category: SystemDesignCategory,
+  tokenId: string,
+): Promise<TokenLinkUsage[]> {
+  const rows = await listSystemDesigns();
+  const out: TokenLinkUsage[] = [];
+  for (const row of rows) {
+    if (row.ownerScope !== "project") continue;
+    const list = row.tokens[category] as LinkableToken[];
+    if (list.some((t) => t.instanceOf && t.instanceOf.tokenId === tokenId)) {
+      out.push({ designId: row.id, projectId: row.ownerId });
+    }
+  }
+  return out;
+}
+
+export type TokenLinkDecision = { designId: string; action: "copy" | "delete" };
+
+/**
+ * Apply per-project copy/delete decisions when a workspace token is unlinked.
+ * "copy" detaches the project's linked instance into a local token holding the
+ * master's current values; "delete" removes it. `masterToken` is the workspace
+ * token providing the copy values.
+ */
+export async function applyTokenLinkDecisions(
+  category: SystemDesignCategory,
+  tokenId: string,
+  masterToken: LinkableToken & Record<string, unknown>,
+  decisions: TokenLinkDecision[],
+): Promise<void> {
+  for (const decision of decisions) {
+    const row = await getSystemDesign(decision.designId);
+    if (!row) continue;
+    const list = row.tokens[category] as LinkableToken[];
+    const nextList =
+      decision.action === "delete"
+        ? list.filter((t) => !(t.instanceOf && t.instanceOf.tokenId === tokenId))
+        : list.map((t) => {
+            if (!(t.instanceOf && t.instanceOf.tokenId === tokenId)) return t;
+            const { instanceOf: _i, linkable: _l, ...rest } = { ...masterToken, id: t.id };
+            return rest as LinkableToken;
+          });
+    saveSystemDesign({
+      ...row,
+      tokens: { ...row.tokens, [category]: nextList } as SystemDesignTokens,
+    });
+  }
 }
