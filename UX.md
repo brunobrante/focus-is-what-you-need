@@ -390,6 +390,11 @@ Full-screen visual editor with floating UI layers.
 - Clicking a card enlarges that reference **inline within the canvas window**
   (not a modal) — a **Back** control returns to the gallery and a trash control
   removes it. Card hover also reveals remove.
+- **Linkable / detach**: a reference attached here is a **linked instance** of the
+  library master (the title shows a link icon). The enlarged toolbar adds a
+  **Detach** control (unlink icon) that makes an independent **local copy** owned
+  by this subject and breaks the link — mirroring component/token detach. A
+  detached (local) reference is no longer linkable and shows no detach control.
 - **Stack references** (a whole stacked image **or** a sub-screen root) open as an
   **interactive composite**, mirroring the Builder Stack tab: the background image
   with its cuts overlaid. Hovering a cut outlines it; clicking selects it; clicking
@@ -690,7 +695,10 @@ Icons | Spacing | Radius | Images. Only the active category is shown at a time.
 - **Radius** — grid of rounded-corner previews with name + px value
 - **Images** — grid of uploaded image cards (empty state when none)
 
-Token cards reveal edit/delete actions on hover.
+Token cards reveal actions on hover. On the **workspace** page each card shows a
+**linkable toggle** (a link icon, on by default) plus edit/delete — the toggle
+marks whether that token is shareable into projects, mirroring how a
+project/workspace-global component is linkable.
 
 There is no "design system" selector and no libraries/icons name-lists — those
 belonged to the old disconnected manager and were removed. The page edits one
@@ -698,11 +706,11 @@ real, persisted design.
 
 **Add-token modal** (`AddTokenModal`): on the workspace page it shows just the
 create form. On a project (when a workspace exists) it has two tabs — **Create
-new** (the per-category form) and **From workspace** (a list of workspace tokens
-the project previously removed, click to re-add). Editing a token uses
-`EditTokenModal`. Forms per category: color picker + hex; gradient from/to +
-angle; family/weight/size + sample; emoji/glyph; spacing slider; radius with
-"Full / Pill"; image upload.
+new** (the per-category form) and **From workspace** (a list of the workspace's
+**linkable** tokens not yet linked, click to **Link** one as a live instance).
+Editing a token uses `EditTokenModal`. Forms per category: color picker + hex;
+gradient from/to + angle; family/weight/size + sample; emoji/glyph; spacing
+slider; radius with "Full / Pill"; image upload.
 
 ---
 
@@ -712,24 +720,27 @@ The **System** tab inside a project (`/project/:id`) edits that project's own
 system design using the same editor and modals as the workspace page. A project's
 design is independent and persisted per project.
 
-**Unified token model** (the core idea — there is no Inherited/Custom switch):
-- The project's own tokens and the tokens shared by its workspace are shown
-  **together** in one list per category. An info bar names the workspace.
-- Each card carries an **origin badge**: `WS` for a workspace (shared) token, or
-  `Local` for a project token. Workspace tokens are not edited here (edit at the
-  workspace level); they can be deleted.
-- **Deleting a token removes it from the project.** A project token is deleted
-  outright; a shared token is excluded from this project only — the deletion
-  persists. It reappears under the add-token modal's **From workspace** tab to be
-  re-added.
-- **Adding** a token creates a project-local token (or re-adds a removed shared one
-  from the From-workspace tab).
-- A project with **no workspace** has no shared tokens and no badges — it just owns
-  its tokens.
+**Linkable token model** (the same linkable → instance → detach model as
+components):
+- The project's own (local) tokens and the workspace tokens it has **linked** are
+  shown **together** in one list per category. An info bar names the workspace.
+- Each card carries an **origin badge**: `Linked` for a linked instance of a
+  workspace token, or `Local` for a project token. A linked token shows the
+  master's live values and is **read-only** here.
+- A linked token's hover actions are **Detach** (an unlink icon — copies the
+  master's current values locally and breaks the link, so it becomes an editable
+  `Local` token) and **Remove link** (drops it from the project). A local token
+  has the usual edit/delete.
+- **Linking** a token: the add-token modal's **From workspace** tab lists the
+  workspace's linkable tokens not yet linked; clicking one adds a live linked
+  instance. Editing the master in the workspace updates every linked instance.
+- A project with **no workspace** has no linkable source and no badges — it just
+  owns its tokens.
 
 A global setting, **"Share workspace tokens with new projects by default"**
-(default on), decides whether a new project starts with all workspace tokens
-shared or none. It is editable in the new-project flow (section 2).
+(default on), decides whether a new project starts with **all linkable workspace
+tokens already linked** or none. It is editable in the new-project flow
+(section 2).
 
 ---
 

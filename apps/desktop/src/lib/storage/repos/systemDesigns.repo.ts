@@ -1,13 +1,12 @@
 import {
   createDefaultSystemDesignTokens,
-  emptyExcludedShared,
   emptySystemDesignTokens,
 } from "@/domain/system-design/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import type {
-  SystemDesignExclusions,
   SystemDesignOwnerScope,
   SystemDesignRow,
+  SystemDesignTokens,
 } from "@/lib/storage/schema";
 import {
   TABLES,
@@ -20,42 +19,21 @@ import {
 const KEY = TABLES.systemDesigns;
 
 /**
- * Upgrade any persisted row to the current shape.
- * - Current rows (have `tokens` + `excludedShared`) pass through, backfilled.
- * - Interim rows (the short-lived per-category `inherit` model) keep workspace
- *   tokens but drop project-local tokens, which were seed copies that would
- *   otherwise duplicate the inherited ones.
- * - Legacy rows (schema ≤ 15, no tokens) reset to a fresh default design while
- *   keeping their identity and ownership.
+ * Backfill any persisted row to the current shape. (A SCHEMA_VERSION bump nukes
+ * and reseeds, so this only ever sees current-shaped rows; it stays defensive.)
+ * - Rows with `tokens` pass through, with every category present.
+ * - Rows with no tokens reset to a fresh default design, keeping identity/owner.
  */
 export function normalizeSystemDesignRow(raw: SystemDesignRow): SystemDesignRow {
-  const candidate = raw as Partial<SystemDesignRow> & { excludedShared?: unknown };
+  const candidate = raw as Partial<SystemDesignRow>;
   const ownerScope = candidate.ownerScope ?? "workspace";
 
-  if (candidate.tokens && candidate.excludedShared) {
+  if (candidate.tokens) {
     return {
       ...(raw as SystemDesignRow),
-      inheritsFromId: candidate.inheritsFromId ?? null,
-      excludedShared: { ...emptyExcludedShared(), ...candidate.excludedShared },
-      tokens: { ...emptySystemDesignTokens(), ...candidate.tokens },
-    };
-  }
-
-  if (candidate.tokens) {
-    // Interim shape: keep workspace tokens, discard project seed copies.
-    return {
-      id: raw.id,
-      name: candidate.name || "Design system",
       ownerScope,
-      ownerId: candidate.ownerId ?? "",
       inheritsFromId: candidate.inheritsFromId ?? null,
-      excludedShared: emptyExcludedShared(),
-      tokens:
-        ownerScope === "project"
-          ? emptySystemDesignTokens()
-          : { ...emptySystemDesignTokens(), ...candidate.tokens },
-      createdAt: candidate.createdAt ?? now(),
-      updatedAt: candidate.updatedAt ?? now(),
+      tokens: { ...emptySystemDesignTokens(), ...candidate.tokens },
     };
   }
 
@@ -66,7 +44,6 @@ export function normalizeSystemDesignRow(raw: SystemDesignRow): SystemDesignRow 
     ownerScope,
     ownerId: candidate.ownerId ?? "",
     inheritsFromId: null,
-    excludedShared: emptyExcludedShared(),
     tokens: createDefaultSystemDesignTokens(),
     createdAt: t,
     updatedAt: candidate.updatedAt ?? t,
@@ -94,9 +71,9 @@ export async function getSystemDesignByOwner(
  * Return the owner's design, creating it lazily on first access.
  *
  * A workspace design starts with the seed tokens. A project design inside a
- * workspace starts empty (it shows the workspace tokens via inheritance), with
- * `initialExcludedShared` deciding which workspace tokens are hidden up front. A
- * project with no workspace gets its own seed tokens.
+ * workspace starts with `initialTokens` (the linked instances of the workspace
+ * tokens it chose to link, built by the caller), or empty if none. A project
+ * with no workspace gets its own seed tokens.
  *
  * Extra rows for the same owner (the old model allowed many) are pruned so each
  * owner ends up with exactly one design.
@@ -106,7 +83,7 @@ export async function getOrCreateSystemDesignByOwner(input: {
   ownerId: string;
   name?: string;
   inheritsFromId?: string | null;
-  initialExcludedShared?: SystemDesignExclusions;
+  initialTokens?: SystemDesignTokens;
 }): Promise<SystemDesignRow> {
   const rows = await listSystemDesigns();
   const owned = rows
@@ -148,11 +125,10 @@ export async function getOrCreateSystemDesignByOwner(input: {
     ownerId: input.ownerId,
     inheritsFromId:
       input.ownerScope === "project" ? input.inheritsFromId ?? null : null,
-    excludedShared: input.initialExcludedShared ?? emptyExcludedShared(),
-    // A project with a workspace shows the inherited tokens, so it owns none
-    // initially; everything else starts from the seed set.
+    // A project with a workspace owns only the linked instances the caller seeds
+    // (possibly none); everything else starts from the seed set.
     tokens: hasParent
-      ? emptySystemDesignTokens()
+      ? input.initialTokens ?? emptySystemDesignTokens()
       : createDefaultSystemDesignTokens(),
     createdAt: t,
     updatedAt: t,

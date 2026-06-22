@@ -96,15 +96,21 @@ export function EmptySlot({ label }: { label: string }) {
 export function TokenAction({
   icon,
   danger,
+  active,
+  title,
   onClick,
 }: {
   icon: ReactNode;
   danger?: boolean;
+  /** Renders an "on" state — used by the linkable toggle. */
+  active?: boolean;
+  title?: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      title={title}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -113,7 +119,9 @@ export function TokenAction({
         "grid h-6 w-6 cursor-pointer place-items-center rounded-md border backdrop-blur-md transition-colors",
         danger
           ? "border-[var(--border-strong)] bg-[rgba(20,20,20,0.9)] text-[#ff8080] hover:bg-[rgba(255,60,60,0.18)]"
-          : "border-[var(--border-strong)] bg-[rgba(20,20,20,0.9)] text-[var(--text-muted)] hover:text-[var(--text)]",
+          : active
+            ? "border-[#8638E5] bg-[rgba(134,56,229,0.18)] text-[var(--text)]"
+            : "border-[var(--border-strong)] bg-[rgba(20,20,20,0.9)] text-[var(--text-muted)] hover:text-[var(--text)]",
       ].join(" ")}
     >
       {icon}

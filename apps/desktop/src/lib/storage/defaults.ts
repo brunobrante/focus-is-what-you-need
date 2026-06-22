@@ -142,5 +142,9 @@ export function normalizeReferenceRow(row: ReferenceRow): ReferenceRow {
     stack: row.stack,
     projectIds,
     attachments,
+    // Library references are linkable by default; a detached local copy sets
+    // these explicitly when it is created.
+    linkable: row.linkable ?? true,
+    detachedFrom: row.detachedFrom ?? null,
   };
 }

@@ -10,17 +10,21 @@ import {
   canvasRectToViewport as transformCanvasRectToViewport,
   type ViewportTransform,
 } from "@/canvas/engine/viewport";
+import {
+  LINKED_INSTANCE_COLOR,
+  LINKED_INSTANCE_HOVER,
+} from "@/lib/ui/linkedColor";
 import type { ToolingBoxCommand } from "./toolingRenderAdapter";
 
 export type { ViewportTransform } from "@/canvas/engine/viewport";
 
 export const SELECTION_COLOR = "#0d99ff";
 // Linked instances (external components) select in purple to distinguish them from
-// editable content — outline and resize handles alike.
-export const INSTANCE_SELECTION_COLOR = "#8638E5";
+// editable content — outline and resize handles alike. Shared with tokens/refs.
+export const INSTANCE_SELECTION_COLOR = LINKED_INSTANCE_COLOR;
 export const HOVER_COLOR = "rgba(13, 153, 255, 0.55)";
 // Hover over a linked instance (or anything inside it) mirrors the purple selection.
-export const INSTANCE_HOVER_COLOR = "rgba(134, 56, 229, 0.55)";
+export const INSTANCE_HOVER_COLOR = LINKED_INSTANCE_HOVER;
 export const GROUP_FILL = "rgba(13, 153, 255, 0.06)";
 const GUIDE_COLOR = "#ff2ca8";
 const MARQUEE_FILL = "rgba(13, 153, 255, 0.08)";

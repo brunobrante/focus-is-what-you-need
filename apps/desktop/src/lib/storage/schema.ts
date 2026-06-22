@@ -12,7 +12,11 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // v19: dropped the in-hot-path legacy coercions in `constrainAll` (old
 // "#e9edf3" shell background + removed "container" element type). Reseed clears
 // any stale rows carrying those shapes.
-export const SCHEMA_VERSION = 19;
+// v20: unified the linkable model across System Design tokens and References.
+// Tokens carry `linkable`/`instanceOf` and projects hold linked instances
+// instead of per-category inheritance (`excludedShared` removed); references
+// carry `linkable`/`detachedFrom`. Reseed clears the old inheritance shapes.
+export const SCHEMA_VERSION = 20;
 
 export type Meta = {
   schemaVersion: number;
@@ -154,6 +158,12 @@ export type ReferenceRow = {
   stackNodeName?: string;
   projectIds: string[];
   attachments: ReferenceAttachment[];
+  // Linkable model (mirrors components/tokens): `linkable` marks a reference as
+  // shareable into other locations — a non-linkable reference is a local copy
+  // that cannot be attached elsewhere. `detachedFrom` records the master a local
+  // copy was detached from. Default linkable = true (the library is shareable).
+  linkable?: boolean;
+  detachedFrom?: string | null;
   // Legacy fields kept for backward compatibility with older persisted rows.
   projectId?: string;
   ownerType?: OwnerType;
@@ -246,7 +256,6 @@ import type {
   ImageToken,
   SystemDesignCategory,
   SystemDesignTokens,
-  SystemDesignExclusions,
   SystemDesignOwnerScope,
   SystemDesignRow,
 } from "@/domain/system-design/types";
@@ -260,7 +269,6 @@ export type {
   ImageToken,
   SystemDesignCategory,
   SystemDesignTokens,
-  SystemDesignExclusions,
   SystemDesignOwnerScope,
   SystemDesignRow,
 };

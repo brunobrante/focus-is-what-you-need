@@ -197,7 +197,11 @@ The product is organized as a strict containment hierarchy:
 > **Workspace → Project → Screen → Component → … (nested components)**
 
 Three capabilities recur at multiple levels — **Components**, **System Design**,
-and **References** — and flow downward by sharing/inheritance.
+and **References** — and flow downward through **one shared mechanism: linkable
+instances** (see "Linkable, instances, and detach"). A higher scope marks an item
+as *linkable*; a lower scope places it as a *linked instance* that points back to
+the master; *detach* turns an instance into an owned local copy. The same three
+verbs apply to all three capabilities.
 
 ### Workspace **[NOW]**
 
@@ -232,9 +236,12 @@ recurring capabilities:
   inside it — components in screens, components inside components, everything.
 - **References** — references added directly to the project, or pulled from the
   workspace's references or from the unattached global library.
-- **System Design** — the project can define its own design system **and/or
-  inherit from the workspace**, fully or partially (inherit everything, or only
-  some tokens) — the user's choice, per category.
+- **System Design** — the project can define its own tokens **and/or link
+  individual tokens from the workspace**. A workspace token marked *linkable* can
+  be placed into the project as a *linked instance* (a live reference to the
+  master token, not a copy); the project chooses which tokens to link, one by one.
+  A linked token cannot be edited in the project — to change it you edit the master
+  in the workspace, or *detach* it to get an independent local copy.
 
 **[PLANNED]** Richer screen definitions: more than one screen type in one project
 (e.g. tablet and mobile together), and pre-defined types that are not locked to a
@@ -273,20 +280,26 @@ where it can be reused, but it always has exactly one owner/origin.
 ### System Design **[NOW]**
 
 Brand and design tokens (colors, gradients, typography, icons, spacing, radius,
-images). Lives at the **workspace** level and at the **project** level, where a
-project may inherit the workspace tokens — wholly or per-category — or define its
-own.
+images). Lives at the **workspace** level and at the **project** level. A token is
+**linkable** like a component: a workspace token marked linkable can be placed into
+a project as a **linked instance** (a live reference to the master), one token at a
+time. A project may also define its own tokens. A linked token is not editable in
+place — edit the master in the workspace, or **detach** it into an independent
+local copy. (This replaces the older per-category inheritance model; the unit of
+sharing is now the individual token.)
 
 ### References **[NOW]**
 
-A library of UX/UI reference images and videos. A single reference can be
-**attached** to a project, a screen, and/or a component — so the same reference
-flows wherever it is useful. References can be created globally (unattached),
-created on a workspace/project, or imported directly onto a screen/component.
+A library of UX/UI reference images and videos. A reference is **linkable** like a
+component: a linkable reference can be placed into a project, a screen, and/or a
+component as a **linked instance** — the same master reference flowing wherever it
+is useful. **Detach** turns a linked reference into an independent local copy owned
+by the current location. References can be created globally (unattached), created
+on a workspace/project, or imported directly onto a screen/component.
 
 References can also hold **stacks** (see the Builder) — a reference image cut into
-a tree of pieces — and you can attach a stack, or a single piece of a stack, not
-just a whole flat image.
+a tree of pieces — and you can link (and detach) a stack, or a single piece of a
+stack, not just a whole flat image.
 
 ### Unattached / loose entities
 
@@ -309,19 +322,30 @@ inherit) — but it is otherwise a normal entity.
 
 ## Linkable, instances, and detach
 
+This is **one mechanism shared by Components, System Design tokens, and
+References.** Wherever the product shares something downward, it shares it the same
+way: mark it *linkable*, place it as a *linked instance*, *detach* it to own a local
+copy. The vocabulary below is written for components, but the same three verbs and
+the same ownership guarantees apply to tokens and references.
+
 ### Linkable **[NOW]**
 
-**Linkable is a state of an element** — it marks the element as shareable to
-another location. Without it, you cannot reuse the component elsewhere.
+**Linkable is a state of an item** — it marks the item as shareable to another
+location. Without it, you cannot reuse it elsewhere. The "global" scope of each
+capability is linkable by default: workspace/project-global components, workspace
+tokens, and workspace/gallery references.
 
-When a component is linkable, it can be **placed into another screen, or inside
-another component**, as a **linked instance** — a *visual reference* to the
-master, not a copy.
+When an item is linkable, it can be **placed into a lower scope** as a **linked
+instance** — a *live reference* to the master, not a copy:
 
-A linked instance **cannot be edited in place**. To edit it you **open it on its
-own**, which takes you into the **master at its own home (its main/origin)**: if
-the master belongs to a screen, you enter that screen's flow with the item focused
-for editing.
+- a **component** placed into another screen or component;
+- a **system-design token** linked from the workspace into a project;
+- a **reference** linked into a project, screen, or component.
+
+A linked instance **cannot be edited in place**. To edit it you go to the **master
+at its own home (its main/origin)**. For a component you **open it on its own**,
+which takes you into the master's flow with the item focused; for a token you edit
+it in the workspace System Design; for a reference you edit the master reference.
 
 **[PLANNED]** A back button on that flow that returns you to exactly where you
 were, for a smoother round trip.
@@ -331,9 +355,10 @@ this may change for a specific future feature.)
 
 ### Detach **[NOW]**
 
-**Detach removes the link** and **copies the whole element into the current
-location** — turning a linked instance into a local, fully independent copy owned
-by the current screen / version / component, no longer connected to the master.
+**Detach removes the link** and **copies the item into the current location** —
+turning a linked instance into a local, fully independent copy owned by the current
+screen / version / component / project, no longer connected to the master. This
+applies identically to components, tokens, and references.
 
 ---
 

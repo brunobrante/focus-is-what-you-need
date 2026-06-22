@@ -378,7 +378,7 @@ export function AddTokenModal({
 
   return (
     <Modal open={open} onClose={onClose} ariaLabel={`Add ${label}`}>
-      <ModalHeader title={`Add ${label}`} subtitle="Create a new token or add one shared by the workspace." onClose={onClose} />
+      <ModalHeader title={`Add ${label}`} subtitle="Create a new token or link one from the workspace." onClose={onClose} />
       {hasWorkspace && (
         <div className="flex gap-1 border-b border-[var(--border)] px-5">
           <ModalTab active={tab === "create"} onClick={() => setTab("create")}>Create new</ModalTab>
@@ -425,7 +425,7 @@ function WorkspacePicker({
   if (availableShared.length === 0) {
     return (
       <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-[var(--border)] px-4 text-center text-[12.5px] text-[var(--text-faint)]">
-        Every workspace {CATEGORY_LABEL[category].toLowerCase()} token is already in this project.
+        Every linkable workspace {CATEGORY_LABEL[category].toLowerCase()} token is already linked.
       </div>
     );
   }
@@ -439,7 +439,7 @@ function WorkspacePicker({
           className="flex items-center gap-3 rounded-lg border border-[var(--border)] px-2.5 py-2 text-left transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
         >
           <TokenPreview category={category} token={token} />
-          <span className="ml-auto shrink-0 text-[11.5px] text-[var(--text-faint)]">Add</span>
+          <span className="ml-auto shrink-0 text-[11.5px] text-[var(--text-faint)]">Link</span>
         </button>
       ))}
     </div>

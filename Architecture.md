@@ -30,6 +30,31 @@ both are masters that own a chain of `VariantRow`s (a `VariantRow` carries
 Do not store any canvas scene under a screen id or a component id. Variants are
 the editable scene owners for **both** screens and components.
 
+### Linkable model: tokens & references (same shape as component instances)
+
+System Design tokens and References reuse the component **linkable → linked
+instance → detach** model (the product law is in `Product.md`). The data shapes:
+
+- **System Design tokens** (`domain/system-design/types.ts`): every token carries
+  optional `linkable?: boolean` (a workspace token shareable into projects, on by
+  default) and `instanceOf?: { systemDesignId, tokenId } | null` (a linked
+  instance pointing at a master token). A project's `SystemDesignRow.tokens` holds
+  both its local tokens and the linked instances it chose; there is **no**
+  per-category inheritance / `excludedShared`. `resolveSystemDesign(design, parent)`
+  refreshes a linked token's display values live from the master (keeping its id so
+  `$$ref` pointers stay valid) and exposes the workspace's unlinked linkable tokens
+  as `availableShared` for the picker. **Detach** (`detachToken` in
+  `useSystemDesign`) copies the master's values locally and clears `instanceOf`.
+- **References** (`ReferenceRow`): `linkable?: boolean` (library references are
+  linkable by default) and `detachedFrom?: string | null`. A reference attached to
+  many owners via `attachments[]` **is** the linked-instance mechanism (one master
+  row, many places). **Detach** (`detachReference` in `references.repo.ts`) creates
+  a new local row (`visibility: "local"`, `linkable: false`, `detachedFrom`) owned
+  only by the current owner and removes that owner's attachment from the master,
+  preserving the master row.
+
+A SCHEMA_VERSION bump (→ 20) reseeds; no migration of the old inheritance shapes.
+
 ---
 
 ## Component ownership & navigation (the contract the canvas must obey)

@@ -14,11 +14,13 @@ import {
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import { setShareWithProjectsByDefault } from "@/lib/storage/repos/settings.repo";
-import { SYSTEM_DESIGN_CATEGORIES } from "@/domain/system-design/defaults";
+import {
+  SYSTEM_DESIGN_CATEGORIES,
+  buildLinkedTokens,
+} from "@/domain/system-design/defaults";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type {
   SystemDesignCategory,
-  SystemDesignExclusions,
   SystemDesignRow,
   SystemDesignTokens,
 } from "@/lib/storage/schema";
@@ -182,17 +184,12 @@ export function useNewProject(): NewProjectState {
           ownerScope: "workspace",
           ownerId: workspaceId,
         });
-        const excludedShared = {} as SystemDesignExclusions;
-        for (const category of SYSTEM_DESIGN_CATEGORIES) {
-          excludedShared[category] = (parent.tokens[category] as { id: string }[])
-            .filter((token) => !sharedIds.has(token.id))
-            .map((token) => token.id);
-        }
+        // Seed the project with linked instances of the chosen workspace tokens.
         await getOrCreateSystemDesignByOwner({
           ownerScope: "project",
           ownerId: project.id,
           inheritsFromId: parent.id,
-          initialExcludedShared: excludedShared,
+          initialTokens: buildLinkedTokens(parent.id, parent.tokens, sharedIds),
         });
       }
       navigate(`/project/${encodeURIComponent(project.id)}`);

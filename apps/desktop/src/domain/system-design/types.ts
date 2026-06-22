@@ -3,15 +3,34 @@
 // schema. `@/lib/storage/schema` re-exports them, so storage call sites are
 // unchanged. See ORG-14.
 
-export type ColorToken = { id: string; name: string; value: string };
-export type GradientToken = {
+// A pointer from a linked-instance token back to its master token in another
+// (workspace) design. Mirrors a component's `instanceOf`: the token's display
+// values are resolved live from the master; only the link is stored locally.
+export type TokenInstanceRef = { systemDesignId: string; tokenId: string };
+
+// Fields every token can carry, shared by all categories — the linkable model.
+// `linkable` marks a (workspace) token as shareable into projects; `instanceOf`
+// marks a token as a linked instance of a master token. A linked token keeps a
+// snapshot of the master's fields (so it renders even if the master is gone) but
+// the resolver overrides them live while the master exists.
+export type LinkableTokenFields = {
+  linkable?: boolean;
+  instanceOf?: TokenInstanceRef | null;
+};
+
+export type ColorToken = LinkableTokenFields & {
+  id: string;
+  name: string;
+  value: string;
+};
+export type GradientToken = LinkableTokenFields & {
   id: string;
   name: string;
   from: string;
   to: string;
   angle: number;
 };
-export type TypeStyleToken = {
+export type TypeStyleToken = LinkableTokenFields & {
   id: string;
   name: string;
   family: string;
@@ -19,18 +38,31 @@ export type TypeStyleToken = {
   size: string;
   sample: string;
 };
-export type IconToken = { id: string; name: string; glyph: string };
-export type SpacingToken = { id: string; name: string; value: number };
-export type RadiusToken = { id: string; name: string; value: number };
-export type ImageToken = {
+export type IconToken = LinkableTokenFields & {
+  id: string;
+  name: string;
+  glyph: string;
+};
+export type SpacingToken = LinkableTokenFields & {
+  id: string;
+  name: string;
+  value: number;
+};
+export type RadiusToken = LinkableTokenFields & {
+  id: string;
+  name: string;
+  value: number;
+};
+export type ImageToken = LinkableTokenFields & {
   id: string;
   name: string;
   previewUrl: string;
   format: string;
 };
 
-// The seven token categories a system design owns. Inheritance is decided
-// per-category, which is what lets a project share only some of them.
+// The seven token categories a system design owns. Sharing is decided per token
+// via the linkable model (a project links individual workspace tokens), not
+// per-category inheritance.
 export type SystemDesignCategory =
   | "colors"
   | "gradients"
@@ -50,11 +82,6 @@ export type SystemDesignTokens = {
   images: ImageToken[];
 };
 
-// Per-category set of workspace token ids that a project has removed from its
-// view. A project's effective tokens are the workspace tokens MINUS these,
-// plus the project's own tokens. Empty for workspace designs.
-export type SystemDesignExclusions = Record<SystemDesignCategory, string[]>;
-
 export type SystemDesignOwnerScope = "workspace" | "project";
 
 export type SystemDesignRow = {
@@ -62,15 +89,12 @@ export type SystemDesignRow = {
   name: string;
   ownerScope: SystemDesignOwnerScope;
   ownerId: string;
-  // The workspace design this project design inherits from (project scope
-  // only). Null for workspace designs and for projects without a workspace.
+  // The workspace design a project links tokens from (project scope only). Null
+  // for workspace designs and for projects without a workspace.
   inheritsFromId: string | null;
-  // Workspace tokens this project has explicitly removed (project scope only).
-  // Deletions persist here so a removed shared token stays removed; it can be
-  // re-added from the workspace picker in the add-token modal.
-  excludedShared: SystemDesignExclusions;
-  // The project's (or workspace's) own tokens, shown alongside any inherited
-  // workspace tokens.
+  // This design's tokens. For a project, this holds both its own local tokens
+  // and the linked instances of workspace tokens it has chosen to link (each
+  // carrying `instanceOf`).
   tokens: SystemDesignTokens;
   createdAt: number;
   updatedAt: number;

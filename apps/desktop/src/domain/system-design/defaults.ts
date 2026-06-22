@@ -5,7 +5,6 @@ import type {
   RadiusToken,
   SpacingToken,
   SystemDesignCategory,
-  SystemDesignExclusions,
   SystemDesignTokens,
   TypeStyleToken,
 } from "@/domain/system-design/types";
@@ -34,37 +33,51 @@ export const CATEGORY_LABEL: Record<SystemDesignCategory, string> = {
   images: "Images",
 };
 
-// ─── Exclusion helpers ──────────────────────────────────────────────────────
+// ─── Linking helpers ────────────────────────────────────────────────────────
 
-/** An empty per-category exclusion map (nothing removed → share everything). */
-export function emptyExcludedShared(): SystemDesignExclusions {
+/** Ids of every workspace token that is linkable (offered to projects). */
+export function linkableTokenIds(tokens: SystemDesignTokens): string[] {
+  return SYSTEM_DESIGN_CATEGORIES.flatMap((category) =>
+    (tokens[category] as { id: string; linkable?: boolean }[])
+      .filter((t) => t.linkable === true)
+      .map((t) => t.id),
+  );
+}
+
+/**
+ * Build a linked instance of one master token: a copy of the master's fields
+ * (keeping its id, so `$$ref` pointers stay valid) tagged with `instanceOf` so
+ * the resolver refreshes it live from the master. `linkable` is dropped — a
+ * linked instance is not itself re-shareable.
+ */
+function linkToken<T extends { id: string; linkable?: boolean }>(
+  master: T,
+  workspaceDesignId: string,
+): T {
+  const { linkable: _linkable, ...rest } = master;
   return {
-    colors: [],
-    gradients: [],
-    typography: [],
-    icons: [],
-    spacing: [],
-    radius: [],
-    images: [],
+    ...(rest as T),
+    instanceOf: { systemDesignId: workspaceDesignId, tokenId: master.id },
   };
 }
 
 /**
- * Exclude every workspace token — used when a project opts out of sharing. Given
- * the parent's token set, returns the exclusion map listing all of its ids.
+ * Produce a token set holding linked instances of the chosen workspace tokens.
+ * Used when a project is created (or lazily opened) to seed the tokens it links
+ * from its workspace.
  */
-export function excludeAllShared(
+export function buildLinkedTokens(
+  workspaceDesignId: string,
   parentTokens: SystemDesignTokens,
-): SystemDesignExclusions {
-  return {
-    colors: parentTokens.colors.map((t) => t.id),
-    gradients: parentTokens.gradients.map((t) => t.id),
-    typography: parentTokens.typography.map((t) => t.id),
-    icons: parentTokens.icons.map((t) => t.id),
-    spacing: parentTokens.spacing.map((t) => t.id),
-    radius: parentTokens.radius.map((t) => t.id),
-    images: parentTokens.images.map((t) => t.id),
-  };
+  tokenIds: ReadonlySet<string>,
+): SystemDesignTokens {
+  const out = emptySystemDesignTokens();
+  for (const category of SYSTEM_DESIGN_CATEGORIES) {
+    out[category] = (parentTokens[category] as { id: string }[])
+      .filter((t) => tokenIds.has(t.id))
+      .map((t) => linkToken(t as never, workspaceDesignId)) as never;
+  }
+  return out;
 }
 
 // ─── Seed tokens ────────────────────────────────────────────────────────────
@@ -126,16 +139,18 @@ const SEED_RADIUS: RadiusToken[] = [
 
 /**
  * The token set a brand-new system design starts with. Returns deep copies so
- * two designs never alias the same token objects.
+ * two designs never alias the same token objects. Seed tokens are `linkable` by
+ * default — like a project/workspace-global component, a workspace token is
+ * shareable into projects out of the box.
  */
 export function createDefaultSystemDesignTokens(): SystemDesignTokens {
   return {
-    colors: SEED_COLORS.map((t) => ({ ...t })),
-    gradients: SEED_GRADIENTS.map((t) => ({ ...t })),
-    typography: SEED_TYPOGRAPHY.map((t) => ({ ...t })),
-    icons: SEED_ICONS.map((t) => ({ ...t })),
-    spacing: SEED_SPACING.map((t) => ({ ...t })),
-    radius: SEED_RADIUS.map((t) => ({ ...t })),
+    colors: SEED_COLORS.map((t) => ({ ...t, linkable: true })),
+    gradients: SEED_GRADIENTS.map((t) => ({ ...t, linkable: true })),
+    typography: SEED_TYPOGRAPHY.map((t) => ({ ...t, linkable: true })),
+    icons: SEED_ICONS.map((t) => ({ ...t, linkable: true })),
+    spacing: SEED_SPACING.map((t) => ({ ...t, linkable: true })),
+    radius: SEED_RADIUS.map((t) => ({ ...t, linkable: true })),
     images: [],
   };
 }

@@ -5,8 +5,8 @@ import { useWorkspaces } from "@/lib/storage/hooks";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 import {
-  emptyExcludedShared,
-  excludeAllShared,
+  buildLinkedTokens,
+  linkableTokenIds,
 } from "@/domain/system-design/defaults";
 import {
   getOrCreateSystemDesignByOwner,
@@ -16,7 +16,6 @@ import { getWorkspaceForProject } from "@/lib/storage/repos/workspace.repo";
 import { TABLES, subscribe } from "@/lib/storage/store";
 import type {
   SystemDesignCategory,
-  SystemDesignExclusions,
   SystemDesignOwnerScope,
   SystemDesignRow,
   SystemDesignTokens,
@@ -24,7 +23,6 @@ import type {
 import {
   resolveSystemDesign,
   type ResolvedSystemDesign,
-  type TokenSource,
 } from "@/domain/system-design/resolve";
 
 // A token is anything with a stable id; the editor passes concrete token types.
@@ -52,21 +50,25 @@ export interface SystemDesignController {
   parent: SystemDesignRow | null;
   /** Merged tokens per category (workspace + project) with their source. */
   resolved: ResolvedSystemDesign | null;
-  /** True when there is a workspace to inherit shared tokens from. */
+  /** True when there is a workspace to link shared tokens from. */
   hasParent: boolean;
   /** Create or edit one of the owner's own tokens. */
   upsertToken: (category: SystemDesignCategory, token: AnyToken) => void;
+  /** Remove a token (local or linked instance) from this design. */
+  deleteToken: (category: SystemDesignCategory, tokenId: string) => void;
+  /** Link a workspace token into this project as a live linked instance. */
+  linkToken: (category: SystemDesignCategory, masterTokenId: string) => void;
   /**
-   * Remove a token from this design. A project token is deleted outright; a
-   * workspace (shared) token is excluded from the project and can be re-added.
+   * Detach a linked instance: copy the master's current values locally and drop
+   * the link, so it becomes an independent, editable project token.
    */
-  deleteToken: (
+  detachToken: (category: SystemDesignCategory, tokenId: string) => void;
+  /** Toggle a (workspace) token's linkable state — its shareability. */
+  setTokenLinkable: (
     category: SystemDesignCategory,
     tokenId: string,
-    source: TokenSource,
+    linkable: boolean,
   ) => void;
-  /** Bring a previously-removed workspace token back into the project. */
-  reAddShared: (category: SystemDesignCategory, tokenId: string) => void;
   rename: (name: string) => void;
 }
 
@@ -78,8 +80,8 @@ type LoadState = {
 
 const IDLE: LoadState = { loading: true, design: null, parent: null };
 
-type BuildInitialExcluded =
-  | ((parent: SystemDesignRow | null) => SystemDesignExclusions | undefined)
+type BuildInitialTokens =
+  | ((parent: SystemDesignRow | null) => SystemDesignTokens | undefined)
   | null;
 
 /**
@@ -91,20 +93,22 @@ function useOwnedSystemDesign(
   scope: SystemDesignOwnerScope,
   ownerId: string | null,
   loadParent: (() => Promise<SystemDesignRow | null>) | null,
-  buildInitialExcluded: BuildInitialExcluded,
+  buildInitialTokens: BuildInitialTokens,
   depsKey: string,
 ): SystemDesignController {
   const [state, setState] = useState<LoadState>(IDLE);
 
   const designRef = useRef<SystemDesignRow | null>(null);
+  const parentRef = useRef<SystemDesignRow | null>(null);
   const loadParentRef = useRef(loadParent);
   loadParentRef.current = loadParent;
-  const buildInitialRef = useRef(buildInitialExcluded);
-  buildInitialRef.current = buildInitialExcluded;
+  const buildInitialRef = useRef(buildInitialTokens);
+  buildInitialRef.current = buildInitialTokens;
 
   useEffect(() => {
     designRef.current = state.design;
-  }, [state.design]);
+    parentRef.current = state.parent;
+  }, [state.design, state.parent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +125,7 @@ function useOwnedSystemDesign(
         ownerScope: scope,
         ownerId,
         inheritsFromId: parent?.id ?? null,
-        initialExcludedShared: buildInitialRef.current?.(parent),
+        initialTokens: buildInitialRef.current?.(parent),
       });
       if (!cancelled) setState({ loading: false, design, parent });
     };
@@ -150,53 +154,109 @@ function useOwnedSystemDesign(
   const upsertToken = useCallback(
     (category: SystemDesignCategory, token: AnyToken) => {
       mutate((d) => {
+        // Workspace tokens are shareable out of the box, mirroring how a
+        // project/workspace-global component is linkable by default.
+        const next =
+          scope === "workspace" &&
+          (token as { linkable?: boolean }).linkable === undefined
+            ? { ...token, linkable: true }
+            : token;
         const list = d.tokens[category] as AnyToken[];
         const nextTokens = {
           ...d.tokens,
-          [category]: upsertById(list, token),
+          [category]: upsertById(list, next),
         } as SystemDesignTokens;
         return { ...d, tokens: nextTokens };
       });
     },
-    [mutate],
+    [mutate, scope],
   );
 
   const deleteToken = useCallback(
-    (category: SystemDesignCategory, tokenId: string, source: TokenSource) => {
+    (category: SystemDesignCategory, tokenId: string) => {
       mutate((d) => {
-        if (source === "workspace") {
-          const current = d.excludedShared[category] ?? [];
-          if (current.includes(tokenId)) return d;
-          return {
-            ...d,
-            excludedShared: {
-              ...d.excludedShared,
-              [category]: [...current, tokenId],
-            },
-          };
-        }
         const list = d.tokens[category] as AnyToken[];
-        const nextTokens = {
-          ...d.tokens,
-          [category]: list.filter((t) => t.id !== tokenId),
-        } as SystemDesignTokens;
-        return { ...d, tokens: nextTokens };
+        const next = list.filter((t) => t.id !== tokenId);
+        if (next.length === list.length) return d;
+        return {
+          ...d,
+          tokens: { ...d.tokens, [category]: next } as SystemDesignTokens,
+        };
       });
     },
     [mutate],
   );
 
-  const reAddShared = useCallback(
-    (category: SystemDesignCategory, tokenId: string) => {
+  const linkToken = useCallback(
+    (category: SystemDesignCategory, masterTokenId: string) => {
+      const parent = parentRef.current;
+      if (!parent) return;
       mutate((d) => {
-        const current = d.excludedShared[category] ?? [];
-        if (!current.includes(tokenId)) return d;
+        const list = d.tokens[category] as AnyToken[];
+        if (list.some((t) => t.id === masterTokenId)) return d; // already present
+        const linked = buildLinkedTokens(
+          parent.id,
+          parent.tokens,
+          new Set([masterTokenId]),
+        )[category] as AnyToken[];
+        if (linked.length === 0) return d;
         return {
           ...d,
-          excludedShared: {
-            ...d.excludedShared,
-            [category]: current.filter((id) => id !== tokenId),
-          },
+          tokens: {
+            ...d.tokens,
+            [category]: [...list, ...linked],
+          } as SystemDesignTokens,
+        };
+      });
+    },
+    [mutate],
+  );
+
+  const detachToken = useCallback(
+    (category: SystemDesignCategory, tokenId: string) => {
+      const parent = parentRef.current;
+      mutate((d) => {
+        const list = d.tokens[category] as (AnyToken & {
+          instanceOf?: { tokenId: string } | null;
+          linkable?: boolean;
+        })[];
+        const idx = list.findIndex((t) => t.id === tokenId);
+        if (idx < 0 || !list[idx]!.instanceOf) return d;
+        const master =
+          (parent?.tokens[category] as AnyToken[] | undefined)?.find(
+            (t) => t.id === list[idx]!.instanceOf!.tokenId,
+          ) ?? null;
+        // Copy the master's live values (fallback to the stored snapshot) and
+        // drop the link + linkable so it becomes an independent local token.
+        const { instanceOf: _i, linkable: _l, ...snapshot } = list[idx]!;
+        const detached = {
+          ...(master ?? snapshot),
+          id: tokenId,
+        } as AnyToken;
+        delete (detached as { instanceOf?: unknown }).instanceOf;
+        delete (detached as { linkable?: unknown }).linkable;
+        const next = [...list];
+        next[idx] = detached;
+        return {
+          ...d,
+          tokens: { ...d.tokens, [category]: next } as SystemDesignTokens,
+        };
+      });
+    },
+    [mutate],
+  );
+
+  const setTokenLinkable = useCallback(
+    (category: SystemDesignCategory, tokenId: string, linkable: boolean) => {
+      mutate((d) => {
+        const list = d.tokens[category] as (AnyToken & { linkable?: boolean })[];
+        const idx = list.findIndex((t) => t.id === tokenId);
+        if (idx < 0 || list[idx]!.linkable === linkable) return d;
+        const next = [...list];
+        next[idx] = { ...list[idx]!, linkable };
+        return {
+          ...d,
+          tokens: { ...d.tokens, [category]: next } as SystemDesignTokens,
         };
       });
     },
@@ -226,7 +286,9 @@ function useOwnedSystemDesign(
     hasParent: Boolean(state.parent),
     upsertToken,
     deleteToken,
-    reAddShared,
+    linkToken,
+    detachToken,
+    setTokenLinkable,
     rename,
   };
 }
@@ -272,12 +334,15 @@ export function useProjectSystemDesign(
     });
   }, [projectId]);
 
-  const buildInitialExcluded = useCallback(
+  const buildInitialTokens = useCallback(
     (parent: SystemDesignRow | null) => {
-      if (!parent) return undefined;
-      return shareByDefault
-        ? emptyExcludedShared()
-        : excludeAllShared(parent.tokens);
+      if (!parent || !shareByDefault) return undefined;
+      // "Share by default" → link every linkable workspace token up front.
+      return buildLinkedTokens(
+        parent.id,
+        parent.tokens,
+        new Set(linkableTokenIds(parent.tokens)),
+      );
     },
     [shareByDefault],
   );
@@ -286,7 +351,7 @@ export function useProjectSystemDesign(
     "project",
     projectId,
     loadParent,
-    buildInitialExcluded,
+    buildInitialTokens,
     projectId ?? "",
   );
 }

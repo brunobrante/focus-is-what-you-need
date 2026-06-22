@@ -70,6 +70,9 @@ export async function createOrAttachReference(input: {
 
   if (idx >= 0) {
     const current = rows[idx]!;
+    // A non-linkable reference is a detached local copy — it cannot be shared
+    // into another location, so attaching it elsewhere is a no-op.
+    if (current.linkable === false) return current;
     const attachments = current.attachments.some(
       (attachment) =>
         attachment.projectId === nextAttachment.projectId &&
@@ -210,6 +213,62 @@ export async function removeReferenceFromOwner(
     .filter((reference) => reference.projectIds.length > 0);
   await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
+}
+
+/** References that may be shared into other locations (linkable, not local copies). */
+export async function listLinkableReferences(): Promise<ReferenceRow[]> {
+  const rows = await listReferences();
+  return rows.filter((reference) => reference.linkable !== false);
+}
+
+/**
+ * Detach a linked reference at one owner: create an independent local copy owned
+ * only by that owner, and drop the link to the master there. Mirrors a
+ * component/token detach — the copy is no longer connected to the master. The
+ * master row is preserved (it may still be linked elsewhere or live in the
+ * library). Works for whole images, stacks, and stack pieces alike.
+ */
+export async function detachReference(
+  referenceId: string,
+  ownerType: OwnerType,
+  ownerId: string,
+): Promise<ReferenceRow | null> {
+  const rows = await listReferences();
+  const master = rows.find((reference) => reference.id === referenceId);
+  if (!master) return null;
+
+  const ownerAttachment =
+    master.attachments.find((attachment) =>
+      attachmentMatchesOwner(attachment, ownerType, ownerId),
+    ) ?? master.attachments[0];
+  if (!ownerAttachment) return null;
+
+  const copy = normalizeReferenceRow({
+    ...master,
+    id: newId(),
+    visibility: "local",
+    linkable: false,
+    detachedFrom: master.id,
+    attachments: [ownerAttachment],
+    projectIds: [ownerAttachment.projectId],
+    createdAt: now(),
+  });
+
+  const remaining = master.attachments.filter(
+    (attachment) => !attachmentMatchesOwner(attachment, ownerType, ownerId),
+  );
+  const updatedMaster = normalizeReferenceRow({
+    ...master,
+    attachments: remaining,
+    projectIds: Array.from(new Set(remaining.map((attachment) => attachment.projectId))),
+  });
+
+  const nextRows = rows.map((reference) =>
+    reference.id === master.id ? updatedMaster : reference,
+  );
+  await replaceTable<ReferenceRow>(KEY, [copy, ...nextRows]);
+  notify(KEY);
+  return copy;
 }
 
 export async function bulkInsertReferences(rows: ReferenceRow[]): Promise<void> {

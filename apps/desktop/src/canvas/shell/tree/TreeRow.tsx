@@ -2,10 +2,11 @@ import { useSortable } from "@dnd-kit/sortable";
 import type { DropMode, Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
 import { IconChevronRight, IconCrosshair, IconEye, IconEyeOff, IconLock, IconOpenCanvas, IconUnlink, IconUnlock } from "@/components/icons";
+import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 
 // The accent for an "external" (linked component) instance — its tree icon and its
 // single open-in-canvas link. Matches the canvas instance-selection purple.
-const EXTERNAL_COMPONENT_COLOR = "#8638E5";
+const EXTERNAL_COMPONENT_COLOR = LINKED_INSTANCE_COLOR;
 
 export function TreeRow({
   node,
