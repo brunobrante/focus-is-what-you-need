@@ -18,6 +18,7 @@ import type { ScreenVersion } from "@/lib/data/screenVersions";
 import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import { updateComponent } from "@/lib/storage/repos/components.repo";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
+import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { DetailView } from "./DetailView";
 import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
@@ -35,6 +36,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
   } = useComponentDetail(componentId);
 
   const [infoOpen, setInfoOpen] = useState(false);
+  const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
   const fastEditRef = useRef<FastEditModalHandle>(null);
   const compareRef = useRef<CompareVersionsModalHandle>(null);
 
@@ -183,6 +185,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
               }}
               onMoveTo={() => {}}
               onMakeGlobal={() => {}}
+              onToggleLinkable={(cmp) => void requestToggle(cmp)}
             />
           ))}
           {filteredChildren.length === 0 && (
@@ -209,6 +212,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
           <ConfirmActionModal ref={confirmRef} />
           <AddReferenceModal ref={addRefModalRef} projectId={project?.id ?? null} screens={screens} components={projectComponents} existingReferences={references} defaultComponentId={component.id} onAdd={handleAddReference} />
           <VersionModeModal ref={versionModeRef} />
+          {unlinkModal}
         </>
       }
     />

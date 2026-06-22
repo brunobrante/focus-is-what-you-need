@@ -808,8 +808,11 @@ Workspace-level shared component library.
 - Row of project-usage badges (shows which projects use this component)
 - On hover: CardMenu with Fast Edit / Canvas Edit / **more** menu
 
-**Linkable toggle (card "more" menu)**: when the component is linkable the menu
-shows a **purple "Unlink"** item; otherwise a **"Make linkable"** item. Making it
+**Linkable toggle (card "more" menu)** — present on **every component card**: the
+Global Components card, the project **Components** tab (grid + list rows), and the
+**Sub Components** cards in screen/component detail (`ComponentSideCard`). When the
+component is linkable the menu shows a **purple "Unlink"** item; otherwise a
+**"Make linkable"** item. Making it
 linkable just sets the flag. **Unlinking** runs a consequence check:
 - no instances use it → it's disabled silently;
 - instances exist → the **`UnlinkComponentModal`** opens, listing **every

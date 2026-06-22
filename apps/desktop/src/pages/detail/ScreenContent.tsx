@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
+import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { AddCard } from "@/components/screen/AddCard";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
@@ -38,6 +39,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
   } = useScreenDetail(screenId, pid);
 
   const [infoOpen, setInfoOpen] = useState(false);
+  const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: displayComponents.length },
@@ -146,6 +148,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
               }}
               onMoveTo={() => {}}
               onMakeGlobal={() => {}}
+              onToggleLinkable={(cmp) => void requestToggle(cmp)}
             />
           ))}
           {filteredComponents.length === 0 && (
@@ -169,6 +172,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
           <NewComponentModal ref={newComponentRef} projectId={project?.id ?? null} screens={screens} onCreated={handleNewComponentCreated} />
           <ConfirmActionModal ref={confirmRef} />
           <VersionModeModal ref={versionModeRef} />
+          {unlinkModal}
         </>
       }
     />

@@ -24,13 +24,16 @@ import {
   IconDiamond,
   IconFastEdit,
   IconFolder,
+  IconLink,
   IconOpenCanvas,
   IconPhone,
   IconPlus,
   IconScreen,
   IconSearch,
+  IconUnlink,
 } from "@/components/icons";
 import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
+import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { CardMenu } from "./shared/CardMenu";
 import { SectionedGrid } from "./shared/SectionedGrid";
@@ -69,6 +72,7 @@ export function ComponentsTab({
   onRequestDelete: (component: ComponentRow) => void;
 }) {
   const fastEditRef = useRef<FastEditModalHandle>(null);
+  const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [screenFilter, setScreenFilter] = useState("all");
@@ -192,6 +196,7 @@ export function ComponentsTab({
                 onRequestAssignSection={helpers.onRequestAssignSection}
                 onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
                 onFastEdit={openFastEdit}
+                onToggleLinkable={(cmp) => void requestToggle(cmp)}
               />
             ) : (
               <ComponentCard
@@ -205,6 +210,7 @@ export function ComponentsTab({
                 onRequestAssignSection={helpers.onRequestAssignSection}
                 onRequestAssignScreens={() => setScreenAssignmentComponent(c)}
                 onFastEdit={openFastEdit}
+                onToggleLinkable={(cmp) => void requestToggle(cmp)}
               />
             );
           }}
@@ -222,6 +228,7 @@ export function ComponentsTab({
         }}
       />
       <FastEditModal ref={fastEditRef} />
+      {unlinkModal}
     </>
   );
 }
@@ -340,6 +347,7 @@ function ComponentCard({
   onRequestAssignSection,
   onRequestAssignScreens,
   onFastEdit,
+  onToggleLinkable,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
@@ -350,6 +358,7 @@ function ComponentCard({
   onRequestAssignSection: () => void;
   onRequestAssignScreens: () => void;
   onFastEdit: () => void;
+  onToggleLinkable: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
@@ -394,6 +403,20 @@ function ComponentCard({
                   icon: <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />,
                   onClick: onRequestAssignScreens,
                 },
+                component.linkable
+                  ? {
+                      key: "unlink",
+                      label: "Unlink",
+                      icon: <IconUnlink size={13} strokeWidth={1.7} />,
+                      accent: true,
+                      onClick: () => onToggleLinkable(component),
+                    }
+                  : {
+                      key: "link",
+                      label: "Make linkable",
+                      icon: <IconLink size={13} strokeWidth={1.7} />,
+                      onClick: () => onToggleLinkable(component),
+                    },
                 {
                   key: "delete",
                   label: "Delete component",
@@ -428,6 +451,7 @@ function ComponentListRow({
   onRequestAssignSection,
   onRequestAssignScreens,
   onFastEdit,
+  onToggleLinkable,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
@@ -438,6 +462,7 @@ function ComponentListRow({
   onRequestAssignSection: () => void;
   onRequestAssignScreens: () => void;
   onFastEdit: () => void;
+  onToggleLinkable: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
@@ -560,6 +585,20 @@ function ComponentListRow({
                   <IconScreen size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />
                 </span>
                 <span>Link screens</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); onToggleLinkable(component); setMoreOpen(false); }}
+                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] transition-colors hover:bg-[var(--surface-hover)]"
+                style={component.linkable ? { color: "#8638E5" } : undefined}
+              >
+                <span className="grid h-4 w-4 place-items-center">
+                  {component.linkable ? <IconUnlink size={13} strokeWidth={1.7} /> : <IconLink size={13} strokeWidth={1.7} />}
+                </span>
+                <span style={component.linkable ? undefined : { color: "var(--text-muted)" }}>
+                  {component.linkable ? "Unlink" : "Make linkable"}
+                </span>
               </button>
               <button
                 type="button"

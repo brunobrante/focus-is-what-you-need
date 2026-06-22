@@ -14,6 +14,7 @@ export function CardMenu({
       label: string;
       icon?: ReactNode;
       destructive?: boolean;
+      accent?: boolean;
       onClick: () => void;
     }>;
   }>;
@@ -110,8 +111,11 @@ export function CardMenu({
                     "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] transition-colors",
                     item.destructive
                       ? "text-[#ff7373] hover:bg-[rgba(255,80,80,0.12)]"
-                      : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+                      : item.accent
+                        ? "hover:bg-[var(--surface-hover)]"
+                        : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
                   ].join(" ")}
+                  style={item.accent ? { color: "#8638E5" } : undefined}
                 >
                   {item.icon ? <span className="grid h-4 w-4 place-items-center">{item.icon}</span> : null}
                   <span>{item.label}</span>

@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
-import { IconComponentLink } from "@/components/icons";
+import { IconComponentLink, IconLink, IconUnlink } from "@/components/icons";
 import type { ComponentRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 
@@ -16,6 +16,7 @@ export function ComponentSideCard({
   onFastEdit,
   onMoveTo,
   onMakeGlobal,
+  onToggleLinkable,
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
@@ -30,6 +31,7 @@ export function ComponentSideCard({
   onFastEdit: (component: ComponentRow) => void;
   onMoveTo: (component: ComponentRow) => void;
   onMakeGlobal: (component: ComponentRow) => void;
+  onToggleLinkable?: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
   const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
@@ -95,6 +97,24 @@ export function ComponentSideCard({
                     menuItems: [
                       { key: "move-to", label: "Move to", icon: CardMenuIcons.MoveTo, onClick: () => onMoveTo(component) },
                       { key: "make-global", label: "Make global", icon: CardMenuIcons.MakeGlobal, onClick: () => onMakeGlobal(component) },
+                      ...(onToggleLinkable
+                        ? [
+                            component.linkable
+                              ? {
+                                  key: "unlink",
+                                  label: "Unlink",
+                                  icon: <IconUnlink size={13} strokeWidth={1.7} />,
+                                  accent: true,
+                                  onClick: () => onToggleLinkable(component),
+                                }
+                              : {
+                                  key: "link",
+                                  label: "Make linkable",
+                                  icon: <IconLink size={13} strokeWidth={1.7} />,
+                                  onClick: () => onToggleLinkable(component),
+                                },
+                          ]
+                        : []),
                       { key: "delete", label: "Delete component", icon: CardMenuIcons.Trash, destructive: true, onClick: () => onRequestDelete(component) },
                     ],
                   },
