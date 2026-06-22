@@ -19,6 +19,8 @@ import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle
 import { useResolvedCanvasSettings } from "@/application/settings/useResolvedCanvasSettings";
 import { useProjectFontTokens } from "@/application/settings/useProjectFontTokens";
 import { ElementFontTokensProvider } from "@/canvas/stage/elementFontTokensContext";
+import { useProjectSystemDesign } from "@/application/system-design/useSystemDesign";
+import { ResolvedSystemDesignProvider } from "@/canvas/stage/resolvedSystemDesignContext";
 import { useSearch, useSearchSource } from "@/application/search/SearchProvider";
 import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
 import type { SearchItem } from "@/domain/search/searchTypes";
@@ -125,6 +127,7 @@ function CanvasPageContent() {
   const [shellTabSignal, setShellTabSignal] = useState(0);
   const { settings } = useResolvedCanvasSettings(projectIdParam || null);
   const fontTokens = useProjectFontTokens(projectIdParam || null);
+  const projectSystemDesign = useProjectSystemDesign(projectIdParam || null);
 
   const editorTool = useEditorBridge((v) => v?.state.tool);
   const editorPanning = useEditorBridge((v) => v?.state.panning ?? false);
@@ -637,6 +640,7 @@ function CanvasPageContent() {
 
   return (
     <ElementFontTokensProvider value={fontTokens ?? null}>
+    <ResolvedSystemDesignProvider value={projectSystemDesign.resolved}>
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--bg)]">
       <CanvasRender
         treeOpen={treeOpen}
@@ -920,6 +924,7 @@ function CanvasPageContent() {
 
       <VersionModeModal ref={versionModeRef} />
     </div>
+    </ResolvedSystemDesignProvider>
     </ElementFontTokensProvider>
   );
 }

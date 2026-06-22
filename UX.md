@@ -71,8 +71,11 @@ here the user picks a workspace, opens a recent project, or jumps to a section.
 
 **Layout**:
 - Its **own header** (`HomeHeader`), deliberately separate from the workspace
-  TopBar — product mark on the left and a primary "New project" action on the
+  TopBar — product mark on the left and a primary **Create** dropdown on the
   right. No workspace switcher (workspace selection happens via the cards below).
+  The Create menu lists, each with an icon: **New workspace** (creates one and
+  makes it active in place), **New project** (→ the `/new` wizard), and **New
+  draft** (a "Coming soon" placeholder until that flow exists).
 - A left **sidebar** with quick links and a main content column beside it
 - Page footer with version string
 
@@ -505,6 +508,16 @@ header is a two-select block instead of the single subject row:
   not only screen versions.) Linked-instance rows instead keep their **"go to master"** link, which
   navigates to the master's own canonical location (shown in **Current**, its origin) regardless of
   where the instance is placed; they are never materialized.
+
+**Binding a color to a System Design token (Appearance / Tipografia)**: the Fill, Border, and
+text Color controls (`InsColor`) each carry a **link button**. Clicking it lists the project's
+System Design **color tokens**; picking one **binds** that style to the token (stored as a
+`$$ref`, e.g. `colors:c-primary`). A bound control shows the token's swatch + name with a
+purple link badge and is read-only, plus an **unlink** button that reverts it to a literal
+colour. A bound colour resolves **live**: editing the workspace master token (or detaching it
+into a local copy — see System Design) updates every bound element automatically. Choosing a
+literal colour from the picker also unbinds. (Live updates while a canvas stays open rely on
+the same scenes-table reactivity as linked instances.)
 
 **Read-only linked instances (Versions window)**: when the Versions window is focused and
 the selected element is a **linked instance** (a node referencing a master component), the

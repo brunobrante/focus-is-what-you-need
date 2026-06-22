@@ -1,7 +1,13 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
+import { resolveTokenRef } from "@/domain/system-design/resolveTokenRef";
+import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
+
+// Resolves a token `$$ref` (e.g. "colors:c-primary") to a live CSS value, or
+// undefined when unbound/unresolved so the literal style fallback is used.
+type RefResolver = (ref: string | undefined) => string | undefined;
 
 // ─── Clip-path helpers ────────────────────────────────────────────────────────
 
@@ -46,7 +52,12 @@ function scaled(value: number | undefined, renderScale: number): number | undefi
   return value === undefined ? undefined : value * renderScale;
 }
 
-function nodeStyle(node: ElementNode, isEditing = false, renderScale = 1): CSSProperties {
+function nodeStyle(
+  node: ElementNode,
+  isEditing = false,
+  renderScale = 1,
+  resolveRef?: RefResolver,
+): CSSProperties {
   const styles = node.styles;
   const isEllipse = node.type === "ellipse";
   const hasSceneChildren = node.children.length > 0;
@@ -62,8 +73,8 @@ function nodeStyle(node: ElementNode, isEditing = false, renderScale = 1): CSSPr
     transform: rotationTransform(node.rotation, width, height),
     transformOrigin: "0 0",
     boxSizing: "border-box",
-    background: styles.background,
-    color: styles.color,
+    background: resolveRef?.(styles.backgroundRef) ?? styles.background,
+    color: resolveRef?.(styles.colorRef) ?? styles.color,
     fontFamily: styles.fontFamily,
     fontSize: scaled(styles.fontSize, renderScale),
     fontWeight: styles.fontWeight,
@@ -71,7 +82,7 @@ function nodeStyle(node: ElementNode, isEditing = false, renderScale = 1): CSSPr
     borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
     borderWidth: clipPath ? undefined : scaled(styles.borderWidth, renderScale),
     borderStyle: !clipPath && styles.borderWidth ? "solid" : undefined,
-    borderColor: clipPath ? undefined : styles.borderColor,
+    borderColor: clipPath ? undefined : (resolveRef?.(styles.borderColorRef) ?? styles.borderColor),
     clipPath,
     opacity: 1,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
@@ -88,6 +99,7 @@ function detachedNodeStyle(
   node: ElementNode,
   canvasDocument: CanvasDocument,
   renderScale = 1,
+  resolveRef?: RefResolver,
 ): CSSProperties {
   const rect = getVisualRect(canvasDocument, node.id);
   const rotation = getEffectiveRotation(canvasDocument, node.id);
@@ -107,8 +119,8 @@ function detachedNodeStyle(
     transform: rotationTransform(rotation, width, height),
     transformOrigin: "0 0",
     boxSizing: "border-box",
-    background: styles.background,
-    color: styles.color,
+    background: resolveRef?.(styles.backgroundRef) ?? styles.background,
+    color: resolveRef?.(styles.colorRef) ?? styles.color,
     fontFamily: styles.fontFamily,
     fontSize: scaled(styles.fontSize, renderScale),
     fontWeight: styles.fontWeight,
@@ -116,7 +128,7 @@ function detachedNodeStyle(
     borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
     borderWidth: clipPath ? undefined : scaled(styles.borderWidth, renderScale),
     borderStyle: !clipPath && styles.borderWidth ? "solid" : undefined,
-    borderColor: clipPath ? undefined : styles.borderColor,
+    borderColor: clipPath ? undefined : (resolveRef?.(styles.borderColorRef) ?? styles.borderColor),
     clipPath,
     opacity: styles.opacity,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
@@ -270,6 +282,12 @@ function ElementRendererImpl({
   renderScale = 1,
 }: ElementRendererProps) {
   const canvasDocument = document;
+  const resolvedDesign = useResolvedSystemDesign();
+  const resolveRef = useMemo<RefResolver>(
+    () => (ref) =>
+      ref && resolvedDesign ? resolveTokenRef(ref, resolvedDesign) ?? undefined : undefined,
+    [resolvedDesign],
+  );
   const node = canvasDocument.elements[id];
   const isolatedParentId = preview ? null : isolatedParentIdProp;
   const isEditing = !preview && editingTextId === id;
@@ -283,7 +301,7 @@ function ElementRendererImpl({
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element text-element", isEditing, isolatedParentId, canvasDocument.elements)}
-        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, isEditing, renderScale)}
+        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, isEditing, renderScale, resolveRef)}
       >
         {node.content}
       </div>
@@ -296,7 +314,7 @@ function ElementRendererImpl({
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element image-element", false, isolatedParentId, canvasDocument.elements)}
-        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, false, renderScale)}
+        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef)}
       >
         {node.src ? (
           <img src={node.src} alt={node.name} draggable={false} style={{ objectFit: node.styles.objectFit }} />
@@ -313,7 +331,7 @@ function ElementRendererImpl({
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element icon-element", false, isolatedParentId, canvasDocument.elements)}
-        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, false, renderScale)}
+        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef)}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M12 3.5l2.64 5.35 5.91.86-4.27 4.16 1.01 5.88L12 16.98l-5.29 2.77 1.01-5.88-4.27-4.16 5.91-.86L12 3.5z" />
@@ -327,7 +345,7 @@ function ElementRendererImpl({
       data-element-id={node.id}
       data-node-type={node.type}
       className={elementClassName(node, "element", false, isolatedParentId, canvasDocument.elements)}
-      style={detached ? detachedNodeStyle(node, canvasDocument, renderScale) : nodeStyle(node, false, renderScale)}
+      style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef)}
     >
       {!isIsolatedParent && node.children.map((childId) => (
         <ElementRenderer

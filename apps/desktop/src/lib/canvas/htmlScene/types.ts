@@ -35,6 +35,12 @@ export type HtmlCanvasBounds = Box;
 export type HtmlCanvasStyle = {
   background: string;
   color: string;
+  // System Design token bindings ($$ref, e.g. "colors:c-primary"). Persisted
+  // alongside the resolved literal above, which stays the fallback. Optional so
+  // unbound styles keep their exact current shape.
+  backgroundRef?: string;
+  colorRef?: string;
+  borderColorRef?: string;
   opacity: number;
   borderColor: string;
   borderWidth: number;

@@ -469,6 +469,9 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
       : style.borderRadius,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
+    backgroundRef: style.backgroundRef,
+    colorRef: style.colorRef,
+    borderColorRef: style.borderColorRef,
     opacity: style.opacity,
     display: style.display === "flex" ? "flex" : "block",
     justifyContent: justifyContentFromHtml(style.justify),
@@ -492,6 +495,12 @@ function styleFromElement(
         ? "transparent"
         : styles.background ?? previousStyle?.background ?? "transparent",
     color: styles.color ?? previousStyle?.color ?? "#17211D",
+    // Token bindings come straight from engine state (the source of truth) — no
+    // fallback to previousStyle, so clearing a binding (unbind) persists instead
+    // of resurrecting the old ref.
+    backgroundRef: styles.backgroundRef,
+    colorRef: styles.colorRef,
+    borderColorRef: styles.borderColorRef,
     opacity: styles.opacity ?? previousStyle?.opacity ?? 1,
     borderColor: styles.borderColor ?? previousStyle?.borderColor ?? "transparent",
     borderWidth,

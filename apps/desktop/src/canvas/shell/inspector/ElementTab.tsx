@@ -1,11 +1,15 @@
+import { useMemo } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
+import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
+import type { ColorToken } from "@/domain/system-design/types";
 import {
   clamp,
   InsColor,
+  type InsColorToken,
   InsInput,
   InsRow,
   InsSection,
@@ -70,6 +74,15 @@ export function ElementTab({
   const rect = getAbsoluteRect(document, node.id);
   const parentSize = getParentSize(document, node.id);
   const opacity = Math.round((node.styles.opacity ?? 1) * 100);
+  const resolvedDesign = useResolvedSystemDesign();
+  const colorTokens = useMemo<InsColorToken[]>(
+    () =>
+      (resolvedDesign?.colors.tokens ?? []).map((sourced) => {
+        const token = sourced.token as ColorToken;
+        return { id: token.id, name: token.name, value: token.value };
+      }),
+    [resolvedDesign],
+  );
   const def = getElementDefinition(node.type).capabilities;
   const c = def.constraints;
   const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? w);
@@ -208,7 +221,13 @@ export function ElementTab({
 
       <InsSection title="Appearance" disabled={locked}>
         <InsRow label="Fill">
-          <InsColor value={node.styles.background ?? "#FFFFFF"} onChange={(background) => onUpdateStyle({ background })} />
+          <InsColor
+            value={node.styles.background ?? "#FFFFFF"}
+            onChange={(background) => onUpdateStyle({ background, backgroundRef: undefined })}
+            tokens={colorTokens}
+            boundRef={node.styles.backgroundRef}
+            onBind={(backgroundRef) => onUpdateStyle({ backgroundRef })}
+          />
         </InsRow>
         <InsRow label="Opacity">
           <InsInput value={String(opacity)} onChange={(value) => updateNumber(value, (next) => onUpdateStyle({ opacity: clamp(next, 0, 100) / 100 }))} suffix="%" />
@@ -226,7 +245,13 @@ export function ElementTab({
           <InsInput value={String(node.styles.borderWidth ?? 0)} onChange={(value) => updateNumber(value, (borderWidth) => onUpdateStyle({ borderWidth }))} suffix="px" />
         </InsRow>
         <InsRow label="Borda">
-          <InsColor value={node.styles.borderColor ?? "#CBD5E1"} onChange={(borderColor) => onUpdateStyle({ borderColor })} />
+          <InsColor
+            value={node.styles.borderColor ?? "#CBD5E1"}
+            onChange={(borderColor) => onUpdateStyle({ borderColor, borderColorRef: undefined })}
+            tokens={colorTokens}
+            boundRef={node.styles.borderColorRef}
+            onBind={(borderColorRef) => onUpdateStyle({ borderColorRef })}
+          />
         </InsRow>
       </InsSection>
 
@@ -243,7 +268,13 @@ export function ElementTab({
             />
           </InsRow>
           <InsRow label="Color">
-            <InsColor value={node.styles.color ?? "#111827"} onChange={(color) => onUpdateStyle({ color })} />
+            <InsColor
+              value={node.styles.color ?? "#111827"}
+              onChange={(color) => onUpdateStyle({ color, colorRef: undefined })}
+              tokens={colorTokens}
+              boundRef={node.styles.colorRef}
+              onBind={(colorRef) => onUpdateStyle({ colorRef })}
+            />
           </InsRow>
         </InsSection>
       ) : null}

@@ -38,6 +38,13 @@ export type ElementStyles = {
   borderRadius?: number;
   borderWidth?: number;
   borderColor?: string;
+  // System Design token bindings ($$ref, e.g. "colors:c-primary"). When set, the
+  // renderer resolves the LIVE token value (reflecting the workspace master, or a
+  // detached local copy); the matching string field above is the fallback. Kept
+  // as separate optional fields so existing string consumers stay unaffected.
+  backgroundRef?: string;
+  colorRef?: string;
+  borderColorRef?: string;
   opacity?: number;
   display?: "block" | "flex";
   justifyContent?: string;

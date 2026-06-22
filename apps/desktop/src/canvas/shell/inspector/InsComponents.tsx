@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { IconChevronDown } from "@/components/icons";
+import { IconChevronDown, IconLink, IconUnlink } from "@/components/icons";
 
 import { clamp } from "@/domain/canvas/geometry";
+import { parseTokenRef, tokenRef } from "@/domain/system-design/resolveTokenRef";
+import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
+
+/** A System Design color token offered for binding in InsColor. */
+export type InsColorToken = { id: string; name: string; value: string };
 
 export { clamp };
 
@@ -218,16 +223,63 @@ export function InsColor({
   value,
   onChange,
   disabled = false,
+  tokens,
+  boundRef,
+  onBind,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  /** System Design color tokens this control can bind to. */
+  tokens?: InsColorToken[];
+  /** The current token binding ("colors:<id>"), if the value is bound. */
+  boundRef?: string;
+  /** Bind to a token ref, or pass undefined to revert to a literal value. */
+  onBind?: (ref: string | undefined) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const colorInputValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000";
+  const canBind = Boolean(onBind && tokens && tokens.length > 0);
+
+  // Bound to a token: show it read-only with a purple link badge + unbind.
+  if (boundRef && onBind) {
+    const boundId = parseTokenRef(boundRef)?.tokenId;
+    const token = boundId ? tokens?.find((t) => t.id === boundId) : undefined;
+    return (
+      <div
+        className={[
+          "flex min-w-0 flex-1 items-center gap-1.5",
+          disabled ? "pointer-events-none opacity-40" : "",
+        ].join(" ")}
+      >
+        <span
+          className="h-[22px] w-[22px] shrink-0 rounded-[5px] border border-[#2C2C2C]"
+          style={{ background: token?.value ?? value }}
+        />
+        <span
+          className="flex min-w-0 flex-1 items-center gap-1 truncate text-[12px]"
+          style={{ color: LINKED_INSTANCE_COLOR }}
+          title="Bound to a System Design token"
+        >
+          <IconLink size={11} />
+          <span className="truncate">{token?.name ?? "Token"}</span>
+        </span>
+        <button
+          type="button"
+          title="Unbind — revert to a literal color"
+          onClick={() => onBind(undefined)}
+          className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2]"
+        >
+          <IconUnlink size={11} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={[
-        "flex min-w-0 flex-1 items-center gap-1.5",
+        "relative flex min-w-0 flex-1 items-center gap-1.5",
         disabled ? "pointer-events-none opacity-40" : "",
       ].join(" ")}
     >
@@ -247,6 +299,37 @@ export function InsColor({
         value={value.toUpperCase().replace("#", "")}
         onChange={(v) => onChange("#" + v.replace("#", ""))}
       />
+      {canBind && (
+        <button
+          type="button"
+          title="Bind to a System Design token"
+          onClick={() => setOpen((o) => !o)}
+          className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2]"
+        >
+          <IconLink size={11} />
+        </button>
+      )}
+      {open && canBind && (
+        <div className="absolute right-0 top-[26px] z-50 max-h-48 w-44 overflow-y-auto rounded-md border border-[#2C2C2C] bg-[#1E1E1E] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.45)]">
+          {tokens!.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                onBind?.(tokenRef("colors", t.id));
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[12px] text-[#E2E2E2] transition-colors hover:bg-[#2A2A2A]"
+            >
+              <span
+                className="h-3 w-3 shrink-0 rounded-[3px] border border-white/10"
+                style={{ background: t.value }}
+              />
+              <span className="truncate">{t.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

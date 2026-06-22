@@ -55,6 +55,24 @@ instance → detach** model (the product law is in `Product.md`). The data shape
 
 A SCHEMA_VERSION bump (→ 20) reseeds; no migration of the old inheritance shapes.
 
+**Tokens bound to canvas elements** — an element style can reference a token via a
+`$$ref` string (`"<category>:<tokenId>"`). The binding is stored as additive
+`backgroundRef`/`colorRef`/`borderColorRef` fields on `ElementStyles` and
+`HtmlCanvasStyle` (the literal color stays as the fallback, so the ~25 string
+consumers are untouched). `ElementRenderer` resolves the ref live via
+`resolveTokenRef` against the project's `ResolvedSystemDesign` (provided at the
+canvas root by `useProjectSystemDesign`), so editing the workspace master token —
+or detaching it — updates bound elements automatically. The inspector's `InsColor`
+binds/unbinds; `styleFromElement` reads refs straight from engine state (no
+`previousStyle` fallback) so unbind persists.
+
+**Live instance refresh** — linked component instances are inlined from their
+master at scene seed time; the `LiveInstanceRefresh` component (inside each
+`EditorProvider`) watches the scenes table and re-inlines (`reresolveInstances`:
+strip-then-resolve) via the gentle `refreshInstances` action when a transitively
+referenced master changes, so open canvases (Versions especially) stay live
+without a remount. A master-signature guard prevents churn from own-scene saves.
+
 ---
 
 ## Component ownership & navigation (the contract the canvas must obey)
