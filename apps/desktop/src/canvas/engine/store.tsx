@@ -36,6 +36,7 @@ export type EditorAction =
   | { type: "setGuides"; guides: SnapGuide[] }
   | { type: "setExportOpen"; exportOpen: boolean }
   | { type: "hydrateDocument"; document: CanvasDocument }
+  | { type: "refreshInstances"; document: CanvasDocument }
   | { type: "setDocumentTransient"; document: CanvasDocument; guides?: SnapGuide[]; changedIds?: readonly string[] }
   | {
       type: "commitDocument";
@@ -344,6 +345,17 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       future: [],
       focusNodeId: null,
     };
+  },
+  refreshInstances(state, action) {
+    // Live re-inline of linked-instance content after a master changed. Unlike
+    // hydrateDocument this is gentle: it swaps only the document and re-sanitizes
+    // selection, preserving viewport, undo history and text editing — the inlined
+    // master subtrees are locked/read-only, so replacing them never touches edits.
+    const document = constrainAll(action.document);
+    if (documentsEqual(state.document, document)) return state;
+    const selectedIds = sanitizeSelection(document, state.selectedIds);
+    const isolatedParentId = sanitizeIsolatedParent(document, state.isolatedParentId, selectedIds);
+    return { ...state, document, selectedIds, isolatedParentId };
   },
   setDocumentTransient(state, action) {
     if (

@@ -7,6 +7,7 @@ import {
 
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
 import { EditorProvider, useEditor } from "@/canvas/engine/store";
+import { LiveInstanceRefresh } from "./LiveInstanceRefresh";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
@@ -321,6 +322,7 @@ export function CanvasSurface({
           onDocumentChange={onDocumentChange}
         >
           <EditorBridgePublisher sourceId={sourceId} active={publishBridge} />
+          <LiveInstanceRefresh />
           <CanvasStage
             draftMode={draftMode}
             activeTool={activeTool}

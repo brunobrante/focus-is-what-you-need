@@ -7,6 +7,7 @@ import {
   normalizeHtmlCanvasDocument,
   resolveInstances,
   serializeHtmlCanvasDocument,
+  stripResolvedInstanceChildren,
   type HtmlCanvasDocument,
   type HtmlCanvasNode,
   type HtmlCanvasNodeKind,
@@ -60,6 +61,30 @@ export function withResolvedInstances(
     resolveMaster,
   });
   if (!resolved) return document;
+  return { ...resolved, shellBackground: document.shellBackground };
+}
+
+/**
+ * Re-inline linked instances in a document that is ALREADY resolved, picking up
+ * the master's current content. Unlike `withResolvedInstances`, this first strips
+ * the previously-inlined instance children (`stripResolvedInstanceChildren`) so
+ * re-resolving cannot duplicate them — instance ids are deterministic, so a stale
+ * inlined subtree would otherwise collide and be appended twice. Used by the live
+ * refresh that runs when a master scene changes while a canvas is open.
+ */
+export function reresolveInstances(
+  document: CanvasDocument,
+  resolveMaster: MasterResolver,
+  fallbackName: string,
+): CanvasDocument {
+  const json = htmlGraphJSONFromCanvasDocument(document, null, fallbackName);
+  const htmlDocument = htmlCanvasDocumentFromJSON(json);
+  if (!htmlDocument) return document;
+  const bare = stripResolvedInstanceChildren(htmlDocument);
+  const resolved = canvasDocumentFromHtmlDocument(bare, {
+    promoteSubjectRoot: true,
+    resolveMaster,
+  });
   return { ...resolved, shellBackground: document.shellBackground };
 }
 
