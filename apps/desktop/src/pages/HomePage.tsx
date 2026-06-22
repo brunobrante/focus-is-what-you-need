@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { PageFooter } from "@/components/layout/PageFooter";
@@ -7,17 +7,23 @@ import {
   type AppSettingsModalHandle,
 } from "@/components/modals/AppSettingsModal";
 import {
+  IconChevronDown,
   IconClock,
   IconDocument,
+  IconFrame,
   IconGrid,
   IconImage,
+  IconPencil,
   IconPlus,
   IconSettings,
   IconSparkles,
 } from "@/components/icons";
 import { DashedAddTile } from "@/components/DashedAddTile";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectRow, WorkspaceRow } from "@/lib/storage/schema";
+import { createWorkspace } from "@/lib/storage/repos/workspace.repo";
+import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { relativeTime } from "@/application/landing/useLanding";
 import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home/useHome";
 
@@ -93,11 +99,130 @@ function HomeHeader() {
         Focus
       </span>
       <span className="flex-1" />
-      <Link to="/new" className="btn btn-primary">
-        <IconPlus size={14} strokeWidth={2} />
-        New project
-      </Link>
+      <NewMenu />
     </header>
+  );
+}
+
+/**
+ * The header's "New" dropdown — one entry point for creating a workspace, a
+ * project, or a draft. New project routes to the wizard; new workspace creates
+ * one and makes it active in place; draft is a placeholder until that flow
+ * exists.
+ */
+function NewMenu() {
+  const navigate = useNavigate();
+  const [, setActiveWorkspaceId] = useActiveWorkspaceId();
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useDismissable(open, () => setOpen(false), [triggerRef, menuRef]);
+
+  const onNewWorkspace = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const created = await createWorkspace({ name: "Untitled workspace" });
+      setActiveWorkspaceId(created.id);
+      setOpen(false);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="btn btn-primary"
+      >
+        <IconPlus size={14} strokeWidth={2} />
+        Create
+        <IconChevronDown
+          size={11}
+          strokeWidth={2.2}
+          className={["transition-transform duration-150", open ? "rotate-180" : ""].join(" ")}
+        />
+      </button>
+
+      {open ? (
+        <div
+          ref={menuRef}
+          role="menu"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[230px] overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)] backdrop-blur-md"
+        >
+          <MenuItem
+            icon={<IconGrid size={15} strokeWidth={1.7} />}
+            onClick={() => void onNewWorkspace()}
+            disabled={creating}
+          >
+            {creating ? "Creating workspace…" : "New workspace"}
+          </MenuItem>
+          <MenuItem
+            icon={<IconFrame size={15} strokeWidth={1.7} />}
+            onClick={() => {
+              setOpen(false);
+              navigate("/new");
+            }}
+          >
+            New project
+          </MenuItem>
+          <MenuItem
+            icon={<IconPencil size={15} strokeWidth={1.7} />}
+            placeholder
+          >
+            New draft
+          </MenuItem>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  children,
+  onClick,
+  disabled,
+  placeholder,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  /** A not-yet-built action: visible but inert ("Coming soon"). */
+  placeholder?: boolean;
+}) {
+  if (placeholder) {
+    return (
+      <span
+        role="menuitem"
+        aria-disabled
+        title="Coming soon"
+        className="flex h-9 w-full cursor-default items-center gap-2.5 rounded-lg px-3 text-[12.5px] text-[var(--text-faint)]"
+      >
+        <span className="opacity-70">{icon}</span>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 bg-transparent px-3 text-left text-[12.5px] text-[var(--text-muted)] transition-colors duration-[120ms] hover:bg-[var(--surface)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+    >
+      <span className="opacity-85">{icon}</span>
+      {children}
+    </button>
   );
 }
 
