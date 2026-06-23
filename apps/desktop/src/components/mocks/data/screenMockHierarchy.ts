@@ -340,7 +340,7 @@ function screenFrame(
       w: d.w,
       h: d.h,
       bg: SCREEN_BG,
-      rounded: d.projectType === "desktop" ? 0 : 32,
+      rounded: 0,
       overflow: "hidden",
       flex: "col",
       gap: d.sectionGap,

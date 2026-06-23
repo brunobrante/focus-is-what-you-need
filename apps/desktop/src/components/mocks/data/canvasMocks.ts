@@ -363,7 +363,7 @@ function previewSnapshotSVG(
 
   return `
     <svg xmlns="http://www.w3.org/2000/svg" width="${size.w}" height="${size.h}" viewBox="0 0 ${size.w} ${size.h}" fill="none">
-      <rect width="${size.w}" height="${size.h}" rx="${projectType === "desktop" ? 0 : 32}" fill="#F7F7F2" />
+      <rect width="${size.w}" height="${size.h}" rx="0" fill="#F7F7F2" />
       ${body}
     </svg>
   `;
