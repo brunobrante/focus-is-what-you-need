@@ -100,6 +100,12 @@ function useOwnedSystemDesign(
 
   const designRef = useRef<SystemDesignRow | null>(null);
   const parentRef = useRef<SystemDesignRow | null>(null);
+  // Monotonic load counter: a reload triggered by another design's write (e.g.
+  // applyTokenLinkDecisions touching project designs) can be in flight, reading the
+  // store BEFORE a local optimistic write lands. Without ordering, that stale load's
+  // setState would clobber the fresh optimistic state (re-resurrecting a just-cleared
+  // `linkable` flag). Only the latest run is allowed to commit.
+  const runSeqRef = useRef(0);
   const loadParentRef = useRef(loadParent);
   loadParentRef.current = loadParent;
   const buildInitialRef = useRef(buildInitialTokens);
@@ -114,20 +120,24 @@ function useOwnedSystemDesign(
     let cancelled = false;
 
     const run = async () => {
+      const seq = ++runSeqRef.current;
+      const stale = () => cancelled || seq !== runSeqRef.current;
       await ensureLocalProjectsLoaded();
-      if (cancelled) return;
+      if (stale()) return;
       if (!ownerId) {
         setState({ loading: false, design: null, parent: null });
         return;
       }
       const parent = loadParentRef.current ? await loadParentRef.current() : null;
+      if (stale()) return;
       const design = await getOrCreateSystemDesignByOwner({
         ownerScope: scope,
         ownerId,
         inheritsFromId: parent?.id ?? null,
         initialTokens: buildInitialRef.current?.(parent),
       });
-      if (!cancelled) setState({ loading: false, design, parent });
+      if (stale()) return;
+      setState({ loading: false, design, parent });
     };
 
     void run();
