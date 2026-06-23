@@ -13,11 +13,13 @@ import {
   useComponentsByProject,
   useProject,
   useReferences,
+  useScene,
   useScreen,
   useScreens,
   useVariantChildren,
   useVariants,
 } from "@/lib/storage/hooks";
+import { subcomponentsForVariantScene } from "@/canvas/canvasUtils";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import { DEFAULT_HISTORY } from "@/lib/data/screenVersions";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
@@ -178,9 +180,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const screenIdAncestor = useScreenAncestor(component ?? null);
   const { data: screen } = useScreen(screenIdAncestor);
   const trail = useAncestorTrail(component ?? null);
-  // A non-main variant's subcomponents are the main variant's children, referenced as
-  // linked instances. Load the main's children and mark them linked; the version's own
-  // (detached) children come from ownChildren.
   const mainVariant = useMemo(
     () => variants.find((v) => isMainVariant(v)) ?? null,
     [variants],
@@ -189,19 +188,32 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     activeVariant && mainVariant && activeVariant.id !== mainVariant.id,
   );
   const { data: ownChildren } = useVariantChildren(activeVariant?.id);
-  const { data: mainChildren } = useVariantChildren(
-    isVersionVariant ? mainVariant?.id : undefined,
-  );
-  const children = useMemo(
-    () => (isVersionVariant ? [...mainChildren, ...ownChildren] : ownChildren),
-    [isVersionVariant, mainChildren, ownChildren],
-  );
-  const linkedChildIds = useMemo(
-    () => (isVersionVariant ? new Set(mainChildren.map((c) => c.id)) : new Set<string>()),
-    [isVersionVariant, mainChildren],
-  );
-  const { data: childVariants } = useActiveVariants(children);
   const { data: projectComponents } = useComponentsByProject(project?.id ?? null);
+  // For the main variant, the component's own nested children ARE its subcomponents.
+  // For a version, derive them from that variant's scene: a "linked" version's children
+  // resolve through their `instanceOf` to the original masters (purple, read-only); a
+  // "copy" version's children resolve to the version's OWN cloned masters (editable,
+  // independent — deleting one never touches the original).
+  const { data: versionScene } = useScene(
+    "variant",
+    isVersionVariant ? activeVariant?.id ?? null : null,
+  );
+  const { children, linkedChildIds } = useMemo<{
+    children: ComponentRow[];
+    linkedChildIds: Set<string>;
+  }>(() => {
+    if (isVersionVariant && activeVariant) {
+      const { components: list, linkedIds } = subcomponentsForVariantScene({
+        graphJSON: versionScene?.graphJSON ?? null,
+        variantId: activeVariant.id,
+        screenId: null,
+        projectComponents,
+      });
+      return { children: list, linkedChildIds: linkedIds };
+    }
+    return { children: ownChildren, linkedChildIds: new Set<string>() };
+  }, [isVersionVariant, activeVariant, versionScene?.graphJSON, projectComponents, ownChildren]);
+  const { data: childVariants } = useActiveVariants(children);
   const { data: references } = useReferences("component", component?.id ?? null);
 
   const type: ProjectType = project?.type ?? "desktop";

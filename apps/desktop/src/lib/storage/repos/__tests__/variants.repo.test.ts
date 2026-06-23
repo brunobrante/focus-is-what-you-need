@@ -1,6 +1,11 @@
 import { beforeEach, expect, test } from "bun:test";
 
-import { createComponent } from "@/lib/storage/repos/components.repo";
+import {
+  createComponent,
+  deleteComponentTree,
+  getComponent,
+  listChildrenOfVariant,
+} from "@/lib/storage/repos/components.repo";
 import {
   duplicateVariant,
   listVariantsByComponent,
@@ -77,6 +82,51 @@ test("duplicateVariant copies the source variant's scene into a new sibling vari
   // The source scene is untouched by the duplication.
   const sourceScene = await getSceneByOwner("variant", defaultVariant.id);
   expect(sourceScene!.graphJSON).toBe(graphJSON);
+});
+
+test("copy-mode version clones child components into independent masters", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  // A nested child owned by the source variant.
+  const { component: child } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+
+  // duplicateVariant only clones when the source variant has a scene.
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: defaultVariant.id,
+    graphJSON: serializeHtmlCanvasDocument(
+      createDefaultHtmlCanvasDocument({ name: "Card", projectType: "mobile", targetKind: "variant" }),
+    ),
+  });
+
+  const copy = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "copy",
+  });
+
+  // The new version owns a fresh child master, not the original.
+  const cloned = await listChildrenOfVariant(copy.id);
+  expect(cloned).toHaveLength(1);
+  const clone = cloned[0]!;
+  expect(clone.id).not.toBe(child.id);
+  expect(clone.name).toBe("Title");
+  expect(clone.parentVariantId).toBe(copy.id);
+  expect(clone.linkable).toBe(false);
+
+  // Deleting the copied version's child must NOT delete the original.
+  await deleteComponentTree(clone.id);
+  expect(await getComponent(child.id)).not.toBeNull();
+  expect(await getComponent(clone.id)).toBeNull();
 });
 
 test("duplicateVariant works when the source variant has no scene yet", async () => {

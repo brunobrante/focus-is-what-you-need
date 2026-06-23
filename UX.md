@@ -1214,7 +1214,10 @@ version is created:
   **open in canvas** action opens the **main** in Current (`?screen=`) or a **version** in
   the persistent **Versions window** (see §6).
 - **Linked**: child components become read-only instances of the originals — editing a
-  master updates every version. **Copy**: a fully independent duplicate.
+  master updates every version. **Copy**: a fully independent duplicate — the scene is
+  copied **and** every child component is **re-mastered into the version's own component**
+  (no link to the original). A copied version's Sub Components are therefore editable and
+  deletable in place; deleting one **never** affects the component it was copied from.
 
 **Linked instances in the canvas**:
 - Selecting an instance shows **purple** selection chrome (`#8638E5`) — outline, resize

@@ -1,4 +1,5 @@
 import type { ComponentVariant } from "@/lib/data/types";
+import { normalizeComponentRow } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
@@ -225,14 +226,17 @@ export async function duplicateVariant(input: {
     ownerId: input.ownerId,
     name: input.name,
   });
+  // The subject's child components: a screen's top-level components, or a component
+  // variant's nested children.
+  const children =
+    input.ownerKind === "screen"
+      ? await listTopLevelByScreenId(input.ownerId)
+      : await listChildrenOfVariant(input.sourceVariantId);
+
   const sourceScene = await getSceneByOwner("variant", input.sourceVariantId);
   if (sourceScene) {
     let graphJSON = sourceScene.graphJSON;
     if (input.mode === "linked") {
-      const children =
-        input.ownerKind === "screen"
-          ? await listTopLevelByScreenId(input.ownerId)
-          : await listChildrenOfVariant(input.sourceVariantId);
       const linked = linkifyChildComponentsInGraph(
         graphJSON,
         children.map((c) => ({
@@ -248,6 +252,15 @@ export async function duplicateVariant(input: {
         // pickable from the canvas "Add components" picker.
         await markComponentsLinkable(children.map((c) => c.id));
       }
+    } else {
+      // "copy": a fully independent version. Deep-clone every child component master
+      // (its whole variant chain + scenes + nested children) into NEW masters owned
+      // by the new variant, so the version owns its components outright — editing or
+      // DELETING one never touches the original it was copied from.
+      await cloneChildComponentsIntoVariant({
+        sourceChildren: children,
+        targetVariantId: created.id,
+      });
     }
     await upsertScene(
       { ownerType: "variant", ownerId: created.id, graphJSON },
@@ -255,4 +268,98 @@ export async function duplicateVariant(input: {
     );
   }
   return created;
+}
+
+/**
+ * Deep-clones a set of child component masters into fresh masters parented to
+ * `targetVariantId` — used by "copy"-mode versioning so the new version owns
+ * independent components with no link back to the originals.
+ *
+ * For each source child it clones the ComponentRow, its entire variant chain, and
+ * each variant's scene (verbatim — node ids are scene-scoped so a verbatim copy is
+ * safe), then recurses into the children nested under every source variant. Linked
+ * instances embedded in a cloned scene keep their `instanceOf` (they still point at
+ * their own external master); only owned content is given new masters. The clones are
+ * not linkable (a fresh local copy is not shared until the user opts in).
+ */
+async function cloneChildComponentsIntoVariant(input: {
+  sourceChildren: ComponentRow[];
+  targetVariantId: string;
+}): Promise<void> {
+  if (input.sourceChildren.length === 0) return;
+
+  const allComponents = await listTable<ComponentRow>(TABLES.components);
+  const allVariants = await listTable<VariantRow>(KEY);
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+  const sceneByOwner = new Map(
+    scenes.map((s) => [`${s.ownerType}:${s.ownerId}`, s] as const),
+  );
+
+  const newComponents: ComponentRow[] = [];
+  const newVariants: VariantRow[] = [];
+  const newScenes: Array<{ ownerId: string; graphJSON: string }> = [];
+
+  const variantsOfComponent = (componentId: string) =>
+    allVariants
+      .filter((v) => v.ownerKind === "component" && v.ownerId === componentId)
+      .sort((a, b) => a.order - b.order);
+  const childrenOfVariant = (variantId: string) =>
+    allComponents.filter((c) => c.parentVariantId === variantId);
+
+  const cloneOne = (source: ComponentRow, parentVariantId: string): void => {
+    const t = now();
+    const newComponentId = newId();
+    const sourceVariants = variantsOfComponent(source.id);
+    const variantIdMap = new Map<string, string>();
+
+    for (const sv of sourceVariants) {
+      const newVariantId = newId();
+      variantIdMap.set(sv.id, newVariantId);
+      newVariants.push({ ...sv, id: newVariantId, ownerId: newComponentId, createdAt: t, updatedAt: t });
+      const scene = sceneByOwner.get(`variant:${sv.id}`);
+      if (scene) newScenes.push({ ownerId: newVariantId, graphJSON: scene.graphJSON });
+    }
+
+    const newActiveVariantId =
+      variantIdMap.get(source.activeVariantId) ?? [...variantIdMap.values()][0] ?? newId();
+
+    newComponents.push(
+      normalizeComponentRow({
+        ...source,
+        id: newComponentId,
+        // Owned by the new version's variant — a version-scoped local copy.
+        parentVariantId,
+        screenId: null,
+        linkable: false,
+        activeVariantId: newActiveVariantId,
+        createdAt: t,
+        updatedAt: t,
+      }),
+    );
+
+    // Recurse into the children nested under each source variant.
+    for (const sv of sourceVariants) {
+      const nextParent = variantIdMap.get(sv.id)!;
+      for (const grandchild of childrenOfVariant(sv.id)) {
+        cloneOne(grandchild, nextParent);
+      }
+    }
+  };
+
+  for (const child of input.sourceChildren) cloneOne(child, input.targetVariantId);
+
+  if (newVariants.length > 0) {
+    await replaceTable<VariantRow>(KEY, [...newVariants, ...allVariants]);
+    notify(KEY);
+  }
+  if (newComponents.length > 0) {
+    await replaceTable<ComponentRow>(TABLES.components, [...newComponents, ...allComponents]);
+    notify(TABLES.components);
+  }
+  for (const scene of newScenes) {
+    await upsertScene(
+      { ownerType: "variant", ownerId: scene.ownerId, graphJSON: scene.graphJSON },
+      { propagate: false },
+    );
+  }
 }

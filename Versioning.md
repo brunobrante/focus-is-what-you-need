@@ -171,7 +171,24 @@ modal (reuse `src/components/modals/Modal.tsx` / `ConfirmActionModal.tsx`):
 - **Linked** — the frame and all **non-component** children are copied; every
   **component** child becomes an instance pointing at the original's master. Editing a
   master then reflects in both the original and the new version.
-- **Copy** — a full deep copy with no links (today's `duplicateVariant` behavior).
+- **Copy** — a fully independent version. The scene graph is copied verbatim **and**
+  every child component master is **deep-cloned into a new master owned by the new
+  variant** (`cloneChildComponentsIntoVariant` in `variants.repo.ts`): the whole child
+  subtree — its variant chain, each variant's scene, and its own nested children — is
+  recreated with fresh ids, `parentVariantId` repointed to the new variant, and
+  `linkable: false`. There is **no link back to the original**. The instant the copy is
+  made, the version's components become *the version's own components*; editing or
+  **deleting** one never touches the component it was copied from. (Linked instances
+  embedded in a copied scene keep their `instanceOf` — only owned content is re-mastered.)
+
+> **Why clone the masters, not just the graph.** Child masters are addressed by
+> `sourceNodeId` (screen-level) / `parentVariantId` (nested). A verbatim graph copy alone
+> would leave the new version's nodes resolving back to the *original* masters, so deleting
+> a "copied" component deleted the original. Cloning the masters under the new variant is
+> what makes a Copy version truly independent. Cleanup follows ownership: a screen's
+> `deleteScreen` collects components parented to the screen's version variants too
+> (`collectScreenComponentIds`), and `deleteVariant` already removes a variant's own
+> children — so a copy version's clones are never orphaned.
 
 `duplicateVariant({ ownerKind, ownerId, sourceVariantId, name, mode })`
 (`src/lib/storage/repos/variants.repo.ts`) is the single entry point for **both** screen

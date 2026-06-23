@@ -174,18 +174,39 @@ export async function updateScreen(
   return next;
 }
 
+/**
+ * Collects all component ids owned (transitively) by a screen: its top-level
+ * components (parentVariantId === null) PLUS any component parented to one of the
+ * screen's version variants — copy-mode versions own independent child components
+ * there — and the full subtree under each.
+ */
+function collectScreenComponentIds(
+  screenId: string,
+  components: ComponentRow[],
+  variants: VariantRow[],
+): Set<string> {
+  const screenVariantIds = new Set(
+    variants.filter((v) => v.ownerKind === "screen" && v.ownerId === screenId).map((v) => v.id),
+  );
+  const rootIds = components
+    .filter(
+      (c) =>
+        (c.screenId === screenId && c.parentVariantId === null) ||
+        (c.parentVariantId != null && screenVariantIds.has(c.parentVariantId)),
+    )
+    .map((c) => c.id);
+  const ids = new Set<string>();
+  for (const id of rootIds) {
+    collectComponentTreeIds(id, components, variants).forEach((childId) => ids.add(childId));
+  }
+  return ids;
+}
+
 /** Collects all component ids owned (transitively) by a screen. */
 async function screenComponentIds(screenId: string): Promise<Set<string>> {
   const components = await listTable<ComponentRow>(TABLES.components);
   const variants = await listTable<VariantRow>(TABLES.variants);
-  const topLevelIds = components
-    .filter((c) => c.screenId === screenId && c.parentVariantId === null)
-    .map((c) => c.id);
-  const ids = new Set<string>();
-  for (const id of topLevelIds) {
-    collectComponentTreeIds(id, components, variants).forEach((childId) => ids.add(childId));
-  }
-  return ids;
+  return collectScreenComponentIds(screenId, components, variants);
 }
 
 /** Number of linked instances elsewhere that reference any of this screen's components. */
@@ -203,15 +224,7 @@ export async function deleteScreen(
 
   const components = await listTable<ComponentRow>(TABLES.components);
   const variants = await listTable<VariantRow>(TABLES.variants);
-  const topLevelIds = components
-    .filter((c) => c.screenId === screenId && c.parentVariantId === null)
-    .map((c) => c.id);
-  const componentIds = new Set<string>();
-  for (const id of topLevelIds) {
-    collectComponentTreeIds(id, components, variants).forEach((childId) =>
-      componentIds.add(childId),
-    );
-  }
+  const componentIds = collectScreenComponentIds(screenId, components, variants);
   // Variants to delete: the screen's own version variants, plus every variant owned
   // by the screen's (transitive) components.
   const variantIds = new Set(
