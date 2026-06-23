@@ -49,7 +49,7 @@ export function SystemDesignEditor({
 }) {
   const [tab, setTab] = useState<SystemDesignCategory>("colors");
   const { resolved } = controller;
-  const { requestUnlink, modal: unlinkTokenModal } = useUnlinkToken();
+  const { requestUnlink, requestDelete, modal: unlinkTokenModal } = useUnlinkToken();
 
   // Toggling linkable ON just sets the flag. Toggling OFF runs the unlink flow:
   // if projects link this token, confirm copy/delete per project before disabling.
@@ -71,6 +71,25 @@ export function SystemDesignEditor({
       return;
     }
     void requestUnlink({ category, token, onDisable: disable });
+  };
+
+  // Deleting a workspace master token that projects still link runs the same per-project
+  // copy/delete flow as unlink, then removes the master. Project-scope tokens (locals and
+  // linked instances) just delete in place.
+  const handleDeleteToken = (category: SystemDesignCategory, tokenId: string) => {
+    const remove = () => controller.deleteToken(category, tokenId);
+    if (controller.scope !== "workspace") {
+      remove();
+      return;
+    }
+    const token = (controller.design?.tokens[category] as { id: string }[] | undefined)?.find(
+      (t) => t.id === tokenId,
+    );
+    if (!token) {
+      remove();
+      return;
+    }
+    void requestDelete({ category, token, onDelete: remove });
   };
 
   if (!resolved) return null;
@@ -108,6 +127,7 @@ export function SystemDesignEditor({
             controller={controller}
             workspaceName={workspaceName}
             onToggleLinkable={handleToggleLinkable}
+            onDeleteToken={handleDeleteToken}
           />
         </div>
       </main>
@@ -124,6 +144,7 @@ function TokenSection({
   controller,
   workspaceName,
   onToggleLinkable,
+  onDeleteToken,
 }: {
   category: SystemDesignCategory;
   resolved: ResolvedCategory;
@@ -134,6 +155,7 @@ function TokenSection({
     tokenId: string,
     nextLinkable: boolean,
   ) => void;
+  onDeleteToken: (category: SystemDesignCategory, tokenId: string) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<AnyToken | null>(null);
@@ -163,7 +185,7 @@ function TokenSection({
             scope={controller.scope}
             showSource={hasWorkspace}
             onEdit={(token) => setEditing(token)}
-            onDelete={(id) => controller.deleteToken(category, id)}
+            onDelete={(id) => onDeleteToken(category, id)}
             onDetach={(id) => controller.detachToken(category, id)}
             onToggleLinkable={(id, linkable) => onToggleLinkable(category, id, linkable)}
           />

@@ -749,7 +749,10 @@ consequence flow as components: if no project links the token it's disabled
 silently; if projects link it, the **`UnlinkComponentModal`** opens listing each
 **project** that links it, each a switch — **copy** (detach into an independent
 local token in that project, default) or **delete** — then applies the choices and
-clears the linkable flag.
+clears the linkable flag. The toggle button itself turns **purple** while the token
+is linkable (the shared linked-instance accent). **Deleting** a workspace token runs
+the very same per-project copy/delete modal when projects link it (confirm label
+"Confirm & delete"), then removes the master; with no links it deletes immediately.
 
 There is no "design system" selector and no libraries/icons name-lists — those
 belonged to the old disconnected manager and were removed. The page edits one

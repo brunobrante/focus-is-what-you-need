@@ -360,16 +360,35 @@ turning a linked instance into a local, fully independent copy owned by the curr
 screen / version / component / project, no longer connected to the master. This
 applies identically to components, tokens, and references.
 
+### Removing a linkable item that is used elsewhere **[NOW]**
+
+When you **unlink** a linkable item (turn off its linkable state) **or delete** it
+while it still has linked instances placed elsewhere, the product must not silently
+break those other places. It asks, **per instance**, what to do with each link —
+either **keep a copy** (detach it into an independent local copy, the default) or
+**delete** it there too. The same per-place copy-or-delete choice is offered for all
+three capabilities (components, tokens, references). The only difference between
+unlink and delete is the fate of the item itself: unlink keeps it (just no longer
+shareable); delete removes it after the links are resolved.
+
 ---
 
 ## Versioning **[NOW]**
 
-You can keep many versions of a screen or of a component.
+You can keep many versions of a screen or of a component. Creating a version always
+makes **a copy of the frame**; what differs is how the components inside it relate
+to the originals. The user chooses one of two modes:
 
-Creating a new version makes **a copy of the frame**, and the components inside it
-are **linked back to the main's components** — i.e. the inner components become
-linked instances of the originals, placed into the copied frame. This works the
-same way for **both screens and components**.
+- **Linked** — the inner components become **linked instances** of the originals,
+  placed into the copied frame. Editing a master then reflects in the original and in
+  this version. This works the same way for **both screens and components**.
+- **Copy** — the version becomes **fully independent**. **[LAW]** The moment a Copy
+  version is made, the components inside it become **the version's own components**,
+  with **no link to the originals** — they are re-created as new owned components under
+  the version. Editing or **deleting** one of them must affect **only this version**
+  and **never** the component it was copied from. (A "copy" that still secretly shared
+  the original master, so that deleting it deleted the original, is a bug — not the
+  model.)
 
 (The principle under all reuse: **ownership and origin are never ambiguous.** You
 can always tell whether you are looking at a reference or the real thing, and
