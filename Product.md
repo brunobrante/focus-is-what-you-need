@@ -188,6 +188,24 @@ assets first. The user then points the element at real content (via its `src`).
 **[PLANNED]** Sending a photo/file **directly onto the canvas** to become an
 image, instead of setting `src` afterward.
 
+### SVG is a sealed component **[PLANNED]**
+
+Inserting an **SVG** drops in a default placeholder (like Image and Icon). An SVG
+holds vector elements (paths, shapes) inside it, so by the automatic rule above it
+**is a component** — but it is a **sealed** one:
+
+- In the tree it appears as a **single node** with a link to open it on its own;
+  its internal vector children (paths, etc.) are **not** surfaced as sub-components.
+- On the canvas only the **SVG frame** renders.
+- You **cannot edit its internals in place**. To edit the paths inside you must
+  **open the SVG on its own** — isolate it / enter its page — exactly like editing
+  any component in isolation.
+
+This keeps an imported icon or illustration as **one honest object** in the
+structure, while still letting you drill in and edit its vectors when you
+explicitly focus on it. It follows the same spine as the laws "any element with a
+child is a component" and "you edit inside a frame, in isolation."
+
 ---
 
 ## The entity model
