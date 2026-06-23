@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { useWorkspaceComponents, useWorkspaces, useProjects } from "@/lib/storage/hooks";
-import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
 import type { ComponentKind } from "@/lib/data/types";
 import type { ComponentRow, ProjectRow } from "@/lib/storage/schema";
 
@@ -27,10 +26,7 @@ export interface GlobalComponentsState {
   setQuery: (value: string) => void;
   kindFilter: ComponentKind | "all";
   setKindFilter: (value: ComponentKind | "all") => void;
-  pendingDelete: ComponentRow | null;
-  setPendingDelete: (value: ComponentRow | null) => void;
   filtered: ComponentRow[];
-  handleConfirmDelete: () => Promise<void>;
 }
 
 export function useGlobalComponents(): GlobalComponentsState {
@@ -50,7 +46,6 @@ export function useGlobalComponents(): GlobalComponentsState {
 
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<ComponentKind | "all">("all");
-  const [pendingDelete, setPendingDelete] = useState<ComponentRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -61,12 +56,6 @@ export function useGlobalComponents(): GlobalComponentsState {
     });
   }, [components, kindFilter, query]);
 
-  const handleConfirmDelete = async () => {
-    if (!pendingDelete) return;
-    await deleteComponentTree(pendingDelete.id);
-    setPendingDelete(null);
-  };
-
   return {
     workspaceId,
     components,
@@ -75,9 +64,6 @@ export function useGlobalComponents(): GlobalComponentsState {
     setQuery,
     kindFilter,
     setKindFilter,
-    pendingDelete,
-    setPendingDelete,
     filtered,
-    handleConfirmDelete,
   };
 }

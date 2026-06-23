@@ -31,6 +31,7 @@ export function UnlinkComponentModal({
   title,
   subtitle,
   items,
+  confirmLabel = "Confirm & unlink",
   onCancel,
   onConfirm,
 }: {
@@ -38,6 +39,7 @@ export function UnlinkComponentModal({
   title: string;
   subtitle: string;
   items: UnlinkItem[];
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: (decisions: UnlinkDecision[]) => void;
 }) {
@@ -126,7 +128,7 @@ export function UnlinkComponentModal({
             }
             className="rounded-lg bg-[var(--text)] px-3 py-1.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90"
           >
-            Confirm & unlink
+            {confirmLabel}
           </button>
         </div>
       </ModalBody>

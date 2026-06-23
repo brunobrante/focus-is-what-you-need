@@ -1,18 +1,14 @@
 import { useCallback, useState } from "react";
 
 import type { ComponentRow } from "@/lib/storage/schema";
-import { getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
-import { getScreen } from "@/lib/storage/repos/screens.repo";
-import { getVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
-import {
-  applyInstanceDecisions,
-  listDetailedInstanceUsages,
-} from "@/lib/storage/repos/scenes.repo";
+import { updateComponent } from "@/lib/storage/repos/components.repo";
+import { applyInstanceDecisions } from "@/lib/storage/repos/scenes.repo";
 import {
   UnlinkComponentModal,
   type UnlinkDecision,
   type UnlinkItem,
 } from "@/components/modals/UnlinkComponentModal";
+import { buildInstanceUsageItems } from "./instanceUsageItems";
 
 type Pending = { componentId: string; name: string; items: UnlinkItem[] };
 
@@ -35,38 +31,10 @@ export function useUnlinkComponent() {
       return;
     }
 
-    const usages = await listDetailedInstanceUsages(new Set([component.id]));
-    if (usages.length === 0) {
+    const items = await buildInstanceUsageItems(new Set([component.id]));
+    if (items.length === 0) {
       await updateComponent(component.id, { linkable: false });
       return;
-    }
-
-    // Build a human label per occurrence: "Owner (version) — element".
-    const variantCache = new Map<string, Awaited<ReturnType<typeof getVariant>>>();
-    const items: UnlinkItem[] = [];
-    for (const usage of usages) {
-      let variant = variantCache.get(usage.ownerId);
-      if (variant === undefined) {
-        variant = await getVariant(usage.ownerId);
-        variantCache.set(usage.ownerId, variant);
-      }
-      let where = "Unknown";
-      if (variant) {
-        const version = variantVersionLabel(variant);
-        if (variant.ownerKind === "component") {
-          const owner = await getComponent(variant.ownerId);
-          where = `${owner?.name ?? "Component"} (${version})`;
-        } else {
-          const owner = await getScreen(variant.ownerId);
-          where = `${owner?.title ?? "Screen"} (${version})`;
-        }
-      }
-      items.push({
-        key: `${usage.ownerId}:${usage.nodeId}`,
-        ownerId: usage.ownerId,
-        nodeId: usage.nodeId,
-        label: `${where} — ${usage.nodeName}`,
-      });
     }
 
     setPending({ componentId: component.id, name: component.name, items });

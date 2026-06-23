@@ -14,7 +14,7 @@ import {
   useReferencesByProject,
   useScreens,
 } from "@/lib/storage/hooks";
-import { deleteComponentTree, type InstanceDeleteStrategy } from "@/lib/storage/repos/components.repo";
+import { type InstanceDeleteStrategy } from "@/lib/storage/repos/components.repo";
 import { deleteScreen } from "@/lib/storage/repos/screens.repo";
 import { getGalleryLayout, saveGalleryLayout } from "@/lib/storage/repos/galleryLayout.repo";
 import type { NewScreenModalHandle } from "@/components/modals/NewScreenModal";
@@ -109,8 +109,6 @@ export interface GalleryState {
   // delete confirmation state
   pendingScreenDelete: ScreenRow | null;
   setPendingScreenDelete: (screen: ScreenRow | null) => void;
-  pendingComponentDelete: ComponentRow | null;
-  setPendingComponentDelete: (component: ComponentRow | null) => void;
 
   // modal refs
   newScreenRef: RefObject<NewScreenModalHandle | null>;
@@ -123,7 +121,6 @@ export interface GalleryState {
   handleComponentCreated: (result: { component: ComponentRow }) => void;
   handleSettingsSaved: (updatedProject: ProjectRow) => void;
   handleConfirmDeleteScreen: (strategy?: InstanceDeleteStrategy) => Promise<void>;
-  handleConfirmDeleteComponent: (strategy?: InstanceDeleteStrategy) => Promise<void>;
 }
 
 export function useGallery(projectId: string): GalleryState {
@@ -144,7 +141,6 @@ export function useGallery(projectId: string): GalleryState {
   const componentSectionState = usePersistentSectionState(project?.id, "components");
 
   const [pendingScreenDelete, setPendingScreenDelete] = useState<ScreenRow | null>(null);
-  const [pendingComponentDelete, setPendingComponentDelete] = useState<ComponentRow | null>(null);
 
   const newScreenRef = useRef<NewScreenModalHandle>(null);
   const newComponentRef = useRef<NewComponentModalHandle>(null);
@@ -177,15 +173,6 @@ export function useGallery(projectId: string): GalleryState {
     setPendingScreenDelete(null);
   };
 
-  const handleConfirmDeleteComponent = async (strategy?: InstanceDeleteStrategy) => {
-    if (!pendingComponentDelete) return;
-    await deleteComponentTree(
-      pendingComponentDelete.id,
-      strategy ? { instanceStrategy: strategy } : undefined,
-    );
-    setPendingComponentDelete(null);
-  };
-
   return {
     projectId,
     project,
@@ -209,8 +196,6 @@ export function useGallery(projectId: string): GalleryState {
     setComponentSectionById: componentSectionState.setSectionById,
     pendingScreenDelete,
     setPendingScreenDelete,
-    pendingComponentDelete,
-    setPendingComponentDelete,
     newScreenRef,
     newComponentRef,
     openNewScreen,
@@ -219,6 +204,5 @@ export function useGallery(projectId: string): GalleryState {
     handleComponentCreated,
     handleSettingsSaved,
     handleConfirmDeleteScreen,
-    handleConfirmDeleteComponent,
   };
 }

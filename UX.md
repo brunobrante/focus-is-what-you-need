@@ -827,6 +827,9 @@ linkable just sets the flag. **Unlinking** runs a consequence check:
   a running count sit at the top. **Confirm & unlink** applies each choice across
   all scenes, then clears the linkable flag. (Unlinking ≠ deleting the component —
   the component stays; only its shareability and the chosen instances change.)
+  The **Delete component** action reuses the very same per-instance modal when the
+  component is linked elsewhere, but additionally removes the master afterwards (see
+  "Deleting a linked component" below).
 
 **EmptyState**: icon + title + description + CTA button
 
@@ -1265,13 +1268,21 @@ version is created:
   banner) — the same read-only treatment as the Versions window — signalling it cannot be
   edited in place; edit it via **go to component** or **detach**.
 
-**Deleting a linked master** — when a screen or component being deleted still has linked
-instances elsewhere, an `InstanceDeleteModal` replaces the plain delete confirm. It shows
-how many places use it and offers two paths:
-- **Detach instances, then delete** — each instance becomes an independent copy in place
-  (nothing lost elsewhere).
-- **Delete everywhere (cascade)** — removes the master and every instance of it.
-When there are no linked instances, the normal `ConfirmActionModal` is shown instead.
+**Deleting a linked component** — deleting a component that is used as a linked instance
+elsewhere opens the **same per-instance modal as Unlink** (`UnlinkComponentModal`, the
+shared `useDeleteComponent` flow): it lists **every placement** (one row per instance,
+"Owner (version) — element name"), each a switch — ON = keep an independent **local copy**
+(detach, the default), OFF = **delete** that instance — with "Copy all" / "Delete all"
+shortcuts. **Confirm & delete** resolves every link by the chosen action **and then removes
+the master**. This is offered from every component card (Global Components, the project
+**Components** tab, and the **Sub Components** cards in screen/component detail). With no
+linked instances it falls back to a plain `ConfirmActionModal`.
+
+**Deleting a linked screen** — when a screen still has linked instances of its components
+elsewhere, an `InstanceDeleteModal` replaces the plain confirm, offering **Detach
+instances, then delete** (each instance becomes an independent copy in place) or **Delete
+everywhere (cascade)** (removes every instance too). With no instances, a plain
+`ConfirmActionModal` is shown.
 
 ### Empty states
 - Every list, grid, and tab has a dedicated empty state

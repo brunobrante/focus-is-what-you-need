@@ -11,8 +11,8 @@ import { VersionModeModal, type VersionModeModalHandle } from "@/components/moda
 import { InstanceDeleteModal } from "@/components/modals/InstanceDeleteModal";
 import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/components/modals/ProjectPreviewModal";
 import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/repos/screens.repo";
-import { countComponentInstanceUsages } from "@/lib/storage/repos/components.repo";
 import { useGallery } from "@/application/gallery/useGallery";
+import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 
 import {
   Crumbs,
@@ -55,8 +55,6 @@ export function GalleryPage() {
     setComponentSectionById,
     pendingScreenDelete,
     setPendingScreenDelete,
-    pendingComponentDelete,
-    setPendingComponentDelete,
     newScreenRef,
     newComponentRef,
     openNewScreen,
@@ -65,8 +63,11 @@ export function GalleryPage() {
     handleComponentCreated,
     handleSettingsSaved,
     handleConfirmDeleteScreen,
-    handleConfirmDeleteComponent,
   } = useGallery(projectId);
+
+  // Component deletion is instance-aware: if the component is linked elsewhere it
+  // opens the per-instance copy/delete modal (same as Unlink), then removes the master.
+  const { requestDelete: requestDeleteComponent, modal: deleteComponentModal } = useDeleteComponent();
 
   // Versions are variants of a screen, not separate screens, so every screen row is a
   // real project screen. Its versions live in the screen's Versions tab.
@@ -75,7 +76,6 @@ export function GalleryPage() {
   // Linked-instance usage counts for the master being deleted — drive whether the
   // delete shows the detach-all/cascade choice or a plain confirm.
   const [screenDeleteUsage, setScreenDeleteUsage] = useState(0);
-  const [componentDeleteUsage, setComponentDeleteUsage] = useState(0);
 
   useEffect(() => {
     if (!pendingScreenDelete) {
@@ -90,20 +90,6 @@ export function GalleryPage() {
       cancelled = true;
     };
   }, [pendingScreenDelete]);
-
-  useEffect(() => {
-    if (!pendingComponentDelete) {
-      setComponentDeleteUsage(0);
-      return;
-    }
-    let cancelled = false;
-    void countComponentInstanceUsages(pendingComponentDelete.id).then((n) => {
-      if (!cancelled) setComponentDeleteUsage(n);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [pendingComponentDelete]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]" data-type={type}>
@@ -179,7 +165,7 @@ export function GalleryPage() {
               sectionById={componentSectionById}
               onSectionsChange={setComponentSections}
               onSectionByIdChange={setComponentSectionById}
-              onRequestDelete={setPendingComponentDelete}
+              onRequestDelete={(c) => void requestDeleteComponent(c)}
             />
           )}
           {tab === "references" && (
@@ -229,28 +215,7 @@ export function GalleryPage() {
           onConfirm={handleConfirmDeleteScreen}
         />
       )}
-      {pendingComponentDelete && componentDeleteUsage > 0 ? (
-        <InstanceDeleteModal
-          open
-          entityName={pendingComponentDelete.name}
-          usageCount={componentDeleteUsage}
-          onCancel={() => setPendingComponentDelete(null)}
-          onDetachAll={() => void handleConfirmDeleteComponent("detach")}
-          onCascade={() => void handleConfirmDeleteComponent("cascade")}
-        />
-      ) : (
-        <ConfirmActionModal
-          open={Boolean(pendingComponentDelete)}
-          title="Delete component"
-          message={
-            pendingComponentDelete
-              ? `The component "${pendingComponentDelete.name}" will be removed along with subcomponents and variants.`
-              : ""
-          }
-          onClose={() => setPendingComponentDelete(null)}
-          onConfirm={handleConfirmDeleteComponent}
-        />
-      )}
+      {deleteComponentModal}
     </div>
   );
 }

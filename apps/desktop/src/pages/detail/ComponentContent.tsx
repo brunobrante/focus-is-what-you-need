@@ -19,6 +19,7 @@ import { isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants
 import { updateComponent } from "@/lib/storage/repos/components.repo";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
+import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { DetailView } from "./DetailView";
 import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
@@ -28,15 +29,16 @@ export function ComponentContent({ componentId }: { componentId: string }) {
     children, linkedChildIds, childVariants, projectComponents, references, type, projectId,
     projectName, variantCount, canvasHref, filteredChildren,
     filteredReferences, history, sideTab, setSideTab, query, setQuery,
-    filter, setFilter, pendingChildDelete,
-    setPendingChildDelete, versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef, confirmRef,
-    openNewChild, addVariant, removeLinkedReference, handleChildDeleteConfirm,
+    filter, setFilter,
+    versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef, confirmRef,
+    openNewChild, addVariant, removeLinkedReference,
     handleComponentCreated, handleOpenCanvas, handleOpenVersionCanvas, handleAddReference, handleSelectVariant,
     handleDeleteVariant, handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
+  const { requestDelete, modal: deleteModal } = useDeleteComponent();
   const fastEditRef = useRef<FastEditModalHandle>(null);
   const compareRef = useRef<CompareVersionsModalHandle>(null);
 
@@ -174,7 +176,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
               projectId={projectId}
               type={type}
               linked={linkedChildIds.has(c.id)}
-              onRequestDelete={setPendingChildDelete}
+              onRequestDelete={requestDelete}
               onOpenCanvas={handleOpenCanvas}
               onFastEdit={(cmp) => {
                 const variant = childVariants.get(cmp.id) ?? null;
@@ -201,18 +203,12 @@ export function ComponentContent({ componentId }: { componentId: string }) {
           <ReferencesModal ref={referencesRef} references={filteredReferences} onRemove={(ref) => removeLinkedReference(ref.id)} />
           <FastEditModal ref={fastEditRef} />
           <NewComponentModal ref={newComponentRef} projectId={project?.id ?? null} screens={screens} onCreated={handleComponentCreated} />
-          <ConfirmActionModal
-            open={Boolean(pendingChildDelete)}
-            title="Delete component"
-            message={pendingChildDelete ? `The component "${pendingChildDelete.name}" will be removed along with subcomponents and variants.` : ""}
-            onClose={() => setPendingChildDelete(null)}
-            onConfirm={handleChildDeleteConfirm}
-          />
           {/* Version deletes (from the switcher) confirm via the imperative API, matching the screen. */}
           <ConfirmActionModal ref={confirmRef} />
           <AddReferenceModal ref={addRefModalRef} projectId={project?.id ?? null} screens={screens} components={projectComponents} existingReferences={references} defaultComponentId={component.id} onAdd={handleAddReference} />
           <VersionModeModal ref={versionModeRef} />
           {unlinkModal}
+          {deleteModal}
         </>
       }
     />

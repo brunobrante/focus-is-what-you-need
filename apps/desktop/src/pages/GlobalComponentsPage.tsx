@@ -3,11 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { Snapshot } from "@/components/Snapshot";
-import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { NewComponentModal, type NewComponentModalHandle } from "@/components/modals/NewComponentModal";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
 import { IconPlus, IconSearch, IconGlobe, IconDiamond, IconLink, IconUnlink } from "@/components/icons";
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
+import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
@@ -24,15 +24,13 @@ export function GlobalComponentsPage() {
     setQuery,
     kindFilter,
     setKindFilter,
-    pendingDelete,
-    setPendingDelete,
     filtered,
-    handleConfirmDelete,
   } = useGlobalComponents();
 
   const newComponentModalRef = useRef<NewComponentModalHandle>(null);
   const fastEditRef = useRef<FastEditModalHandle>(null);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
+  const { requestDelete, modal: deleteModal } = useDeleteComponent();
 
   const openCreateModal = () => {
     if (!workspaceId) return;
@@ -109,7 +107,7 @@ export function GlobalComponentsPage() {
                   key={c.id}
                   component={c}
                   projects={workspaceProjects}
-                  onRequestDelete={() => setPendingDelete(c)}
+                  onRequestDelete={() => void requestDelete(c)}
                   onToggleLinkable={() => void requestToggle(c)}
                   onFastEdit={() =>
                     fastEditRef.current?.open({
@@ -133,21 +131,10 @@ export function GlobalComponentsPage() {
         )}
       </main>
 
-      <ConfirmActionModal
-        open={Boolean(pendingDelete)}
-        title="Delete component"
-        message={
-          pendingDelete
-            ? `The component "${pendingDelete.name}" and all of its variants will be removed.`
-            : ""
-        }
-        onClose={() => setPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
-      />
-
       <NewComponentModal ref={newComponentModalRef} />
       <FastEditModal ref={fastEditRef} />
       {unlinkModal}
+      {deleteModal}
 
       <PageFooter />
     </div>

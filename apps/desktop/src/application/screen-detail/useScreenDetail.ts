@@ -12,7 +12,6 @@ import {
   useScreenVariants,
 } from "@/lib/storage/hooks";
 import { subcomponentsForVariantScene } from "@/canvas/canvasUtils";
-import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
@@ -111,7 +110,6 @@ export interface ScreenDetailState {
   openNewComponent: () => void;
   addVersion: () => void;
   removeLinkedReference: (referenceId: string) => void;
-  requestDeleteComponent: (component: ComponentRow) => void;
   handleOpenCanvas: (variantId: string) => void;
   handleOpenScreenCanvas: () => void;
   handleOpenVersionCanvas: (versionScreenId: string) => void;
@@ -321,14 +319,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     void removeReferenceFromOwner(referenceId, "screen", screen.id);
   };
 
-  const requestDeleteComponent = (component: ComponentRow) => {
-    confirmRef.current?.open({
-      title: "Delete component",
-      message: `The component "${component.name}" will be removed along with subcomponents and variants.`,
-      onConfirm: () => deleteComponentTree(component.id),
-    });
-  };
-
   const handleOpenCanvas = (variantId: string) => {
     navigate(
       `/canvas?project=${encodeURIComponent(project?.id ?? projectId)}&type=${type}&variant=${variantId}`,
@@ -450,7 +440,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     openNewComponent,
     addVersion,
     removeLinkedReference,
-    requestDeleteComponent,
     handleOpenCanvas,
     handleOpenScreenCanvas,
     handleOpenVersionCanvas,

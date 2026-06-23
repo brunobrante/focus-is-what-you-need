@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
+import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { AddCard } from "@/components/screen/AddCard";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
@@ -34,12 +35,13 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
     previewVariantId, previewCanvasHref,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, buildComponentFastEditHref, openNewComponent, addVersion,
-    removeLinkedReference, requestDeleteComponent, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
+    removeLinkedReference, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
+  const { requestDelete, modal: deleteModal } = useDeleteComponent();
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: displayComponents.length },
@@ -139,7 +141,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
               projectId={project?.id ?? pid}
               type={type}
               linked={linkedComponentIds.has(c.id)}
-              onRequestDelete={requestDeleteComponent}
+              onRequestDelete={requestDelete}
               onOpenCanvas={handleOpenCanvas}
               onFastEdit={(cmp) => {
                 const variant = activeVariants.get(cmp.id) ?? null;
@@ -173,6 +175,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
           <ConfirmActionModal ref={confirmRef} />
           <VersionModeModal ref={versionModeRef} />
           {unlinkModal}
+          {deleteModal}
         </>
       }
     />

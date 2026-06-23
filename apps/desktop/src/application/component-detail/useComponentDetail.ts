@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { deleteComponentTree, getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
+import { getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
@@ -78,8 +78,6 @@ export interface ComponentDetailState {
   filter: CmpKindFilter;
   setFilter: (f: CmpKindFilter) => void;
   creatingVariant: boolean;
-  pendingChildDelete: ComponentRow | null;
-  setPendingChildDelete: (c: ComponentRow | null) => void;
 
   // Refs
   versionModeRef: React.RefObject<VersionModeModalHandle | null>;
@@ -93,7 +91,6 @@ export interface ComponentDetailState {
   openNewChild: () => void;
   addVariant: () => void;
   removeLinkedReference: (referenceId: string) => void;
-  handleChildDeleteConfirm: () => Promise<void>;
   handleComponentCreated: (r: { component: ComponentRow }) => void;
   handleOpenCanvas: (variantId: string) => void;
   handleOpenVersionCanvas: (variantId: string) => void;
@@ -215,7 +212,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CmpKindFilter>("all");
   const [creatingVariant, setCreatingVariant] = useState(false);
-  const [pendingChildDelete, setPendingChildDelete] = useState<ComponentRow | null>(null);
   // Preview-only selection: which version the preview pane shows. Null falls back
   // to the active variant. Selecting a version never persists it as main.
   const [previewVariantId, setPreviewVariantId] = useState<string | null>(null);
@@ -317,12 +313,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     void removeReferenceFromOwner(referenceId, "component", component.id);
   };
 
-  const handleChildDeleteConfirm = async () => {
-    if (!pendingChildDelete) return;
-    await deleteComponentTree(pendingChildDelete.id);
-    setPendingChildDelete(null);
-  };
-
   const handleComponentCreated = (r: { component: ComponentRow }) => {
     navigate(`/project/${encodeURIComponent(r.component.projectId)}/c/${r.component.id}`);
   };
@@ -408,8 +398,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     filter,
     setFilter,
     creatingVariant,
-    pendingChildDelete,
-    setPendingChildDelete,
     versionModeRef,
     historyRef,
     referencesRef,
@@ -419,7 +407,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     openNewChild,
     addVariant,
     removeLinkedReference,
-    handleChildDeleteConfirm,
     handleComponentCreated,
     handleOpenCanvas,
     handleOpenVersionCanvas,
