@@ -50,7 +50,7 @@ import { VersionsSubjectHeader } from "./tree/VersionsSubjectHeader";
 import { PickerNode } from "./tree/PickerNode";
 import { TreeRow } from "./tree/TreeRow";
 import { TypeIcon } from "./tree/TypeIcon";
-import { IconClose, IconLayers } from "@/components/icons";
+import { IconClose, IconLayers, IconTrash } from "@/components/icons";
 
 export type { ProjectTreeNode };
 
@@ -159,6 +159,7 @@ type Props = {
   // Back navigation for the Versions window: pops its drill-in history (or falls back to
   // the structural parent). Drives the back footer instead of a plain subject re-point.
   onVersionsBack?: () => void;
+  onClearSketch?: () => void;
 };
 
 export function Tree({
@@ -202,6 +203,7 @@ export function Tree({
   onSelectVersionsSubject,
   onLinkVersionsToCurrent,
   onVersionsBack,
+  onClearSketch,
 }: Props) {
   const bridgeDocument = useEditorBridge(
     (value) => value?.state.document ?? null,
@@ -470,6 +472,17 @@ export function Tree({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          {isDraftMode && onClearSketch ? (
+            <button
+              type="button"
+              onClick={onClearSketch}
+              aria-label="Clear sketch"
+              title="Clear sketch"
+              className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <IconTrash size={11} strokeWidth={1.8} />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -480,6 +493,14 @@ export function Tree({
           </button>
         </div>
       </div>
+      {isDraftMode ? (
+        <div className="flex shrink-0 items-center gap-1.5 border-b border-[#222] bg-[#111] px-3.5 py-1.5">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#444]" />
+          <span className="text-[10px] font-medium text-[#555]">
+            Não salvo no banco — local ao dispositivo
+          </span>
+        </div>
+      ) : null}
 
       <>
         <div ref={pickerTriggerRef}>

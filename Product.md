@@ -447,6 +447,21 @@ A window beside the main canvas that uses the **same tools** but is intentionall
 **freedom to experiment** — try out components and ideas without touching the
 real frame, which stays intact; then copy-paste anything good back in.
 
+**Scope and persistence rules:**
+- The Sketch canvas is **per project** — each project has its own scratch space;
+  opening a different project shows a different (or empty) sketch.
+- It is **local to the device and to the user** — stored in the browser/app's
+  local storage, never written to the database, never shared across machines or
+  accounts. When multi-user support arrives, each user will have their own sketch
+  per project; until then, the device is the user.
+- It is **not a persistent artefact**: there is no history, no versions, no
+  sync. The user can clear it at any time with an explicit "Clear sketch" action.
+  Nothing in the Sketch canvas is ever promoted automatically — the only path out
+  is manual copy-paste into the real frame.
+- The Sketch window is **not part of the component hierarchy**. Nothing created
+  there gains scope, ownership, or linkability until it is pasted into a screen
+  or component. It is a scratchpad, not a secondary canvas.
+
 (Not to be confused with **Drafts** — the loose, project-less screens and
 components created from Home. "Sketch" is this free scratch window inside the
 canvas; "Drafts" are real saved entities that live outside any workspace/project.)

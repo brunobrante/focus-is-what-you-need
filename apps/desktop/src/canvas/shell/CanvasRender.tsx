@@ -3,7 +3,7 @@ import {
   IconExpand,
 } from "@/components/icons";
 
-import { CURRENT_CANVAS_STORAGE_KEY, DRAFTS_CANVAS_STORAGE_KEY, VERSIONS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
+import { CURRENT_CANVAS_STORAGE_KEY, SKETCH_CANVAS_STORAGE_KEY, VERSIONS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import { createDraftDocument } from "@/canvas/engine/actions";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
@@ -84,6 +84,7 @@ export function CanvasRender({
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
+  sketchResetKey = 0,
 }: {
   treeOpen: boolean;
   inspectorOpen: boolean;
@@ -119,6 +120,7 @@ export function CanvasRender({
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
+  sketchResetKey?: number;
 }) {
   const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + TREE_WIDTH + GAP      : PANEL_MARGIN);
   const right  = expanded ? 0 : (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP : PANEL_MARGIN);
@@ -191,13 +193,14 @@ export function CanvasRender({
     if (windowType === "sketch") {
       return (
         <CanvasSurface
+          key={`sketch:${sketchResetKey}`}
           active={active}
           showActiveBorder={showActiveBorder}
           sourceId="sketch"
           publishBridge={active}
           expanded={expanded}
           onClick={() => onActiveCanvasChange?.("sketch")}
-          storageKey={DRAFTS_CANVAS_STORAGE_KEY}
+          storageKey={SKETCH_CANVAS_STORAGE_KEY}
           draftMode
           fallbackDocument={draftsFallbackDoc}
           activeTool={activeTool}

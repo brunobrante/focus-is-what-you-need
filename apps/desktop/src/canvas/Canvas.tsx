@@ -52,6 +52,7 @@ import {
 } from "./canvasUtils";
 import { PreviewLauncher } from "./shell/PreviewLauncher";
 import { IconChevronLeft, IconPanelRight } from "@/components/icons";
+import { SKETCH_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 
 export type { SplitMode } from "./canvasUtils";
 
@@ -125,6 +126,11 @@ function CanvasPageContent() {
   const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
   const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
   const [shellTabSignal, setShellTabSignal] = useState(0);
+  const [sketchResetKey, setSketchResetKey] = useState(0);
+  const clearSketch = useCallback(() => {
+    localStorage.removeItem(SKETCH_CANVAS_STORAGE_KEY);
+    setSketchResetKey((k) => k + 1);
+  }, []);
   const { settings } = useResolvedCanvasSettings(projectIdParam || null);
   const fontTokens = useProjectFontTokens(projectIdParam || null);
   const projectSystemDesign = useProjectSystemDesign(projectIdParam || null);
@@ -677,6 +683,7 @@ function CanvasPageContent() {
         settings={settings}
         onCanvasToolShortcut={handleToolChange}
         onOpenSelectedComponentShortcut={openSelectedComponentInCanvas}
+        sketchResetKey={sketchResetKey}
       />
 
       <div className="fixed left-1/2 top-3 z-[12] -translate-x-1/2">
@@ -835,6 +842,7 @@ function CanvasPageContent() {
           if (component) setVersionsSubject({ id: component.id, kind: "component" });
           else if (screen) setVersionsSubject({ id: screen.id, kind: "screen" });
         }}
+        onClearSketch={clearSketch}
       />
       <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
 
