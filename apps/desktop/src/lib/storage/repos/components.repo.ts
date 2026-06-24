@@ -480,10 +480,18 @@ export async function deleteComponentTree(
         return {
           ...reference,
           attachments,
-          projectIds: Array.from(new Set(attachments.map((attachment) => attachment.projectId))),
+          projectIds: Array.from(
+            new Set(
+              attachments
+                .map((attachment) => attachment.projectId)
+                .filter((id): id is string => Boolean(id)),
+            ),
+          ),
         };
       })
-      .filter((reference) => reference.projectIds.length > 0),
+      // Keep references that still have any attachment (a workspace-level link has
+      // no project but must survive a component delete).
+      .filter((reference) => reference.attachments.length > 0),
   );
 
   // Delete only the affected scene/thumbnail rows. replaceTable would re-stringify

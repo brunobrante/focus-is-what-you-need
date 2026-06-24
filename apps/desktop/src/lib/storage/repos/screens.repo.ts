@@ -271,10 +271,18 @@ export async function deleteScreen(
         return {
           ...reference,
           attachments,
-          projectIds: Array.from(new Set(attachments.map((attachment) => attachment.projectId))),
+          projectIds: Array.from(
+            new Set(
+              attachments
+                .map((attachment) => attachment.projectId)
+                .filter((id): id is string => Boolean(id)),
+            ),
+          ),
         };
       })
-      .filter((reference) => reference.projectIds.length > 0),
+      // Keep references that still have any attachment (a workspace-level link has
+      // no project but must survive a screen delete).
+      .filter((reference) => reference.attachments.length > 0),
   );
 
   const scenes = await listTable<SceneRow>(TABLES.scenes);

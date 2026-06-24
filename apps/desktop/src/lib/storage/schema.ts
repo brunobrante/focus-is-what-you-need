@@ -137,14 +137,19 @@ export type ChecklistRow = {
   updatedAt: number;
 };
 
-export type OwnerType = "project" | "screen" | "component";
+export type OwnerType = "workspace" | "project" | "screen" | "component";
 // Scenes (and thumbnails) are always owned by a variant — a screen's scene lives on its
 // active variant, a component's on its active variant. There is no separate "screen"
 // scene owner anymore.
 export type SceneOwnerType = "variant";
 
 export type ReferenceAttachment = {
-  projectId: string;
+  // The scope this reference is linked to. Exactly one anchor is set:
+  //   - workspace-level: workspaceId set, projectId null — added to the workspace
+  //     itself (shown on the workspace references page), not to any project.
+  //   - project/screen/component: projectId set (+ optional screenId/componentId).
+  workspaceId?: string | null;
+  projectId: string | null;
   screenId: string | null;
   componentId: string | null;
 };

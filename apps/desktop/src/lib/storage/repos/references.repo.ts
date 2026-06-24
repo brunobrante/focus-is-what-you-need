@@ -5,6 +5,18 @@ import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.references;
 
+/** Distinct project ids backing a set of attachments (workspace-level attachments
+ *  have no project, so they contribute nothing). */
+function collectProjectIds(attachments: ReferenceAttachment[]): string[] {
+  return Array.from(
+    new Set(
+      attachments
+        .map((attachment) => attachment.projectId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+}
+
 export async function listReferences(): Promise<ReferenceRow[]> {
   const rows = await listTable<ReferenceRow>(KEY);
   return rows.map(normalizeReferenceRow);
@@ -15,20 +27,11 @@ export async function listReferencesByOwner(
   ownerId: string,
 ): Promise<ReferenceRow[]> {
   const rows = await listReferences();
-  return rows.filter((reference) => {
-    if (ownerType === "project") {
-      return reference.attachments.some(
-        (attachment) =>
-          attachment.projectId === ownerId &&
-          attachment.screenId === null &&
-          attachment.componentId === null,
-      );
-    }
-    if (ownerType === "screen") {
-      return reference.attachments.some((attachment) => attachment.screenId === ownerId);
-    }
-    return reference.attachments.some((attachment) => attachment.componentId === ownerId);
-  });
+  return rows.filter((reference) =>
+    reference.attachments.some((attachment) =>
+      attachmentMatchesOwner(attachment, ownerType, ownerId),
+    ),
+  );
 }
 
 export async function listReferencesByProject(projectId: string): Promise<ReferenceRow[]> {
@@ -75,6 +78,7 @@ export async function createOrAttachReference(input: {
     if (current.linkable === false) return current;
     const attachments = current.attachments.some(
       (attachment) =>
+        (attachment.workspaceId ?? null) === (nextAttachment.workspaceId ?? null) &&
         attachment.projectId === nextAttachment.projectId &&
         attachment.screenId === nextAttachment.screenId &&
         attachment.componentId === nextAttachment.componentId,
@@ -98,7 +102,7 @@ export async function createOrAttachReference(input: {
       stackNodeId: input.stackNodeId ?? current.stackNodeId,
       stackNodeName: input.stackNodeName ?? current.stackNodeName,
       attachments,
-      projectIds: Array.from(new Set([nextAttachment.projectId, ...attachments.map((attachment) => attachment.projectId)])),
+      projectIds: collectProjectIds(attachments),
     });
     const nextRows = [...rows];
     nextRows[idx] = updated;
@@ -123,7 +127,7 @@ export async function createOrAttachReference(input: {
     sourceReferenceId: input.sourceReferenceId,
     stackNodeId: input.stackNodeId,
     stackNodeName: input.stackNodeName,
-    projectIds: [nextAttachment.projectId],
+    projectIds: collectProjectIds([nextAttachment]),
     attachments: [nextAttachment],
     createdAt: now(),
   });
@@ -166,10 +170,10 @@ export async function removeReferenceFromProject(referenceId: string, projectId:
       return normalizeReferenceRow({
         ...reference,
         attachments,
-        projectIds: Array.from(new Set(attachments.map((attachment) => attachment.projectId))),
+        projectIds: collectProjectIds(attachments),
       });
     })
-    .filter((reference) => reference.projectIds.length > 0);
+    .filter((reference) => reference.attachments.length > 0);
   await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
 }
@@ -179,6 +183,14 @@ function attachmentMatchesOwner(
   ownerType: OwnerType,
   ownerId: string,
 ): boolean {
+  if (ownerType === "workspace") {
+    return (
+      attachment.workspaceId === ownerId &&
+      attachment.projectId == null &&
+      attachment.screenId === null &&
+      attachment.componentId === null
+    );
+  }
   if (ownerType === "project") {
     return (
       attachment.projectId === ownerId &&
@@ -207,10 +219,10 @@ export async function removeReferenceFromOwner(
       return normalizeReferenceRow({
         ...reference,
         attachments,
-        projectIds: Array.from(new Set(attachments.map((attachment) => attachment.projectId))),
+        projectIds: collectProjectIds(attachments),
       });
     })
-    .filter((reference) => reference.projectIds.length > 0);
+    .filter((reference) => reference.attachments.length > 0);
   await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
 }
@@ -250,7 +262,7 @@ export async function detachReference(
     linkable: false,
     detachedFrom: master.id,
     attachments: [ownerAttachment],
-    projectIds: [ownerAttachment.projectId],
+    projectIds: collectProjectIds([ownerAttachment]),
     createdAt: now(),
   });
 
@@ -260,7 +272,7 @@ export async function detachReference(
   const updatedMaster = normalizeReferenceRow({
     ...master,
     attachments: remaining,
-    projectIds: Array.from(new Set(remaining.map((attachment) => attachment.projectId))),
+    projectIds: collectProjectIds(remaining),
   });
 
   const nextRows = rows.map((reference) =>
@@ -290,7 +302,7 @@ export async function countReferenceLinkUsages(
       continue;
     }
     for (const attachment of reference.attachments) {
-      projects.add(attachment.projectId);
+      if (attachment.projectId) projects.add(attachment.projectId);
       attachments += 1;
     }
   }
