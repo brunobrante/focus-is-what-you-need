@@ -55,6 +55,7 @@ import {
 } from "@/components/screen/SceneCanvasInspector";
 import { useProcessingFeatures } from "@/lib/models/useProcessingFeatures";
 import { useBuilderProcessing } from "./hooks/useBuilderProcessing";
+import { linkReferenceToOwner } from "@/application/references/linkReferenceToOwner";
 
 // A circular brush cursor sized to the LaMa brush (20px radius / 40px diameter).
 const LAMA_BRUSH_CURSOR =
@@ -64,7 +65,7 @@ const LAMA_BRUSH_CURSOR =
   ) +
   "') 20 20, crosshair";
 
-export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLocally }: ToolsEditorProps) {
+export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLocally, linkTarget }: ToolsEditorProps) {
   const {
     // Refs
     fileInputRef,
@@ -804,7 +805,16 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 <SidebarSaveButton
                   saving={savingStack}
                   saveStatus={stackSaveStatus}
-                  onSave={() => void persistReferenceStack()}
+                  onSave={() =>
+                    void (async () => {
+                      await persistReferenceStack();
+                      // Opened from inside a project: link the worked reference
+                      // back to that owner on save (no copy — shares the blob).
+                      if (linkTarget && referenceId) {
+                        await linkReferenceToOwner(referenceId, linkTarget);
+                      }
+                    })()
+                  }
                 />
               </>
             ) : (

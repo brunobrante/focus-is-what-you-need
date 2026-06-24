@@ -23,6 +23,19 @@ import {
 export function Generate() {
   const [searchParams, setSearchParams] = useSearchParams();
   const referenceId = searchParams.get("id");
+  // Optional target owner: when the Builder is opened from inside a project, the
+  // worked reference is linked back to this owner on save. The Builder itself
+  // stays a general route — this is the only project context it carries.
+  const linkProjectId = searchParams.get("projectId");
+  const linkScreenId = searchParams.get("screenId");
+  const linkComponentId = searchParams.get("componentId");
+  const linkTarget = linkProjectId
+    ? {
+        projectId: linkProjectId,
+        screenId: linkScreenId || null,
+        componentId: linkComponentId || null,
+      }
+    : null;
   const [localSource, setLocalSource] = useState<ToolReference | null>(null);
   const [diskReference, setDiskReference] = useState<ToolReference | null>(null);
   const [groupContext, setGroupContext] = useState<ToolReferenceGroupContext | null>(null);
@@ -135,6 +148,7 @@ export function Generate() {
       item={item}
       referenceId={referenceId}
       groupContext={referenceId ? groupContext : null}
+      linkTarget={linkTarget}
       onUploadedLocally={(next) => {
         setLocalSource(next);
         setSearchParams({});

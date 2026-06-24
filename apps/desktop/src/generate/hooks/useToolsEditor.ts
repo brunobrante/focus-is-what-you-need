@@ -42,6 +42,7 @@ import {
   removeSavedComponents,
 } from "../engine/storage";
 import type { ProcessingActionKind } from "@/lib/models/modelCommands";
+import type { ReferenceAttachment } from "@/lib/storage/schema";
 import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
@@ -59,6 +60,12 @@ export type ToolsEditorProps = {
   referenceId: string | null;
   groupContext: ToolReferenceGroupContext | null;
   onUploadedLocally: (next: ToolReference) => void;
+  /**
+   * When the Builder is opened from inside a project/screen/component, this is the
+   * owner to link the worked reference into on save. The Builder stays a general,
+   * workspace-agnostic route; this is the only project context it carries.
+   */
+  linkTarget?: ReferenceAttachment | null;
 };
 
 export type ToolsEditorState = {
