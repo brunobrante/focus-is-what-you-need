@@ -895,7 +895,14 @@ linkable just sets the flag. **Unlinking** runs a consequence check:
 
 ### 10. Generate / Builder Page `/generate`
 
-AI-assisted image-to-component tool.
+AI-assisted image-to-component tool. The Builder is a **general, workspace-
+agnostic route** (`/generate`, `/tools`) — it carries no workspace or project
+state of its own. It reads the reference via `?id=` (and group via `?groupId=`).
+It also accepts an **optional target owner** via `?projectId=`/`?screenId=`/
+`?componentId=`: when opened from inside a project with these params, **Save**
+links the worked reference back into that owner (via the reference link engine —
+no copy, shares the library blob), and **Close** returns to the origin. (The
+in-project entry button that supplies these params is not built yet.)
 
 **Screens, images and groups**: one imported image is one **screen**. A single
 image can hold several screens (its roots) — "New screen" copies the original as
