@@ -436,12 +436,16 @@ A window that renders a canvas **for versions** — identical in behavior to the
 main canvas, but dedicated to versions so you can put a version **side by side**
 and focus on comparing/editing them.
 
-### Free canvas — "Drafts" **[NOW]**
+### Free canvas — "Sketch" **[NOW]**
 
 A window beside the main canvas that uses the **same tools** but is intentionally
 **free**: no fixed frame, edit anywhere, like a giant sheet. Its purpose is
 **freedom to experiment** — try out components and ideas without touching the
 real frame, which stays intact; then copy-paste anything good back in.
+
+(Not to be confused with **Drafts** — the loose, project-less screens and
+components created from Home. "Sketch" is this free scratch window inside the
+canvas; "Drafts" are real saved entities that live outside any workspace/project.)
 
 ### References canvas **[NOW]**
 

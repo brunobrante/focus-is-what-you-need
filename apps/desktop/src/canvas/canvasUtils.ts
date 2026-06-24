@@ -63,14 +63,14 @@ export const CANVAS_FEATURE_WINDOW_ORDER: readonly CanvasFeatureWindowType[] = [
 
 export const CANVAS_WINDOW_LABELS: Record<CanvasWindowType, string> = {
   current: "Current",
-  drafts: "Drafts",
+  sketch: "Sketch",
   references: "References",
   versions: "Versions",
   preview: "Preview",
 };
 
 export const DEFAULT_CANVAS_FEATURES: CanvasFeatureFlags = {
-  drafts: true,
+  sketch: true,
   references: false,
   versions: false,
 };

@@ -54,8 +54,8 @@ export function CanvasRender({
   inspectorOpen,
   split,
   activeTab = "current",
-  enabledTabs = ["current", "drafts"],
-  splitWindows = ["current", "drafts"],
+  enabledTabs = ["current", "sketch"],
+  splitWindows = ["current", "sketch"],
   expanded,
   activeTool,
   currentDocument,
@@ -188,15 +188,15 @@ export function CanvasRender({
     active: boolean,
     showActiveBorder: boolean,
   ) => {
-    if (windowType === "drafts") {
+    if (windowType === "sketch") {
       return (
         <CanvasSurface
           active={active}
           showActiveBorder={showActiveBorder}
-          sourceId="drafts"
+          sourceId="sketch"
           publishBridge={active}
           expanded={expanded}
-          onClick={() => onActiveCanvasChange?.("drafts")}
+          onClick={() => onActiveCanvasChange?.("sketch")}
           storageKey={DRAFTS_CANVAS_STORAGE_KEY}
           draftMode
           fallbackDocument={draftsFallbackDoc}

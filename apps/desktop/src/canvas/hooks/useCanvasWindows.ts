@@ -34,7 +34,7 @@ export function useCanvasWindows({
     versionVariantParam ? "versions" : "current",
   );
   const [split, setSplit] = useState<SplitMode>("none");
-  const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "drafts"]);
+  const [splitWindows, setSplitWindows] = useState<CanvasSplitWindows>(["current", "sketch"]);
   const [extraCurrents, setExtraCurrents] = useState<
     Array<{ key: CanvasWindowKey; subject: SubjectOwner }>
   >([]);

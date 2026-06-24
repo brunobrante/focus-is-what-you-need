@@ -371,7 +371,7 @@ Full-screen visual editor with floating UI layers.
 - Search toggle button — opens the [global search / command palette](#global-search--command-palette)
 
 **Top-center**:
-- Canvas tabs: Current | Drafts | References (Versions when enabled)
+- Canvas tabs: Current | Sketch | References (Versions when enabled)
 - Split mode selector: None | Vertical | Grid (icon buttons)
 - The Current tab always renders the opened screen/component itself; a screen
   **version** is never rendered in Current — it opens in the Versions window.
@@ -420,7 +420,7 @@ Full-screen visual editor with floating UI layers.
 - It respects the split/grid like the other windows (selectable in the Panels menu
   and laid out under None/Vertical/Horizontal/Quadrants).
 
-**References window** (a canvas window, like Current/Drafts):
+**References window** (a canvas window, like Current/Sketch):
 - Shows references attached to the subject currently open in the canvas (a
   component takes precedence over its screen) as a gallery of `ReferenceThumbCard`s.
 - Clicking a card enlarges that reference **inline within the canvas window**
@@ -450,7 +450,7 @@ Full-screen visual editor with floating UI layers.
   the current subject, so new references appear here and in the side References tab.
 - Empty state prompts to add the first reference.
 
-**Versions window** (a canvas window, like Current/Drafts) — always available:
+**Versions window** (a canvas window, like Current/Sketch) — always available:
 - A persistent, functional clone of the Current canvas surface — a real, editable
   stage — **decoupled from Current**. It is never created on open; it is part of the
   canvas. It seeds its subject from whatever Current is editing, but the user can then
