@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { HomePage } from "@/pages/HomePage";
 import { LandingPage } from "@/pages/LandingPage";
 import { NewProjectPage } from "@/pages/NewProjectPage";
+import { NewWorkspacePage } from "@/pages/NewWorkspacePage";
 import { NewDraftPage } from "@/pages/NewDraftPage";
 import { DraftsPage } from "@/pages/DraftsPage";
 import { GalleryPage } from "@/pages/GalleryPage";
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/projects" element={<LandingPage />} />
       <Route path="/new" element={<NewProjectPage />} />
+      <Route path="/new-workspace" element={<NewWorkspacePage />} />
       <Route path="/new-draft" element={<NewDraftPage />} />
       <Route path="/drafts" element={<DraftsPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />

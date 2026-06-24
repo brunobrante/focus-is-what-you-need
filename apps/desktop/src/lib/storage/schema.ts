@@ -247,6 +247,8 @@ export type ThumbnailRow = {
 export type WorkspaceRow = {
   id: string;
   name: string;
+  /** Optional free-text purpose, set in the creation wizard; editable later. */
+  description?: string | null;
   projectIds: string[];
   createdAt: number;
   updatedAt: number;

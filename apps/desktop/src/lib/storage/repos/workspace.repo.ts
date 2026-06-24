@@ -28,6 +28,7 @@ export async function getWorkspaceForProject(
 
 export async function createWorkspace(input: {
   name: string;
+  description?: string | null;
   projectIds?: string[];
 }): Promise<WorkspaceRow> {
   const rows = await listWorkspaces();
@@ -35,6 +36,7 @@ export async function createWorkspace(input: {
   const created: WorkspaceRow = {
     id: newId(),
     name: input.name.trim(),
+    description: input.description?.trim() || null,
     projectIds: input.projectIds ?? [],
     createdAt: t,
     updatedAt: t,
@@ -46,7 +48,7 @@ export async function createWorkspace(input: {
 
 export async function updateWorkspace(
   id: string,
-  patch: Partial<Pick<WorkspaceRow, "name" | "projectIds">>,
+  patch: Partial<Pick<WorkspaceRow, "name" | "description" | "projectIds">>,
 ): Promise<WorkspaceRow | null> {
   const rows = await listWorkspaces();
   const idx = rows.findIndex((r) => r.id === id);

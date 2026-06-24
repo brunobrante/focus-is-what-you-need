@@ -14,6 +14,7 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/projects` | LandingPage | Project browser for the active workspace |
 | `/new` | NewProjectPage | Multi-step project creation wizard. Links the project to a workspace only when launched with `?workspace=<id>` (from the workspace project browser); from Home it creates a loose, workspace-less project and skips the token-sharing step |
 | `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component) creation wizard |
+| `/new-workspace` | NewWorkspacePage | Multi-step workspace creation wizard (name → optional description); on finish it makes the workspace active and opens its project browser |
 | `/drafts` | DraftsPage | Loose, project-less screens and components |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
@@ -76,8 +77,8 @@ here the user picks a workspace, opens a recent project, or jumps to a section.
 - Its **own header** (`HomeHeader`), deliberately separate from the workspace
   TopBar — product mark on the left and a primary **Create** dropdown on the
   right. No workspace switcher (workspace selection happens via the cards below).
-  The Create menu lists, each with an icon: **New workspace** (creates one and
-  makes it active in place), **New project** (→ the `/new` wizard), and **New
+  The Create menu lists, each with an icon: **New workspace** (→ the
+  `/new-workspace` wizard), **New project** (→ the `/new` wizard), and **New
   draft** (→ the `/new-draft` wizard).
 - A left **sidebar** with quick links and a main content column beside it
 - Page footer with version string
@@ -198,6 +199,22 @@ On **Create**, the draft is persisted as a loose component and the app navigates
 straight to the global canvas at `/canvas?variant=<activeVariantId>&type=<device>`
 — drafts have no project, so they open by variant alone (the same path global
 components use). Close (`×`) returns to `/drafts`.
+
+---
+
+### 2b. New Workspace Page `/new-workspace`
+
+Wizard for creating a **workspace**, mirroring the New Project/Draft layout
+(progress bar, centered step, Back/Next footer) with **2 steps**:
+
+**Step — Name**: the workspace name (required).
+
+**Step — Description**: an optional free-text note about the workspace; can be
+skipped.
+
+On **Create workspace**, the workspace is persisted, made the active workspace,
+and the app opens its (initially empty) project browser at `/projects`. Close
+(`×`) returns to Home (`/`). Reached from Home's **Create → New workspace**.
 
 ---
 

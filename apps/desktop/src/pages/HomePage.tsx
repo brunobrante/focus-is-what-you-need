@@ -22,8 +22,6 @@ import { DashedAddTile } from "@/components/DashedAddTile";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectRow, WorkspaceRow } from "@/lib/storage/schema";
-import { createWorkspace } from "@/lib/storage/repos/workspace.repo";
-import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { relativeTime } from "@/application/landing/useLanding";
 import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home/useHome";
 
@@ -114,25 +112,11 @@ function HomeHeader() {
  */
 function NewMenu() {
   const navigate = useNavigate();
-  const [, setActiveWorkspaceId] = useActiveWorkspaceId();
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useDismissable(open, () => setOpen(false), [triggerRef, menuRef]);
-
-  const onNewWorkspace = async () => {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const created = await createWorkspace({ name: "Untitled workspace" });
-      setActiveWorkspaceId(created.id);
-      setOpen(false);
-    } finally {
-      setCreating(false);
-    }
-  };
 
   return (
     <div className="relative">
@@ -161,10 +145,12 @@ function NewMenu() {
         >
           <MenuItem
             icon={<IconGrid size={15} strokeWidth={1.7} />}
-            onClick={() => void onNewWorkspace()}
-            disabled={creating}
+            onClick={() => {
+              setOpen(false);
+              navigate("/new-workspace");
+            }}
           >
-            {creating ? "Creating workspace…" : "New workspace"}
+            New workspace
           </MenuItem>
           <MenuItem
             icon={<IconFrame size={15} strokeWidth={1.7} />}
