@@ -18,6 +18,7 @@ import type { ScreenRow } from "@/lib/storage/schema";
 import type { ProjectType, ScreenVariant } from "@/lib/data/types";
 import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import { useScreenDetail } from "@/application/screen-detail/useScreenDetail";
+import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
 import { DetailView } from "./DetailView";
 import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
@@ -39,6 +40,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
 
+  const back = useProjectBackTarget(project?.id ?? pid);
   const [infoOpen, setInfoOpen] = useState(false);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
   const { requestDelete, modal: deleteModal } = useDeleteComponent();
@@ -57,7 +59,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
         <DetailBreadcrumb
           backHref={`/project/${encodeURIComponent(project?.id ?? pid)}`}
           trail={[
-            { label: "Projects", href: "/" },
+            { label: back.label, href: back.href },
             { label: projectName, href: `/project/${encodeURIComponent(project?.id ?? pid)}` },
           ]}
           current={screenName}

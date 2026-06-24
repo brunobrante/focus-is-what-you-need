@@ -13,6 +13,7 @@ import { ProjectPreviewModal, type ProjectPreviewModalHandle } from "@/component
 import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/repos/screens.repo";
 import { useGallery } from "@/application/gallery/useGallery";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
+import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
 
 import {
   Crumbs,
@@ -69,6 +70,9 @@ export function GalleryPage() {
   // opens the per-instance copy/delete modal (same as Unlink), then removes the master.
   const { requestDelete: requestDeleteComponent, modal: deleteComponentModal } = useDeleteComponent();
 
+  // Loose projects (no workspace) back out to Home, not the workspace browser.
+  const back = useProjectBackTarget(project?.id ?? projectId);
+
   // Versions are variants of a screen, not separate screens, so every screen row is a
   // real project screen. Its versions live in the screen's Versions tab.
   const projectScreens = screens;
@@ -94,7 +98,7 @@ export function GalleryPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]" data-type={type}>
       <header className="flex h-14 items-center border-b border-[var(--border)] px-5">
-        <Crumbs projectName={projectName} type={type} />
+        <Crumbs projectName={projectName} type={type} backHref={back.href} backLabel={back.label} />
       </header>
 
       {editOpen && project ? (

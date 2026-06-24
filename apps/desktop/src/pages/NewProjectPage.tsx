@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { IconCheck, IconChevronLeft, IconChevronRight, IconClose, IconUpload } from "@/components/icons";
 import {
   PROJECT_TYPE_DIMS,
@@ -48,6 +48,11 @@ export function NewProjectPage() {
     setShareByDefault,
   } = useNewProject();
 
+  // Close returns where the wizard was opened from: the workspace browser when
+  // launched from a workspace (?workspace=<id>), otherwise Home.
+  const [searchParams] = useSearchParams();
+  const closeHref = searchParams.get("workspace") ? "/projects" : "/";
+
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
       <header className="px-6 pt-[18px]">
@@ -60,7 +65,7 @@ export function NewProjectPage() {
             </span>
           </div>
           <Link
-            to="/projects"
+            to={closeHref}
             aria-label="Close"
             className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-lg border border-[var(--border)] bg-transparent text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >

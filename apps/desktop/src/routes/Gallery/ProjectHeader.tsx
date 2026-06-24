@@ -122,15 +122,26 @@ export function ProjectOverview({
   );
 }
 
-export function Crumbs({ projectName, type }: { projectName: string; type: ProjectType }) {
+export function Crumbs({
+  projectName,
+  type,
+  backHref = "/projects",
+  backLabel = "Projects",
+}: {
+  projectName: string;
+  type: ProjectType;
+  /** Root crumb target — the workspace browser, or Home for a loose project. */
+  backHref?: string;
+  backLabel?: string;
+}) {
   return (
     <div className="flex items-center gap-2.5 text-[12px] tracking-[0.2px] text-[var(--text-muted)]">
-      <Link to="/projects" aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
+      <Link to={backHref} aria-label="Back" className="text-[var(--text-muted)] hover:text-[var(--text)]">
         <IconChevronLeft size={14} strokeWidth={1.6} />
       </Link>
       <span className="text-[var(--text-faint)]">/</span>
-      <Link to="/projects" className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
-        Projects
+      <Link to={backHref} className="text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
+        {backLabel}
       </Link>
       <span className="text-[var(--text-faint)]">/</span>
       <span className="text-[13px] font-medium text-[var(--text)]">{projectName}</span>

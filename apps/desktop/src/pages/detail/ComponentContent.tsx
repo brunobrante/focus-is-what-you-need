@@ -20,6 +20,7 @@ import { updateComponent } from "@/lib/storage/repos/components.repo";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
+import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
 import { DetailView } from "./DetailView";
 import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
@@ -36,6 +37,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
     handleDeleteVariant, handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
+  const back = useProjectBackTarget(projectId);
   const [infoOpen, setInfoOpen] = useState(false);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
   const { requestDelete, modal: deleteModal } = useDeleteComponent();
@@ -95,7 +97,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
         <DetailBreadcrumb
           backHref={componentParentHref(projectId, trail, screen)}
           trail={[
-            { label: "Projects", href: "/" },
+            { label: back.label, href: back.href },
             { label: projectName, href: `/project/${encodeURIComponent(projectId)}` },
             ...(screen ? [{ label: screen.title, href: `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}` }] : []),
             ...trail.map((c) => ({ label: c.name, href: `/project/${encodeURIComponent(projectId)}/c/${c.id}` })),

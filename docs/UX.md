@@ -229,7 +229,11 @@ scratch surface inside the editor.)
 Shows all screens, components, and references inside a project.
 
 **Header**:
-- Breadcrumb: Projects > ProjectName
+- Breadcrumb: Projects > ProjectName. The root crumb is **workspace-aware**: a
+  project in a workspace backs out to `Projects` (`/projects`); a **loose** project
+  (no workspace) backs out to `Home` (`/`) instead, so it never dead-ends in a
+  workspace it never belonged to. The same rule drives the screen/component detail
+  breadcrumbs (via `useProjectBackTarget`) and the New Project wizard's close.
 - Counts: `Screens (N)` | `Components (N)` | `References (N)`
 - "Edit project" button
 
