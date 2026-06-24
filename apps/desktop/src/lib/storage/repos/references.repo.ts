@@ -271,6 +271,51 @@ export async function detachReference(
   return copy;
 }
 
+/**
+ * How many places link a library reference. Counts the whole-image card and any
+ * stack-cut cards derived from it (`${id}::<node>`), since deleting the library
+ * master removes them all. Used to warn before a cascading library delete.
+ */
+export async function countReferenceLinkUsages(
+  libraryReferenceId: string,
+): Promise<{ projects: number; attachments: number }> {
+  const rows = await listReferences();
+  const projects = new Set<string>();
+  let attachments = 0;
+  for (const reference of rows) {
+    if (
+      reference.id !== libraryReferenceId &&
+      !reference.id.startsWith(`${libraryReferenceId}::`)
+    ) {
+      continue;
+    }
+    for (const attachment of reference.attachments) {
+      projects.add(attachment.projectId);
+      attachments += 1;
+    }
+  }
+  return { projects: projects.size, attachments };
+}
+
+/**
+ * Remove every link row derived from a library reference (the whole-image card
+ * and all its stack-cut cards). Called when the library master is deleted so no
+ * project keeps a dangling link to a blob that no longer exists.
+ */
+export async function removeReferenceLinksForLibraryId(
+  libraryReferenceId: string,
+): Promise<void> {
+  const rows = await listReferences();
+  const next = rows.filter(
+    (reference) =>
+      reference.id !== libraryReferenceId &&
+      !reference.id.startsWith(`${libraryReferenceId}::`),
+  );
+  if (next.length === rows.length) return;
+  await replaceTable<ReferenceRow>(KEY, next);
+  notify(KEY);
+}
+
 export async function bulkInsertReferences(rows: ReferenceRow[]): Promise<void> {
   await replaceTable<ReferenceRow>(KEY, rows.map(normalizeReferenceRow));
   notify(KEY);

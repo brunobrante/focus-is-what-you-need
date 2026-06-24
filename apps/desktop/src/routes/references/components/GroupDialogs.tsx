@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { ReferenceGroup } from "@/lib/references/groupTypes";
 import { SmallButton } from "./ui";
@@ -167,6 +167,77 @@ export const DeleteGroupModal = forwardRef<DeleteGroupModalHandle>(
               }}
             >
               Delete group
+            </SmallButton>
+          </div>
+        </div>
+      </div>
+    );
+  },
+);
+
+export interface DeleteReferenceModalHandle {
+  open: (input: { name: string; projects: number }, onConfirm: () => void) => void;
+  close: () => void;
+}
+
+/**
+ * Confirms deleting a library reference that is still linked into projects. The
+ * library entry is the source of truth, so deleting it removes the reference from
+ * every project that links it — there are no per-project copies to keep.
+ */
+export const DeleteReferenceModal = forwardRef<DeleteReferenceModalHandle>(
+  function DeleteReferenceModal(_, ref) {
+    const [isOpen, setIsOpen] = useState(false);
+    const dataRef = useRef<{ name: string; projects: number } | null>(null);
+    const onConfirmRef = useRef<(() => void) | null>(null);
+
+    useImperativeHandle(ref, () => ({
+      open: (input, onConfirm) => {
+        dataRef.current = input;
+        onConfirmRef.current = onConfirm;
+        setIsOpen(true);
+      },
+      close: () => setIsOpen(false),
+    }));
+
+    if (!isOpen || !dataRef.current) return null;
+
+    const { name, projects } = dataRef.current;
+    const projectLabel = projects === 1 ? "project" : "projects";
+
+    return (
+      <div
+        role="dialog"
+        aria-modal
+        aria-label="Delete reference"
+        onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(0,0,0,0.68)] p-8 backdrop-blur-[6px]"
+      >
+        <div
+          role="document"
+          className="flex w-[min(420px,100%)] flex-col overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--bg-elev)]"
+          style={{ boxShadow: "var(--shadow-pop)" }}
+        >
+          <div className="border-b border-[var(--border)] px-[18px] py-4">
+            <h3 className="m-0 text-[15px] font-semibold text-[var(--text)]">Delete reference?</h3>
+            <p className="m-0 mt-2 text-[12px] leading-[1.5] text-[var(--text-muted)]">
+              "{name}" is linked in {projects} {projectLabel}. Deleting it from the
+              library removes it from {projects === 1 ? "that project" : "all of them"} too.
+              This can't be undone.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 px-[18px] py-3">
+            <SmallButton type="button" onClick={() => setIsOpen(false)}>
+              Cancel
+            </SmallButton>
+            <SmallButton
+              type="button"
+              onClick={() => {
+                onConfirmRef.current?.();
+                setIsOpen(false);
+              }}
+            >
+              Delete everywhere
             </SmallButton>
           </div>
         </div>

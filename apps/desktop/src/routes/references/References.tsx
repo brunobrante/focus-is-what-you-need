@@ -9,7 +9,8 @@ import { VideoFramePicker } from "../import/VideoFramePicker";
 import { useReferenceLibrary } from "./hooks/useReferenceLibrary";
 import { ReferenceGrid } from "@/components/references/ReferenceGrid";
 import { ImportModal, type ImportModalHandle } from "./components/ImportModal";
-import { ReferenceGroupModal, type ReferenceGroupModalHandle, DeleteGroupModal, type DeleteGroupModalHandle } from "./components/GroupDialogs";
+import { ReferenceGroupModal, type ReferenceGroupModalHandle, DeleteGroupModal, type DeleteGroupModalHandle, DeleteReferenceModal, type DeleteReferenceModalHandle } from "./components/GroupDialogs";
+import { countReferenceLinkUsages } from "@/lib/storage/repos/references.repo";
 import { ReferenceDetailModal, type ReferenceDetailSubject } from "./components/ReferenceDetailModal";
 import { SmallButton, FilterSearchBar } from "./components/ui";
 
@@ -18,6 +19,19 @@ export function References() {
   const importRef = useRef<ImportModalHandle>(null);
   const groupModalRef = useRef<ReferenceGroupModalHandle>(null);
   const deleteGroupRef = useRef<DeleteGroupModalHandle>(null);
+  const deleteReferenceRef = useRef<DeleteReferenceModalHandle>(null);
+
+  // Deleting a library reference cascades to every project that links it, so warn
+  // first when it is in use; an unlinked reference is removed straight away.
+  const handleDeleteReference = async (id: string) => {
+    const usage = await countReferenceLinkUsages(id);
+    if (usage.projects === 0) {
+      lib.removeItem(id);
+      return;
+    }
+    const name = lib.library.find((item) => item.id === id)?.name ?? "This reference";
+    deleteReferenceRef.current?.open({ name, projects: usage.projects }, () => lib.removeItem(id));
+  };
 
   const modalSubject: ReferenceDetailSubject = (() => {
     if (!lib.selectedSubject) return null;
@@ -183,7 +197,7 @@ export function References() {
         looseReferences={lib.looseGroupCandidates}
         stackThumbnailUrls={lib.stackThumbnailUrls}
         onClose={() => lib.setSelectedSubject(null)}
-        onDelete={(id) => lib.removeItem(id)}
+        onDelete={(id) => void handleDeleteReference(id)}
         onNameChange={lib.updateName}
         onDescriptionChange={lib.updateDescription}
         onTagsChange={lib.updateTags}
@@ -228,6 +242,7 @@ export function References() {
 
       <ReferenceGroupModal ref={groupModalRef} />
       <DeleteGroupModal ref={deleteGroupRef} />
+      <DeleteReferenceModal ref={deleteReferenceRef} />
     </div>
   );
 }

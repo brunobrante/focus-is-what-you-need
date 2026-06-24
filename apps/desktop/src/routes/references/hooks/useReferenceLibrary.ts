@@ -10,6 +10,7 @@ import {
   replaceReferenceLibraryMeta,
   replaceReferenceLibraryGroups,
 } from "@/lib/storage/repos/referenceLibrary.repo";
+import { removeReferenceLinksForLibraryId } from "@/lib/storage/repos/references.repo";
 import { clearReferenceUrlCache } from "@/lib/references/referenceUrlCache";
 import { ensureWorkspaceFolders } from "@/lib/tauri/workspace";
 import {
@@ -345,6 +346,9 @@ export function useReferenceLibrary() {
       return next;
     });
     void removeReferenceFile(id);
+    // The library entry is the single source of truth, so deleting it cascades to
+    // every project/screen/component that only links to it (whole image + cuts).
+    void removeReferenceLinksForLibraryId(id);
     setSelectedSubject((current) =>
       current?.kind === "reference" && current.id === id ? null : current,
     );
