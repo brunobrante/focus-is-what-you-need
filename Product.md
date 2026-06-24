@@ -297,6 +297,10 @@ level. Entities can exist without a parent above them:
 
 - **Projects without a workspace** — **[NOW]** a project can live on its own,
   outside any workspace.
+- **Screens / components without a project — "Drafts"** — **[NOW]** loose screens
+  and components, created from Home and saved on their own, with no project or
+  workspace above them. They are real, persisted entities (not scratch work); they
+  simply have no parent to inherit from. See the Drafts note under "Sketch".
 - **References without any attachment** — **[NOW]** the global library holds
   references attached to nothing.
 
