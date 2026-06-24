@@ -29,6 +29,7 @@ import type { ReferenceStackData } from "@/lib/references/stackTypes";
 import { stackRootIds } from "@/lib/references/stackTypes";
 import { listReferenceLibraryMeta } from "@/lib/storage/repos/referenceLibrary.repo";
 import type { createOrAttachReference } from "@/lib/storage/repos/references.repo";
+import { addReferencesFromFiles } from "@/application/references/addReferencesFromFiles";
 import { bakeOriginalThumbnail, bakeStackNodeThumbnail } from "@/lib/references/referenceThumbnails";
 
 /* ---------- Types ---------- */
@@ -172,8 +173,11 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [stackDataById, setStackDataById] = useState<Record<string, ReferenceStackData | null>>({});
 
+  const [uploading, setUploading] = useState(false);
+
   const objectUrlsRef = useRef<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
@@ -293,6 +297,20 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
     (attachMode === "screen" && Boolean(screenId)) ||
     (attachMode === "component" && Boolean(componentId));
 
+  // Upload brand-new files from inside a project: each one is saved to the root
+  // library and auto-linked to the current target in a single gesture.
+  async function handleUploadFiles(files: FileList | null) {
+    const attachment = buildAttachment();
+    if (!files || files.length === 0 || !attachment || uploading) return;
+    setUploading(true);
+    try {
+      await addReferencesFromFiles(files, attachment);
+      close();
+    } finally {
+      setUploading(false);
+    }
+  }
+
   function derivedId(item: LibMeta, node: PickNode): string {
     return node.stackNodeId ? `${item.id}::${node.stackNodeId}` : item.id;
   }
@@ -379,6 +397,27 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
               placeholder="Search images and stack components..."
               className="flex-1 bg-transparent text-[14.5px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
             />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                void handleUploadFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!attachmentReady || uploading}
+              title={attachmentReady ? "Upload new files to the library and link them here" : "Choose a target first"}
+              className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)] px-3 text-[11.5px] font-medium text-[var(--text)] transition-colors hover:bg-[rgba(255,255,255,0.1)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <IconImage size={13} strokeWidth={1.8} />
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
             <button
               type="button"
               onClick={close}
@@ -486,7 +525,7 @@ function EmptyLibrary() {
       <div>
         <p className="m-0 text-[13.5px] font-semibold text-[var(--text)]">Empty library</p>
         <p className="m-0 mt-1 max-w-[300px] text-[12.5px] leading-[1.55] text-[var(--text-muted)]">
-          Add images and videos on the <span className="text-[var(--text)]">References</span> page so they appear here.
+          Use <span className="text-[var(--text)]">Upload</span> above to add images or videos — they are saved to your library and linked here.
         </p>
       </div>
     </div>

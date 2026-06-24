@@ -240,7 +240,7 @@ the project's own tokens shown together — see section 8a.
 - `NewScreenModal` — form with name field and template selector
 - `NewComponentModal` — form with name field, optional **Size (W×H)** inputs, and kind selector. When both width and height are filled, the component is seeded with a blank frame at exactly that size; left blank, it uses the project-type default size.
 - `ProjectPreviewModal` — full-screen preview of project screens
-- `AddReferenceModal` — searchable stack tree for attaching references
+- `AddReferenceModal` — searchable stack tree for attaching existing library references, plus an **Upload** action that saves brand-new files to the root library and auto-links them to the current target in one gesture
 - `ReferencesModal` — lightbox preview of a project reference (opened from a card)
 - `ConfirmActionModal` — confirmation dialog with Cancel / Delete buttons. Works both imperatively (via `ref.open(...)`) and as a controlled component (via `open` + `onConfirm` props).
 
