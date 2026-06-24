@@ -109,23 +109,11 @@ div with children; every control writes real CSS). One doc per panel/group.
   — generic `CanvasSurfacePolicy` + `CanvasEngineAdapter` so Main/Drafts/Versions/
   References/Fast Edit become policies over one scene engine. **Deliberately parked**
   — don't build until a second scene surface needs it; revisit criterion in the doc.
-- **Unify component ownership — drop the screen-main `screenId` special case.** Make a
-  screen's main top-level components variant-owned (`parentVariantId = mainVariant`) like
-  every other variant (screen versions + all component variants already are), so ownership
-  is uniform (`component → parentVariant → master`) and `promoteVariantToMain` loses its
-  `screenId ↔ parentVariantId` re-home. **Pure cleanup, no behavior change.** Safe re: the
-  "casal" model — it only moves the *component → scene* axis, never *variant → master* (the
-  screen still owns its variant chain; §3.1). **Real cost (bigger than it looks):** it forces
-  `componentScope` (`lib/storage/defaults.ts`, a pure hot-path field check in
-  `normalizeComponentRow`) to become **variant-aware** — once a screen top-level carries
-  `parentVariantId`, scope must be read from the parent variant's `ownerKind`
-  (`screen` → screen-level, `component` → nested), so `variants` must be threaded to its
-  callers. Ripples to `listTopLevelByScreen` / `findComponentBySourceNode` /
-  `collectScreenComponentIds`, the materializer's top-level `rootOwner` (the version path
-  already shows the shape), `dependencyIndex` (already maps `screenId → mainVariant`), and the
-  seed (bump `SCHEMA_VERSION`, reseed — no migration). Stage one commit per reader, tests each;
-  last step deletes the promote re-home. The bug this would tidy is already fixed (version
-  promote-to-main shipped: `7eb1c13` / `4bc1150` / `afbb307`) — this is optional polish.
+- [Unify component ownership — drop the screen-main `screenId` special case](./unify-component-ownership.md)
+  — make a screen's main top-level components variant-owned (`parentVariantId = mainVariant`)
+  like every other variant, so ownership is uniform and `promoteVariantToMain` loses its
+  `screenId ↔ parentVariantId` re-home. Pure cleanup, no behavior change; safe re: the "casal"
+  model. Real cost: `componentScope` must become variant-aware (full detail + staging in the doc).
 
 ## Already shipped — folded back into Product.md as `[NOW]`
 
