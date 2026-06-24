@@ -8,7 +8,8 @@ import { DraftsPage } from "@/pages/DraftsPage";
 import { GalleryPage } from "@/pages/GalleryPage";
 import { DetailPage } from "@/pages/DetailPage";
 import { CanvasPage } from "@/canvas/Canvas";
-import { References } from "@/routes/References";
+import { HomeReferencesPage } from "@/pages/HomeReferencesPage";
+import { WorkspaceReferencesPage } from "@/pages/WorkspaceReferencesPage";
 import { SystemDesignPage } from "@/pages/SystemDesignPage";
 import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
@@ -34,7 +35,8 @@ export default function App() {
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />
       <Route path="/canvas" element={<CanvasPage />} />
-      <Route path="/references" element={<References />} />
+      <Route path="/references" element={<HomeReferencesPage />} />
+      <Route path="/workspace/:workspaceId/references" element={<WorkspaceReferencesPage />} />
       <Route path="/system-design" element={<SystemDesignPage />} />
       <Route path="/components" element={<GlobalComponentsPage />} />
       <Route path="/generate" element={<Generate />} />

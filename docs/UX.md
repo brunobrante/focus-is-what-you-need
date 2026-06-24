@@ -19,7 +19,8 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
 | `/canvas` | CanvasPage | Full-screen visual canvas editor |
-| `/references` | References | Reference image library |
+| `/references` | HomeReferencesPage | Home's reference library — the user's global references, standalone chrome (no workspace TopBar) |
+| `/workspace/:workspaceId/references` | WorkspaceReferencesPage | The same reference library inside a workspace (workspace TopBar); the route's workspace becomes active |
 | `/system-design` | SystemDesignPage | Active workspace's design system (tokens shared with its projects) |
 | `/components` | GlobalComponentsPage | Workspace-level global components |
 | `/generate` | Generate | AI builder and content generation |

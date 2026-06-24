@@ -172,7 +172,7 @@ export function TopBar({
           <IconColorStyles size={14} strokeWidth={1.7} className="opacity-85" />
           System
         </TopNavLink>
-        <TopNavLink to="/references">
+        <TopNavLink to={currentWs ? `/workspace/${currentWs.id}/references` : "/references"}>
           <IconImage size={14} strokeWidth={1.7} className="opacity-85" />
           References
         </TopNavLink>

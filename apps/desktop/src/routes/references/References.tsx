@@ -1,7 +1,6 @@
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { Upload, FolderPlus } from "lucide-react";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
-import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { extFromName, deleteReferenceFrames } from "@/lib/tauri/referenceStorage";
 import { typeOptionsForKind } from "./lib/utils";
@@ -14,7 +13,13 @@ import { countReferenceLinkUsages } from "@/lib/storage/repos/references.repo";
 import { ReferenceDetailModal, type ReferenceDetailSubject } from "./components/ReferenceDetailModal";
 import { SmallButton, FilterSearchBar } from "./components/ui";
 
-export function References() {
+/**
+ * The reference library page body. The top chrome is supplied by the route
+ * wrapper via `header` — the workspace route passes the workspace `TopBar`, the
+ * Home route passes a standalone header — so the same grid/cards/modals serve
+ * both `/references` and `/workspace/:id/references` without duplication.
+ */
+export function References({ header }: { header?: ReactNode }) {
   const lib = useReferenceLibrary();
   const importRef = useRef<ImportModalHandle>(null);
   const groupModalRef = useRef<ReferenceGroupModalHandle>(null);
@@ -46,7 +51,7 @@ export function References() {
 
   return (
     <div className="flex h-screen flex-col bg-[var(--bg)]">
-      <TopBar />
+      {header}
 
       <main className="flex flex-1 min-h-0 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-y-auto">
