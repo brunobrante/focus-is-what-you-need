@@ -1,7 +1,7 @@
 # Architecture.md
 
 Implementation reference for this codebase. **This is implementation detail — it
-may be refactored freely** as long as no law in [`Product.md`](./Product.md) is
+may be refactored freely** as long as no law in [`../Product.md`](../Product.md) is
 broken. `CLAUDE.md` links here for the deep detail; keep this file in sync with
 the code.
 

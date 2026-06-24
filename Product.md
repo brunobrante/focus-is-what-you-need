@@ -27,8 +27,11 @@ follow the code and may change. This document leads.
 Sections are tagged where useful:
 - **[LAW]** — invariant. Never break it.
 - **[NOW]** — built and shipping today; behavior to preserve.
-- **[PLANNED]** — direction, not yet built. Do not treat as a law and do not
-  assume it exists.
+
+This document describes only what the product **is and must do today**. Features
+that are planned but not yet built do not live here — they wait in [`docs/`](./docs),
+indexed in [`docs/planned/product-backlog.md`](./docs/planned/product-backlog.md), and are folded
+back in as `[NOW]` once they ship.
 
 ---
 
@@ -185,27 +188,6 @@ Inserting an **Image** or an **Icon** drops in a **mock placeholder** — this i
 intentional, so structure reads immediately without forcing the user to find real
 assets first. The user then points the element at real content (via its `src`).
 
-**[PLANNED]** Sending a photo/file **directly onto the canvas** to become an
-image, instead of setting `src` afterward.
-
-### SVG is a sealed component **[PLANNED]**
-
-Inserting an **SVG** drops in a default placeholder (like Image and Icon). An SVG
-holds vector elements (paths, shapes) inside it, so by the automatic rule above it
-**is a component** — but it is a **sealed** one:
-
-- In the tree it appears as a **single node** with a link to open it on its own;
-  its internal vector children (paths, etc.) are **not** surfaced as sub-components.
-- On the canvas only the **SVG frame** renders.
-- You **cannot edit its internals in place**. To edit the paths inside you must
-  **open the SVG on its own** — isolate it / enter its page — exactly like editing
-  any component in isolation.
-
-This keeps an imported icon or illustration as **one honest object** in the
-structure, while still letting you drill in and edit its vectors when you
-explicitly focus on it. It follows the same spine as the laws "any element with a
-child is a component" and "you edit inside a frame, in isolation."
-
 ---
 
 ## The entity model
@@ -235,9 +217,6 @@ workspace; it contains many projects. A workspace owns:
 - **References** — UX/UI reference images and videos, global to the workspace and
   shareable into its projects, screens, and components.
 
-**[PLANNED]** People and permissions — inviting members to a workspace and
-managing who can edit what.
-
 ### Project **[NOW]**
 
 The space that holds screens. Created by choosing a type — **mobile | tablet |
@@ -261,10 +240,6 @@ recurring capabilities:
   A linked token cannot be edited in the project — to change it you edit the master
   in the workspace, or *detach* it to get an independent local copy.
 
-**[PLANNED]** Richer screen definitions: more than one screen type in one project
-(e.g. tablet and mobile together), and pre-defined types that are not locked to a
-fixed width×height.
-
 ### Screen **[NOW]**
 
 The main frame of the tree, sized by the project type (e.g. mobile `390×844`).
@@ -277,10 +252,6 @@ are free to build anything **inside that specific frame**. A screen has:
   screen attached to the Home screen). Imported directly, or pulled from the
   project or workspace references.
 - **Versions** — multiple versions of that specific screen (see Versioning).
-
-**[PLANNED]** Choosing which version is the **main**: promote any version to be
-the main (the one shown for the screen in the project), and the previously-main
-becomes a normal version.
 
 ### Component **[NOW]**
 
@@ -328,9 +299,6 @@ level. Entities can exist without a parent above them:
   outside any workspace.
 - **References without any attachment** — **[NOW]** the global library holds
   references attached to nothing.
-- **Screens and components without a project (or workspace)** — **[PLANNED]**
-  create a standalone screen or component directly, with no project/workspace
-  above it.
 
 When an entity is loose, it simply loses the capabilities it would have inherited
 from a parent scope (e.g. a project with no workspace has no workspace tokens to
@@ -365,11 +333,10 @@ at its own home (its main/origin)**. For a component you **open it on its own**,
 which takes you into the master's flow with the item focused; for a token you edit
 it in the workspace System Design; for a reference you edit the master reference.
 
-**[PLANNED]** A back button on that flow that returns you to exactly where you
-were, for a smoother round trip.
+**[NOW]** A back button on that flow returns you to exactly where you were, for a
+smooth round trip back to the instance after editing the master.
 
-**[NOW]** A **Screen cannot be linkable** — it makes no sense yet. (**[PLANNED]**
-this may change for a specific future feature.)
+**[NOW]** A **Screen cannot be linkable** — it makes no sense yet.
 
 ### Detach **[NOW]**
 
@@ -531,23 +498,11 @@ more. Editing a cut with an AI tool **saves a new variant while keeping the old
 one** — each cut can carry a history, so an edited cut and its original both live
 in the tree.
 
-### Builder — planned
+### Video frames → screens **[NOW]**
 
-- **[PLANNED]** **Video import**: extract frames from a video and turn the frames
-  into screens. (Video *as a reference* already exists; frame-extraction does
-  not.)
-- **[PLANNED]** A **data window** beside the Builder to generate training data and
-  sync between the static image and its reconstruction.
-- **[PLANNED]** Background-remove quality tools and other image processing to
-  improve cut quality.
-
-### Why the Builder exists **[PLANNED direction]**
-
-Beyond producing references, the long-term goal is to **accumulate labeled
-image→component data to train UX/UI models** — eventually turning a static UI
-image into HTML/CSS automatically. Because of this, the Builder is intentionally
-**not hard-wired to References only**; it may feed other features (references
-**and** data).
+You can import a **video**, pick frames from it, and turn those frames into
+screens — each extracted frame becomes a screen, grouped together. This is a real
+input path, alongside importing static images.
 
 ---
 

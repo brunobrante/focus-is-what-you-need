@@ -15,10 +15,10 @@ long as no law in `Product.md` is broken. When the idea and the code disagree,
 ## Documentation map
 
 - [`Product.md`](./Product.md) — product concept + UX laws (locked). **Read first.**
-- [`UX.md`](./UX.md) — living UI spec: every route, page, modal, and interaction.
+- [`UX.md`](./docs/UX.md) — living UI spec: every route, page, modal, and interaction.
 - [`Design.md`](./Design.md) — UI patterns, height scale, component conventions, visual tokens.
-- [`Versioning.md`](./Versioning.md) — master / instance / detach / version model.
-- [`Architecture.md`](./Architecture.md) — save system, settings, storage ownership, snapshot propagation, Rust backend.
+- [`Versioning.md`](./docs/Versioning.md) — master / instance / detach / version model.
+- [`Architecture.md`](./docs/Architecture.md) — save system, settings, storage ownership, snapshot propagation, Rust backend.
 
 Read the relevant doc before touching its area. Two are not optional to keep in
 sync:
@@ -96,7 +96,7 @@ auto-mirror the DB into files.
 
 ## Storage and save guardrails
 
-Detail and rationale live in [`Architecture.md`](./Architecture.md). The
+Detail and rationale live in [`Architecture.md`](./docs/Architecture.md). The
 non-negotiables:
 
 - **Never** call `getTable` / `setTable` (gone). Use `listTable`, `putRecord`,
