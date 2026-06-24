@@ -94,6 +94,11 @@ name, an **Active** badge on the current workspace, and a project count. A card
 is deliberately minimal (the project-focused detail lives in the browser); click
 sets that workspace active and navigates to `/projects`. Empty copy when none.
 
+**My Projects section**: a card grid of **loose projects** — projects that
+belong to no workspace, created from Home. They live only here (never in a
+workspace's project browser). Same card as Recent plus a dashed **New project**
+add tile (`DashedAddTile` → `/new`, which creates another loose project).
+
 **Recent Items section**: a card grid of the active workspace's projects sorted
 by last-updated (capped at 8), each a `RecentThumb` (type badge + thumbnail or
 grid glyph) above name and "{N} screens · updated {relative}". A dashed

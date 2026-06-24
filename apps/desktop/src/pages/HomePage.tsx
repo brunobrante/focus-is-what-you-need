@@ -34,7 +34,7 @@ import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home
  * `/projects`, and each workspace card jumps there with that workspace active.
  */
 export function HomePage() {
-  const { workspaces, recent, activeWorkspace, setActiveWorkspaceId } = useHome();
+  const { workspaces, recent, looseProjects, activeWorkspace, setActiveWorkspaceId } = useHome();
   const navigate = useNavigate();
   const settingsRef = useRef<AppSettingsModalHandle>(null);
 
@@ -65,6 +65,8 @@ export function HomePage() {
               workspaces={workspaces}
               onOpenWorkspace={openWorkspace}
             />
+
+            <MyProjectsSection projects={looseProjects} />
 
             <RecentSection recent={recent} />
           </div>
@@ -402,6 +404,35 @@ function WorkspaceTile({
 
 function initialOf(workspace: WorkspaceRow): string {
   return workspace.name.trim()[0]?.toUpperCase() ?? "W";
+}
+
+/* ── My projects (loose) ──────────────────────────────────────────────────── */
+
+/**
+ * Projects that belong to no workspace — created loose from Home. They live here
+ * (not in any workspace browser); the add tile creates more loose projects.
+ */
+function MyProjectsSection({ projects }: { projects: RecentItem[] }) {
+  return (
+    <section className="mb-11">
+      <SectionHeading title="My Projects" />
+      <div
+        className="grid gap-x-[18px] gap-y-[22px]"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
+      >
+        {projects.map((item) => (
+          <RecentCard key={item.project.id} item={item} />
+        ))}
+        <Link
+          to="/new"
+          aria-label="Create project"
+          className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
+        >
+          <DashedAddTile label="New project" />
+        </Link>
+      </div>
+    </section>
+  );
 }
 
 /* ── Recent items ─────────────────────────────────────────────────────────── */

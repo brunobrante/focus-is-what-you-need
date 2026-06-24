@@ -20,6 +20,8 @@ export interface RecentItem {
 export interface HomeState {
   workspaces: WorkspaceCard[];
   recent: RecentItem[];
+  /** Projects that belong to no workspace — created loose from Home. */
+  looseProjects: RecentItem[];
   /** Total projects in the active workspace (or all projects when loose). */
   projectCount: number;
   activeWorkspace: WorkspaceRow | null;
@@ -88,9 +90,24 @@ export function useHome(): HomeState {
     [scopedProjects, screensByProject],
   );
 
+  // Projects in no workspace (created loose from Home). Home owns these — they
+  // never show in a workspace's project browser.
+  const looseProjects = useMemo<RecentItem[]>(() => {
+    const inAnyWorkspace = new Set<string>();
+    for (const ws of workspaces) for (const id of ws.projectIds) inAnyWorkspace.add(id);
+    return [...allProjects]
+      .filter((p) => !inAnyWorkspace.has(p.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((project) => ({
+        project,
+        screensCount: screensByProject.get(project.id) ?? 0,
+      }));
+  }, [allProjects, workspaces, screensByProject]);
+
   return {
     workspaces: workspaceCards,
     recent,
+    looseProjects,
     projectCount: scopedProjects.length,
     activeWorkspace,
     setActiveWorkspaceId,
