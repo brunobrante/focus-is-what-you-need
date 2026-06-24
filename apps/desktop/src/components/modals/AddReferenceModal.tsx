@@ -35,7 +35,7 @@ import { bakeOriginalThumbnail, bakeStackNodeThumbnail } from "@/lib/references/
 /* ---------- Types ---------- */
 
 type LibMeta = StoredRefMeta & { _objectUrl?: string };
-type AttachMode = "global" | "screen" | "component";
+type AttachMode = "workspace" | "global" | "screen" | "component";
 type KindFilter = "all" | "image" | "video";
 
 // A selectable node inside an image's stack tree. `stackNodeId === null` is the
@@ -53,6 +53,9 @@ type PickNode = {
 
 type Props = {
   projectId: string | null;
+  /** Set on the workspace references page: enables the workspace-global attach
+   *  tab so picks/uploads link to the workspace itself, not a project. */
+  workspaceId?: string | null;
   screens: ScreenRow[];
   components: ComponentRow[];
   existingReferences: ReferenceRow[];
@@ -66,9 +69,16 @@ export interface AddReferenceModalHandle {
   close: () => void;
 }
 
-function defaultAttachMode(input: { defaultScreenId?: string; defaultComponentId?: string }): AttachMode {
+function defaultAttachMode(input: {
+  defaultScreenId?: string;
+  defaultComponentId?: string;
+  projectId: string | null;
+  workspaceId?: string | null;
+}): AttachMode {
   if (input.defaultComponentId) return "component";
   if (input.defaultScreenId) return "screen";
+  // Workspace references page: no project in scope, only the workspace-global tab.
+  if (!input.projectId && input.workspaceId) return "workspace";
   return "global";
 }
 
@@ -156,14 +166,14 @@ function screenEntriesForItem(item: LibMeta, data: ReferenceStackData | null | u
 /* ---------- Component ---------- */
 
 export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(function AddReferenceModal(
-  { projectId, screens, components, existingReferences, defaultScreenId, defaultComponentId, onAdd },
+  { projectId, workspaceId, screens, components, existingReferences, defaultScreenId, defaultComponentId, onAdd },
   ref,
 ) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [attachMode, setAttachMode] = useState<AttachMode>(
-    defaultAttachMode({ defaultScreenId, defaultComponentId }),
+    defaultAttachMode({ defaultScreenId, defaultComponentId, projectId, workspaceId }),
   );
   const [screenId, setScreenId] = useState(defaultScreenId ?? "");
   const [componentId, setComponentId] = useState(defaultComponentId ?? "");
@@ -190,7 +200,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
       objectUrlsRef.current = [];
       setQuery("");
       setKindFilter("all");
-      setAttachMode(defaultAttachMode({ defaultScreenId, defaultComponentId }));
+      setAttachMode(defaultAttachMode({ defaultScreenId, defaultComponentId, projectId, workspaceId }));
       setScreenId(defaultScreenId ?? "");
       setComponentId(defaultComponentId ?? "");
       setLibraryItems([]);
@@ -230,7 +240,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
     })();
 
     return () => { cancelled = true; };
-  }, [open, defaultScreenId, defaultComponentId]);
+  }, [open, defaultScreenId, defaultComponentId, projectId, workspaceId]);
 
   const close = () => setOpen(false);
 
@@ -286,6 +296,11 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
   }, [kindItems, q, stackDataById]);
 
   function buildAttachment(): ReferenceAttachment | null {
+    if (attachMode === "workspace") {
+      return workspaceId
+        ? { workspaceId, projectId: null, screenId: null, componentId: null }
+        : null;
+    }
     if (!projectId) return null;
     if (attachMode === "screen") return screenId ? { projectId, screenId, componentId: null } : null;
     if (attachMode === "component") return componentId ? { projectId, screenId: null, componentId } : null;
@@ -293,7 +308,8 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
   }
 
   const attachmentReady =
-    attachMode === "global" ||
+    (attachMode === "workspace" && Boolean(workspaceId)) ||
+    (attachMode === "global" && Boolean(projectId)) ||
     (attachMode === "screen" && Boolean(screenId)) ||
     (attachMode === "component" && Boolean(componentId));
 
@@ -489,9 +505,15 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11.5px] text-[var(--text-faint)]">Attach to</span>
               <FooterSelect value={attachMode} onChange={(v) => setAttachMode(v as AttachMode)}>
-                <option value="global">Entire project</option>
-                <option value="screen">Specific screen</option>
-                {components.length > 0 && <option value="component">Specific component</option>}
+                {projectId ? (
+                  <>
+                    <option value="global">Entire project</option>
+                    <option value="screen">Specific screen</option>
+                    {components.length > 0 && <option value="component">Specific component</option>}
+                  </>
+                ) : (
+                  <option value="workspace">Workspace (global)</option>
+                )}
               </FooterSelect>
               {attachMode === "screen" && (
                 <FooterSelect value={screenId} onChange={setScreenId}>
