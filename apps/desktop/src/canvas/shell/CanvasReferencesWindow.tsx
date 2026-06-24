@@ -1,15 +1,13 @@
 import { useRef, useState } from "react";
-import { ChevronLeft, Link2, Plus, Trash2, Unlink } from "lucide-react";
+import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { IconImage } from "@/components/icons";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
 import { useReferences } from "@/lib/storage/hooks";
 import {
   createOrAttachReference,
-  detachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
 import { ReferenceCard } from "@/components/references/ReferenceCard";
-import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 import { CanvasReferenceInspector } from "@/canvas/shell/CanvasReferenceInspector";
 import {
   AddReferenceModal,
@@ -51,12 +49,6 @@ export function CanvasReferencesWindow({
   const removeOne = (id: string) =>
     void removeReferenceFromOwner(id, context.ownerType, context.ownerId);
 
-  // Detach: replace the linked instance here with an independent local copy.
-  const detachOne = async (id: string) => {
-    const copy = await detachReference(id, context.ownerType, context.ownerId);
-    if (copy) setSelectedId(copy.id);
-  };
-
   const stop = (event: React.MouseEvent) => event.stopPropagation();
 
   return (
@@ -85,25 +77,10 @@ export function CanvasReferencesWindow({
               Back
             </button>
             <span
-              style={selected.linkable !== false ? { borderColor: LINKED_INSTANCE_COLOR } : undefined}
               className="inline-flex h-8 max-w-[220px] items-center gap-1.5 truncate rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
             >
-              {selected.linkable !== false ? (
-                <Link2 size={12} strokeWidth={1.8} className="shrink-0" style={{ color: LINKED_INSTANCE_COLOR }} />
-              ) : null}
               {selected.title}
             </span>
-            {selected.linkable !== false && (
-              <button
-                type="button"
-                aria-label="Detach reference"
-                title="Detach — make a local copy"
-                onClick={() => void detachOne(selected.id)}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222] hover:text-[#E2E2E2]"
-              >
-                <Unlink size={14} strokeWidth={1.8} />
-              </button>
-            )}
             <button
               type="button"
               aria-label="Remove reference"
@@ -135,17 +112,8 @@ export function CanvasReferencesWindow({
 
       {/* Body */}
       {selected ? (
-        /* Inspector — image (zoom) or stack (tree + selection), inside the canvas.
-           A linked reference gets the purple instance ring, like a component. */
-        <div
-          className="absolute inset-0"
-          style={
-            selected.linkable !== false
-              ? { boxShadow: `inset 0 0 0 1.5px ${LINKED_INSTANCE_COLOR}` }
-              : undefined
-          }
-          onClick={stop}
-        >
+        /* Inspector — image (zoom) or stack (tree + selection), inside the canvas. */
+        <div className="absolute inset-0" onClick={stop}>
           <CanvasReferenceInspector reference={selected} />
         </div>
       ) : references.length === 0 ? (

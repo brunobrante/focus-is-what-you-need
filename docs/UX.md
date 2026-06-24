@@ -426,11 +426,16 @@ Full-screen visual editor with floating UI layers.
 - Clicking a card enlarges that reference **inline within the canvas window**
   (not a modal) — a **Back** control returns to the gallery and a trash control
   removes it. Card hover also reveals remove.
-- **Linkable / detach**: a reference attached here is a **linked instance** of the
-  library master (the title shows a link icon). The enlarged toolbar adds a
-  **Detach** control (unlink icon) that makes an independent **local copy** owned
-  by this subject and breaks the link — mirroring component/token detach. A
-  detached (local) reference is no longer linkable and shows no detach control.
+- **Link model (linked-only)**: a reference attached here is a **link** to the
+  library master — projects/screens/components never own a copy, they only point
+  at the root library entry (the master and its blob are shared by id, so there is
+  no storage duplication). This reuses the same linkable engine as components/
+  tokens, but references are intentionally **linked-only**: there is **no detach
+  control** and **no purple "linked" indicator** (detach exists in the data layer
+  but is blocked in the UI). Removing a reference here only drops the link for this
+  subject; the master stays in the library. Deleting the master from the
+  `/references` library removes it from every project that links it (with a
+  confirmation warning).
 - **Stack references** (a whole stacked image **or** a sub-screen root) open as an
   **interactive composite**, mirroring the Builder Stack tab: the background image
   with its cuts overlaid. Hovering a cut outlines it; clicking selects it; clicking

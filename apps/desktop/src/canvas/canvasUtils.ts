@@ -13,14 +13,14 @@ import type { ProjectType } from "@/lib/data/types";
 import { DEFAULT_DEVICE_ID } from "@/canvas/devices";
 
 export type SplitMode = "none" | "vertical" | "horizontal" | "grid";
-export type CanvasWindowType = "current" | "drafts" | "references" | "versions" | "preview";
+export type CanvasWindowType = "current" | "sketch" | "references" | "versions" | "preview";
 // Preview is no longer a togglable feature window — it is a special view-only
 // window launched from the button above the Inspector, so it is excluded here.
 export type CanvasFeatureWindowType = Exclude<CanvasWindowType, "current" | "preview">;
 export type CanvasFeatureFlags = Record<CanvasFeatureWindowType, boolean>;
 
 // A window is identified by a string KEY, not just its type. Feature windows use
-// their type as the key ("drafts", "versions", …). The "current" window can have
+// their type as the key ("sketch", "versions", …). The "current" window can have
 // multiple instances: the primary is "current"; extras are "current-2", "current-3"…
 // Keys stay unique strings, so the dedup logic below (which used to mean "each type
 // once") now means "each key once" with no other change.
@@ -50,14 +50,14 @@ export const MAX_CURRENT_WINDOWS = MAX_CANVAS_SPLIT_PANES;
 export const CANVAS_WINDOW_ORDER: readonly CanvasWindowType[] = [
   "current",
   "versions",
-  "drafts",
+  "sketch",
   "references",
   "preview",
 ];
 
 export const CANVAS_FEATURE_WINDOW_ORDER: readonly CanvasFeatureWindowType[] = [
   "versions",
-  "drafts",
+  "sketch",
   "references",
 ];
 
