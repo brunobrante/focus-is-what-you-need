@@ -59,6 +59,7 @@ export function DetailView<T extends string>({
   onAddVersion,
   onOpenVersionCanvas,
   onDeleteVersion,
+  onMakeMainVersion,
   onCompare,
   // tabs + body
   tabs,
@@ -107,6 +108,7 @@ export function DetailView<T extends string>({
   onAddVersion: () => void;
   onOpenVersionCanvas: (v: ScreenVersion) => void;
   onDeleteVersion: (v: ScreenVersion) => void;
+  onMakeMainVersion: (v: ScreenVersion) => void;
   onCompare: () => void;
   tabs: ReadonlyArray<{ readonly id: T; readonly label: string; readonly count?: number }>;
   sideTab: T;
@@ -170,6 +172,7 @@ export function DetailView<T extends string>({
               onCompare={onCompare}
               onOpenCanvas={onOpenVersionCanvas}
               onDelete={onDeleteVersion}
+              onMakeMain={onMakeMainVersion}
             />
           }
           tabs={tabs}

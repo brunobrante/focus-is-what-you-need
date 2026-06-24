@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { IconCompare, IconOpenCanvas, IconPlus, IconTrash } from "@/components/icons";
+import { IconCompare, IconOpenCanvas, IconPlus, IconStar, IconTrash } from "@/components/icons";
 import { Snapshot } from "@/components/Snapshot";
 import type { ScreenVersion } from "@/lib/data/screenVersions";
 import type { ProjectType } from "@/lib/data/types";
@@ -88,6 +88,7 @@ export function VersionSwitcher({
   onAdd,
   onOpenCanvas,
   onDelete,
+  onMakeMain,
   onCompare,
 }: {
   versions: ScreenVersion[];
@@ -100,6 +101,9 @@ export function VersionSwitcher({
   onAdd: () => void;
   onOpenCanvas: (v: ScreenVersion) => void;
   onDelete: (v: ScreenVersion) => void;
+  /** Promote the selected version to be the master's main (the canonical, owned
+   *  definition). Absent on surfaces that don't allow promotion. */
+  onMakeMain?: (v: ScreenVersion) => void;
   onCompare: () => void;
 }) {
   const active = versions.find((v) => v.id === activeId) ?? versions[0] ?? null;
@@ -204,6 +208,18 @@ export function VersionSwitcher({
         >
           <IconOpenCanvas size={13} strokeWidth={1.7} />
         </button>
+        {onMakeMain ? (
+          <button
+            type="button"
+            aria-label="Make this version the main"
+            title={active && isMainVersion(active) ? "This is already the main" : "Make main"}
+            onClick={() => active && onMakeMain(active)}
+            disabled={!active || isMainVersion(active)}
+            className={actionBtn}
+          >
+            <IconStar size={13} strokeWidth={1.7} />
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label="Delete version"

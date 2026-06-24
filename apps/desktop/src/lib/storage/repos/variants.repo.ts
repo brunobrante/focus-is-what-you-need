@@ -8,7 +8,11 @@ import {
   markComponentsLinkable,
   setActiveVariant,
 } from "@/lib/storage/repos/components.repo";
-import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
+import {
+  linkifyChildComponentsInGraph,
+  materializeInstancesInGraph,
+} from "@/domain/canvas/graphTransforms";
+import { htmlCanvasDocumentFromJSON } from "@/lib/canvas/htmlScene";
 import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import type {
   ComponentRow,
@@ -268,6 +272,169 @@ export async function duplicateVariant(input: {
     );
   }
   return created;
+}
+
+/**
+ * Promotes a version variant to be its master's **main** (order 0) — the canonical,
+ * owned definition. It is the mirror image of creating a version and serves both
+ * screen and component masters.
+ *
+ * The crown carries ownership. Two shapes, detected automatically:
+ *
+ *  - **Copy version** (independent — it already embeds its own cloned masters): a plain
+ *    swap. Reorder so the promoted variant is main and point the owner's active variant
+ *    at it. For a screen, top-level component ownership (`screenId` vs `parentVariantId`)
+ *    is swapped too, so the new main owns its components as screen-owned and the demoted
+ *    old main keeps its own as version-owned — otherwise the old main's screen-owned
+ *    components would resolve their embedding scene to the new main (a latent corruption).
+ *
+ *  - **Linked version** (holds instances of the old main's child masters): the **masters
+ *    move with the crown**. The child masters are re-parented to the promoted variant and
+ *    its scene re-embeds their real subtrees; the demoted old main keeps linked instances
+ *    pointing at them. This keeps the new main editable and independent of any version's
+ *    lifetime (deleting the old version never guts the main) while preserving the link —
+ *    editing the new main still reflects in the old version. Master ids are preserved (a
+ *    re-parent, never a clone), so linked instances placed elsewhere keep resolving.
+ *
+ * No-op when the variant is already the main or is unknown.
+ */
+export async function promoteVariantToMain(variantId: string): Promise<void> {
+  const variants = await listVariants();
+  const promoted = variants.find((v) => v.id === variantId);
+  if (!promoted || promoted.order <= 0) return; // already main / unknown
+
+  const siblings = variants.filter(
+    (v) => v.ownerKind === promoted.ownerKind && v.ownerId === promoted.ownerId,
+  );
+  const oldMain = siblings.find((v) => v.order <= 0);
+  if (!oldMain || oldMain.id === promoted.id) return;
+
+  const components = await listTable<ComponentRow>(TABLES.components);
+
+  // The old main's OWNED child components — the ones it embeds as real content. For a
+  // screen these are its screen-owned top-level components; for a component they are the
+  // children parented to its main variant.
+  const ownedChildren =
+    promoted.ownerKind === "screen"
+      ? components.filter((c) => c.screenId === oldMain.ownerId && c.parentVariantId === null)
+      : components.filter((c) => c.parentVariantId === oldMain.id);
+  const ownedIds = new Set(ownedChildren.map((c) => c.id));
+
+  const promotedScene = await getSceneByOwner("variant", promoted.id);
+  const oldMainScene = await getSceneByOwner("variant", oldMain.id);
+
+  // Linked version iff the promoted variant holds instances of the old main's owned
+  // children (a copy version embeds its own cloned masters instead).
+  const promotedDoc = htmlCanvasDocumentFromJSON(promotedScene?.graphJSON ?? null);
+  const isLinkedVersion = Boolean(
+    promotedDoc?.nodes.some((n) => n.instanceOf && ownedIds.has(n.instanceOf.componentId)),
+  );
+
+  // 1. Reorder: promoted → main (0); old main → a fresh version slot.
+  const maxOrder = siblings.reduce((m, v) => (v.order > m ? v.order : m), 0);
+  const t = now();
+  await replaceTable<VariantRow>(
+    KEY,
+    variants.map((v) => {
+      if (v.id === promoted.id) return { ...v, order: 0, updatedAt: t };
+      if (v.id === oldMain.id) return { ...v, order: maxOrder + 1, updatedAt: t };
+      return v;
+    }),
+  );
+  notify(KEY);
+
+  // 2. The owner's active variant follows the crown; component ownership moves with it.
+  let nextComponents = components;
+  if (promoted.ownerKind === "component") {
+    nextComponents = components.map((c) => {
+      if (c.id === promoted.ownerId) return { ...c, activeVariantId: promoted.id, updatedAt: t };
+      // Linked: the old main's children become owned by the new main variant.
+      if (isLinkedVersion && ownedIds.has(c.id)) {
+        return normalizeComponentRow({ ...c, parentVariantId: promoted.id, updatedAt: t });
+      }
+      return c;
+    });
+  } else {
+    // Screen owner: the active variant lives on the ScreenRow.
+    const screens = await listTable<ScreenRow>(TABLES.screens);
+    await replaceTable<ScreenRow>(
+      TABLES.screens,
+      screens.map((s) =>
+        s.id === promoted.ownerId ? { ...s, activeVariantId: promoted.id, updatedAt: t } : s,
+      ),
+    );
+    notify(TABLES.screens);
+
+    if (!isLinkedVersion) {
+      // Copy version of a screen: swap top-level component ownership so the new main owns
+      // its components as screen-owned and the demoted main keeps its own as version-owned.
+      // (A linked screen version shares the same screen-owned masters, so no ownership move
+      // is needed — the re-embed/linkify below handle them.)
+      const promotedClones = new Set(
+        components.filter((c) => c.parentVariantId === promoted.id).map((c) => c.id),
+      );
+      nextComponents = components.map((c) => {
+        if (ownedIds.has(c.id)) {
+          return normalizeComponentRow({ ...c, screenId: null, parentVariantId: oldMain.id, updatedAt: t });
+        }
+        if (promotedClones.has(c.id)) {
+          return normalizeComponentRow({ ...c, screenId: promoted.ownerId, parentVariantId: null, updatedAt: t });
+        }
+        return c;
+      });
+    }
+  }
+  if (nextComponents !== components) {
+    await replaceTable<ComponentRow>(TABLES.components, nextComponents);
+    notify(TABLES.components);
+  }
+
+  // 3. Linked only: swap embed↔instance between the two scenes.
+  if (isLinkedVersion) {
+    // Keep the (now promoted-owned) masters pickable as linked instances.
+    await markComponentsLinkable([...ownedIds]);
+
+    const scenes = await listTable<SceneRow>(TABLES.scenes);
+    const sceneByVariant = new Map(
+      scenes
+        .filter((s) => s.ownerType === "variant")
+        .map((s) => [s.ownerId, s.graphJSON] as const),
+    );
+
+    // New main: inline each linked instance back into owned, embedded content.
+    if (promotedScene) {
+      const embedded = materializeInstancesInGraph(
+        promotedScene.graphJSON,
+        (node) => !!node.instanceOf && ownedIds.has(node.instanceOf.componentId),
+        (vid) => sceneByVariant.get(vid) ?? null,
+      );
+      if (embedded) {
+        await upsertScene(
+          { ownerType: "variant", ownerId: promoted.id, graphJSON: embedded },
+          { propagate: true },
+        );
+      }
+    }
+
+    // Old main: collapse its embedded subtrees into linked instances of the new main.
+    if (oldMainScene) {
+      const linked = linkifyChildComponentsInGraph(
+        oldMainScene.graphJSON,
+        ownedChildren.map((c) => ({
+          id: c.id,
+          activeVariantId: c.activeVariantId,
+          sourceNodeId: c.sourceNodeId ?? null,
+          name: c.name,
+        })),
+      );
+      if (linked && linked !== oldMainScene.graphJSON) {
+        await upsertScene(
+          { ownerType: "variant", ownerId: oldMain.id, graphJSON: linked },
+          { propagate: false },
+        );
+      }
+    }
+  }
 }
 
 /**

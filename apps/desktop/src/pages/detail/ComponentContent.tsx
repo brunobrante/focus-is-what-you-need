@@ -34,7 +34,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
     versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef, confirmRef,
     openNewChild, addVariant, removeLinkedReference,
     handleComponentCreated, handleOpenCanvas, handleOpenVersionCanvas, handleAddReference, handleSelectVariant,
-    handleDeleteVariant, handleRename, handleUpdate,
+    handleDeleteVariant, handleMakeMain, handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
   const back = useProjectBackTarget(projectId);
@@ -156,6 +156,7 @@ export function ComponentContent({ componentId }: { componentId: string }) {
         else handleOpenVersionCanvas(v.variantId);
       }}
       onDeleteVersion={(v) => { if (v.variantId) handleDeleteVariant(v.variantId); }}
+      onMakeMainVersion={(v) => { if (v.variantId) handleMakeMain(v.variantId); }}
       tabs={tabs}
       sideTab={displayTab}
       onTabChange={setSideTab}

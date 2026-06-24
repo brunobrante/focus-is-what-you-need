@@ -379,6 +379,23 @@ to the originals. The user chooses one of two modes:
   the original master, so that deleting it deleted the original, is a bug — not the
   model.)
 
+### Promoting a version to be the main **[NOW]**
+
+Any version of a screen or component can be **made the main** — the canonical one the
+others descend from. **[LAW]** When this happens, **the components move with the crown:
+the main is always the owner, and versions only reference it.** Promotion is never a mere
+label swap.
+
+- For a **Copy** version this is trivial — it already owns everything, so it just takes
+  the crown.
+- For a **Linked** version, the linked child components are **re-homed onto the promoted
+  version**, which becomes their real owner; the screen/component that *used* to be the
+  main becomes an ordinary version holding **linked instances** that point back at the new
+  main. The link is preserved (editing the new main still reflects in the old one), but
+  the new main is now a true, editable owner — and **deleting the old version can never
+  empty the new main.** A promoted main that still secretly depended on the old one for
+  its content would be a bug, by the same law that governs Copy above.
+
 (The principle under all reuse: **ownership and origin are never ambiguous.** You
 can always tell whether you are looking at a reference or the real thing, and
 where the real thing lives. See `Versioning.md` for the full rules.)

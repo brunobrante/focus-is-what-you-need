@@ -5,7 +5,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { deleteVariant, duplicateVariant, getVariant, isMainVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { deleteVariant, duplicateVariant, getVariant, isMainVariant, promoteVariantToMain, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
   useActiveVariants,
@@ -99,6 +99,7 @@ export interface ComponentDetailState {
   handleAddReference: (input: Parameters<typeof createOrAttachReference>[0]) => Promise<void>;
   handleSelectVariant: (variantId: string) => void;
   handleDeleteVariant: (variantId: string) => void;
+  handleMakeMain: (variantId: string) => void;
   handleRename: (name: string) => void;
   handleUpdate: (patch: Parameters<typeof updateComponent>[1]) => void;
 }
@@ -368,6 +369,21 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     });
   };
 
+  // Promote a version to be the component's main (the canonical, owned definition). A
+  // linked version's child masters move with the crown; a copy version is a plain swap.
+  const handleMakeMain = (variantId: string) => {
+    const target = variants.find((v) => v.id === variantId);
+    const label = target ? variantVersionLabel(target) : "";
+    confirmRef.current?.open({
+      title: "Make main",
+      message: `Version "${label}" of "${component?.name ?? "component"}" will become the main. The current main becomes a version.`,
+      onConfirm: async () => {
+        await promoteVariantToMain(variantId);
+        setPreviewVariantId(null);
+      },
+    });
+  };
+
   const handleRename = (name: string) => {
     if (component) void updateComponent(component.id, { name });
   };
@@ -425,6 +441,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     handleAddReference,
     handleSelectVariant,
     handleDeleteVariant,
+    handleMakeMain,
     handleRename,
     handleUpdate,
   };

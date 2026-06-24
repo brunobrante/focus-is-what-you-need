@@ -18,7 +18,7 @@ import {
 } from "@/lib/storage/repos/references.repo";
 import { createScreenVersion, updateScreen } from "@/lib/storage/repos/screens.repo";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
-import { deleteVariant, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { deleteVariant, promoteVariantToMain, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -114,6 +114,7 @@ export interface ScreenDetailState {
   handleOpenScreenCanvas: () => void;
   handleOpenVersionCanvas: (versionScreenId: string) => void;
   handleDeleteVersion: (versionScreenId: string, label: string) => void;
+  handleMakeMain: (variantId: string, label: string) => void;
   handleScreenTitleSave: (title: string) => void;
   handleNewComponentCreated: (r: { component: ComponentRow }) => void;
   handleCompareOpenInCanvas: (ids: string[]) => void;
@@ -358,6 +359,20 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     });
   };
 
+  // Promote a version to be the screen's main (the canonical, owned definition). For a
+  // linked version the child masters move with the crown and the old main becomes a linked
+  // version of it; for a copy version it is a plain swap. See promoteVariantToMain.
+  const handleMakeMain = (variantId: string, label: string) => {
+    confirmRef.current?.open({
+      title: "Make main",
+      message: `Version "${label}" of "${screenName}" will become the main. The current main becomes a version.`,
+      onConfirm: async () => {
+        await promoteVariantToMain(variantId);
+        setActiveVersionId(null);
+      },
+    });
+  };
+
   const handleScreenTitleSave = (title: string) => {
     if (!screen || title === screen.title) return;
     void (async () => {
@@ -444,6 +459,7 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     handleOpenScreenCanvas,
     handleOpenVersionCanvas,
     handleDeleteVersion,
+    handleMakeMain,
     handleScreenTitleSave,
     handleNewComponentCreated,
     handleCompareOpenInCanvas,

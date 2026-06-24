@@ -229,6 +229,52 @@ and commits — rendering with the standard purple, read-only instance treatment
 
 ---
 
+## 7c. Promoting a Version to Main ("Make main")
+
+A user can promote any version to be its master's **main** — the canonical, owned
+definition (order 0). This is the mirror image of §7's version creation and runs through
+one entry point for screens and components alike:
+`promoteVariantToMain(variantId)` (`variants.repo.ts`).
+
+**The crown carries ownership.** The master always lives in the main; versions only
+reference it (§2.4–2.5). So promotion is not a flag flip on `order` — the owned content
+must travel to whichever variant wears the crown. Two shapes, detected automatically by
+whether the promoted variant holds **instances of the old main's owned children**:
+
+- **Copy version → main** (the promoted variant already embeds its own cloned masters): a
+  plain swap. Reorder so the promoted variant is `order 0` and the old main takes a fresh
+  version slot; point the owner's active variant (`ComponentRow.activeVariantId` /
+  `ScreenRow.activeVariantId`) at it. For a **screen**, top-level component ownership is
+  swapped too — the promoted variant's cloned children become screen-owned
+  (`screenId` set, `parentVariantId` null) and the demoted main's screen-owned children
+  become version-owned (`parentVariantId` = old main). Without that swap the old main's
+  screen-owned components would resolve their embedding scene to the new main
+  (`mainVariantIdForScreen` = lowest order), corrupting on the next edit.
+
+- **Linked version → main** (the promoted variant holds bare instances of the old main's
+  child masters): the **masters move with the crown**.
+  1. The child masters are **re-parented** to the promoted variant
+     (`parentVariantId` → promoted; screen top-level components stay `screenId`-owned and
+     simply follow the new main variant). This is a re-parent, **never a clone** — master
+     ids are preserved, so any linked instances placed elsewhere keep resolving (§2.1).
+  2. The promoted variant's scene **re-embeds** the real subtrees: each instance node is
+     inlined back into owned content via `materializeInstancesInGraph`, clearing
+     `instanceOf`.
+  3. The demoted old main's scene is **linkified** (`linkifyChildComponentsInGraph`): its
+     embedded subtrees collapse into linked instances pointing at the (now promoted-owned)
+     masters, exactly as a freshly created linked version.
+
+  The result preserves the link — editing the new main still reflects in the old version —
+  while keeping the main editable and **independent of any version's lifetime**: deleting
+  the demoted version only removes its instances and never guts the main (the symmetric
+  guarantee to §7's Copy law).
+
+No-op when the variant is already the main. UI: a **"Make main"** action sits in the
+`VersionSwitcher` toolbar on the screen/component detail pages, beside Compare / Open /
+Delete, enabled only for non-main versions (`handleMakeMain` in the detail hooks).
+
+---
+
 ## 8. Detach
 
 Detach replaces an instance node with a **deep copy** of the resolved master subtree
@@ -325,6 +371,11 @@ regressions):
   and the dead `ScreenVersionRow` / `ComponentPlacementRow` tables were removed. A screen
   version is now a variant, listed in the screen detail Versions tab and selected/opened
   via `setActiveScreenVariant`. Local data is reset by the `SCHEMA_VERSION` bump + reseed.
+- **Promote to main (done, §7c).** `promoteVariantToMain(variantId)` makes a version the
+  master's main — for both screens and components. A linked version moves its child masters
+  with the crown (re-parent + re-embed the new main, linkify the old) and a copy version is a
+  plain swap (with screen top-level ownership re-homed). Surfaced as a **"Make main"** action
+  in the `VersionSwitcher` toolbar (with unit tests for the linked and copy paths).
 
 All phases are complete. Remaining polish (optional): exact "used in <names>" listing
 in the delete dialog (currently shows a count), and per-instance overrides.

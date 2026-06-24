@@ -36,7 +36,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
     previewVariantId, previewCanvasHref,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, buildComponentFastEditHref, openNewComponent, addVersion,
-    removeLinkedReference, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleScreenTitleSave,
+    removeLinkedReference, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleMakeMain, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
 
@@ -121,6 +121,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
         else if (v.variantId) handleOpenVersionCanvas(v.variantId);
       }}
       onDeleteVersion={(v) => { if (v.variantId) handleDeleteVersion(v.variantId, v.tag ?? v.title); }}
+      onMakeMainVersion={(v) => { if (v.variantId) handleMakeMain(v.variantId, v.tag ?? v.title); }}
       tabs={tabs}
       sideTab={sideTab}
       onTabChange={setSideTab}

@@ -9,14 +9,17 @@ import {
 import {
   duplicateVariant,
   listVariantsByComponent,
+  promoteVariantToMain,
 } from "@/lib/storage/repos/variants.repo";
 import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import {
   createDefaultHtmlCanvasDocument,
+  htmlCanvasDocumentFromJSON,
   serializeHtmlCanvasDocument,
+  type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
 import { flushThumbnailJobs } from "@/application/thumbnails/thumbnailQueue";
-import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
+import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
@@ -146,6 +149,129 @@ test("duplicateVariant works when the source variant has no scene yet", async ()
   expect(copy.ownerId).toBe(component.id);
   const copyScene = await getSceneByOwner("variant", copy.id);
   expect(copyScene).toBeNull();
+});
+
+/** A variant scene with a single named child node under the frame, so linkify/embed can
+ *  match it by `sourceNodeId`. Reuses the default doc for a valid frame + style shape. */
+function sceneWithChildNode(childNodeId: string, childName: string): string {
+  const doc = createDefaultHtmlCanvasDocument({
+    name: "Card",
+    projectType: "mobile",
+    targetKind: "variant",
+  });
+  const template = doc.nodes.find((n) => n.parentId === doc.rootId) ?? doc.nodes[0]!;
+  const childNode: HtmlCanvasNode = {
+    ...template,
+    id: childNodeId,
+    parentId: doc.rootId,
+    name: childName,
+    order: 99,
+    instanceOf: null,
+  };
+  return serializeHtmlCanvasDocument({ ...doc, nodes: [...doc.nodes, childNode] });
+}
+
+function nodeById(graphJSON: string, nodeId: string): HtmlCanvasNode | undefined {
+  return htmlCanvasDocumentFromJSON(graphJSON)?.nodes.find((n) => n.id === nodeId);
+}
+
+test("promoteVariantToMain on a linked version moves the masters with the crown", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  // A nested child whose node lives at "title-node" in the parent scene.
+  const { component: child } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  const components = await listTable<ComponentRow>(TABLES.components);
+  await replaceTable<ComponentRow>(
+    TABLES.components,
+    components.map((c) => (c.id === child.id ? { ...c, sourceNodeId: "title-node" } : c)),
+  );
+
+  // Main embeds the child; the child owns its own scene (the master content to inline).
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: defaultVariant.id,
+    graphJSON: sceneWithChildNode("title-node", "Title"),
+  });
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: child.activeVariantId,
+    graphJSON: serializeHtmlCanvasDocument(
+      createDefaultHtmlCanvasDocument({ name: "Title", projectType: "mobile", targetKind: "variant" }),
+    ),
+  });
+
+  // A linked version collapses the child into an instance node.
+  const version = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "linked",
+  });
+  expect(nodeById((await getSceneByOwner("variant", version.id))!.graphJSON, "title-node")?.instanceOf)
+    .toMatchObject({ componentId: child.id });
+
+  await promoteVariantToMain(version.id);
+
+  // 1. The crown moved: the version is now the main (order 0), the old main is a version.
+  const variants = await listVariantsByComponent(component.id);
+  expect(variants.find((v) => v.id === version.id)!.order).toBe(0);
+  expect(variants.find((v) => v.id === defaultVariant.id)!.order).toBeGreaterThan(0);
+  expect((await getComponent(component.id))!.activeVariantId).toBe(version.id);
+
+  // 2. The child master is now owned by the new main variant (a re-parent, not a clone).
+  expect((await getComponent(child.id))!.parentVariantId).toBe(version.id);
+
+  // 3. The new main embeds real content; the demoted old main holds the linked instance.
+  expect(nodeById((await getSceneByOwner("variant", version.id))!.graphJSON, "title-node")?.instanceOf)
+    .toBeNull();
+  expect(nodeById((await getSceneByOwner("variant", defaultVariant.id))!.graphJSON, "title-node")?.instanceOf)
+    .toMatchObject({ componentId: child.id });
+});
+
+test("promoteVariantToMain on a copy version is a plain swap with independent children", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: defaultVariant.id,
+    graphJSON: serializeHtmlCanvasDocument(
+      createDefaultHtmlCanvasDocument({ name: "Card", projectType: "mobile", targetKind: "variant" }),
+    ),
+  });
+
+  const copy = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "copy",
+  });
+  const copyChild = (await listChildrenOfVariant(copy.id))[0]!;
+
+  await promoteVariantToMain(copy.id);
+
+  const variants = await listVariantsByComponent(component.id);
+  expect(variants.find((v) => v.id === copy.id)!.order).toBe(0);
+  expect(variants.find((v) => v.id === defaultVariant.id)!.order).toBeGreaterThan(0);
+  expect((await getComponent(component.id))!.activeVariantId).toBe(copy.id);
+  // The copy already owned its own child; promotion does not re-parent or clone again.
+  expect((await getComponent(copyChild.id))!.parentVariantId).toBe(copy.id);
 });
 
 test("createComponent supports workspace-global scope", async () => {

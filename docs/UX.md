@@ -343,15 +343,20 @@ Two-column layout for inspecting and editing a screen.
 - Action buttons: History (clock icon) | Info (pencil icon) | badge showing component count
 - **Version switcher** (`VersionSwitcher`, above the tab bar — always visible): a
   segmented row of version chips (Main · V1 · V2 …) with a trailing dashed "+" to add a
-  version, and a right-aligned action cluster (Compare · Open in canvas · Delete) that
-  operates on the **selected** version. Selecting a chip is **preview-only**: it drives
+  version, and a right-aligned action cluster (Compare · Open in canvas · Make main ·
+  Delete) that operates on the **selected** version. Selecting a chip is **preview-only**:
+  it drives
   the left preview pane **and** the **Sub Components** grid below — switching versions
   repopulates the subcomponents live (the master/linked children of that variant), so the
   selection is no longer buried next to the cards it changes. It does **not** persist the
   screen's active variant — a single click never changes the screen's main or what the
   projects gallery shows. Main's chip is green; version chips are purple (matching the
   version badge). "Open in canvas" routes the **main** to Current (`?screen=`) and a
-  **version** to the Versions window; "Delete" is disabled on the main.
+  **version** to the Versions window; "Make main" and "Delete" are disabled on the main.
+  - **Make main** (star icon) promotes the selected version to be the canonical main, after
+    a confirm. A linked version re-homes its child masters onto the promoted version and
+    demotes the old main to a linked version of it; a copy version is a plain swap. See
+    `Versioning.md` §7c.
   - **Hover preview**: resting the mouse on a **version** chip (never the main) for ~600ms
     reveals a floating card — pinned below the chip via a portal so the chips' scroll
     container can't clip it — showing that version's screen snapshot plus its tag and the
@@ -427,7 +432,7 @@ Differences from Screen Detail:
   - InfoPanel fields: description textarea, kind dropdown, category input
 - **Versioning uses the same model as the screen** — a **version switcher above the
   tab bar** (not a Versions tab), with the right-aligned **Compare / Open in canvas /
-  Delete** cluster and a **"+"** to create a version. The tab bar is therefore just
+  Make main / Delete** cluster and a **"+"** to create a version. The tab bar is therefore just
   **Sub Components | References**. Selecting a version is **preview-only**: it shows
   that variant in the preview pane and repopulates the Sub Components grid, but never
   persists it as the component's active/main variant and never changes what the
