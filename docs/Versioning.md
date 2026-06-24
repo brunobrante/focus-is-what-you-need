@@ -264,6 +264,17 @@ whether the promoted variant holds **instances of the old main's owned children*
      embedded subtrees collapse into linked instances pointing at the (now promoted-owned)
      masters, exactly as a freshly created linked version.
 
+  **Only the children the version still shares move with the crown.** Each step above is
+  scoped to the children the promoted variant **still references** (an `instanceOf` for them
+  survives in its scene) — `sharedIds`, not every owned child. A child the version dropped
+  (the user unlinked then deleted it inside the version) is **left as the demoted main's own
+  local copy**: it is *not* re-homed onto the new main (so it can't show up as a phantom
+  subcomponent with no node in the scene) and the old main is *not* linkified for it (so it
+  stays embedded, owned content rather than a dangling instance pointing at a master the new
+  main never received). Forcing every owned child to linkify regardless — the naive
+  approach — resurrects components the version deliberately removed; this per-child check is
+  the difference.
+
   The result preserves the link — editing the new main still reflects in the old version —
   while keeping the main editable and **independent of any version's lifetime**: deleting
   the demoted version only removes its instances and never guts the main (the symmetric

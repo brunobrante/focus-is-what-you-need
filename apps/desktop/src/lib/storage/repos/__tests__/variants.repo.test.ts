@@ -151,24 +151,34 @@ test("duplicateVariant works when the source variant has no scene yet", async ()
   expect(copyScene).toBeNull();
 });
 
-/** A variant scene with a single named child node under the frame, so linkify/embed can
- *  match it by `sourceNodeId`. Reuses the default doc for a valid frame + style shape. */
-function sceneWithChildNode(childNodeId: string, childName: string): string {
+/** A variant scene with the given named child nodes under the frame, so linkify/embed can
+ *  match them by `sourceNodeId`. Reuses the default doc for a valid frame + style shape. */
+function sceneWithChildNodes(children: Array<{ id: string; name: string }>): string {
   const doc = createDefaultHtmlCanvasDocument({
     name: "Card",
     projectType: "mobile",
     targetKind: "variant",
   });
   const template = doc.nodes.find((n) => n.parentId === doc.rootId) ?? doc.nodes[0]!;
-  const childNode: HtmlCanvasNode = {
+  const childNodes: HtmlCanvasNode[] = children.map((c, i) => ({
     ...template,
-    id: childNodeId,
+    id: c.id,
     parentId: doc.rootId,
-    name: childName,
-    order: 99,
+    name: c.name,
+    order: 99 + i,
     instanceOf: null,
-  };
-  return serializeHtmlCanvasDocument({ ...doc, nodes: [...doc.nodes, childNode] });
+  }));
+  return serializeHtmlCanvasDocument({ ...doc, nodes: [...doc.nodes, ...childNodes] });
+}
+
+function sceneWithChildNode(childNodeId: string, childName: string): string {
+  return sceneWithChildNodes([{ id: childNodeId, name: childName }]);
+}
+
+/** Drops a node (and would-be subtree) from a serialized scene, as the user deleting it. */
+function sceneWithoutNode(graphJSON: string, nodeId: string): string {
+  const doc = htmlCanvasDocumentFromJSON(graphJSON)!;
+  return serializeHtmlCanvasDocument({ ...doc, nodes: doc.nodes.filter((n) => n.id !== nodeId) });
 }
 
 function nodeById(graphJSON: string, nodeId: string): HtmlCanvasNode | undefined {
@@ -234,6 +244,85 @@ test("promoteVariantToMain on a linked version moves the masters with the crown"
     .toBeNull();
   expect(nodeById((await getSceneByOwner("variant", defaultVariant.id))!.graphJSON, "title-node")?.instanceOf)
     .toMatchObject({ componentId: child.id });
+});
+
+test("promoteVariantToMain leaves a child the version dropped as the old main's local copy", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  // Two children the main embeds: "kept" stays linked in the version, "dropped" is removed.
+  const { component: kept } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  const { component: dropped } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Subtitle",
+  });
+  const components = await listTable<ComponentRow>(TABLES.components);
+  await replaceTable<ComponentRow>(
+    TABLES.components,
+    components.map((c) =>
+      c.id === kept.id
+        ? { ...c, sourceNodeId: "kept-node" }
+        : c.id === dropped.id
+          ? { ...c, sourceNodeId: "dropped-node" }
+          : c,
+    ),
+  );
+
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: defaultVariant.id,
+    graphJSON: sceneWithChildNodes([
+      { id: "kept-node", name: "Title" },
+      { id: "dropped-node", name: "Subtitle" },
+    ]),
+  });
+  for (const child of [kept, dropped]) {
+    await upsertScene({
+      ownerType: "variant",
+      ownerId: child.activeVariantId,
+      graphJSON: serializeHtmlCanvasDocument(
+        createDefaultHtmlCanvasDocument({ name: child.name, projectType: "mobile", targetKind: "variant" }),
+      ),
+    });
+  }
+
+  const version = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "linked",
+  });
+  // The user unlinks + deletes "dropped" inside the version: its instance node is gone.
+  const versionScene = (await getSceneByOwner("variant", version.id))!.graphJSON;
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: version.id,
+    graphJSON: sceneWithoutNode(versionScene, "dropped-node"),
+  });
+
+  await promoteVariantToMain(version.id);
+
+  // Kept child moves with the crown; dropped child stays owned by the demoted old main.
+  expect((await getComponent(kept.id))!.parentVariantId).toBe(version.id);
+  expect((await getComponent(dropped.id))!.parentVariantId).toBe(defaultVariant.id);
+
+  // The dropped child is NOT a phantom subcomponent of the new main…
+  expect((await listChildrenOfVariant(version.id)).map((c) => c.id)).toEqual([kept.id]);
+  // …and is still the old main's child (a local copy, not a dangling link).
+  expect((await listChildrenOfVariant(defaultVariant.id)).map((c) => c.id)).toEqual([dropped.id]);
+
+  // The old main holds a linked instance for the kept child but keeps "dropped" embedded.
+  const oldMainGraph = (await getSceneByOwner("variant", defaultVariant.id))!.graphJSON;
+  expect(nodeById(oldMainGraph, "kept-node")?.instanceOf).toMatchObject({ componentId: kept.id });
+  expect(nodeById(oldMainGraph, "dropped-node")?.instanceOf ?? null).toBeNull();
 });
 
 test("promoteVariantToMain on a copy version is a plain swap with independent children", async () => {

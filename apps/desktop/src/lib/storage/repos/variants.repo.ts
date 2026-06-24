@@ -296,6 +296,12 @@ export async function duplicateVariant(input: {
  *    editing the new main still reflects in the old version. Master ids are preserved (a
  *    re-parent, never a clone), so linked instances placed elsewhere keep resolving.
  *
+ * Only the children the promoted version **still shares** (an instance of them survives in
+ * its scene) move with the crown and get linkified back onto the old main. A child the
+ * version dropped — unlinked then deleted inside it — is left as the demoted main's own
+ * **local copy**: not re-homed onto the new main (no phantom subcomponent) and not turned
+ * into a dangling instance pointing at a master the new main never received.
+ *
  * No-op when the variant is already the main or is unknown.
  */
 export async function promoteVariantToMain(variantId: string): Promise<void> {
@@ -323,12 +329,25 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
   const promotedScene = await getSceneByOwner("variant", promoted.id);
   const oldMainScene = await getSceneByOwner("variant", oldMain.id);
 
-  // Linked version iff the promoted variant holds instances of the old main's owned
-  // children (a copy version embeds its own cloned masters instead).
+  // Which of the old main's owned children the promoted variant STILL references as a linked
+  // instance. Only these move with the crown. A child the version dropped — the user unlinked
+  // then deleted it inside the version — must NOT be force-linkified back onto the old main:
+  // there is no master left to point at, so it stays the demoted main's own local copy, and it
+  // must not be re-homed onto the new main (where it would resurface as a phantom subcomponent
+  // with no node in the scene). Verifying this per child, instead of assuming every owned child
+  // is still shared, is what stops a promotion from resurrecting a component the version lost.
   const promotedDoc = htmlCanvasDocumentFromJSON(promotedScene?.graphJSON ?? null);
-  const isLinkedVersion = Boolean(
-    promotedDoc?.nodes.some((n) => n.instanceOf && ownedIds.has(n.instanceOf.componentId)),
-  );
+  const sharedIds = new Set<string>();
+  for (const node of promotedDoc?.nodes ?? []) {
+    if (node.instanceOf && ownedIds.has(node.instanceOf.componentId)) {
+      sharedIds.add(node.instanceOf.componentId);
+    }
+  }
+  const sharedChildren = ownedChildren.filter((c) => sharedIds.has(c.id));
+  const unsharedChildren = ownedChildren.filter((c) => !sharedIds.has(c.id));
+  // Linked promotion = the version still links at least one of the old main's children;
+  // otherwise it is an independent (copy) version and promotion is a plain swap.
+  const isLinkedVersion = sharedChildren.length > 0;
 
   // 1. Reorder: promoted → main (0); old main → a fresh version slot.
   const maxOrder = siblings.reduce((m, v) => (v.order > m ? v.order : m), 0);
@@ -348,8 +367,9 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
   if (promoted.ownerKind === "component") {
     nextComponents = components.map((c) => {
       if (c.id === promoted.ownerId) return { ...c, activeVariantId: promoted.id, updatedAt: t };
-      // Linked: the old main's children become owned by the new main variant.
-      if (isLinkedVersion && ownedIds.has(c.id)) {
+      // Linked: only the children the version STILL shares become owned by the new main
+      // variant. Dropped children stay parented to the old main as its own local copy.
+      if (isLinkedVersion && sharedIds.has(c.id)) {
         return normalizeComponentRow({ ...c, parentVariantId: promoted.id, updatedAt: t });
       }
       return c;
@@ -365,34 +385,38 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
     );
     notify(TABLES.screens);
 
-    if (!isLinkedVersion) {
-      // Copy version of a screen: swap top-level component ownership so the new main owns
-      // its components as screen-owned and the demoted main keeps its own as version-owned.
-      // (A linked screen version shares the same screen-owned masters, so no ownership move
-      // is needed — the re-embed/linkify below handle them.)
-      const promotedClones = new Set(
-        components.filter((c) => c.parentVariantId === promoted.id).map((c) => c.id),
-      );
-      nextComponents = components.map((c) => {
-        if (ownedIds.has(c.id)) {
-          return normalizeComponentRow({ ...c, screenId: null, parentVariantId: oldMain.id, updatedAt: t });
-        }
-        if (promotedClones.has(c.id)) {
-          return normalizeComponentRow({ ...c, screenId: promoted.ownerId, parentVariantId: null, updatedAt: t });
-        }
-        return c;
-      });
-    }
+    // Re-home the screen's top-level component ownership around the new main. Everything the
+    // promoted variant owns becomes screen-owned (it is the new main's content); children that
+    // must stay with the demoted old main become version-owned by it. For a copy version that
+    // is ALL of the old main's children (it shares none); for a linked version it is only the
+    // ones the version dropped — the shared ones stay screen-owned and follow the new main.
+    // Without this, a demoted child would resolve its embedding scene to the new main and
+    // resurface there as a phantom.
+    const promotedClones = new Set(
+      components.filter((c) => c.parentVariantId === promoted.id).map((c) => c.id),
+    );
+    const keepOnOldIds = isLinkedVersion
+      ? new Set(unsharedChildren.map((c) => c.id))
+      : ownedIds;
+    nextComponents = components.map((c) => {
+      if (keepOnOldIds.has(c.id)) {
+        return normalizeComponentRow({ ...c, screenId: null, parentVariantId: oldMain.id, updatedAt: t });
+      }
+      if (promotedClones.has(c.id)) {
+        return normalizeComponentRow({ ...c, screenId: promoted.ownerId, parentVariantId: null, updatedAt: t });
+      }
+      return c;
+    });
   }
   if (nextComponents !== components) {
     await replaceTable<ComponentRow>(TABLES.components, nextComponents);
     notify(TABLES.components);
   }
 
-  // 3. Linked only: swap embed↔instance between the two scenes.
+  // 3. Linked only: swap embed↔instance between the two scenes, for the SHARED children only.
   if (isLinkedVersion) {
     // Keep the (now promoted-owned) masters pickable as linked instances.
-    await markComponentsLinkable([...ownedIds]);
+    await markComponentsLinkable([...sharedIds]);
 
     const scenes = await listTable<SceneRow>(TABLES.scenes);
     const sceneByVariant = new Map(
@@ -405,7 +429,7 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
     if (promotedScene) {
       const embedded = materializeInstancesInGraph(
         promotedScene.graphJSON,
-        (node) => !!node.instanceOf && ownedIds.has(node.instanceOf.componentId),
+        (node) => !!node.instanceOf && sharedIds.has(node.instanceOf.componentId),
         (vid) => sceneByVariant.get(vid) ?? null,
       );
       if (embedded) {
@@ -416,11 +440,12 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
       }
     }
 
-    // Old main: collapse its embedded subtrees into linked instances of the new main.
+    // Old main: collapse only the still-shared subtrees into linked instances of the new
+    // main. Dropped children are left embedded as the demoted main's own local copy.
     if (oldMainScene) {
       const linked = linkifyChildComponentsInGraph(
         oldMainScene.graphJSON,
-        ownedChildren.map((c) => ({
+        sharedChildren.map((c) => ({
           id: c.id,
           activeVariantId: c.activeVariantId,
           sourceNodeId: c.sourceNodeId ?? null,
