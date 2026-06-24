@@ -152,6 +152,7 @@ export function useVersionsWindow({
       ready: versionsReady,
       baseGraphJSON: versionGraphJSON,
       canvasName: versionsCanvasName,
+      projectId: projectId || null,
     });
 
   const versionsSubjectSize = versionsDocument?.canvas;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
 import { saveScene } from "@/application/scenes/saveScene";
+import { materializeVersionScene } from "@/application/canvas/canvasMaterializer";
 import type { CanvasDocument } from "@/canvas/engine/types";
 
 type PendingVersionSave = {
@@ -8,23 +9,27 @@ type PendingVersionSave = {
   document: CanvasDocument;
   previousGraphJSON: string | null;
   canvasName: string;
+  projectId: string | null;
 };
 
 /**
- * Lightweight debounced persistence for the "Versions" canvas window. It saves the
- * edited document straight back to the version's variant scene — no component
- * materialization (a screen version's children are read-only linked instances), so it
- * stays a thin clone of the Current window's save path. The pending edit is flushed
- * when the selected version changes and on unmount, so a fast tab switch or navigation
- * never drops it.
+ * Lightweight debounced persistence for the "Versions" canvas window. It saves the edited
+ * document back to the version's variant scene AND materializes its owned content into
+ * version-owned components (`materializeVersionScene`) — symmetric with the Current
+ * window. Detaching (unlinking) an instance or drawing a new element inside a version
+ * therefore creates a real, version-owned component, so the content survives in the
+ * subcomponents list and when the version is promoted to main. Linked instances are left
+ * untouched (the materializer skips them). The pending edit is flushed when the selected
+ * version changes and on unmount, so a fast tab switch or navigation never drops it.
  */
 export function useVersionScenePersistence(input: {
   variantId: string | null;
   ready: boolean;
   baseGraphJSON: string | null;
   canvasName: string;
+  projectId: string | null;
 }): { onChange: (document: CanvasDocument) => void; flush: () => void } {
-  const { variantId, ready, baseGraphJSON, canvasName } = input;
+  const { variantId, ready, baseGraphJSON, canvasName, projectId } = input;
   const timerRef = useRef<number | null>(null);
   const pendingRef = useRef<PendingVersionSave | null>(null);
   const ownerRef = useRef<string | null>(variantId);
@@ -55,6 +60,13 @@ export function useVersionScenePersistence(input: {
     );
     if (graphJSON === pending.previousGraphJSON) return;
     saveScene({ ownerType: "variant", ownerId: pending.variantId, graphJSON });
+    // Materialize owned content (detached/new) into version-owned components, symmetric
+    // with the Current window. Fire-and-forget; linked instances are skipped internally.
+    void materializeVersionScene({
+      versionVariantId: pending.variantId,
+      document: pending.document,
+      projectId: pending.projectId,
+    });
   }, []);
 
   // Flush the pending edit when the selected version changes or the canvas unmounts,
@@ -68,11 +80,11 @@ export function useVersionScenePersistence(input: {
         skipInitialRef.current = false;
         return;
       }
-      pendingRef.current = { variantId, document, previousGraphJSON: baseGraphJSON, canvasName };
+      pendingRef.current = { variantId, document, previousGraphJSON: baseGraphJSON, canvasName, projectId };
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(flush, 300);
     },
-    [variantId, ready, baseGraphJSON, canvasName, flush],
+    [variantId, ready, baseGraphJSON, canvasName, projectId, flush],
   );
 
   return { onChange: onDocumentChange, flush };

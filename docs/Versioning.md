@@ -296,6 +296,28 @@ logic that `duplicateVariant` already performs.)
 A **"Detach" button** sits in the instance's tree row, alongside the existing
 visibility/lock affordances (`src/canvas/shell/tree/TreeRow.tsx`).
 
+### 8b. Version scenes materialize their owned content
+
+Detach clears `instanceOf` on a node inside a version — that content is now **owned** by
+the version. Per "components form automatically", owned content with children **must** be a
+real component. The Current window has always materialized owned content into components on
+save (`materializeComponentsFromCanvasDocument`); the **Versions** window historically did
+not, on the (wrong) assumption that a version's children are always read-only instances.
+
+That gap is closed: the version save path now calls `materializeVersionScene`
+(`canvasMaterializer.ts`), which materializes a version scene's owned content into
+**version-owned** components (`rootOwner: { kind: "variant", variantId }` → top-level nodes
+are parented to the version's variant, not the screen). Linked-instance nodes are skipped,
+so a freshly created, unedited linked version still materializes nothing. The cross-screen
+path dedup is disabled in this mode, so a version can never adopt a same-named main
+component — matching stays scoped to the variant (sourceNodeId + name-within-parent).
+
+This is what makes promotion (§7c) robust: once a detached/new node in a version is a real
+version-owned component (`parentVariantId = versionVariant`), promotion needs nothing
+special — for a component it already belongs to the new main; for a screen the
+`promotedClones` re-home turns it screen-owned. Without it, the detached content had no row
+and vanished from the new main's subcomponents on promote.
+
 ---
 
 ## 9. Deleting a Master (screen or component)

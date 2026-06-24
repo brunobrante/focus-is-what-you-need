@@ -3,6 +3,7 @@ import {
   createComponent,
   findComponentByName,
   findComponentBySourceNode,
+  listComponentsByProject,
   markComponentsLinkable,
   updateComponent,
 } from "@/lib/storage/repos/components.repo";
@@ -86,6 +87,11 @@ export async function materializeComponentFromCanvasNode(input: {
   projectId: string | null;
   screen: ScreenRow | null;
   variants?: ReadonlyArray<{ id: string; ownerKind: string; ownerId: string }>;
+  // When set, top-level owned nodes are owned by this variant (a version's own
+  // components) instead of the screen. Used to materialize a version scene, where the
+  // ownership is the variant, not a screen — mirrors the "Current" window so detached or
+  // newly drawn content inside a version becomes a real, version-owned component.
+  rootOwner?: { kind: "screen"; screenId: string } | { kind: "variant"; variantId: string };
 }): Promise<ComponentRow | null> {
   if (!input.projectId) return null;
   const targetNode = input.document.elements[input.nodeId];
@@ -103,15 +109,29 @@ export async function materializeComponentFromCanvasNode(input: {
     const cached = createdByNodeId.get(nodeId);
     if (cached) return cached;
 
-    const fullPath = fullComponentPathForCanvasNode({
-      currentComponent: input.currentComponent,
-      document: input.document,
-      nodeId,
-      projectComponents: components,
-      screen: input.screen,
-      variants: input.variants,
-    });
-    if (!fullPath?.screenId) return null;
+    // Version-scoped materialization is owned by the variant, not a screen: it needs no
+    // screen path, and the cross-screen path dedup below is skipped (it matches by
+    // screen+names across ALL components and would let a version adopt a same-named main
+    // component). sourceNodeId + name-within-parent (in createOrFindComponent) stay
+    // parent-scoped, so they never reach outside the version.
+    const versionScoped = input.rootOwner?.kind === "variant";
+
+    // For main materialization the node must resolve to a screen path (used for the
+    // cross-screen path dedup below). Version materialization is variant-owned and needs
+    // neither — `screenScope` stays null and the path dedup is skipped.
+    let screenScope: { screenId: string; names: string[] } | null = null;
+    if (!versionScoped) {
+      const fullPath = fullComponentPathForCanvasNode({
+        currentComponent: input.currentComponent,
+        document: input.document,
+        nodeId,
+        projectComponents: components,
+        screen: input.screen,
+        variants: input.variants,
+      });
+      if (!fullPath?.screenId) return null;
+      screenScope = { screenId: fullPath.screenId, names: fullPath.names };
+    }
 
     const parentComponent = node.parentId
       ? await ensureNodeComponent(node.parentId)
@@ -120,7 +140,7 @@ export async function materializeComponentFromCanvasNode(input: {
     const parent: { kind: "screen"; screenId: string } | { kind: "variant"; variantId: string } =
       parentComponent
         ? { kind: "variant", variantId: parentComponent.activeVariantId }
-        : { kind: "screen", screenId: fullPath.screenId };
+        : input.rootOwner ?? { kind: "screen", screenId: screenScope!.screenId };
 
     const graphJSON = htmlGraphJSONFromCanvasDocument(
       canvasDocumentForNode(input.document, nodeId),
@@ -135,7 +155,9 @@ export async function materializeComponentFromCanvasNode(input: {
       return existingBySourceNode;
     }
 
-    const existingByPath = findComponentByPath(components, fullPath.screenId, fullPath.names);
+    const existingByPath = screenScope
+      ? findComponentByPath(components, screenScope.screenId, screenScope.names)
+      : null;
     if (existingByPath && !existingByPath.sourceNodeId) {
       const updated = await updateComponent(existingByPath.id, { sourceNodeId: node.id });
       const existing = updated ?? { ...existingByPath, sourceNodeId: node.id };
@@ -247,9 +269,41 @@ export async function materializeComponentsFromCanvasDocument(input: {
   projectComponents: ComponentRow[];
   projectId: string | null;
   screen: ScreenRow | null;
+  rootOwner?: { kind: "screen"; screenId: string } | { kind: "variant"; variantId: string };
 }): Promise<void> {
   const nodeIds = componentNodeIdsFromDocument(input.document);
   for (const nodeId of nodeIds) {
     await materializeComponentFromCanvasNode({ ...input, nodeId });
   }
+}
+
+/**
+ * Materializes a VERSION scene's owned content into version-owned components — the
+ * symmetric counterpart of the "Current" window's `materializeComponentsFromCanvasDocument`.
+ *
+ * The version save path historically skipped materialization on the (now wrong) assumption
+ * that a version's children are always read-only linked instances. The moment you detach
+ * (unlink) an instance or draw a new element inside a version, that content is **owned** by
+ * the version and — per the "components form automatically" law — must become a real
+ * component owned by the version's variant. Without a backing row it is invisible to the
+ * subcomponents list and is lost when the version is promoted to main.
+ *
+ * Linked-instance nodes are skipped (they reference a master, they are not one), so a
+ * freshly created, unedited linked version still materializes nothing.
+ */
+export async function materializeVersionScene(input: {
+  versionVariantId: string;
+  document: CanvasDocument;
+  projectId: string | null;
+}): Promise<void> {
+  if (!input.projectId) return;
+  const projectComponents = await listComponentsByProject(input.projectId);
+  await materializeComponentsFromCanvasDocument({
+    currentComponent: null,
+    document: input.document,
+    projectComponents,
+    projectId: input.projectId,
+    screen: null,
+    rootOwner: { kind: "variant", variantId: input.versionVariantId },
+  });
 }
