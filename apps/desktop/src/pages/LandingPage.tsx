@@ -17,6 +17,7 @@ type Filter = "all" | ProjectType;
 
 export function LandingPage() {
   const {
+    activeWorkspaceId,
     query,
     setQuery,
     filter,
@@ -32,6 +33,12 @@ export function LandingPage() {
     onConfirmDelete,
     onSavedProject,
   } = useLanding();
+
+  // Projects created from the workspace browser link to that workspace; Home
+  // creates loose projects (no ?workspace param).
+  const newProjectHref = activeWorkspaceId
+    ? `/new?workspace=${encodeURIComponent(activeWorkspaceId)}`
+    : "/new";
 
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const exportNoticeTimerRef = useRef<number | null>(null);
@@ -75,7 +82,8 @@ export function LandingPage() {
       />
 
       <main className="flex flex-1 flex-col">
-        {projects.length === 0 ? <EmptyState /> : <ProjectsView
+        {projects.length === 0 ? <EmptyState href={newProjectHref} /> : <ProjectsView
+          newProjectHref={newProjectHref}
           allProjects={projects}
           filtered={filtered}
           screensByProject={screensByProject}
@@ -122,6 +130,7 @@ export function LandingPage() {
 export default LandingPage;
 
 function ProjectsView({
+  newProjectHref,
   allProjects,
   filtered,
   screensByProject,
@@ -133,6 +142,7 @@ function ProjectsView({
   onRequestDelete,
   onRequestExport,
 }: {
+  newProjectHref: string;
   allProjects: ProjectRow[];
   filtered: ProjectRow[];
   screensByProject: Map<string, number>;
@@ -153,7 +163,7 @@ function ProjectsView({
             {allProjects.length} {allProjects.length === 1 ? "project" : "projects"} in workspace
           </p>
         </div>
-        <Link to="/new" className="btn btn-primary">
+        <Link to={newProjectHref} className="btn btn-primary">
           <IconPlus size={14} strokeWidth={2} />
           New project
         </Link>
@@ -197,7 +207,7 @@ function ProjectsView({
             onRequestExport={onRequestExport}
           />
         ))}
-        <AddProjectCard />
+        <AddProjectCard href={newProjectHref} />
       </div>
     </div>
   );
@@ -353,10 +363,10 @@ function Frame({ type }: { type: ProjectType }) {
   );
 }
 
-function AddProjectCard() {
+function AddProjectCard({ href }: { href: string }) {
   return (
     <Link
-      to="/new"
+      to={href}
       aria-label="Create project"
       className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
     >
@@ -365,7 +375,7 @@ function AddProjectCard() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ href }: { href: string }) {
   return (
     <div className="grid flex-1 place-items-center px-6 py-12">
       <div className="max-w-[460px] text-center">
@@ -379,7 +389,7 @@ function EmptyState() {
         <p className="mb-7 text-[14px] leading-[1.5] text-[var(--text-muted)]">
           Start by creating your first project. You can choose the format and give it a name.
         </p>
-        <Link to="/new" className="btn btn-primary">
+        <Link to={href} className="btn btn-primary">
           <IconPlus size={14} strokeWidth={2} />
           Create project
         </Link>

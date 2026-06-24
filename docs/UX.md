@@ -12,7 +12,7 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 |-------|------|---------|
 | `/` | HomePage | App home — workspaces, quick links, recent items |
 | `/projects` | LandingPage | Project browser for the active workspace |
-| `/new` | NewProjectPage | Multi-step project creation wizard |
+| `/new` | NewProjectPage | Multi-step project creation wizard. Links the project to a workspace only when launched with `?workspace=<id>` (from the workspace project browser); from Home it creates a loose, workspace-less project and skips the token-sharing step |
 | `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component) creation wizard |
 | `/drafts` | DraftsPage | Loose, project-less screens and components |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |

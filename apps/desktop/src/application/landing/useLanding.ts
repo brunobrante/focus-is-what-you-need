@@ -22,6 +22,7 @@ export function relativeTime(ts: number): string {
 }
 
 export interface LandingState {
+  activeWorkspaceId: string | null;
   query: string;
   setQuery: (v: string) => void;
   filter: Filter;
@@ -103,6 +104,9 @@ export function useLanding(): LandingState {
   }
 
   return {
+    // The workspace this browser is scoped to — new projects created from here
+    // link to it (Home creates loose projects with no workspace).
+    activeWorkspaceId: activeWorkspace?.id ?? null,
     query,
     setQuery,
     filter,

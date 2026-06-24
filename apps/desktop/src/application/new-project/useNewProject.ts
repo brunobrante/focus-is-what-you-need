@@ -1,16 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ProjectType } from "@/lib/data/types";
 import { createProject } from "@/lib/storage/repos/projects.repo";
-import {
-  addProjectToWorkspace,
-  getDefaultWorkspace,
-} from "@/lib/storage/repos/workspace.repo";
+import { addProjectToWorkspace } from "@/lib/storage/repos/workspace.repo";
 import { getOrCreateSystemDesignByOwner } from "@/lib/storage/repos/systemDesigns.repo";
-import {
-  getActiveWorkspaceId,
-  useActiveWorkspaceId,
-} from "@/lib/storage/activeWorkspace";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import { setShareWithProjectsByDefault } from "@/lib/storage/repos/settings.repo";
@@ -72,7 +65,11 @@ export function useNewProject(): NewProjectState {
   const navigate = useNavigate();
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const [activeWsId] = useActiveWorkspaceId();
+  const [searchParams] = useSearchParams();
+  // The wizard links the new project to a workspace only when launched from one
+  // (?workspace=<id>, e.g. from the workspace project browser). Created from Home
+  // there is no param, so the project is loose (not bound to any workspace).
+  const targetWorkspaceId = searchParams.get("workspace");
   const { data: workspaces } = useWorkspaces();
   const { loading: settingsLoading, settings } = useGlobalSettings();
   const shareByDefault = settings.systemDesign.shareWithProjectsByDefault;
@@ -88,22 +85,21 @@ export function useNewProject(): NewProjectState {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const fallback = await getDefaultWorkspace();
-      const wsId = activeWsId ?? fallback?.id ?? null;
-      if (!wsId) {
+      // No target workspace (created from Home) → loose project, no sharing step.
+      if (!targetWorkspaceId) {
         if (!cancelled) setWorkspace(null);
         return;
       }
       const design = await getOrCreateSystemDesignByOwner({
         ownerScope: "workspace",
-        ownerId: wsId,
+        ownerId: targetWorkspaceId,
       });
-      if (!cancelled) setWorkspace({ id: wsId, design });
+      if (!cancelled) setWorkspace({ id: targetWorkspaceId, design });
     })();
     return () => {
       cancelled = true;
     };
-  }, [activeWsId]);
+  }, [targetWorkspaceId]);
 
   // Seed the per-token selection once the design and the setting are known.
   useEffect(() => {
@@ -174,8 +170,7 @@ export function useNewProject(): NewProjectState {
         type,
         thumbnailDataUrl: thumbnail,
       });
-      const workspaceId =
-        getActiveWorkspaceId() ?? (await getDefaultWorkspace())?.id ?? null;
+      const workspaceId = targetWorkspaceId;
       if (workspaceId) {
         await addProjectToWorkspace(workspaceId, project.id);
         // Eagerly create the project's design with the chosen sharing so the
