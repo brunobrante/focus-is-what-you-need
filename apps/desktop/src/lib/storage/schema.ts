@@ -16,7 +16,11 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // Tokens carry `linkable`/`instanceOf` and projects hold linked instances
 // instead of per-category inheritance (`excludedShared` removed); references
 // carry `linkable`/`detachedFrom`. Reseed clears the old inheritance shapes.
-export const SCHEMA_VERSION = 20;
+// v21: Drafts — loose, project-less components born from Home. A draft is a
+// ComponentRow with every scope owner null, tagged with `draftKind`
+// ("screen" | "component") and a `draftType` device for sizing/canvas. Reseed
+// is harmless; no existing rows carry these fields.
+export const SCHEMA_VERSION = 21;
 
 export type Meta = {
   schemaVersion: number;
@@ -80,6 +84,14 @@ export type ComponentRow = {
   // existing rows / literals stay valid; normalizeComponentRow backfills it
   // from the component's scope.
   linkable?: boolean;
+  // Draft marker. Set only on loose, project-less components created from Home
+  // (every scope owner is null). `draftKind` records whether the user meant a
+  // top-level Screen (the "top component" per the product law) or a free-size
+  // Component; `draftType` is the device used for sizing and the canvas `type`
+  // param (screens pick a device; components default to "desktop"). Null/absent
+  // on every non-draft component. Optional so existing rows/literals stay valid.
+  draftKind?: "screen" | "component" | null;
+  draftType?: ProjectType | null;
   activeVariantId: string;
   order: number;
   createdAt: number;

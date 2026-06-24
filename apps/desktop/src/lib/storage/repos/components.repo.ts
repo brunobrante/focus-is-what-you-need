@@ -1,4 +1,4 @@
-import type { ComponentKind } from "@/lib/data/types";
+import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import {
   componentScope,
   normalizeComponentRow,
@@ -34,7 +34,28 @@ export type ComponentParent =
   | { kind: "workspace"; workspaceId: string }
   | { kind: "project"; projectId: string }
   | { kind: "screen"; screenId: string }
-  | { kind: "variant"; variantId: string };
+  | { kind: "variant"; variantId: string }
+  // A loose, project-less draft: every scope owner is null. Born from Home.
+  | { kind: "draft" };
+
+/**
+ * Loose drafts — components that belong to no workspace, project, screen, or
+ * parent variant (every scope owner null). They are the Home "Drafts" feature:
+ * a Screen (top-level component) or a free Component created outside the
+ * containment hierarchy.
+ */
+export async function listDrafts(): Promise<ComponentRow[]> {
+  const rows = await listComponents();
+  return rows
+    .filter(
+      (r) =>
+        !r.workspaceId &&
+        !r.projectId &&
+        !r.screenId &&
+        !r.parentVariantId,
+    )
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
 
 export async function listComponents(): Promise<ComponentRow[]> {
   const rows = await listTable<ComponentRow>(KEY);
@@ -179,6 +200,11 @@ export async function findComponentByName(
       if (parent.kind === "screen") {
         return r.screenId === parent.screenId && r.parentVariantId === null;
       }
+      if (parent.kind === "draft") {
+        return (
+          !r.workspaceId && !r.projectId && !r.screenId && !r.parentVariantId
+        );
+      }
       return r.parentVariantId === parent.variantId;
     }) ?? null
   );
@@ -211,6 +237,11 @@ export async function findComponentBySourceNode(
       if (parent.kind === "screen") {
         return r.screenId === parent.screenId && r.parentVariantId === null;
       }
+      if (parent.kind === "draft") {
+        return (
+          !r.workspaceId && !r.projectId && !r.screenId && !r.parentVariantId
+        );
+      }
       return r.parentVariantId === parent.variantId;
     }) ?? null
   );
@@ -236,6 +267,9 @@ export async function createComponent(input: {
   // opens at the chosen dimensions instead of a project-type default.
   width?: number | null;
   height?: number | null;
+  // Draft markers, set only when parent.kind === "draft".
+  draftKind?: "screen" | "component" | null;
+  draftType?: ProjectType | null;
 }): Promise<{ component: ComponentRow; defaultVariant: VariantRow }> {
   const trimmedName = input.name.trim();
   if (!trimmedName) {
@@ -267,6 +301,11 @@ export async function createComponent(input: {
     if (input.parent.kind === "screen") {
       return (
         c.screenId === input.parent.screenId && c.parentVariantId === null
+      );
+    }
+    if (input.parent.kind === "draft") {
+      return (
+        !c.workspaceId && !c.projectId && !c.screenId && !c.parentVariantId
       );
     }
     return c.parentVariantId === input.parent.variantId;
@@ -312,6 +351,8 @@ export async function createComponent(input: {
     // Global components (project or workspace scope) are linkable on creation.
     linkable:
       input.parent.kind === "project" || input.parent.kind === "workspace",
+    draftKind: input.parent.kind === "draft" ? input.draftKind ?? null : null,
+    draftType: input.parent.kind === "draft" ? input.draftType ?? null : null,
     activeVariantId: variantId,
     order,
     createdAt: t,

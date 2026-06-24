@@ -175,7 +175,10 @@ function NewMenu() {
           </MenuItem>
           <MenuItem
             icon={<IconPencil size={15} strokeWidth={1.7} />}
-            placeholder
+            onClick={() => {
+              setOpen(false);
+              navigate("/new-draft");
+            }}
           >
             New draft
           </MenuItem>
@@ -232,14 +235,14 @@ function HomeSidebar({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <aside className="hidden w-[224px] shrink-0 border-r border-[var(--border)] px-3 py-6 md:block">
       <nav className="flex flex-col gap-0.5">
-        {/* Recent Items and Local References reach real routes today; Drafts and
-            Learn are placeholders until their features land. */}
+        {/* Recent Items, Drafts, and Local References reach real routes today;
+            Learn is a placeholder until its feature lands. */}
         <SidebarLink to="/" icon={<IconClock size={15} strokeWidth={1.7} />}>
           Recent Items
         </SidebarLink>
-        <SidebarPlaceholder icon={<IconDocument size={15} strokeWidth={1.7} />}>
+        <SidebarLink to="/drafts" icon={<IconDocument size={15} strokeWidth={1.7} />}>
           Drafts
-        </SidebarPlaceholder>
+        </SidebarLink>
         <SidebarLink to="/references" icon={<IconImage size={15} strokeWidth={1.7} />}>
           Local References
         </SidebarLink>

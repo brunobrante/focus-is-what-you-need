@@ -9,6 +9,7 @@ import {
   listChildrenOfVariant,
   listComponents,
   listComponentsByProject,
+  listDrafts,
   listTopLevelByScreen,
   listWorkspaceComponents,
 } from "@/lib/storage/repos/components.repo";
@@ -287,6 +288,16 @@ export function useComponentsByProject(
     async () => (projectId ? listComponentsByProject(projectId) : []),
     [],
     [projectId ?? ""],
+  );
+}
+
+/** Loose, project-less drafts (Home "Drafts"), newest first. */
+export function useDrafts(): State<ComponentRow[]> {
+  return useTableQuery<ComponentRow[]>(
+    [TABLES.components],
+    async () => listDrafts(),
+    [],
+    [],
   );
 }
 

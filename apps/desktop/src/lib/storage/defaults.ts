@@ -65,6 +65,8 @@ export function normalizeComponentRow(row: ComponentRow): ComponentRow {
     // Project/workspace-global components are linkable by default; existing rows
     // need no migration. An explicit `linkable: false` is preserved.
     linkable: row.linkable ?? (scope === "project" || scope === "workspace"),
+    draftKind: row.draftKind ?? null,
+    draftType: row.draftType ?? null,
   };
 }
 

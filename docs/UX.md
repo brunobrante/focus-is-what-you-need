@@ -13,6 +13,8 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/` | HomePage | App home — workspaces, quick links, recent items |
 | `/projects` | LandingPage | Project browser for the active workspace |
 | `/new` | NewProjectPage | Multi-step project creation wizard |
+| `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component) creation wizard |
+| `/drafts` | DraftsPage | Loose, project-less screens and components |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
@@ -75,16 +77,16 @@ here the user picks a workspace, opens a recent project, or jumps to a section.
   right. No workspace switcher (workspace selection happens via the cards below).
   The Create menu lists, each with an icon: **New workspace** (creates one and
   makes it active in place), **New project** (→ the `/new` wizard), and **New
-  draft** (a "Coming soon" placeholder until that flow exists).
+  draft** (→ the `/new-draft` wizard).
 - A left **sidebar** with quick links and a main content column beside it
 - Page footer with version string
 
 **Sidebar** (`HomeSidebar`, hidden below `md`): a vertical list of links —
-**Recent Items** (→ `/`), **Drafts** (placeholder), **Local References** (→
+**Recent Items** (→ `/`), **Drafts** (→ `/drafts`), **Local References** (→
 `/references`), **Learn** (placeholder), and, below a divider, **Settings**
-(opens the global Settings modal). Drafts and Learn are intentionally inert
-placeholders ("Coming soon") until their features exist; the others reach real
-destinations. Each row is a 36px icon+label row that highlights on hover.
+(opens the global Settings modal). Learn is an inert placeholder ("Coming soon")
+until its feature exists; the others reach real destinations. Each row is a 36px
+icon+label row that highlights on hover.
 
 **Workspaces section**: a grid of light `WorkspaceTile` cards — avatar initial,
 name, an **Active** badge on the current workspace, and a project count. A card
@@ -166,6 +168,53 @@ step appears only when the target workspace has a design system with tokens.
 - "Back" button on the left
 - "Next" / "Create" button on the right, disabled when required fields are empty
 - "Save and skip" on the final step
+
+---
+
+### 2a. New Draft Page `/new-draft`
+
+Wizard for creating a **draft** — a loose screen or component that lives outside
+any workspace or project (see the Drafts page below). Mirrors the New Project
+wizard's layout (progress bar, centered step, Back/Next footer) with **3 steps**:
+
+**Step — Kind**: two cards, **Screen** (a top-level frame at a device size) vs
+**Component** (a free-size frame). The choice reroutes the middle step.
+
+**Step — Device** (Screen only): three device cards (Desktop / Tablet / Mobile),
+identical to the project type step; the chosen device fixes the screen's size.
+
+**Step — Size** (Component only): Width × Height number inputs (px) for the
+component's frame. Defaults to `720 × 360`.
+
+**Step — Name**: a badge showing the chosen kind, then a name input.
+
+On **Create**, the draft is persisted as a loose component and the app navigates
+straight to the global canvas at `/canvas?variant=<activeVariantId>&type=<device>`
+— drafts have no project, so they open by variant alone (the same path global
+components use). Close (`×`) returns to `/drafts`.
+
+---
+
+### 2b. Drafts Page `/drafts`
+
+The home of loose, project-less drafts — reached from the Home sidebar's
+**Drafts** link. Sibling in spirit to the Global Components page.
+
+- A slim top bar: back-to-home chevron, "Drafts" title, and a **New draft**
+  button (→ `/new-draft`).
+- Header with title and a count ("N drafts").
+- A responsive card grid. Each `DraftCard` shows a `Snapshot` of the draft's
+  scene, its name, and a meta line — **Screen · {Device}** or **Component** with
+  a matching icon. Clicking the card (or its "Open in canvas" menu) opens the
+  global canvas; the card menu also offers **Delete draft** (instance-aware, via
+  the shared delete flow). A trailing `DashedAddTile` ("New draft") closes the grid.
+- Empty state when there are no drafts.
+
+Drafts are stored as `ComponentRow`s with every scope owner null (no workspace,
+project, screen, or parent variant), tagged with `draftKind` ("screen" |
+"component") and a `draftType` device. They never appear in project or workspace
+component views. (Not to be confused with the canvas **Sketch** window — the free
+scratch surface inside the editor.)
 
 ---
 
@@ -606,13 +655,13 @@ To edit the contents, open the master or detach the instance first.
 - It currently fires when a **wrapper** is added — both ways of creating one: choosing the Wrapper tool with a selection (which wraps the selection) and drawing a wrapper on an empty area. Because a wrapper has no fill or border, the message ("Wrapper added") is the user's confirmation that the tool worked.
 
 **Canvas zoom & pan model:**
-- Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform draft canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel. The wheel zooms toward the **cursor**; the toolbar/percentage/keyboard zoom (which have no cursor to pivot on) anchor on the **viewport center**, so the view grows from the middle instead of the canvas top-left corner.
+- Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform sketch canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel. The wheel zooms toward the **cursor**; the toolbar/percentage/keyboard zoom (which have no cursor to pivot on) anchor on the **viewport center**, so the view grows from the middle instead of the canvas top-left corner.
 - Panning and zooming clamp to the **navigable region**: by default the edited subject, but when the screen simulator is on it grows to include the whole device frame (see below).
-- **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device. The freeform draft canvas is the exception: it has no meaningful center, so it is **not** force-centered at minimum zoom (doing so would push the user's content, which sits in a tiny corner of the huge canvas, off-screen); its offset stays anchored to wherever you panned/zoomed.
+- **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device. The freeform sketch canvas is the exception: it has no meaningful center, so it is **not** force-centered at minimum zoom (doing so would push the user's content, which sits in a tiny corner of the huge canvas, off-screen); its offset stays anchored to wherever you panned/zoomed.
 - **Once zoomed in past 100%** (the region overflowing) panning gains over-scroll: the camera can travel until **any edge of the region reaches the viewport center** (≈ half the scaled region in each direction). Panning stops there — the region can never be pushed entirely past center into one half. Pan via space-drag or two-finger/wheel scroll.
 - On window resize (or when the overlay/alignment changes) the camera re-centers on the **navigable region's center**.
 - This same **edge-to-center over-scroll** is shared by the Builder stage and the snapshot viewers (Preview, FastEdit, the reference inspector): once the content is zoomed past 100% (or otherwise larger than its stage) it can be **dragged to pan** — or panned with plain wheel/two-finger scroll — until any edge reaches the viewport center, and never past it; when it fits the stage it snaps centered. In the viewers a click still selects the node under the cursor; only a drag past a small threshold pans.
-- **Scroll indicators:** every zoom surface (the canvas, the Builder stage, and the snapshot viewers) shows thin, discrete scroll thumbs — bottom edge for horizontal, right edge for vertical, no track background — that appear **only on an axis where the content overflows its viewport** (i.e. once zoomed in). They are non-interactive position indicators that track the pan in real time and disappear when the content fits. The freeform draft canvas, being effectively infinite, can't measure a fixed stage that way, so its indicators are computed from the drawn elements' **bounding box** projected through the current transform (the Figma/Penpot model): the track is that content box and the thumb is the viewport within it, so the thumb length is **proportional to the window** — `viewport / content` (a 600px window over 1000px of content gives a 60% thumb) — and shrinks as you zoom in. Like the frame canvases it is **hidden whenever the content fits the window** (e.g. at minimum zoom) and appears only once the content overflows the viewport.
+- **Scroll indicators:** every zoom surface (the canvas, the Builder stage, and the snapshot viewers) shows thin, discrete scroll thumbs — bottom edge for horizontal, right edge for vertical, no track background — that appear **only on an axis where the content overflows its viewport** (i.e. once zoomed in). They are non-interactive position indicators that track the pan in real time and disappear when the content fits. The freeform sketch canvas, being effectively infinite, can't measure a fixed stage that way, so its indicators are computed from the drawn elements' **bounding box** projected through the current transform (the Figma/Penpot model): the track is that content box and the thumb is the viewport within it, so the thumb length is **proportional to the window** — `viewport / content` (a 600px window over 1000px of content gives a 60% thumb) — and shrinks as you zoom in. Like the frame canvases it is **hidden whenever the content fits the window** (e.g. at minimum zoom) and appears only once the content overflows the viewport.
 
 **Parent-frames overlay** (bottom-left of the canvas; the phone/monitor button appears only when editing a component that has resolvable ancestors):
 - The toggle button draws **all ancestor frames** of the edited component — its parent component, that parent's parent, … up to the screen — behind it as a translucent **visual guide, like a grid**. Each frame is sized to that ancestor's own frame and placed at its **real relative position** (the offset where the component actually lives inside it), so the component still renders 1:1 inside the stack. The navigable region expands to enclose every visible frame, so the whole stack can be scrolled into view; enabling it reframes/centers on that region. There is no alignment menu — frames always sit at their true positions.
