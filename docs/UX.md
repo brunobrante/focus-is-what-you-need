@@ -19,8 +19,8 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
 | `/canvas` | CanvasPage | Full-screen visual canvas editor |
-| `/references` | HomeReferencesPage | Home's reference library — the user's global references, standalone chrome (no workspace TopBar) |
-| `/workspace/:workspaceId/references` | WorkspaceReferencesPage | The same reference library inside a workspace (workspace TopBar); the route's workspace becomes active |
+| `/references` | HomeReferencesPage | Home's reference library — the user's full global library, standalone chrome (no workspace TopBar). Adding here only touches the library, never a workspace |
+| `/workspace/:workspaceId/references` | WorkspaceReferencesPage | Only the references explicitly added to that workspace (workspace-level links), inside the workspace TopBar. "Add reference" picks from the library or uploads via the shared modal's Workspace-global mode |
 | `/system-design` | SystemDesignPage | Active workspace's design system (tokens shared with its projects) |
 | `/components` | GlobalComponentsPage | Workspace-level global components |
 | `/generate` | Generate | AI builder and content generation |
@@ -290,7 +290,7 @@ the project's own tokens shown together — see section 8a.
 - `NewScreenModal` — form with name field and template selector
 - `NewComponentModal` — form with name field, optional **Size (W×H)** inputs, and kind selector. When both width and height are filled, the component is seeded with a blank frame at exactly that size; left blank, it uses the project-type default size.
 - `ProjectPreviewModal` — full-screen preview of project screens
-- `AddReferenceModal` — searchable stack tree for attaching existing library references, plus an **Upload** action that saves brand-new files to the root library and auto-links them to the current target in one gesture
+- `AddReferenceModal` — searchable stack tree for attaching existing library references, plus an **Upload** action that saves brand-new files to the root library and auto-links them to the current target in one gesture. The attach target follows the context: project/screen/component in a project, or a single **Workspace (global)** target on the workspace references page
 - `ReferencesModal` — lightbox preview of a project reference (opened from a card)
 - `ConfirmActionModal` — confirmation dialog with Cancel / Delete buttons. Works both imperatively (via `ref.open(...)`) and as a controlled component (via `open` + `onConfirm` props).
 
