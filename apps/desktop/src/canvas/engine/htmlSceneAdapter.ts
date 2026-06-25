@@ -474,6 +474,9 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
     borderRadius: node.appearance === "ellipse" && style.borderRadius === 0
       ? 999
       : style.borderRadius,
+    blendMode: style.blendMode,
+    isolation: style.isolation,
+    cornerRadii: style.cornerRadii,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
     borderStyle: style.borderStyle === "none" ? undefined : style.borderStyle,
@@ -546,6 +549,11 @@ function styleFromElement(
     underlineThickness: styles.underlineThickness,
     underlineOffset: styles.underlineOffset,
     borderRadius: styles.borderRadius ?? previousStyle?.borderRadius ?? 0,
+    // Appearance fields read straight from engine state (no previousStyle
+    // fallback) so clearing one persists instead of resurrecting the old value.
+    blendMode: styles.blendMode,
+    isolation: styles.isolation,
+    cornerRadii: styles.cornerRadii,
     display: styles.display === "flex" ? "flex" : "block",
     align: alignFromElement(styles.alignItems ?? previousStyle?.align),
     justify: justifyFromElement(styles.justifyContent ?? previousStyle?.justify),

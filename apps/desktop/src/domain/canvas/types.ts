@@ -76,6 +76,29 @@ export type Effect = {
   amount?: number;
 };
 
+// ── Blend mode (Inspector → Appearance panel) ───────────────────────────────
+// Maps 1:1 to CSS `mix-blend-mode`. "plus-darker" is deliberately omitted: it is
+// non-standard/WebKit-only and mathematically unstable (see docs/inspector-
+// appearance.md). "plus-lighter" is kept — it is valid in WebKit.
+export type BlendMode =
+  | "normal"
+  | "darken"
+  | "multiply"
+  | "color-burn"
+  | "lighten"
+  | "screen"
+  | "color-dodge"
+  | "overlay"
+  | "soft-light"
+  | "hard-light"
+  | "difference"
+  | "exclusion"
+  | "hue"
+  | "saturation"
+  | "color"
+  | "luminosity"
+  | "plus-lighter";
+
 export type ElementStyles = {
   background?: string;
   // Inspector → Fill panel. The typed, stackable fill list (solid/gradient/
@@ -119,6 +142,16 @@ export type ElementStyles = {
   colorRef?: string;
   borderColorRef?: string;
   opacity?: number;
+  // ── Appearance (Inspector → Appearance panel) ─────────────────────────────
+  // Type-aware over the unified HTML/SVG render (see docs/inspector-appearance.md).
+  // blendMode → `mix-blend-mode` (how the element composites with the backdrop);
+  // absent / "normal" = no blend. isolation → `isolation: isolate` ("Normal" group
+  // blending) vs absent ("Pass through"); only meaningful on a div with children.
+  // cornerRadii → per-corner `border-*-radius` longhands [tl, tr, br, bl]; absent
+  // = the uniform `borderRadius` above applies to every corner.
+  blendMode?: BlendMode;
+  isolation?: "isolate";
+  cornerRadii?: [number, number, number, number];
   /** Ordered effects list. Order is load-bearing: filters chain left-to-right and
    *  shadows stack first-on-top — see compileEffects. */
   effects?: Effect[];

@@ -1,5 +1,5 @@
 import type { Box } from "@/domain/canvas/geometry";
-import type { Effect } from "@/domain/canvas/types";
+import type { BlendMode, Effect } from "@/domain/canvas/types";
 import type { Fill } from "@/domain/canvas/fill";
 
 export const HTML_CANVAS_FORMAT = "html-css-canvas";
@@ -48,6 +48,12 @@ export type HtmlCanvasStyle = {
   borderWidth: number;
   borderStyle: "solid" | "dashed" | "dotted" | "double" | "none";
   borderRadius: number;
+  // Inspector → Appearance panel. Optional + additive; absent on legacy scenes.
+  // blendMode → mix-blend-mode; isolation → isolation: isolate ("Normal" group
+  // blending); cornerRadii → per-corner radii [tl, tr, br, bl].
+  blendMode?: BlendMode;
+  isolation?: "isolate";
+  cornerRadii?: [number, number, number, number];
   /** Inspector → Border/Stroke panel. Optional + additive; absent on legacy scenes. */
   borderAlign?: "inside" | "outside";
   // Text stroke + underline (text nodes only). Optional + additive.

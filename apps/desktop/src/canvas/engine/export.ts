@@ -26,7 +26,10 @@ function stylesToCss(styles: ElementStyles): string[] {
   if (styles.fontWeight) {
     rules.push(`  font-weight: ${styles.fontWeight};`);
   }
-  if (styles.borderRadius !== undefined) {
+  if (styles.cornerRadii) {
+    const [tl, tr, br, bl] = styles.cornerRadii.map((c) => c ?? styles.borderRadius ?? 0);
+    rules.push(`  border-radius: ${tl}px ${tr}px ${br}px ${bl}px;`);
+  } else if (styles.borderRadius !== undefined) {
     rules.push(`  border-radius: ${styles.borderRadius}px;`);
   }
   if (styles.borderWidth !== undefined) {
@@ -38,6 +41,12 @@ function stylesToCss(styles: ElementStyles): string[] {
   }
   if (styles.opacity !== undefined) {
     rules.push(`  opacity: ${styles.opacity};`);
+  }
+  if (styles.blendMode && styles.blendMode !== "normal") {
+    rules.push(`  mix-blend-mode: ${styles.blendMode};`);
+  }
+  if (styles.isolation === "isolate") {
+    rules.push("  isolation: isolate;");
   }
   if (styles.display) {
     rules.push(`  display: ${styles.display};`);

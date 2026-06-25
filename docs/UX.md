@@ -655,6 +655,29 @@ single plain solid (or a single plain image on the Image element) is stored as t
 from it then. *Stacked-image per-layer opacity is best-effort (CSS has no per-layer image
 opacity); image-token binding and `path` SVG paint-servers are deferred.*
 
+**Inspector → Appearance** (shown for every element type): opacity, blend, group blending,
+and corner radius — a **type-aware** panel over the unified HTML/SVG render (paper.design's
+CSS-honesty with Figma's per-type behavior). Controls:
+- **Opacity** — a **slider + numeric input** (paper-style fast control), `opacity` 0–100%.
+  The element now renders at its real opacity on the main canvas too (a text element stays
+  fully opaque only while it is being edited).
+- **Blend** — `mix-blend-mode` (how the element composites with what is behind it): Normal,
+  Darken/Multiply/Color burn, Lighten/Screen/Color dodge, Overlay/Soft light/Hard light,
+  Difference/Exclusion, Hue/Saturation/Color/Luminosity, and Plus lighter. *"Plus darker" is
+  deliberately omitted — it is non-standard/WebKit-only and mathematically unstable.*
+- **Blending** (only on a **div with children** — our group/frame, no separate entity):
+  **Pass through** (`isolation: auto`, children blend through to the backdrop) vs **Normal**
+  (`isolation: isolate`, inner blends composite only among siblings).
+- **Radius** — type-aware. On a **box** (rect / image / div) it is CSS `border-radius`: a
+  **slider + numeric input**, a **Full** button (pill — sets the radius to half the shorter
+  side), and a **per-corner** toggle (the corner icon) that reveals **Top L / Top R / Bot R /
+  Bot L** inputs (`border-*-radius` longhands). On a **star** it is the inner-radius **%**
+  (slider + input). Ellipses are always round; clip-path shapes (polygon / star / arrow) carry
+  the radius as path geometry, not CSS. *Corner smoothing (squircle) and vector vertex-rounding
+  are deferred — both need the renderer's HTML↔SVG target switch (see inspector-appearance.md).*
+
+The CSS conversions are handled in `compileAppearance`.
+
 **Inspector → Border / Stroke** (below Appearance): a **type-aware** panel whose header and
 controls follow the selected element — paper.design's CSS-honest, per-type naming, with one
 real CSS property behind each name:

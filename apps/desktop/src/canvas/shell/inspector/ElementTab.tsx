@@ -7,6 +7,7 @@ import { effectTargetForType } from "@/domain/canvas/effects";
 import { borderTargetForType } from "@/domain/canvas/border";
 import { fillTargetForType } from "@/domain/canvas/fillCompile";
 import { normalizeFills, fillsToWritePatch } from "@/domain/canvas/fill";
+import { AppearanceSection } from "./AppearanceSection";
 import { BorderSection } from "./BorderSection";
 import { EffectsSection } from "./EffectsSection";
 import { TypographySection } from "./TypographySection";
@@ -77,7 +78,6 @@ export function ElementTab({
   const fillOpacity = Math.round((node.styles.fillOpacity ?? 1) * 100);
   const rect = getAbsoluteRect(document, node.id);
   const parentSize = getParentSize(document, node.id);
-  const opacity = Math.round((node.styles.opacity ?? 1) * 100);
   const resolvedDesign = useResolvedSystemDesign();
   const colorTokens = useMemo<InsColorToken[]>(
     () =>
@@ -117,7 +117,6 @@ export function ElementTab({
   const c = def.constraints;
   const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? w);
   const clampH = (h: number) => clamp(h, c.height.min, c.height.max ?? h);
-  const clampR = (r: number) => c.radius ? clamp(r, c.radius.min, c.radius.max ?? r) : r;
   const widthFit = node.type === "text" && node.sizing?.width === "fit";
   const heightFit = node.type === "text" && node.sizing?.height === "fit";
 
@@ -267,20 +266,17 @@ export function ElementTab({
         />
       ) : null}
 
-      <InsSection title="Appearance" disabled={locked}>
-        <InsRow label="Opacity">
-          <InsInput value={String(opacity)} onChange={(value) => updateNumber(value, (next) => onUpdateStyle({ opacity: clamp(next, 0, 100) / 100 }))} suffix="%" />
-        </InsRow>
-        {def.radius && (
-          <InsRow label="Radius">
-            <InsInput
-              value={String(node.styles.borderRadius ?? 0)}
-              onChange={(value) => updateNumber(value, (r) => onUpdateStyle({ borderRadius: clampR(r) }))}
-              suffix={def.radiusRole === "ratio" ? "%" : "px"}
-            />
-          </InsRow>
-        )}
-      </InsSection>
+      <AppearanceSection
+        styles={node.styles}
+        radius={def.radius}
+        radiusRole={def.radiusRole}
+        radiusConstraint={c.radius}
+        width={node.width}
+        height={node.height}
+        hasChildren={node.children.length > 0}
+        locked={locked}
+        onChange={onUpdateStyle}
+      />
 
       <BorderSection
         styles={node.styles}

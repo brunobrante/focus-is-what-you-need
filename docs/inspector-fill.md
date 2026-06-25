@@ -239,7 +239,7 @@ thread and return hex/sRGB to the webview.
   [`builder-future.md`](./planned/builder-future.md).
 - **Blend overlap:** per-fill blend is `background-blend-mode` (within element); the
   element-vs-backdrop blend is `mix-blend-mode` in
-  [`inspector-appearance.md`](./planned/inspector-appearance.md). Keep the two distinct in UI.
+  [`inspector-appearance.md`](./inspector-appearance.md). Keep the two distinct in UI.
 - **Render-target switching:** Pattern/Tile and SVG-shape fills switch the element's
   render (img ↔ div ↔ inline SVG) — same theme as Appearance/Border/Effects and the
   shipped vector editing ([`UX.md`](./UX.md), "Vector editing").

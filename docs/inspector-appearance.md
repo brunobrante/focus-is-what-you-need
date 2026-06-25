@@ -1,11 +1,38 @@
 # Inspector — Appearance (Radius, Opacity, Blending)
 
-Status: planned. Inspector spec derived from **paper.design** ("Radius" + "Blending"
-panels) and **Figma** ("Appearance"), re-grounded for this product's **DOM-native**
-canvas and verified against WebKit/Safari support (this app runs in a Tauri
-**WKWebView**, not Chromium). When built, fold the shipped behavior into `Product.md`
-as `[NOW]` and trim this entry. One doc for the **Appearance** panel group: corner
-radius, opacity, and blend mode.
+Status: **v1 shipped** (2026-06-25). Inspector spec derived from **paper.design**
+("Radius" + "Blending" panels) and **Figma** ("Appearance"), re-grounded for this
+product's **DOM-native** canvas and verified against WebKit/Safari support (this app
+runs in a Tauri **WKWebView**, not Chromium). One doc for the **Appearance** panel
+group: corner radius, opacity, and blend mode.
+
+## What shipped in v1
+
+- **Opacity** — slider + numeric input → `opacity`. The renderer now applies real
+  opacity on the main stage too (a text element stays fully opaque only while it is
+  being edited).
+- **Blend mode** — `mixBlendMode` field → `mix-blend-mode`. The full standard set,
+  **omitting Plus Darker** (Plus Lighter is kept).
+- **Group blending** — `isolation` field → `isolation: isolate` ("Normal") vs absent
+  ("Pass through"), shown only on a div with children.
+- **Corner radius** — slider + numeric input, a **Full**/pill shortcut, and a
+  **per-corner** toggle (`cornerRadii: [tl, tr, br, bl]` → the four `border-*-radius`
+  longhands). Star keeps the inner-radius **%** control. Type-aware: ellipse forced
+  round, clip-path shapes suppress CSS radius.
+
+Implementation: data on `ElementStyles` (`blendMode` / `isolation` / `cornerRadii`),
+compiled by the pure `domain/canvas/appearance.ts` (`compileAppearance`), spread into
+both `nodeStyle` + `detachedNodeStyle` in `ElementRenderer.tsx`, edited by
+`shell/inspector/AppearanceSection.tsx`, and round-tripped through `HtmlCanvasStyle` +
+both directions of `htmlSceneAdapter.ts`.
+
+## Deferred to v2
+
+- **Corner smoothing (squircle / superellipse)** — no native WebKit `corner-shape`;
+  needs the SVG superellipse-path fallback and so the renderer's **HTML↔SVG target
+  switch** (the heavy piece called out below). Not built.
+- **Vector vertex rounding** — rounding the `d`-path vertices of star/polygon shapes
+  (radius as true geometry) likewise rides on that target switch. Not built.
 
 ## The unification this panel forces (read first)
 
@@ -25,7 +52,7 @@ HTML/SVG)**. Radius is the sharpest example:
 This ties directly to the planned **SVG ↔ HTML** work: a star authored as SVG must be
 convertible toward HTML where possible, and Appearance must read the element's render
 target to choose the right mechanism. Cross-link: vector editing + "SVG as a sealed
-component", now shipped — see [`UX.md`](../UX.md) ("Vector editing"). The Appearance panel is **type-aware over a unified
+component", now shipped — see [`UX.md`](./UX.md) ("Vector editing"). The Appearance panel is **type-aware over a unified
 HTML+SVG renderer** — that is the Figma+paper merge for this section.
 
 ## Today (what already exists)
@@ -154,7 +181,7 @@ Figma behavior, achieved over the paper-style HTML/SVG render.
 - **Fill, stroke/border styling** — separate Fill and Stroke panel docs. This doc only
   touches stroke insofar as smoothing/SVG affects how the border follows a curve.
 - The renderer's **HTML↔SVG target switching** and the **SVG vertex-rounding geometry**
-  build on the shipped vector editing — see [`UX.md`](../UX.md) ("Vector editing").
+  build on the shipped vector editing — see [`UX.md`](./UX.md) ("Vector editing").
 
 ## Open questions
 

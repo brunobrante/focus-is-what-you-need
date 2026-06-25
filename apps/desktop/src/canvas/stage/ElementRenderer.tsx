@@ -5,6 +5,7 @@ import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/t
 import { compileEffects, effectTargetForType } from "@/domain/canvas/effects";
 import { borderTargetForType, compileBorder } from "@/domain/canvas/border";
 import { compileTypography } from "@/domain/canvas/typography";
+import { compileAppearance } from "@/domain/canvas/appearance";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
 import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
@@ -150,10 +151,12 @@ function nodeStyle(
     fontSize: scaled(styles.fontSize, renderScale),
     fontWeight: styles.fontWeight,
     textAlign: styles.textAlign,
-    borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
     ...borderStyleFor(node, renderScale, clipPath, resolveRef),
+    ...compileAppearance(styles, { isEllipse, hasClipPath: Boolean(clipPath) }, renderScale),
     clipPath,
-    opacity: 1,
+    // Keep the text being edited fully opaque so it stays legible; every other
+    // element renders at its real Appearance opacity (matching detached copies).
+    opacity: isEditing ? 1 : styles.opacity ?? 1,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
     justifyContent: hasSceneChildren ? undefined : styles.justifyContent,
     alignItems: hasSceneChildren ? undefined : styles.alignItems,
@@ -198,10 +201,10 @@ function detachedNodeStyle(
     fontSize: scaled(styles.fontSize, renderScale),
     fontWeight: styles.fontWeight,
     textAlign: styles.textAlign,
-    borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
     ...borderStyleFor(node, renderScale, clipPath, resolveRef),
+    ...compileAppearance(styles, { isEllipse, hasClipPath: Boolean(clipPath) }, renderScale),
     clipPath,
-    opacity: styles.opacity,
+    opacity: styles.opacity ?? 1,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
     justifyContent: hasSceneChildren ? undefined : styles.justifyContent,
     alignItems: hasSceneChildren ? undefined : styles.alignItems,
