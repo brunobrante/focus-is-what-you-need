@@ -1,20 +1,31 @@
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useProjectSystemDesign } from "@/application/system-design/useSystemDesign";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { SystemDesignEditor } from "@/system-design/SystemDesignEditor";
+import { projectBase } from "@/lib/navigation/projectUrl";
+import { SYSTEM_DESIGN_CATEGORIES } from "@/domain/system-design/defaults";
+import type { SystemDesignCategory } from "@/lib/storage/schema";
 import type { ProjectRow } from "@/lib/storage/schema";
 
-/**
- * A project's design system. The project's own tokens and the tokens shared by
- * its workspace are shown together in one unified list per category, each tagged
- * with its origin. Removing a shared token hides it from this project only (and
- * it can be re-added from the workspace picker). Projects with no workspace just
- * have their own tokens.
- */
 export function SystemTab({ project }: { project: ProjectRow }) {
+  const { workspaceId, systemCategory } = useParams<{ workspaceId?: string; systemCategory?: string }>();
+  const navigate = useNavigate();
   const controller = useProjectSystemDesign(project.id);
   const { data: workspaces } = useWorkspaces();
-  const workspace =
-    workspaces.find((w) => w.projectIds.includes(project.id)) ?? null;
+  const workspace = workspaces.find((w) => w.projectIds.includes(project.id)) ?? null;
+
+  const systemBase = `${projectBase(project.id, workspaceId)}/system`;
+  const activeCategory: SystemDesignCategory =
+    SYSTEM_DESIGN_CATEGORIES.includes(systemCategory as SystemDesignCategory)
+      ? (systemCategory as SystemDesignCategory)
+      : "colors";
+
+  useEffect(() => {
+    if (!systemCategory) {
+      navigate(`${systemBase}/colors`, { replace: true });
+    }
+  }, [systemCategory, systemBase, navigate]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -27,7 +38,12 @@ export function SystemTab({ project }: { project: ProjectRow }) {
           workspace.
         </div>
       ) : null}
-      <SystemDesignEditor controller={controller} workspaceName={workspace?.name} />
+      <SystemDesignEditor
+        controller={controller}
+        workspaceName={workspace?.name}
+        category={activeCategory}
+        systemBase={systemBase}
+      />
     </div>
   );
 }

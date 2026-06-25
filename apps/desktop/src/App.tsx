@@ -57,6 +57,7 @@ export default function App() {
       <Route path="/workspace/:workspaceId/project/:projectId/components" element={<GalleryPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/references" element={<GalleryPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/system" element={<GalleryPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/system/:systemCategory" element={<GalleryPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/edit" element={<ProjectEditPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/c/:componentId" element={<DetailPage />} />
@@ -68,6 +69,7 @@ export default function App() {
       <Route path="/project/:projectId/components" element={<GalleryPage />} />
       <Route path="/project/:projectId/references" element={<GalleryPage />} />
       <Route path="/project/:projectId/system" element={<GalleryPage />} />
+      <Route path="/project/:projectId/system/:systemCategory" element={<GalleryPage />} />
       <Route path="/project/:projectId/edit" element={<ProjectEditPage />} />
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />

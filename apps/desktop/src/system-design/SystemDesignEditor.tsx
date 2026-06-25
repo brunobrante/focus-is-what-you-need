@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { IconFastEdit, IconLink, IconTrash, IconUnlink } from "@/components/icons";
 import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 import { SYSTEM_DESIGN_CATEGORIES, CATEGORY_LABEL } from "@/domain/system-design/defaults";
@@ -43,11 +44,16 @@ const EMPTY_LABEL: Record<SystemDesignCategory, string> = {
 export function SystemDesignEditor({
   controller,
   workspaceName,
+  category: controlledCategory,
+  systemBase,
 }: {
   controller: SystemDesignController;
   workspaceName?: string | null;
+  category?: SystemDesignCategory;
+  systemBase?: string;
 }) {
-  const [tab, setTab] = useState<SystemDesignCategory>("colors");
+  const [localTab, setLocalTab] = useState<SystemDesignCategory>("colors");
+  const tab = controlledCategory ?? localTab;
   const { resolved } = controller;
   const { requestUnlink, requestDelete, modal: unlinkTokenModal } = useUnlinkToken();
 
@@ -99,21 +105,38 @@ export function SystemDesignEditor({
       <nav role="tablist" className="flex gap-1 border-b border-[var(--border)] px-7">
         {SYSTEM_DESIGN_CATEGORIES.map((category) => {
           const isActive = category === tab;
-          return (
+          const itemClass = [
+            "relative inline-flex cursor-pointer items-center gap-1.5 px-3.5 py-3 text-[13px] font-medium tracking-[0.1px]",
+            isActive ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
+          ].join(" ");
+          const inner = (
+            <>
+              <span className="opacity-75">{CATEGORY_ICON[category]}</span>
+              {CATEGORY_LABEL[category]}
+              {isActive && <span className="absolute -bottom-px left-2.5 right-2.5 h-0.5 rounded-[2px] bg-[var(--text)]" />}
+            </>
+          );
+          return systemBase ? (
+            <Link
+              key={category}
+              to={`${systemBase}/${category}`}
+              role="tab"
+              aria-selected={isActive}
+              replace
+              className={`${itemClass} no-underline`}
+            >
+              {inner}
+            </Link>
+          ) : (
             <button
               key={category}
               role="tab"
               type="button"
               aria-selected={isActive}
-              onClick={() => setTab(category)}
-              className={[
-                "relative inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent px-3.5 py-3 text-[13px] font-medium tracking-[0.1px]",
-                isActive ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
-              ].join(" ")}
+              onClick={() => setLocalTab(category)}
+              className={`${itemClass} border-0 bg-transparent`}
             >
-              <span className="opacity-75">{CATEGORY_ICON[category]}</span>
-              {CATEGORY_LABEL[category]}
-              {isActive && <span className="absolute -bottom-px left-2.5 right-2.5 h-0.5 rounded-[2px] bg-[var(--text)]" />}
+              {inner}
             </button>
           );
         })}

@@ -32,9 +32,9 @@ export function GalleryPage() {
   const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : "";
 
   const location = useLocation();
-  const lastSegment = location.pathname.split("/").filter(Boolean).at(-1) ?? "";
+  const segments = location.pathname.split("/").filter(Boolean);
   const GALLERY_TABS: Tab[] = ["screens", "components", "references", "system"];
-  const tab: Tab = GALLERY_TABS.includes(lastSegment as Tab) ? (lastSegment as Tab) : "screens";
+  const tab: Tab = GALLERY_TABS.find(t => segments.includes(t)) ?? "screens";
 
   const base = projectBase(projectId, workspaceId);
   const tabHrefs: Record<Tab, string> = {
