@@ -400,7 +400,13 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const selectedIds = sanitizeSelection(action.document, action.selectedIds ?? state.selectedIds);
     const isolatedParentId = sanitizeIsolatedParent(action.document, state.isolatedParentId, selectedIds);
     if (documentsEqual(beforeDocument, action.document)) {
-      return { ...state, document: action.document, selectedIds, isolatedParentId, editingTextId: null, guides: [] };
+      // No net change for this commit. Preserve the current document reference
+      // when it is content-equal, so the identity-keyed persistence effect does
+      // not re-fire on a no-op. (Only equal when the gesture left state.document
+      // untouched — e.g. a vector edit that reverts mid-gesture keeps the real
+      // committed document.)
+      const document = documentsEqual(state.document, action.document) ? state.document : action.document;
+      return { ...state, document, selectedIds, isolatedParentId, editingTextId: null, guides: [] };
     }
     return {
       ...state,
