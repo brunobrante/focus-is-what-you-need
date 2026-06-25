@@ -6,6 +6,14 @@ violations, duplication, and improvement opportunities. Produced by a multi-agen
 [`Architecture.md`](../Architecture.md), and [`Versioning.md`](../Versioning.md) so that
 **intentional product laws and business rules are not mistaken for bugs**.
 
+This file is the **single, consolidated audit**: the original 8-agent sweep **plus** a second
+verification pass that re-opened every Critical/High finding in the real code and labeled it
+CONFIRMED / INTENTIONAL / OVERSTATED / FALSE POSITIVE. Those verdicts are folded in inline, in the
+"Verification verdicts" table, and in the "Verified intentional / do-not-touch" table below. (The
+old `Better2.md` was merged here and deleted.) **One correction was applied during the merge:** the
+verification pass had waved away **UI-1** by citing `UX.md`; since only `Product.md` is law, UI-1 is
+kept as a real finding — see its note.
+
 ## How to read this
 
 - Every item says **why it is a real defect and not a feature**, because the most
@@ -18,6 +26,12 @@ violations, duplication, and improvement opportunities. Produced by a multi-agen
   **High** = real bug or law violation, or a clear performance cliff ·
   **Medium** = correctness smell, notable perf, or meaningful duplication ·
   **Low** = polish, dead code, latent traps.
+- **Verdicts (from the verification pass, folded in below):** **CONFIRMED** = real, safe to fix ·
+  **INTENTIONAL** = a law or deliberate design, do not touch · **OVERSTATED** = real but milder than
+  first stated · **FALSE POSITIVE** = the surrounding code already prevents it.
+- **Only `Product.md` is law.** `UX.md` is a *living spec* you may change — a finding is **not**
+  dismissed just because `UX.md` documents the current behavior. If the behavior is wrong, the fix is
+  to change `UX.md` *and* the code. (This is why UI-1 below stays a real finding.)
 
 ## What was checked and found CORRECT (not bugs)
 
@@ -38,6 +52,32 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
   tree; kept AI cut variants; no-group-sharing; multi-screen→group; the
   `forwardRef`+`useImperativeHandle` modal convention; the isolation navigation model;
   the absence of SQL migrations (nuke-and-reseed on `SCHEMA_VERSION` bump is intended).
+
+### Verified intentional / do-not-touch (second-pass verification)
+
+Re-opened in the real source and confirmed **safe / by-design / false-positive**. Do not "fix"
+these — it would churn correct code or break a law. (All cite code, a `Product.md` law, or
+`Architecture.md` — none was waved away on `UX.md` alone.)
+
+| Item | Verdict | Why |
+| --- | --- | --- |
+| `materializeVersionScene` / extra-Current `if (!projectId) return` | INTENTIONAL | Drafts (no project) legitimately don't materialize component rows — consistent across every materialize path. Draft content still lives in the saved scene. |
+| Deep-clone of the whole document per keystroke/frame | FALSE POSITIVE | 60fps paths use `shallowCloneDocument`; the deep `structuredClone` only runs on discrete commits. |
+| `snapping.ts` O(n·depth) candidate scan | FALSE POSITIVE | Cached once per drag (`interaction.snapCandidates ??= …`), not per frame. |
+| `commitDocument` full `documentsEqual` deep-compare | INTENTIONAL | The no-op-commit filter that keeps undo history clean. (But ENG-1 — new ref on equality — is a separate real bug.) |
+| `handleDrawMove` height clamp "below minimum" | FALSE POSITIVE | `Math.max(rawH, minH)` floor — never below. |
+| Module-scoped cursor caches "unbounded" | FALSE POSITIVE | Keyed by rounded angle 0–359 → finite. |
+| `1×` zoom floor / no zoom-out | LAW 10 | Correct via `USER_MIN_ZOOM=1` → `clampViewportState`. |
+| `roundCropBox` mutates `interaction.committedCorner` | INTENTIONAL | Load-bearing gesture state (locks the corner for the rest of the drag). |
+| `getParentSize` vs `getParentBounds` in one clamp | OVERSTATED → Low | Deliberate coarse-then-fine clamp in one synchronous tick. |
+| `export.ts` raw CSS values = "injection vuln" | NOT a vuln | Single-user local tool exporting the user's own design; no trust boundary. |
+| `resolveMaster` memo keyed on `graphJSON` but reads scenes snapshot | FALSE POSITIVE | `LiveInstanceRefresh` re-resolves open editors when a referenced master changes. |
+| Two initial-zoom helpers "disagree" | INTENTIONAL | Container-agnostic seed at init vs viewport-aware fit after measure (see ENG-2). |
+| Single global `writeChain` serializes propagation/thumbnail | INTENTIONAL | Ordering required for ancestor snapshot propagation (`Architecture.md`). |
+| `loadStackThumbnailUrl` object-URL leak | FALSE POSITIVE | Revoked correctly in `useReferenceLibrary.ts` (on replace, cancel, unmount). |
+| XSS / SVG `font-family` / `target="_blank"` injection | FALSE POSITIVE | No `dangerouslySetInnerHTML`; attrs go through `escapeAttr`; the one `_blank` has `rel="noopener noreferrer"`. |
+| Builder keeps all variant data-URLs in memory | OVERSTATED | Per-cut variant history is a Builder law; the painter cache *does* evict. |
+| Builder "new variant keeps old" / "can't share groups" | INTENTIONAL | Honored correctly in `variants.ts`. |
 
 ---
 
@@ -82,6 +122,27 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
   minor alt-key hint in the stage.
 - **Full-table JSON re-parse / re-stringify** on hot paths — instance/delete flows,
   `replaceTable` diffing large blobs, repeated graph parses per render.
+
+### Verification verdicts (Critical/High re-checked against the real code)
+
+| ID | Verdict | Note |
+| --- | --- | --- |
+| SAVE-1 | CONFIRMED | Real loss window between `outbox.clear()` and the next `outbox.save()`. |
+| SAVE-2 | CONFIRMED | No `sceneVersion` compare-and-set anywhere. Only the **propagation** chain races scene rows (the thumbnail chain writes the thumbnails table). |
+| SAVE-3 | CONFIRMED | `replayOutbox` does unconditional `pending.set` — missing the retry guard. Narrow window, trivial fix. |
+| ENG-1 | CONFIRMED | `store.tsx:402-404` returns a new equal ref. One-line fix. |
+| ENG-3 | CONFIRMED | `clipboard.ts:10` singleton leaks across split editors. Structural fix. |
+| ENG-2 | **FALSE POSITIVE** | Only *seeds* zoom before the viewport is measured; `useViewportControls` overwrites it with the viewport-aware fit before paint. Do not act. |
+| STAGE-1 | **FALSE POSITIVE** | The memo runs during render; the ref lags by exactly one committed doc, so the diff is always (prev, current). The `prev===next` path is unreachable. Do not act. |
+| UI-1 | CONFIRMED (real data loss) | No persistence path. `UX.md` calls FastEdit ephemeral, but `UX.md` is not law — persisting is a product decision, not a closed false-positive. |
+| UI-2 | CONFIRMED (latent) | Same-ms creation is human-gated → unlikely but real. |
+| UI-3 | CONFIRMED | Usage fetched after the pending screen is set → first-frame confirm bypasses the per-instance law. |
+| UI-5 | CONFIRMED | I/O inside `setState` updaters; React 19 may double-invoke. |
+| RUST-1 | CONFIRMED | `unwrap_or_else(\|e\| e.into_inner())` is safe (writes are transactional). |
+| RUST-2 | CONFIRMED | No `prepare_cached`; hoist two cached statements before the loop. |
+| RUST-4 | CONFIRMED | Full scan + `Vec<String>` under lock. Page / fetch large-blob tables per-id. |
+| RUST-8 | CONFIRMED | No session caching; a cache needs interior mutability (`Session::run` takes `&mut self`). |
+| VER-1, DOM-1..3, BLD-1, BLD-2 | NOT RE-VERIFIED | The verification pass was interrupted before these. VER-1 (`deleteVariant` ignoring `instanceStrategy`) is the highest-priority unverified claim and ties to REF-1 below. |
 
 ---
 
@@ -196,6 +257,10 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
   `getInitialZoomForCanvas` does proper viewport-aware fitting.
 - **Why real:** This is *initial framing*, not the `1×` zoom-out law; the two helpers diverged.
 - **Fix:** Compute initial zoom via the viewport-aware path once `viewportSize` is known; converge both.
+- **Verification: FALSE POSITIVE.** This helper only *seeds* zoom before the viewport is measured;
+  `useViewportControls` overwrites it with the viewport-aware `getInitialZoomForCanvas` before paint, so
+  frame-mode subjects do not open at `1×`. The two helpers are intentionally different callers.
+  **Likely not a real bug — verify before acting.**
 
 ### ENG-3 — [High] Module-global clipboard shared across split editors
 - **Category:** Architecture / Bug · **Location:** `src/canvas/engine/clipboard.ts:10,106`
@@ -211,6 +276,9 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
   `prev === next`, diffing a document against itself → empty change set → subtrees don't repaint.
 - **Fix:** Capture `{prev, computed}` keyed on document identity within the same render, not via a
   separately-timed layout effect.
+- **Verification: FALSE POSITIVE.** The memo runs during render and the ref lags by exactly one committed
+  document, so the diff is always (prev-doc, current-doc); the `prev===next → empty` path is not reachable
+  under React's render/commit ordering. **Likely not a real bug — verify before acting.**
 
 ### STAGE-2 — [Medium] `findChildAtPoint` recurses into every subtree regardless of hit
 - **Category:** Bug / Performance · **Location:** `src/canvas/stage/canvasHitTesting.ts:23-35`
@@ -409,6 +477,11 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
   presents functional editable inputs. Losing edits is not the isolation/mock model.
 - **Fix:** Persist edits via `saveScene`/`getSaveQueue().enqueue` (debounced) per edit, or add an explicit
   Save + `onSaved`; at minimum guard close with an unsaved-changes prompt.
+- **Verification:** the no-persistence claim is **accurate**. `UX.md:1237` currently documents FastEdit
+  as ephemeral ("all edits applied directly to the scene state held by the modal"), so the verification
+  pass first marked this "not a bug" — but `UX.md` is **not law**, only `Product.md` is. If FastEdit is
+  meant to keep edits, this is **real data loss**; treat it as a product decision (update `UX.md` +
+  persist), not a closed false-positive. **Do not silently drop it.**
 
 ### UI-2 — [High] `Date.now()` section IDs collide → duplicate keys + corrupted assignment
 - **Category:** Bug · **Location:** `src/routes/Gallery/shared/SectionedGrid.tsx:83`
@@ -754,6 +827,79 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
 
 ---
 
+## Additional findings (verification pass)
+
+New defects surfaced by the second pass that were not in the original sweep. Verdicts already applied
+(each re-opened in the real source).
+
+### REF-1 — [High, LAW gap] References lack the per-instance "copy-or-delete" flow
+- **Category:** Bug (law) · **Location:** `application/references/*`,
+  `routes/references/components/GroupDialogs.tsx` (`DeleteReferenceModal`),
+  `lib/storage/repos/references.repo.ts:317` (`removeReferenceLinksForLibraryId`).
+- **Problem:** `Product.md` "Removing a linkable item that is used elsewhere" requires the per-place
+  keep-a-copy-or-delete choice for **all three** linkable capabilities (components, tokens, references).
+  Components (`UnlinkComponentModal` + `applyInstanceDecisions`) and tokens (`applyTokenLinkDecisions`)
+  have it; references only offer "Delete everywhere" and silently drop the links. `detachReference` (the
+  "keep a copy" half) already exists — only the per-instance dialog is missing.
+- **Verdict:** CONFIRMED. The one genuine LAW violation the verification pass found; closely tied to
+  VER-1. Not a one-liner (needs a per-instance modal + decision applier mirroring the component flow).
+  Update `UX.md` before building.
+
+### META-1 — [Medium-High] Hardcoded "updated 1 hour ago"
+- **Category:** Bug · **Location:** `pages/detail/ScreenContent.tsx:96` (literal
+  `<span>updated 1 hour ago</span>`).
+- **Verdict:** CONFIRMED. Sits next to real derived fields; this is the `updatedAt` field that should be
+  wired. LAW 5 covers content *inside* a mock screen, not always-false chrome metadata.
+
+### META-2 — [Low-Medium] Hardcoded author "You"/"VC" on every version chip
+- **Category:** Bug · **Location:** `pages/detail/ComponentContent.tsx:59-60`.
+- **Verdict:** CONFIRMED. Real attribution fields stubbed; lower impact than META-1.
+
+### VID-1 — [Medium] VideoFramePicker conflates "empty" and "error"
+- **Category:** Bug · **Location:** `routes/import/VideoFramePicker.tsx:38-64`.
+- **Verdict:** CONFIRMED. A successful extraction returning 0 frames and an ffmpeg-missing failure
+  collapse into the same blank state. Distinguish them.
+
+### BLD-14 — [Low] RootSwitcher leaks one object URL on the cancelled path
+- **Category:** Bug (bounded leak) · **Location:** `generate/ui/RootSwitcher.tsx:338-341`.
+- **Verdict:** CONFIRMED. Sibling loaders revoke on the cached branch; this one drops a fresh `blob:` URL
+  when the effect is cancelled after load. One-line fix (revoke `loaded` when cancelled).
+
+## Safe cleanups (behavior-neutral, no law risk)
+
+Confirmed by the verification pass — pure hygiene.
+
+- **Mixed-language UI copy (PT in an English UI)** — confirmed across `Inspector.tsx`, `ElementTab.tsx`,
+  `ShellTab.tsx`, `CanvasTab.tsx`, `Tree.tsx`, `LayersFooter.tsx`, `TreeRow.tsx`, `CanvasSurfaces.tsx`,
+  `treeHelpers.ts` (`"elipse"`→`"ellipse"`), `useNewProject.ts`, `"Projeto"` fallbacks, and the Builder
+  (`ToolsEditorView.tsx`, `ConfirmModal.tsx`). Interface language is clearly English. (Same theme as the
+  cross-cutting mixed-language note and BLD-7.)
+- **Truly duplicated code:** `cloneDocument` (4×) + `clampNodeToParentBounds` (2×); `normalizedVector`
+  (2×); `arrayValuesEqual` (2×); the `byOwner`+`applyInstanceDecisions` block in
+  `useUnlinkComponent`/`useDeleteComponent`; `KIND_BY_MEDIA`+payload in
+  `linkReferenceToOwner`/`addReferencesFromFiles`; crop→canvas rasterization in
+  `useBuilderCutOperations`/`useAutoDetect`; `IconButton` (2×, see BLD-6).
+- **Divergent duplication (higher value):** two reference URL caches used together in `ReferenceCard.tsx`;
+  `stackHelpers.ts` vs `stackViewHelpers.ts`; two `CardMenu` implementations; three near-identical Builder
+  thumbnail loaders (unifying fixes BLD-14).
+- **Dead code:** `routes/NewProject.tsx` (14KB, unimported, missing the token step); dead 2D tooling
+  drawers in `canvasToolingRenderer.ts` (~160 lines; renderer is Skia — also touches one test);
+  fully-unrendered mock panels (`Chat.tsx`, `GalleryPanel`); dead placeholder controls ("Formas" toggles,
+  render-mode pill — see SHELL-6).
+- **`useDismissable` exists but has ~0 adopters** — ~10–13 hand-rolled outside-click/Escape effects could
+  use it (same theme as SHELL-1 / UI-14).
+
+## Real but minor (perf / optional)
+
+- `deleteProject` (and `deleteScreen`) use `replaceTable` (re-stringifies the whole table) where
+  `deleteComponentTree`/`deleteVariant` already use the cheaper `removeRecords`. Real, but an infrequent
+  op, not a hot path.
+- Builder: base64 char-by-char + synchronous canvas raster (`modelCommands.ts:129`) → jank on large
+  images (Medium, not High); `rebuildAllRoots` O(n²) per edit; `measureImage` has no timeout.
+- Grid overlay re-renders per frame (fresh `canvasRect` object in deps) and is not DPR-scaled (blurry at
+  zoom ≥ 4). `reset` reducer wastes a localStorage hydration. `useCanvasWindows` split-collapse reads a
+  stale closure (self-corrects on the next effect).
+
 ## Suggested sequencing
 
 1. **Stop the bleeding (data loss / corruption):** UI-1, SAVE-1, SAVE-2, VER-1, RUST-1, UI-5, UI-3.
@@ -765,4 +911,9 @@ Recording this explicitly, because "is it a bug or the model?" was the central q
    dead modules/props (BLD-3/4, SHELL-11, UI-18).
 
 > Each item is independently shippable; none requires a `Product.md` change. Where a fix touches UX
-> (e.g. UI-1's save flow, VER-1's delete dialog), update `UX.md` before committing, per the project rule.
+> (e.g. UI-1's save flow, VER-1's delete dialog, REF-1's delete dialog), update `UX.md` before
+> committing, per the project rule.
+>
+> From the verification pass: **REF-1** (references copy-or-delete) is the one confirmed `Product.md`
+> LAW gap — finish verifying **VER-1** first, since they share the per-instance delete machinery. And
+> **do not spend effort on ENG-2 / STAGE-1** — both were re-checked and judged FALSE POSITIVE.
