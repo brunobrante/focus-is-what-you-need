@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
+import { compileEffects, effectTargetForType } from "@/domain/canvas/effects";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
 import { resolveTokenRef } from "@/domain/system-design/resolveTokenRef";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -53,6 +54,25 @@ function scaled(value: number | undefined, renderScale: number): number | undefi
   return value === undefined ? undefined : value * renderScale;
 }
 
+// Compiles the element's Effects list into the box-shadow / filter / backdrop /
+// text-shadow inline-style fragments, type-aware per element kind. Background
+// blur is emitted under both the prefixed and unprefixed key (WebKit < 18).
+function effectStyle(node: ElementNode, renderScale: number, resolveRef?: RefResolver): CSSProperties {
+  const fx = compileEffects(
+    node.styles.effects,
+    effectTargetForType(node.type),
+    renderScale,
+    resolveRef,
+  );
+  return {
+    boxShadow: fx.boxShadow,
+    textShadow: fx.textShadow,
+    filter: fx.filter,
+    backdropFilter: fx.backdropFilter,
+    WebkitBackdropFilter: fx.backdropFilter,
+  };
+}
+
 function nodeStyle(
   node: ElementNode,
   isEditing = false,
@@ -92,7 +112,8 @@ function nodeStyle(
     gap: hasSceneChildren ? undefined : scaled(styles.gap, renderScale),
     padding: hasSceneChildren ? undefined : scaled(styles.padding, renderScale),
     overflow: isEditing ? "visible" : styles.overflow ?? "hidden",
-    zIndex: isEditing ? 10 : undefined
+    zIndex: isEditing ? 10 : undefined,
+    ...effectStyle(node, renderScale, resolveRef),
   };
 }
 
@@ -138,6 +159,7 @@ function detachedNodeStyle(
     gap: hasSceneChildren ? undefined : scaled(styles.gap, renderScale),
     padding: hasSceneChildren ? undefined : scaled(styles.padding, renderScale),
     overflow: styles.overflow ?? "hidden",
+    ...effectStyle(node, renderScale, resolveRef),
   };
 }
 

@@ -31,6 +31,49 @@ export type InsertTool = Exclude<Tool, "select" | "hand" | "scale">;
 
 export type ShellGridType = "dots" | "squares";
 
+// ── Effects (Inspector → Effects panel) ─────────────────────────────────────
+// One unified list (Figma's model) where each entry has a type. The CSS the
+// renderer emits is type-aware (paper.design's honesty): the same "Drop shadow"
+// compiles to `box-shadow` on a box, `filter: drop-shadow()` on an image/vector,
+// and `text-shadow` on text. See docs/planned/inspector-effects.md.
+export type EffectType =
+  | "drop-shadow"
+  | "inner-shadow"
+  | "layer-blur"
+  | "background-blur"
+  | "brightness"
+  | "contrast"
+  | "saturate"
+  | "grayscale"
+  | "invert"
+  | "sepia"
+  | "hue-rotate";
+
+/**
+ * A single effect entry. A flat bag of optional params (rather than a
+ * discriminated union) so the inspector's merge/reorder and the persistence
+ * round-trip stay trivial; each `type` reads only the fields that apply to it.
+ */
+export type Effect = {
+  /** Stable id for React keys + reorder; unique within the element. */
+  id: string;
+  type: EffectType;
+  /** Per-entry enable toggle. Absent or true = applied. */
+  enabled?: boolean;
+  // Shadow params — `drop-shadow` / `inner-shadow`:
+  x?: number; // offset px
+  y?: number; // offset px
+  blur?: number; // px (≥ 0)
+  spread?: number; // px — only honored on a box (box-shadow); ignored elsewhere
+  color?: string; // shadow color (rgba/hex); falls back to a translucent black
+  colorRef?: string; // System Design token ref ("colors:<id>"); resolved live
+  // Blur params — `layer-blur` / `background-blur`:
+  radius?: number; // px (≥ 0)
+  // Filter-function param — brightness/contrast/saturate (multiplier, 1 = identity),
+  // grayscale/invert/sepia (0..1), hue-rotate (degrees):
+  amount?: number;
+};
+
 export type ElementStyles = {
   background?: string;
   color?: string;
@@ -49,6 +92,9 @@ export type ElementStyles = {
   colorRef?: string;
   borderColorRef?: string;
   opacity?: number;
+  /** Ordered effects list. Order is load-bearing: filters chain left-to-right and
+   *  shadows stack first-on-top — see compileEffects. */
+  effects?: Effect[];
   display?: "block" | "flex";
   justifyContent?: string;
   alignItems?: string;

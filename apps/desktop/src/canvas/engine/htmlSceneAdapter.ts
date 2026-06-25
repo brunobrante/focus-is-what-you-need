@@ -480,6 +480,7 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
     padding: Math.max(style.paddingX, style.paddingY),
     overflow: style.overflow,
     objectFit: style.objectFit,
+    effects: style.effects,
   };
 }
 
@@ -501,6 +502,9 @@ function styleFromElement(
     backgroundRef: styles.backgroundRef,
     colorRef: styles.colorRef,
     borderColorRef: styles.borderColorRef,
+    // Like the *Ref bindings: read straight from engine state (no previousStyle
+    // fallback) so removing every effect persists instead of resurrecting them.
+    effects: styles.effects,
     opacity: styles.opacity ?? previousStyle?.opacity ?? 1,
     borderColor: styles.borderColor ?? previousStyle?.borderColor ?? "transparent",
     borderWidth,

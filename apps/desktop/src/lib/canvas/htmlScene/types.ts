@@ -1,4 +1,5 @@
 import type { Box } from "@/domain/canvas/geometry";
+import type { Effect } from "@/domain/canvas/types";
 
 export const HTML_CANVAS_FORMAT = "html-css-canvas";
 export const HTML_CANVAS_VERSION = 1;
@@ -47,6 +48,8 @@ export type HtmlCanvasStyle = {
   borderStyle: "solid" | "dashed" | "dotted" | "none";
   borderRadius: number;
   shadow: string;
+  /** Inspector → Effects panel. Optional + additive; absent on legacy scenes. */
+  effects?: Effect[];
   display: "block" | "flex" | "grid";
   flexDirection: "row" | "column";
   align: "start" | "center" | "end" | "stretch";

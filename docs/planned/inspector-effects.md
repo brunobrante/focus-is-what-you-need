@@ -1,6 +1,23 @@
 # Inspector — Effects (Filters, Shadow, Inner Shadow, Blur)
 
-Status: planned. Inspector spec derived from **Figma** ("Effects", one list) and
+Status: **v1 shipped** — shadows + blur + filters (the unified Effects panel). Still
+planned/deferred: **Noise, Texture, Glass**, the non-box inner-shadow *tricks* (text
+`background-clip` + SVG inverted-alpha), and `feMorphology` spread dilation on
+image/SVG/text. Drag-reorder is shipped as **up/down** buttons for now.
+
+**What shipped (v1):**
+- Data: `Effect` / `EffectType` + `ElementStyles.effects?: Effect[]` in
+  `src/domain/canvas/types.ts`. Persists via `HtmlCanvasStyle.effects` round-tripped
+  through `styleFromElement` / `stylesFromHtmlNode` (additive/optional — no version bump).
+- Compile: pure `src/domain/canvas/effects.ts` (`compileEffects`, `effectTargetForType`,
+  `effectTypeAvailable`, `effectSpreadHonored`) → type-aware `box-shadow` /
+  `text-shadow` / `filter` / `backdrop-filter` (+ `-webkit-` twin).
+- Render: `effectStyle()` spread into both `nodeStyle` and `detachedNodeStyle` in
+  `src/canvas/stage/ElementRenderer.tsx` (effects show in-frame *and* detached).
+- UI: `src/canvas/shell/inspector/EffectsSection.tsx`, mounted after Appearance in
+  `ElementTab.tsx`. Inner shadow + spread are box-only; shadow color binds to tokens.
+
+Inspector spec derived from **Figma** ("Effects", one list) and
 **paper.design** (split into "Filters" / "Inner Shadow" / "Shadow" by element type),
 re-grounded for this product's **DOM-native** canvas and verified against WebKit/Safari
 support (this app runs in a Tauri **WKWebView**, not Chromium). When built, fold the

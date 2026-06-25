@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
-import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
+import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
+import { effectTargetForType } from "@/domain/canvas/effects";
+import { EffectsSection } from "./EffectsSection";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -264,6 +266,14 @@ export function ElementTab({
           />
         </InsRow>
       </InsSection>
+
+      <EffectsSection
+        effects={node.styles.effects ?? []}
+        target={effectTargetForType(node.type)}
+        tokens={colorTokens}
+        locked={locked}
+        onChange={(effects: Effect[]) => onUpdateStyle({ effects })}
+      />
 
       {isVector ? (
         <InsSection title="Vector" disabled={locked}>

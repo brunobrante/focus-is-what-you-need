@@ -605,6 +605,20 @@ into a local copy — see System Design) updates every bound element automatical
 literal colour from the picker also unbinds. (Live updates while a canvas stays open rely on
 the same scenes-table reactivity as linked instances.)
 
+**Inspector → Effects** (shown for every element type): a single unified **Effects** list
+(Figma's model) below Appearance. It starts empty with a one-line hint and an **Add effect**
+button; each added entry is a card with an **eye** enable/disable toggle, a **type dropdown**,
+**move up / move down** reorder, and a **remove** button. Order is load-bearing — filters chain
+left-to-right and shadows stack first-on-top. Effect types: **Drop shadow**, **Inner shadow**,
+**Layer blur**, **Background blur**, and the color filters **Brightness / Contrast / Saturation
+/ Grayscale / Invert / Sepia / Hue rotate**. The CSS mechanism is **type-aware** (hidden from
+the user): a drop shadow compiles to `box-shadow` on a box, `filter: drop-shadow()` on an
+image/SVG/path, and `text-shadow` on text; background blur emits both the prefixed and
+unprefixed `backdrop-filter` for WebKit. **Inner shadow** and the **Spread** field appear only
+for box elements (the only first-class inner shadow); they are hidden on image/SVG/text.
+Shadow **Color** is an `InsColor` control, so it can bind to a System Design color token
+(link/unlink) like Fill. *Not in v1: Noise, Texture, Glass.*
+
 **Read-only linked instances (Versions window)**: when the Versions window is focused and
 the selected element is a **linked instance** (a node referencing a master component), the
 Inspector's Element tab still shows every section (Position, Tamanho, Layout, Appearance, …)
