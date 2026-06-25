@@ -492,6 +492,31 @@ reference is a stack, a **tree** of its cuts is shown alongside.
 
 ---
 
+## Fast Edit **[NOW]**
+
+**Fast Edit** is a quick, in-place editor for a subject — a **screen** (or a
+component, since they are one abstraction) — opened as a modal straight from its
+card or detail view, without entering the full canvas. The name is the promise:
+it is for *fast*, surface-level edits, and nothing more.
+
+You **select an element and change only its aesthetic properties** — text
+content, text color, background, border (color and width), and corner radius.
+That is the entire scope.
+
+**[LAW]** Fast Edit **cannot change structure or geometry.** You cannot move,
+resize, rotate, reparent, add, or delete elements — you only select an element
+and adjust how it looks. Anything structural or more complex is **the canvas's
+job**; Fast Edit deliberately stops at cosmetics so it stays fast and
+unambiguous. When you need more, you open the subject in the canvas.
+
+Fast Edit is a **real editor, not a preview**: every change is **applied to the
+subject's real scene and persisted** — it edits the same scene the canvas edits,
+not a throwaway copy. Within Fast Edit, **linked subcomponents are read-only**:
+they show their master content for context but cannot be edited here; to change
+one you go to its master, exactly as everywhere else.
+
+---
+
 ## The Builder
 
 The Builder (routes `/generate`, `/tools`) is a **standalone tool**, connected to
