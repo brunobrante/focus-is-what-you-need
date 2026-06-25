@@ -4,6 +4,7 @@ import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
 import { compileEffects, effectTargetForType } from "@/domain/canvas/effects";
 import { borderTargetForType, compileBorder } from "@/domain/canvas/border";
+import { compileTypography } from "@/domain/canvas/typography";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
 import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
@@ -161,6 +162,9 @@ function nodeStyle(
     overflow: isEditing ? "visible" : styles.overflow ?? "hidden",
     zIndex: isEditing ? 10 : undefined,
     ...effectStyle(node, renderScale, resolveRef),
+    // Spread last: typography owns the combined text-decoration line and, when a
+    // vertical align is set, overrides display/justify on the text box.
+    ...compileTypography(styles),
   };
 }
 
@@ -205,6 +209,7 @@ function detachedNodeStyle(
     padding: hasSceneChildren ? undefined : scaled(styles.padding, renderScale),
     overflow: styles.overflow ?? "hidden",
     ...effectStyle(node, renderScale, resolveRef),
+    ...compileTypography(styles),
   };
 }
 

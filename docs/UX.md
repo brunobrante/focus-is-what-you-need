@@ -615,7 +615,7 @@ header is a two-select block instead of the single subject row:
   navigates to the master's own canonical location (shown in **Current**, its origin) regardless of
   where the instance is placed; they are never materialized.
 
-**Binding a color to a System Design token (Appearance / Tipografia)**: the Fill, Border, and
+**Binding a color to a System Design token (Appearance / Typography)**: the Fill, Border, and
 text Color controls (`InsColor`) each carry a **link button**. Clicking it lists the project's
 System Design **color tokens**; picking one **binds** that style to the token (stored as a
 `$$ref`, e.g. `colors:c-primary`). A bound control shows the token's swatch + name with a
@@ -686,6 +686,20 @@ unprefixed `backdrop-filter` for WebKit. **Inner shadow** and the **Spread** fie
 for box elements (the only first-class inner shadow); they are hidden on image/SVG/text.
 Shadow **Color** is an `InsColor` control, so it can bind to a System Design color token
 (link/unlink) like Fill. *Not in v1: Noise, Texture, Glass.*
+
+**Inspector → Typography** (shown only for **text** elements, replacing the old "Tipografia"
+section): **Font** (family, free text, placeholder "System Sans-Serif"), **Size** (px),
+**Weight** (a continuous 1–1000 number that drives a variable font's `wght` axis), **Style**
+(Normal / Italic), **Color** (an `InsColor` that can bind to a System Design color token like
+Fill), **Line** (Auto / Custom — Auto is `line-height: normal`, Custom reveals a unitless
+multiplier field), **Spacing** (letter-spacing in **%**, compiled to `em` so it survives a
+size change — Figma's 1% = 0.01em), **Align** (left / center / right / **justify**), **V-align**
+(Top / Middle / Bottom — a flex column on the text box; inert when **H = Fit** hugs the
+content, with an inline note saying so), **Case** (As typed / UPPERCASE / lowercase /
+Capitalize → `text-transform`), **Strike** (a switch — strikethrough; **underline** stays in
+the Border panel and the two decorations coexist), and **Tight box** (a switch — `text-box-trim`
+for cap/baseline-tight bounds matching the design tool; opt-in, Safari 18.2+, silently no-ops
+on older WebKit). The CSS conversions are handled in `compileTypography`.
 
 **Read-only linked instances (Versions window)**: when the Versions window is focused and
 the selected element is a **linked instance** (a node referencing a master component), the

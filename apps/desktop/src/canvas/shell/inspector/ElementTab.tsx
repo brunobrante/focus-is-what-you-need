@@ -9,6 +9,7 @@ import { fillTargetForType } from "@/domain/canvas/fillCompile";
 import { normalizeFills, fillsToWritePatch } from "@/domain/canvas/fill";
 import { BorderSection } from "./BorderSection";
 import { EffectsSection } from "./EffectsSection";
+import { TypographySection } from "./TypographySection";
 import { FillSection, type GradientTokenOption } from "./FillSection";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
@@ -53,21 +54,6 @@ type ElementTabProps = {
   /** Opens the master variant this instance points to (used by the locked banner link). */
   onGoToInstance?: (variantId: string) => void;
 };
-
-function labelForWeight(value: string | undefined): string {
-  const numeric = Number(value ?? 400);
-  if (numeric >= 700) return "Bold";
-  if (numeric >= 600) return "Semibold";
-  if (numeric >= 500) return "Medium";
-  return "Regular";
-}
-
-function weightForLabel(value: string): string {
-  if (value === "Bold") return "700";
-  if (value === "Semibold") return "600";
-  if (value === "Medium") return "500";
-  return "400";
-}
 
 export function ElementTab({
   node,
@@ -358,27 +344,13 @@ export function ElementTab({
       ) : null}
 
       {node.type === "text" ? (
-        <InsSection title="Tipografia" defaultOpen={false} disabled={locked}>
-          <InsRow label="Size">
-            <InsInput value={String(node.styles.fontSize ?? 14)} onChange={(value) => updateNumber(value, (fontSize) => onUpdateStyle({ fontSize }))} suffix="px" />
-          </InsRow>
-          <InsRow label="Weight">
-            <InsSelect
-              value={labelForWeight(node.styles.fontWeight)}
-              onChange={(value) => onUpdateStyle({ fontWeight: weightForLabel(value) })}
-              options={["Regular", "Medium", "Semibold", "Bold"]}
-            />
-          </InsRow>
-          <InsRow label="Color">
-            <InsColor
-              value={node.styles.color ?? "#111827"}
-              onChange={(color) => onUpdateStyle({ color, colorRef: undefined })}
-              tokens={colorTokens}
-              boundRef={node.styles.colorRef}
-              onBind={(colorRef) => onUpdateStyle({ colorRef })}
-            />
-          </InsRow>
-        </InsSection>
+        <TypographySection
+          styles={node.styles}
+          tokens={colorTokens}
+          heightFit={heightFit}
+          locked={locked}
+          onChange={onUpdateStyle}
+        />
       ) : null}
 
     </>

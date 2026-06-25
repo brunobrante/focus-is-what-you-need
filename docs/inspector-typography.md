@@ -1,10 +1,18 @@
 # Inspector — Typography (Text)
 
-Status: planned. Inspector spec derived from **paper.design** ("Text") and **Figma**
+Status: **v1 shipped.** Inspector spec derived from **paper.design** ("Text") and **Figma**
 ("Typography"), re-grounded for this product's **DOM-native** canvas and verified
 against WebKit/Safari support (this app runs in a Tauri **WKWebView**, not Chromium).
-When built, fold the shipped behavior into `Product.md` as `[NOW]` and trim this entry.
 One doc for the **Typography** panel — shown only when the selected element is **Text**.
+
+**v1 shipped** (the `TypographySection` panel + `compileTypography`): font family, size,
+continuous variable **weight** (1–1000), **style** (italic), color (token-bindable), **line
+height** (Auto/Custom unitless), **letter-spacing** (% → em), horizontal **align** (incl.
+justify), **vertical align** (flex column), **case** (`text-transform`), **strikethrough**,
+and **tight box** (`text-box-trim`, opt-in). Round-trips through the htmlScene adapter. **Not
+yet built:** paragraph spacing/indent, OpenType features, truncation/line-clamp, wrap quality,
+variable axes beyond `wght`, the pre-18.2 `text-box-trim` metrics fallback, and typography
+token binding (only color binds today).
 
 ## Scope note
 

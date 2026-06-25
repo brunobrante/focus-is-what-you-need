@@ -82,7 +82,15 @@ export type HtmlCanvasStyle = {
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
-  textAlign: "left" | "center" | "right";
+  textAlign: "left" | "center" | "right" | "justify";
+  // Typography panel (text nodes only). Optional + additive; absent on legacy scenes.
+  fontStyle?: "normal" | "italic";
+  lineHeight?: number; // unitless; absent = Auto (`line-height: normal`)
+  letterSpacing?: number; // percent → em at compile time
+  verticalAlign?: "top" | "middle" | "bottom";
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  lineThrough?: boolean;
+  textBoxTrim?: boolean;
   objectFit: "fill" | "contain" | "cover" | "none" | "scale-down";
   overflow: "visible" | "hidden";
 };

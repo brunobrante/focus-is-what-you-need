@@ -464,6 +464,13 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
     fontSize: style.fontSize,
     fontWeight: String(style.fontWeight),
     textAlign: style.textAlign,
+    fontStyle: style.fontStyle,
+    lineHeight: style.lineHeight,
+    letterSpacing: style.letterSpacing,
+    verticalAlign: style.verticalAlign,
+    textTransform: style.textTransform,
+    lineThrough: style.lineThrough,
+    textBoxTrim: style.textBoxTrim,
     borderRadius: node.appearance === "ellipse" && style.borderRadius === 0
       ? 999
       : style.borderRadius,
@@ -550,6 +557,15 @@ function styleFromElement(
     fontSize: styles.fontSize ?? previousStyle?.fontSize ?? 14,
     fontWeight: Number(styles.fontWeight ?? previousStyle?.fontWeight ?? 400),
     textAlign: styles.textAlign ?? previousStyle?.textAlign ?? "left",
+    // Typography fields read straight from engine state (no previousStyle
+    // fallback) so clearing one persists instead of resurrecting the old value.
+    fontStyle: styles.fontStyle,
+    lineHeight: styles.lineHeight,
+    letterSpacing: styles.letterSpacing,
+    verticalAlign: styles.verticalAlign,
+    textTransform: styles.textTransform,
+    lineThrough: styles.lineThrough,
+    textBoxTrim: styles.textBoxTrim,
     objectFit: styles.objectFit ?? previousStyle?.objectFit ?? "cover",
     overflow: styles.overflow ?? previousStyle?.overflow ?? "visible",
   };

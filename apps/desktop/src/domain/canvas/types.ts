@@ -88,7 +88,20 @@ export type ElementStyles = {
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: string;
-  textAlign?: "left" | "center" | "right";
+  textAlign?: "left" | "center" | "right" | "justify";
+  // ── Typography (Inspector → Typography panel; text only) ──────────────────
+  // The "non-obvious conversion" fields (see docs/inspector-typography.md):
+  // italic → font-style; letterSpacing in % → em; lineHeight unitless (absent =
+  // Auto/`normal`); verticalAlign → flex-column justify on the text box; case →
+  // text-transform; strike → text-decoration-line (combined with `underline`);
+  // textBoxTrim → tight cap/baseline bounds (Safari 18.2+, no-ops on older WK).
+  fontStyle?: "normal" | "italic";
+  lineHeight?: number; // unitless multiplier; absent = Auto (`line-height: normal`)
+  letterSpacing?: number; // percent (Figma's rule: 1% = 0.01em); compiled to em
+  verticalAlign?: "top" | "middle" | "bottom";
+  textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
+  lineThrough?: boolean; // strikethrough; underline stays in the Border panel
+  textBoxTrim?: boolean; // trim line-box half-leading to cap/baseline (opt-in)
   borderRadius?: number;
   borderWidth?: number;
   borderColor?: string;
