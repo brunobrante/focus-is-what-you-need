@@ -133,24 +133,13 @@ export function TopBar({
             </button>
           ))}
           <div className="mt-1 border-t border-[var(--border)] px-2 pt-2">
-            <input
-              type="text"
-              value={newWsName}
-              placeholder="New workspace name…"
-              onChange={(e) => setNewWsName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreateWorkspace();
-              }}
-              className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
-            />
             <button
               type="button"
-              onClick={() => void handleCreateWorkspace()}
-              disabled={!newWsName.trim() || creatingWs}
-              className="mt-1.5 flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-1 py-1.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:text-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+              onClick={() => { setWsOpen(false); setWsPosition(null); navigate("/new-workspace"); }}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-1 py-1.5 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
             >
               <IconPlus size={13} strokeWidth={2} />
-              {creatingWs ? "Creating…" : "Create workspace"}
+              Create workspace
             </button>
           </div>
         </div>,
