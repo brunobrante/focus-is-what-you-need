@@ -1,7 +1,10 @@
 # Standalone screen / component (no project or workspace)
 
-Status: planned. Extracted from `Product.md` ("Unattached / loose entities").
-When built, fold back into `Product.md` as `[NOW]`.
+Status: **shipped** — implemented as **Drafts**. A draft is a `ComponentRow` with
+all scope owners null (`workspaceId`, `projectId`, `screenId`, `parentVariantId`)
+plus `draftKind: "screen" | "component"`. Lives at the `/drafts` route
+(`DraftsPage.tsx`), created via `useNewDraft.ts`. Fold behavior back into
+`Product.md` as `[NOW]`.
 
 ## Today (loose entities that already work)
 
