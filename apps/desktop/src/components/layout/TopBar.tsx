@@ -159,15 +159,15 @@ export function TopBar({
 
       <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--border)]" />
       <nav aria-label="Workspace" className="inline-flex items-center gap-1">
-        <TopNavLink to="/projects">
+        <TopNavLink to={currentWs ? `/workspace/${currentWs.id}/projects` : "/projects"}>
           <IconGrid size={14} strokeWidth={1.7} className="opacity-85" />
           Projects
         </TopNavLink>
-        <TopNavLink to="/components">
+        <TopNavLink to={currentWs ? `/workspace/${currentWs.id}/components` : "/components"}>
           <IconLayers size={14} strokeWidth={1.7} className="opacity-85" />
           Components
         </TopNavLink>
-        <TopNavLink to="/system-design">
+        <TopNavLink to={currentWs ? `/workspace/${currentWs.id}/system-design` : "/system-design"}>
           <IconColorStyles size={14} strokeWidth={1.7} className="opacity-85" />
           System
         </TopNavLink>

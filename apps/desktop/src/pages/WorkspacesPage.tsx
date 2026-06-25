@@ -21,7 +21,7 @@ export function WorkspacesPage() {
 
   const openWorkspace = (id: string) => {
     setActiveWorkspaceId(id);
-    navigate("/projects");
+    navigate(`/workspace/${id}/projects`);
   };
 
   async function handleConfirmDelete(keepProjects: boolean) {

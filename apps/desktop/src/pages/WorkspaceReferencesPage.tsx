@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { useReferences } from "@/lib/storage/hooks";
@@ -53,8 +52,7 @@ export function WorkspaceReferencesPage() {
     workspaceId && void removeReferenceFromOwner(id, "workspace", workspaceId);
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--bg)]">
-      <TopBar />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
       <main className="flex flex-1 min-h-0 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-y-auto">

@@ -18,6 +18,7 @@ import { WorkspaceReferencesPage } from "@/pages/WorkspaceReferencesPage";
 import { SystemDesignPage } from "@/pages/SystemDesignPage";
 import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
+import { WorkspaceLayout } from "@/pages/WorkspaceLayout";
 import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { WorkspaceEditPage } from "@/pages/WorkspaceEditPage";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
@@ -44,7 +45,13 @@ export default function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Route>
-      <Route path="/projects" element={<LandingPage />} />
+      <Route path="/workspace/:workspaceId" element={<WorkspaceLayout />}>
+        <Route path="projects" element={<LandingPage />} />
+        <Route path="components" element={<GlobalComponentsPage />} />
+        <Route path="system-design" element={<SystemDesignPage />} />
+        <Route path="references" element={<WorkspaceReferencesPage />} />
+      </Route>
+      <Route path="/workspace/:workspaceId/edit" element={<WorkspaceEditPage />} />
       <Route path="/new" element={<NewProjectPage />} />
       <Route path="/new-workspace" element={<NewWorkspacePage />} />
       <Route path="/new-draft" element={<NewDraftPage />} />
@@ -52,11 +59,7 @@ export default function App() {
       <Route path="/project/:projectId/edit" element={<ProjectEditPage />} />
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />
-      <Route path="/workspace/:workspaceId/edit" element={<WorkspaceEditPage />} />
       <Route path="/canvas" element={<CanvasPage />} />
-      <Route path="/workspace/:workspaceId/references" element={<WorkspaceReferencesPage />} />
-      <Route path="/system-design" element={<SystemDesignPage />} />
-      <Route path="/components" element={<GlobalComponentsPage />} />
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />
       </Routes>

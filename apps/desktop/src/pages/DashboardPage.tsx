@@ -22,7 +22,7 @@ export function DashboardPage() {
 
   const openWorkspace = (id: string) => {
     setActiveWorkspaceId(id);
-    navigate("/projects");
+    navigate(`/workspace/${id}/projects`);
   };
 
   return (

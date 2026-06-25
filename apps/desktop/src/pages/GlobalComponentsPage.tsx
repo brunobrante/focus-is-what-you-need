@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { Snapshot } from "@/components/Snapshot";
 import { NewComponentModal, type NewComponentModalHandle } from "@/components/modals/NewComponentModal";
@@ -38,8 +37,7 @@ export function GlobalComponentsPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      <TopBar />
+    <div className="flex min-h-0 flex-1 flex-col">
       <main className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-14">
         <header className="mb-8 flex items-end justify-between gap-4">
           <div className="flex items-center gap-3">

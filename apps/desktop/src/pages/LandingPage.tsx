@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { exportLocalProjectToFigx, isLocalProject } from "@/lib/storage/localProjects";
-import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { CardMoreMenu, CardMenuIcons } from "@/components/screen/CardMenu";
@@ -23,11 +22,9 @@ export function LandingPage() {
     setFilter,
     pendingDelete,
     setPendingDelete,
-    isResettingFactory,
     projects,
     filtered,
     screensByProject,
-    onResetToFactory,
     onConfirmDelete,
   } = useLanding();
 
@@ -73,12 +70,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      <TopBar
-        isResettingFactory={isResettingFactory}
-        onResetToFactory={onResetToFactory}
-      />
-
+    <div className="flex min-h-0 flex-1 flex-col">
       <main className="flex flex-1 flex-col">
         {projects.length === 0 ? <EmptyState href={newProjectHref} /> : <ProjectsView
           newProjectHref={newProjectHref}

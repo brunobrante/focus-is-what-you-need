@@ -1,4 +1,3 @@
-import { TopBar } from "@/components/layout/TopBar";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useWorkspaceSystemDesign } from "@/application/system-design/useSystemDesign";
 import { SystemDesignEditor } from "@/system-design/SystemDesignEditor";
@@ -10,9 +9,7 @@ export function SystemDesignPage() {
     workspaces.find((w) => w.id === controller.workspaceId) ?? null;
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--bg)]">
-      <TopBar />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-[var(--border)] px-7 pb-5 pt-8">
           <h1 className="m-0 mb-1 text-[22px] font-semibold tracking-[-0.3px] text-[var(--text)]">
             System Design
@@ -40,9 +37,9 @@ export function SystemDesignPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
 
 export default SystemDesignPage;
+
