@@ -52,10 +52,10 @@ bun run typecheck
 
 ## Routes
 
-| Path      | Description                             |
-|-----------|-----------------------------------------|
-| `/`       | Home — tech stack overview              |
-| `/canvas` | Canvas — HTML/CSS focused editor         |
+| Path      | Description                      |
+| --------- | -------------------------------- |
+| `/`       | Home — tech stack overview       |
+| `/canvas` | Canvas — HTML/CSS focused editor |
 
 ## Canvas Architecture
 
