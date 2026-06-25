@@ -1,17 +1,17 @@
+import { Link } from "react-router-dom";
 import type { Tab } from "./types";
 
 export function Tabs({
   tab,
-  onChange,
+  tabHrefs,
   screensCount,
   componentsCount,
   referencesCount,
 }: {
   tab: Tab;
-  onChange: (t: Tab) => void;
+  tabHrefs: Record<Tab, string>;
   screensCount: number;
   componentsCount: number;
-  referencesCount: number;
 }) {
   const tabs: Array<{ id: Tab; label: string; count?: number }> = [
     { id: "screens", label: "Screens", count: screensCount },
@@ -24,14 +24,14 @@ export function Tabs({
       {tabs.map((t) => {
         const active = t.id === tab;
         return (
-          <button
+          <Link
             key={t.id}
+            to={tabHrefs[t.id]}
             role="tab"
-            type="button"
-            onClick={() => onChange(t.id)}
             aria-selected={active}
+            replace
             className={[
-              "relative cursor-pointer border-0 bg-transparent px-3.5 py-3 text-[13px] font-medium tracking-[0.1px]",
+              "relative cursor-pointer border-0 bg-transparent px-3.5 py-3 text-[13px] font-medium tracking-[0.1px] no-underline",
               active ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
             ].join(" ")}
           >
@@ -50,7 +50,7 @@ export function Tabs({
             {active && (
               <span className="absolute -bottom-px left-2.5 right-2.5 h-0.5 rounded-[2px] bg-[var(--text)]" />
             )}
-          </button>
+          </Link>
         );
       })}
     </nav>

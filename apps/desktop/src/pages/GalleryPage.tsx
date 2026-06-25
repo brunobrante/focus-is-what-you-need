@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   NewScreenModal,
 } from "@/components/modals/NewScreenModal";
@@ -14,7 +14,8 @@ import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/re
 import { useGallery } from "@/application/gallery/useGallery";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
-import { projectEditPath } from "@/lib/navigation/projectUrl";
+import { projectBase, projectEditPath } from "@/lib/navigation/projectUrl";
+import type { Tab } from "@/routes/Gallery/types";
 
 import {
   Crumbs,
@@ -30,6 +31,19 @@ export function GalleryPage() {
   const { projectId: rawProjectId, workspaceId } = useParams<{ projectId: string; workspaceId?: string }>();
   const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : "";
 
+  const location = useLocation();
+  const lastSegment = location.pathname.split("/").filter(Boolean).at(-1) ?? "";
+  const GALLERY_TABS: Tab[] = ["screens", "components", "references", "system"];
+  const tab: Tab = GALLERY_TABS.includes(lastSegment as Tab) ? (lastSegment as Tab) : "screens";
+
+  const base = projectBase(projectId, workspaceId);
+  const tabHrefs: Record<Tab, string> = {
+    screens: `${base}/screens`,
+    components: `${base}/components`,
+    references: `${base}/references`,
+    system: `${base}/system`,
+  };
+
   const previewRef = useRef<ProjectPreviewModalHandle>(null);
   const versionScreenRef = useRef<VersionModeModalHandle>(null);
   const navigate = useNavigate();
@@ -42,8 +56,6 @@ export function GalleryPage() {
     activeVariants,
     type,
     projectName,
-    tab,
-    setTab,
     cmpFilter,
     setCmpFilter,
     screenSections,
@@ -113,10 +125,9 @@ export function GalleryPage() {
           />
           <Tabs
             tab={tab}
-            onChange={setTab}
+            tabHrefs={tabHrefs}
             screensCount={projectScreens.length}
             componentsCount={components.length}
-            referencesCount={references.length}
           />
 
           {tab === "screens" && (

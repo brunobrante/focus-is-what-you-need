@@ -53,6 +53,10 @@ export default function App() {
       </Route>
       <Route path="/workspace/:workspaceId/edit" element={<WorkspaceEditPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId" element={<GalleryPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/screens" element={<GalleryPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/components" element={<GalleryPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/references" element={<GalleryPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/system" element={<GalleryPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/edit" element={<ProjectEditPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/workspace/:workspaceId/project/:projectId/c/:componentId" element={<DetailPage />} />
@@ -60,6 +64,10 @@ export default function App() {
       <Route path="/new-workspace" element={<NewWorkspacePage />} />
       <Route path="/new-draft" element={<NewDraftPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />
+      <Route path="/project/:projectId/screens" element={<GalleryPage />} />
+      <Route path="/project/:projectId/components" element={<GalleryPage />} />
+      <Route path="/project/:projectId/references" element={<GalleryPage />} />
+      <Route path="/project/:projectId/system" element={<GalleryPage />} />
       <Route path="/project/:projectId/edit" element={<ProjectEditPage />} />
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />

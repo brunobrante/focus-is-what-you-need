@@ -29,7 +29,6 @@ import type {
   VariantRow,
 } from "@/lib/storage/schema";
 
-export type Tab = "screens" | "components" | "references" | "system";
 export type CmpKindFilter = "all" | ComponentKind;
 export type SectionState = { id: string; name: string };
 
@@ -87,10 +86,6 @@ export interface GalleryState {
   type: ProjectType;
   projectName: string;
 
-  // tab
-  tab: Tab;
-  setTab: (tab: Tab) => void;
-
   // component kind filter
   cmpFilter: CmpKindFilter;
   setCmpFilter: (filter: CmpKindFilter) => void;
@@ -135,7 +130,6 @@ export function useGallery(projectId: string, workspaceId?: string | null): Gall
   const type: ProjectType = project?.type ?? "desktop";
   const projectName = project?.name ?? "Projeto";
 
-  const [tab, setTab] = useState<Tab>("screens");
   const [cmpFilter, setCmpFilter] = useState<CmpKindFilter>("all");
 
   const screenSectionState = usePersistentSectionState(project?.id, "screens");
@@ -183,8 +177,6 @@ export function useGallery(projectId: string, workspaceId?: string | null): Gall
     activeVariants,
     type,
     projectName,
-    tab,
-    setTab,
     cmpFilter,
     setCmpFilter,
     screenSections: screenSectionState.sections,
