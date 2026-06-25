@@ -190,55 +190,40 @@ export function TopBar({
         aria-expanded={menuOpen}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
-          const width = 220;
+          const width = 200;
           setMenuPosition({
             top: rect.bottom + 8,
             left: Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width)),
           });
           setMenuOpen((current) => !current);
         }}
-        className="grid h-8 w-8 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[linear-gradient(135deg,#5b6cff,#2a2f4a)] text-[10.5px] font-semibold tracking-[0.2px] text-white transition-colors hover:border-[var(--border-strong)]"
+        className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
       >
-        JD
+        <IconSettings size={15} strokeWidth={1.7} />
       </button>
       {menuOpen && menuPosition
         ? createPortal(
             <div
               ref={menuRef}
               role="menu"
-              className="fixed z-[80] min-w-[220px] overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)] backdrop-blur-md"
+              className="fixed z-[80] min-w-[200px] overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)] backdrop-blur-md"
               style={{ top: menuPosition.top, left: menuPosition.left }}
             >
-              <div className="border-b border-[var(--border)] px-3 py-2.5">
-                <div className="text-[12px] font-semibold text-[var(--text)]">Workspace owner</div>
-                <div className="mt-1 text-[11px] text-[var(--text-faint)]">JD · Local desktop workspace</div>
-              </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setMenuPosition(null);
-                  if (currentWs) navigate(`/workspace/${currentWs.id}/edit`);
-                }}
-                className="mt-1 flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
-              >
-                <IconPencil size={13} />
-                <span>Edit workspace</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setMenuPosition(null);
-                  settingsRef.current?.open();
-                }}
-                className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
-              >
-                <IconSettings size={13} />
-                <span>Settings</span>
-              </button>
+              {currentWs && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setMenuPosition(null);
+                    navigate(`/workspace/${currentWs.id}/edit`);
+                  }}
+                  className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+                >
+                  <IconPencil size={13} />
+                  <span>Edit workspace settings</span>
+                </button>
+              )}
               {onResetToFactory ? (
                 <>
                   <div className="my-1 h-px bg-[var(--border)]" />
