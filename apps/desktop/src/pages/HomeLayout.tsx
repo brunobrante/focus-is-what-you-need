@@ -198,7 +198,7 @@ function HomeSidebar() {
         {/* All rows but Learn reach real routes inside this layout; Learn is a
             placeholder until its feature lands. */}
         <SidebarLink to="/" end icon={<IconLayoutVertical size={15} strokeWidth={1.7} />}>
-          Dashboard
+          Home
         </SidebarLink>
         <SidebarLink to="/workspaces" icon={<IconGrid size={15} strokeWidth={1.7} />}>
           Workspaces
@@ -212,9 +212,6 @@ function HomeSidebar() {
         <SidebarLink to="/references" icon={<IconImage size={15} strokeWidth={1.7} />}>
           References
         </SidebarLink>
-        <SidebarLink to="/generate" icon={<IconWand size={15} strokeWidth={1.7} />}>
-          Builder
-        </SidebarLink>
         <SidebarPlaceholder icon={<IconSparkles size={15} strokeWidth={1.7} />}>
           Learn
         </SidebarPlaceholder>
@@ -222,6 +219,9 @@ function HomeSidebar() {
 
       <div className="my-3 h-px bg-[var(--border)]" />
 
+      <SidebarLink to="/generate" icon={<IconWand size={15} strokeWidth={1.7} />}>
+        Builder
+      </SidebarLink>
       <SidebarLink to="/settings" icon={<IconSettings size={15} strokeWidth={1.7} />}>
         Settings
       </SidebarLink>
