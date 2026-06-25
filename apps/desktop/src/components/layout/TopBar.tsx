@@ -4,7 +4,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { Home } from "lucide-react";
 import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
-import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
+import { IconChevronDown, IconColorStyles, IconEllipsis, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { createWorkspace } from "@/lib/storage/repos/workspace.repo";
@@ -199,7 +199,7 @@ export function TopBar({
         }}
         className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
       >
-        <IconSettings size={15} strokeWidth={1.7} />
+        <IconEllipsis size={15} />
       </button>
       {menuOpen && menuPosition
         ? createPortal(
@@ -224,6 +224,19 @@ export function TopBar({
                   <span>Edit workspace settings</span>
                 </button>
               )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMenuPosition(null);
+                  settingsRef.current?.open();
+                }}
+                className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+              >
+                <IconSettings size={13} />
+                <span>Settings</span>
+              </button>
               {onResetToFactory ? (
                 <>
                   <div className="my-1 h-px bg-[var(--border)]" />
