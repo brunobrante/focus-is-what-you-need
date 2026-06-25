@@ -20,6 +20,7 @@ import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/
 import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
 import { CardMenuIcons as SharedCardMenuIcons } from "@/components/screen/CardMenu";
 import { IconPlus } from "@/components/icons";
+import { newId } from "@/lib/storage/ids";
 import type { SectionState } from "../types";
 
 export function SectionedGrid<T>({
@@ -80,7 +81,7 @@ export function SectionedGrid<T>({
     const trimmed = sectionName.trim();
     if (!trimmed) return;
     const section: SectionState = {
-      id: `section-${Date.now()}`,
+      id: `section-${newId()}`,
       name: trimmed,
     };
     onSectionsChange((prev) => [...prev, section]);
