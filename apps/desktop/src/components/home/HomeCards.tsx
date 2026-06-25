@@ -77,25 +77,46 @@ export function WorkspaceTile({
 
 /* ── Project card ─────────────────────────────────────────────────────────── */
 
-export function ProjectCard({ item }: { item: RecentItem }) {
+export function ProjectCard({
+  item,
+  onDelete,
+}: {
+  item: RecentItem;
+  onDelete?: () => void;
+}) {
   const { project, screensCount, workspace } = item;
   return (
-    <Link
-      to={`/project/${encodeURIComponent(project.id)}`}
-      className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
-    >
-      <ProjectThumb project={project} workspace={workspace} />
-      <div className="flex flex-col gap-[3px] px-0.5">
-        <span className="truncate text-[13.5px] font-medium text-[var(--text)]">
-          {project.name}
-        </span>
-        <div className="text-[11.5px] text-[var(--text-muted)]">
-          {screensCount} {screensCount === 1 ? "screen" : "screens"}
-          <span className="px-1.5 text-[var(--text-faint)]">·</span>
-          updated {relativeTime(project.updatedAt)}
+    <div className="group relative">
+      <Link
+        to={`/project/${encodeURIComponent(project.id)}`}
+        className="flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
+      >
+        <ProjectThumb project={project} workspace={workspace} />
+        <div className="flex flex-col gap-[3px] px-0.5">
+          <span className="truncate text-[13.5px] font-medium text-[var(--text)]">
+            {project.name}
+          </span>
+          <div className="text-[11.5px] text-[var(--text-muted)]">
+            {screensCount} {screensCount === 1 ? "screen" : "screens"}
+            <span className="px-1.5 text-[var(--text-faint)]">·</span>
+            updated {relativeTime(project.updatedAt)}
+          </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+      {onDelete ? (
+        <CardMoreMenu
+          items={[
+            {
+              key: "delete",
+              label: "Delete project",
+              icon: CardMenuIcons.Trash,
+              destructive: true,
+              onClick: onDelete,
+            },
+          ]}
+        />
+      ) : null}
+    </div>
   );
 }
 
