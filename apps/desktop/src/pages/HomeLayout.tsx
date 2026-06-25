@@ -14,6 +14,7 @@ import {
   IconPlus,
   IconSettings,
   IconSparkles,
+  IconWand,
 } from "@/components/icons";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 
@@ -209,7 +210,10 @@ function HomeSidebar() {
           Drafts
         </SidebarLink>
         <SidebarLink to="/references" icon={<IconImage size={15} strokeWidth={1.7} />}>
-          Local References
+          References
+        </SidebarLink>
+        <SidebarLink to="/generate" icon={<IconWand size={15} strokeWidth={1.7} />}>
+          Builder
         </SidebarLink>
         <SidebarPlaceholder icon={<IconSparkles size={15} strokeWidth={1.7} />}>
           Learn

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, NavLink } from "react-router-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
-import { Home, Wand2 } from "lucide-react";
+import { Home } from "lucide-react";
 import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
 import { WorkspaceEditPanel, type WorkspaceEditPanelHandle } from "@/components/layout/WorkspaceEditPanel";
 import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
@@ -184,20 +184,6 @@ export function TopBar({
         </>
       ) : null}
       <span className="flex-1" />
-      <NavLink
-        to="/generate"
-        className={({ isActive }) =>
-          [
-            "inline-flex h-8 items-center gap-2 rounded-md border px-3.5 text-[13px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
-            isActive
-              ? "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]"
-              : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
-          ].join(" ")
-        }
-      >
-        <Wand2 size={13} strokeWidth={1.7} className="opacity-80" />
-        Builder
-      </NavLink>
       <button
         ref={triggerRef}
         type="button"
