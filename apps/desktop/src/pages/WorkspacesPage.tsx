@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { IconGrid, IconPlus } from "@/components/icons";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { WorkspaceTile } from "@/components/home/HomeCards";
-import { useHome } from "@/application/home/useHome";
+import { useHome, type WorkspaceCard } from "@/application/home/useHome";
+import { DeleteWorkspaceModal } from "@/components/modals/DeleteWorkspaceModal";
+import { deleteWorkspace } from "@/lib/storage/repos/workspace.repo";
 
 /**
  * WorkspacesPage (`/workspaces`) — the dedicated grid of every workspace, reached
@@ -12,13 +15,21 @@ import { useHome } from "@/application/home/useHome";
  * active and jumps to its project browser (`/projects`).
  */
 export function WorkspacesPage() {
-  const { workspaces, setActiveWorkspaceId } = useHome();
+  const { workspaces, activeWorkspace, setActiveWorkspaceId } = useHome();
   const navigate = useNavigate();
+  const [pendingDelete, setPendingDelete] = useState<WorkspaceCard | null>(null);
 
   const openWorkspace = (id: string) => {
     setActiveWorkspaceId(id);
     navigate("/projects");
   };
+
+  async function handleConfirmDelete(keepProjects: boolean) {
+    if (!pendingDelete) return;
+    const id = pendingDelete.workspace.id;
+    if (activeWorkspace?.id === id) setActiveWorkspaceId(null);
+    await deleteWorkspace(id, keepProjects);
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-12">
@@ -52,10 +63,18 @@ export function WorkspacesPage() {
               key={card.workspace.id}
               card={card}
               onClick={() => openWorkspace(card.workspace.id)}
+              onDelete={() => setPendingDelete(card)}
             />
           ))}
         </div>
       )}
+
+      <DeleteWorkspaceModal
+        open={Boolean(pendingDelete)}
+        card={pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

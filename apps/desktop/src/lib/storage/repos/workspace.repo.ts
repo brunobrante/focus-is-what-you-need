@@ -1,6 +1,7 @@
 import { newId, now } from "@/lib/storage/ids";
 import type { WorkspaceRow } from "@/lib/storage/schema";
 import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
+import { deleteProject } from "@/lib/storage/repos/projects.repo";
 
 const KEY = TABLES.workspaces;
 
@@ -90,6 +91,19 @@ export async function removeProjectFromWorkspace(
   return updateWorkspace(workspaceId, {
     projectIds: current.projectIds.filter((id) => id !== projectId),
   });
+}
+
+export async function deleteWorkspace(id: string, keepProjects: boolean): Promise<void> {
+  if (!keepProjects) {
+    const workspace = await getWorkspace(id);
+    if (!workspace) return;
+    for (const projectId of workspace.projectIds) {
+      await deleteProject(projectId);
+    }
+  }
+  const rows = await listWorkspaces();
+  await replaceTable<WorkspaceRow>(KEY, rows.filter((r) => r.id !== id));
+  notify(KEY);
 }
 
 export async function bulkInsertWorkspaces(rows: WorkspaceRow[]): Promise<void> {

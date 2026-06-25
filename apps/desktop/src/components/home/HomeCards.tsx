@@ -6,6 +6,7 @@ import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectRow, WorkspaceRow } from "@/lib/storage/schema";
 import { relativeTime } from "@/application/landing/useLanding";
 import type { RecentItem, WorkspaceCard } from "@/application/home/useHome";
+import { CardMenuIcons, CardMoreMenu } from "@/components/screen/CardMenu";
 
 /**
  * Home card primitives shared by the Dashboard and the dedicated Workspaces /
@@ -21,39 +22,56 @@ export function initialOf(workspace: WorkspaceRow): string {
 export function WorkspaceTile({
   card,
   onClick,
+  onDelete,
 }: {
   card: WorkspaceCard;
   onClick: () => void;
+  onDelete?: () => void;
 }) {
   const { workspace, projectCount, isActive } = card;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex cursor-pointer items-center gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3.5 text-left transition-[border-color,transform] duration-[120ms] hover:-translate-y-0.5 hover:border-[var(--border-strong)]"
-    >
-      <span
-        aria-hidden
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] bg-[var(--text)] text-[14px] font-bold text-[var(--bg)]"
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full cursor-pointer items-center gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3.5 text-left transition-[border-color,transform] duration-[120ms] hover:-translate-y-0.5 hover:border-[var(--border-strong)]"
       >
-        {initialOf(workspace)}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[13.5px] font-medium text-[var(--text)]">
-            {workspace.name}
-          </span>
-          {isActive ? (
-            <span className="shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px] text-[var(--text-muted)]">
-              Active
+        <span
+          aria-hidden
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] bg-[var(--text)] text-[14px] font-bold text-[var(--bg)]"
+        >
+          {initialOf(workspace)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13.5px] font-medium text-[var(--text)]">
+              {workspace.name}
             </span>
-          ) : null}
+            {isActive ? (
+              <span className="shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px] text-[var(--text-muted)]">
+                Active
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+            {projectCount} {projectCount === 1 ? "project" : "projects"}
+          </div>
         </div>
-        <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
-          {projectCount} {projectCount === 1 ? "project" : "projects"}
-        </div>
-      </div>
-    </button>
+      </button>
+      {onDelete ? (
+        <CardMoreMenu
+          items={[
+            {
+              key: "delete",
+              label: "Delete workspace",
+              icon: CardMenuIcons.Trash,
+              destructive: true,
+              onClick: onDelete,
+            },
+          ]}
+        />
+      ) : null}
+    </div>
   );
 }
 
