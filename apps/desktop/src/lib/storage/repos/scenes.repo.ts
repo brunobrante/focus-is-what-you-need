@@ -219,7 +219,13 @@ async function propagateVariantSceneToParents(
     );
     if (!nextParentGraphJSON || nextParentGraphJSON === parentScene.graphJSON) return;
 
-    await upsertSceneRowWithoutPropagation({
+    // SAVE-2: write atomically against the parent row we just read. The merge
+    // (read parentScene → embed child → putRecord) runs with NO `await` in
+    // between, so a concurrent direct edit of the parent cannot interleave and
+    // be overwritten by this stale-basis propagation (lost update). Reusing
+    // `parentScene` as `existing` — instead of re-reading inside the write — is
+    // what keeps the read-modify-write a single synchronous tick.
+    writeSceneRow(parentScene, {
       ownerType: parentOwner.ownerType,
       ownerId: parentOwner.ownerId,
       graphJSON: nextParentGraphJSON,
@@ -232,13 +238,21 @@ async function propagateVariantSceneToParents(
   }
 }
 
-async function upsertSceneRowWithoutPropagation(input: {
-  ownerType: SceneOwnerType;
-  ownerId: string;
-  graphJSON: string;
-  t: number;
-}): Promise<void> {
-  const existing = await getSceneByOwner(input.ownerType, input.ownerId);
+/**
+ * Synchronous scene-row write that merges into a caller-supplied `existing` row
+ * (or creates a fresh one when null). Synchronous on purpose: callers must read
+ * `existing` and call this in the same tick with no `await` between, so the
+ * read-modify-write is atomic and cannot lose a concurrent write (SAVE-2).
+ */
+function writeSceneRow(
+  existing: SceneRow | null,
+  input: {
+    ownerType: SceneOwnerType;
+    ownerId: string;
+    graphJSON: string;
+    t: number;
+  },
+): void {
   const row: SceneRow = existing
     ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: input.t }
     : {
