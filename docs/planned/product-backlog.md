@@ -12,10 +12,6 @@ This file is the index; the detail lives in the linked docs.
 - [Drag a photo/file onto the canvas](./canvas-image-drop.md) — drop an image
   file directly onto the frame to create an Image element, instead of setting
   `src` afterward.
-- [SVG as a sealed component](./svg-vector-editing-plan.md) — an inserted SVG is a
-  single sealed node; its vectors are editable only by opening the SVG in
-  isolation. Behavior + implementation mapping live in §8.1 of the vector-editing
-  plan.
 
 ## Inspector (canvas element properties)
 

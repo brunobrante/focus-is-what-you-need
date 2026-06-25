@@ -24,8 +24,8 @@ HTML/SVG)**. Radius is the sharpest example:
 
 This ties directly to the planned **SVG ↔ HTML** work: a star authored as SVG must be
 convertible toward HTML where possible, and Appearance must read the element's render
-target to choose the right mechanism. Cross-link: [`svg-vector-editing-plan.md`](./svg-vector-editing-plan.md)
-("SVG as a sealed component"). The Appearance panel is **type-aware over a unified
+target to choose the right mechanism. Cross-link: vector editing + "SVG as a sealed
+component", now shipped — see [`UX.md`](../UX.md) ("Vector editing"). The Appearance panel is **type-aware over a unified
 HTML+SVG renderer** — that is the Figma+paper merge for this section.
 
 ## Today (what already exists)
@@ -154,8 +154,7 @@ Figma behavior, achieved over the paper-style HTML/SVG render.
 - **Fill, stroke/border styling** — separate Fill and Stroke panel docs. This doc only
   touches stroke insofar as smoothing/SVG affects how the border follows a curve.
 - The renderer's **HTML↔SVG target switching** and the **SVG vertex-rounding geometry**
-  are implementation tasks this spec authorizes; details live in
-  [`svg-vector-editing-plan.md`](./svg-vector-editing-plan.md).
+  build on the shipped vector editing — see [`UX.md`](../UX.md) ("Vector editing").
 
 ## Open questions
 

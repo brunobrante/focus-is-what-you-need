@@ -161,7 +161,7 @@ color (Safari 10+). SVG → `stroke-opacity: 1` (independent of color alpha).
 - **SVG render switching:** Center alignment, exact dashes on rounded corners, mixed
   corners, and any vector/line/arrow promote the element to an **SVG render target** —
   the same HTML↔SVG unification as [`inspector-appearance.md`](./inspector-appearance.md)
-  (squircle) and [`svg-vector-editing-plan.md`](./svg-vector-editing-plan.md).
+  (squircle) and the shipped vector editing ([`UX.md`](../UX.md), "Vector editing").
 
 ## Respecting the laws
 

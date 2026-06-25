@@ -205,8 +205,8 @@ thread and return hex/sRGB to the webview.
   element-vs-backdrop blend is `mix-blend-mode` in
   [`inspector-appearance.md`](./inspector-appearance.md). Keep the two distinct in UI.
 - **Render-target switching:** Pattern/Tile and SVG-shape fills switch the element's
-  render (img ↔ div ↔ inline SVG) — same theme as Appearance/Border/Effects and
-  [`svg-vector-editing-plan.md`](./svg-vector-editing-plan.md).
+  render (img ↔ div ↔ inline SVG) — same theme as Appearance/Border/Effects and the
+  shipped vector editing ([`UX.md`](../UX.md), "Vector editing").
 
 ## Respecting the laws
 
