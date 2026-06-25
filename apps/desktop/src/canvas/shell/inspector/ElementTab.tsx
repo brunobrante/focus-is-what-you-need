@@ -13,6 +13,7 @@ import { BorderSection } from "./BorderSection";
 import { EffectsSection } from "./EffectsSection";
 import { TypographySection } from "./TypographySection";
 import { FillSection, type GradientTokenOption } from "./FillSection";
+import { ExportSection } from "./ExportSection";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -323,6 +324,7 @@ export function ElementTab({
         />
       ) : null}
 
+      <ExportSection node={node} document={document} locked={locked} />
     </>
   );
 }

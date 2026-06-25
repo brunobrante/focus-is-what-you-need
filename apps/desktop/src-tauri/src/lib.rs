@@ -31,6 +31,14 @@ pub struct FigxProjectInput {
     pub reference_ids: Vec<String>,
 }
 
+// One file in a batched export (per-element Export panel). `data` arrives as a
+// JSON number array from the webview (same convention as the model runners).
+#[derive(Deserialize)]
+pub struct ExportArchiveEntry {
+    pub name: String,
+    pub data: Vec<u8>,
+}
+
 
 struct ZipEntry {
     name: String,
@@ -637,6 +645,71 @@ fn export_figx_project(
     Ok(path.to_string_lossy().into_owned())
 }
 
+// Per-element export (Inspector → Export panel). Opens a native "Save As…"
+// dialog and writes the produced bytes; returns the written path, or None when
+// the user cancels. Distinct from `.figx` project export (which targets the
+// workspace folder): this is a user-chosen destination for one element's image/
+// SVG/HTML output.
+#[tauri::command]
+async fn save_export_file(
+    suggested_name: String,
+    data: Vec<u8>,
+) -> Result<Option<String>, String> {
+    let chosen = tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog = rfd::FileDialog::new()
+            .set_title("Export")
+            .set_file_name(&suggested_name);
+        if let Some(ext) = Path::new(&suggested_name).extension().and_then(|e| e.to_str()) {
+            dialog = dialog.add_filter(ext.to_uppercase(), &[ext]);
+        }
+        dialog.save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    match chosen {
+        Some(path) => {
+            fs::write(&path, &data).map_err(|e| e.to_string())?;
+            Ok(Some(path.to_string_lossy().into_owned()))
+        }
+        None => Ok(None),
+    }
+}
+
+// Saves a batched export (multiple entries, or an HTML bundle) as a single
+// `.zip`, reusing the store-only zip writer. Returns the written path, or None
+// when the user cancels.
+#[tauri::command]
+async fn save_export_archive(
+    suggested_name: String,
+    entries: Vec<ExportArchiveEntry>,
+) -> Result<Option<String>, String> {
+    let chosen = tauri::async_runtime::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_title("Export")
+            .set_file_name(&suggested_name)
+            .add_filter("ZIP", &["zip"])
+            .save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    match chosen {
+        Some(path) => {
+            let zip_entries: Vec<ZipEntry> = entries
+                .into_iter()
+                .map(|entry| ZipEntry {
+                    name: entry.name,
+                    data: entry.data,
+                })
+                .collect();
+            write_zip_file(&path, &zip_entries)?;
+            Ok(Some(path.to_string_lossy().into_owned()))
+        }
+        None => Ok(None),
+    }
+}
+
 // Removes any exported `.figx` file for a deleted project. A no-op if the
 // project was never exported (the workspace folder may not even exist).
 #[tauri::command]
@@ -967,6 +1040,8 @@ pub fn run() {
             delete_reference_frames,
             export_figx_project,
             delete_figx_project,
+            save_export_file,
+            save_export_archive,
             models::model_is_installed,
             models::model_install,
             models::model_uninstall,

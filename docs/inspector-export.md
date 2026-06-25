@@ -1,10 +1,19 @@
 # Inspector — Export (PNG, JPEG, WebP, PDF, SVG, HTML + device mock)
 
-Status: planned. Inspector spec derived from **paper.design** and **Figma** (Export
-panel) plus this product's own differentiators, re-grounded for the **DOM-native**
-canvas in a Tauri v2 + **WKWebView** app (WebKit, not Chromium) and verified against
-native WebKit/Tauri/Rust capabilities. When built, fold the shipped behavior into
-`Product.md` as `[NOW]` and trim this entry. One doc for the **Export** panel group.
+Status: **v1 shipped (webview-complete)** — the **Export** panel exists in the element
+Inspector (`canvas/shell/inspector/ExportSection.tsx`, engine in `lib/canvas/export/*`,
+Rust save in `save_export_file` / `save_export_archive`). What shipped: the per-element
+entry list (scale + format + suffix, `+`/`−`), **HTML** export (standalone single-file +
+`index.html`/`styles.css` bundle), **SVG** export, and **PNG/JPEG/WebP** raster (rasterized
+from the authored SVG on a 2D canvas at true-size × scale — no `foreignObject`), with the
+**Background** (Transparent/Color/Flatten) control, written via a native "Save As…" dialog
+(single file or `.zip`). **Still deferred to a native macOS pass** (kept here as the spec):
+high-fidelity raster of full HTML/CSS via **`WKWebView.takeSnapshot`**, vector **PDF** via
+**`createPDF`**, **AVIF**, the **device mock**, the **⇧⌘E** shortcut, and persisting export
+entries per element. Inspector spec derived from **paper.design** and **Figma** (Export panel)
+plus this product's own differentiators, re-grounded for the **DOM-native** canvas in a Tauri
+v2 + **WKWebView** app (WebKit, not Chromium). When the native pass lands, fold the shipped
+behavior into `Product.md` as `[NOW]` and trim this entry. One doc for the **Export** panel group.
 
 ## What this is (and isn't)
 

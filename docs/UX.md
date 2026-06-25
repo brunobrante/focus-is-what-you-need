@@ -742,6 +742,29 @@ the Border panel and the two decorations coexist), and **Tight box** (a switch �
 for cap/baseline-tight bounds matching the design tool; opt-in, Safari 18.2+, silently no-ops
 on older WebKit). The CSS conversions are handled in `compileTypography`.
 
+**Inspector → Export** (shown for every element type, collapsed by default — the **last**
+element section): per-element export of the selected node to image / vector / code, distinct
+from the project-level `.figx` file (which is export-only and lives in the Landing page menu).
+A list of **export entries** (add via **Add export**, remove via the trash icon — at least one
+always remains); each entry picks a **Format** (PNG / JPEG / WebP / SVG / HTML), and raster
+formats also get a **Scale** (0.5× / 1× / 2× / 3×) and an optional filename **Suffix**
+(defaults to `@Nx` for non-1× scales). When any raster entry is present a **Background** toggle
+appears (**None** = transparent / **Color** / **Flatten**, with a color swatch for the latter
+two; JPEG is always flattened since it has no alpha). When any HTML entry is present an **HTML**
+toggle appears (**Single file** = one self-contained `.html` with embedded styles, or
+**Bundle** = `index.html` + `styles.css`). The **Export** button (purple, full-width) runs every
+entry, then opens a native **"Save As…"** dialog — one file when a single plain file is produced,
+or a `.zip` when several entries (or an HTML bundle) are. A status line below reports the result
+(`Exported N files.` / `Export cancelled.` / failure). **How it's produced (webview-complete):**
+PNG/JPEG/WebP are rasterized from the element's authored SVG onto a 2D canvas at true-size × scale
+(a clean supersample — no `foreignObject`, which WebKit mis-renders); SVG reuses the canvas's
+own `svgForHtmlCanvasDocument`; HTML is authored from the element's style objects via the same
+`compile*` functions the renderer uses (`lib/canvas/export/*`), so the CSS matches what's drawn.
+Bytes are written by the Rust `save_export_file` / `save_export_archive` commands. *Deferred to a
+native pass (macOS WKWebView): high-fidelity raster of full HTML/CSS (backdrop-filter, complex
+gradients) via `takeSnapshot`, vector **PDF** via `createPDF`, **AVIF**, and the **device mock**
+— see `docs/inspector-export.md`.*
+
 **Read-only linked instances (Versions window)**: when the Versions window is focused and
 the selected element is a **linked instance** (a node referencing a master component), the
 Inspector's Element tab still shows every section (Position, Tamanho, Layout, Appearance, …)
