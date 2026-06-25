@@ -27,7 +27,10 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
   "canvas.overlay.toggleScreen": [{ key: "3" }],
   "canvas.viewport.zoomIn": [
     { mod: true, key: "=" },
-    { mod: true, key: "+" },
+    // "+" is typed as Shift+"=", so the event carries shiftKey. Without shift:true
+    // the matcher's `event.shiftKey === Boolean(binding.shift)` check rejects it and
+    // the binding never fires (DOM-2).
+    { mod: true, key: "+", shift: true },
   ],
   "canvas.viewport.zoomOut": [{ mod: true, key: "-" }],
   "canvas.viewport.zoomReset": [{ mod: true, key: "0" }],
