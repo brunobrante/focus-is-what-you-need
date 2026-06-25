@@ -1,10 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
-import { PageFooter } from "@/components/layout/PageFooter";
 import { Snapshot } from "@/components/Snapshot";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
-import { IconPlus, IconChevronLeft, IconDocument, IconFrame, IconDiamond } from "@/components/icons";
+import { IconPlus, IconDocument, IconFrame, IconDiamond } from "@/components/icons";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { useDrafts } from "@/lib/storage/hooks";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
@@ -21,53 +20,40 @@ export function DraftsPage() {
   const { requestDelete, modal: deleteModal } = useDeleteComponent();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] px-6">
-        <Link
-          to="/"
-          aria-label="Back to home"
-          className="inline-grid h-7 w-7 place-items-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-        >
-          <IconChevronLeft size={14} strokeWidth={1.7} />
-        </Link>
-        <span className="text-[14px] font-semibold tracking-[-0.2px] text-[var(--text)]">Drafts</span>
-        <span className="flex-1" />
-        <Link to="/new-draft" className="btn btn-primary no-underline">
-          <IconPlus size={14} strokeWidth={2} />
-          New draft
-        </Link>
-      </header>
-
-      <main className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-12">
-        <header className="mb-8">
+    <div className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-12">
+      <header className="mb-8 flex items-start justify-between gap-4">
+        <div>
           <h1 className="m-0 mb-0.5 text-2xl font-semibold tracking-[-0.3px]">Drafts</h1>
           <p className="m-0 text-[13.5px] text-[var(--text-muted)]">
             Loose screens and components, outside any workspace or project ·{" "}
             {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
           </p>
-        </header>
+        </div>
+        <Link to="/new-draft" className="btn btn-primary no-underline shrink-0">
+          <IconPlus size={14} strokeWidth={2} />
+          New draft
+        </Link>
+      </header>
 
-        {drafts.length === 0 ? (
-          <EmptyMessage
-            icon={<IconDocument size={17} strokeWidth={1.7} />}
-            title="No drafts yet"
-            description="Drafts are project-less screens and components to sketch ideas freely."
-          />
-        ) : (
-          <div
-            className="grid gap-5"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
-          >
-            {drafts.map((d) => (
-              <DraftCard key={d.id} draft={d} onRequestDelete={() => void requestDelete(d)} />
-            ))}
-            <AddDraftCard />
-          </div>
-        )}
-      </main>
+      {drafts.length === 0 ? (
+        <EmptyMessage
+          icon={<IconDocument size={17} strokeWidth={1.7} />}
+          title="No drafts yet"
+          description="Drafts are project-less screens and components to sketch ideas freely."
+        />
+      ) : (
+        <div
+          className="grid gap-5"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+        >
+          {drafts.map((d) => (
+            <DraftCard key={d.id} draft={d} onRequestDelete={() => void requestDelete(d)} />
+          ))}
+          <AddDraftCard />
+        </div>
+      )}
 
       {deleteModal}
-      <PageFooter />
     </div>
   );
 }

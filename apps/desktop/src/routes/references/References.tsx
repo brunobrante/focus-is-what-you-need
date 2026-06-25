@@ -15,11 +15,19 @@ import { SmallButton, FilterSearchBar } from "./components/ui";
 
 /**
  * The reference library page body. The top chrome is supplied by the route
- * wrapper via `header` — the workspace route passes the workspace `TopBar`, the
- * Home route passes a standalone header — so the same grid/cards/modals serve
- * both `/references` and `/workspace/:id/references` without duplication.
+ * wrapper via `header` — the workspace route passes the workspace `TopBar` — so
+ * the same grid/cards/modals serve `/references` and `/workspace/:id/references`
+ * without duplication. When `embedded` (the Home `/references` route), the shell
+ * comes from `HomeLayout` instead: this body fills the layout `<main>` and skips
+ * its own full-height wrapper and footer.
  */
-export function References({ header }: { header?: ReactNode }) {
+export function References({
+  header,
+  embedded = false,
+}: {
+  header?: ReactNode;
+  embedded?: boolean;
+}) {
   const lib = useReferenceLibrary();
   const importRef = useRef<ImportModalHandle>(null);
   const groupModalRef = useRef<ReferenceGroupModalHandle>(null);
@@ -50,7 +58,13 @@ export function References({ header }: { header?: ReactNode }) {
   })();
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--bg)]">
+    <div
+      className={
+        embedded
+          ? "flex min-h-0 flex-1 flex-col"
+          : "flex h-screen flex-col bg-[var(--bg)]"
+      }
+    >
       {header}
 
       <main className="flex flex-1 min-h-0 flex-col overflow-hidden">
@@ -178,7 +192,7 @@ export function References({ header }: { header?: ReactNode }) {
           </div>
         </div>
 
-        <PageFooter />
+        {embedded ? null : <PageFooter />}
       </main>
 
       <ImportModal ref={importRef} />

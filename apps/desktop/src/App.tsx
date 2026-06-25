@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
-import { HomePage } from "@/pages/HomePage";
+import { HomeLayout } from "@/pages/HomeLayout";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { NewProjectPage } from "@/pages/NewProjectPage";
 import { NewWorkspacePage } from "@/pages/NewWorkspacePage";
@@ -27,23 +29,28 @@ export default function App() {
   return (
     <SearchProvider>
       <Routes>
-      <Route path="/" element={<HomePage />} />
+      {/* Home shell: one header + sidebar + footer (HomeLayout), with each
+          Home-area page rendered through its <Outlet />. */}
+      <Route element={<HomeLayout />}>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/drafts" element={<DraftsPage />} />
+        <Route path="/references" element={<HomeReferencesPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<DashboardPage />} />
+      </Route>
       <Route path="/projects" element={<LandingPage />} />
       <Route path="/new" element={<NewProjectPage />} />
       <Route path="/new-workspace" element={<NewWorkspacePage />} />
       <Route path="/new-draft" element={<NewDraftPage />} />
-      <Route path="/drafts" element={<DraftsPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />
       <Route path="/canvas" element={<CanvasPage />} />
-      <Route path="/references" element={<HomeReferencesPage />} />
       <Route path="/workspace/:workspaceId/references" element={<WorkspaceReferencesPage />} />
       <Route path="/system-design" element={<SystemDesignPage />} />
       <Route path="/components" element={<GlobalComponentsPage />} />
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />
-      <Route path="*" element={<HomePage />} />
       </Routes>
     </SearchProvider>
   );

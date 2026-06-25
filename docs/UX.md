@@ -10,17 +10,19 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 
 | Route | Page | Purpose |
 |-------|------|---------|
-| `/` | HomePage | App home — workspaces, quick links, recent items |
+| _(layout)_ | HomeLayout | The Home shell — one header + sidebar + footer, declared once. `/`, `/drafts`, `/references`, and `/settings` nest under it and render through its `<Outlet />` (no chrome is copied per page) |
+| `/` | DashboardPage | Home shell index — workspaces, loose projects, recent items |
+| `/settings` | SettingsPage | Standalone Settings inside the Home shell; reuses the same body (`AppSettingsContent`) as the global Settings modal |
 | `/projects` | LandingPage | Project browser for the active workspace |
 | `/new` | NewProjectPage | Multi-step project creation wizard. Links the project to a workspace only when launched with `?workspace=<id>` (from the workspace project browser); from Home it creates a loose, workspace-less project and skips the token-sharing step |
 | `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component) creation wizard |
 | `/new-workspace` | NewWorkspacePage | Multi-step workspace creation wizard (name → optional description); on finish it makes the workspace active and opens its project browser |
-| `/drafts` | DraftsPage | Loose, project-less screens and components |
+| `/drafts` | DraftsPage | Loose, project-less screens and components (renders inside the Home shell) |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
 | `/canvas` | CanvasPage | Full-screen visual canvas editor |
-| `/references` | HomeReferencesPage | Home's reference library — the user's full global library, standalone chrome (no workspace TopBar). Adding here only touches the library, never a workspace |
+| `/references` | HomeReferencesPage | Home's reference library — the user's full global library, rendered `embedded` inside the Home shell (no workspace TopBar). Adding here only touches the library, never a workspace |
 | `/workspace/:workspaceId/references` | WorkspaceReferencesPage | Only the references explicitly added to that workspace (workspace-level links), inside the workspace TopBar. "Add reference" picks from the library or uploads via the shared modal's Workspace-global mode |
 | `/system-design` | SystemDesignPage | Active workspace's design system (tokens shared with its projects) |
 | `/components` | GlobalComponentsPage | Workspace-level global components |
@@ -67,28 +69,38 @@ kind badge (Element, Screen, Component, Reference, Project, Command).
 
 ## Pages
 
-### 0. Home Page `/`
+### 0. Home shell (`HomeLayout`) + Dashboard `/`
 
-The first screen shown when the app opens — a shallow hub over the workspace. It
-is **not** the project browser (that is the Landing Page at `/projects`); from
-here the user picks a workspace, opens a recent project, or jumps to a section.
+The Home area is a **persistent shell** (`HomeLayout`) that owns the chrome once
+and renders each Home-area page through a React Router `<Outlet />`. The shell's
+header + sidebar stay mounted while the content swaps between **Dashboard** (`/`),
+**Drafts** (`/drafts`), **Local References** (`/references`), and **Settings**
+(`/settings`) — none of those pages re-declares the header or sidebar. The
+Dashboard is the index: a shallow hub over the workspace, **not** the project
+browser (that is the Landing Page at `/projects`).
 
-**Layout**:
-- Its **own header** (`HomeHeader`), deliberately separate from the workspace
-  TopBar — product mark on the left and a primary **Create** dropdown on the
-  right. No workspace switcher (workspace selection happens via the cards below).
-  The Create menu lists, each with an icon: **New workspace** (→ the
-  `/new-workspace` wizard), **New project** (→ the `/new` wizard), and **New
-  draft** (→ the `/new-draft` wizard).
-- A left **sidebar** with quick links and a main content column beside it
-- Page footer with version string
+**Shell layout** (`HomeLayout`):
+- A **single header** (`HomeHeader`), deliberately separate from the workspace
+  TopBar — product mark on the left (links to `/`) and a primary **Create**
+  dropdown on the right. No workspace switcher (workspace selection happens via
+  the Dashboard cards). The Create menu lists, each with an icon: **New
+  workspace** (→ the `/new-workspace` wizard), **New project** (→ the `/new`
+  wizard), and **New draft** (→ the `/new-draft` wizard).
+- A left **sidebar** beside the `<Outlet />` content column
+- A single page footer with the version string
+- The global `AppSettingsModal` stays mounted here too (still openable from the
+  workspace TopBar avatar menu); the sidebar's **Settings** now routes to the
+  `/settings` page rather than opening the modal.
 
-**Sidebar** (`HomeSidebar`, hidden below `md`): a vertical list of links —
-**Recent Items** (→ `/`), **Drafts** (→ `/drafts`), **Local References** (→
-`/references`), **Learn** (placeholder), and, below a divider, **Settings**
-(opens the global Settings modal). Learn is an inert placeholder ("Coming soon")
-until its feature exists; the others reach real destinations. Each row is a 36px
-icon+label row that highlights on hover.
+**Sidebar** (`HomeSidebar`, hidden below `md`): a vertical list of `NavLink`s
+that highlight the active route — **Dashboard** (→ `/`), **Drafts** (→
+`/drafts`), **Local References** (→ `/references`), **Learn** (placeholder), and,
+below a divider, **Settings** (→ `/settings`). Learn is an inert placeholder
+("Coming soon") until its feature exists; the others reach real destinations.
+Each row is a 36px icon+label row that highlights on hover and when active.
+
+**Dashboard content** (`DashboardPage`, the `/` index): heading "Dashboard" plus
+the three sections below.
 
 **Workspaces section**: a grid of light `WorkspaceTile` cards — avatar initial,
 name, an **Active** badge on the current workspace, and a project count. A card
@@ -221,11 +233,11 @@ and the app opens its (initially empty) project browser at `/projects`. Close
 ### 2b. Drafts Page `/drafts`
 
 The home of loose, project-less drafts — reached from the Home sidebar's
-**Drafts** link. Sibling in spirit to the Global Components page.
+**Drafts** link. Renders **inside the Home shell** (`HomeLayout` supplies the
+header + sidebar), so the page itself is only the content column.
 
-- A slim top bar: back-to-home chevron, "Drafts" title, and a **New draft**
-  button (→ `/new-draft`).
-- Header with title and a count ("N drafts").
+- Content header: "Drafts" title with a count ("N drafts") on the left and a
+  **New draft** button (→ `/new-draft`) on the right.
 - A responsive card grid. Each `DraftCard` shows a `Snapshot` of the draft's
   scene, its name, and a meta line — **Screen · {Device}** or **Component** with
   a matching icon. Clicking the card (or its "Open in canvas" menu) opens the
@@ -1140,9 +1152,18 @@ All modals share a consistent structure.
 
 ---
 
-### Settings Modal
+### Settings (modal + page)
 
-Opened from the user menu (TopBar → avatar → Settings). Wide modal with a top tab bar and a sticky footer (Cancel / Save changes).
+The Settings controls live in one shared body, `AppSettingsContent` (the tab bar,
+the active tab, and the Cancel / Save footer), surfaced two ways so they never
+drift:
+
+- **Settings modal** — opened from the workspace user menu (TopBar → avatar →
+  Settings). Wide modal wrapping `AppSettingsContent`.
+- **Settings page** (`/settings`, `SettingsPage`) — the Home sidebar's
+  **Settings** link routes here. Renders the same `AppSettingsContent` inside the
+  Home shell (header + sidebar from `HomeLayout`), under a "Settings" page
+  heading. Cancel and a successful save return to the Dashboard (`/`).
 
 **Tabs**:
 - **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, reveal selected layers), plus the **Toolbar config** section — the **Global** element defaults (see below)
