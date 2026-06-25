@@ -67,6 +67,45 @@ test("outbox replays on boot", async () => {
   expect(await outbox.load()).toHaveLength(0);
 });
 
+test("replay does not clobber a newer edit enqueued before it ran (SAVE-3)", async () => {
+  const { port, batches } = recordingPort();
+  const outbox = createMemoryOutbox([
+    { op: "upsertRecord", table: "t", id: "k", json: "OLD" },
+  ]);
+  const queue = new SaveQueue(port, { autoFlush: false, outbox });
+
+  // A newer edit for the same row is enqueued before replay runs.
+  queue.enqueue({ op: "upsertRecord", table: "t", id: "k", json: "NEW" });
+  await queue.replayOutbox();
+
+  expect(batches[0]![0]).toMatchObject({ id: "k", json: "NEW" });
+});
+
+test("edit enqueued during an in-flight flush is persisted to the outbox (SAVE-1)", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  let firstCall = true;
+  const port = stubPort(async (batch) => {
+    if (firstCall) { firstCall = false; await gate; }
+    return { applied: batch.length };
+  });
+  const outbox = createMemoryOutbox();
+  const queue = new SaveQueue(port, { autoFlush: false, outbox });
+
+  queue.enqueue({ op: "upsertRecord", table: "t", id: "a", json: "1" });
+  const flushed = queue.flush(); // applyBatch([a]) is now awaiting the gate
+
+  // This edit lands in pending while the flush is in flight — it must already be
+  // crash-durable in the outbox, not only in memory.
+  queue.enqueue({ op: "upsertRecord", table: "t", id: "b", json: "2" });
+  const saved = await outbox.load();
+  expect(saved.some((m) => "id" in m && m.id === "b")).toBe(true);
+
+  release();
+  await flushed;
+  expect(await outbox.load()).toHaveLength(0);
+});
+
 test("failed batch is retried and then succeeds", async () => {
   let calls = 0;
   const port = stubPort(async (batch) => {

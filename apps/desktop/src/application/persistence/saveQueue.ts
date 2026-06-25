@@ -42,6 +42,9 @@ export class SaveQueue {
   private readonly maxRetries: number;
 
   private pending = new Map<string, Mutation>();
+  /** The batch currently being applied. Tracked so the outbox can be kept equal
+   *  to the full unflushed set (in-flight + pending) during an in-flight flush. */
+  private inFlight: Mutation[] = [];
   private flushing: Promise<void> | null = null;
   private scheduled = false;
   private retries = 0;
@@ -58,7 +61,23 @@ export class SaveQueue {
 
   enqueue(mutation: Mutation): void {
     this.pending.set(mutationKey(mutation), mutation);
+    // While a flush is in flight the on-disk outbox predates this edit; persist
+    // the full unflushed set so a crash during applyBatch cannot drop it (SAVE-1).
+    if (this.flushing && this.outbox) {
+      void this.outbox.save(this.unflushedSnapshot()).catch(() => {});
+    }
     if (this.autoFlush) this.scheduleFlush();
+  }
+
+  /** Every edit not yet durably applied: the in-flight batch plus anything
+   *  enqueued since. Replaying an already-applied (idempotent) mutation is
+   *  harmless, so the outbox may over-include — it must never under-include. */
+  private unflushedSnapshot(): Mutation[] {
+    if (this.inFlight.length === 0) return Array.from(this.pending.values());
+    const merged = new Map<string, Mutation>();
+    for (const mutation of this.inFlight) merged.set(mutationKey(mutation), mutation);
+    for (const mutation of this.pending.values()) merged.set(mutationKey(mutation), mutation);
+    return Array.from(merged.values());
   }
 
   /** Number of coalesced mutations waiting to be sent. */
@@ -86,7 +105,10 @@ export class SaveQueue {
     const saved = await this.outbox.load();
     if (saved.length === 0) return;
     for (const mutation of saved) {
-      this.pending.set(mutationKey(mutation), mutation);
+      // Don't clobber a newer edit enqueued before replay ran (SAVE-3) — same
+      // guard as the retry re-queue path.
+      const key = mutationKey(mutation);
+      if (!this.pending.has(key)) this.pending.set(key, mutation);
     }
     await this.flush();
   }
@@ -104,15 +126,26 @@ export class SaveQueue {
     while (this.pending.size > 0) {
       const batch = Array.from(this.pending.values());
       this.pending.clear();
+      this.inFlight = batch;
 
       this.setStatus(this.retries > 0 ? "retrying" : "saving");
-      if (this.outbox) await this.outbox.save(batch).catch(() => {});
+      if (this.outbox) await this.outbox.save(this.unflushedSnapshot()).catch(() => {});
 
       try {
         await this.port.applyBatch(batch);
         this.retries = 0;
-        if (this.outbox) await this.outbox.clear().catch(() => {});
+        this.inFlight = [];
+        // Keep the outbox equal to the still-unflushed set. Clearing it outright
+        // would drop edits enqueued during applyBatch in the crash window before
+        // the next flush (SAVE-1); a crash between ack and this write only replays
+        // the just-applied (idempotent) batch.
+        if (this.outbox) {
+          const remaining = this.unflushedSnapshot();
+          if (remaining.length > 0) await this.outbox.save(remaining).catch(() => {});
+          else await this.outbox.clear().catch(() => {});
+        }
       } catch (error) {
+        this.inFlight = [];
         // Re-queue without clobbering newer edits that arrived meanwhile.
         for (const mutation of batch) {
           const key = mutationKey(mutation);
