@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { IconClose } from "@/components/icons";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { updateWorkspace } from "@/lib/storage/repos/workspace.repo";
 import { useWorkspaceElementDefaults } from "@/application/settings/useScopedElementDefaults";
@@ -88,17 +87,7 @@ export function WorkspaceEditPage() {
     >
       {/* Action header */}
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-7 py-3">
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => navigate(-1)}
-            className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-          >
-            <IconClose size={11} strokeWidth={2} />
-          </button>
-          <span className="text-[13px] font-medium text-[var(--text)]">Edit workspace</span>
-        </div>
+        <span className="text-[13px] font-medium text-[var(--text)]">Edit workspace</span>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => navigate(-1)} className="btn btn-ghost">
             Cancel
