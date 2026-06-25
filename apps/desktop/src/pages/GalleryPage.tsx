@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   NewScreenModal,
 } from "@/components/modals/NewScreenModal";
@@ -18,7 +18,6 @@ import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
 import {
   Crumbs,
   ProjectOverview,
-  ProjectEditPanel,
   Tabs,
   ScreensTab,
   ComponentsTab,
@@ -32,7 +31,7 @@ export function GalleryPage() {
 
   const previewRef = useRef<ProjectPreviewModalHandle>(null);
   const versionScreenRef = useRef<VersionModeModalHandle>(null);
-  const [editOpen, setEditOpen] = useState(false);
+  const navigate = useNavigate();
 
   const {
     project,
@@ -101,28 +100,15 @@ export function GalleryPage() {
         <Crumbs projectName={projectName} type={type} backHref={back.href} backLabel={back.label} />
       </header>
 
-      {editOpen && project ? (
-        // The editor opens in place of the overview + tabs — a full page below the
-        // breadcrumb header, no routing. Closing returns to the overview.
-        <ProjectEditPanel
-          project={project}
-          screens={projectScreens}
-          onClose={() => setEditOpen(false)}
-          onSaved={(updated) => {
-            handleSettingsSaved(updated);
-            setEditOpen(false);
-          }}
-        />
-      ) : (
-        <>
+      <>
           <ProjectOverview
             project={project}
             screensCount={projectScreens.length}
             componentsCount={components.length}
             referencesCount={references.length}
             onPreview={projectScreens.length > 0 && project ? () => previewRef.current?.open(project, projectScreens) : null}
-            onEdit={() => setEditOpen(true)}
-            editOpen={editOpen}
+            onEdit={() => navigate(`/project/${encodeURIComponent(projectId)}/edit`)}
+            editOpen={false}
           />
           <Tabs
             tab={tab}
@@ -181,8 +167,7 @@ export function GalleryPage() {
             />
           )}
           {tab === "system" && project ? <SystemTab project={project} /> : null}
-        </>
-      )}
+      </>
 
       <NewScreenModal
         ref={newScreenRef}

@@ -1,10 +1,9 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { Home } from "lucide-react";
 import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/modals/AppSettingsModal";
-import { WorkspaceEditPanel, type WorkspaceEditPanelHandle } from "@/components/layout/WorkspaceEditPanel";
 import { IconChevronDown, IconColorStyles, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
@@ -22,7 +21,7 @@ export function TopBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const settingsRef = useRef<AppSettingsModalHandle>(null);
-  const workspaceEditRef = useRef<WorkspaceEditPanelHandle>(null);
+  const navigate = useNavigate();
   const [wsOpen, setWsOpen] = useState(false);
   const [wsPosition, setWsPosition] = useState<{ top: number; left: number } | null>(null);
   const { data: workspaces } = useWorkspaces();
@@ -220,7 +219,7 @@ export function TopBar({
                 onClick={() => {
                   setMenuOpen(false);
                   setMenuPosition(null);
-                  workspaceEditRef.current?.open();
+                  if (currentWs) navigate(`/workspace/${currentWs.id}/edit`);
                 }}
                 className="mt-1 flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
               >
@@ -265,7 +264,6 @@ export function TopBar({
         : null}
     </header>
     <AppSettingsModal ref={settingsRef} />
-    <WorkspaceEditPanel ref={workspaceEditRef} />
     </>
   );
 }

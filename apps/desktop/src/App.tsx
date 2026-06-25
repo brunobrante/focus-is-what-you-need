@@ -18,6 +18,8 @@ import { WorkspaceReferencesPage } from "@/pages/WorkspaceReferencesPage";
 import { SystemDesignPage } from "@/pages/SystemDesignPage";
 import { GlobalComponentsPage } from "@/pages/GlobalComponentsPage";
 import { Generate } from "@/generate/Generate";
+import { ProjectEditPage } from "@/pages/ProjectEditPage";
+import { WorkspaceEditPage } from "@/pages/WorkspaceEditPage";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 import { SearchProvider } from "@/application/search/SearchProvider";
 
@@ -47,8 +49,10 @@ export default function App() {
       <Route path="/new-workspace" element={<NewWorkspacePage />} />
       <Route path="/new-draft" element={<NewDraftPage />} />
       <Route path="/project/:projectId" element={<GalleryPage />} />
+      <Route path="/project/:projectId/edit" element={<ProjectEditPage />} />
       <Route path="/project/:projectId/screen/:screenId" element={<DetailPage />} />
       <Route path="/project/:projectId/c/:componentId" element={<DetailPage />} />
+      <Route path="/workspace/:workspaceId/edit" element={<WorkspaceEditPage />} />
       <Route path="/canvas" element={<CanvasPage />} />
       <Route path="/workspace/:workspaceId/references" element={<WorkspaceReferencesPage />} />
       <Route path="/system-design" element={<SystemDesignPage />} />
