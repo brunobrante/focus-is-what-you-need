@@ -33,6 +33,41 @@ export type InsertTool = Exclude<Tool, "select" | "hand" | "scale">;
 
 export type ShellGridType = "dots" | "squares";
 
+// ── Layout engine vocabulary (Inspector → Layout panel) ─────────────────────
+// See docs/planned/inspector-layout.md. These describe how a CONTAINER lays out
+// its children and how a CHILD sizes/aligns inside its parent. Compiled by
+// domain/canvas/layout.ts; NOT yet applied by the canvas renderer — absolute
+// positioning stays the default and the pure engine lands first.
+
+/** Per-axis sizing of a child inside a flex/grid parent. "hug" = fit content,
+ *  "fill" = take available space — but the CSS mechanism differs by axis: Fill
+ *  on the main axis is `flex-grow`, Fill on the cross axis is `align-self:
+ *  stretch` (trap #3). The engine picks by direction, not by this value alone. */
+export type SizingMode = "fixed" | "hug" | "fill";
+
+/** One grid track. `fill` → `<value>fr` (default 1), `fixed` → `<value>px`,
+ *  `auto` → content-sized `auto`, `min` → `min-content`. Figma's "Auto" is
+ *  really `1fr`; in real CSS we can also offer true `auto`/`min-content`. */
+export type GridTrackKind = "fill" | "fixed" | "auto" | "min";
+export type GridTrack = { kind: GridTrackKind; value?: number };
+
+/** Packed alignment position on one visual axis (a cell of the 9-point pad). */
+export type PadAlign = "start" | "center" | "end";
+
+/** Main-axis distribution. Absent = "packed" (use the pad position). Figma's
+ *  gap = "Auto" is `space-between` and suppresses `gap` (trap #2). */
+export type Distribute = "space-between" | "space-around" | "space-evenly";
+
+/** Absolute-child horizontal constraint when its frame resizes (trap #9). */
+export type ConstraintH = "left" | "right" | "left-right" | "center" | "scale";
+/** Absolute-child vertical constraint when its frame resizes (trap #9). */
+export type ConstraintV = "top" | "bottom" | "top-bottom" | "center" | "scale";
+
+/** Text auto-resize — its OWN enum, not the Fixed/Hug/Fill container modes
+ *  (trap #10). auto-width → `max-content`; auto-height → fixed width + `auto`
+ *  height (wraps); fixed → fixed W+H (clips). */
+export type TextResize = "auto-width" | "auto-height" | "fixed";
+
 // ── Effects (Inspector → Effects panel) ─────────────────────────────────────
 // One unified list (Figma's model) where each entry has a type. The CSS the
 // renderer emits is type-aware (paper.design's honesty): the same "Drop shadow"
@@ -155,12 +190,61 @@ export type ElementStyles = {
   /** Ordered effects list. Order is load-bearing: filters chain left-to-right and
    *  shadows stack first-on-top — see compileEffects. */
   effects?: Effect[];
-  display?: "block" | "flex";
+  display?: "block" | "flex" | "grid";
   justifyContent?: string;
   alignItems?: string;
   gap?: number;
   padding?: number;
   overflow?: "visible" | "hidden";
+  // ── Layout engine (Inspector → Layout panel) ──────────────────────────────
+  // Compiled by domain/canvas/layout.ts. These are the engine's canonical
+  // inputs; the legacy `justifyContent`/`alignItems` strings above predate it
+  // and stay for the current childless-flex render path. Every field optional +
+  // additive; not applied to the canvas yet (absolute stays default).
+  //
+  // Container — how this element lays out its children:
+  flexDirection?: "row" | "column";
+  flexWrap?: "nowrap" | "wrap";
+  rowGap?: number;
+  columnGap?: number;
+  // Alignment is stored VISUALLY (alignX = horizontal, alignY = vertical); the
+  // engine maps each to justify-content / align-items per `flexDirection` and
+  // FLIPS which is which when direction is column (trap #1).
+  alignX?: PadAlign;
+  alignY?: PadAlign;
+  distribute?: Distribute;             // main-axis distribution; space-between drops gap (#2)
+  counterStretch?: boolean;            // stretch children on the cross axis (align-items: stretch)
+  baseline?: boolean;                  // align-items: baseline — row flow only (advanced)
+  alignContent?: "start" | "center" | "end" | "stretch" | "space-between"; // wrap rows (#5)
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  gridColumns?: GridTrack[];
+  gridRows?: GridTrack[];
+  strokesIncluded?: boolean;           // advanced: stroke participates in sizing → border-box (#8)
+  canvasStacking?: "last" | "first";   // advanced: paint order; "first" = reversed z-index, NOT reverse (#7)
+  // Child — how this element sits inside its flex/grid parent:
+  widthMode?: SizingMode;
+  heightMode?: SizingMode;
+  alignSelf?: "auto" | "start" | "center" | "end" | "stretch"; // cross-axis override / grid cell
+  justifySelf?: "start" | "center" | "end" | "stretch";        // grid cell (main axis)
+  order?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  gridColumnSpan?: number;
+  gridRowSpan?: number;
+  // Absolute child — how it reflows when its frame resizes (trap #9):
+  constraintH?: ConstraintH;
+  constraintV?: ConstraintV;
+  // Self transform — flips compose with `node.rotation` (trap #6: Figma's
+  // rotation sign is inverted vs CSS; we keep the CSS convention here):
+  flipH?: boolean;
+  flipV?: boolean;
+  // Text auto-resize — its own enum, separate from widthMode/heightMode (#10):
+  textResize?: TextResize;
   objectFit?: "fill" | "contain" | "cover" | "none" | "scale-down";
   // ── Text stroke & underline (Inspector → Border/Stroke panel; text only) ──
   // Text stroke is `-webkit-text-stroke` (fixed-center; ~half the set width is

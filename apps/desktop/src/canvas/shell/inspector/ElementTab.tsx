@@ -8,6 +8,7 @@ import { borderTargetForType } from "@/domain/canvas/border";
 import { fillTargetForType } from "@/domain/canvas/fillCompile";
 import { normalizeFills, fillsToWritePatch } from "@/domain/canvas/fill";
 import { AppearanceSection } from "./AppearanceSection";
+import { LayoutSection } from "./LayoutSection";
 import { BorderSection } from "./BorderSection";
 import { EffectsSection } from "./EffectsSection";
 import { TypographySection } from "./TypographySection";
@@ -211,42 +212,15 @@ export function ElementTab({
         {c.height.max !== undefined && <Readout label="Max H" value={String(c.height.max)} />}
       </InsSection>
 
-      <InsSection title="Layout" defaultOpen={false} disabled={locked}>
-        <InsRow label="Display">
-          <InsToggle
-            value={node.styles.display ?? "block"}
-            onChange={(value) => onUpdateStyle({ display: value as ElementStyles["display"] })}
-            options={[
-              { value: "block", label: "Block" },
-              { value: "flex", label: "Flex" },
-            ]}
-          />
-        </InsRow>
-        {(node.styles.display ?? "block") === "flex" ? (
-          <>
-            <InsRow label="Justify">
-              <InsSelect
-                value={node.styles.justifyContent ?? "flex-start"}
-                onChange={(justifyContent) => onUpdateStyle({ justifyContent })}
-                options={["flex-start", "center", "flex-end", "space-between"]}
-              />
-            </InsRow>
-            <InsRow label="Align">
-              <InsSelect
-                value={node.styles.alignItems ?? "stretch"}
-                onChange={(alignItems) => onUpdateStyle({ alignItems })}
-                options={["stretch", "flex-start", "center", "flex-end"]}
-              />
-            </InsRow>
-            <InsRow label="Gap">
-              <InsInput value={String(node.styles.gap ?? 0)} onChange={(value) => updateNumber(value, (gap) => onUpdateStyle({ gap }))} suffix="px" />
-            </InsRow>
-          </>
-        ) : null}
-        <InsRow label="Padding">
-          <InsInput value={String(node.styles.padding ?? 0)} onChange={(value) => updateNumber(value, (padding) => onUpdateStyle({ padding }))} suffix="px" />
-        </InsRow>
-      </InsSection>
+      <LayoutSection
+        styles={node.styles}
+        type={node.type}
+        hasChildren={node.children.length > 0}
+        parentStyles={node.parentId ? document.elements[node.parentId]?.styles ?? null : null}
+        isRoot={!node.parentId}
+        locked={locked}
+        onChange={onUpdateStyle}
+      />
 
       {fillTarget ? (
         <FillSection

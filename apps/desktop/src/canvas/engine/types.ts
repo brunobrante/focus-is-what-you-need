@@ -1,8 +1,38 @@
 // `Tool`, `InsertTool`, `ShellGridType` and `ElementStyles` are shared with the
 // domain layer (settings), so they're defined in `@/domain/canvas/types` and
 // re-exported here — canvas call sites keep importing them from this module.
-import type { Tool, InsertTool, ShellGridType, ElementStyles, Effect, EffectType } from "@/domain/canvas/types";
-export type { Tool, InsertTool, ShellGridType, ElementStyles, Effect, EffectType };
+import type {
+  Tool,
+  InsertTool,
+  ShellGridType,
+  ElementStyles,
+  Effect,
+  EffectType,
+  SizingMode,
+  GridTrack,
+  GridTrackKind,
+  PadAlign,
+  Distribute,
+  ConstraintH,
+  ConstraintV,
+  TextResize,
+} from "@/domain/canvas/types";
+export type {
+  Tool,
+  InsertTool,
+  ShellGridType,
+  ElementStyles,
+  Effect,
+  EffectType,
+  SizingMode,
+  GridTrack,
+  GridTrackKind,
+  PadAlign,
+  Distribute,
+  ConstraintH,
+  ConstraintV,
+  TextResize,
+};
 import type {
   Fill,
   FillType,

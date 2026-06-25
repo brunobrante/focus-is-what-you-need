@@ -710,6 +710,24 @@ for box elements (the only first-class inner shadow); they are hidden on image/S
 Shadow **Color** is an `InsColor` control, so it can bind to a System Design color token
 (link/unlink) like Fill. *Not in v1: Noise, Texture, Glass.*
 
+**Inspector → Layout** (shown for every element type; replaces the old inline Display/Justify/
+Align/Gap/Padding block): the paper-style panel that folds Figma's **Layout + Position** into
+one and authors the **layout engine** fields. It is **type-adaptive**: a **div with children**
+(a "frame") gets the container controls — **Display** (Block / Flex / Grid), **Direction** (Row /
+Column), a **9-point alignment pad** (a visual 3×3 — the engine maps it to `justify-content` /
+`align-items` and flips the mapping for a column), **Distribute** (Packed / Between / Around —
+Between is the "auto gap"), **Stretch**, **Gap**, **Wrap**, individual **Padding** (a `4` toggle
+splits the uniform value into Top/Right/Bottom/Left), a minimal **Columns/Rows** track editor for
+Grid (Fill `fr` / Auto / Min / Fixed `px`), and the advanced **Strokes** (Excluded / Included)
+and **Stacking** (Last / First on top). An element **inside a flex/grid parent** also gets **W/H
+mode** (Fixed / Hug / Fill), **Align self**, **Order**, and **Min/Max W/H**. Every element gets
+**Flip H / Flip V** and, when it has a parent, **Pin X / Pin Y** constraint dropdowns (Left /
+Right / Left-Right / Center / Scale). **Text** gets a **Resize** enum (Auto W / Auto H / Fixed),
+distinct from the container sizing modes. **Authoring-only for now:** these controls write real
+CSS-bound fields compiled by `domain/canvas/layout.ts`, but they have **no on-canvas effect yet** —
+absolute positioning stays the default and the renderer adopts the engine in a later pass.
+(X/Y/W/H and rotation remain live in the separate **Position** / **Tamanho** sections.)
+
 **Inspector → Typography** (shown only for **text** elements, replacing the old "Tipografia"
 section): **Font** (family, free text, placeholder "System Sans-Serif"), **Size** (px),
 **Weight** (a continuous 1–1000 number that drives a variable font's `wght` axis), **Style**
