@@ -29,8 +29,10 @@ export function ComponentSideCard({
   onRequestDelete: (component: ComponentRow) => void;
   onOpenCanvas: (variantId: string) => void;
   onFastEdit: (component: ComponentRow) => void;
-  onMoveTo: (component: ComponentRow) => void;
-  onMakeGlobal: (component: ComponentRow) => void;
+  // Optional: the "Move to" / "Make global" menu items only appear when a handler
+  // is wired. Omit them rather than rendering an action that does nothing (UI-10).
+  onMoveTo?: (component: ComponentRow) => void;
+  onMakeGlobal?: (component: ComponentRow) => void;
   onToggleLinkable?: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
@@ -95,8 +97,12 @@ export function ComponentSideCard({
                     label: "More",
                     icon: CardMenuIcons.More,
                     menuItems: [
-                      { key: "move-to", label: "Move to", icon: CardMenuIcons.MoveTo, onClick: () => onMoveTo(component) },
-                      { key: "make-global", label: "Make global", icon: CardMenuIcons.MakeGlobal, onClick: () => onMakeGlobal(component) },
+                      ...(onMoveTo
+                        ? [{ key: "move-to", label: "Move to", icon: CardMenuIcons.MoveTo, onClick: () => onMoveTo(component) }]
+                        : []),
+                      ...(onMakeGlobal
+                        ? [{ key: "make-global", label: "Make global", icon: CardMenuIcons.MakeGlobal, onClick: () => onMakeGlobal(component) }]
+                        : []),
                       ...(onToggleLinkable
                         ? [
                             component.linkable

@@ -154,8 +154,6 @@ export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }:
                 const href = buildComponentFastEditHref(cmp);
                 fastEditRef.current?.open({ mode: "component", component: cmp, variant, type, canvasHref: href });
               }}
-              onMoveTo={() => {}}
-              onMakeGlobal={() => {}}
               onToggleLinkable={(cmp) => void requestToggle(cmp)}
             />
           ))}

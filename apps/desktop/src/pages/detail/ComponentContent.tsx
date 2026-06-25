@@ -191,8 +191,6 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
                   : canvasHref;
                 fastEditRef.current?.open({ mode: "component", component: cmp, variant, type, canvasHref: href });
               }}
-              onMoveTo={() => {}}
-              onMakeGlobal={() => {}}
               onToggleLinkable={(cmp) => void requestToggle(cmp)}
             />
           ))}

@@ -437,8 +437,10 @@ pieces differ (breadcrumb trail data, preview primitive, meta line, info panel, 
 modal set). The breadcrumb itself renders through one shared `detail/DetailBreadcrumb.tsx`
 (back chevron + ancestor trail + current label + type badge); each view only supplies its
 back target and trail segments. The Sub Components grid uses the same `ComponentSideCard`
-in both views (Canvas / Fast edit / More » Move to · Make global · Delete; linked instances
-get the purple component-link badge), so the cards never diverge.
+in both views (Canvas / Fast edit / More » Make linkable·Unlink · Delete; linked instances
+get the purple component-link badge), so the cards never diverge. "Move to" and "Make
+global" only appear when a handler is wired — currently neither view wires them, so the
+items are hidden rather than shown as no-ops.
 
 Differences from Screen Detail:
 
