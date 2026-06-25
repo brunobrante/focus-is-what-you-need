@@ -20,6 +20,7 @@ import { updateComponent } from "@/lib/storage/repos/components.repo";
 import { useComponentDetail } from "@/application/component-detail/useComponentDetail";
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
+import { useDeleteVariant } from "@/application/components/useDeleteVariant";
 import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
 import { projectBase, screenPath, componentPath } from "@/lib/navigation/projectUrl";
 import { DetailView } from "./DetailView";
@@ -35,13 +36,14 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
     versionModeRef, historyRef, referencesRef, newComponentRef, addRefModalRef, confirmRef,
     openNewChild, addVariant, removeLinkedReference,
     handleComponentCreated, handleOpenCanvas, handleOpenVersionCanvas, handleAddReference, handleSelectVariant,
-    handleDeleteVariant, handleMakeMain, handleRename, handleUpdate,
+    handleMakeMain, handleRename, handleUpdate,
   } = useComponentDetail(componentId);
 
   const back = useProjectBackTarget(projectId);
   const [infoOpen, setInfoOpen] = useState(false);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
   const { requestDelete, modal: deleteModal } = useDeleteComponent();
+  const { requestDeleteVariant, modal: deleteVariantModal } = useDeleteVariant();
   const fastEditRef = useRef<FastEditModalHandle>(null);
   const compareRef = useRef<CompareVersionsModalHandle>(null);
 
@@ -156,7 +158,7 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
         if (v.tag === "main") handleOpenCanvas(v.variantId);
         else handleOpenVersionCanvas(v.variantId);
       }}
-      onDeleteVersion={(v) => { if (v.variantId) handleDeleteVariant(v.variantId); }}
+      onDeleteVersion={(v) => { if (v.variantId) void requestDeleteVariant({ variantId: v.variantId, label: v.tag ?? v.title, ownerName: component?.name ?? "component" }); }}
       onMakeMainVersion={(v) => { if (v.variantId) handleMakeMain(v.variantId); }}
       tabs={tabs}
       sideTab={displayTab}
@@ -213,6 +215,7 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
           <VersionModeModal ref={versionModeRef} />
           {unlinkModal}
           {deleteModal}
+          {deleteVariantModal}
         </>
       }
     />

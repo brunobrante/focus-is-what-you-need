@@ -3,6 +3,7 @@ import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
+import { useDeleteVariant } from "@/application/components/useDeleteVariant";
 import { VersionModeModal } from "@/components/modals/VersionModeModal";
 import { AddCard } from "@/components/screen/AddCard";
 import { ComponentSideCard } from "@/components/screen/ComponentSideCard";
@@ -37,7 +38,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }:
     previewVariantId, previewCanvasHref,
     versionModeRef, historyRef, compareRef, referencesRef, newComponentRef, addRefModalRef, fastEditRef, confirmRef,
     defaultHistory, projectDims, buildScreenHref, buildComponentFastEditHref, openNewComponent, addVersion,
-    removeLinkedReference, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleDeleteVersion, handleMakeMain, handleScreenTitleSave,
+    removeLinkedReference, handleOpenCanvas, handleOpenScreenCanvas, handleOpenVersionCanvas, handleMakeMain, handleScreenTitleSave,
     handleNewComponentCreated, handleCompareOpenInCanvas, handleAddReference,
   } = useScreenDetail(screenId, pid);
 
@@ -45,6 +46,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }:
   const [infoOpen, setInfoOpen] = useState(false);
   const { requestToggle, modal: unlinkModal } = useUnlinkComponent();
   const { requestDelete, modal: deleteModal } = useDeleteComponent();
+  const { requestDeleteVariant, modal: deleteVariantModal } = useDeleteVariant();
 
   const tabs = [
     { id: "components" as const, label: "Sub Components", count: displayComponents.length },
@@ -121,7 +123,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }:
         if (v.tag === "main") handleOpenScreenCanvas();
         else if (v.variantId) handleOpenVersionCanvas(v.variantId);
       }}
-      onDeleteVersion={(v) => { if (v.variantId) handleDeleteVersion(v.variantId, v.tag ?? v.title); }}
+      onDeleteVersion={(v) => { if (v.variantId) void requestDeleteVariant({ variantId: v.variantId, label: v.tag ?? v.title, ownerName: screenName }); }}
       onMakeMainVersion={(v) => { if (v.variantId) handleMakeMain(v.variantId, v.tag ?? v.title); }}
       tabs={tabs}
       sideTab={sideTab}
@@ -180,6 +182,7 @@ export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }:
           <VersionModeModal ref={versionModeRef} />
           {unlinkModal}
           {deleteModal}
+          {deleteVariantModal}
         </>
       }
     />

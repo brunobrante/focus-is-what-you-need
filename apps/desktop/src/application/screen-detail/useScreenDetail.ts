@@ -18,7 +18,7 @@ import {
 } from "@/lib/storage/repos/references.repo";
 import { createScreenVersion, updateScreen } from "@/lib/storage/repos/screens.repo";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
-import { deleteVariant, promoteVariantToMain, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { promoteVariantToMain, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import type { ComponentRow } from "@/lib/storage/schema";
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import {
@@ -113,7 +113,6 @@ export interface ScreenDetailState {
   handleOpenCanvas: (variantId: string) => void;
   handleOpenScreenCanvas: () => void;
   handleOpenVersionCanvas: (versionScreenId: string) => void;
-  handleDeleteVersion: (versionScreenId: string, label: string) => void;
   handleMakeMain: (variantId: string, label: string) => void;
   handleScreenTitleSave: (title: string) => void;
   handleNewComponentCreated: (r: { component: ComponentRow }) => void;
@@ -348,17 +347,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     );
   };
 
-  const handleDeleteVersion = (variantId: string, label: string) => {
-    confirmRef.current?.open({
-      title: "Delete version",
-      message: `Version "${label}" of "${screenName}" will be removed.`,
-      onConfirm: async () => {
-        // deleteVariant switches the screen's active variant to a sibling if needed.
-        await deleteVariant(variantId);
-      },
-    });
-  };
-
   // Promote a version to be the screen's main (the canonical, owned definition). For a
   // linked version the child masters move with the crown and the old main becomes a linked
   // version of it; for a copy version it is a plain swap. See promoteVariantToMain.
@@ -458,7 +446,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
     handleOpenCanvas,
     handleOpenScreenCanvas,
     handleOpenVersionCanvas,
-    handleDeleteVersion,
     handleMakeMain,
     handleScreenTitleSave,
     handleNewComponentCreated,

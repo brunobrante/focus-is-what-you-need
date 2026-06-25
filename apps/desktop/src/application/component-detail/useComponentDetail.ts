@@ -5,7 +5,7 @@ import {
   createOrAttachReference,
   removeReferenceFromOwner,
 } from "@/lib/storage/repos/references.repo";
-import { deleteVariant, duplicateVariant, getVariant, isMainVariant, promoteVariantToMain, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
+import { duplicateVariant, getVariant, isMainVariant, promoteVariantToMain, variantVersionLabel } from "@/lib/storage/repos/variants.repo";
 import {
   useActiveVariant,
   useActiveVariants,
@@ -98,7 +98,6 @@ export interface ComponentDetailState {
   handleOpenVersionCanvas: (variantId: string) => void;
   handleAddReference: (input: Parameters<typeof createOrAttachReference>[0]) => Promise<void>;
   handleSelectVariant: (variantId: string) => void;
-  handleDeleteVariant: (variantId: string) => void;
   handleMakeMain: (variantId: string) => void;
   handleRename: (name: string) => void;
   handleUpdate: (patch: Parameters<typeof updateComponent>[1]) => void;
@@ -356,19 +355,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     setPreviewVariantId(variantId);
   };
 
-  const handleDeleteVariant = (variantId: string) => {
-    const target = variants.find((v) => v.id === variantId);
-    const label = target ? variantVersionLabel(target) : "";
-    confirmRef.current?.open({
-      title: "Delete version",
-      message: `Version "${label}" of "${component?.name ?? "component"}" will be removed.`,
-      onConfirm: async () => {
-        // deleteVariant switches the component's active variant to a sibling if needed.
-        await deleteVariant(variantId);
-      },
-    });
-  };
-
   // Promote a version to be the component's main (the canonical, owned definition). A
   // linked version's child masters move with the crown; a copy version is a plain swap.
   const handleMakeMain = (variantId: string) => {
@@ -440,7 +426,6 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
     handleOpenVersionCanvas,
     handleAddReference,
     handleSelectVariant,
-    handleDeleteVariant,
     handleMakeMain,
     handleRename,
     handleUpdate,

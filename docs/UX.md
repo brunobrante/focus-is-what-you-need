@@ -1580,6 +1580,16 @@ instances, then delete** (each instance becomes an independent copy in place) or
 everywhere (cascade)** (removes every instance too). With no instances, a plain
 `ConfirmActionModal` is shown.
 
+**Deleting a version** — deleting a version from the **version switcher** (screen or
+component detail) deletes the components that version owns. When any of those owned
+components is placed as a **linked instance** elsewhere, the same `InstanceDeleteModal`
+opens first (the shared `useDeleteVariant` flow), offering **Detach instances, then
+delete** or **Delete everywhere (cascade)** before the version's masters are removed —
+the version-delete path is now instance-aware like screen/component deletion, instead of
+silently leaving dangling instances. With no external instances it falls back to a plain
+`ConfirmActionModal` ("Version X of Y will be removed"). The default/original **main**
+version cannot be deleted.
+
 ### Empty states
 - Every list, grid, and tab has a dedicated empty state
 - EmptyState always includes: icon, title, short description, CTA button
