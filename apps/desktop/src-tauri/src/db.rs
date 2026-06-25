@@ -79,7 +79,7 @@ pub struct ApplyAck {
 pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<ApplyAck, String> {
     let db = state.0.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut conn = db.lock().map_err(|_| "db mutex poisoned".to_string())?;
+        let mut conn = db.lock().unwrap_or_else(|e| e.into_inner());
         let tx = conn.transaction().map_err(|e| e.to_string())?;
         let applied = batch.len();
 
@@ -121,7 +121,7 @@ pub async fn db_get_record(
 ) -> Result<Option<String>, String> {
     let db = state.0.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| "db mutex poisoned".to_string())?;
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT json FROM records WHERE tbl = ?1 AND id = ?2",
             params![table, id],
@@ -138,7 +138,7 @@ pub async fn db_get_record(
 pub async fn db_list_records(state: State<'_, Db>, table: String) -> Result<Vec<String>, String> {
     let db = state.0.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| "db mutex poisoned".to_string())?;
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn
             .prepare("SELECT json FROM records WHERE tbl = ?1")
             .map_err(|e| e.to_string())?;
