@@ -7,6 +7,7 @@ import type { ReferenceItem } from "@/lib/references/referenceItemTypes";
 import { useReferenceRowImage } from "@/lib/references/useReferenceRowImage";
 import type { ComponentRow, ReferenceRow, ScreenRow } from "@/lib/storage/schema";
 import { useReferenceUrl } from "@/routes/references/hooks/useReferenceUrl";
+import { formatDuration, formatSize } from "@/routes/references/lib/utils";
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -101,8 +102,8 @@ function ItemCard({ item, stackThumbnailUrl, groupName, selected, onSelect, onDo
     subtitleParts.push(`${screenCount} screens`);
   } else {
     if (item.w && item.h) subtitleParts.push(`${item.w} × ${item.h}`);
-    subtitleParts.push(`${item.size || 0} KB`);
-    if (item.duration) subtitleParts.push(`${item.duration}s`);
+    subtitleParts.push(formatSize(item.size || 0));
+    if (item.duration) subtitleParts.push(formatDuration(item.duration));
   }
 
   return (
