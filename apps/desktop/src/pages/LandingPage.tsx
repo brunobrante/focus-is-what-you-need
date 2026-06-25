@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { exportLocalProjectToFigx, isLocalProject } from "@/lib/storage/localProjects";
 import { TopBar } from "@/components/layout/TopBar";
 import { PageFooter } from "@/components/layout/PageFooter";
-import { ProjectSettingsModal, type ProjectSettingsModalHandle } from "@/components/modals/ProjectSettingsModal";
 import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
 import { CardMoreMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
@@ -25,14 +24,14 @@ export function LandingPage() {
     pendingDelete,
     setPendingDelete,
     isResettingFactory,
-    allScreens,
     projects,
     filtered,
     screensByProject,
     onResetToFactory,
     onConfirmDelete,
-    onSavedProject,
   } = useLanding();
+
+  const navigate = useNavigate();
 
   // Projects created from the workspace browser link to that workspace; Home
   // creates loose projects (no ?workspace param).
@@ -42,7 +41,6 @@ export function LandingPage() {
 
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const exportNoticeTimerRef = useRef<number | null>(null);
-  const projectSettingsRef = useRef<ProjectSettingsModalHandle>(null);
 
   // Clear any pending dismiss timer on unmount so it can't fire after the page
   // is gone (and can't clobber a fresh notice from a later export).
@@ -91,13 +89,7 @@ export function LandingPage() {
           onQueryChange={setQuery}
           filter={filter}
           onFilterChange={setFilter}
-          onRequestEdit={(project) =>
-            projectSettingsRef.current?.open(
-              project,
-              allScreens.filter((screen) => screen.projectId === project.id),
-              onSavedProject,
-            )
-          }
+          onRequestEdit={(project) => navigate(`/project/${encodeURIComponent(project.id)}/edit`)}
           onRequestDelete={setPendingDelete}
           onRequestExport={onRequestExport}
         />}
@@ -120,8 +112,6 @@ export function LandingPage() {
         onClose={() => setPendingDelete(null)}
         onConfirm={onConfirmDelete}
       />
-      <ProjectSettingsModal ref={projectSettingsRef} />
-
       <PageFooter />
     </div>
   );
@@ -275,7 +265,7 @@ function ProjectCard({
             {
               key: "edit",
               label: "Edit project",
-              icon: CardMenuIcons.Open,
+              icon: CardMenuIcons.FastEdit,
               onClick: () => onRequestEdit(project),
             },
             ...(isLocalProject(project)
