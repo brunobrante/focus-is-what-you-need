@@ -124,17 +124,7 @@ export function ProjectEditPanel({
     >
       {/* Sticky action header */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-7 py-3">
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-          >
-            <IconClose size={11} strokeWidth={2} />
-          </button>
-          <span className="text-[13px] font-medium text-[var(--text)]">Edit project</span>
-        </div>
+        <span className="text-[13px] font-medium text-[var(--text)]">Edit project</span>
         <div className="flex items-center gap-2">
           <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
           <button
