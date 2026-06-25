@@ -7,7 +7,6 @@ import { AppSettingsModal, type AppSettingsModalHandle } from "@/components/moda
 import { IconChevronDown, IconColorStyles, IconEllipsis, IconGrid, IconImage, IconLayers, IconPencil, IconPlus, IconSettings, IconTrash } from "@/components/icons";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
-import { createWorkspace } from "@/lib/storage/repos/workspace.repo";
 
 export function TopBar({
   onResetToFactory,
@@ -26,8 +25,6 @@ export function TopBar({
   const [wsPosition, setWsPosition] = useState<{ top: number; left: number } | null>(null);
   const { data: workspaces } = useWorkspaces();
   const [activeWsId, setActiveWsId] = useActiveWorkspaceId();
-  const [newWsName, setNewWsName] = useState("");
-  const [creatingWs, setCreatingWs] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wsTriggerRef = useRef<HTMLButtonElement>(null);
@@ -53,21 +50,6 @@ export function TopBar({
 
   const currentWs =
     workspaces.find((w) => w.id === activeWsId) ?? workspaces[0] ?? null;
-
-  const handleCreateWorkspace = async () => {
-    const name = newWsName.trim();
-    if (!name || creatingWs) return;
-    setCreatingWs(true);
-    try {
-      const created = await createWorkspace({ name });
-      setActiveWsId(created.id);
-      setNewWsName("");
-      setWsOpen(false);
-      setWsPosition(null);
-    } finally {
-      setCreatingWs(false);
-    }
-  };
 
   return (
     <>
