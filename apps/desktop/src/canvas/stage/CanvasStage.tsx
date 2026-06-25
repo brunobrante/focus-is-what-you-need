@@ -502,6 +502,8 @@ export function CanvasStage({
         document={state.document}
         selectedIds={state.selectedIds}
         editingTextId={state.editingTextId}
+        pathEditId={state.pathEditId}
+        penToolActive={state.tool === "pen"}
         canvasStageActive={state.canvasStageActive}
         guides={state.guides}
         viewportTransform={viewportTransform}

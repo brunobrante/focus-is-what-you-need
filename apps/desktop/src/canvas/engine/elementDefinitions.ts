@@ -104,6 +104,20 @@ const DEFINITIONS: Record<ElementType, ElementDefinition> = {
       constraints: { width: { min: 8 }, height: { min: 8 }, radius: { min: 1, max: 49 } },
     },
   },
+  path: {
+    type: "path",
+    capabilities: {
+      radius: false, radiusRole: "none", lockAspectRatio: false, resizeHandles: "all", drawMode: "free",
+      constraints: { width: { min: 1 }, height: { min: 1 } },
+    },
+  },
+  svg: {
+    type: "svg",
+    capabilities: {
+      radius: false, radiusRole: "none", lockAspectRatio: false, resizeHandles: "all", drawMode: "free",
+      constraints: { width: { min: 1 }, height: { min: 1 } },
+    },
+  },
 };
 
 const TOOL_TO_ELEMENT_TYPE: Partial<Record<InsertTool, ElementType>> = {
@@ -117,6 +131,9 @@ const TOOL_TO_ELEMENT_TYPE: Partial<Record<InsertTool, ElementType>> = {
   arrow: "arrow",
   polygon: "polygon",
   star: "star",
+  pen: "path",
+  pencil: "path",
+  svg: "svg",
 };
 
 export function getElementDefinition(type: ElementType): ElementDefinition {

@@ -14,8 +14,11 @@ import {
   updateElementText,
   updateShellBackground,
   updateShellGrid,
+  flattenElementToPath,
+  applyBooleanToSelection,
   DEFAULT_SHELL_GRID,
 } from "@/canvas/engine/actions";
+import type { BooleanOp } from "@/canvas/engine/vector/boolean";
 import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument, CanvasProperties, ElementSizing, ElementStyles } from "@/canvas/engine/types";
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
 import { getInstanceRootId } from "@/canvas/engine/geometry";
@@ -164,6 +167,21 @@ export function Inspector({
     commitDocument(setTextElementSizing(document, node.id, sizing));
   };
 
+  const onEditPath = () => {
+    if (!node) return;
+    (editorProp ?? getEditorSnapshot())?.dispatch({ type: "enterPathEdit", pathEditId: node.id });
+  };
+  const onFlattenToPath = () => {
+    if (!document || !node) return;
+    commitDocument(flattenElementToPath(document, node.id), [node.id]);
+  };
+  const onBooleanOp = (op: BooleanOp) => {
+    if (!document) return;
+    const ids = (editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [];
+    const result = applyBooleanToSelection(document, ids, op);
+    if (result) commitDocument(result.document, [result.selectedId]);
+  };
+
   const headerTitle = canvasStageActive ? "Frame" : node ? node.name : "Inspector";
   const headerMeta = canvasStageActive
     ? `${document?.canvas.width ?? 0}×${document?.canvas.height ?? 0}px`
@@ -264,7 +282,29 @@ export function Inspector({
             onUpdateAncestorItem={onUpdateAncestorItem}
           />
         ) : selectedCount > 1 ? (
-          <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />
+          <div className="flex flex-col">
+            <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />
+            <div className="flex flex-col gap-1.5 border-t border-[#2C2C2C] px-3.5 py-3">
+              <span className="text-[11px] font-medium text-[#9A9A9A]">Boolean</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  ["union", "Union"],
+                  ["subtract", "Subtract"],
+                  ["intersect", "Intersect"],
+                  ["exclude", "Exclude"],
+                ] as const).map(([op, label]) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => onBooleanOp(op)}
+                    className="cursor-pointer rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A]"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : !node ? (
           <EmptyState title="No element selected" body="Select an element in the tree or canvas." />
         ) : (
@@ -278,6 +318,8 @@ export function Inspector({
             onUpdateRotation={(rotation) => commitDocument(updateElementRotation(document, node.id, rotation))}
             onUpdateStyle={commitStyle}
             onUpdateSizing={commitSizing}
+            onEditPath={onEditPath}
+            onFlattenToPath={onFlattenToPath}
             onToggleLocked={(locked) => commitDocument(setElementLocked(document, node.id, locked))}
             onToggleVisible={(visible) => {
               const ids = (editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [];

@@ -5,3 +5,16 @@ export { insertElement, constrainElement, constrainAll, reparentElements, moveEl
 export { fitTextElementToContent, setTextElementSizing, updateElementGeometry, updateElementRotation, updateElementStyles } from "./mutations/elementGeometry";
 export { updateElementText, updateElementTextShallow, updateElementImageSource, renameElement, setElementLocked, setElementVisible, detachInstance } from "./mutations/elementContent";
 export { reorderElement, moveElementBefore, bringToFront, sendToBack } from "./mutations/elementOrder";
+export {
+  makePathNode,
+  appendAnchor,
+  updateAnchor,
+  updateHandle,
+  insertAnchorOnSegment,
+  deleteAnchor,
+  closeSubpath,
+  setHandleType,
+  setFillRule,
+  recomputePathBounds,
+} from "./mutations/vectorPath";
+export { insertSvgDocument, flattenElementToPath, applyBooleanToSelection } from "./mutations/vectorOps";

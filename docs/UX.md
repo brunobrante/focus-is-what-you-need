@@ -716,6 +716,17 @@ To edit the contents, open the master or detach the instance first.
 - The ghost appears only during a move-drag, only for the invisible dragged elements; visible elements in the same selection still move as themselves. It disappears on drop, where the normal selection outline returns.
 - This is toggleable in **Settings → Canvas → "Drag ghost for invisible elements"** (on by default).
 
+**Vector editing (pen / pencil / paths / SVG):**
+- The toolbar exposes a **Pen**/**Pencil** dropdown (default keys `P` / `⇧P`) and an **SVG** tool (`G`).
+- **Pen** is click-to-place: each click adds a corner anchor; click-drag pulls symmetric bézier handles out of the just-placed anchor; clicking the **first anchor** of the open subpath (highlighted with a ring) closes it and finishes the path. `Enter` finishes the open path; `Esc` cancels the in-flight anchor. The pen shows context cursors — pen, pen-insert (over a segment), pen-remove (Alt over an anchor), pen-snap.
+- **Pencil** is freehand: drag to draw; on release the stroke is simplified (Ramer–Douglas–Peucker) and curve-fit into an editable path.
+- **Path edit mode:** double-click a selected path (or press `Enter`) to edit it. Anchors render as small squares and handles as round knobs on the overlay. Drag an anchor or handle to move it; **double-click a segment** inserts an anchor; **Alt-click an anchor** removes it; double-click an anchor toggles corner ↔ smooth. `Esc`/`Enter` or clicking empty canvas leaves edit mode. The element's box/resize handles are hidden while editing.
+- **Inspector → Vector** (shown for `path`/`svg` elements): fill + fill-opacity + fill-rule, stroke + stroke-width + stroke-opacity, line cap / join, and dash. Path elements get an **Edit path** button. (SVG stroke alignment is center-only — SVG has no native inside/outside stroke.)
+- **Convert → Flatten to path:** rect/ellipse/polygon/star/line/arrow show a **Flatten to path** action that converts the shape into an editable vector path.
+- **Boolean ops:** selecting two or more shapes/paths shows **Union / Subtract / Intersect / Exclude** buttons in the Inspector; the result replaces the operands with a single path.
+- **SVG import:** pasting raw SVG markup (clipboard) decomposes it into a sealed **SVG** container node holding one child path per shape (`<path>/<rect>/<circle>/<ellipse>/<line>/<polygon>/<polyline>`); scripts/event handlers/external refs are stripped on import.
+- **SVG is a sealed component:** an imported/inserted SVG shows in the layers tree as a **single leaf row** (its internal paths hidden) and on the canvas renders only its frame. To edit its vectors, **double-click it to isolate/open** it; its paths become selectable and editable only inside that isolation. A global **Settings → Canvas → reveal sealed SVG internals** toggle (off by default) expands the SVG's path children in the tree — visibility only; editing still requires isolation.
+
 **Actions panel** (expands above the toolbar):
 - Search bar
 - Filter tabs: All | Assets | Plugins

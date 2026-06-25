@@ -8,6 +8,7 @@ import {
   ROTATION_SIZE,
   type ToolingBox,
 } from "./canvasToolingRenderer";
+import { PEN_CURSOR, PEN_INSERT_CURSOR } from "./penCursors";
 
 // ─── Element hit testing ──────────────────────────────────────────────────────
 
@@ -80,7 +81,33 @@ export type ToolingHit =
   | { type: "none"; cursor: null }
   | { type: "resize"; handle: ResizeHandle; cursor: string }
   | { type: "rotate"; cursor: string }
-  | { type: "radius"; corner: RadiusCorner; cursor: string };
+  | { type: "radius"; corner: RadiusCorner; cursor: string }
+  | { type: "path-anchor"; subpathIndex: number; anchorIndex: number; cursor: string }
+  | { type: "path-handle"; subpathIndex: number; anchorIndex: number; which: "in" | "out"; cursor: string }
+  | { type: "path-segment"; subpathIndex: number; segIndex: number; t: number; cursor: string }
+  | { type: "path-empty"; cursor: string };
+
+// Anchor/handle/segment geometry in VIEWPORT space, computed by the tooling layer
+// when a path is in edit mode. Used both to draw the overlay and to hit-test it.
+export type PathEditAnchorGeom = {
+  subpathIndex: number;
+  anchorIndex: number;
+  point: Point;
+  inHandle: Point | null;
+  outHandle: Point | null;
+  selected: boolean;
+};
+export type PathEditSegmentGeom = {
+  subpathIndex: number;
+  segIndex: number;
+  samples: Point[]; // polyline approximation of the (possibly curved) segment
+};
+export type PathEditGeometry = {
+  anchors: PathEditAnchorGeom[];
+  segments: PathEditSegmentGeom[];
+  // The first anchor of the active subpath, when the pen tool can close it.
+  closeTarget: Point | null;
+};
 
 export type ToolingGeometry = {
   selectionBox: ToolingBox | null;
@@ -91,6 +118,8 @@ export type ToolingGeometry = {
   cursorRotation: number;
   /** When set, only these handles are hit-tested. null = all handles. */
   allowedResizeHandles: readonly ResizeHandle[] | null;
+  /** Present only while a path is in edit mode (takes hit-test priority). */
+  pathEdit: PathEditGeometry | null;
 };
 
 // ─── Figma-style rotation cursor (curved arrow, two arrowheads) ───────────────
@@ -318,7 +347,46 @@ function hitTestRadiusPositions(vx: number, vy: number, positions: Point[]): Rad
   return null;
 }
 
+const ANCHOR_HIT = 9;
+const HANDLE_HIT = 8;
+const SEGMENT_HIT = 6;
+
+function hitTestPathEdit(vx: number, vy: number, geom: PathEditGeometry): ToolingHit | null {
+  const p = { x: vx, y: vy };
+  // Handles take priority (drawn on top), then anchors, then segments.
+  const hr = HANDLE_HIT / 2;
+  for (const a of geom.anchors) {
+    if (a.outHandle && Math.hypot(vx - a.outHandle.x, vy - a.outHandle.y) <= hr) {
+      return { type: "path-handle", subpathIndex: a.subpathIndex, anchorIndex: a.anchorIndex, which: "out", cursor: "pointer" };
+    }
+    if (a.inHandle && Math.hypot(vx - a.inHandle.x, vy - a.inHandle.y) <= hr) {
+      return { type: "path-handle", subpathIndex: a.subpathIndex, anchorIndex: a.anchorIndex, which: "in", cursor: "pointer" };
+    }
+  }
+  const ar = ANCHOR_HIT / 2;
+  for (const a of geom.anchors) {
+    if (Math.abs(vx - a.point.x) <= ar && Math.abs(vy - a.point.y) <= ar) {
+      return { type: "path-anchor", subpathIndex: a.subpathIndex, anchorIndex: a.anchorIndex, cursor: "pointer" };
+    }
+  }
+  for (const seg of geom.segments) {
+    for (let i = 1; i < seg.samples.length; i++) {
+      if (distanceToSegment(p, seg.samples[i - 1], seg.samples[i]) <= SEGMENT_HIT) {
+        const t = (i - 1 + 0.5) / (seg.samples.length - 1);
+        return { type: "path-segment", subpathIndex: seg.subpathIndex, segIndex: seg.segIndex, t, cursor: PEN_INSERT_CURSOR };
+      }
+    }
+  }
+  return null;
+}
+
 export function hitTestTooling(vx: number, vy: number, geometry: ToolingGeometry): ToolingHit {
+  if (geometry.pathEdit) {
+    const hit = hitTestPathEdit(vx, vy, geometry.pathEdit);
+    if (hit) return hit;
+    return { type: "path-empty", cursor: PEN_CURSOR };
+  }
+
   if (geometry.hasRadiusHandles && geometry.radiusHandlePositions) {
     const corner = hitTestRadiusPositions(vx, vy, geometry.radiusHandlePositions);
     if (corner) return { type: "radius", corner, cursor: "pointer" };

@@ -89,7 +89,7 @@ export const TOOL_ENTRIES: Record<CanvasToolId, ToolEntry> = {
   pencil:    { id: "pencil",    name: "Pencil",     icon: ICONS.pencil },
   text:      { id: "text",      name: "Text",       icon: ICONS.text },
   image:     { id: "image",     name: "Image",      icon: ICONS.image },
-  svg:       { id: "svg",       name: "Icon",       icon: ICONS.svg },
+  svg:       { id: "svg",       name: "SVG",        icon: ICONS.svg },
   actions:   { id: "actions",   name: "Actions",    icon: ICONS.actions },
 };
 

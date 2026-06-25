@@ -139,6 +139,14 @@ export type CanvasShellSettings = {
   grid: { enabled: boolean; type: ShellGridType };
   tree: {
     autoRevealSelection: boolean;
+    /**
+     * By default an SVG node is a sealed component: the tree shows it as a single
+     * leaf and hides its internal `path` children (they are only editable when the
+     * SVG is isolated/opened). When true, the tree expands the SVG's vector
+     * children like a normal component. Purely a tree-visibility switch — it never
+     * changes where the vectors can be edited. Default false.
+     */
+    revealSealedComponentChildren: boolean;
   };
   /**
    * Draw a ghost (soft shadow + faint surface + dashed outline) in place of an

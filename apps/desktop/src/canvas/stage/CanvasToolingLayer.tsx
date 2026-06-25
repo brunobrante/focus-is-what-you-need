@@ -10,6 +10,7 @@ import type { GlobalSettings } from "@/domain/settings/types";
 import type { CanvasDropTarget } from "./canvasStageTypes";
 import type { RadiusCorner, ToolingGeometry, ToolingHit } from "./canvasHitTesting";
 import { hitTestTooling } from "./canvasHitTesting";
+import { computePathEditGeometry } from "./pathEditGeometry";
 import {
   type ViewportTransform,
   GROUP_FILL,
@@ -34,6 +35,7 @@ import type {
   ToolingGhostCommand,
   ToolingOutlineCommand,
   ToolingParentDistanceCommand,
+  ToolingPathEditCommand,
   ToolingRadiusLabelCommand,
   ToolingRendererAdapter,
   ToolingSizeLabelCommand,
@@ -50,6 +52,8 @@ export type CanvasToolingLayerProps = {
   document: CanvasDocument;
   selectedIds: string[];
   editingTextId: string | null;
+  pathEditId: string | null;
+  penToolActive: boolean;
   canvasStageActive: boolean;
   guides: SnapGuide[];
   viewportTransform: ViewportTransform;
@@ -110,6 +114,7 @@ const EMPTY_GEOMETRY: ToolingGeometry = {
   hasRadiusHandles: false,
   cursorRotation: 0,
   allowedResizeHandles: null,
+  pathEdit: null,
 };
 
 const TOOLING_RENDERER_KIND = "skia";
@@ -158,6 +163,7 @@ type ToolingRenderData = {
   radiusLabel: ToolingRadiusLabelCommand | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
+  pathEdit: ToolingPathEditCommand | null;
   isInstanceSelection: boolean;
   isDragging: boolean;
   isEditingText: boolean;
@@ -231,7 +237,15 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       const isDragging =
         props.interactionType === "drag" || props.interactionType === "draw";
       const isRadiusDragging = props.interactionType === "radius";
-      const suppressHandles = isDragging || isEditingText;
+      const pathEditNode = props.pathEditId ? doc.elements[props.pathEditId] : null;
+      const pathEditGeometry =
+        pathEditNode && pathEditNode.type === "path"
+          ? computePathEditGeometry(pathEditNode, t, props.penToolActive)
+          : null;
+      const pathEditActive = pathEditGeometry !== null;
+      // In path edit mode the box + resize/rotate/radius handles are hidden; only
+      // the anchor/handle overlay is interactive.
+      const suppressHandles = isDragging || isEditingText || pathEditActive;
       const visibleSelectedIds = props.selectedIds.filter(
         (id) => doc.elements[id]?.visible !== false,
       );
@@ -407,6 +421,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             hasRadiusHandles: false,
             cursorRotation: doc.canvas.rotation ?? 0,
             allowedResizeHandles: null,
+            pathEdit: null,
           }
         : {
             selectionBox: suppressHandles ? null : selectionBox,
@@ -416,6 +431,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             hasRadiusHandles: suppressHandles ? false : hasRadiusHandles,
             cursorRotation: selectionBox ? getToolingBoxRotation(selectionBox) : 0,
             allowedResizeHandles: suppressHandles ? null : allowedResizeHandles,
+            pathEdit: pathEditGeometry,
           };
 
       // While moving a selection, any dragged element whose whole subtree paints
@@ -473,6 +489,17 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         radiusLabel,
         dropTarget,
         parentDistances,
+        pathEdit: pathEditGeometry
+          ? {
+              anchors: pathEditGeometry.anchors.map((a) => ({
+                point: a.point,
+                inHandle: a.inHandle,
+                outHandle: a.outHandle,
+                selected: a.selected,
+              })),
+              closeTarget: pathEditGeometry.closeTarget,
+            }
+          : null,
         isInstanceSelection,
         isDragging,
         isEditingText,
@@ -488,6 +515,8 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.canvasStageActive,
       props.dropTarget,
       props.editingTextId,
+      props.pathEditId,
+      props.penToolActive,
       props.interactionType,
       props.radiusDragCorner,
       selectedIdsKey,
@@ -613,6 +642,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         parentDistances: renderData.parentDistances,
         sizeLabel,
         radiusLabel: renderData.radiusLabel,
+        pathEdit: renderData.pathEdit,
       });
     }, [
       hostRect.left,

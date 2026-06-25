@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
+import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
@@ -32,6 +33,10 @@ type ElementTabProps = {
   onUpdateSizing: (sizing: ElementSizing) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
+  /** Enter path edit mode (path elements only). */
+  onEditPath?: () => void;
+  /** Convert a primitive shape into an editable path. */
+  onFlattenToPath?: () => void;
   /** When true every field is shown but read-only (linked instance or its descendants). */
   locked?: boolean;
   /** Master variant the banner link opens (the instance root's variant), or null. */
@@ -67,10 +72,15 @@ export function ElementTab({
   onUpdateSizing,
   onToggleLocked,
   onToggleVisible,
+  onEditPath,
+  onFlattenToPath,
   locked = false,
   lockedInstanceVariantId = null,
   onGoToInstance,
 }: ElementTabProps) {
+  const isVector = node.type === "path" || node.type === "svg";
+  const fillOpacity = Math.round((node.styles.fillOpacity ?? 1) * 100);
+  const strokeOpacity = Math.round((node.styles.strokeOpacity ?? 1) * 100);
   const rect = getAbsoluteRect(document, node.id);
   const parentSize = getParentSize(document, node.id);
   const opacity = Math.round((node.styles.opacity ?? 1) * 100);
@@ -254,6 +264,81 @@ export function ElementTab({
           />
         </InsRow>
       </InsSection>
+
+      {isVector ? (
+        <InsSection title="Vector" disabled={locked}>
+          <InsRow label="Fill">
+            <InsColor
+              value={node.styles.fill ?? "#000000"}
+              onChange={(fill) => onUpdateStyle({ fill })}
+              tokens={colorTokens}
+            />
+          </InsRow>
+          <InsRow label="Fill opacity">
+            <InsInput value={String(fillOpacity)} onChange={(value) => updateNumber(value, (n) => onUpdateStyle({ fillOpacity: clamp(n, 0, 100) / 100 }))} suffix="%" />
+          </InsRow>
+          <InsRow label="Fill rule">
+            <InsSelect
+              value={node.styles.fillRule ?? node.path?.fillRule ?? "nonzero"}
+              onChange={(value) => onUpdateStyle({ fillRule: value as ElementStyles["fillRule"] })}
+              options={["nonzero", "evenodd"]}
+            />
+          </InsRow>
+          <InsRow label="Stroke">
+            <InsColor
+              value={node.styles.stroke ?? "#000000"}
+              onChange={(stroke) => onUpdateStyle({ stroke })}
+              tokens={colorTokens}
+            />
+          </InsRow>
+          <InsRow label="Stroke W">
+            <InsInput value={String(node.styles.strokeWidth ?? 0)} onChange={(value) => updateNumber(value, (strokeWidth) => onUpdateStyle({ strokeWidth }))} suffix="px" />
+          </InsRow>
+          <InsRow label="Stroke opacity">
+            <InsInput value={String(strokeOpacity)} onChange={(value) => updateNumber(value, (n) => onUpdateStyle({ strokeOpacity: clamp(n, 0, 100) / 100 }))} suffix="%" />
+          </InsRow>
+          <InsRow label="Cap">
+            <InsSelect
+              value={node.styles.strokeLinecap ?? "butt"}
+              onChange={(value) => onUpdateStyle({ strokeLinecap: value as ElementStyles["strokeLinecap"] })}
+              options={["butt", "round", "square"]}
+            />
+          </InsRow>
+          <InsRow label="Join">
+            <InsSelect
+              value={node.styles.strokeLinejoin ?? "miter"}
+              onChange={(value) => onUpdateStyle({ strokeLinejoin: value as ElementStyles["strokeLinejoin"] })}
+              options={["miter", "round", "bevel"]}
+            />
+          </InsRow>
+          <InsRow label="Dash">
+            <InsInput value={node.styles.strokeDasharray ?? ""} onChange={(value) => onUpdateStyle({ strokeDasharray: value || undefined })} placeholder="4 2" />
+          </InsRow>
+          {node.type === "path" && onEditPath ? (
+            <button
+              type="button"
+              onClick={onEditPath}
+              disabled={locked}
+              className="mt-1 w-full cursor-pointer rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Edit path
+            </button>
+          ) : null}
+        </InsSection>
+      ) : null}
+
+      {canFlattenToPath(node.type) && onFlattenToPath ? (
+        <InsSection title="Convert" defaultOpen={false} disabled={locked}>
+          <button
+            type="button"
+            onClick={onFlattenToPath}
+            disabled={locked}
+            className="w-full cursor-pointer rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Flatten to path
+          </button>
+        </InsSection>
+      ) : null}
 
       {node.type === "text" ? (
         <InsSection title="Tipografia" defaultOpen={false} disabled={locked}>

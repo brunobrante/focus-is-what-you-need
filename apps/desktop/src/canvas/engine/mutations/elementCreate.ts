@@ -15,6 +15,11 @@ const TOOL_TYPES: Record<InsertTool, ElementType> = {
   arrow: "arrow",
   polygon: "polygon",
   star: "star",
+  // Pen/pencil create an editable vector node; svg import is handled separately
+  // (it default-inserts a placeholder container — see vector import).
+  pen: "path",
+  pencil: "path",
+  svg: "svg",
 };
 
 const DEFAULT_SIZE_RANGES: Record<
@@ -31,6 +36,10 @@ const DEFAULT_SIZE_RANGES: Record<
   arrow: { width: [20, 400], height: [16, 80] },
   polygon: { width: [16, 400], height: [16, 400] },
   star: { width: [16, 400], height: [16, 400] },
+  // Pen/pencil only need the pre-first-anchor box; the path then drives its own size.
+  pen: { width: [1, 4000], height: [1, 4000] },
+  pencil: { width: [1, 4000], height: [1, 4000] },
+  svg: { width: [16, 1000], height: [16, 1000] },
 };
 
 type ElementCreationOptions = {
@@ -147,5 +156,7 @@ export function elementTypeLabel(type: ElementType): string {
   if (type === "arrow") return "Arrow";
   if (type === "polygon") return "Polygon";
   if (type === "star") return "Star";
+  if (type === "path") return "Path";
+  if (type === "svg") return "SVG";
   return "Text";
 }

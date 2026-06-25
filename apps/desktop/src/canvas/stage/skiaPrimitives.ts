@@ -14,6 +14,7 @@ import type {
   ToolingDropTargetCommand,
   ToolingGhostCommand,
   ToolingOutlineCommand,
+  ToolingPathEditCommand,
   ToolingRadiusLabelCommand,
   ToolingRenderFrame,
   ToolingSizeLabelCommand,
@@ -159,6 +160,53 @@ export function drawRadiusHandles(
   for (const pos of positions) {
     canvas.drawCircle(pos.x, pos.y, radius, fillPaint);
     canvas.drawCircle(pos.x, pos.y, radius, strokePaint);
+  }
+}
+
+const ANCHOR_SIZE = 7;
+const ANCHOR_RADIUS = 1.5;
+const HANDLE_KNOB_RADIUS = 3.5;
+const CLOSE_TARGET_RADIUS = 6;
+
+// Anchor/handle affordances for path edit mode. Handle lines + knobs first, then
+// anchor squares on top, then the close-target ring.
+export function drawPathEdit(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  cmd: ToolingPathEditCommand,
+): void {
+  const linePaint = pool.getStroke(SELECTION_COLOR, 1);
+  const knobFill = pool.getFill(HANDLE_FILL);
+  const knobStroke = pool.getStroke(SELECTION_COLOR, 1);
+  const half = ANCHOR_SIZE / 2;
+
+  for (const a of cmd.anchors) {
+    if (a.inHandle) {
+      canvas.drawLine(a.point.x, a.point.y, a.inHandle.x, a.inHandle.y, linePaint);
+      canvas.drawCircle(a.inHandle.x, a.inHandle.y, HANDLE_KNOB_RADIUS, knobFill);
+      canvas.drawCircle(a.inHandle.x, a.inHandle.y, HANDLE_KNOB_RADIUS, knobStroke);
+    }
+    if (a.outHandle) {
+      canvas.drawLine(a.point.x, a.point.y, a.outHandle.x, a.outHandle.y, linePaint);
+      canvas.drawCircle(a.outHandle.x, a.outHandle.y, HANDLE_KNOB_RADIUS, knobFill);
+      canvas.drawCircle(a.outHandle.x, a.outHandle.y, HANDLE_KNOB_RADIUS, knobStroke);
+    }
+  }
+
+  for (const a of cmd.anchors) {
+    const rect = { x: a.point.x - half, y: a.point.y - half, width: ANCHOR_SIZE, height: ANCHOR_SIZE };
+    if (a.selected) {
+      drawRoundRectWithPaint(ck, canvas, rect, ANCHOR_RADIUS, pool.getFill(SELECTION_COLOR));
+      drawRoundRectWithPaint(ck, canvas, rect, ANCHOR_RADIUS, pool.getStroke(HANDLE_FILL, 1));
+    } else {
+      drawRoundRectWithPaint(ck, canvas, rect, ANCHOR_RADIUS, knobFill);
+      drawRoundRectWithPaint(ck, canvas, rect, ANCHOR_RADIUS, pool.getStroke(SELECTION_COLOR, 1));
+    }
+  }
+
+  if (cmd.closeTarget) {
+    canvas.drawCircle(cmd.closeTarget.x, cmd.closeTarget.y, CLOSE_TARGET_RADIUS, pool.getStroke(SELECTION_COLOR, 1.5));
   }
 }
 

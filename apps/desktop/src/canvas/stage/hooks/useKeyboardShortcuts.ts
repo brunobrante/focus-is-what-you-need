@@ -51,8 +51,48 @@ export function useKeyboardShortcuts({
       const currentState = latestStateRef.current;
       if (isEditableTarget(event.target) || currentState.editingTextId) return;
 
+      // Enter: commit the pen path / toggle into path edit mode.
+      if (event.key === "Enter" && !event.metaKey && !event.ctrlKey) {
+        if (currentState.pathEditId && currentState.tool === "pen") {
+          event.preventDefault();
+          dispatch({ type: "setTool", tool: "select" });
+          dispatch({ type: "setSelected", selectedIds: [currentState.pathEditId] });
+          return;
+        }
+        if (currentState.pathEditId) {
+          event.preventDefault();
+          dispatch({ type: "exitPathEdit" });
+          return;
+        }
+        if (currentState.selectedIds.length === 1) {
+          const node = currentState.document.elements[currentState.selectedIds[0]];
+          if (node?.type === "path") {
+            event.preventDefault();
+            dispatch({ type: "enterPathEdit", pathEditId: node.id });
+            return;
+          }
+        }
+      }
+
       if (matchesKeyCommand(event, settings, "canvas.selection.cancel")) {
         const interaction = interactionRef.current;
+        // Cancel an in-flight pen anchor-drag → revert to before the anchor placement.
+        if (interaction?.type === "pen" || interaction?.type === "anchor-edit") {
+          const viewport = viewportRef.current;
+          if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
+          interactionRef.current = null;
+          setInteractionActive(false);
+          dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
+          dispatch({ type: "exitPathEdit" });
+          if (currentState.tool === "pen") dispatch({ type: "setTool", tool: "select" });
+          return;
+        }
+        // Esc while editing a path (no active drag) → leave edit mode first.
+        if (currentState.pathEditId) {
+          dispatch({ type: "exitPathEdit" });
+          if (currentState.tool === "pen") dispatch({ type: "setTool", tool: "select" });
+          return;
+        }
         if (interaction?.type === "draw") {
           const viewport = viewportRef.current;
           if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);

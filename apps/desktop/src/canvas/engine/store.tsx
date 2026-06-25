@@ -31,6 +31,8 @@ export type EditorAction =
   | { type: "setSelected"; selectedIds: string[] }
   | { type: "setIsolatedParent"; isolatedParentId: string | null }
   | { type: "setEditingText"; editingTextId: string | null }
+  | { type: "enterPathEdit"; pathEditId: string }
+  | { type: "exitPathEdit" }
   | { type: "setCanvasStageActive"; active: boolean }
   | { type: "requestNodeFocus"; nodeId: string | null }
   | { type: "setGuides"; guides: SnapGuide[] }
@@ -170,6 +172,7 @@ function createInitialState(
     selectedIds: [],
     isolatedParentId: null,
     editingTextId: null,
+    pathEditId: null,
     canvasStageActive: false,
     tool: "select",
     zoom: getInitialZoomForSubjectSize(document.canvas, viewportMode),
@@ -203,7 +206,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     ) {
       return state;
     }
-    return { ...state, tool: action.tool, isolatedParentId, editingTextId: null };
+    return { ...state, tool: action.tool, isolatedParentId, editingTextId: null, pathEditId: null };
   },
   setPanning(state, action) {
     if (state.panning === action.panning) return state;
@@ -285,6 +288,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       isolatedParentId,
       canvasStageActive,
       editingTextId: selectedIds.includes(state.editingTextId ?? "") ? state.editingTextId : null,
+      pathEditId: selectedIds.includes(state.pathEditId ?? "") ? state.pathEditId : null,
     };
   },
   setIsolatedParent(state, action) {
@@ -307,6 +311,17 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     if (state.editingTextId === action.editingTextId) return state;
     return { ...state, editingTextId: action.editingTextId };
   },
+  enterPathEdit(state, action) {
+    const node = state.document.elements[action.pathEditId];
+    if (!node || node.type !== "path") return state;
+    if (state.pathEditId === action.pathEditId) return state;
+    // Editing a path is its own modal mode — leave text editing.
+    return { ...state, pathEditId: action.pathEditId, editingTextId: null };
+  },
+  exitPathEdit(state) {
+    if (state.pathEditId === null) return state;
+    return { ...state, pathEditId: null };
+  },
   setCanvasStageActive(state, action) {
     const selectedIds = action.active ? [] : state.selectedIds;
     const isolatedParentId = action.active ? null : state.isolatedParentId;
@@ -318,7 +333,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     ) {
       return state;
     }
-    return { ...state, canvasStageActive: action.active, selectedIds, isolatedParentId, editingTextId: null };
+    return { ...state, canvasStageActive: action.active, selectedIds, isolatedParentId, editingTextId: null, pathEditId: null };
   },
   setGuides(state, action) {
     if (guidesEqual(state.guides, action.guides)) return state;
@@ -336,6 +351,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       selectedIds: [],
       isolatedParentId: null,
       editingTextId: null,
+      pathEditId: null,
       canvasStageActive: false,
       zoom: getInitialZoomForSubjectSize(action.document.canvas, state.viewportMode),
       offsetX: 0,

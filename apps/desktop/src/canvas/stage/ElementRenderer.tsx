@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
+import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
 import { resolveTokenRef } from "@/domain/system-design/resolveTokenRef";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 
@@ -320,6 +321,91 @@ function ElementRendererImpl({
           <img src={node.src} alt={node.name} draggable={false} style={{ objectFit: node.styles.objectFit }} />
         ) : (
           <div className="image-placeholder"><span>IMG</span></div>
+        )}
+      </div>
+    );
+  }
+
+  if (node.type === "path") {
+    const vb = node.viewBox ?? { width: node.width || 1, height: node.height || 1 };
+    const base = detached
+      ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
+      : nodeStyle(node, false, renderScale, resolveRef);
+    // The positioning box paints nothing — fill/stroke live on the <path>.
+    const boxStyle: CSSProperties = {
+      ...base,
+      background: undefined,
+      borderWidth: undefined,
+      borderStyle: undefined,
+      borderColor: undefined,
+      borderRadius: undefined,
+      clipPath: undefined,
+      overflow: "visible",
+    };
+    const s = node.styles;
+    const fill = s.fill ?? resolveRef?.(s.backgroundRef) ?? s.background ?? "none";
+    const stroke = resolveRef?.(s.strokeRef) ?? s.stroke;
+    return (
+      <div
+        data-element-id={node.id}
+        data-node-type="path"
+        className={elementClassName(node, "element path-element", false, isolatedParentId, canvasDocument.elements)}
+        style={boxStyle}
+      >
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${vb.width} ${vb.height}`}
+          preserveAspectRatio="none"
+          style={{ overflow: "visible", display: "block" }}
+        >
+          <path
+            d={pathToSvgPathData(node.path)}
+            fillRule={node.path?.fillRule ?? s.fillRule}
+            fill={fill}
+            fillOpacity={s.fillOpacity}
+            stroke={stroke}
+            strokeWidth={s.strokeWidth}
+            strokeOpacity={s.strokeOpacity}
+            strokeLinecap={s.strokeLinecap}
+            strokeLinejoin={s.strokeLinejoin}
+            strokeDasharray={s.strokeDasharray}
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  if (node.type === "svg") {
+    // Container node: a transparent positioning box that holds child `path` nodes
+    // (rendered through the normal hierarchy). No raw markup is injected.
+    const base = detached
+      ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
+      : nodeStyle(node, false, renderScale, resolveRef);
+    const boxStyle: CSSProperties = { ...base, background: undefined, overflow: "visible" };
+    return (
+      <div
+        data-element-id={node.id}
+        data-node-type="svg"
+        className={elementClassName(node, "element svg-element", false, isolatedParentId, canvasDocument.elements)}
+        style={boxStyle}
+      >
+        {node.children.length === 0 ? (
+          <div className="image-placeholder"><span>SVG</span></div>
+        ) : (
+          !isIsolatedParent &&
+          node.children.map((childId) => (
+            <ElementRenderer
+              key={childId}
+              id={childId}
+              document={canvasDocument}
+              isolatedParentId={isolatedParentIdProp}
+              editingTextId={editingTextId}
+              affectedElementIds={affectedElementIds}
+              preview={preview}
+              renderScale={renderScale}
+            />
+          ))
         )}
       </div>
     );

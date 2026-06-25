@@ -178,6 +178,27 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
           styles: { background: "#dbeafe", borderRadius: 22.49, opacity: 1 },
           sizeMode: "auto",
         },
+        pen: {
+          name: "Path",
+          width: 120,
+          height: 120,
+          styles: { fill: "none", stroke: "#182033", strokeWidth: 2, opacity: 1 },
+          sizeMode: "auto",
+        },
+        pencil: {
+          name: "Path",
+          width: 120,
+          height: 120,
+          styles: { fill: "none", stroke: "#182033", strokeWidth: 2, opacity: 1 },
+          sizeMode: "auto",
+        },
+        svg: {
+          name: "SVG",
+          width: 140,
+          height: 140,
+          styles: { fill: "#182033", opacity: 1 },
+          sizeMode: "auto",
+        },
       },
     },
     inputBindings: {
@@ -194,6 +215,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       grid: { enabled: false, type: "dots" },
       tree: {
         autoRevealSelection: true,
+        revealSealedComponentChildren: false,
       },
       invisibleDragGhost: true,
     },

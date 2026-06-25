@@ -240,12 +240,18 @@ export function nodeTypeFromElement(type: ElementType, hasChildren: boolean): No
   if (type === "arrow") return "arrow";
   if (type === "polygon") return "polygon";
   if (type === "star") return "star";
+  if (type === "path") return "path";
+  if (type === "svg") return "svg";
   return hasChildren ? "component" : "rect";
 }
 
 export function treeFromCanvasDocument(
   document: import("@/canvas/engine/types").CanvasDocument | null | undefined,
   name = "Canvas",
+  // By default an SVG is a sealed component (its child paths are hidden). When the
+  // global canvas setting opts in, its vector children are expanded like a normal
+  // component (see Versioning §8.2).
+  revealSealedSvg = false,
 ): { root: Node } {
   if (!document) {
     return {
@@ -262,6 +268,9 @@ export function treeFromCanvasDocument(
 
   const build = (node: ElementNode): Node => {
     const linked = Boolean(node.instanceOf);
+    // A sealed SVG renders as one leaf row; its internal path children are hidden
+    // unless the reveal setting is on. (Linked instances are always sealed.)
+    const sealed = linked || (node.type === "svg" && !revealSealedSvg);
     return {
       id: node.id,
       name: node.name,
@@ -270,9 +279,9 @@ export function treeFromCanvasDocument(
       locked: node.locked,
       linked,
       instanceVariantId: node.instanceOf?.variantId,
-      // A linked instance shows as a single row — its inlined master content
-      // (read-only) is not expanded into the layers tree.
-      children: linked
+      // A linked instance / sealed SVG shows as a single row — its content is not
+      // expanded into the layers tree.
+      children: sealed
         ? []
         : node.children
             .map((childId) => document.elements[childId])

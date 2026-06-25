@@ -106,11 +106,20 @@ export function TypeIcon({
         </svg>
       );
     case "pen":
+    case "path":
       return (
         <svg {...common}>
           <path d="M4 20c2-1 4-2 6-5s4-8 7-11" />
           <path d="M17 4l3 3" />
           <circle cx="4" cy="20" r="1.4" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "svg":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M8 15l3-6 3 6" />
+          <path d="M8.7 13h4.6" />
         </svg>
       );
   }

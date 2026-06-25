@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 
 import { hasClipboard } from "@/canvas/engine/clipboard";
+import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import {
   useEditorBridge,
   useEditorBridgeReader,
@@ -210,10 +211,13 @@ export function Tree({
     documentTreeShapeEqual,
   );
   const document = documentProp !== undefined ? documentProp : bridgeDocument;
+  const { settings: globalSettings } = useGlobalSettings();
+  const revealSealedSvg = globalSettings.canvas.shell.tree.revealSealedComponentChildren;
   const tree = useMemo(() => {
-    if (document) return treeFromCanvasDocument(document, componentName || screenName || "Canvas");
-    return treeFromCanvasDocument(null, componentName || screenName || "Canvas");
-  }, [componentName, document, screenName]);
+    const label = componentName || screenName || "Canvas";
+    if (document) return treeFromCanvasDocument(document, label, revealSealedSvg);
+    return treeFromCanvasDocument(null, label, revealSealedSvg);
+  }, [componentName, document, screenName, revealSealedSvg]);
   const treeStructureKey = useMemo(() => structureKey(tree.root), [tree]);
 
   const [openSet, setOpenSet] = useState<Set<string>>(() => initiallyOpen(tree.root));

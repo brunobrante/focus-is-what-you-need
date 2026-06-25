@@ -79,6 +79,23 @@ export type ToolingRadiusLabelCommand = {
   align: "start" | "end";
 };
 
+/**
+ * Anchor + handle affordances drawn while a path is in edit mode. All points are
+ * in viewport/overlay space. Anchors are squares (filled when selected); handles
+ * are a line anchor→knob with a round knob; `closeTarget` highlights the first
+ * anchor when the pen can close the subpath.
+ */
+export type ToolingPathEditAnchor = {
+  point: Point;
+  inHandle: Point | null;
+  outHandle: Point | null;
+  selected: boolean;
+};
+export type ToolingPathEditCommand = {
+  anchors: ToolingPathEditAnchor[];
+  closeTarget: Point | null;
+};
+
 export type ToolingRenderFrame = {
   left: number;
   top: number;
@@ -95,6 +112,7 @@ export type ToolingRenderFrame = {
   parentDistances: ToolingParentDistanceCommand | null;
   sizeLabel: ToolingSizeLabelCommand | null;
   radiusLabel: ToolingRadiusLabelCommand | null;
+  pathEdit: ToolingPathEditCommand | null;
 };
 
 export type ToolingRendererAdapter = {

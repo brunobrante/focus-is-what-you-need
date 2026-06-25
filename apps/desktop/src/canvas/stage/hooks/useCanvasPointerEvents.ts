@@ -1,7 +1,9 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { getCommonParentId, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
-import { getElementIdFromTarget } from "@/canvas/engine/hitTesting";
+import { getElementIdFromTarget, isEditableTarget } from "@/canvas/engine/hitTesting";
+import { insertSvgDocument } from "@/canvas/engine/actions";
+import { parseSvg } from "@/canvas/engine/vector/svgImport";
 import type { ElementFontTokens, EditorState, Point, Rect } from "@/canvas/engine/types";
 import { isInsertTool, isSelectionTool } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
@@ -14,6 +16,21 @@ import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import type { CanvasToolingRef } from "../CanvasToolingLayer";
 import { findChildAtPoint, retargetForIsolatedParent } from "../canvasHitTesting";
+import type { ToolingHit } from "../canvasHitTesting";
+import { PEN_CURSOR, PEN_REMOVE_CURSOR } from "../penCursors";
+import {
+  anchorEditMove,
+  anchorEditPointerDown,
+  finishAnchorEdit,
+  finishPen,
+  finishPencil,
+  pathDoubleClick,
+  pencilMove,
+  pencilPointerDown,
+  penPointerDown,
+  penPointerMove,
+  type VectorPointerCtx,
+} from "../canvasVectorInteraction";
 import { clearNativeTextSelection } from "../canvasStageHelpers";
 import { isPointInsideCanvas } from "../canvasCoordinates";
 import {
@@ -151,6 +168,39 @@ export function useCanvasPointerEvents({
   const getInteractiveElementId = (target: EventTarget | null): string | null =>
     retargetForIsolatedParent(state.document, state.isolatedParentId, getElementIdFromTarget(target));
 
+  const vectorCtx = (viewport: HTMLDivElement): VectorPointerCtx => ({
+    state,
+    dispatch,
+    settings,
+    interactionRef,
+    setInteractionActive,
+    latestDocumentRef,
+    viewport,
+  });
+
+  // System-clipboard SVG paste → decompose into a sealed svg node (Versioning §8).
+  // Internal element paste (Cmd+V of copied elements) is handled separately in the
+  // keyboard hook; this only fires when the clipboard holds raw SVG markup.
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (isEditableTarget(event.target)) return;
+      const data = event.clipboardData;
+      if (!data) return;
+      const text = data.getData("image/svg+xml") || data.getData("text/plain");
+      if (!text || !text.trim().startsWith("<svg")) return;
+      const parsed = parseSvg(text);
+      if (!parsed) return;
+      event.preventDefault();
+      const doc = latestStateRef.current.document;
+      const cx = doc.canvas.width / 2 - parsed.viewBox.width / 2;
+      const cy = doc.canvas.height / 2 - parsed.viewBox.height / 2;
+      const { document: nextDocument, svgId } = insertSvgDocument(doc, parsed, roundPixel(cx), roundPixel(cy));
+      dispatch({ type: "commitDocument", document: nextDocument, selectedIds: [svgId] });
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [dispatch, latestStateRef]);
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (contextMenu) setContextMenu(null);
 
@@ -187,9 +237,23 @@ export function useCanvasPointerEvents({
       return;
     }
 
+    let toolingHit: ToolingHit | null = null;
     if (viewport && toolingRef.current && !state.editingTextId) {
       const vpRect = getCurrentViewportRect();
       const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
+      toolingHit = hit;
+      // Path edit mode (select tool): anchor/handle/segment interactions take priority.
+      if (state.pathEditId && state.tool !== "pen") {
+        if (
+          hit.type === "path-anchor" ||
+          hit.type === "path-handle" ||
+          hit.type === "path-segment" ||
+          hit.type === "path-empty"
+        ) {
+          const pePoint = getCanvasPoint(event) ?? { x: 0, y: 0 };
+          if (anchorEditPointerDown(vectorCtx(viewport), event, pePoint, hit)) return;
+        }
+      }
       const ctx: InteractionBeginCtx = { state, draftMode, viewport, interactionRef, setInteractionActive, getCurrentViewportSize };
       if (hit.type === "resize") {
         const point = getCanvasPoint(event);
@@ -220,6 +284,16 @@ export function useCanvasPointerEvents({
         event.preventDefault();
         viewport.setPointerCapture(event.pointerId);
       }
+      return;
+    }
+
+    if (state.tool === "pen") {
+      if (penPointerDown(vectorCtx(viewport), event, point, toolingHit ?? { type: "none", cursor: null })) return;
+      return;
+    }
+
+    if (state.tool === "pencil") {
+      if (pencilPointerDown(vectorCtx(viewport), event, point)) return;
       return;
     }
 
@@ -337,10 +411,23 @@ export function useCanvasPointerEvents({
         const vpRect = getCurrentViewportRect();
         const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
         if (hit.cursor) {
-          viewport.style.cursor = hit.type === "radius" ? RADIUS_CURSOR : hit.cursor;
+          // Alt over an anchor in edit mode shows the remove-anchor cursor.
+          const cursor =
+            hit.type === "radius"
+              ? RADIUS_CURSOR
+              : hit.type === "path-anchor" && event.altKey
+                ? PEN_REMOVE_CURSOR
+                : hit.cursor;
+          viewport.style.cursor = cursor;
           if (hit.type !== "radius") hoverStore.set(null);
           return;
         }
+      }
+      // Free-space cursor for the vector tools.
+      if (viewport && (state.tool === "pen" || state.tool === "pencil")) {
+        viewport.style.cursor = state.tool === "pen" ? PEN_CURSOR : "crosshair";
+        hoverStore.set(null);
+        return;
       }
       hoverStore.set(getInteractiveElementId(event.target));
       return;
@@ -353,6 +440,9 @@ export function useCanvasPointerEvents({
     if (!point) return;
 
     if (interaction.type === "draw") { handleDrawMove(interaction, event, point, dispatch, latestDocumentRef, settings); return; }
+    if (interaction.type === "pen") { penPointerMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "pencil") { pencilMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "anchor-edit") { anchorEditMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
     if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
 
@@ -390,6 +480,9 @@ export function useCanvasPointerEvents({
     }
     if (interaction.type === "marquee") { setMarqueeRect(null); return; }
     if (interaction.type === "draw") { finishDrawInteraction(interaction, dispatch, settings, noticeStore); return; }
+    if (interaction.type === "pen") { finishPen(interaction, dispatch); return; }
+    if (interaction.type === "pencil") { finishPencil(interaction, dispatch); return; }
+    if (interaction.type === "anchor-edit") { finishAnchorEdit(interaction, dispatch); return; }
 
     const wasCommandMode = commandModeRef.current;
     const capturedDropTarget = dropTargetRef.current;
@@ -401,6 +494,16 @@ export function useCanvasPointerEvents({
     } else {
       dispatch({ type: "setGuides", guides: [] });
     }
+  };
+
+  const onDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (viewport && toolingRef.current && !state.editingTextId) {
+      const vpRect = getCurrentViewportRect();
+      const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
+      if (pathDoubleClick(vectorCtx(viewport), event, hit)) return;
+    }
+    textInteraction.onDoubleClick(event);
   };
 
   const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -419,7 +522,7 @@ export function useCanvasPointerEvents({
     onPointerDown,
     onPointerMove,
     finishInteraction,
-    onDoubleClick: textInteraction.onDoubleClick,
+    onDoubleClick,
     handleContextMenu,
   };
 }

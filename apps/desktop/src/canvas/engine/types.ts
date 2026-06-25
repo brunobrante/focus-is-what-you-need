@@ -5,7 +5,34 @@ import type { Tool, InsertTool, ShellGridType, ElementStyles } from "@/domain/ca
 export type { Tool, InsertTool, ShellGridType, ElementStyles };
 import type { Box, Vec2 } from "@/domain/canvas/geometry";
 
-export type ElementType = "rect" | "ellipse" | "text" | "image" | "icon" | "line" | "arrow" | "polygon" | "star";
+export type ElementType =
+  | "rect" | "ellipse" | "text" | "image" | "icon"
+  | "line" | "arrow" | "polygon" | "star"
+  | "path"   // one editable vector node (pen/pencil output, or a child of an svg)
+  | "svg";   // an imported SVG container that holds child "path" nodes
+
+// ─── Vector path representation ─────────────────────────────────────────────────
+// Structured anchors are the edit source of truth; the `d` string is derived for
+// rendering (see canvas/engine/vector/pathData.ts). A path holds many subpaths so
+// it can represent holes (boolean subtract, donuts), multi-`M` imported paths, and
+// fill-rule. Anchor positions live in INTRINSIC viewBox space (see ElementNode.viewBox).
+
+export type VectorAnchor = {
+  x: number;
+  y: number;
+  inX?: number; // in-handle, relative to anchor (absent = corner)
+  inY?: number;
+  outX?: number; // out-handle, relative to anchor
+  outY?: number;
+  handleType?: "corner" | "mirrored" | "asymmetric"; // continuity when dragging a handle
+};
+
+export type VectorSubpath = { anchors: VectorAnchor[]; closed: boolean };
+
+export type VectorPath = {
+  subpaths: VectorSubpath[];
+  fillRule?: "nonzero" | "evenodd"; // default "nonzero"
+};
 
 /** Selection-style tools: they pick/move existing elements rather than insert. */
 export function isSelectionTool(tool: Tool): boolean {
@@ -54,6 +81,14 @@ export type ElementNode = {
   visible?: boolean;
   // Non-null only on linked instance elements (see ElementInstanceRef).
   instanceOf?: ElementInstanceRef | null;
+  // ── Vector fields (path/svg only) ──
+  // Intrinsic authoring space. Anchors are stored in these coords; render keeps
+  // viewBox fixed while width/height stretch the box so the path scales for free
+  // through the existing geometry pipeline (see Versioning §2.4).
+  viewBox?: { width: number; height: number };
+  // Present when type === "path". A "svg" container node has no `path`, only a
+  // `viewBox` and child `path` nodes via the existing children/parentId hierarchy.
+  path?: VectorPath;
 };
 
 export type CanvasProperties = {
@@ -137,6 +172,10 @@ export type EditorState = {
   selectedIds: string[];
   isolatedParentId: string | null;
   editingTextId: string | null;
+  // The path element currently in anchor-edit mode (null = off). Lifecycle mirrors
+  // editingTextId: enter on double-click / Enter, exit on Esc / empty-canvas click /
+  // tool switch (see store enterPathEdit / exitPathEdit).
+  pathEditId: string | null;
   canvasStageActive: boolean;
   tool: Tool;
   zoom: number;
@@ -291,6 +330,49 @@ export type DrawInteraction = {
   moved: boolean;
 };
 
+// Pen tool: click-to-place anchors, drag to pull symmetric bezier handles, click
+// the first anchor to close. Each placement is its own commit (per-anchor undo).
+export type PenInteraction = {
+  type: "pen";
+  pointerId: number;
+  startPoint: Point;
+  elementId: string;
+  subpathIndex: number;
+  // Index of the anchor whose handles are being dragged on this gesture (the
+  // just-placed anchor), within the active subpath.
+  draggingHandleOfAnchor: number;
+  beforeDocument: CanvasDocument;
+  lastDocument: CanvasDocument;
+  moved: boolean;
+};
+
+// Pencil tool: freehand drag; the sampled points are simplified + curve-fit into
+// anchors on pointer-up (see canvas/engine/vector/simplify.ts).
+export type PencilInteraction = {
+  type: "pencil";
+  pointerId: number;
+  startPoint: Point;
+  elementId: string;
+  points: Point[]; // canvas-space samples
+  beforeDocument: CanvasDocument;
+  lastDocument: CanvasDocument;
+  moved: boolean;
+};
+
+// Edit mode: dragging an existing anchor or one of its two handles on the overlay.
+export type AnchorEditInteraction = {
+  type: "anchor-edit";
+  pointerId: number;
+  startPoint: Point;
+  elementId: string;
+  subpathIndex: number;
+  anchorIndex: number;
+  target: "anchor" | "in" | "out";
+  beforeDocument: CanvasDocument;
+  lastDocument: CanvasDocument;
+  moved: boolean;
+};
+
 export type MarqueeInteraction = {
   type: "marquee";
   pointerId: number;
@@ -345,6 +427,9 @@ export type Interaction =
   | RotateInteraction
   | RadiusInteraction
   | DrawInteraction
+  | PenInteraction
+  | PencilInteraction
+  | AnchorEditInteraction
   | MarqueeInteraction
   | PanInteraction
   | CanvasResizeInteraction

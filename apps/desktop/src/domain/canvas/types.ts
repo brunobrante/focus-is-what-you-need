@@ -17,7 +17,10 @@ export type Tool =
   | "line"
   | "arrow"
   | "polygon"
-  | "star";
+  | "star"
+  | "pen"
+  | "pencil"
+  | "svg";
 
 /**
  * Tools that insert a new element on the canvas. Excludes the non-inserting
@@ -53,6 +56,19 @@ export type ElementStyles = {
   padding?: number;
   overflow?: "visible" | "hidden";
   objectFit?: "fill" | "contain" | "cover" | "none" | "scale-down";
+  // ── Vector semantics (path/svg elements only; ignored by every other type) ──
+  // Cheap in SVG, high value — Figma/paper.design expose all of these.
+  fill?: string; // path fill ("none" allowed); falls back to `background`
+  fillOpacity?: number; // 0..1
+  fillRule?: "nonzero" | "evenodd"; // mirrors VectorPath.fillRule on the inspector
+  stroke?: string; // stroke color
+  strokeWidth?: number;
+  strokeOpacity?: number; // 0..1
+  strokeLinecap?: "butt" | "round" | "square";
+  strokeLinejoin?: "miter" | "round" | "bevel";
+  strokeDasharray?: string; // e.g. "4 2" — dashed/dotted strokes
+  strokeAlign?: "center" | "inside" | "outside"; // see Versioning §9 (SVG caveat)
+  strokeRef?: string; // design-token ref, like backgroundRef/colorRef
 };
 
 export type CanvasToolId =
