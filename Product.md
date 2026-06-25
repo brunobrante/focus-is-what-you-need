@@ -30,7 +30,7 @@ Sections are tagged where useful:
 
 This document describes only what the product **is and must do today**. Features
 that are planned but not yet built do not live here — they wait in [`docs/`](./docs),
-indexed in [`docs/planned/product-backlog.md`](./docs/planned/product-backlog.md), and are folded
+indexed in [`docs/planned/`](./docs/planned/), and are folded
 back in as `[NOW]` once they ship.
 
 ---
@@ -474,10 +474,9 @@ real frame, which stays intact; then copy-paste anything good back in.
 **Scope and persistence rules:**
 - The Sketch canvas is **per project** — each project has its own scratch space;
   opening a different project shows a different (or empty) sketch.
-- It is **local to the device and to the user** — stored in the browser/app's
-  local storage, never written to the database, never shared across machines or
-  accounts. When multi-user support arrives, each user will have their own sketch
-  per project; until then, the device is the user.
+- It is **local to the device and to the user** — never shared across machines
+  or accounts. When multi-user support arrives, each user will have their own
+  sketch per project; until then, the device is the user.
 - It is **not a persistent artefact**: there is no history, no versions, no
   sync. The user can clear it at any time with an explicit "Clear sketch" action.
   Nothing in the Sketch canvas is ever promoted automatically — the only path out
@@ -526,7 +525,7 @@ one you go to its master, exactly as everywhere else.
 
 ## The Builder
 
-The Builder (routes `/generate`, `/tools`) is a **standalone tool**, connected to
+The Builder is a **standalone tool**, connected to
 References but **not a direct feature of References**, and **outside** the
 screen-first component tree. Do not merge it into the canvas/component model.
 
