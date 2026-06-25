@@ -127,8 +127,17 @@ export function isModifierCommandActive(
 }
 
 function isMacLike(): boolean {
-  const nav = globalThis.navigator as Navigator | undefined;
-  return Boolean(nav?.platform && /mac|iphone|ipad|ipod/i.test(nav.platform));
+  const nav = globalThis.navigator as
+    | (Navigator & { userAgentData?: { platform?: string } })
+    | undefined;
+  const macRe = /mac|iphone|ipad|ipod/i;
+  // navigator.platform is deprecated and empty in some webview/test contexts,
+  // where a Mac user's `mod` would silently resolve to Ctrl (DOM-3). Prefer the
+  // modern UA-Client-Hints platform, then fall back to platform, then the UA string.
+  const uaDataPlatform = nav?.userAgentData?.platform;
+  if (uaDataPlatform) return macRe.test(uaDataPlatform);
+  if (nav?.platform && macRe.test(nav.platform)) return true;
+  return Boolean(nav?.userAgent && macRe.test(nav.userAgent));
 }
 
 function formatKeyName(binding: KeyBinding): string {
