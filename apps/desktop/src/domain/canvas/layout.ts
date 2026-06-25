@@ -2,7 +2,7 @@
 // zero React — given the styles (and, for a child, its parent's flow) it returns
 // the inline-style longhands a renderer would spread. This is the layout ENGINE:
 // it is where every "auto layout ≠ naive flexbox" trap from
-// docs/planned/inspector-layout.md is paid, so the eventual renderer/panel stay
+// docs/inspector-layout.md is paid, so the eventual renderer/panel stay
 // thin. It is intentionally NOT wired to the canvas yet — absolute positioning
 // remains the default; this module lands first and is exercised only by tests
 // and the inspector panel.

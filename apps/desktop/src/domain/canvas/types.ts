@@ -34,7 +34,7 @@ export type InsertTool = Exclude<Tool, "select" | "hand" | "scale">;
 export type ShellGridType = "dots" | "squares";
 
 // ── Layout engine vocabulary (Inspector → Layout panel) ─────────────────────
-// See docs/planned/inspector-layout.md. These describe how a CONTAINER lays out
+// See docs/inspector-layout.md. These describe how a CONTAINER lays out
 // its children and how a CHILD sizes/aligns inside its parent. Compiled by
 // domain/canvas/layout.ts; NOT yet applied by the canvas renderer — absolute
 // positioning stays the default and the pure engine lands first.

@@ -6,7 +6,7 @@
 // Deliberately NOT wired to the canvas renderer yet: these controls write real
 // CSS-bound fields but have no on-canvas effect (absolute positioning stays the
 // default). The panel is the authoring surface; the renderer adopts the engine
-// in a later pass. See docs/planned/inspector-layout.md.
+// in a later pass. See docs/inspector-layout.md.
 
 import type { ElementStyles, ElementType, GridTrack, PadAlign } from "@/canvas/engine/types";
 import {
