@@ -7,13 +7,20 @@ import {
   listTopLevelByScreenId,
   markComponentsLinkable,
   setActiveVariant,
+  type InstanceDeleteStrategy,
 } from "@/lib/storage/repos/components.repo";
 import {
   linkifyChildComponentsInGraph,
   materializeInstancesInGraph,
 } from "@/domain/canvas/graphTransforms";
 import { htmlCanvasDocumentFromJSON } from "@/lib/canvas/htmlScene";
-import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
+import {
+  countInstanceUsages,
+  detachInstancesOfComponents,
+  getSceneByOwner,
+  removeInstancesOfComponents,
+  upsertScene,
+} from "@/lib/storage/repos/scenes.repo";
 import type {
   ComponentRow,
   SceneRow,
@@ -76,12 +83,52 @@ export function isMainVariant(variant: VariantRow): boolean {
 }
 
 /**
+ * The components a version (variant) owns outright: every component parented to
+ * this variant, plus their whole subtrees. These are the masters that disappear
+ * when the version is deleted — and the ones whose linked instances elsewhere
+ * must be resolved first (Law 5).
+ */
+function collectVariantOwnedComponentIds(
+  variantId: string,
+  components: ComponentRow[],
+  variants: VariantRow[],
+): Set<string> {
+  const ids = new Set<string>();
+  for (const child of components.filter((c) => c.parentVariantId === variantId)) {
+    collectComponentTreeIds(child.id, components, variants).forEach((id) => ids.add(id));
+  }
+  return ids;
+}
+
+/**
+ * How many linked-instance placements exist ELSEWHERE for the components this
+ * version owns. Drives whether deleting the version must offer the per-instance
+ * detach/cascade choice (Law 5), mirroring `countScreenInstanceUsages`.
+ */
+export async function countVariantInstanceUsages(variantId: string): Promise<number> {
+  const variants = await listVariants();
+  const variant = variants.find((v) => v.id === variantId);
+  if (!variant || variant.order <= 0) return 0;
+  const components = await listTable<ComponentRow>(TABLES.components);
+  const ids = collectVariantOwnedComponentIds(variantId, components, variants);
+  return ids.size === 0 ? 0 : countInstanceUsages(ids);
+}
+
+/**
  * Deletes a variant (a version): its scene, thumbnail, and any nested child
  * components owned by it. The default/original variant ("main") cannot be deleted. If
  * the deleted variant was the master's active one, the master switches to its
  * lowest-order sibling. Works for both screen and component masters.
+ *
+ * When the version owns components that are linked as instances elsewhere, the
+ * caller must pass an `instanceStrategy` (Law 5): "detach" materializes each such
+ * instance into a local copy, "cascade" removes them. Omitting it deletes the
+ * masters outright — only safe when there are no external instances.
  */
-export async function deleteVariant(variantId: string): Promise<void> {
+export async function deleteVariant(
+  variantId: string,
+  opts?: { instanceStrategy?: InstanceDeleteStrategy },
+): Promise<void> {
   const variants = await listVariants();
   const variant = variants.find((v) => v.id === variantId);
   if (!variant || variant.order <= 0) return; // never delete the main
@@ -118,10 +165,20 @@ export async function deleteVariant(variantId: string): Promise<void> {
   }
 
   // Child components nested under this variant (and their whole subtrees).
-  const childComponentIds = new Set<string>();
-  for (const child of components.filter((c) => c.parentVariantId === variantId)) {
-    collectComponentTreeIds(child.id, components, variants).forEach((id) => childComponentIds.add(id));
+  const childComponentIds = collectVariantOwnedComponentIds(variantId, components, variants);
+
+  // Law 5: those owned masters may be placed as linked instances in OTHER scenes.
+  // Resolve every such placement BEFORE the masters disappear — "detach"
+  // materializes each into a local copy, "cascade" removes it. Skipping this
+  // would leave dangling `instanceOf` nodes that resolve to nothing.
+  if (childComponentIds.size > 0) {
+    if (opts?.instanceStrategy === "detach") {
+      await detachInstancesOfComponents(childComponentIds);
+    } else if (opts?.instanceStrategy === "cascade") {
+      await removeInstancesOfComponents(childComponentIds);
+    }
   }
+
   const childVariantIds = new Set(
     variants
       .filter((v) => v.ownerKind === "component" && childComponentIds.has(v.ownerId))
