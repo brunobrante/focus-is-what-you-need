@@ -49,6 +49,14 @@ export const ImportModal = forwardRef<ImportModalHandle>(
     const confirmedRef = useRef(false);
     const pendingDuplicate = duplicateQueue[0] ?? null;
 
+    // Mirror the latest staged/queue so discard side effects can run OUTSIDE a
+    // setState updater — React 19 may invoke updaters twice, which would
+    // double-delete files / double-revoke object URLs (UI-5).
+    const stagedRef = useRef<StagedItem[]>([]);
+    stagedRef.current = staged;
+    const duplicateQueueRef = useRef<PendingDuplicate[]>([]);
+    duplicateQueueRef.current = duplicateQueue;
+
     useImperativeHandle(ref, () => ({
       open: (config) => {
         configRef.current = config;
@@ -69,19 +77,13 @@ export const ImportModal = forwardRef<ImportModalHandle>(
     useEffect(() => {
       if (!isOpen) {
         if (!confirmedRef.current) {
-          setStaged((prev) => {
-            for (const item of prev) discardReferenceItem(item);
-            return [];
-          });
-          setDuplicateQueue((prev) => {
-            for (const dup of prev) discardReferenceItem(dup.imported);
-            return [];
-          });
+          for (const item of stagedRef.current) discardReferenceItem(item);
+          for (const dup of duplicateQueueRef.current) discardReferenceItem(dup.imported);
         } else {
-          setStaged([]);
-          setDuplicateQueue([]);
           confirmedRef.current = false;
         }
+        setStaged([]);
+        setDuplicateQueue([]);
         setTab("local");
         setDragActive(false);
         setRejectedFiles([]);
@@ -137,8 +139,10 @@ export const ImportModal = forwardRef<ImportModalHandle>(
           }
         }
 
-        setStaged((prev) => { for (const item of prev) discardReferenceItem(item); return nextStaged; });
-        setDuplicateQueue((prev) => { for (const dup of prev) discardReferenceItem(dup.imported); return nextDuplicates; });
+        for (const item of stagedRef.current) discardReferenceItem(item);
+        for (const dup of duplicateQueueRef.current) discardReferenceItem(dup.imported);
+        setStaged(nextStaged);
+        setDuplicateQueue(nextDuplicates);
         setDuplicateDecision("existing");
       } finally {
         setProcessing(false);
