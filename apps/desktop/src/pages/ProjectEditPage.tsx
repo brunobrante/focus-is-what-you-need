@@ -1,9 +1,10 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useProjects, useAllScreens } from "@/lib/storage/hooks";
 import { ProjectEditPanel } from "@/routes/Gallery/ProjectEditPanel";
+import { projectBase } from "@/lib/navigation/projectUrl";
 
 export function ProjectEditPage() {
-  const { projectId: rawId } = useParams<{ projectId: string }>();
+  const { projectId: rawId, workspaceId } = useParams<{ projectId: string; workspaceId?: string }>();
   const projectId = rawId ? decodeURIComponent(rawId) : "";
   const navigate = useNavigate();
 
@@ -13,14 +14,16 @@ export function ProjectEditPage() {
   const project = allProjects.find((p) => p.id === projectId);
   const screens = allScreens.filter((s) => s.projectId === projectId);
 
+  const back = projectBase(projectId, workspaceId);
+
   if (!project) return null;
 
   return (
     <ProjectEditPanel
       project={project}
       screens={screens}
-      onClose={() => navigate(-1)}
-      onSaved={() => {}}
+      onClose={() => navigate(back)}
+      onSaved={() => navigate(back)}
     />
   );
 }

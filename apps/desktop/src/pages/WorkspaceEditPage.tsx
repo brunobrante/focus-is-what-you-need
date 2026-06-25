@@ -52,20 +52,22 @@ export function WorkspaceEditPage() {
     if (workspace) setName(workspace.name);
   }, [workspace?.id]);
 
+  const back = workspaceId ? `/workspace/${workspaceId}/projects` : "/";
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") navigate(-1);
+      if (e.key === "Escape") navigate(back);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate]);
+  }, [navigate, back]);
 
   async function save() {
     if (!workspaceId || !name.trim() || saving) return;
     setSaving(true);
     try {
       await updateWorkspace(workspaceId, { name: name.trim() });
-      navigate(-1);
+      navigate(back);
     } finally {
       setSaving(false);
     }
@@ -89,7 +91,7 @@ export function WorkspaceEditPage() {
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-7 py-3">
         <span className="text-[13px] font-medium text-[var(--text)]">Edit workspace</span>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => navigate(-1)} className="btn btn-ghost">
+          <button type="button" onClick={() => navigate(back)} className="btn btn-ghost">
             Cancel
           </button>
           <button
