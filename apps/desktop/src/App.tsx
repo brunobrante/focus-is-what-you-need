@@ -2,6 +2,8 @@ import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { HomeLayout } from "@/pages/HomeLayout";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { WorkspacesPage } from "@/pages/WorkspacesPage";
+import { ProjectsPage } from "@/pages/ProjectsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { NewProjectPage } from "@/pages/NewProjectPage";
@@ -33,6 +35,8 @@ export default function App() {
           Home-area page rendered through its <Outlet />. */}
       <Route element={<HomeLayout />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/workspaces" element={<WorkspacesPage />} />
+        <Route path="/my-projects" element={<ProjectsPage />} />
         <Route path="/drafts" element={<DraftsPage />} />
         <Route path="/references" element={<HomeReferencesPage />} />
         <Route path="/settings" element={<SettingsPage />} />

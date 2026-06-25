@@ -9,6 +9,7 @@ import {
   IconFrame,
   IconGrid,
   IconImage,
+  IconLayoutVertical,
   IconPencil,
   IconPlus,
   IconSettings,
@@ -193,10 +194,16 @@ function HomeSidebar() {
   return (
     <aside className="hidden w-[224px] shrink-0 border-r border-[var(--border)] px-3 py-6 md:block">
       <nav className="flex flex-col gap-0.5">
-        {/* Dashboard, Drafts, Local References, and Settings reach real routes
-            inside this layout; Learn is a placeholder until its feature lands. */}
-        <SidebarLink to="/" end icon={<IconGrid size={15} strokeWidth={1.7} />}>
+        {/* All rows but Learn reach real routes inside this layout; Learn is a
+            placeholder until its feature lands. */}
+        <SidebarLink to="/" end icon={<IconLayoutVertical size={15} strokeWidth={1.7} />}>
           Dashboard
+        </SidebarLink>
+        <SidebarLink to="/workspaces" icon={<IconGrid size={15} strokeWidth={1.7} />}>
+          Workspaces
+        </SidebarLink>
+        <SidebarLink to="/my-projects" icon={<IconFrame size={15} strokeWidth={1.7} />}>
+          Projects
         </SidebarLink>
         <SidebarLink to="/drafts" icon={<IconDocument size={15} strokeWidth={1.7} />}>
           Drafts

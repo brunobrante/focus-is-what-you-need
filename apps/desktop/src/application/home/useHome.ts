@@ -15,6 +15,8 @@ export interface WorkspaceCard {
 export interface RecentItem {
   project: ProjectRow;
   screensCount: number;
+  /** The workspace this project belongs to, if any (null for loose projects). */
+  workspace: WorkspaceRow | null;
 }
 
 export interface HomeState {
@@ -68,6 +70,16 @@ export function useHome(): HomeState {
     [workspaces, projectCountByWorkspace, activeWorkspace],
   );
 
+  // Which workspace (if any) owns each project — lets Recent cards flag the
+  // ones that live inside a workspace. First owner wins on the rare overlap.
+  const workspaceByProjectId = useMemo(() => {
+    const map = new Map<string, WorkspaceRow>();
+    for (const ws of workspaces) {
+      for (const id of ws.projectIds) if (!map.has(id)) map.set(id, ws);
+    }
+    return map;
+  }, [workspaces]);
+
   // Recent items are scoped to the active workspace so they match what the
   // projects browser shows; with no workspace, every project is in scope.
   const scopedProjects = useMemo(
@@ -86,8 +98,9 @@ export function useHome(): HomeState {
         .map((project) => ({
           project,
           screensCount: screensByProject.get(project.id) ?? 0,
+          workspace: workspaceByProjectId.get(project.id) ?? null,
         })),
-    [scopedProjects, screensByProject],
+    [scopedProjects, screensByProject, workspaceByProjectId],
   );
 
   // Projects in no workspace (created loose from Home). Home owns these — they
@@ -101,6 +114,7 @@ export function useHome(): HomeState {
       .map((project) => ({
         project,
         screensCount: screensByProject.get(project.id) ?? 0,
+        workspace: null,
       }));
   }, [allProjects, workspaces, screensByProject]);
 

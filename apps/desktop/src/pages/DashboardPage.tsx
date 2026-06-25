@@ -1,10 +1,10 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-import { IconGrid } from "@/components/icons";
-import { DashedAddTile } from "@/components/DashedAddTile";
-import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
-import type { ProjectRow, WorkspaceRow } from "@/lib/storage/schema";
-import { relativeTime } from "@/application/landing/useLanding";
+import {
+  AddProjectTile,
+  ProjectCard,
+  WorkspaceTile,
+} from "@/components/home/HomeCards";
 import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home/useHome";
 
 /**
@@ -12,7 +12,9 @@ import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home
  * light cards), loose projects, and recent items. It is a deliberately shallow
  * overview: the project-focused browser lives at `/projects`, and each workspace
  * card jumps there with that workspace active. The header, sidebar, and footer
- * come from `HomeLayout`; this component renders only the content.
+ * come from `HomeLayout`; this component renders only the content. The dedicated
+ * Workspaces (`/workspaces`) and Projects (`/my-projects`) pages reuse the same
+ * cards.
  */
 export function DashboardPage() {
   const { workspaces, recent, looseProjects, activeWorkspace, setActiveWorkspaceId } = useHome();
@@ -79,49 +81,6 @@ function WorkspacesSection({
   );
 }
 
-function WorkspaceTile({
-  card,
-  onClick,
-}: {
-  card: WorkspaceCard;
-  onClick: () => void;
-}) {
-  const { workspace, projectCount, isActive } = card;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex cursor-pointer items-center gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3.5 text-left transition-[border-color,transform] duration-[120ms] hover:-translate-y-0.5 hover:border-[var(--border-strong)]"
-    >
-      <span
-        aria-hidden
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] bg-[var(--text)] text-[14px] font-bold text-[var(--bg)]"
-      >
-        {initialOf(workspace)}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[13.5px] font-medium text-[var(--text)]">
-            {workspace.name}
-          </span>
-          {isActive ? (
-            <span className="shrink-0 rounded border border-[var(--border)] px-1.5 py-px text-[9.5px] uppercase tracking-[0.5px] text-[var(--text-muted)]">
-              Active
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
-          {projectCount} {projectCount === 1 ? "project" : "projects"}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function initialOf(workspace: WorkspaceRow): string {
-  return workspace.name.trim()[0]?.toUpperCase() ?? "W";
-}
-
 /* ── My projects (loose) ──────────────────────────────────────────────────── */
 
 /**
@@ -137,15 +96,9 @@ function MyProjectsSection({ projects }: { projects: RecentItem[] }) {
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
       >
         {projects.map((item) => (
-          <RecentCard key={item.project.id} item={item} />
+          <ProjectCard key={item.project.id} item={item} />
         ))}
-        <Link
-          to="/new"
-          aria-label="Create project"
-          className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
-        >
-          <DashedAddTile label="New project" />
-        </Link>
+        <AddProjectTile />
       </div>
     </section>
   );
@@ -162,60 +115,11 @@ function RecentSection({ recent }: { recent: RecentItem[] }) {
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
       >
         {recent.map((item) => (
-          <RecentCard key={item.project.id} item={item} />
+          <ProjectCard key={item.project.id} item={item} />
         ))}
-        <Link
-          to="/new"
-          aria-label="Create project"
-          className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
-        >
-          <DashedAddTile label="New project" />
-        </Link>
+        <AddProjectTile />
       </div>
     </section>
-  );
-}
-
-function RecentCard({ item }: { item: RecentItem }) {
-  const { project, screensCount } = item;
-  return (
-    <Link
-      to={`/project/${encodeURIComponent(project.id)}`}
-      className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
-    >
-      <RecentThumb project={project} />
-      <div className="flex flex-col gap-[3px] px-0.5">
-        <span className="truncate text-[13.5px] font-medium text-[var(--text)]">
-          {project.name}
-        </span>
-        <div className="text-[11.5px] text-[var(--text-muted)]">
-          {screensCount} {screensCount === 1 ? "screen" : "screens"}
-          <span className="px-1.5 text-[var(--text-faint)]">·</span>
-          updated {relativeTime(project.updatedAt)}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function RecentThumb({ project }: { project: ProjectRow }) {
-  return (
-    <div className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]">
-      <span className="absolute left-2.5 top-2.5 z-[2] rounded border border-[var(--border)] bg-black/55 px-1.5 py-[3px] text-[10px] uppercase tracking-[0.5px] text-[var(--text-muted)] backdrop-blur-md">
-        {PROJECT_TYPE_LABEL[project.type]}
-      </span>
-      {project.thumbnailDataUrl ? (
-        <img
-          src={project.thumbnailDataUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 grid place-items-center text-[var(--text-faint)]">
-          <IconGrid size={26} strokeWidth={1.3} />
-        </div>
-      )}
-    </div>
   );
 }
 
