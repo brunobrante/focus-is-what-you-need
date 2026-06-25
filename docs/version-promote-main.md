@@ -1,7 +1,9 @@
 # Promote a version to main
 
-Status: planned. Extracted from `Product.md` (Screen → Versions). When built,
-fold back into `Product.md` as `[NOW]`.
+Status: **shipped**. UI lives in `VersionSwitcher.tsx` (`onPromote` prop);
+mutation is `promoteVariantToMain` in `variants.repo.ts`, called from
+`useScreenDetail.ts` and `useComponentDetail.ts`. Fold behavior back into
+`Product.md` as `[NOW]`.
 
 ## Behavior (how it must work)
 
