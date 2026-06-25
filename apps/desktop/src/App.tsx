@@ -52,6 +52,10 @@ export default function App() {
         <Route path="references" element={<WorkspaceReferencesPage />} />
       </Route>
       <Route path="/workspace/:workspaceId/edit" element={<WorkspaceEditPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId" element={<GalleryPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/edit" element={<ProjectEditPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/screen/:screenId" element={<DetailPage />} />
+      <Route path="/workspace/:workspaceId/project/:projectId/c/:componentId" element={<DetailPage />} />
       <Route path="/new" element={<NewProjectPage />} />
       <Route path="/new-workspace" element={<NewWorkspacePage />} />
       <Route path="/new-draft" element={<NewDraftPage />} />

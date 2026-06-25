@@ -14,6 +14,7 @@ import { countScreenInstanceUsages, createScreenVersion } from "@/lib/storage/re
 import { useGallery } from "@/application/gallery/useGallery";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
+import { projectEditPath } from "@/lib/navigation/projectUrl";
 
 import {
   Crumbs,
@@ -26,7 +27,7 @@ import {
 } from "@/routes/Gallery";
 
 export function GalleryPage() {
-  const { projectId: rawProjectId } = useParams<{ projectId: string }>();
+  const { projectId: rawProjectId, workspaceId } = useParams<{ projectId: string; workspaceId?: string }>();
   const projectId = rawProjectId ? decodeURIComponent(rawProjectId) : "";
 
   const previewRef = useRef<ProjectPreviewModalHandle>(null);
@@ -63,7 +64,7 @@ export function GalleryPage() {
     handleComponentCreated,
     handleSettingsSaved,
     handleConfirmDeleteScreen,
-  } = useGallery(projectId);
+  } = useGallery(projectId, workspaceId);
 
   // Component deletion is instance-aware: if the component is linked elsewhere it
   // opens the per-instance copy/delete modal (same as Unlink), then removes the master.
@@ -107,7 +108,7 @@ export function GalleryPage() {
             componentsCount={components.length}
             referencesCount={references.length}
             onPreview={projectScreens.length > 0 && project ? () => previewRef.current?.open(project, projectScreens) : null}
-            onEdit={() => navigate(`/project/${encodeURIComponent(projectId)}/edit`)}
+            onEdit={() => navigate(projectEditPath(projectId, workspaceId))}
             editOpen={false}
           />
           <Tabs
@@ -123,6 +124,7 @@ export function GalleryPage() {
               screens={projectScreens}
               type={type}
               projectId={project?.id ?? projectId}
+              workspaceId={workspaceId}
               onNewScreen={openNewScreen}
               sections={screenSections}
               sectionById={screenSectionById}
@@ -148,6 +150,7 @@ export function GalleryPage() {
               filter={cmpFilter}
               onFilterChange={setCmpFilter}
               projectId={project?.id ?? projectId}
+              workspaceId={workspaceId}
               type={type}
               onNewComponent={openNewProjectComponent}
               canCreate={Boolean(project)}

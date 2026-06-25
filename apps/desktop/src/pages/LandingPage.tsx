@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { IconPlus, IconSearch } from "@/components/icons";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { exportLocalProjectToFigx, isLocalProject } from "@/lib/storage/localProjects";
@@ -10,10 +10,12 @@ import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import type { ProjectRow } from "@/lib/storage/schema";
 import { useLanding, relativeTime } from "@/application/landing/useLanding";
+import { projectBase, projectEditPath } from "@/lib/navigation/projectUrl";
 
 type Filter = "all" | ProjectType;
 
 export function LandingPage() {
+  const { workspaceId } = useParams<{ workspaceId?: string }>();
   const {
     activeWorkspaceId,
     query,
@@ -81,7 +83,8 @@ export function LandingPage() {
           onQueryChange={setQuery}
           filter={filter}
           onFilterChange={setFilter}
-          onRequestEdit={(project) => navigate(`/project/${encodeURIComponent(project.id)}/edit`)}
+          workspaceId={workspaceId}
+          onRequestEdit={(project) => navigate(projectEditPath(project.id, workspaceId))}
           onRequestDelete={setPendingDelete}
           onRequestExport={onRequestExport}
         />}
@@ -120,6 +123,7 @@ function ProjectsView({
   onQueryChange,
   filter,
   onFilterChange,
+  workspaceId,
   onRequestEdit,
   onRequestDelete,
   onRequestExport,
@@ -132,6 +136,7 @@ function ProjectsView({
   onQueryChange: (v: string) => void;
   filter: Filter;
   onFilterChange: (f: Filter) => void;
+  workspaceId?: string;
   onRequestEdit: (project: ProjectRow) => void;
   onRequestDelete: (project: ProjectRow) => void;
   onRequestExport: (project: ProjectRow) => void;
@@ -184,6 +189,7 @@ function ProjectsView({
             key={p.id}
             project={p}
             screensCount={screensByProject.get(p.id) ?? 0}
+            workspaceId={workspaceId}
             onRequestEdit={onRequestEdit}
             onRequestDelete={onRequestDelete}
             onRequestExport={onRequestExport}
@@ -236,19 +242,21 @@ function Segmented<T extends string>({
 function ProjectCard({
   project,
   screensCount,
+  workspaceId,
   onRequestEdit,
   onRequestDelete,
   onRequestExport,
 }: {
   project: ProjectRow;
   screensCount: number;
+  workspaceId?: string;
   onRequestEdit: (project: ProjectRow) => void;
   onRequestDelete: (project: ProjectRow) => void;
   onRequestExport: (project: ProjectRow) => void;
 }) {
   return (
     <Link
-      to={`/project/${encodeURIComponent(project.id)}`}
+      to={projectBase(project.id, workspaceId)}
       className="group flex cursor-pointer flex-col gap-2.5 text-inherit no-underline transition-transform duration-[120ms] hover:-translate-y-0.5"
     >
       <ProjectThumb project={project}>

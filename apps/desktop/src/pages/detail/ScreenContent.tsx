@@ -19,10 +19,11 @@ import type { ProjectType, ScreenVariant } from "@/lib/data/types";
 import { updateScreen } from "@/lib/storage/repos/screens.repo";
 import { useScreenDetail } from "@/application/screen-detail/useScreenDetail";
 import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
+import { projectBase } from "@/lib/navigation/projectUrl";
 import { DetailView } from "./DetailView";
 import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
-export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId: string; screenId: string }) {
+export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }: { projectId: string; screenId: string; workspaceId?: string }) {
   const screenId = decodeURIComponent(rawScreenId);
   const pid = decodeURIComponent(projectId);
 
@@ -57,10 +58,10 @@ export function ScreenContent({ projectId, screenId: rawScreenId }: { projectId:
       type={type}
       breadcrumb={
         <DetailBreadcrumb
-          backHref={`/project/${encodeURIComponent(project?.id ?? pid)}`}
+          backHref={projectBase(project?.id ?? pid, workspaceId)}
           trail={[
             { label: back.label, href: back.href },
-            { label: projectName, href: `/project/${encodeURIComponent(project?.id ?? pid)}` },
+            { label: projectName, href: projectBase(project?.id ?? pid, workspaceId) },
           ]}
           current={screenName}
           type={type}

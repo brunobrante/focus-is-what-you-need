@@ -7,6 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { projectBase, screenPath, componentPath } from "@/lib/navigation/projectUrl";
 import {
   useActiveVariants,
   useComponentsByProject,
@@ -123,7 +124,7 @@ export interface GalleryState {
   handleConfirmDeleteScreen: (strategy?: InstanceDeleteStrategy) => Promise<void>;
 }
 
-export function useGallery(projectId: string): GalleryState {
+export function useGallery(projectId: string, workspaceId?: string | null): GalleryState {
   const navigate = useNavigate();
 
   const { data: project } = useProject(projectId);
@@ -153,15 +154,15 @@ export function useGallery(projectId: string): GalleryState {
   };
 
   const handleScreenCreated = (s: ScreenRow) => {
-    navigate(`/project/${encodeURIComponent(s.projectId)}/screen/${encodeURIComponent(s.id)}`);
+    navigate(screenPath(s.projectId, s.id, workspaceId));
   };
 
   const handleComponentCreated = (r: { component: ComponentRow }) => {
-    navigate(`/project/${encodeURIComponent(r.component.projectId)}/c/${r.component.id}`);
+    navigate(componentPath(r.component.projectId ?? projectId, r.component.id, workspaceId));
   };
 
   const handleSettingsSaved = (updatedProject: ProjectRow) => {
-    navigate(`/project/${encodeURIComponent(updatedProject.id)}`, { replace: true });
+    navigate(projectBase(updatedProject.id, workspaceId), { replace: true });
   };
 
   const handleConfirmDeleteScreen = async (strategy?: InstanceDeleteStrategy) => {

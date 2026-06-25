@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
+import { screenPath, componentPath } from "@/lib/navigation/projectUrl";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
 import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 import { Modal, ModalBody, ModalHeader } from "@/components/modals/Modal";
@@ -47,6 +48,7 @@ export function ComponentsTab({
   filter,
   onFilterChange,
   projectId,
+  workspaceId,
   type,
   onNewComponent,
   canCreate,
@@ -62,6 +64,7 @@ export function ComponentsTab({
   filter: CmpKindFilter;
   onFilterChange: (f: CmpKindFilter) => void;
   projectId: string;
+  workspaceId?: string | null;
   type: ProjectType;
   onNewComponent: () => void;
   canCreate: boolean;
@@ -191,6 +194,7 @@ export function ComponentsTab({
                 variant={variant}
                 screens={screens}
                 projectId={projectId}
+                workspaceId={workspaceId}
                 type={type}
                 onRequestDelete={onRequestDelete}
                 onRequestAssignSection={helpers.onRequestAssignSection}
@@ -205,6 +209,7 @@ export function ComponentsTab({
                 variant={variant}
                 screens={screens}
                 projectId={projectId}
+                workspaceId={workspaceId}
                 type={type}
                 onRequestDelete={onRequestDelete}
                 onRequestAssignSection={helpers.onRequestAssignSection}
@@ -342,6 +347,7 @@ function ComponentCard({
   variant,
   screens,
   projectId,
+  workspaceId,
   type: _type,
   onRequestDelete,
   onRequestAssignSection,
@@ -353,6 +359,7 @@ function ComponentCard({
   variant: VariantRow | null;
   screens: ScreenRow[];
   projectId: string;
+  workspaceId?: string | null;
   type: ProjectType;
   onRequestDelete: (component: ComponentRow) => void;
   onRequestAssignSection: () => void;
@@ -361,7 +368,7 @@ function ComponentCard({
   onToggleLinkable: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
-  const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
+  const href = componentPath(projectId, component.id, workspaceId);
   const canvasHref = variant
     ? `/canvas?project=${encodeURIComponent(projectId)}&type=${_type}&variant=${variant.id}`
     : `/canvas?project=${encodeURIComponent(projectId)}&type=${_type}&component=${component.id}`;
@@ -381,7 +388,7 @@ function ComponentCard({
             display="card"
           />
         ) : null}
-        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} />
+        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} workspaceId={workspaceId} />
         <CardMenu
           actions={[
             { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
@@ -446,6 +453,7 @@ function ComponentListRow({
   variant,
   screens,
   projectId,
+  workspaceId,
   type: _type,
   onRequestDelete,
   onRequestAssignSection,
@@ -457,6 +465,7 @@ function ComponentListRow({
   variant: VariantRow | null;
   screens: ScreenRow[];
   projectId: string;
+  workspaceId?: string | null;
   type: ProjectType;
   onRequestDelete: (component: ComponentRow) => void;
   onRequestAssignSection: () => void;
@@ -465,7 +474,7 @@ function ComponentListRow({
   onToggleLinkable: (component: ComponentRow) => void;
 }) {
   const navigate = useNavigate();
-  const href = `/project/${encodeURIComponent(projectId)}/c/${component.id}`;
+  const href = componentPath(projectId, component.id, workspaceId);
   const canvasHref = variant
     ? `/canvas?project=${encodeURIComponent(projectId)}&type=${_type}&variant=${variant.id}`
     : `/canvas?project=${encodeURIComponent(projectId)}&type=${_type}&component=${component.id}`;
@@ -616,7 +625,7 @@ function ComponentListRow({
       </div>
 
       <div className="hidden shrink-0 xl:block">
-        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} inline />
+        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} workspaceId={workspaceId} inline />
       </div>
     </Link>
   );
@@ -732,11 +741,13 @@ function ComponentSourceBadge({
   component,
   screens,
   projectId,
+  workspaceId,
   inline = false,
 }: {
   component: ComponentRow;
   screens: ScreenRow[];
   projectId: string;
+  workspaceId?: string | null;
   inline?: boolean;
 }) {
   const navigate = useNavigate();
@@ -774,7 +785,7 @@ function ComponentSourceBadge({
     event.preventDefault();
     event.stopPropagation();
     setOpen(false);
-    navigate(`/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`);
+    navigate(screenPath(projectId, screen.id, workspaceId));
   };
 
   return (

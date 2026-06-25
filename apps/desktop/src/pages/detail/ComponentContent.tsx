@@ -21,10 +21,11 @@ import { useComponentDetail } from "@/application/component-detail/useComponentD
 import { useUnlinkComponent } from "@/application/components/useUnlinkComponent";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
+import { projectBase, screenPath, componentPath } from "@/lib/navigation/projectUrl";
 import { DetailView } from "./DetailView";
 import { DetailBreadcrumb } from "./DetailBreadcrumb";
 
-export function ComponentContent({ componentId }: { componentId: string }) {
+export function ComponentContent({ componentId, workspaceId }: { componentId: string; workspaceId?: string }) {
   const {
     component, project, screens, variants, activeVariant, displayVariant, screen, trail,
     children, linkedChildIds, childVariants, projectComponents, references, type, projectId,
@@ -95,12 +96,12 @@ export function ComponentContent({ componentId }: { componentId: string }) {
       type={type}
       breadcrumb={
         <DetailBreadcrumb
-          backHref={componentParentHref(projectId, trail, screen)}
+          backHref={componentParentHref(projectId, trail, screen, workspaceId)}
           trail={[
             { label: back.label, href: back.href },
-            { label: projectName, href: `/project/${encodeURIComponent(projectId)}` },
-            ...(screen ? [{ label: screen.title, href: `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}` }] : []),
-            ...trail.map((c) => ({ label: c.name, href: `/project/${encodeURIComponent(projectId)}/c/${c.id}` })),
+            { label: projectName, href: projectBase(projectId, workspaceId) },
+            ...(screen ? [{ label: screen.title, href: screenPath(projectId, screen.id, workspaceId) }] : []),
+            ...trail.map((c) => ({ label: c.name, href: componentPath(projectId, c.id, workspaceId) })),
           ]}
           current={component.name}
           type={type}
@@ -222,10 +223,10 @@ export function ComponentContent({ componentId }: { componentId: string }) {
 
 // The back chevron targets the component's immediate parent: the deepest trail
 // ancestor, else the source screen, else the project root.
-function componentParentHref(projectId: string, trail: ComponentRow[], screen: ScreenRow | null | undefined): string {
-  if (trail.length > 0) return `/project/${encodeURIComponent(projectId)}/c/${trail[trail.length - 1].id}`;
-  if (screen) return `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`;
-  return `/project/${encodeURIComponent(projectId)}`;
+function componentParentHref(projectId: string, trail: ComponentRow[], screen: ScreenRow | null | undefined, workspaceId?: string): string {
+  if (trail.length > 0) return componentPath(projectId, trail[trail.length - 1].id, workspaceId);
+  if (screen) return screenPath(projectId, screen.id, workspaceId);
+  return projectBase(projectId, workspaceId);
 }
 
 // ── Component info panel ──────────────────────────────────────────────────────

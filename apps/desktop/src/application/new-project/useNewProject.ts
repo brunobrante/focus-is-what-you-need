@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { projectBase } from "@/lib/navigation/projectUrl";
 import type { ProjectType } from "@/lib/data/types";
 import { createProject } from "@/lib/storage/repos/projects.repo";
 import { addProjectToWorkspace } from "@/lib/storage/repos/workspace.repo";
@@ -187,7 +188,7 @@ export function useNewProject(): NewProjectState {
           initialTokens: buildLinkedTokens(parent.id, parent.tokens, sharedIds),
         });
       }
-      navigate(`/project/${encodeURIComponent(project.id)}`);
+      navigate(projectBase(project.id, targetWorkspaceId ?? undefined));
     } finally {
       setCreating(false);
     }

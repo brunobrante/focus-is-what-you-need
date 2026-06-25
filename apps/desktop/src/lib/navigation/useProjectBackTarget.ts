@@ -12,9 +12,10 @@ export function useProjectBackTarget(
   projectId: string | null | undefined,
 ): ProjectBackTarget {
   const { data: workspaces } = useWorkspaces();
-  const inWorkspace =
-    !!projectId && workspaces.some((workspace) => workspace.projectIds.includes(projectId));
-  return inWorkspace
-    ? { href: "/projects", label: "Projects" }
+  const workspace = projectId
+    ? (workspaces.find((ws) => ws.projectIds.includes(projectId)) ?? null)
+    : null;
+  return workspace
+    ? { href: `/workspace/${workspace.id}/projects`, label: "Projects" }
     : { href: "/", label: "Home" };
 }

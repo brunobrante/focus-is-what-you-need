@@ -7,6 +7,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
+import { screenPath } from "@/lib/navigation/projectUrl";
 import { Snapshot } from "@/components/Snapshot";
 import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
@@ -32,6 +33,7 @@ export function ScreensTab({
   screens,
   type,
   projectId,
+  workspaceId,
   onNewScreen,
   sections,
   sectionById,
@@ -43,6 +45,7 @@ export function ScreensTab({
   screens: ScreenRow[];
   type: ProjectType;
   projectId: string;
+  workspaceId?: string | null;
   onNewScreen: () => void;
   sections: SectionState[];
   sectionById: Record<string, string | null>;
@@ -93,6 +96,7 @@ export function ScreensTab({
           }
           type={type}
           projectId={projectId}
+          workspaceId={workspaceId}
           onNewScreen={onNewScreen}
           sections={sections}
           sectionById={sectionById}
@@ -205,6 +209,7 @@ function ScreensGrid({
   screens,
   type,
   projectId,
+  workspaceId,
   onNewScreen,
   sections,
   sectionById,
@@ -217,6 +222,7 @@ function ScreensGrid({
   screens: ScreenRow[];
   type: ProjectType;
   projectId: string;
+  workspaceId?: string | null;
   onNewScreen: () => void;
   sections: SectionState[];
   sectionById: Record<string, string | null>;
@@ -255,6 +261,7 @@ function ScreensGrid({
           screen={s}
           type={type}
           projectId={projectId}
+          workspaceId={workspaceId}
           onRequestDelete={onRequestDelete}
           onRequestVersion={onRequestVersion}
           onRequestAssignSection={helpers.onRequestAssignSection}
@@ -269,6 +276,7 @@ function ScreenCard({
   screen,
   type,
   projectId,
+  workspaceId,
   onRequestDelete,
   onRequestVersion,
   onRequestAssignSection,
@@ -276,12 +284,13 @@ function ScreenCard({
   screen: ScreenRow;
   type: ProjectType;
   projectId: string;
+  workspaceId?: string | null;
   onRequestDelete: (screen: ScreenRow) => void;
   onRequestVersion: (screen: ScreenRow) => void;
   onRequestAssignSection: () => void;
 }) {
   const navigate = useNavigate();
-  const href = `/project/${encodeURIComponent(projectId)}/screen/${encodeURIComponent(screen.id)}`;
+  const href = screenPath(projectId, screen.id, workspaceId);
   const canvasHref = `/canvas?project=${encodeURIComponent(projectId)}&type=${type}&screen=${screen.id}`;
   return (
     <Link
