@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { IconFrame, IconPlus } from "@/components/icons";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { AddProjectTile, ProjectCard } from "@/components/home/HomeCards";
-import { useHome, type RecentItem } from "@/application/home/useHome";
-import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
-import { deleteProject } from "@/lib/storage/repos/projects.repo";
+import { useHome } from "@/application/home/useHome";
 
 /**
  * ProjectsPage (`/my-projects`) — individual projects that belong to no
@@ -16,13 +13,6 @@ import { deleteProject } from "@/lib/storage/repos/projects.repo";
  */
 export function ProjectsPage() {
   const { looseProjects } = useHome();
-  const [pendingDelete, setPendingDelete] = useState<RecentItem | null>(null);
-
-  async function handleConfirmDelete() {
-    if (!pendingDelete) return;
-    await deleteProject(pendingDelete.project.id);
-    setPendingDelete(null);
-  }
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-12">
@@ -52,24 +42,11 @@ export function ProjectsPage() {
           style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
         >
           {looseProjects.map((item) => (
-            <ProjectCard key={item.project.id} item={item} onDelete={() => setPendingDelete(item)} />
+            <ProjectCard key={item.project.id} item={item} />
           ))}
           <AddProjectTile />
         </div>
       )}
-
-      <ConfirmActionModal
-        open={Boolean(pendingDelete)}
-        title="Delete project?"
-        message={
-          pendingDelete
-            ? `"${pendingDelete.project.name}" and its ${pendingDelete.screensCount} ${pendingDelete.screensCount === 1 ? "screen" : "screens"} will be permanently deleted.`
-            : ""
-        }
-        confirmLabel="Delete project"
-        onClose={() => setPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
-      />
     </div>
   );
 }

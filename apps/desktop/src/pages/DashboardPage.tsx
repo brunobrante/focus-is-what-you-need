@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -7,8 +6,6 @@ import {
   WorkspaceTile,
 } from "@/components/home/HomeCards";
 import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home/useHome";
-import { ConfirmActionModal } from "@/components/modals/ConfirmActionModal";
-import { deleteProject } from "@/lib/storage/repos/projects.repo";
 
 /**
  * Dashboard — the Home shell's index page. It surfaces the user's workspaces (as
@@ -22,18 +19,11 @@ import { deleteProject } from "@/lib/storage/repos/projects.repo";
 export function DashboardPage() {
   const { workspaces, recent, looseProjects, activeWorkspace, setActiveWorkspaceId } = useHome();
   const navigate = useNavigate();
-  const [pendingDelete, setPendingDelete] = useState<RecentItem | null>(null);
 
   const openWorkspace = (id: string) => {
     setActiveWorkspaceId(id);
     navigate("/projects");
   };
-
-  async function handleConfirmDelete() {
-    if (!pendingDelete) return;
-    await deleteProject(pendingDelete.project.id);
-    setPendingDelete(null);
-  }
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-7 pb-20 pt-12">
@@ -48,22 +38,9 @@ export function DashboardPage() {
 
       <WorkspacesSection workspaces={workspaces} onOpenWorkspace={openWorkspace} />
 
-      <MyProjectsSection projects={looseProjects} onDeleteProject={setPendingDelete} />
+      <MyProjectsSection projects={looseProjects} />
 
-      <RecentSection recent={recent} onDeleteProject={setPendingDelete} />
-
-      <ConfirmActionModal
-        open={Boolean(pendingDelete)}
-        title="Delete project?"
-        message={
-          pendingDelete
-            ? `"${pendingDelete.project.name}" and its ${pendingDelete.screensCount} ${pendingDelete.screensCount === 1 ? "screen" : "screens"} will be permanently deleted.`
-            : ""
-        }
-        confirmLabel="Delete project"
-        onClose={() => setPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
-      />
+      <RecentSection recent={recent} />
     </div>
   );
 }
@@ -110,13 +87,7 @@ function WorkspacesSection({
  * Projects that belong to no workspace — created loose from Home. They live here
  * (not in any workspace browser); the add tile creates more loose projects.
  */
-function MyProjectsSection({
-  projects,
-  onDeleteProject,
-}: {
-  projects: RecentItem[];
-  onDeleteProject: (item: RecentItem) => void;
-}) {
+function MyProjectsSection({ projects }: { projects: RecentItem[] }) {
   return (
     <section className="mb-11">
       <SectionHeading title="My Projects" />
@@ -125,7 +96,7 @@ function MyProjectsSection({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
       >
         {projects.map((item) => (
-          <ProjectCard key={item.project.id} item={item} onDelete={() => onDeleteProject(item)} />
+          <ProjectCard key={item.project.id} item={item} />
         ))}
         <AddProjectTile />
       </div>
@@ -135,13 +106,7 @@ function MyProjectsSection({
 
 /* ── Recent items ─────────────────────────────────────────────────────────── */
 
-function RecentSection({
-  recent,
-  onDeleteProject,
-}: {
-  recent: RecentItem[];
-  onDeleteProject: (item: RecentItem) => void;
-}) {
+function RecentSection({ recent }: { recent: RecentItem[] }) {
   return (
     <section>
       <SectionHeading title="Recent Items" />
@@ -150,7 +115,7 @@ function RecentSection({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
       >
         {recent.map((item) => (
-          <ProjectCard key={item.project.id} item={item} onDelete={() => onDeleteProject(item)} />
+          <ProjectCard key={item.project.id} item={item} />
         ))}
         <AddProjectTile />
       </div>
