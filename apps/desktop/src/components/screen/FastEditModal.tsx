@@ -8,11 +8,14 @@ import { IconChevronDown, IconClose, IconComponentLink, IconOpenCanvas, IconSpin
 import type { ComponentRow, ScreenRow, SceneRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
+import { saveScene } from "@/application/scenes/saveScene";
 import { peekTable, TABLES } from "@/lib/storage/store";
 import {
   buildMasterResolver,
   htmlCanvasDocumentFromJSON,
   resolveInstances,
+  serializeHtmlCanvasDocument,
+  type HtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
 import { buildSceneFromHtmlCanvas } from "@/lib/canvas/buildSceneFromHtmlCanvas";
 import {
@@ -63,12 +66,20 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const pickerTriggerRef = useRef<HTMLButtonElement>(null);
     const pickerDropRef = useRef<HTMLDivElement>(null);
 
+    // Persistence: edits are mapped back onto the original (unresolved) document
+    // and saved to the owner variant's scene. The Scene shown is built from the
+    // instance-resolved doc, so it is never the thing we serialize.
+    const docRef = useRef<HtmlCanvasDocument | null>(null);
+    const ownerIdRef = useRef<string | null>(null);
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const dirtyRef = useRef(false);
+
     useImperativeHandle(ref, () => ({
       open: (nextConfig) => {
         setConfig(nextConfig);
         setIsOpen(true);
       },
-      close: () => setIsOpen(false),
+      close: () => { flushSave(); setIsOpen(false); },
     }));
 
     // A screen's scene lives on its active variant, so both modes read a variant scene.
@@ -78,6 +89,28 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
         ? (config.variantId ?? config.screen?.activeVariantId ?? null)
         : (config?.variant?.id ?? null);
 
+    useEffect(() => { ownerIdRef.current = ownerId; }, [ownerId]);
+
+    // Persist the in-memory document for the owner captured at edit time. Never
+    // awaited — saveScene is fire-and-forget (storage guardrail).
+    const flushSave = () => {
+      if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+      if (!dirtyRef.current) return;
+      dirtyRef.current = false;
+      const doc = docRef.current;
+      const id = ownerIdRef.current;
+      if (!doc || !id) return;
+      saveScene({ ownerType, ownerId: id, graphJSON: serializeHtmlCanvasDocument(doc) });
+    };
+
+    const scheduleSave = () => {
+      dirtyRef.current = true;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(flushSave, 300);
+    };
+
+    const close = () => { flushSave(); setIsOpen(false); };
+
     useEffect(() => {
       if (!isOpen || !ownerId) { setScene(null); return; }
       let cancelled = false;
@@ -85,6 +118,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
         if (cancelled || !row) return;
         const doc = htmlCanvasDocumentFromJSON(row.graphJSON);
         if (!doc) return;
+        // Keep the original (unresolved) doc as the source we persist edits into.
+        docRef.current = doc;
         // Resolve linked instances so their master content shows; buildScene marks
         // those subtrees as `linked` (read-only) so they can't be edited here.
         const resolved = resolveInstances(
@@ -94,7 +129,8 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
         const built = buildSceneFromHtmlCanvas(resolved);
         if (!cancelled && built) setScene(built);
       });
-      return () => { cancelled = true; };
+      // Persist any pending edits before the owner switches or the modal closes.
+      return () => { cancelled = true; flushSave(); };
     }, [isOpen, ownerId, ownerType]);
 
     useEffect(() => {
@@ -124,12 +160,14 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const updateSelected = (patch: Partial<SceneNode>) => {
       if (!selectedNode || selectedNode.linked) return; // linked instances are read-only
       setScene((prev) => (prev ? updateNodeInScene(prev, selectedNode.id, patch) : prev));
+      applyPatchToDoc(docRef.current, selectedNode.id, patch);
+      scheduleSave();
     };
 
     if (!config) return null;
 
     return (
-      <Modal open={isOpen} onClose={() => setIsOpen(false)} ariaLabel="FastEdit" size="wide">
+      <Modal open={isOpen} onClose={close} ariaLabel="FastEdit" size="wide">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.07)] px-5 py-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="text-[13px] font-semibold tracking-[-0.1px] text-[var(--text)]">FastEdit</span>
@@ -149,7 +187,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
             <button
               type="button"
               aria-label="Close"
-              onClick={() => setIsOpen(false)}
+              onClick={close}
               className="grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[var(--text-faint)] transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text)]"
             >
               <IconClose size={10} strokeWidth={2.2} />
@@ -614,6 +652,24 @@ function ColorInput({ value, onChange }: { value: string; onChange: (value: stri
       />
     </div>
   );
+}
+
+// Map a Scene-node edit (the only fields FastEdit exposes) back onto the matching
+// node in the unresolved document, mutating our private parsed copy in place.
+function applyPatchToDoc(
+  doc: HtmlCanvasDocument | null,
+  nodeId: string,
+  patch: Partial<SceneNode>,
+): void {
+  if (!doc) return;
+  const node = doc.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+  if (patch.text !== undefined) node.text = patch.text;
+  if (patch.textColor !== undefined) node.style.color = patch.textColor;
+  if (patch.background !== undefined) node.style.background = patch.background;
+  if (patch.borderColor !== undefined) node.style.borderColor = patch.borderColor;
+  if (patch.borderWidth !== undefined) node.style.borderWidth = patch.borderWidth;
+  if (patch.radius !== undefined) node.style.borderRadius = patch.radius;
 }
 
 function normalizeHex(value: string): string {

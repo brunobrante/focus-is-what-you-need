@@ -1234,7 +1234,7 @@ Modal for quick in-place editing of a screen or component's scene schema.
 - Left: `SceneCanvasInspector` rendering the scene — clicking a node selects it (blue outline); hovering shows an orange highlight
 - Right: sidebar showing the selected node's properties (name, background, text color, font size, etc.)
 
-**Behavior**: sidebar edits update the scene immediately and the canvas re-renders in real time. No draft system — all edits are applied directly to the scene state held by the modal.
+**Behavior**: sidebar edits update the scene immediately and the canvas re-renders in real time. There is no separate draft — each edit is applied to the live scene and **persisted to the owner variant's scene** (debounced, fire-and-forget via `saveScene`; pending edits are flushed on close). Edits are mapped back onto the original unresolved document, so linked subcomponents (resolved read-only for display) are never rewritten.
 
 ---
 
