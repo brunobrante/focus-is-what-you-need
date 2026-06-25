@@ -12,6 +12,8 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 |-------|------|---------|
 | _(layout)_ | HomeLayout | The Home shell — one header + sidebar + footer, declared once. `/`, `/drafts`, `/references`, and `/settings` nest under it and render through its `<Outlet />` (no chrome is copied per page) |
 | `/` | DashboardPage | Home shell index — workspaces, loose projects, recent items |
+| `/workspaces` | WorkspacesPage | Home shell — full grid of every workspace; opening a card activates it and jumps to `/projects` |
+| `/my-projects` | ProjectsPage | Home shell — individual (loose) projects that belong to no workspace. Distinct from `/projects` (the workspace browser) |
 | `/settings` | SettingsPage | Standalone Settings inside the Home shell; reuses the same body (`AppSettingsContent`) as the global Settings modal |
 | `/projects` | LandingPage | Project browser for the active workspace |
 | `/new` | NewProjectPage | Multi-step project creation wizard. Links the project to a workspace only when launched with `?workspace=<id>` (from the workspace project browser); from Home it creates a loose, workspace-less project and skips the token-sharing step |
@@ -93,14 +95,17 @@ browser (that is the Landing Page at `/projects`).
   `/settings` page rather than opening the modal.
 
 **Sidebar** (`HomeSidebar`, hidden below `md`): a vertical list of `NavLink`s
-that highlight the active route — **Dashboard** (→ `/`), **Drafts** (→
-`/drafts`), **Local References** (→ `/references`), **Learn** (placeholder), and,
-below a divider, **Settings** (→ `/settings`). Learn is an inert placeholder
-("Coming soon") until its feature exists; the others reach real destinations.
-Each row is a 36px icon+label row that highlights on hover and when active.
+that highlight the active route — **Dashboard** (→ `/`), **Workspaces** (→
+`/workspaces`), **Projects** (→ `/my-projects`), **Drafts** (→ `/drafts`),
+**Local References** (→ `/references`), **Learn** (placeholder), and, below a
+divider, **Settings** (→ `/settings`). Learn is an inert placeholder ("Coming
+soon") until its feature exists; the others reach real destinations. Each row is
+a 36px icon+label row that highlights on hover and when active.
 
 **Dashboard content** (`DashboardPage`, the `/` index): heading "Dashboard" plus
-the three sections below.
+the three sections below. The **Workspaces** and **Projects** pages reuse the
+same cards as full-page grids (`WorkspaceTile` / `ProjectCard` from
+`HomeCards`).
 
 **Workspaces section**: a grid of light `WorkspaceTile` cards — avatar initial,
 name, an **Active** badge on the current workspace, and a project count. A card
@@ -113,9 +118,12 @@ workspace's project browser). Same card as Recent plus a dashed **New project**
 add tile (`DashedAddTile` → `/new`, which creates another loose project).
 
 **Recent Items section**: a card grid of the active workspace's projects sorted
-by last-updated (capped at 8), each a `RecentThumb` (type badge + thumbnail or
-grid glyph) above name and "{N} screens · updated {relative}". A dashed
-**New project** add tile (`DashedAddTile` → `/new`) closes the grid.
+by last-updated (capped at 8), each a `ProjectCard` — a thumbnail (type badge
+top-left + thumbnail or grid glyph) above name and "{N} screens · updated
+{relative}". When a project belongs to a workspace, the thumbnail also carries a
+top-right **workspace chip** (grid icon + workspace name, tooltip "In workspace:
+{name}") so it reads at a glance as workspace-owned vs. loose. A dashed **New
+project** add tile (`DashedAddTile` → `/new`) closes the grid.
 
 ---
 
@@ -616,6 +624,54 @@ colour. A bound colour resolves **live**: editing the workspace master token (or
 into a local copy — see System Design) updates every bound element automatically. Choosing a
 literal colour from the picker also unbinds. (Live updates while a canvas stays open rely on
 the same scenes-table reactivity as linked instances.)
+
+**Inspector → Fill** (shown for every fillable element — hidden for **line / arrow** which have
+no interior, and for **path / svg** which fill through the Vector section): a stacked **Fill**
+list (Figma's model) above Appearance. Each fill is a card with an **eye** enable toggle, a
+**type dropdown** (**Solid / Gradient / Image**, plus **Video** on the Image element),
+**move up / down** reorder, **remove**, and shared **Opacity** + **Blend mode** controls.
+`fills[0]` is the top layer. The CSS/SVG is **type-aware** (hidden from the user) and differs
+per element kind — the same fill compiles to a `background-image` layer on a box, a
+`background-clip: text` paint on text, and an `<img>` / `<video>` / repeating background on the
+Image element:
+- **Solid** — a colour via the Fill color field, which accepts any CSS literal (`#RRGGBBAA`,
+  `rgb()`, **Display P3** `color(display-p3 …)`, **OKLCH** `oklch(…)`), carries a **native
+  eyedropper** (web `EyeDropper`, falling back to the macOS `NSColorSampler` in the WKWebView),
+  and can **bind to a System Design color token** (link/unlink) like before.
+- **Gradient** — **linear / radial / conic**, angle, an editable **stop list** (colour +
+  position, add/remove), and an **interpolation** space (**sRGB (Average)** default, **OKLAB**,
+  **OKLCH**, **Nearest hue**). A gradient can **bind to a System Design gradient token**.
+- **Image** — a URL and a **fit** mode: **Fill** (cover) / **Fit** (contain) / **Crop** /
+  **Tile**. Tile swaps the render target to a repeating background (an `<img>` can never tile);
+  an exact **tile gap** renders an inline SVG `<pattern>`. Plus **position**, **scale**, and
+  **image adjustments** (Exposure / Contrast / Saturation via CSS `filter`; Temperature / Tint /
+  Highlights / Shadows via an inline SVG filter chain).
+- **Video** (Image element only) — a `<video autoplay loop muted playsinline>` behind content.
+
+Inserting an Image still defaults to **Fill (cover)**; new gradients default to **sRGB**. A
+single plain solid (or a single plain image on the Image element) is stored as the simple
+`background` / `src` it always was — `fills` only materializes once a fill becomes non-trivial
+(gradient/image/video, a second fill, a per-fill blend/opacity), and the renderer composites
+from it then. *Stacked-image per-layer opacity is best-effort (CSS has no per-layer image
+opacity); image-token binding and `path` SVG paint-servers are deferred.*
+
+**Inspector → Border / Stroke** (below Appearance): a **type-aware** panel whose header and
+controls follow the selected element — paper.design's CSS-honest, per-type naming, with one
+real CSS property behind each name:
+- **Box** (rect / wrapper / image / a div with children) → a **Border** section: **Width**,
+  **Color** (binds to a System Design color token like Fill), **Style** (**solid / dashed /
+  dotted / double**), and **Align** (**Inside** = CSS `border`; **Outside** = CSS `outline`
+  hugging the edge — keeps dashes and follows the corner radius). *Center alignment, per-side
+  widths, and a separate Outline-offset control are deferred (they need an SVG render target).*
+- **Text** → an **Underline** section (on/off switch, then **Style** solid/double/dotted/
+  dashed/wavy, **Color**, **Thickness**, **Offset** → the `text-decoration-*` family) and a
+  **Text stroke** section (**Width**, **Color**, and a **Fill** toggle **Above / Below** =
+  `paint-order`, mapping to `-webkit-text-stroke`; visible width is ~half the set value on
+  WebKit). Underline and text-stroke colors bind to tokens.
+- **Vector** (path / svg) → a **Stroke** section: **Color** (token-bindable), **Width**,
+  **Opacity**, **Cap** (butt/round/square), **Join** (miter/round/bevel), and **Dash** (e.g.
+  `4 2`), painted directly on the `<path>`. *clip-path shapes (polygon / star / arrow) can't
+  carry a CSS border yet — that promotion to SVG is deferred.*
 
 **Inspector → Effects** (shown for every element type): a single unified **Effects** list
 (Figma's model) below Appearance. It starts empty with a one-line hint and an **Add effect**

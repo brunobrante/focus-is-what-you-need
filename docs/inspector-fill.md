@@ -1,11 +1,47 @@
 # Inspector — Fill (Solid, Gradient, Image, Pattern, Video)
 
-Status: planned. Inspector spec derived from **paper.design** (Solid / Gradient / Image
-fills) and **Figma** (adds Pattern, Video, multiple stacked fills, per-fill blend mode,
-image adjustments, wide-gamut picker), re-grounded for this product's **DOM-native**
-canvas and verified against WebKit/Safari support (this app runs in a Tauri
-**WKWebView**, not Chromium). When built, fold the shipped behavior into `Product.md`
-as `[NOW]` and trim this entry. One doc for the **Fill** panel group.
+Status: **v1 shipped** — Solid / Gradient / Image / Video, multiple stacked fills with
+per-fill blend + opacity, image adjustments, wide-gamut P3/OKLCH, gradient interpolation
+spaces, exact-gap tile patterns, and a native macOS eyedropper. The UX lives in
+[`UX.md`](./UX.md) ("Inspector → Fill"). Inspector spec derived from **paper.design**
+(Solid / Gradient / Image fills) and **Figma** (adds Pattern, Video, stacked fills,
+per-fill blend, image adjustments, wide-gamut picker), re-grounded for this product's
+**DOM-native** canvas and verified against WebKit/Safari support (this app runs in a Tauri
+**WKWebView**, not Chromium). One doc for the **Fill** panel group.
+
+**What shipped (v1):**
+- Data: `Fill` union (solid/gradient/image/video) + `ElementStyles.fills?: Fill[]` in
+  `src/domain/canvas/fill.ts`. Additive/optional — a single plain solid (or a single plain
+  image on the Image element) stays the simple `background` / `src`; `fills` only
+  materializes for non-trivial fills. Round-trips through `HtmlCanvasStyle.fills` via
+  `styleFromElement` / `stylesFromHtmlNode` (no version bump, like Effects).
+- Compile: pure `src/domain/canvas/fillCompile.ts` (`compileFills`, `fillTargetForType`,
+  `gradientToCss`, `adjustmentsToFilter`) — type-aware box/text/image targets, comma-stacked
+  `background-image` layers + `background-blend-mode`, `color-mix` opacity baking, the
+  img↔background-div↔`<video>` dual render path, and SVG def descriptors (filters/patterns).
+- Render: `ElementRenderer` weaves the compiled fill into every box/text/image/icon branch;
+  `src/canvas/stage/FillDefs.tsx` inlines the SVG `<filter>` (temp/tint/highlights/shadows)
+  and exact-gap `<pattern>` overlays.
+- UI: `src/canvas/shell/inspector/FillSection.tsx` (stacked cards, type switch, gradient
+  stop editor, image fit/adjustments, video) + `FillColorField.tsx` (CSS-literal color
+  field accepting P3/OKLCH, native eyedropper, token binding).
+- Eyedropper: web `EyeDropper` with a native macOS `NSColorSampler` Tauri fallback
+  (`src-tauri/src/eyedropper.rs` → `pick_screen_color`, bridged by
+  `src/infrastructure/eyedropper.ts`).
+
+**Deferred:** SVG paint-servers for `path`/`svg` elements (they fill via the Vector
+section; star/ellipse/polygon take fills as clipped-div backgrounds); image-token binding
+(`resolveTokenRef` returns null for images today); true per-layer image/video opacity (CSS
+has no per-background-layer image opacity — baked for solid/gradient, best-effort for
+images); an HSV/gamut slider picker UI (the color field is typeable + native swatch). The
+Safari-16.2 `in <space>` gradients and `color-mix` opacity assume a modern WKWebView (no
+old-WebKit fallback layer is emitted). The macOS eyedropper objc2 bindings were written but
+not `cargo check`ed on this Linux host — a binding-name rename may be needed on a real Mac.
+
+---
+
+## Original spec (for reference)
+
 
 ## The merge (read first)
 
@@ -17,7 +53,7 @@ This product takes the **superset** — but renders it as honest CSS/SVG, type-a
 
 **Figma note honored:** *lines and arrows take no fill* (open shapes have no interior).
 Hide/disable the Fill panel for `line`/`arrow` types — they are styled only via
-[`inspector-border-stroke.md`](./inspector-border-stroke.md).
+[`inspector-border-stroke.md`](./planned/inspector-border-stroke.md).
 
 ## The user's adendo — Image element default + Pattern (important)
 
@@ -200,13 +236,13 @@ thread and return hex/sRGB to the webview.
   (linkable/detach). `backgroundRef` already models a color-token binding today.
 - **References → image/pattern fills:** an image or a **stack piece** from References
   can become an image/pattern fill (the Builder produces stacks). Cross-link
-  [`builder-future.md`](./builder-future.md).
+  [`builder-future.md`](./planned/builder-future.md).
 - **Blend overlap:** per-fill blend is `background-blend-mode` (within element); the
   element-vs-backdrop blend is `mix-blend-mode` in
-  [`inspector-appearance.md`](./inspector-appearance.md). Keep the two distinct in UI.
+  [`inspector-appearance.md`](./planned/inspector-appearance.md). Keep the two distinct in UI.
 - **Render-target switching:** Pattern/Tile and SVG-shape fills switch the element's
   render (img ↔ div ↔ inline SVG) — same theme as Appearance/Border/Effects and the
-  shipped vector editing ([`UX.md`](../UX.md), "Vector editing").
+  shipped vector editing ([`UX.md`](./UX.md), "Vector editing").
 
 ## Respecting the laws
 
@@ -220,7 +256,7 @@ thread and return hex/sRGB to the webview.
 ## Not in scope (here)
 
 - **Stroke/border** color (shares the color picker but is its own capability —
-  [`inspector-border-stroke.md`](./inspector-border-stroke.md)).
+  [`inspector-border-stroke.md`](./planned/inspector-border-stroke.md)).
 - **AI image tools** ("Make an image", background remove, upscale) — those are the
   Builder's per-cut tools (`Product.md` → Builder / AI tools); fill just consumes the
   result.

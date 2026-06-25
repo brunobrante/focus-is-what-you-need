@@ -156,7 +156,8 @@
   }
 }
 
-.image-element img {
+.image-element img,
+.image-element video {
   display: block;
   width: 100%;
   height: 100%;

@@ -162,6 +162,16 @@ export function Inspector({
     commitDocument(updateElementStyles(document, node.id, styles));
   };
 
+  // The Fill panel can change the style (`fills` / `background`) AND the image
+  // `src` together; commit both in ONE document so the second mutation doesn't
+  // overwrite the first (both read the same snapshot).
+  const commitFill = (styles: Partial<ElementStyles>, src?: string) => {
+    if (!document || !node) return;
+    let next = updateElementStyles(document, node.id, styles);
+    if (src !== undefined) next = updateElementImageSource(next, node.id, src);
+    commitDocument(next);
+  };
+
   const commitSizing = (sizing: ElementSizing) => {
     if (!document || !node) return;
     commitDocument(setTextElementSizing(document, node.id, sizing));
@@ -313,10 +323,10 @@ export function Inspector({
             document={document}
             onUpdateName={(name) => commitDocument(renameElement(document, node.id, name))}
             onUpdateText={(text) => commitDocument(updateElementText(document, node.id, text))}
-            onUpdateImageSource={(src) => commitDocument(updateElementImageSource(document, node.id, src))}
             onUpdateGeometry={(patch) => commitDocument(updateElementGeometry(document, node.id, patch))}
             onUpdateRotation={(rotation) => commitDocument(updateElementRotation(document, node.id, rotation))}
             onUpdateStyle={commitStyle}
+            onUpdateFill={commitFill}
             onUpdateSizing={commitSizing}
             onEditPath={onEditPath}
             onFlattenToPath={onFlattenToPath}

@@ -1,5 +1,6 @@
 import type { Box } from "@/domain/canvas/geometry";
 import type { Effect } from "@/domain/canvas/types";
+import type { Fill } from "@/domain/canvas/fill";
 
 export const HTML_CANVAS_FORMAT = "html-css-canvas";
 export const HTML_CANVAS_VERSION = 1;
@@ -45,11 +46,27 @@ export type HtmlCanvasStyle = {
   opacity: number;
   borderColor: string;
   borderWidth: number;
-  borderStyle: "solid" | "dashed" | "dotted" | "none";
+  borderStyle: "solid" | "dashed" | "dotted" | "double" | "none";
   borderRadius: number;
+  /** Inspector → Border/Stroke panel. Optional + additive; absent on legacy scenes. */
+  borderAlign?: "inside" | "outside";
+  // Text stroke + underline (text nodes only). Optional + additive.
+  textStrokeWidth?: number;
+  textStrokeColor?: string;
+  textStrokeColorRef?: string;
+  textStrokePaintOrder?: "over" | "under";
+  underline?: boolean;
+  underlineStyle?: "solid" | "double" | "dotted" | "dashed" | "wavy";
+  underlineColor?: string;
+  underlineColorRef?: string;
+  underlineThickness?: number;
+  underlineOffset?: number;
   shadow: string;
   /** Inspector → Effects panel. Optional + additive; absent on legacy scenes. */
   effects?: Effect[];
+  /** Inspector → Fill panel — the typed, stackable fill list. Optional + additive;
+   *  absent means the simple `background` above is the fill. See domain/canvas/fill.ts. */
+  fills?: Fill[];
   display: "block" | "flex" | "grid";
   flexDirection: "row" | "column";
   align: "start" | "center" | "end" | "stretch";

@@ -4,6 +4,8 @@
 // these from `@/canvas/engine/types` and `@/canvas/tools`, so existing canvas
 // call sites are unchanged.
 
+import type { Fill } from "./fill";
+
 export type Tool =
   | "select"
   | "hand"
@@ -76,6 +78,12 @@ export type Effect = {
 
 export type ElementStyles = {
   background?: string;
+  // Inspector → Fill panel. The typed, stackable fill list (solid/gradient/
+  // image/video). Optional + additive: absent means the simple `background` /
+  // `backgroundRef` solid below IS the fill (today's behavior). When present it
+  // is the COMPLETE fill description and the renderer composites from it; see
+  // `domain/canvas/fill.ts` and `fillCompile.ts`.
+  fills?: Fill[];
   color?: string;
   fontFamily?: string;
   fontSize?: number;
@@ -84,6 +92,12 @@ export type ElementStyles = {
   borderRadius?: number;
   borderWidth?: number;
   borderColor?: string;
+  // Box border (Inspector → Border/Stroke panel). `borderStyle` maps to CSS
+  // border-style; `borderAlign` chooses the mechanism: Inside = `border`,
+  // Outside = `outline` (Center is deferred — it needs an SVG render target;
+  // see docs/inspector-border-stroke.md).
+  borderStyle?: "solid" | "dashed" | "dotted" | "double";
+  borderAlign?: "inside" | "outside";
   // System Design token bindings ($$ref, e.g. "colors:c-primary"). When set, the
   // renderer resolves the LIVE token value (reflecting the workspace master, or a
   // detached local copy); the matching string field above is the fallback. Kept
@@ -102,6 +116,20 @@ export type ElementStyles = {
   padding?: number;
   overflow?: "visible" | "hidden";
   objectFit?: "fill" | "contain" | "cover" | "none" | "scale-down";
+  // ── Text stroke & underline (Inspector → Border/Stroke panel; text only) ──
+  // Text stroke is `-webkit-text-stroke` (fixed-center; ~half the set width is
+  // visible) plus `paint-order` for stroke above/below the fill. Underline maps
+  // to the `text-decoration-*` family. See docs/inspector-border-stroke.md.
+  textStrokeWidth?: number; // px
+  textStrokeColor?: string;
+  textStrokeColorRef?: string; // design-token ref, like borderColorRef
+  textStrokePaintOrder?: "over" | "under"; // "under" = clean outline (default)
+  underline?: boolean;
+  underlineStyle?: "solid" | "double" | "dotted" | "dashed" | "wavy";
+  underlineColor?: string;
+  underlineColorRef?: string;
+  underlineThickness?: number; // px
+  underlineOffset?: number; // px
   // ── Vector semantics (path/svg elements only; ignored by every other type) ──
   // Cheap in SVG, high value — Figma/paper.design expose all of these.
   fill?: string; // path fill ("none" allowed); falls back to `background`

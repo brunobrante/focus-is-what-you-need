@@ -2,13 +2,18 @@ import { useMemo } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
-import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType } from "@/canvas/engine/types";
+import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType, Fill } from "@/canvas/engine/types";
 import { effectTargetForType } from "@/domain/canvas/effects";
+import { borderTargetForType } from "@/domain/canvas/border";
+import { fillTargetForType } from "@/domain/canvas/fillCompile";
+import { normalizeFills, fillsToWritePatch } from "@/domain/canvas/fill";
+import { BorderSection } from "./BorderSection";
 import { EffectsSection } from "./EffectsSection";
+import { FillSection, type GradientTokenOption } from "./FillSection";
 import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
-import type { ColorToken } from "@/domain/system-design/types";
+import type { ColorToken, GradientToken } from "@/domain/system-design/types";
 import {
   clamp,
   InsColor,
@@ -28,10 +33,12 @@ type ElementTabProps = {
   document: CanvasDocument;
   onUpdateName: (name: string) => void;
   onUpdateText: (text: string) => void;
-  onUpdateImageSource: (src: string) => void;
   onUpdateGeometry: (patch: Partial<{ x: number; y: number; width: number; height: number }>) => void;
   onUpdateRotation: (rotation: number) => void;
   onUpdateStyle: (style: Partial<ElementStyles>) => void;
+  /** Commit a Fill-panel change: a style patch plus an optional image `src`, in
+   *  one document (so the two don't overwrite each other). */
+  onUpdateFill: (style: Partial<ElementStyles>, src?: string) => void;
   onUpdateSizing: (sizing: ElementSizing) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
@@ -67,10 +74,10 @@ export function ElementTab({
   document,
   onUpdateName,
   onUpdateText,
-  onUpdateImageSource,
   onUpdateGeometry,
   onUpdateRotation,
   onUpdateStyle,
+  onUpdateFill,
   onUpdateSizing,
   onToggleLocked,
   onToggleVisible,
@@ -82,7 +89,6 @@ export function ElementTab({
 }: ElementTabProps) {
   const isVector = node.type === "path" || node.type === "svg";
   const fillOpacity = Math.round((node.styles.fillOpacity ?? 1) * 100);
-  const strokeOpacity = Math.round((node.styles.strokeOpacity ?? 1) * 100);
   const rect = getAbsoluteRect(document, node.id);
   const parentSize = getParentSize(document, node.id);
   const opacity = Math.round((node.styles.opacity ?? 1) * 100);
@@ -95,6 +101,32 @@ export function ElementTab({
       }),
     [resolvedDesign],
   );
+  const gradientTokens = useMemo<GradientTokenOption[]>(
+    () =>
+      (resolvedDesign?.gradients.tokens ?? []).map((sourced) => {
+        const token = sourced.token as GradientToken;
+        return {
+          id: token.id,
+          name: token.name,
+          css: `linear-gradient(${token.angle}deg, ${token.from}, ${token.to})`,
+        };
+      }),
+    [resolvedDesign],
+  );
+  const fillTarget = fillTargetForType(node.type);
+  // The Fill panel edits a normalized Fill[]; we translate it back to the stored
+  // shape (collapsing the trivial solid/image cases to `background` / `src`).
+  const handleFillsChange = (next: Fill[]) => {
+    const patch = fillsToWritePatch(next, node.type);
+    const stylePatch: Partial<ElementStyles> = {
+      fills: patch.fills,
+      background: patch.background,
+      backgroundRef: patch.backgroundRef,
+    };
+    if (patch.objectFit !== undefined) stylePatch.objectFit = patch.objectFit as ElementStyles["objectFit"];
+    // Style + image src commit together in one document (see Inspector.commitFill).
+    onUpdateFill(stylePatch, patch.src);
+  };
   const def = getElementDefinition(node.type).capabilities;
   const c = def.constraints;
   const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? w);
@@ -231,16 +263,25 @@ export function ElementTab({
         </InsRow>
       </InsSection>
 
+      {fillTarget ? (
+        <FillSection
+          fills={normalizeFills({
+            type: node.type,
+            fills: node.styles.fills,
+            background: node.styles.background,
+            backgroundRef: node.styles.backgroundRef,
+            src: node.src,
+            objectFit: node.styles.objectFit,
+          })}
+          target={fillTarget}
+          tokens={colorTokens}
+          gradientTokens={gradientTokens}
+          locked={locked}
+          onChange={handleFillsChange}
+        />
+      ) : null}
+
       <InsSection title="Appearance" disabled={locked}>
-        <InsRow label="Fill">
-          <InsColor
-            value={node.styles.background ?? "#FFFFFF"}
-            onChange={(background) => onUpdateStyle({ background, backgroundRef: undefined })}
-            tokens={colorTokens}
-            boundRef={node.styles.backgroundRef}
-            onBind={(backgroundRef) => onUpdateStyle({ backgroundRef })}
-          />
-        </InsRow>
         <InsRow label="Opacity">
           <InsInput value={String(opacity)} onChange={(value) => updateNumber(value, (next) => onUpdateStyle({ opacity: clamp(next, 0, 100) / 100 }))} suffix="%" />
         </InsRow>
@@ -253,19 +294,15 @@ export function ElementTab({
             />
           </InsRow>
         )}
-        <InsRow label="Border">
-          <InsInput value={String(node.styles.borderWidth ?? 0)} onChange={(value) => updateNumber(value, (borderWidth) => onUpdateStyle({ borderWidth }))} suffix="px" />
-        </InsRow>
-        <InsRow label="Borda">
-          <InsColor
-            value={node.styles.borderColor ?? "#CBD5E1"}
-            onChange={(borderColor) => onUpdateStyle({ borderColor, borderColorRef: undefined })}
-            tokens={colorTokens}
-            boundRef={node.styles.borderColorRef}
-            onBind={(borderColorRef) => onUpdateStyle({ borderColorRef })}
-          />
-        </InsRow>
       </InsSection>
+
+      <BorderSection
+        styles={node.styles}
+        target={borderTargetForType(node.type)}
+        tokens={colorTokens}
+        locked={locked}
+        onChange={onUpdateStyle}
+      />
 
       <EffectsSection
         effects={node.styles.effects ?? []}
@@ -293,36 +330,6 @@ export function ElementTab({
               onChange={(value) => onUpdateStyle({ fillRule: value as ElementStyles["fillRule"] })}
               options={["nonzero", "evenodd"]}
             />
-          </InsRow>
-          <InsRow label="Stroke">
-            <InsColor
-              value={node.styles.stroke ?? "#000000"}
-              onChange={(stroke) => onUpdateStyle({ stroke })}
-              tokens={colorTokens}
-            />
-          </InsRow>
-          <InsRow label="Stroke W">
-            <InsInput value={String(node.styles.strokeWidth ?? 0)} onChange={(value) => updateNumber(value, (strokeWidth) => onUpdateStyle({ strokeWidth }))} suffix="px" />
-          </InsRow>
-          <InsRow label="Stroke opacity">
-            <InsInput value={String(strokeOpacity)} onChange={(value) => updateNumber(value, (n) => onUpdateStyle({ strokeOpacity: clamp(n, 0, 100) / 100 }))} suffix="%" />
-          </InsRow>
-          <InsRow label="Cap">
-            <InsSelect
-              value={node.styles.strokeLinecap ?? "butt"}
-              onChange={(value) => onUpdateStyle({ strokeLinecap: value as ElementStyles["strokeLinecap"] })}
-              options={["butt", "round", "square"]}
-            />
-          </InsRow>
-          <InsRow label="Join">
-            <InsSelect
-              value={node.styles.strokeLinejoin ?? "miter"}
-              onChange={(value) => onUpdateStyle({ strokeLinejoin: value as ElementStyles["strokeLinejoin"] })}
-              options={["miter", "round", "bevel"]}
-            />
-          </InsRow>
-          <InsRow label="Dash">
-            <InsInput value={node.styles.strokeDasharray ?? ""} onChange={(value) => onUpdateStyle({ strokeDasharray: value || undefined })} placeholder="4 2" />
           </InsRow>
           {node.type === "path" && onEditPath ? (
             <button
@@ -374,13 +381,6 @@ export function ElementTab({
         </InsSection>
       ) : null}
 
-      {node.type === "image" ? (
-        <InsSection title="Image" defaultOpen={false} disabled={locked}>
-          <InsRow label="URL">
-            <InsInput value={node.src ?? ""} onChange={onUpdateImageSource} placeholder="https://..." />
-          </InsRow>
-        </InsSection>
-      ) : null}
     </>
   );
 }

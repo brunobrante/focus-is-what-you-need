@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 mod db;
+mod eyedropper;
 mod models;
 
 const APP_FOLDER_NAME: &str = "focus-is-what-you-need";
@@ -978,6 +979,7 @@ pub fn run() {
             models::run_craft,
             models::run_lama,
             models::extract_colors,
+            eyedropper::pick_screen_color,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

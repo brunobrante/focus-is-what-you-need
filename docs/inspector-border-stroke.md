@@ -1,10 +1,30 @@
 # Inspector — Border / Stroke (Outline, Underline, text Stroke, shape Stroke)
 
-Status: planned. Inspector spec derived from **paper.design** (Border / Stroke /
+Status: **v1 shipped** — the type-aware Border / Stroke panel. Still planned/deferred:
+**Center** alignment, **per-side** widths/colors, a separate **Outline (offset)** control,
+exact **SVG dashes on rounded corners** / **mixed corners** (the SVG render-target promotion),
+**stroke alignment on vector shapes** (inside/outside), and **endpoint markers** for
+lines/arrows.
+
+**What shipped (v1):**
+- Data: box `borderStyle` / `borderAlign`, text `textStroke*` + `underline*` in
+  `src/domain/canvas/types.ts`. The SVG `stroke*` family already existed. Persists via
+  `HtmlCanvasStyle` round-tripped through `styleFromElement` / `stylesFromHtmlNode`
+  (additive/optional — no version bump).
+- Compile: pure `src/domain/canvas/border.ts` (`compileBorder`, `borderTargetForType`) →
+  type-aware `border` (Inside) / `outline` (Outside) / `-webkit-text-stroke` + `paint-order` /
+  `text-decoration-*`. **Outside uses `outline`, not a `box-shadow` ring** — so it keeps
+  dashes, follows the radius, and never collides with the Effects `box-shadow` list.
+- Render: `borderStyleFor()` spread into both `nodeStyle` and `detachedNodeStyle` in
+  `src/canvas/stage/ElementRenderer.tsx`; clip-path shapes suppress the CSS border (defer to SVG).
+- UI: `src/canvas/shell/inspector/BorderSection.tsx`, mounted after Appearance in
+  `ElementTab.tsx`; vector stroke controls moved here out of the Vector section. Border/stroke
+  colors bind to System Design color tokens.
+
+Inspector spec derived from **paper.design** (Border / Stroke /
 Outline / Underline) and **Figma** (one unified "Stroke" with alignment + per-side +
 dash + endpoints), re-grounded for this product's **DOM-native** canvas and verified
 against WebKit/Safari support (this app runs in a Tauri **WKWebView**, not Chromium).
-When built, fold the shipped behavior into `Product.md` as `[NOW]` and trim this entry.
 One doc for the **Border/Stroke** panel group.
 
 ## The merge (read first)

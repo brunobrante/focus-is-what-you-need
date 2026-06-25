@@ -3,6 +3,34 @@
 // re-exported here — canvas call sites keep importing them from this module.
 import type { Tool, InsertTool, ShellGridType, ElementStyles, Effect, EffectType } from "@/domain/canvas/types";
 export type { Tool, InsertTool, ShellGridType, ElementStyles, Effect, EffectType };
+import type {
+  Fill,
+  FillType,
+  FillBlendMode,
+  SolidFill,
+  GradientFill,
+  ImageFill,
+  VideoFill,
+  GradientStop,
+  GradientKind,
+  GradientInterpolation,
+  ImageFit,
+  ImageAdjustments,
+} from "@/domain/canvas/fill";
+export type {
+  Fill,
+  FillType,
+  FillBlendMode,
+  SolidFill,
+  GradientFill,
+  ImageFill,
+  VideoFill,
+  GradientStop,
+  GradientKind,
+  GradientInterpolation,
+  ImageFit,
+  ImageAdjustments,
+};
 import type { Box, Vec2 } from "@/domain/canvas/geometry";
 
 export type ElementType =

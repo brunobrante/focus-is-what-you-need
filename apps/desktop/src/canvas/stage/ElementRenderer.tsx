@@ -3,6 +3,9 @@ import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
 import { compileEffects, effectTargetForType } from "@/domain/canvas/effects";
+import { borderTargetForType, compileBorder } from "@/domain/canvas/border";
+import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
+import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
 import { resolveTokenRef } from "@/domain/system-design/resolveTokenRef";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -73,6 +76,52 @@ function effectStyle(node: ElementNode, renderScale: number, resolveRef?: RefRes
   };
 }
 
+// Compiles the element's border / stroke styles into inline-style fragments,
+// type-aware per element kind: a box gets `border` (Inside) or `outline`
+// (Outside); text gets `-webkit-text-stroke` + `paint-order` and the underline
+// `text-decoration-*` family. Vector strokes are painted by the <path> branch.
+// `clipPath` boxes (polygon/star/arrow) can't carry a CSS border — those defer
+// to an SVG render target (v2), so the border is suppressed for them.
+function borderStyleFor(
+  node: ElementNode,
+  renderScale: number,
+  clipPath: string | undefined,
+  resolveRef?: RefResolver,
+): CSSProperties {
+  const target = borderTargetForType(node.type);
+  if (clipPath && target === "box") return {};
+  const b = compileBorder(node.styles, target, renderScale, resolveRef);
+  return {
+    borderWidth: b.borderWidth,
+    borderStyle: b.borderStyle as CSSProperties["borderStyle"],
+    borderColor: b.borderColor,
+    outlineWidth: b.outlineWidth,
+    outlineStyle: b.outlineStyle as CSSProperties["outlineStyle"],
+    outlineColor: b.outlineColor,
+    outlineOffset: b.outlineOffset,
+    WebkitTextStroke: b.webkitTextStroke,
+    paintOrder: b.paintOrder as CSSProperties["paintOrder"],
+    textDecorationLine: b.textDecorationLine as CSSProperties["textDecorationLine"],
+    textDecorationStyle: b.textDecorationStyle as CSSProperties["textDecorationStyle"],
+    textDecorationColor: b.textDecorationColor,
+    textDecorationThickness: b.textDecorationThickness,
+    textUnderlineOffset: b.textUnderlineOffset,
+  };
+}
+
+// When an element carries a typed `fills` stack the compiled background longhands
+// replace the legacy `background` shorthand (clearing it so the two don't fight).
+function withFill(base: CSSProperties, compiled: CompiledFill | null): CSSProperties {
+  if (!compiled || !compiled.hasFills) return base;
+  return { ...base, background: undefined, ...compiled.style };
+}
+
+/** Chain the effect filter (already on `base`) with an image-adjustment filter. */
+function combineFilter(base: CSSProperties, extra: string | undefined): CSSProperties["filter"] {
+  const existing = typeof base.filter === "string" ? base.filter : undefined;
+  return [existing, extra].filter(Boolean).join(" ") || undefined;
+}
+
 function nodeStyle(
   node: ElementNode,
   isEditing = false,
@@ -101,9 +150,7 @@ function nodeStyle(
     fontWeight: styles.fontWeight,
     textAlign: styles.textAlign,
     borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
-    borderWidth: clipPath ? undefined : scaled(styles.borderWidth, renderScale),
-    borderStyle: !clipPath && styles.borderWidth ? "solid" : undefined,
-    borderColor: clipPath ? undefined : (resolveRef?.(styles.borderColorRef) ?? styles.borderColor),
+    ...borderStyleFor(node, renderScale, clipPath, resolveRef),
     clipPath,
     opacity: 1,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
@@ -148,9 +195,7 @@ function detachedNodeStyle(
     fontWeight: styles.fontWeight,
     textAlign: styles.textAlign,
     borderRadius: isEllipse ? "50%" : clipPath ? undefined : scaled(styles.borderRadius, renderScale),
-    borderWidth: clipPath ? undefined : scaled(styles.borderWidth, renderScale),
-    borderStyle: !clipPath && styles.borderWidth ? "solid" : undefined,
-    borderColor: clipPath ? undefined : (resolveRef?.(styles.borderColorRef) ?? styles.borderColor),
+    ...borderStyleFor(node, renderScale, clipPath, resolveRef),
     clipPath,
     opacity: styles.opacity,
     display: hasSceneChildren ? "block" : styles.display ?? "block",
@@ -318,26 +363,108 @@ function ElementRendererImpl({
 
   if (!node || node.visible === false) return null;
 
+  // The typed Fill stack (solid/gradient/image/video), compiled type-aware. Null
+  // for types that take no fill (line/arrow/path/svg). When `hasFills` is false
+  // the legacy `background` path below is used unchanged.
+  const fillTarget = fillTargetForType(node.type);
+  const compiledFill: CompiledFill | null = fillTarget
+    ? compileFills(node.styles.fills, fillTarget, resolveRef, node.id)
+    : null;
+  const fillDefs =
+    compiledFill && (compiledFill.filterDefs.length || compiledFill.patternLayer) ? (
+      <>
+        <FillFilterDefs defs={compiledFill.filterDefs} />
+        {compiledFill.patternLayer ? (
+          <FillPatternOverlay layer={compiledFill.patternLayer} renderScale={renderScale} />
+        ) : null}
+      </>
+    ) : null;
+
   if (node.type === "text") {
+    const base = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, isEditing, renderScale, resolveRef);
     return (
       <div
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element text-element", isEditing, isolatedParentId, canvasDocument.elements)}
-        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, isEditing, renderScale, resolveRef)}
+        style={withFill(base, compiledFill)}
       >
+        {compiledFill?.filterDefs.length ? <FillFilterDefs defs={compiledFill.filterDefs} /> : null}
         {node.content}
       </div>
     );
   }
 
   if (node.type === "image") {
+    const base = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
+    const render = compiledFill?.imageRender;
+    const wrapperBase: CSSProperties = { ...base, background: undefined };
+
+    if (render?.mode === "img") {
+      return (
+        <div
+          data-element-id={node.id}
+          data-node-type={node.type}
+          className={elementClassName(node, "element image-element", false, isolatedParentId, canvasDocument.elements)}
+          style={wrapperBase}
+        >
+          <FillFilterDefs defs={compiledFill!.filterDefs} />
+          <img
+            src={render.src}
+            alt={node.name}
+            draggable={false}
+            style={{ objectFit: render.objectFit as CSSProperties["objectFit"], objectPosition: render.objectPosition, filter: render.filter }}
+          />
+        </div>
+      );
+    }
+
+    if (render?.mode === "video") {
+      return (
+        <div
+          data-element-id={node.id}
+          data-node-type={node.type}
+          className={elementClassName(node, "element image-element", false, isolatedParentId, canvasDocument.elements)}
+          style={wrapperBase}
+        >
+          <video
+            src={render.src}
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{ objectFit: render.objectFit as CSSProperties["objectFit"], objectPosition: render.objectPosition }}
+          />
+        </div>
+      );
+    }
+
+    if (render?.mode === "background") {
+      // A Tile fill (or a solid/gradient fill on the image element) renders as a
+      // background div — an <img> can never tile.
+      const style: CSSProperties = {
+        ...withFill(base, compiledFill),
+        filter: combineFilter(base, render.filter),
+      };
+      return (
+        <div
+          data-element-id={node.id}
+          data-node-type={node.type}
+          className={elementClassName(node, "element image-element", false, isolatedParentId, canvasDocument.elements)}
+          style={style}
+        >
+          {fillDefs}
+        </div>
+      );
+    }
+
+    // No typed fill — legacy single-image path, unchanged.
     return (
       <div
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element image-element", false, isolatedParentId, canvasDocument.elements)}
-        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef)}
+        style={base}
       >
         {node.src ? (
           <img src={node.src} alt={node.name} draggable={false} style={{ objectFit: node.styles.objectFit }} />
@@ -434,13 +561,15 @@ function ElementRendererImpl({
   }
 
   if (node.type === "icon") {
+    const base = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
     return (
       <div
         data-element-id={node.id}
         data-node-type={node.type}
         className={elementClassName(node, "element icon-element", false, isolatedParentId, canvasDocument.elements)}
-        style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef)}
+        style={withFill(base, compiledFill)}
       >
+        {fillDefs}
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M12 3.5l2.64 5.35 5.91.86-4.27 4.16 1.01 5.88L12 16.98l-5.29 2.77 1.01-5.88-4.27-4.16 5.91-.86L12 3.5z" />
         </svg>
@@ -448,13 +577,15 @@ function ElementRendererImpl({
     );
   }
 
+  const genericBase = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
   return (
     <div
       data-element-id={node.id}
       data-node-type={node.type}
       className={elementClassName(node, "element", false, isolatedParentId, canvasDocument.elements)}
-      style={detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef)}
+      style={withFill(genericBase, compiledFill)}
     >
+      {fillDefs}
       {!isIsolatedParent && node.children.map((childId) => (
         <ElementRenderer
           key={childId}

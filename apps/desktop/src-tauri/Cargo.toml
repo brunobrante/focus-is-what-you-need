@@ -34,3 +34,12 @@ ort = "2.0.0-rc.12"
 # Must match ort's internal ndarray (0.17.x) so array types unify across crates.
 ndarray = "0.17"
 reqwest = "0.12"
+
+# Native macOS-only deps for the screen color sampler (eyedropper). AppKit's
+# NSColorSampler is driven through the safe objc2 bindings; gated to macOS so
+# Linux/Windows builds never see them.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5"
+objc2-foundation = "0.2"
+objc2-app-kit = { version = "0.2", features = ["NSColor", "NSColorSampler", "NSColorSpace"] }
+block2 = "0.5"

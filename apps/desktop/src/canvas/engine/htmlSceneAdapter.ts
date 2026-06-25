@@ -469,6 +469,18 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
       : style.borderRadius,
     borderWidth: style.borderWidth,
     borderColor: style.borderColor,
+    borderStyle: style.borderStyle === "none" ? undefined : style.borderStyle,
+    borderAlign: style.borderAlign,
+    textStrokeWidth: style.textStrokeWidth,
+    textStrokeColor: style.textStrokeColor,
+    textStrokeColorRef: style.textStrokeColorRef,
+    textStrokePaintOrder: style.textStrokePaintOrder,
+    underline: style.underline,
+    underlineStyle: style.underlineStyle,
+    underlineColor: style.underlineColor,
+    underlineColorRef: style.underlineColorRef,
+    underlineThickness: style.underlineThickness,
+    underlineOffset: style.underlineOffset,
     backgroundRef: style.backgroundRef,
     colorRef: style.colorRef,
     borderColorRef: style.borderColorRef,
@@ -481,6 +493,7 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
     overflow: style.overflow,
     objectFit: style.objectFit,
     effects: style.effects,
+    fills: style.fills,
   };
 }
 
@@ -505,10 +518,26 @@ function styleFromElement(
     // Like the *Ref bindings: read straight from engine state (no previousStyle
     // fallback) so removing every effect persists instead of resurrecting them.
     effects: styles.effects,
+    // Same: the typed Fill stack is read straight from engine state so clearing
+    // it back to a simple `background` persists (no previousStyle fallback).
+    fills: styles.fills,
     opacity: styles.opacity ?? previousStyle?.opacity ?? 1,
     borderColor: styles.borderColor ?? previousStyle?.borderColor ?? "transparent",
     borderWidth,
-    borderStyle: borderWidth > 0 ? "solid" : "none",
+    borderStyle: borderWidth > 0 ? styles.borderStyle ?? "solid" : "none",
+    // Border/Stroke fields read straight from engine state (no previousStyle
+    // fallback) so clearing one persists instead of resurrecting the old value.
+    borderAlign: styles.borderAlign,
+    textStrokeWidth: styles.textStrokeWidth,
+    textStrokeColor: styles.textStrokeColor,
+    textStrokeColorRef: styles.textStrokeColorRef,
+    textStrokePaintOrder: styles.textStrokePaintOrder,
+    underline: styles.underline,
+    underlineStyle: styles.underlineStyle,
+    underlineColor: styles.underlineColor,
+    underlineColorRef: styles.underlineColorRef,
+    underlineThickness: styles.underlineThickness,
+    underlineOffset: styles.underlineOffset,
     borderRadius: styles.borderRadius ?? previousStyle?.borderRadius ?? 0,
     display: styles.display === "flex" ? "flex" : "block",
     align: alignFromElement(styles.alignItems ?? previousStyle?.align),

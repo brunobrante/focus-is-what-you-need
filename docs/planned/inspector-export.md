@@ -69,7 +69,7 @@ Per element, a list of export entries (Figma/paper model) — add/remove via `+`
   PNG) — that's why encoding is Rust-side.
 - ⚠ The software snapshot **does not capture WebGL/`<video>`/some accelerated layers**
   (they come back blank). Pure HTML/CSS + inline SVG (our case) is fine; a **video fill**
-  ([`inspector-fill.md`](./inspector-fill.md)) won't snapshot — flag/flatten it.
+  ([`inspector-fill.md`](../inspector-fill.md)) won't snapshot — flag/flatten it.
 - **Tauri bridge:** `webview.with_webview(|w| …)` + `objc2-web-kit` to reach the raw
   `WKWebView`; the snapshot is an **async completion handler** — wrap in a Rust oneshot,
   marshal off the main thread. Pin Tauri's minor version (objc bindings can shift).
@@ -113,12 +113,12 @@ inspector uses WebKit-specific CSS):
 - **Cross-engine prefixes:** emit **both** standard and prefixed for the WebKit features
   the other panels rely on — `-webkit-backdrop-filter`+`backdrop-filter`
   ([effects](./inspector-effects.md)), `-webkit-background-clip:text`+`background-clip`
-  ([fill](./inspector-fill.md)/[typography](./inspector-typography.md)),
+  ([fill](../inspector-fill.md)/[typography](./inspector-typography.md)),
   `-webkit-text-stroke` ([border-stroke](./inspector-border-stroke.md)). Run the emitted
   CSS through an autoprefixer step.
 - **Color fallbacks:** emit sRGB first, then the wide-gamut override
   (`color:#ff0040; color:color(display-p3 1 0 0.25)`) so non-P3 browsers don't drop it
-  ([fill](./inspector-fill.md) wide-gamut).
+  ([fill](../inspector-fill.md) wide-gamut).
 - **Fonts:** `@font-face` with woff2 (base64 for single-file, `assets/fonts/` for
   bundle), explicit weight/style + `font-display:swap` to avoid faux bold/italic.
 - **Validate the export in Chrome, not just our WKWebView** — WebKit renders things

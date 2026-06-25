@@ -47,13 +47,16 @@ div with children; every control writes real CSS). One doc per panel/group.
   `text-shadow`), layer blur (`filter: blur`) vs background blur (`backdrop-filter`,
   `-webkit-` prefix), noise (`feTurbulence`), texture, glass (frosted only — refraction
   broken in WebKit). Spread/inset only on boxes; flags the WebKit gotchas.
-- [Fill (Solid, Gradient, Image, Pattern, Video)](./inspector-fill.md) — paper's
-  Solid/Gradient/Image plus Figma's Pattern/Video/multiple-fills/blend/adjustments.
-  Type-aware: `background-*` on boxes, `object-fit` on `<img>`, SVG paint servers on
-  shapes, `background-clip:text` on text. Image element gets a dual render path (img ↔
-  background-div) so Pattern/Tile works; gradient interpolation spaces (OKLAB/OKLCH,
-  Safari 16.2), wide-gamut P3, and a native eyedropper fallback (no `EyeDropper` in
-  WebKit). Lines/arrows take no fill.
+- [Fill (Solid, Gradient, Image, Pattern, Video)](../inspector-fill.md) — **v1 shipped.**
+  paper's Solid/Gradient/Image plus Figma's Pattern/Video/multiple-fills/blend/adjustments.
+  Type-aware: `background-*` on boxes, `background-clip:text` on text, the dual render path
+  (img ↔ background-div ↔ `<video>`) on the Image element so Pattern/Tile works; exact tile
+  gaps via inline SVG `<pattern>`; gradient interpolation spaces (OKLAB/OKLCH, Safari 16.2);
+  wide-gamut P3/OKLCH (typeable color field); image adjustments (CSS `filter` + inline SVG
+  filter for temp/tint/highlights/shadows); a native macOS `NSColorSampler` eyedropper
+  fallback (no `EyeDropper` in WebKit). Lines/arrows take no fill. *Deferred: `path`/`svg`
+  SVG paint-servers (they use the Vector section), image-token binding, per-layer image
+  opacity, an HSV/gamut slider UI.*
 - [Export (PNG/JPEG/WebP/PDF/SVG/HTML + device mock)](./inspector-export.md) — per-element
   export. Native rasterization (`WKWebView.takeSnapshot` for raster, `createPDF` for
   vector PDF) because JS DOM-to-image (`foreignObject`) is broken in WebKit; encoding +
