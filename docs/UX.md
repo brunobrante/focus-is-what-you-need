@@ -876,6 +876,23 @@ To edit the contents, open the master or detach the instance first.
 - The ghost appears only during a move-drag, only for the invisible dragged elements; visible elements in the same selection still move as themselves. It disappears on drop, where the normal selection outline returns.
 - This is toggleable in **Settings → Canvas → "Drag ghost for invisible elements"** (on by default).
 
+**Drop a photo/image file onto the canvas:**
+- Dragging an **image file** from the OS onto the canvas creates a new **Image
+  element** holding that file (read as a data URL), centered at the drop point and
+  selected — no separate "set `src`" step. The drop lands **inside the opened
+  frame** (frame-bounds law); only files whose type is `image/*` are accepted, and
+  non-image drops are ignored.
+- **Resize dropped images to frame** (Settings → Canvas, **on by default**) controls
+  sizing:
+  - **On** — the Image element is scaled **proportionally** (aspect ratio
+    preserved) to fit within the frame's width × height; it only shrinks when the
+    photo is larger than the frame, never upscales. The whole photo is shown,
+    un-cropped.
+  - **Off** — the element keeps the file's **natural pixel size**. Because elements
+    are frame-bounded, the box is still clipped to the frame and the image renders
+    at 1:1 (`objectFit: none`), so an oversized photo shows a crop of the frame
+    region.
+
 **Vector editing (pen / pencil / paths / SVG):**
 - The toolbar exposes a **Pen**/**Pencil** dropdown (default keys `P` / `⇧P`) and an **SVG** tool (`G`).
 - **Pen** is click-to-place: each click adds a corner anchor; click-drag pulls symmetric bézier handles out of the just-placed anchor; clicking the **first anchor** of the open subpath (highlighted with a ring) closes it and finishes the path. `Enter` finishes the open path; `Esc` cancels the in-flight anchor. The pen shows context cursors — pen, pen-insert (over a segment), pen-remove (Alt over an anchor), pen-snap.
@@ -1300,7 +1317,7 @@ drift:
   heading. Cancel and a successful save return to the Dashboard (`/`).
 
 **Tabs**:
-- **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, reveal selected layers), plus the **Toolbar config** section — the **Global** element defaults (see below)
+- **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, resize dropped images to frame, reveal selected layers), plus the **Toolbar config** section — the **Global** element defaults (see below)
 - **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
 - **Keyboard shortcuts**: rebindable canvas commands

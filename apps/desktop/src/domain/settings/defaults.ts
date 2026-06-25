@@ -218,6 +218,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
         revealSealedComponentChildren: false,
       },
       invisibleDragGhost: true,
+      resizeImageToFrame: true,
     },
   },
   systemDesign: {

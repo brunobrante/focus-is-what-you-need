@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { getCommonParentId, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/canvas/engine/hitTesting";
 import { insertSvgDocument } from "@/canvas/engine/actions";
@@ -70,6 +70,38 @@ import { useCanvasTextInteraction } from "./useCanvasTextInteraction";
 // the SVG cursor. The asset lives in `public/`, so it is served from the root.
 const RADIUS_CURSOR = "url(/cursor-bend.svg) 4 3, pointer";
 
+// True when a native drag carries OS files. During `dragover` the browser hides
+// the actual file list for privacy, so we must sniff `types` (not `files`) to
+// decide whether to accept the drop.
+const dragHasFiles = (dataTransfer: DataTransfer | null): boolean =>
+  !!dataTransfer && Array.from(dataTransfer.types).includes("Files");
+
+// First dropped file that is an image (mirrors the References import filter).
+const firstImageFile = (dataTransfer: DataTransfer | null): File | null => {
+  const files = dataTransfer?.files;
+  if (!files) return null;
+  for (let i = 0; i < files.length; i++) {
+    if (files[i].type.startsWith("image/")) return files[i];
+  }
+  return null;
+};
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
+const loadImageNaturalSize = (dataUrl: string): Promise<{ width: number; height: number }> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("Failed to decode dropped image"));
+    img.src = dataUrl;
+  });
+
 type Dispatch = React.Dispatch<EditorAction>;
 
 type Params = {
@@ -111,6 +143,8 @@ export type CanvasPointerEventsResult = {
   finishInteraction: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onDoubleClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
   handleContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
+  onDrop: (event: ReactDragEvent<HTMLDivElement>) => void;
 };
 
 export function useCanvasPointerEvents({
@@ -150,7 +184,7 @@ export function useCanvasPointerEvents({
     latestDocumentRef, latestStateRef, getCurrentViewportSize, getCurrentViewportRect, dispatch,
   });
 
-  const getCanvasPoint = (event: ReactPointerEvent): Point | null => {
+  const getCanvasPoint = (event: { clientX: number; clientY: number }): Point | null => {
     const viewport = viewportRef.current;
     if (!viewport) return null;
     const transform = buildViewportTransform(
@@ -200,6 +234,63 @@ export function useCanvasPointerEvents({
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   }, [dispatch, latestStateRef]);
+
+  // Drop a photo/image file onto the frame → a new Image element holding that
+  // file (planned/canvas-image-drop.md). Async because we decode the file into a
+  // data URL and read its natural size before placing the node.
+  const insertDroppedImageFile = async (file: File, point: Point) => {
+    let dataUrl: string;
+    let natural: { width: number; height: number };
+    try {
+      dataUrl = await readFileAsDataUrl(file);
+      natural = await loadImageNaturalSize(dataUrl);
+    } catch {
+      return;
+    }
+    const document = latestStateRef.current.document;
+    const node = createElementForTool("image", point.x, point.y, document.canvas, settings);
+    node.src = dataUrl;
+
+    if (settings.canvas.shell.resizeImageToFrame) {
+      // Fit proportionally inside the frame; only shrink, never upscale. The box
+      // keeps the image's aspect ratio, so the whole photo is shown un-cropped.
+      const scale = Math.min(
+        1,
+        document.canvas.width / natural.width,
+        document.canvas.height / natural.height,
+      );
+      node.width = Math.max(1, Math.round(natural.width * scale));
+      node.height = Math.max(1, Math.round(natural.height * scale));
+      node.styles = { ...node.styles, objectFit: "fill" };
+    } else {
+      // Keep the file's natural pixel size. Elements are frame-bounded (the
+      // bounded-canvas / frame-bounds law), so `objectFit: none` renders the
+      // image at 1:1 and the frame box clips any overflow.
+      node.width = natural.width;
+      node.height = natural.height;
+      node.styles = { ...node.styles, objectFit: "none" };
+    }
+    node.x = roundPixel(point.x - node.width / 2);
+    node.y = roundPixel(point.y - node.height / 2);
+
+    const next = insertElement(document, node);
+    dispatch({ type: "commitDocument", document: next, selectedIds: [node.id] });
+  };
+
+  const onDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!dragHasFiles(event.dataTransfer)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const onDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    const file = firstImageFile(event.dataTransfer);
+    if (!file) return;
+    event.preventDefault();
+    const point = getCanvasPoint(event);
+    if (!point) return;
+    void insertDroppedImageFile(file, point);
+  };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (contextMenu) setContextMenu(null);
@@ -524,5 +615,7 @@ export function useCanvasPointerEvents({
     finishInteraction,
     onDoubleClick,
     handleContextMenu,
+    onDragOver,
+    onDrop,
   };
 }

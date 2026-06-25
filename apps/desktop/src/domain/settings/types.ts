@@ -154,6 +154,14 @@ export type CanvasShellSettings = {
    * are moving. Purely visual. Default on.
    */
   invisibleDragGhost: boolean;
+  /**
+   * When an image file is dropped onto the canvas, resize the created Image
+   * element proportionally (aspect ratio preserved) so it fits within the
+   * opened frame's width × height. When false, the Image element keeps the
+   * file's natural pixel size and overflows the frame (clipped by it). Default
+   * on.
+   */
+  resizeImageToFrame: boolean;
 };
 
 export type CanvasSettings = {

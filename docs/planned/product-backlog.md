@@ -7,12 +7,6 @@ into `Product.md` as `[NOW]` and trim or delete its backlog entry.
 
 This file is the index; the detail lives in the linked docs.
 
-## Canvas / elements
-
-- [Drag a photo/file onto the canvas](./canvas-image-drop.md) — drop an image
-  file directly onto the frame to create an Image element, instead of setting
-  `src` afterward.
-
 ## Inspector (canvas element properties)
 
 The properties panel for a selected canvas element. Specs merge Figma + paper.design

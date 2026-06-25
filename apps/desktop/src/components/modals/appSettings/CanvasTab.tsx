@@ -3,6 +3,7 @@ import type { GlobalSettings } from "@/domain/settings/types";
 import {
   updateInheritParentBackground,
   updateInvisibleDragGhost,
+  updateResizeImageToFrame,
   updateTreeAutoRevealSelection,
 } from "@/domain/settings/updates";
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
@@ -18,6 +19,7 @@ export function CanvasTab({
   const autoRevealSelection = settings.canvas.shell.tree.autoRevealSelection;
   const inheritParentBackground = settings.canvas.shell.inheritParentBackground;
   const invisibleDragGhost = settings.canvas.shell.invisibleDragGhost;
+  const resizeImageToFrame = settings.canvas.shell.resizeImageToFrame;
 
   return (
     <div className="px-[22px] py-5 grid gap-6">
@@ -55,6 +57,23 @@ export function CanvasTab({
               ariaLabel="Drag ghost for invisible elements"
               onChange={(checked) =>
                 onSettingsChange(updateInvisibleDragGhost(settings, checked))
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between gap-5 border-t border-[var(--border)] px-4 py-3">
+            <div>
+              <div className="text-[13px] text-[var(--text)]">Resize dropped images to frame</div>
+              <p className="m-0 mt-1 max-w-[520px] text-[12.5px] leading-[1.5] text-[var(--text-muted)]">
+                When you drop an image file onto the canvas, scale the new image element
+                proportionally so it fits inside the frame. Turn off to drop images at their
+                full pixel size (overflow is clipped by the frame).
+              </p>
+            </div>
+            <Switch
+              checked={resizeImageToFrame}
+              ariaLabel="Resize dropped images to frame"
+              onChange={(checked) =>
+                onSettingsChange(updateResizeImageToFrame(settings, checked))
               }
             />
           </div>

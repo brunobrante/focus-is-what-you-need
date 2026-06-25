@@ -293,6 +293,8 @@ export function CanvasStage({
     finishInteraction,
     onDoubleClick,
     handleContextMenu,
+    onDragOver,
+    onDrop,
   } = useCanvasPointerEvents({
     state,
     dispatch,
@@ -426,6 +428,8 @@ export function CanvasStage({
       onPointerCancel={finishInteraction}
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       <div
         ref={stageRef}

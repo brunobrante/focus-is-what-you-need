@@ -188,6 +188,13 @@ Inserting an **Image** or an **Icon** drops in a **mock placeholder** — this i
 intentional, so structure reads immediately without forcing the user to find real
 assets first. The user then points the element at real content (via its `src`).
 
+As a direct alternative, the user can **drop an image file onto the canvas frame**
+and it becomes an Image element holding that file, with no separate "set `src`"
+step. The drop respects the frame-bounds law (the image lands inside the opened
+frame). By default the dropped image is resized **proportionally to fit the frame**;
+a Canvas setting can turn this off to keep the file's natural size (clipped by the
+frame). This is an addition — the mock-placeholder path stays.
+
 ---
 
 ## The entity model

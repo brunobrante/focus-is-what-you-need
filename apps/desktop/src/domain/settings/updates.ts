@@ -30,6 +30,19 @@ export function updateInvisibleDragGhost(
   };
 }
 
+export function updateResizeImageToFrame(
+  settings: GlobalSettings,
+  resizeImageToFrame: boolean,
+): GlobalSettings {
+  return {
+    ...settings,
+    canvas: {
+      ...settings.canvas,
+      shell: { ...settings.canvas.shell, resizeImageToFrame },
+    },
+  };
+}
+
 export function updateTreeAutoRevealSelection(
   settings: GlobalSettings,
   autoRevealSelection: boolean,
