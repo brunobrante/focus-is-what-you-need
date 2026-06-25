@@ -36,11 +36,11 @@ export function DashboardPage() {
         </p>
       </header>
 
-      <WorkspacesSection workspaces={workspaces} onOpenWorkspace={openWorkspace} />
+      <WorkspacesSection workspaces={workspaces} onOpenWorkspace={openWorkspace} onEditWorkspace={(id) => navigate(`/workspace/${id}/edit`)} />
 
-      <MyProjectsSection projects={looseProjects} />
+      <MyProjectsSection projects={looseProjects} onEditProject={(id) => navigate(`/project/${encodeURIComponent(id)}/edit`)} />
 
-      <RecentSection recent={recent} />
+      <RecentSection recent={recent} onEditProject={(id) => navigate(`/project/${encodeURIComponent(id)}/edit`)} />
     </div>
   );
 }
@@ -52,9 +52,11 @@ export default DashboardPage;
 function WorkspacesSection({
   workspaces,
   onOpenWorkspace,
+  onEditWorkspace,
 }: {
   workspaces: WorkspaceCard[];
   onOpenWorkspace: (id: string) => void;
+  onEditWorkspace: (id: string) => void;
 }) {
   return (
     <section className="mb-11">
@@ -73,6 +75,7 @@ function WorkspacesSection({
               key={card.workspace.id}
               card={card}
               onClick={() => onOpenWorkspace(card.workspace.id)}
+              onEdit={() => onEditWorkspace(card.workspace.id)}
             />
           ))}
         </div>
@@ -87,7 +90,7 @@ function WorkspacesSection({
  * Projects that belong to no workspace — created loose from Home. They live here
  * (not in any workspace browser); the add tile creates more loose projects.
  */
-function MyProjectsSection({ projects }: { projects: RecentItem[] }) {
+function MyProjectsSection({ projects, onEditProject }: { projects: RecentItem[]; onEditProject: (id: string) => void }) {
   return (
     <section className="mb-11">
       <SectionHeading title="My Projects" />
@@ -96,7 +99,7 @@ function MyProjectsSection({ projects }: { projects: RecentItem[] }) {
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
       >
         {projects.map((item) => (
-          <ProjectCard key={item.project.id} item={item} />
+          <ProjectCard key={item.project.id} item={item} onEdit={() => onEditProject(item.project.id)} />
         ))}
         <AddProjectTile />
       </div>
@@ -106,7 +109,7 @@ function MyProjectsSection({ projects }: { projects: RecentItem[] }) {
 
 /* ── Recent items ─────────────────────────────────────────────────────────── */
 
-function RecentSection({ recent }: { recent: RecentItem[] }) {
+function RecentSection({ recent, onEditProject }: { recent: RecentItem[]; onEditProject: (id: string) => void }) {
   return (
     <section>
       <SectionHeading title="Recent Items" />
@@ -115,7 +118,7 @@ function RecentSection({ recent }: { recent: RecentItem[] }) {
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
       >
         {recent.map((item) => (
-          <ProjectCard key={item.project.id} item={item} />
+          <ProjectCard key={item.project.id} item={item} onEdit={() => onEditProject(item.project.id)} />
         ))}
         <AddProjectTile />
       </div>

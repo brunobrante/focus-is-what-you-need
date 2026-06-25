@@ -22,10 +22,12 @@ export function initialOf(workspace: WorkspaceRow): string {
 export function WorkspaceTile({
   card,
   onClick,
+  onEdit,
   onDelete,
 }: {
   card: WorkspaceCard;
   onClick: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
 }) {
   const { workspace, projectCount, isActive } = card;
@@ -58,16 +60,22 @@ export function WorkspaceTile({
           </div>
         </div>
       </button>
-      {onDelete ? (
+      {(onEdit || onDelete) ? (
         <CardMoreMenu
           items={[
-            {
+            ...(onEdit ? [{
+              key: "edit",
+              label: "Edit workspace",
+              icon: CardMenuIcons.FastEdit,
+              onClick: onEdit,
+            }] : []),
+            ...(onDelete ? [{
               key: "delete",
               label: "Delete workspace",
               icon: CardMenuIcons.Trash,
               destructive: true,
               onClick: onDelete,
-            },
+            }] : []),
           ]}
         />
       ) : null}
@@ -79,9 +87,11 @@ export function WorkspaceTile({
 
 export function ProjectCard({
   item,
+  onEdit,
   onDelete,
 }: {
   item: RecentItem;
+  onEdit?: () => void;
   onDelete?: () => void;
 }) {
   const { project, screensCount, workspace } = item;
@@ -103,16 +113,22 @@ export function ProjectCard({
           </div>
         </div>
       </Link>
-      {onDelete ? (
+      {(onEdit || onDelete) ? (
         <CardMoreMenu
           items={[
-            {
+            ...(onEdit ? [{
+              key: "edit",
+              label: "Edit project",
+              icon: CardMenuIcons.FastEdit,
+              onClick: onEdit,
+            }] : []),
+            ...(onDelete ? [{
               key: "delete",
               label: "Delete project",
               icon: CardMenuIcons.Trash,
               destructive: true,
               onClick: onDelete,
-            },
+            }] : []),
           ]}
         />
       ) : null}

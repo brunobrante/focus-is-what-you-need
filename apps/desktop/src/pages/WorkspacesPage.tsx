@@ -63,6 +63,7 @@ export function WorkspacesPage() {
               key={card.workspace.id}
               card={card}
               onClick={() => openWorkspace(card.workspace.id)}
+              onEdit={() => navigate(`/workspace/${card.workspace.id}/edit`)}
               onDelete={() => setPendingDelete(card)}
             />
           ))}

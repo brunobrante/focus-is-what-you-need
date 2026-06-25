@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { IconFrame, IconPlus } from "@/components/icons";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
@@ -16,6 +16,7 @@ import { deleteProject } from "@/lib/storage/repos/projects.repo";
  */
 export function ProjectsPage() {
   const { looseProjects } = useHome();
+  const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<RecentItem | null>(null);
 
   async function handleConfirmDelete() {
@@ -52,7 +53,7 @@ export function ProjectsPage() {
           style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
         >
           {looseProjects.map((item) => (
-            <ProjectCard key={item.project.id} item={item} onDelete={() => setPendingDelete(item)} />
+            <ProjectCard key={item.project.id} item={item} onEdit={() => navigate(`/project/${encodeURIComponent(item.project.id)}/edit`)} onDelete={() => setPendingDelete(item)} />
           ))}
           <AddProjectTile />
         </div>
