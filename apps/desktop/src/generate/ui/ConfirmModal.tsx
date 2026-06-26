@@ -40,21 +40,30 @@ export function ConfirmActionModal({
 }
 
 export function confirmationDialogCopy(action: PendingConfirmation) {
-  if (action.type === "delete-root") {
-    const cutsNote =
-      action.cutCount > 0
-        ? ` and its ${action.cutCount} ${action.cutCount === 1 ? "cut" : "cuts"}`
-        : "";
-    return {
-      title: "Delete screen",
-      description: `This permanently deletes "${action.name}"${cutsNote}. This can't be undone.`,
-      confirmLabel: "Delete screen",
-    };
+  switch (action.type) {
+    case "delete-root": {
+      const cutsNote =
+        action.cutCount > 0
+          ? ` and its ${action.cutCount} ${action.cutCount === 1 ? "cut" : "cuts"}`
+          : "";
+      return {
+        title: "Delete screen",
+        description: `This permanently deletes "${action.name}"${cutsNote}. This can't be undone.`,
+        confirmLabel: "Delete screen",
+      };
+    }
+    case "reset":
+      return {
+        title: "Reset stack",
+        description:
+          "This resets the current stack back to the original image and removes its crops. Other stacks in this image are not affected.",
+        confirmLabel: "Reset stack",
+      };
+    default: {
+      // Exhaustiveness guard: a new PendingConfirmation variant fails to compile
+      // here instead of silently inheriting the "Reset stack" copy (BLD-13).
+      const _exhaustive: never = action;
+      return _exhaustive;
+    }
   }
-  return {
-    title: "Reset stack",
-    description:
-      "This resets the current stack back to the original image and removes its crops. Other stacks in this image are not affected.",
-    confirmLabel: "Reset stack",
-  };
 }
