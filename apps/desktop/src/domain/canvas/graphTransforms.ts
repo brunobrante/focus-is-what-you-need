@@ -289,11 +289,13 @@ export function groupNodesByParent(
 
 export function uniqueNodeId(preferred: string, usedIds: Set<string>): string {
   if (!usedIds.has(preferred)) return preferred;
-  for (let index = 1; index < 10000; index += 1) {
+  // The used set is finite, so a suffix bump is guaranteed to terminate; loop
+  // without a fixed ceiling rather than fall back to an unchecked id that could
+  // already be in use (DOM-8).
+  for (let index = 1; ; index += 1) {
     const candidate = `${preferred}-${index}`;
     if (!usedIds.has(candidate)) return candidate;
   }
-  return `${preferred}-${Date.now()}`;
 }
 
 export function normalizeName(value: string): string {
