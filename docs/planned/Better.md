@@ -262,15 +262,20 @@ partly wrong — noted inline).
 | SAVE-3 | ☑️ already fixed | `replayOutbox` already has the `if (!pending.has(key))` guard (audit was stale). |
 | SAVE-11 | ✅ `dc512ec` | Upsert/delete of one `(table,id)` now coalesce last-op-wins: multi-id deletes split per record (`eachRecordMutation`) and the opposite op is evicted wherever a mutation enters `pending` (enqueue, in-flight outbox snapshot, re-queue/replay). Was a real ordering bug the v3 coalescing would have inherited; fixed first. |
 | SAVE-4 | ✅ `aa81b40` | `replaceTable({ silent })` suppresses the per-table notify; the two reseed paths fill all caches silently then fire one batched notify, so no subscriber sees a half-applied cross-table state. (`replaceTable` was notifying mid-sequence on each of its 8 awaits.) |
-| SAVE-12 | ✅ `815072f` | A resolved-hydration flag now backs `isTableHydrated(table)`; `peekTable` warns once on a pre-hydration read (was silently returning `[]` for both "empty" and "not loaded"). Return type unchanged. |
+| SAVE-12 | ✅ `815072f` + `98fa423` | A resolved-hydration flag now backs `isTableHydrated(table)`; `peekTable` warns once on a genuinely-ambiguous pre-hydration read (un-hydrated *and* no in-session rows). Return type unchanged. |
+| SAVE-8 | ✅ `8885b80` | Propagation + thumbnail queues share `createOwnerDebounceQueue({ delayMs, run })`; both modules are thin wrappers. Same write-chain serialization / flush drain / coalescing key. |
+| SAVE-10 | 🟡 analyzed, not changed | Real longest backoff is 8s (not 30s; cap unreachable at `maxRetries:6`), no edits lost (batched into the next retry). Decoupling can't speed newer edits without weakening durability — low value, regression risk. |
 | ENG-2, STAGE-1 | 🟡 false positive | Re-confirmed from the verification table — not acted on. |
 | SHELL-8 | 🟡 false positive | Same `resolveMaster`-keyed-on-`graphJSON` pattern the verification "do-not-touch" table already cleared (LiveInstanceRefresh re-resolves). Not touched. |
 
 **Deferred (with rationale), not done this pass:**
-- **Save-path behavior changes — SAVE-8, SAVE-10, SHELL-4.** Each alters retry/backoff, queue
-  coalescing, or merges the two scene-persistence hooks. All are data-loss-adjacent — better as a
-  focused, test-backed effort. (**SAVE-11**, **SAVE-4**, **SAVE-12** are now done — see below;
-  `bun test` *is* available after all.)
+- **SAVE-10 — analyzed, intentionally not changed.** Re-checked against the real code: `backoffMs =
+  min(30_000, 250·2^(retries-1))` with `maxRetries:6` caps the *actual* longest sleep at **8s**, not 30s
+  (the 30s cap is unreachable), and re-queued + newer edits are batched into the next retry — **nothing is
+  lost**, only delayed. Decoupling the sleep from the single-flight wouldn't let newer edits flush sooner
+  without also weakening the backoff/durability semantics. Low value, real regression risk — left as-is.
+- **SHELL-4** (merge the two scene-persistence hooks) — still a focused refactor; not done this pass.
+- (**SAVE-11**, **SAVE-4**, **SAVE-12**, **SAVE-8** are now done — see below; `bun test` *is* available.)
 - **DOM-1 / DOM-4** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
   `document.ts`→`nodeHelpers`→`styleUtils` and 32 importers; a focused architecture effort (audit phase 4).
 - **ENG-8** — the three ancestor-walk loops share only a trivial cycle-guard but diverge in early-exit
