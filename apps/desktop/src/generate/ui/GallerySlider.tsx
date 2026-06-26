@@ -11,6 +11,9 @@ import {
   type FontPrediction,
 } from "../../lib/models/modelCommands";
 
+/** Wraps an index into [0, len) with positive modulo. */
+const wrapIndex = (i: number, len: number) => len <= 0 ? 0 : ((i % len) + len) % len;
+
 export function GallerySlider({
   cuts,
   showColors = false,
@@ -43,16 +46,18 @@ export function GallerySlider({
     setFontResult(null);
   }, [index]);
 
-  const go = (next: number) => setIndex(((next % cuts.length) + cuts.length) % cuts.length);
+  const go = (next: number) => setIndex(wrapIndex(next, cuts.length));
 
   useEffect(() => {
+    // Functional updates so the listener doesn't re-bind on every index change —
+    // it now depends only on cuts.length (BLD-12).
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") go(index - 1);
-      if (e.key === "ArrowRight") go(index + 1);
+      if (e.key === "ArrowLeft") setIndex((i) => wrapIndex(i - 1, cuts.length));
+      if (e.key === "ArrowRight") setIndex((i) => wrapIndex(i + 1, cuts.length));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, cuts.length]);
+  }, [cuts.length]);
 
   const current = cuts[index];
 
