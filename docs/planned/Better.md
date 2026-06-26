@@ -216,10 +216,11 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | BLD-11 | ⏭️ deferred | Module thumbnail cache no longer grows unbounded after BLD-14 (≤ one URL per distinct reference); full revoke-on-unmount still needs a refcounted shared hook (revoking a live shared URL would blank mounted thumbnails). |
 | UI-14 | ✅ `29aaf65` | Six Gallery/modal dropdowns routed through `useDismissable` (ComponentsTab ×2, ScreensTab, Gallery/shared + screen `CardMenu`, CompareVersionsModal). |
 | SHELL-1 | ✅ `42ffda3` + `1abb5c9` | `useDismissable` gained `{ capture, escape }` options; 12 canvas shell/stage dismiss sites converged on it with behavior preserved (capture phase is load-bearing where pointer handlers stopPropagation). Left unconverted: `InsComponents` (commit-on-blur, different semantics) and `references/components/ui.tsx` + `FastEditModal` (document/`mousedown` — converting would change the event type). |
+| Mixed-language sweep (BLD-7 + theme) | ✅ `9a6511a` + `fd51bed` + `5ae077b` | All Portuguese UI copy translated to English across canvas shell/inspector/tree, the Builder, and shared modals/pages/routes/data. Only display labels touched — sibling logic keys (filter `value`s, shape `id`s, node `type` cases, `setTool` ids) left intact. Skipped: `Chat.tsx` + `GalleryPanel.tsx` (unrendered mock panels flagged for deletion — translating dead code is churn). Test fixtures and the "Nova Retail" mock brand name left as-is. |
 
 > Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
 > SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2/3) and the cross-cutting duplication /
-> dead-code / mixed-language sweeps. **VER-2** (version creation captures zero children
+> dead-code sweeps (the **mixed-language** sweep is now done). **VER-2** (version creation captures zero children
 > when the source has no saved scene) was deliberately left for a focused effort — the fix
 > must materialize/synthesize the missing scene and touches the law-sensitive versioning
 > core. With REF-1 landed (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
