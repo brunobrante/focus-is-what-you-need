@@ -52,6 +52,15 @@ function clampPanAxis(pan: number, contentLength: number, viewportLength: number
   // Overflowing → free to travel until either edge reaches the viewport center:
   // half the scaled content of over-scroll per direction, never pushed entirely
   // past center into one half.
+  //
+  // The bound is `±scaled/2` with no viewport term, which can look like it diverges
+  // from the canvas camera's `clampAxisOffset`, whose overflow range is built around
+  // `containerLength/2` (canvas/engine/viewport.ts) (DOM-10). It does not: this is a
+  // center-origin projection where `pan` is already measured from the viewport center,
+  // so the viewport center sits at `pan = 0` implicitly. The canvas uses a top-left
+  // origin and must add `containerLength/2` to reach the same center. `±scaled/2` here
+  // is the exact center-origin equivalent — adding a viewport term would BREAK parity,
+  // not restore it.
   const max = scaled / 2;
   return Math.min(max, Math.max(-max, pan));
 }
