@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Loader2, X } from "lucide-react";
 import {
   extractVideoFrames,
+  ffmpegAvailable,
   loadReferenceFrame,
   type ExtractedFrame,
 } from "@/lib/tauri/referenceStorage";
@@ -49,10 +50,19 @@ export function VideoFramePicker({
           return new Set([...current].filter((file) => valid.has(file)));
         });
       })
-      .catch((err) => {
+      .catch(async (err) => {
         if (cancelled) return;
         console.error("[frames] extraction failed:", err);
-        setError("Could not extract frames. Is ffmpeg installed?");
+        // Only blame ffmpeg when it is genuinely missing; a present-but-failed
+        // extraction (unsupported codec, corrupt file) gets a neutral message
+        // instead of a misleading "Is ffmpeg installed?" hint.
+        const hasFfmpeg = await ffmpegAvailable().catch(() => true);
+        if (cancelled) return;
+        setError(
+          hasFfmpeg
+            ? "Could not extract frames from this video."
+            : "Could not extract frames — ffmpeg is not installed.",
+        );
         setFrames([]);
       })
       .finally(() => {
