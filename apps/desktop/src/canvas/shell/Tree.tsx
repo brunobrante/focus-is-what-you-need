@@ -354,8 +354,12 @@ export function Tree({
     scrollTreeNodeIntoView(layerTreeRef.current, targetId);
   }, [rowsOpenSet]);
 
+  // Controlled when the parent drives selection via selectedNodeIds/selectedNodeId;
+  // only then does localSelectedId go unread (see the selectedIds derivation above).
+  // Writing it in controlled mode creates a second, divergent source of truth (SHELL-2).
+  const selectionControlled = selectedNodeIds != null || selectedNodeId != null;
   const selectLayer = (nodeId: string | null) => {
-    setLocalSelectedId(nodeId);
+    if (!selectionControlled) setLocalSelectedId(nodeId);
     if (nodeId) onSelectNode?.(nodeId);
   };
   // Drag-and-drop drop intent. As the row is dragged we resolve whether it will land
