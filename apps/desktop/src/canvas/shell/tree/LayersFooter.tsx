@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 
 import {
   IconClose,
@@ -53,23 +54,7 @@ export function LayersFooter({
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!filterOpen) return;
-    const onDown = (e: PointerEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
-        setFilterOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFilterOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown, true);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("pointerdown", onDown, true);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [filterOpen]);
+  useDismissable(filterOpen, () => setFilterOpen(false), [filterRef], { capture: true });
 
   const hasQuery = query.trim().length > 0;
   const hasChips = hasQuery || kinds.size > 0;

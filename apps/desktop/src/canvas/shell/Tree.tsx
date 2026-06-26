@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import {
   useEditorBridge,
@@ -425,19 +426,12 @@ export function Tree({
     [readEditor],
   );
 
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (e: PointerEvent) => {
-      if (
-        !pickerRef.current?.contains(e.target as Node) &&
-        !pickerTriggerRef.current?.contains(e.target as Node)
-      ) {
-        setOpenPicker(null);
-      }
-    };
-    window.addEventListener("pointerdown", handler, true);
-    return () => window.removeEventListener("pointerdown", handler, true);
-  }, [pickerOpen]);
+  useDismissable(
+    pickerOpen,
+    () => setOpenPicker(null),
+    [pickerRef, pickerTriggerRef],
+    { capture: true, escape: false },
+  );
 
   if (!open) return null;
 
@@ -775,20 +769,7 @@ function TreeContextMenu({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const editor = getEditor();
 
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) onClose();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismissable(true, onClose, [menuRef], { capture: true });
 
   useEffect(() => {
     const element = menuRef.current;

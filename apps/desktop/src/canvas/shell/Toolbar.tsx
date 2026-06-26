@@ -4,6 +4,7 @@ import {
   IconBackArrow, IconChevronDownFill, IconChevronRight,
   IconCollapse, IconExpand,
 } from "@/components/icons";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import type { ChecklistOwner } from "@/lib/storage/repos/checklists.repo";
 import type { CanvasToolId } from "@/canvas/tools";
 import {
@@ -70,16 +71,12 @@ export function Toolbar({
     onToolChange?.(tool);
   };
 
-  useEffect(() => {
-    if (!actionsMenuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
-        if (!actionsAiMode) setActionsMenuOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [actionsMenuOpen, actionsAiMode]);
+  useDismissable(
+    actionsMenuOpen,
+    () => { if (!actionsAiMode) setActionsMenuOpen(false); },
+    [toolbarRef],
+    { capture: true, escape: false },
+  );
 
   useEffect(() => {
     if (active === "actions") setActionsMenuOpen(true);
@@ -220,16 +217,7 @@ function DropdownToolButton({
     setSelectedToolId(tools[0]?.id ?? null);
   }, [selectedToolId, tools]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [menuOpen]);
+  useDismissable(menuOpen, () => setMenuOpen(false), [ref], { capture: true, escape: false });
 
   if (!current) return null;
 

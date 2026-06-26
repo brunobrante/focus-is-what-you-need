@@ -8,6 +8,7 @@ import {
   setElementLocked,
   setElementVisible
 } from "@/canvas/engine/actions";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { useEditor } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
 
@@ -28,18 +29,7 @@ export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<Context
   const { state, dispatch, clipboard } = useEditor();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const onPointerDown = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
-    };
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismissable(true, onClose, [menuRef], { capture: true });
 
   useEffect(() => {
     const el = menuRef.current;

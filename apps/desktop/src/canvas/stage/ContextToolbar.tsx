@@ -9,6 +9,7 @@ import {
   setTextElementSizing,
   updateElementStyles,
 } from "@/canvas/engine/actions";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import type { CanvasDocument, ElementNode, ElementStyles, Rect } from "@/canvas/engine/types";
 
 // Context-toolbar layout geometry, all in CSS px. Hoisted out of the render body so
@@ -127,22 +128,7 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
     return () => globalThis.cancelAnimationFrame(frame);
   }, [renamingElementId]);
 
-  useEffect(() => {
-    if (!openPanel) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (toolbarRef.current?.contains(event.target as Node)) return;
-      setOpenPanel(null);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenPanel(null);
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [openPanel]);
+  useDismissable(Boolean(openPanel), () => setOpenPanel(null), [toolbarRef], { capture: true });
 
   // The parent clears the open panel on window blur; mirror that here so the held
   // modifier and panel state stay in sync with the rest of the canvas.

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import {
   IconCheck, IconChevronDownMed, IconChevronLeft, IconClose,
   IconCollapse, IconExpand, IconSearch,
@@ -94,16 +95,12 @@ export function LibraryPanel({
   const [sourceDropdownOpen, setSourceDropdownOpen] = useState(false);
   const sourceDropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!sourceDropdownOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (sourceDropdownRef.current && !sourceDropdownRef.current.contains(e.target as Node)) {
-        setSourceDropdownOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [sourceDropdownOpen]);
+  useDismissable(
+    sourceDropdownOpen,
+    () => setSourceDropdownOpen(false),
+    [sourceDropdownRef],
+    { capture: true, escape: false },
+  );
 
   const sources = mode === "images" ? IMAGE_LIBRARY_SOURCES : mode === "icons" ? ICON_LIBRARY_SOURCES : TMB_ASSET_CATEGORIES;
   const activeSource = mode === "images" ? imageSource : mode === "icons" ? iconSource : tmbCategory;

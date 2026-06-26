@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 
 export type ContextMenuItem =
   | { kind: "separator" }
@@ -21,22 +22,7 @@ type Props = {
 export function ContextMenu({ x, y, items, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const onDown = (event: PointerEvent) => {
-      if (!ref.current) return;
-      if (ref.current.contains(event.target as Node)) return;
-      onClose();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
+  useDismissable(true, onClose, [ref]);
 
   return (
     <div

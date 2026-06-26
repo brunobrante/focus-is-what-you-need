@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import {
   CANVAS_FEATURE_WINDOW_ORDER,
   CANVAS_WINDOW_LABELS,
@@ -114,22 +115,7 @@ export function CanvasTabs({
     else if (split === "grid" && next.length < 3) onSplitChange("vertical");
   };
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return;
-      setMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [menuOpen]);
+  useDismissable(menuOpen, () => setMenuOpen(false), [menuRef], { capture: true });
 
   return (
     <div

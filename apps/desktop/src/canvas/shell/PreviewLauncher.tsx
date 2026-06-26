@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { IconChevronDown, IconPlay } from "@/components/icons";
 import { devicesByPlatform, deviceResolutionLabel } from "@/canvas/devices";
 import type { ProjectType } from "@/lib/data/types";
@@ -25,22 +26,7 @@ export function PreviewLauncher({
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return;
-      setMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [menuOpen]);
+  useDismissable(menuOpen, () => setMenuOpen(false), [rootRef], { capture: true });
 
   return (
     <div

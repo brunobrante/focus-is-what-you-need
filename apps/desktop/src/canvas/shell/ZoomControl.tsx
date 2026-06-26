@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { IconMinus, IconPlus } from "@/components/icons";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "@/canvas/engine/viewport";
 import type { ZoomLimits } from "@/canvas/engine/viewport";
 
@@ -29,16 +30,7 @@ export function ZoomControl({
   const clampedPercentMin = Math.round(minZoom * 100);
   const clampedPercentMax = Math.round(maxZoom * 100);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [menuOpen]);
+  useDismissable(menuOpen, () => setMenuOpen(false), [containerRef], { capture: true, escape: false });
 
   useEffect(() => {
     if (menuOpen) return;
