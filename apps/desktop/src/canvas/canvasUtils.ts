@@ -543,6 +543,31 @@ export function subcomponentsForVariantScene(input: {
   const subject = subjectNodeForDocument(doc);
   const parentId = subject?.id ?? doc.rootId;
   const byId = new Map(input.projectComponents.map((c) => [c.id, c] as const));
+  // Index owned components by sourceNodeId once, so resolving each node is O(1)
+  // instead of a full components.find per node — O(nodes × components) → O(nodes)
+  // (ENG-7). The candidate list per node is tiny (sourceNodeId is near-unique).
+  const bySourceNode = new Map<string, ComponentRow[]>();
+  for (const c of input.projectComponents) {
+    if (!c.sourceNodeId) continue;
+    const arr = bySourceNode.get(c.sourceNodeId);
+    if (arr) arr.push(c);
+    else bySourceNode.set(c.sourceNodeId, [c]);
+  }
+  // Resolve an owned (non-linked) node, preserving the original precedence:
+  // version-owned (this variant) wins over the main variant's screen-owned child.
+  const resolveOwned = (nodeId: string): ComponentRow | null => {
+    const candidates = bySourceNode.get(nodeId);
+    if (!candidates) return null;
+    const variantMatch = candidates.find((c) => c.parentVariantId === input.variantId);
+    if (variantMatch) return variantMatch;
+    if (input.screenId != null) {
+      const screenMatch = candidates.find(
+        (c) => c.screenId === input.screenId && c.parentVariantId === null,
+      );
+      if (screenMatch) return screenMatch;
+    }
+    return null;
+  };
   const components: ComponentRow[] = [];
   const linkedIds = new Set<string>();
   const seen = new Set<string>();
@@ -550,18 +575,7 @@ export function subcomponentsForVariantScene(input: {
     if (node.parentId !== parentId) continue; // top-level subcomponents only
     const comp = node.instanceOf
       ? byId.get(node.instanceOf.componentId) ?? null
-      : findComponentBySourceNodeInList(
-          input.projectComponents,
-          { kind: "variant", variantId: input.variantId },
-          node.id,
-        ) ??
-        (input.screenId != null
-          ? findComponentBySourceNodeInList(
-              input.projectComponents,
-              { kind: "screen", screenId: input.screenId },
-              node.id,
-            )
-          : null);
+      : resolveOwned(node.id);
     if (comp && !seen.has(comp.id)) {
       seen.add(comp.id);
       components.push(comp);
