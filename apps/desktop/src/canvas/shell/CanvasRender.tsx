@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   IconExpand,
 } from "@/components/icons";
@@ -11,6 +11,7 @@ export type { ZoomSetter } from "./ZoomControl";
 import {
   DEFAULT_PREVIEW_SETTINGS,
   isCurrentKey,
+  isFeatureWindowType,
   normalizeCanvasSplitWindows,
   windowTypeOfKey,
   type AncestorFrame,
@@ -132,16 +133,30 @@ export function CanvasRender({
     ? (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP + PANEL_MARGIN : PANEL_MARGIN)
     : PANEL_MARGIN;
 
+  // Track the window extent so a draft seeded after a resize uses the current
+  // size, not the size captured once at mount (SHELL-9). Resize is not a hot path,
+  // so a listener-driven recompute is fine; the surface only reads this fallback
+  // when it has no stored draft, so a fresh identity never resets an existing one.
+  const [windowExtent, setWindowExtent] = useState(() => ({
+    w: window.innerWidth,
+    h: window.innerHeight,
+  }));
+  useEffect(() => {
+    const onResize = () => setWindowExtent({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const draftsFallbackDoc = useMemo(() => {
     // Approximate visible-canvas size with both panels open — derived from the
     // shell layout constants rather than hardcoded offsets. It's only a fallback
     // extent for a brand-new draft, so the Math.max floors keep it sane.
     const horizontalChrome = TREE_WIDTH + INSPECTOR_WIDTH + GAP * 2 + PANEL_MARGIN * 2;
     const verticalChrome = HEADER_HEIGHT + BOTTOM_BAR_HEIGHT;
-    const w = Math.floor(window.innerWidth - horizontalChrome);
-    const h = Math.floor(window.innerHeight - verticalChrome);
+    const w = Math.floor(windowExtent.w - horizontalChrome);
+    const h = Math.floor(windowExtent.h - verticalChrome);
     return createDraftDocument(Math.max(400, w), Math.max(300, h));
-  }, []);
+  }, [windowExtent]);
 
   const isKeyRenderable = (key: CanvasWindowKey) =>
     isCurrentKey(key) || enabledTabs.includes(windowTypeOfKey(key));
@@ -295,7 +310,14 @@ export function CanvasRender({
         />
       );
     }
-    return renderSecondarySurface(windowTypeOfKey(windowKey) as CanvasFeatureWindowType, active, showActiveBorder);
+    const windowType = windowTypeOfKey(windowKey);
+    if (isFeatureWindowType(windowType)) {
+      return renderSecondarySurface(windowType, active, showActiveBorder);
+    }
+    // Unknown / unhandled window key: render nothing rather than silently
+    // mis-rendering it as a feature window. A new CanvasWindowKey variant that
+    // reaches here is a missing case to handle above, not something to coerce (SHELL-12).
+    return null;
   };
   const useGridSplit = split === "grid" && renderedWindows.length >= 3;
 

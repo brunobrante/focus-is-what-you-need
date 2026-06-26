@@ -90,6 +90,11 @@ export function windowTypeOfKey(key: CanvasWindowKey): CanvasWindowType {
   return isCurrentKey(key) ? "current" : (key as CanvasWindowType);
 }
 
+/** Narrows a window type to the editable feature windows (not current/preview). */
+export function isFeatureWindowType(type: CanvasWindowType): type is CanvasFeatureWindowType {
+  return type !== "current" && type !== "preview";
+}
+
 /** 0 for the primary "current"; N-1 for "current-N" (so "current-2" → index 1). */
 export function currentInstanceIndex(key: CanvasWindowKey): number {
   if (key === "current") return 0;
