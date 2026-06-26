@@ -48,7 +48,23 @@ export function resolveSystemDesign(
       linkable?: boolean;
       instanceOf?: { systemDesignId: string; tokenId: string } | null;
     } & Record<string, unknown>)[];
-    const parentTokens = (parent?.tokens[category] ?? []) as ({
+
+    // No workspace parent → nothing to link against. Resolve every token locally
+    // (a stale `instanceOf` falls back to its own snapshot, exactly as below) and
+    // skip building the empty per-category parent index entirely (DOM-11).
+    if (!parent) {
+      out[category] = {
+        tokens: own.map((token) => ({
+          token,
+          source: token.instanceOf ? ("linked" as const) : ("project" as const),
+        })),
+        hasWorkspace,
+        availableShared: [],
+      };
+      continue;
+    }
+
+    const parentTokens = (parent.tokens[category] ?? []) as ({
       id: string;
       linkable?: boolean;
     } & Record<string, unknown>)[];
