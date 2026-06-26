@@ -114,7 +114,10 @@ export function ReferenceDetailModal({
     setSelectedStackComponentId(null);
     setStackViewMode("composite");
     setFocusedRootId(null);
-    setStackPreview((prev) => { releaseStackUrls(prev); return null; });
+    // Don't release here — the `[stackPreview]` cleanup effect below is the sole
+    // owner of releasing state-held previews. Releasing here too double-revokes the
+    // same URLs (this set-null fires that cleanup with the very preview we just freed).
+    setStackPreview(null);
     if (!canStack || !currentItem) { setStackLoading(false); return; }
 
     let cancelled = false;
