@@ -204,6 +204,21 @@ function attachmentMatchesOwner(
   return attachment.componentId === ownerId;
 }
 
+/**
+ * Inverse of `attachmentMatchesOwner`: resolve the single owner an attachment is
+ * anchored to. Anchor precedence mirrors the `ReferenceAttachment` doc: the most
+ * specific set anchor wins (component → screen → project → workspace).
+ */
+function ownerOfAttachment(
+  attachment: ReferenceAttachment,
+): { ownerType: OwnerType; ownerId: string } | null {
+  if (attachment.componentId) return { ownerType: "component", ownerId: attachment.componentId };
+  if (attachment.screenId) return { ownerType: "screen", ownerId: attachment.screenId };
+  if (attachment.projectId) return { ownerType: "project", ownerId: attachment.projectId };
+  if (attachment.workspaceId) return { ownerType: "workspace", ownerId: attachment.workspaceId };
+  return null;
+}
+
 export async function removeReferenceFromOwner(
   referenceId: string,
   ownerType: OwnerType,
@@ -261,6 +276,12 @@ export async function detachReference(
     visibility: "local",
     linkable: false,
     detachedFrom: master.id,
+    // Resolve the image from the master's underlying blob (see
+    // `loadReferenceRowBlob`, which tries `sourceReferenceId` then `id`). A whole
+    // -image master has no `sourceReferenceId`, so point it at the master id. This
+    // keeps the copy's image alive after the library master row is deleted, as
+    // long as the blob file is preserved — see `applyReferenceDeleteDecisions`.
+    sourceReferenceId: master.sourceReferenceId ?? master.id,
     attachments: [ownerAttachment],
     projectIds: collectProjectIds([ownerAttachment]),
     createdAt: now(),
@@ -283,17 +304,25 @@ export async function detachReference(
   return copy;
 }
 
+export type ReferenceLinkUsage = {
+  /** The reference row (whole-image master or a stack-cut card) holding the link. */
+  referenceId: string;
+  ownerType: OwnerType;
+  ownerId: string;
+};
+
 /**
- * How many places link a library reference. Counts the whole-image card and any
- * stack-cut cards derived from it (`${id}::<node>`), since deleting the library
- * master removes them all. Used to warn before a cascading library delete.
+ * List every individual place a library reference is linked — one entry per
+ * attachment across the whole-image card and its stack-cut cards. Unlike
+ * `countReferenceLinkUsages` (which only counts), this drives the per-place
+ * keep-a-copy-or-delete dialog required when removing a linkable item used
+ * elsewhere (Product.md "Removing a linkable item that is used elsewhere").
  */
-export async function countReferenceLinkUsages(
+export async function listReferenceLinkUsages(
   libraryReferenceId: string,
-): Promise<{ projects: number; attachments: number }> {
+): Promise<ReferenceLinkUsage[]> {
   const rows = await listReferences();
-  const projects = new Set<string>();
-  let attachments = 0;
+  const usages: ReferenceLinkUsage[] = [];
   for (const reference of rows) {
     if (
       reference.id !== libraryReferenceId &&
@@ -302,11 +331,11 @@ export async function countReferenceLinkUsages(
       continue;
     }
     for (const attachment of reference.attachments) {
-      if (attachment.projectId) projects.add(attachment.projectId);
-      attachments += 1;
+      const owner = ownerOfAttachment(attachment);
+      if (owner) usages.push({ referenceId: reference.id, ...owner });
     }
   }
-  return { projects: projects.size, attachments };
+  return usages;
 }
 
 /**

@@ -331,7 +331,7 @@ export function useReferenceLibrary() {
     [],
   );
 
-  const removeItem = useCallback((id: string) => {
+  const removeItem = useCallback((id: string, opts?: { keepFile?: boolean }) => {
     setLibrary((prev) => {
       const item = prev.find((i) => i.id === id);
       if (item) releaseReferenceItemUrls(item);
@@ -345,7 +345,11 @@ export function useReferenceLibrary() {
       const { [id]: _removed, ...next } = current;
       return next;
     });
-    void removeReferenceFile(id);
+    // Preserve the underlying blob when at least one place kept a detached copy:
+    // those copies resolve their image from this id's file (see `detachReference`).
+    // The library meta is dropped regardless (persistMeta on the `library` change),
+    // so the entry stays out of the gallery — only the orphaned blob lingers.
+    if (!opts?.keepFile) void removeReferenceFile(id);
     // The library entry is the single source of truth, so deleting it cascades to
     // every project/screen/component that only links to it (whole image + cuts).
     void removeReferenceLinksForLibraryId(id);

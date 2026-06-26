@@ -529,16 +529,22 @@ Full-screen visual editor with floating UI layers.
 - Clicking a card enlarges that reference **inline within the canvas window**
   (not a modal) — a **Back** control returns to the gallery and a trash control
   removes it. Card hover also reveals remove.
-- **Link model (linked-only)**: a reference attached here is a **link** to the
-  library master — projects/screens/components never own a copy, they only point
-  at the root library entry (the master and its blob are shared by id, so there is
-  no storage duplication). This reuses the same linkable engine as components/
-  tokens, but references are intentionally **linked-only**: there is **no detach
+- **Link model (linked)**: a reference attached here is a **link** to the library
+  master — projects/screens/components point at the root library entry (the master
+  and its blob are shared by id, so there is no storage duplication). This reuses
+  the same linkable engine as components/tokens. In-place there is **no detach
   control** and **no purple "linked" indicator** (detach exists in the data layer
-  but is blocked in the UI). Removing a reference here only drops the link for this
-  subject; the master stays in the library. Deleting the master from the
-  `/references` library removes it from every project that links it (with a
-  confirmation warning).
+  but is not surfaced as a per-subject control). Removing a reference here only
+  drops the link for this subject; the master stays in the library. **Deleting the
+  master** from the `/references` library, when it is linked elsewhere, opens the
+  **same per-place keep-a-copy-or-delete dialog** as components and tokens
+  (`UnlinkComponentModal`): each place may **keep a copy** (the link is detached
+  into an independent local copy — the default) or **delete** the link there.
+  Keeping any copy preserves the underlying blob on disk so those copies still
+  render; deleting everywhere also removes the blob. An unlinked reference is
+  removed straight away with no dialog. This satisfies the `Product.md` law
+  "Removing a linkable item that is used elsewhere" for all three linkable
+  capabilities.
 - **Stack references** (a whole stacked image **or** a sub-screen root) open as an
   **interactive composite**, mirroring the Builder Stack tab: the background image
   with its cuts overlaid. Hovering a cut outlines it; clicking selects it; clicking

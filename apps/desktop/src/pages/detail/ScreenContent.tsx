@@ -18,6 +18,7 @@ import { AddReferenceModal } from "@/components/modals/AddReferenceModal";
 import type { ScreenRow } from "@/lib/storage/schema";
 import type { ProjectType, ScreenVariant } from "@/lib/data/types";
 import { updateScreen } from "@/lib/storage/repos/screens.repo";
+import { formatRelativeTime } from "@/lib/utils";
 import { useScreenDetail } from "@/application/screen-detail/useScreenDetail";
 import { useProjectBackTarget } from "@/lib/navigation/useProjectBackTarget";
 import { projectBase } from "@/lib/navigation/projectUrl";
@@ -95,8 +96,12 @@ export function ScreenContent({ projectId, screenId: rawScreenId, workspaceId }:
           <span>{projectDims[type]}</span>
           <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
           <span>{tplLabel[tpl]}</span>
-          <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-          <span>updated 1 hour ago</span>
+          {screen ? (
+            <>
+              <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
+              <span>updated {formatRelativeTime(screen.updatedAt)}</span>
+            </>
+          ) : null}
         </>
       }
       onOpenHistory={() => historyRef.current?.open()}
