@@ -81,16 +81,7 @@ export async function upsertScene(input: {
   const t = now();
   // One record per scene: writing it persists a single row (per-row delta on the
   // save queue), never the whole scenes table.
-  const row: SceneRow = existing
-    ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: t }
-    : {
-        id: sceneRecordId(input.ownerType, input.ownerId),
-        ownerType: input.ownerType,
-        ownerId: input.ownerId,
-        graphJSON: input.graphJSON,
-        sceneVersion: 1,
-        updatedAt: t,
-      };
+  const row = buildSceneRow(existing, { ...input, t });
   putRecord<SceneRow>(KEY, row);
   // Snapshot propagation (CLAUDE.md): regenerate this node's thumbnail from the
   // scene graph; propagation below regenerates ancestor thumbnails too.
@@ -244,16 +235,16 @@ async function propagateVariantSceneToParents(
  * `existing` and call this in the same tick with no `await` between, so the
  * read-modify-write is atomic and cannot lose a concurrent write (SAVE-2).
  */
-function writeSceneRow(
+/**
+ * Pure scene-row construction: bumps `sceneVersion` and `updatedAt` on an existing
+ * row, or mints a fresh one. Shared by `upsertScene` and `writeSceneRow` so the row
+ * shape lives in exactly one place (SAVE-7).
+ */
+function buildSceneRow(
   existing: SceneRow | null,
-  input: {
-    ownerType: SceneOwnerType;
-    ownerId: string;
-    graphJSON: string;
-    t: number;
-  },
-): void {
-  const row: SceneRow = existing
+  input: { ownerType: SceneOwnerType; ownerId: string; graphJSON: string; t: number },
+): SceneRow {
+  return existing
     ? { ...existing, graphJSON: input.graphJSON, sceneVersion: existing.sceneVersion + 1, updatedAt: input.t }
     : {
         id: sceneRecordId(input.ownerType, input.ownerId),
@@ -263,6 +254,18 @@ function writeSceneRow(
         sceneVersion: 1,
         updatedAt: input.t,
       };
+}
+
+function writeSceneRow(
+  existing: SceneRow | null,
+  input: {
+    ownerType: SceneOwnerType;
+    ownerId: string;
+    graphJSON: string;
+    t: number;
+  },
+): void {
+  const row = buildSceneRow(existing, input);
   putRecord<SceneRow>(KEY, row);
   scheduleThumbnailRefresh({
     ownerType: input.ownerType,
