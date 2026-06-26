@@ -233,7 +233,7 @@ fn set_workspace_folder(app: tauri::AppHandle, base_folder: String) -> Result<()
 async fn pick_folder_dialog() -> Option<String> {
     tauri::async_runtime::spawn_blocking(|| {
         rfd::FileDialog::new()
-            .set_title("Escolher pasta dos projetos")
+            .set_title("Choose projects folder")
             .pick_folder()
             .map(|p| p.to_string_lossy().into_owned())
     })
