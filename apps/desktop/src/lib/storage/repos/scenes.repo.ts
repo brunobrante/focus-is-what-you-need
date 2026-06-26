@@ -13,6 +13,10 @@ import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/applica
 import { getCachedSceneDependencyIndex } from "@/application/scenes/sceneDependencyIndexCache";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
 import { scheduleThumbnailRefresh } from "@/application/thumbnails/thumbnailQueue";
+import {
+  instanceUsageForComponents,
+  reconcileSceneUsage,
+} from "@/application/scenes/instanceUsage";
 import { now } from "@/lib/storage/ids";
 import type { ComponentRow, SceneOwnerType, SceneRow, VariantRow } from "@/lib/storage/schema";
 import { TABLES, getRecordById, listTable, notify, putRecord } from "@/lib/storage/store";
@@ -83,6 +87,10 @@ export async function upsertScene(input: {
   // save queue), never the whole scenes table.
   const row = buildSceneRow(existing, { ...input, t });
   putRecord<SceneRow>(KEY, row);
+  // Derive the instance-usage index from this scene's nodes and enqueue the
+  // upserts/deletes on the SAME save batch as the scene row (D3) — a rebuildable
+  // cache, so it self-heals on the next save if a crash drops it.
+  void reconcileSceneUsage(input.ownerType, input.ownerId, input.graphJSON);
   // Snapshot propagation (CLAUDE.md): regenerate this node's thumbnail from the
   // scene graph; propagation below regenerates ancestor thumbnails too.
   scheduleThumbnailRefresh({
@@ -306,22 +314,26 @@ export type InstanceUsage = {
   count: number;
 };
 
-/** Reverse index: scenes that contain instances of the given master components. */
+/**
+ * Reverse index: scenes that contain instances of the given master components.
+ * Repointed onto the derived `instance_usage` index (Step 3) — an index hit
+ * aggregated per host scene, not a scan + `JSON.parse` of every scene (SAVE-5).
+ * Scenes are always variant-owned, so the host ownerType is `"variant"`.
+ */
 export async function listInstanceUsages(
   componentIds: Set<string>,
 ): Promise<InstanceUsage[]> {
   if (componentIds.size === 0) return [];
-  const scenes = await listScenes();
-  const usages: InstanceUsage[] = [];
-  for (const scene of scenes) {
-    const doc = htmlCanvasDocumentFromJSON(scene.graphJSON);
-    if (!doc) continue;
-    const count = doc.nodes.filter(
-      (n) => n.instanceOf && componentIds.has(n.instanceOf.componentId),
-    ).length;
-    if (count > 0) usages.push({ ownerType: scene.ownerType, ownerId: scene.ownerId, count });
+  const rows = await instanceUsageForComponents(componentIds);
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.ownerVariantId, (counts.get(row.ownerVariantId) ?? 0) + 1);
   }
-  return usages;
+  return Array.from(counts, ([ownerId, count]) => ({
+    ownerType: "variant" as SceneOwnerType,
+    ownerId,
+    count,
+  }));
 }
 
 export async function countInstanceUsages(componentIds: Set<string>): Promise<number> {

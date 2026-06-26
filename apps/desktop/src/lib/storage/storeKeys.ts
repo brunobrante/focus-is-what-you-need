@@ -10,6 +10,7 @@ export const TABLES = {
   scenes: "scenes",
   thumbnails: "thumbnails",
   graphEdges: "graph_edges",
+  instanceUsage: "instance_usage",
   settings: "settings",
   workspaces: "workspaces",
   systemDesigns: "system_designs",
