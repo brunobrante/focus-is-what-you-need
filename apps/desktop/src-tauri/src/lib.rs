@@ -566,7 +566,10 @@ fn extract_video_frames_blocking(
         .enumerate()
         .filter_map(|(index, path)| {
             let file = path.file_name()?.to_string_lossy().into_owned();
-            let (w, h) = image::image_dimensions(path).unwrap_or((0, 0));
+            // Skip a frame whose dimensions can't be read (corrupt JPEG) rather
+            // than emit a bogus 0x0 frame; the remaining frames keep their correct
+            // index-derived timestamps (RUST-11).
+            let (w, h) = image::image_dimensions(path).ok()?;
             let timestamp_ms = ((index as f64) / (fps as f64) * 1000.0) as u64;
             Some(ExtractedFrame {
                 file,
