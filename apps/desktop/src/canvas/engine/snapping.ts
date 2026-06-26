@@ -71,16 +71,18 @@ export function buildSnapCandidates(
     { value: rectBottom(bounds), from: bounds.x, to: rectRight(bounds) }
   ];
 
-  const allNodes = Object.values(document.elements);
-  const candidateNodes: typeof allNodes =
+  // Only the unscoped / root-level branches need every node; the common
+  // drag-into-parent path (parentId is a string) reads just that parent's
+  // children, so allocate Object.values lazily instead of on every move (ENG-5).
+  const candidateNodes =
     typeof parentId === "string"
       ? (document.elements[parentId]?.children ?? []).flatMap((id) => {
           const n = document.elements[id];
           return n ? [n] : [];
         })
       : parentId === null
-        ? allNodes.filter((n) => n.parentId === null)
-        : allNodes;
+        ? Object.values(document.elements).filter((n) => n.parentId === null)
+        : Object.values(document.elements);
 
   for (const node of candidateNodes) {
     if (ignore.has(node.id) || node.visible === false) {
