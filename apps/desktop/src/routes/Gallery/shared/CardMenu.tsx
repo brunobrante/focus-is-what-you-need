@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 
 export function CardMenu({
   actions,
@@ -24,31 +25,14 @@ export function CardMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!openId) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (
-        !rootRef.current?.contains(target) &&
-        !menuRef.current?.contains(target)
-      ) {
-        setOpenId(null);
-        setMenuPosition(null);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpenId(null);
-        setMenuPosition(null);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [openId]);
+  useDismissable(
+    openId !== null,
+    () => {
+      setOpenId(null);
+      setMenuPosition(null);
+    },
+    [rootRef, menuRef],
+  );
 
   return (
     <div

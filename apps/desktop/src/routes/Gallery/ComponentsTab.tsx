@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { screenPath, componentPath } from "@/lib/navigation/projectUrl";
 import { FastEditModal, type FastEditModalHandle } from "@/components/screen/FastEditModal";
 import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
@@ -266,22 +267,7 @@ function CreateDropdown({
     setOpen(true);
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (
-        !rootRef.current?.contains(e.target as Node) &&
-        !menuRef.current?.contains(e.target as Node)
-      ) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("pointerdown", onPointer);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onPointer);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissable(open, () => setOpen(false), [rootRef, menuRef]);
 
   return (
     <div ref={rootRef} className="relative inline-flex">
@@ -488,22 +474,7 @@ function ComponentListRow({
   const moreBtnRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onPointer = (e: PointerEvent) => {
-      if (
-        !moreBtnRef.current?.contains(e.target as Node) &&
-        !moreMenuRef.current?.contains(e.target as Node)
-      ) setMoreOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMoreOpen(false); };
-    window.addEventListener("pointerdown", onPointer);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onPointer);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [moreOpen]);
+  useDismissable(moreOpen, () => setMoreOpen(false), [moreBtnRef, moreMenuRef]);
 
   const stopNav = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
 

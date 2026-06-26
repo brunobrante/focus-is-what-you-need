@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { IconCheck, IconDuplicate, IconEllipsis, IconFastEdit, IconGlobe, IconGrid, IconMoveTo, IconOpenCanvas, IconTrash, IconZoomIn } from "@/components/icons";
@@ -133,31 +133,14 @@ export function CardMoreMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (
-        !rootRef.current?.contains(target) &&
-        !menuRef.current?.contains(target)
-      ) {
-        setOpen(false);
-        setMenuPosition(null);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        setMenuPosition(null);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  useDismissable(
+    open,
+    () => {
+      setOpen(false);
+      setMenuPosition(null);
+    },
+    [rootRef, menuRef],
+  );
 
   return (
     <div

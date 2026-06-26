@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useRef,
   useState,
   type Dispatch,
@@ -7,6 +6,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { screenPath } from "@/lib/navigation/projectUrl";
 import { Snapshot } from "@/components/Snapshot";
 import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
@@ -145,22 +145,7 @@ function CreateScreenDropdown({
     setOpen(true);
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (
-        !rootRef.current?.contains(e.target as Node) &&
-        !menuRef.current?.contains(e.target as Node)
-      ) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("pointerdown", onPointer);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onPointer);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissable(open, () => setOpen(false), [rootRef, menuRef]);
 
   return (
     <div ref={rootRef} className="relative inline-flex">

@@ -1,5 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Modal, ModalHeader } from "./Modal";
+import { useDismissable } from "@/lib/hooks/useDismissable";
 import { IconClose, IconGrid, IconLayoutHorizontal, IconLayoutVertical, IconOpenCanvas, IconPlus } from "@/components/icons";
 import { Snapshot } from "@/components/Snapshot";
 import { VersionTagBadge } from "@/components/screen/VersionSideCard";
@@ -305,19 +306,7 @@ function AddVersionPicker({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissable(open, () => setOpen(false), [rootRef]);
 
   const menu = (
     <div
