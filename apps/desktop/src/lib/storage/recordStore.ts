@@ -108,10 +108,15 @@ export function removeRecords(table: TableKey, ids: string[]): void {
  *
  * Hot, large tables (scenes/thumbnails) should prefer `putRecord` to avoid the
  * per-row JSON diff; this is for the small cold tables.
+ *
+ * `options.silent` suppresses the per-table `notify`: a multi-table writer (the
+ * reseed) can populate every cache first and fire one batched notify at the end,
+ * so a subscriber can never observe a half-applied cross-table state (SAVE-4).
  */
 export async function replaceTable<T extends Row>(
   table: TableKey,
   rows: T[],
+  options?: { silent?: boolean },
 ): Promise<void> {
   await ensureHydrated(table);
   const map = bucket(table);
@@ -136,7 +141,7 @@ export async function replaceTable<T extends Row>(
     queue.enqueue({ op: "deleteRecords", table, ids: removed });
   }
 
-  notify(table);
+  if (!options?.silent) notify(table);
 }
 
 // ---------------------------------------------------------------------------

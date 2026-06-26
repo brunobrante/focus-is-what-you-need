@@ -142,15 +142,18 @@ async function firstBootSeedV5(): Promise<void> {
     updatedAt: t,
   };
 
-  await replaceTable<ProjectRow>(TABLES.projects, projects);
-  await replaceTable<ScreenRow>(TABLES.screens, screens);
-  await replaceTable<ComponentRow>(TABLES.components, components);
-  await replaceTable<VariantRow>(TABLES.variants, variants);
-  await replaceTable<ReferenceRow>(TABLES.references, references);
-  await replaceTable<SceneRow>(TABLES.scenes, scenes);
-  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace]);
-  await replaceTable<never>(TABLES.history, []);
+  // Populate every cache silently, then fire one batched notify below, so a
+  // subscriber never observes a half-applied cross-table reseed (SAVE-4).
+  const silent = { silent: true };
+  await replaceTable<ProjectRow>(TABLES.projects, projects, silent);
+  await replaceTable<ScreenRow>(TABLES.screens, screens, silent);
+  await replaceTable<ComponentRow>(TABLES.components, components, silent);
+  await replaceTable<VariantRow>(TABLES.variants, variants, silent);
+  await replaceTable<ReferenceRow>(TABLES.references, references, silent);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes, silent);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails, silent);
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace], silent);
+  await replaceTable<never>(TABLES.history, [], silent);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -160,6 +163,7 @@ async function firstBootSeedV5(): Promise<void> {
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
   notify(TABLES.workspaces);
+  notify(TABLES.history);
 }
 
 async function ensureFactoryMocksPresent(): Promise<void> {
@@ -291,13 +295,15 @@ async function ensureFactoryMocksPresent(): Promise<void> {
     );
   }
 
-  await replaceTable<ProjectRow>(TABLES.projects, projects);
-  await replaceTable<ScreenRow>(TABLES.screens, screens);
-  await replaceTable<ComponentRow>(TABLES.components, components);
-  await replaceTable<VariantRow>(TABLES.variants, variants);
-  await replaceTable<SceneRow>(TABLES.scenes, scenes);
-  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails);
-  await replaceTable<WorkspaceRow>(TABLES.workspaces, workspaces);
+  // Silent fill + one batched notify, so no subscriber sees a partial state (SAVE-4).
+  const silent = { silent: true };
+  await replaceTable<ProjectRow>(TABLES.projects, projects, silent);
+  await replaceTable<ScreenRow>(TABLES.screens, screens, silent);
+  await replaceTable<ComponentRow>(TABLES.components, components, silent);
+  await replaceTable<VariantRow>(TABLES.variants, variants, silent);
+  await replaceTable<SceneRow>(TABLES.scenes, scenes, silent);
+  await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails, silent);
+  await replaceTable<WorkspaceRow>(TABLES.workspaces, workspaces, silent);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
