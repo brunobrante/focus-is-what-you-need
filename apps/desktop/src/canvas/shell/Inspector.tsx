@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { windowKeyLabel } from "@/canvas/canvasUtils";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
+import type { EditorAction } from "@/canvas/engine/store";
 import {
   renameElement,
   setTextElementSizing,
@@ -133,7 +134,7 @@ export function Inspector({
     });
   };
 
-  const dispatchAncestor = (action: { type: string } & Record<string, unknown>) => {
+  const dispatchAncestor = (action: EditorAction) => {
     (editorProp ?? getEditorSnapshot())?.dispatch(action);
   };
   const onToggleAncestorOverlay = (enabled: boolean) => {
