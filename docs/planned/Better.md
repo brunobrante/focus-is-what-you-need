@@ -211,6 +211,9 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | VER-4 | ✅ `68cb8f6` | Linked-promote linkifies the demoted old main with `propagate:true` so ancestor thumbnails regenerate. |
 | BLD-4 | ✅ `c2235a4` | Deleted dead `OriginalSlideshow` + `ScreensPanel` Builder modules. |
 | dead route | ✅ `a2fdf1e` | Deleted unimported `routes/NewProject.tsx` (superseded by `NewProjectPage`). |
+| UI-13 | ✅ `e123307` | `ReferenceDetailModal` stackPreview release has a single owner (no double-revoke). |
+| BLD-14 | ✅ `fbbb4b1` | `RootSwitcher` thumbnail loader revokes orphaned object URLs (cancelled / duplicate-cache race); cache now bounded to one URL per id. |
+| BLD-11 | ⏭️ deferred | Module thumbnail cache no longer grows unbounded after BLD-14 (≤ one URL per distinct reference); full revoke-on-unmount still needs a refcounted shared hook (revoking a live shared URL would blank mounted thumbnails). |
 
 > Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
 > SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2/3) and the cross-cutting duplication /
