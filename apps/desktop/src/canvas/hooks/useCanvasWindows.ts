@@ -109,8 +109,12 @@ export function useCanvasWindows({
   const removeExtraCurrent = useCallback(
     (key: CanvasWindowKey) => {
       setExtraCurrents((list) => list.filter((entry) => entry.key !== key));
-      setSplitWindows((current) => current.filter((windowKey) => windowKey !== key));
-      if (splitWindows.filter((windowKey) => windowKey !== key && windowKey !== "preview").length < 2) {
+      // Derive the next windows and the split-mode decision from one computed
+      // value so they can't diverge — the old code set windows via a functional
+      // updater but decided split from the stale closure splitWindows (SHELL-10).
+      const nextWindows = splitWindows.filter((windowKey) => windowKey !== key);
+      setSplitWindows(nextWindows);
+      if (nextWindows.filter((windowKey) => windowKey !== "preview").length < 2) {
         setSplit("none");
       }
       setActiveTab((tab) => (tab === key ? "current" : tab));
@@ -171,8 +175,10 @@ export function useCanvasWindows({
 
   const closePreview = useCallback(() => {
     setPreviewOpen(false);
-    setSplitWindows((current) => current.filter((w) => w !== "preview"));
-    if (splitWindows.filter((w) => w !== "preview").length < 2) {
+    // One computed next value drives both the windows and the split decision (SHELL-10).
+    const nextWindows = splitWindows.filter((w) => w !== "preview");
+    setSplitWindows(nextWindows);
+    if (nextWindows.length < 2) {
       setSplit("none");
     }
   }, [splitWindows]);
