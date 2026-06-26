@@ -39,7 +39,9 @@ reqwest = "0.12"
 # NSColorSampler is driven through the safe objc2 bindings; gated to macOS so
 # Linux/Windows builds never see them.
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.5"
-objc2-foundation = "0.2"
-objc2-app-kit = { version = "0.2", features = ["NSColor", "NSColorSampler", "NSColorSpace"] }
-block2 = "0.5"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+# `block2` feature is required: showSamplerWithSelectionHandler: takes an Obj-C block
+# and is gated behind `all(feature = "NSColor", feature = "block2")` in the bindings.
+objc2-app-kit = { version = "0.3", features = ["NSColor", "NSColorSampler", "NSColorSpace", "block2"] }
+block2 = "0.6"

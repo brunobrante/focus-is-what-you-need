@@ -45,9 +45,9 @@ mod macos {
         let (tx, rx) = mpsc::channel::<Result<Option<String>, String>>();
 
         app.run_on_main_thread(move || {
-            // Safety: Tauri invokes this closure on the main thread, which is
-            // exactly what AppKit's color sampler requires.
-            let sampler: Retained<NSColorSampler> = unsafe { NSColorSampler::new() };
+            // Tauri invokes this closure on the main thread, which is exactly what
+            // AppKit's color sampler requires (load-bearing for the unsafe show below).
+            let sampler: Retained<NSColorSampler> = NSColorSampler::new();
 
             // `showSamplerWithSelectionHandler:` takes a block called with the
             // picked `NSColor`, or `nil` if the user cancelled. The objc2
