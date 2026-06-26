@@ -208,11 +208,16 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | UI-16 | ✅ `8269ff6` | "Create project" button gains `disabled={creating}` alongside `!canNext`. |
 | VID-1 | ✅ `df7a62c` | Extraction errors probe `ffmpegAvailable()` — ffmpeg-missing vs other-failure get distinct copy; the 0-frames success state already rendered separately. |
 | META-2 | ✅ `349fcca` | Dead `author`/`initials` stubs removed from `ScreenVersion` (never rendered; no identity system to wire). |
+| VER-4 | ✅ `68cb8f6` | Linked-promote linkifies the demoted old main with `propagate:true` so ancestor thumbnails regenerate. |
+| BLD-4 | ✅ `c2235a4` | Deleted dead `OriginalSlideshow` + `ScreensPanel` Builder modules. |
+| dead route | ✅ `a2fdf1e` | Deleted unimported `routes/NewProject.tsx` (superseded by `NewProjectPage`). |
 
 > Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
-> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2..4) and the
-> cross-cutting duplication / dead-code / mixed-language sweeps. With REF-1 landed
-> (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
+> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2/3) and the cross-cutting duplication /
+> dead-code / mixed-language sweeps. **VER-2** (version creation captures zero children
+> when the source has no saved scene) was deliberately left for a focused effort — the fix
+> must materialize/synthesize the missing scene and touches the law-sensitive versioning
+> core. With REF-1 landed (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
 
 ---
 
