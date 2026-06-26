@@ -45,11 +45,14 @@ struct ZipEntry {
     data: Vec<u8>,
 }
 
-fn config_path(app: &tauri::AppHandle) -> PathBuf {
-    app.path()
+fn config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // Propagate the failure instead of `.expect()`-panicking the whole command,
+    // matching every sibling path helper that returns Result (RUST-9).
+    Ok(app
+        .path()
         .app_data_dir()
-        .expect("cannot resolve app data dir")
-        .join("workspace-config.json")
+        .map_err(|e| e.to_string())?
+        .join("workspace-config.json"))
 }
 
 fn sqlite_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -105,7 +108,9 @@ fn default_config(app: &tauri::AppHandle) -> WorkspaceConfig {
 }
 
 fn read_config(app: &tauri::AppHandle) -> WorkspaceConfig {
-    let path = config_path(app);
+    let Ok(path) = config_path(app) else {
+        return default_config(app);
+    };
     if let Ok(raw) = fs::read_to_string(&path) {
         if let Ok(cfg) = serde_json::from_str::<WorkspaceConfig>(&raw) {
             return cfg;
@@ -115,7 +120,7 @@ fn read_config(app: &tauri::AppHandle) -> WorkspaceConfig {
 }
 
 fn save_config(app: &tauri::AppHandle, cfg: &WorkspaceConfig) -> Result<(), String> {
-    let path = config_path(app);
+    let path = config_path(app)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -153,6 +158,10 @@ fn workspace_dir(cfg: &WorkspaceConfig) -> PathBuf {
 }
 
 fn now_ms() -> u64 {
+    // `duration_since(UNIX_EPOCH)` only errors if the system clock is set before
+    // 1970; in that (practically impossible) case we fall back to 0 rather than
+    // panic. Callers use this only for a `savedAt` timestamp, so a 0 is harmless
+    // metadata, not a correctness hazard (RUST-9).
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
