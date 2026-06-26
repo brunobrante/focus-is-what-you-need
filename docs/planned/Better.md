@@ -214,6 +214,8 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | UI-13 | ✅ `e123307` | `ReferenceDetailModal` stackPreview release has a single owner (no double-revoke). |
 | BLD-14 | ✅ `fbbb4b1` | `RootSwitcher` thumbnail loader revokes orphaned object URLs (cancelled / duplicate-cache race); cache now bounded to one URL per id. |
 | BLD-11 | ⏭️ deferred | Module thumbnail cache no longer grows unbounded after BLD-14 (≤ one URL per distinct reference); full revoke-on-unmount still needs a refcounted shared hook (revoking a live shared URL would blank mounted thumbnails). |
+| UI-14 | ✅ `29aaf65` | Six Gallery/modal dropdowns routed through `useDismissable` (ComponentsTab ×2, ScreensTab, Gallery/shared + screen `CardMenu`, CompareVersionsModal). |
+| SHELL-1 | ✅ `42ffda3` + `1abb5c9` | `useDismissable` gained `{ capture, escape }` options; 12 canvas shell/stage dismiss sites converged on it with behavior preserved (capture phase is load-bearing where pointer handlers stopPropagation). Left unconverted: `InsComponents` (commit-on-blur, different semantics) and `references/components/ui.tsx` + `FastEditModal` (document/`mousedown` — converting would change the event type). |
 
 > Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
 > SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2/3) and the cross-cutting duplication /
