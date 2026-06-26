@@ -284,8 +284,13 @@ partly wrong — noted inline).
   data-loss-adjacent code that can't be unit-verified in this `bun:test`-only harness (no React testing).
   Same precedent as ENG-8. Left as-is.
 - (**SAVE-11**, **SAVE-4**, **SAVE-12**, **SAVE-8** are now done — see below; `bun test` *is* available.)
-- **DOM-1 / DOM-4** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
+- **DOM-1** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
   `document.ts`→`nodeHelpers`→`styleUtils` and 32 importers; a focused architecture effort (audit phase 4).
+- **DOM-4 — done (`17c1820`).** The shared graph-node helpers (`subjectNodeForDocument`,
+  `groupNodesByParent`, `collectDescendantIds(From)`, `uniqueNodeId`) now live in one pure
+  `lib/canvas/htmlScene/graphNodeHelpers` module (types-only deps → no cycle); domain + infra both import
+  it, ending the byte-for-byte subject-heuristic duplication. Unified `collectDescendantIdsFrom` keeps the
+  cycle guard. (Done independently of DOM-1, which still needs the full type move.)
 - **ENG-8** — the three ancestor-walk loops share only a trivial cycle-guard but diverge in early-exit
   semantics (return null / break / return []) and data structure; a forced abstraction is net-negative.
 - **UI-17** — extracting `ProjectGrid`/`DeviceMock`/`SelectableCard` across 4 pages is a larger
