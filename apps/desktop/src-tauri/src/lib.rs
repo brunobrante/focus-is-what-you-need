@@ -380,8 +380,10 @@ pub struct StackFileInput {
 }
 
 // Writes an entire stack (all crop PNGs + data.json) in a single IPC call,
-// replacing the previous stack folder atomically-ish. This collapses the old
-// O(cuts) round-trips into one.
+// replacing the previous stack folder. Collapses the old O(cuts) round-trips
+// into one, and stages the write so it is atomic-ish: the whole stack is built
+// in a temp dir and swapped in only after every file succeeds, so a mid-batch
+// failure (bad input, disk full) leaves the previous stack intact (BLD-2).
 #[tauri::command]
 fn write_reference_stack_batch(
     app: tauri::AppHandle,
@@ -392,17 +394,35 @@ fn write_reference_stack_batch(
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
     let id = safe_path_segment(&id, "reference id")?;
-    let stack_dir = reference_dir(&cfg, &id).join("stack");
-    if stack_dir.exists() {
-        let _ = fs::remove_dir_all(&stack_dir);
-    }
-    fs::create_dir_all(&stack_dir).map_err(|e| e.to_string())?;
+    let ref_dir = reference_dir(&cfg, &id);
+    let stack_dir = ref_dir.join("stack");
+    let tmp_dir = ref_dir.join("stack.tmp");
+
+    // Validate names + decode every payload before touching the filesystem, so a
+    // bad file name or base64 string can't leave a half-written stack.
+    let mut decoded: Vec<(String, Vec<u8>)> = Vec::with_capacity(files.len());
     for file in &files {
         let file_name = safe_path_segment(&file.file_name, "stack file name")?;
         let data = BASE64.decode(&file.data_b64).map_err(|e| e.to_string())?;
-        fs::write(stack_dir.join(file_name), &data).map_err(|e| e.to_string())?;
+        decoded.push((file_name, data));
     }
-    fs::write(stack_dir.join("data.json"), data_json).map_err(|e| e.to_string())
+
+    // Stage the full stack in a fresh temp dir.
+    let _ = fs::remove_dir_all(&tmp_dir);
+    fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
+    for (file_name, data) in &decoded {
+        fs::write(tmp_dir.join(file_name), data).map_err(|e| e.to_string())?;
+    }
+    fs::write(tmp_dir.join("data.json"), &data_json).map_err(|e| e.to_string())?;
+
+    // Swap it in: only now is the existing stack removed, then the staged dir is
+    // moved into place. On a failed rename, clean up the temp dir rather than
+    // leaving it behind.
+    let _ = fs::remove_dir_all(&stack_dir);
+    fs::rename(&tmp_dir, &stack_dir).map_err(|e| {
+        let _ = fs::remove_dir_all(&tmp_dir);
+        e.to_string()
+    })
 }
 
 /* ---------- Video frame extraction (ffmpeg sidecar) ---------- */
