@@ -64,20 +64,32 @@ export function createSceneDependencyIndex(input: {
     return null;
   };
 
-  const getVariantDepth = (variantId: string, seen = new Set<string>()): number => {
+  // Returns the depth plus whether the walk passed through a cycle. A depth
+  // computed along a cyclic path is wrong (the cycle short-circuits to 0), so it
+  // must NOT be memoized — otherwise an ancestor caches a too-small depth (SAVE-9).
+  const computeDepth = (
+    variantId: string,
+    seen: Set<string>,
+  ): { depth: number; cyclic: boolean } => {
     const cached = depthByVariantId.get(variantId);
-    if (cached !== undefined) return cached;
-    if (seen.has(variantId)) return 0;
+    if (cached !== undefined) return { depth: cached, cyclic: false };
+    if (seen.has(variantId)) return { depth: 0, cyclic: true };
     seen.add(variantId);
 
     const parent = getParentOwnerForVariant(variantId);
-    const depth =
-      parent?.ownerType === "variant"
-        ? 1 + getVariantDepth(parent.ownerId, seen)
-        : 0;
-    depthByVariantId.set(variantId, depth);
-    return depth;
+    if (parent?.ownerType !== "variant") {
+      depthByVariantId.set(variantId, 0);
+      return { depth: 0, cyclic: false };
+    }
+
+    const sub = computeDepth(parent.ownerId, seen);
+    const depth = 1 + sub.depth;
+    if (!sub.cyclic) depthByVariantId.set(variantId, depth);
+    return { depth, cyclic: sub.cyclic };
   };
+
+  const getVariantDepth = (variantId: string): number =>
+    computeDepth(variantId, new Set<string>()).depth;
 
   return {
     componentById,
