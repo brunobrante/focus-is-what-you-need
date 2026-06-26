@@ -58,8 +58,16 @@ export function VariantsPanel({
           return (
             <div
               key={variant.id}
+              role={isActive ? undefined : "button"}
+              tabIndex={isActive ? undefined : 0}
               onClick={() => {
                 if (!isActive) onSetMain(variant.id);
+              }}
+              onKeyDown={(event) => {
+                if (!isActive && (event.key === "Enter" || event.key === " ")) {
+                  event.preventDefault();
+                  onSetMain(variant.id);
+                }
               }}
               className={[
                 "flex h-11 cursor-pointer items-center gap-1.5 rounded-[8px] border bg-[var(--bg-elev)] px-1.5 py-1 transition-colors duration-[120ms]",

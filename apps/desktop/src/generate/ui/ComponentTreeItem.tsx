@@ -48,7 +48,15 @@ export function ComponentTreeItem({
   return (
     <div className="flex flex-col gap-1">
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => onOpen(component.id)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpen(component.id);
+          }
+        }}
         onMouseEnter={() => onHover(component.id)}
         onMouseLeave={() => onHover(null)}
         className={[
