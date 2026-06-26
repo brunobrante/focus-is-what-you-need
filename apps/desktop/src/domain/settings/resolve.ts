@@ -18,7 +18,10 @@ type KeyboardLikeEvent = {
 };
 
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  // structuredClone avoids the JSON serialize+parse round-trip mergeDeep ran over
+  // the whole settings tree on every layer/recursion (DOM-5). Settings are pure
+  // JSON-like data, so a structured clone is equivalent and cheaper.
+  return structuredClone(value);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
