@@ -260,15 +260,15 @@ partly wrong — noted inline).
 | SAVE-7 | ✅ `4b82b91` | Shared pure `buildSceneRow` for upsert/write paths (side-effect order preserved). The shadowed `removeComponentSubtreeInGraph` the audit cited no longer exists. |
 | SAVE-9 | ✅ `f5ebc49` | `getVariantDepth` no longer memoizes a depth computed through a cycle. |
 | SAVE-3 | ☑️ already fixed | `replayOutbox` already has the `if (!pending.has(key))` guard (audit was stale). |
+| SAVE-11 | ✅ `dc512ec` | Upsert/delete of one `(table,id)` now coalesce last-op-wins: multi-id deletes split per record (`eachRecordMutation`) and the opposite op is evicted wherever a mutation enters `pending` (enqueue, in-flight outbox snapshot, re-queue/replay). Was a real ordering bug the v3 coalescing would have inherited; fixed first. |
 | ENG-2, STAGE-1 | 🟡 false positive | Re-confirmed from the verification table — not acted on. |
 | SHELL-8 | 🟡 false positive | Same `resolveMaster`-keyed-on-`graphJSON` pattern the verification "do-not-touch" table already cleared (LiveInstanceRefresh re-resolves). Not touched. |
 
 **Deferred (with rationale), not done this pass:**
-- **Save-path behavior changes — SAVE-4, SAVE-8, SAVE-10, SAVE-11, SAVE-12, SHELL-4.** Each alters
-  reseed-notify timing, retry/backoff, queue coalescing (SAVE-11 is a real ordering bug), the
-  `peekTable` contract, or merges the two scene-persistence hooks. All are data-loss-adjacent and the
-  sandbox has **no `bun`/test runner**, so they can't be runtime-verified — better as a focused,
-  test-backed effort.
+- **Save-path behavior changes — SAVE-4, SAVE-8, SAVE-10, SAVE-12, SHELL-4.** Each alters
+  reseed-notify timing, retry/backoff, queue coalescing, the `peekTable` contract, or merges the two
+  scene-persistence hooks. All are data-loss-adjacent — better as a focused, test-backed effort.
+  (**SAVE-11** is now done — see below; `bun test` *is* available after all.)
 - **DOM-1 / DOM-4** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
   `document.ts`→`nodeHelpers`→`styleUtils` and 32 importers; a focused architecture effort (audit phase 4).
 - **ENG-8** — the three ancestor-walk loops share only a trivial cycle-guard but diverge in early-exit
