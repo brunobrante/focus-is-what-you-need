@@ -397,7 +397,7 @@ export async function computeComponentAncestorFrames(
 
     const name = isScreenRoot
       ? (current.screenId ? screensById.get(current.screenId)?.title ?? "Screen" : "Screen")
-      : (byActiveVariantId.get(current.parentVariantId as string)?.name ?? "Componente");
+      : (byActiveVariantId.get(current.parentVariantId as string)?.name ?? "Component");
 
     frames.push({
       id: ownerId,

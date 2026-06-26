@@ -37,7 +37,7 @@ function AncestorCard({
         </span>
         <span className="min-w-0 flex-1 truncate text-[11px] text-[#CFCFCF]">{frame.name}</span>
         <span className="shrink-0 text-[9px] uppercase tracking-[0.4px] text-[#6B6B6B]">
-          {isScreen ? "Screen" : "Componente"}
+          {isScreen ? "Screen" : "Component"}
         </span>
         <IconChevronDown
           size={10}
@@ -89,11 +89,11 @@ const SHAPE_RENDER_OPTIONS: Array<{ value: ShapeRenderMode; label: string }> = [
 
 const SHAPE_LIST: Array<{ id: string; label: string }> = [
   { id: "rectangle", label: "Rectangle" },
-  { id: "ellipse",   label: "Elipse" },
-  { id: "line",      label: "Linha" },
-  { id: "arrow",     label: "Seta" },
+  { id: "ellipse",   label: "Ellipse" },
+  { id: "line",      label: "Line" },
+  { id: "arrow",     label: "Arrow" },
   { id: "polygon",   label: "Polygon" },
-  { id: "star",      label: "Estrela" },
+  { id: "star",      label: "Star" },
 ];
 
 export type ShellControlVisibility = "show" | "hidden" | "hover";
@@ -179,7 +179,7 @@ export function ShellTab({
           </InsRow>
           {ancestorFrames.length === 0 ? (
             <p className="text-[11px] leading-snug text-[#6B6B6B]">
-              Sem elementos pai para este componente.
+              No parent elements for this component.
             </p>
           ) : (
             ancestorFrames.map((frame, depth) => (
@@ -231,7 +231,7 @@ export function ShellTab({
         </InsRow>
       </InsSection>
 
-      <InsSection title="Formas">
+      <InsSection title="Shapes">
         {SHAPE_LIST.map((shape) => (
           <InsRow key={shape.id} label={shape.label}>
             <InsToggle

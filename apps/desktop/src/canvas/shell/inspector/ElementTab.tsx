@@ -130,7 +130,7 @@ export function ElementTab({
             <IconLink size={12} strokeWidth={1.8} />
           </span>
           <span className="min-w-0 leading-snug text-[#9A9A9A]">
-            Instância linkada — somente leitura. Faça detach para editar.
+            Linked instance — read-only. Detach to edit.
             {lockedInstanceVariantId && onGoToInstance ? (
               <>
                 {" "}
@@ -139,9 +139,9 @@ export function ElementTab({
                   onClick={() => onGoToInstance(lockedInstanceVariantId)}
                   className="cursor-pointer border-0 bg-transparent p-0 font-medium text-[#8638E5] underline underline-offset-2 hover:text-[#A855E6]"
                 >
-                  Ou clique aqui
+                  Or click here
                 </button>{" "}
-                para abrir o componente.
+                to open the component.
               </>
             ) : null}
           </span>

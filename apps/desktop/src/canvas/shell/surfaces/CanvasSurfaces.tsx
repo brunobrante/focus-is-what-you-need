@@ -390,7 +390,7 @@ function CanvasParentBackButton({
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-[8px] font-medium uppercase tracking-[0.08em] leading-none text-[#5E5E5E] transition-colors duration-[100ms] group-hover:text-[#767676]">
-          Voltar para
+          Back to
         </span>
         <span className="truncate text-[12px] font-semibold leading-[1.1] text-[#DEDEDE]">
           {parentTarget.name}

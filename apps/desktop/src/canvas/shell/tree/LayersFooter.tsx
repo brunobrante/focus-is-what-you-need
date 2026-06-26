@@ -26,12 +26,12 @@ function nextExpand(mode: ExpandMode): {
   const order: ExpandMode[] = ["all", "second", "collapsed"];
   const next = order[(order.indexOf(mode) + 1) % order.length];
   if (next === "all") {
-    return { next, Icon: IconExpand, title: "Expandir toda a árvore" };
+    return { next, Icon: IconExpand, title: "Expand entire tree" };
   }
   if (next === "second") {
-    return { next, Icon: IconLayers, title: "Expandir até a primeira hierarquia" };
+    return { next, Icon: IconLayers, title: "Expand to the first hierarchy" };
   }
-  return { next, Icon: IconCollapse, title: "Fechar a árvore" };
+  return { next, Icon: IconCollapse, title: "Collapse tree" };
 }
 
 export function LayersFooter({
@@ -80,7 +80,7 @@ export function LayersFooter({
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Buscar camadas"
+            placeholder="Search layers"
             className="min-w-0 flex-1 border-0 bg-transparent text-[12px] text-[#F2F2F2] outline-none placeholder:text-[#6B6B6B]"
           />
         </div>
@@ -99,8 +99,8 @@ export function LayersFooter({
           <button
             type="button"
             onClick={() => setFilterOpen((v) => !v)}
-            aria-label="Filtrar camadas"
-            title="Filtrar camadas"
+            aria-label="Filter layers"
+            title="Filter layers"
             className={[
               "relative grid h-7 w-7 cursor-pointer place-items-center rounded-md border transition-colors",
               filterOpen || kinds.size > 0

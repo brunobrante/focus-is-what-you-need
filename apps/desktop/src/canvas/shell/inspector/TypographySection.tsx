@@ -148,7 +148,7 @@ export function TypographySection({
       </InsRow>
       {heightFit && (styles.verticalAlign ?? "top") !== "top" ? (
         <p className="text-[11px] leading-4 text-[#6B6B6B]">
-          Alinhamento vertical só aparece com altura fixa (H = Fit ignora).
+          Vertical alignment only appears with a fixed height (H = Fit ignores it).
         </p>
       ) : null}
 

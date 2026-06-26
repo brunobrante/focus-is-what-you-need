@@ -18,7 +18,7 @@ export function CanvasTab({ canvas, active, onToggleActive, onUpdate }: CanvasTa
         className="m-0 w-full border-0 p-0"
         style={{ opacity: editing ? 1 : 0.45 }}
       >
-        <InsSection title="Tamanho">
+        <InsSection title="Size">
           <InsRow label="W">
             <InsInput value={String(canvas.width)} onChange={(value) => updateNumber(value, (width) => onUpdate({ width }))} suffix="px" />
           </InsRow>

@@ -22,7 +22,7 @@ export function BackFooter({
 
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[10px] leading-none text-[#444] transition-colors duration-[90ms] group-hover:text-[#666]">
-          Voltar para
+          Back to
         </span>
         <span className="truncate text-[12px] font-medium leading-none text-[#7A7A7A] transition-colors duration-[90ms] group-hover:text-[#CFCFCF]">
           {parentNode.name}

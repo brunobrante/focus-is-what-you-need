@@ -453,7 +453,7 @@ export function Tree({
   return (
     <>
     <aside
-      aria-label="Camadas"
+      aria-label="Layers"
       className="pointer-events-auto fixed bottom-3 left-3 top-16 z-[6] flex w-[300px] flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
@@ -494,7 +494,7 @@ export function Tree({
         <div className="flex shrink-0 items-center gap-1.5 border-b border-[#222] bg-[#111] px-3.5 py-1.5">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#444]" />
           <span className="text-[10px] font-medium text-[#555]">
-            Não salvo no banco — local ao dispositivo
+            Not saved to the database — local to this device
           </span>
         </div>
       ) : null}
@@ -603,7 +603,7 @@ export function Tree({
                 ))
               ) : filterActive ? (
                 <div className="px-4 py-6 text-center text-[12px] text-[#6B6B6B]">
-                  Nenhuma camada encontrada.
+                  No layers found.
                 </div>
               ) : null}
             </div>
@@ -752,7 +752,7 @@ export function TreeToggle({ open, onClick }: { open: boolean; onClick: () => vo
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)" }}
     >
       <IconLayers size={13} strokeWidth={1.7} />
-      Camadas
+      Layers
     </button>
   );
 }

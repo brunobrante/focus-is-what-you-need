@@ -93,7 +93,7 @@ export function nodeTypeLabel(node: Node): string {
     case "text":    return "text";
     case "image":   return "img";
     case "icon":    return "icon";
-    case "ellipse": return "elipse";
+    case "ellipse": return "ellipse";
     case "line":    return "line";
     case "pen":     return "pen";
     default:        return "div";
@@ -145,12 +145,12 @@ export function openToDepth(root: Node, maxDepth: number): Set<string> {
 
 /** Filter option values used by the layers footer; matched against a node's type. */
 export const LAYER_FILTER_KINDS: { value: string; label: string }[] = [
-  { value: "component", label: "Componente" },
+  { value: "component", label: "Component" },
   { value: "div", label: "Div" },
-  { value: "text", label: "Texto" },
-  { value: "image", label: "Imagem" },
-  { value: "icon", label: "Ícone" },
-  { value: "shape", label: "Forma" },
+  { value: "text", label: "Text" },
+  { value: "image", label: "Image" },
+  { value: "icon", label: "Icon" },
+  { value: "shape", label: "Shape" },
 ];
 
 export function nodeMatchesKind(type: NodeType, kind: string): boolean {
