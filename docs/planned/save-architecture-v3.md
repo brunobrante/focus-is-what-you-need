@@ -159,6 +159,30 @@ until its behavior is in this suite and green on all three.
 - **In-memory record-store cache is the read source; all writes are async,
   fire-and-forget through `SaveQueue`.** The UI never awaits persistence.
 
+### Graph hot-path specifics (so the graph itself stays fast)
+
+These three keep the edge model from hiding a latent cliff:
+
+- **Maintain the adjacency index incrementally, never full-rebuild.** On the
+  `graph_edges` subscription, apply only the *changed* edge to the two maps
+  (`from→edges`, `to→edges`) — add on upsert, remove on tombstone. An edge write is
+  then O(1), not O(E). (Full rebuild on every structural op would be a hidden
+  per-write cost as the workspace grows.)
+- **Filter tombstones at hydration + GC periodically.** `deletedAt` rows accumulate
+  until compaction (deferred), so the boot hydration must skip `deletedAt != null`
+  edges and a periodic sweep must hard-delete old tombstones — otherwise the table and
+  the in-memory index bloat with dead edges over a long-lived workspace. (Don't wait
+  for full compaction to add the filter + sweep.)
+- **Edge mutations reuse the record cross-op coalescing (SAVE-11).** An
+  `upsertGraphEdge` + `deleteGraphEdges` of the same edge id in one batch must collapse
+  last-op-wins — extend `eachRecordMutation` / `oppositeMutationKey` to the edge ops,
+  don't merely add `up:edge` / `del:edge` keys, or a create-then-delete in one flush can
+  resurrect a deleted edge (the exact bug SAVE-11 fixed for records).
+- **Scope edge hydration by active workspace/project when data grows.** All-edges-in-
+  memory is fine for bounded single-user data now; when it stops being bounded, load
+  edges for the open workspace's subtree rather than the whole store. (Not needed for
+  Step 2; noted so it isn't designed out.)
+
 ### Fast-feature-building invariant
 
 A new cross-entity capability is **always** a new `EntityType` + new `GraphRelation` +
