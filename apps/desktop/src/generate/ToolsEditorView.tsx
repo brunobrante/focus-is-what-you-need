@@ -21,8 +21,6 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GeneratorHeader } from "./ui/GeneratorHeader";
 
-import { componentSubtreeIds } from "./engine/componentTree";
-
 import { ComponentTreeItem } from "./ui/ComponentTreeItem";
 import { ElementInfoCard } from "./ui/ElementInfoCard";
 import { ModeButton } from "./ui/ModeButton";
@@ -137,7 +135,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     expandAllComponents,
     collapseAllComponents,
     setTool,
-    openOriginal,
     openBuilderMode,
     openStackMode,
     openGalleryMode,
@@ -166,8 +163,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     handlePointerUp,
     handleRemoveComponent,
     toggleComponentExpanded,
-    setActiveRootId,
-    updateComponents,
     selectStackComponent,
   } = useToolsEditor({ item, referenceId, groupContext, onUploadedLocally });
 
@@ -782,18 +777,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                           onHover={setHoveredComponentId}
                           onEdit={startEditComponent}
                           onOpenVariants={setVariantsPanelCutId}
-                          onRemove={(id) => {
-                            const removedIds = componentSubtreeIds(components, id);
-                            updateComponents((current) =>
-                              current.filter((entry) => !removedIds.has(entry.id)),
-                            );
-                            if (removedIds.has(activeScopeId)) {
-                              setActiveRootId(rootComponentId);
-                              openOriginal();
-                            } else if (selectedComponentId && removedIds.has(selectedComponentId)) {
-                              openOriginal();
-                            }
-                          }}
+                          onRemove={handleRemoveComponent}
                         />
                       ))}
                     </div>
