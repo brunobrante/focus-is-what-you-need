@@ -28,7 +28,7 @@ import {
 } from "@/canvas/engine/bridge";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import { useCanvasCommands } from "./useCanvasCommands";
-import { isCurrentKey, windowKeyLabel, type CanvasWindowKey, type CanvasWindowType } from "@/canvas/canvasUtils";
+import { windowKeyLabel, type CanvasWindowKey } from "@/canvas/canvasUtils";
 
 import type { DeviceType, DropMode, ProjectTreeNode } from "./tree/treeTypes";
 import {
@@ -128,8 +128,6 @@ type Props = {
   onDetachNode?: (nodeId: string) => void;
   onOpenProjectNode?: (node: ProjectTreeNode) => void;
   activeTab?: CanvasWindowKey;
-  enabledTabs?: readonly CanvasWindowType[];
-  onTabChange?: (tab: CanvasWindowKey) => void;
   projectType?: DeviceType;
   projectTree?: ProjectTreeNode[];
   parentNode?: ProjectTreeNode | null;
