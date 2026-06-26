@@ -91,7 +91,14 @@ export async function getRecordById<T>(
  * can legitimately run early (SAVE-12).
  */
 export function peekTable<T>(table: TableKey): T[] {
-  if (!hydrated.has(table) && !peekedBeforeHydrated.has(table)) {
+  // Only the genuinely ambiguous case warns: not hydrated *and* nothing written
+  // this session, so the empty result can't be told from "not loaded yet". A
+  // cache populated by in-session writes is suppressed (it has real data).
+  if (
+    !hydrated.has(table) &&
+    (cache.get(table)?.size ?? 0) === 0 &&
+    !peekedBeforeHydrated.has(table)
+  ) {
     peekedBeforeHydrated.add(table);
     console.warn(
       `[recordStore] peekTable("${table}") read before hydration — got an ` +
