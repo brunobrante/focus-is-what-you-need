@@ -9,6 +9,7 @@ import {
 } from "@/components/icons";
 import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
+import { DeviceMockTile } from "@/pages/shared/DeviceMockTile";
 import { useNewDraft, type DraftKind } from "@/application/new-draft/useNewDraft";
 
 /**
@@ -277,18 +278,7 @@ function DeviceCard({
           : "border-[var(--border)] hover:border-[var(--border-strong)]",
       ].join(" ")}
     >
-      <div
-        className={[
-          "grid h-[120px] place-items-center rounded-[10px] border border-[var(--border)] bg-[#161616]",
-          selected ? "text-[var(--text)]" : "text-[var(--text-muted)]",
-        ].join(" ")}
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)",
-          backgroundSize: "14px 14px",
-        }}
-      >
-        <DeviceMock type={type} />
-      </div>
+      <DeviceMockTile type={type} selected={selected} />
       <div>
         <p className="m-0 text-[15px] font-semibold tracking-[-0.1px]">{PROJECT_TYPE_LABEL[type]}</p>
         <p className="mt-0.5 text-[12px] text-[var(--text-faint)]" style={{ fontFeatureSettings: '"tnum"' }}>
@@ -307,28 +297,6 @@ function DeviceCard({
         <IconCheck size={10} strokeWidth={3} className={selected ? "opacity-100" : "opacity-0"} />
       </span>
     </button>
-  );
-}
-
-function DeviceMock({ type }: { type: ProjectType }) {
-  if (type === "desktop") {
-    return (
-      <div className="relative h-20 w-[132px] rounded-md border-[1.5px] border-current">
-        <span className="absolute -bottom-2.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-b bg-current" />
-      </div>
-    );
-  }
-  if (type === "tablet") {
-    return (
-      <div className="relative h-[100px] w-[78px] rounded-lg border-[1.5px] border-current">
-        <span className="absolute bottom-1.5 left-1/2 h-0.5 w-[18px] -translate-x-1/2 rounded bg-current" />
-      </div>
-    );
-  }
-  return (
-    <div className="relative h-[90px] w-[50px] rounded-lg border-[1.5px] border-current">
-      <span className="absolute left-1/2 top-1 h-0.5 w-3.5 -translate-x-1/2 rounded bg-current" />
-    </div>
   );
 }
 
