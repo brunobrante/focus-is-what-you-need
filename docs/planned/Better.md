@@ -165,6 +165,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | RUST-1 | ☑️ already fixed | All three DB commands recover the poisoned guard via `unwrap_or_else(\|e\| e.into_inner())`. |
 | UI-5 | ✅ `9e797af` | `discardReferenceItem` moved out of the `setState` updaters (refs). |
 | UI-3 | ☑️ already fixed | Delete-screen usage count is resolved before the modal swaps to `InstanceDeleteModal`. |
+| REF-1 | ✅ `1fa8e9b` | Deleting a library reference linked elsewhere now opens the per-place keep-a-copy/delete dialog (`useDeleteReference` reusing `UnlinkComponentModal`); `detachReference` keeps the master blob alive for kept copies. The one remaining `Product.md` LAW gap is closed. |
 
 ### P1 — correctness bugs with user-visible impact
 | ID | Status | Note |
@@ -181,6 +182,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | UI-4 | ☑️ already fixed | `AddReferenceModal` registers + revokes object URLs on close. |
 | UI-10 | ✅ `4a01441` | "Move to"/"Make global" hidden until a handler is wired. |
 | UI-11 | ✅ `f3b1787` | `ReferenceCard` uses `formatSize`/`formatDuration`. |
+| META-1 | ✅ `1fa8e9b` | `ScreenContent` renders real `screen.updatedAt` via `formatRelativeTime`, not the hardcoded "updated 1 hour ago". |
 
 ### P2 — performance cliffs
 | ID | Status | Note |
@@ -200,9 +202,9 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | RUST-8 | ⏭️ deferred | Session cache needs interior mutability (`Session::run` is `&mut self`) + ONNX-state care. |
 
 > Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
-> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2..4, REF-1, META-1/2, VID-1) and the
-> cross-cutting duplication / dead-code / mixed-language sweeps. REF-1 is the one remaining
-> confirmed `Product.md` LAW gap.
+> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2..4, META-2, VID-1) and the
+> cross-cutting duplication / dead-code / mixed-language sweeps. With REF-1 landed
+> (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
 
 ---
 
