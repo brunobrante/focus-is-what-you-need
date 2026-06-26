@@ -29,10 +29,9 @@ export function ElementInfoCard({
             <span className="min-w-0 max-w-[76px] truncate font-semibold text-[var(--text)]">{name}</span>
             <span className="shrink-0 text-[var(--text-faint)]">·</span>
             <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{Math.round(width)} × {Math.round(height)}</span>
-            <span className="shrink-0 text-[var(--text-faint)]">·</span>
           </div>
         </div>
-        <span className="shrink-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[4.5px] font-medium text-[var(--text-muted)]">
+        <span className="shrink-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11.5px] font-medium text-[var(--text-muted)]">
           {type}
         </span>
       </div>
