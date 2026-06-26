@@ -444,14 +444,7 @@ function TypeCard({
 function DeviceMock({ type }: { type: ProjectType }) {
   if (type === "desktop") {
     return (
-      <div
-        className="relative h-20 w-[132px] rounded-md border-[1.5px] border-current"
-        style={
-          {
-            "--after-bg": "currentColor",
-          } as React.CSSProperties
-        }
-      >
+      <div className="relative h-20 w-[132px] rounded-md border-[1.5px] border-current">
         <span className="absolute -bottom-2.5 left-1/2 h-1 w-10 -translate-x-1/2 rounded-b bg-current" />
       </div>
     );
