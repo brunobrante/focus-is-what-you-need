@@ -1,9 +1,9 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type RefObject,
-  type WheelEvent,
 } from "react";
 
 import { zoomToCursorOffset } from "@/domain/zoom";
@@ -16,7 +16,7 @@ export type ToolPan = { x: number; y: number };
 // stage's `transform-origin: center` translate+scale, where `screen = pan +
 // world * zoom`. Returns the centre (no offset) when the viewport is unavailable.
 function cursorOffsetFromCenter(
-  event: WheelEvent<HTMLDivElement>,
+  event: WheelEvent,
   viewport: HTMLDivElement | null,
 ): ToolPan {
   if (!viewport) return { x: 0, y: 0 };
@@ -67,7 +67,7 @@ export function useBuilderViewport({
   }, [imgRef, stageViewportRef]);
 
   const handleStageWheel = useCallback(
-    (event: WheelEvent<HTMLDivElement>) => {
+    (event: WheelEvent) => {
       if (imageError) return;
       event.preventDefault();
 
@@ -102,6 +102,20 @@ export function useBuilderViewport({
     [changeToolZoom, imageError, imgRef, stageViewportRef, toolZoom],
   );
 
+  // Attach wheel as a NON-passive native listener. React 19 registers its onWheel
+  // prop as passive, so preventDefault() there is ignored and the page scrolls while
+  // the user zooms/pans the stage (BLD-1). A ref keeps the listener stable while it
+  // always invokes the latest handler.
+  const wheelHandlerRef = useRef(handleStageWheel);
+  wheelHandlerRef.current = handleStageWheel;
+  useEffect(() => {
+    const el = stageViewportRef.current;
+    if (!el) return;
+    const listener = (event: WheelEvent) => wheelHandlerRef.current(event);
+    el.addEventListener("wheel", listener, { passive: false });
+    return () => el.removeEventListener("wheel", listener);
+  }, [stageViewportRef]);
+
   const handleZoomIn = useCallback(() => {
     changeToolZoom(1);
   }, [changeToolZoom]);
@@ -130,7 +144,6 @@ export function useBuilderViewport({
     setToolPan,
     resetToolViewport,
     changeToolZoom,
-    handleStageWheel,
     handleZoomIn,
     handleZoomOut,
     zoomPercent: Math.round(toolZoom * 100),

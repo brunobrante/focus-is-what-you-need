@@ -109,7 +109,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     // Viewport
     toolZoom,
     toolPan,
-    handleStageWheel,
     handleZoomIn,
     handleZoomOut,
     zoomPercent,
@@ -365,7 +364,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   ? "cursor-crosshair"
                   : "cursor-default",
               ].join(" ")}
-              onWheel={handleStageWheel}
               onPointerDown={masking ? undefined : handlePointerDown}
               onPointerMove={masking ? undefined : handlePointerMove}
               onPointerUp={masking ? undefined : handlePointerUp}

@@ -135,7 +135,6 @@ export type ToolsEditorState = {
   toolPan: { x: number; y: number };
   setToolPan: (pan: { x: number; y: number }) => void;
   resetToolViewport: () => void;
-  handleStageWheel: (event: React.WheelEvent<HTMLDivElement>) => void;
   handleZoomIn: () => void;
   handleZoomOut: () => void;
   zoomPercent: number;
@@ -258,7 +257,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     toolPan,
     setToolPan,
     resetToolViewport,
-    handleStageWheel,
     handleZoomIn,
     handleZoomOut,
     zoomPercent,
@@ -757,7 +755,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     toolPan,
     setToolPan,
     resetToolViewport,
-    handleStageWheel,
     handleZoomIn,
     handleZoomOut,
     zoomPercent,
