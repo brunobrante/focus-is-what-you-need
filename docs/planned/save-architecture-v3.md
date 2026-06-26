@@ -69,6 +69,114 @@ things connect), indexes the structure, and moves large binaries out of the row 
 
 ---
 
+## Locked decisions (resolved — implement exactly this)
+
+Every open question / underspecified point is decided here. These are binding; the
+implementing agent must not re-litigate them. Rationale is **performance first**,
+**offline→online additive** (no row reshape once real user data exists), and **fast
+feature-building** (new capability = new edge, never a new field). None of these
+touch `Product.md`.
+
+**D1 — Sync envelope is lean, and that is deliberate.** Every row carries exactly
+`{ id, createdAt, updatedAt, deletedAt, rev }` — nothing more. The planned
+collaboration model (`collaboration-sync-protocol.md`) resolves conflicts **per
+frame, explicitly, in the Versions UI** — it is *not* CRDT, not field-merge, not
+op-replay. So a single monotonic `rev` (the optimistic-write guard) is sufficient,
+and `updatedAt` doubles as the wall-clock last-write-wins tiebreak. Adding a clock
+field later is a cheap default-backfill, not a reshape — so we do **not** speculatively
+add HLC / version-vectors / per-field clocks now. All sync identity
+(`clientId`, `clientMutationId`, `frameId`, transport) lives in the **frame-commit
+envelope at the future `SyncAdapter` layer, never on rows.** Sync transmits committed
+frame *state* (rev-guarded), so the coalescing outbox is already the right shape — no
+oplog reshape.
+
+**D2 — The graph is the extensibility mechanism; reserve the known-future shapes
+now.** `EntityType` must already include `"user"`, and `GraphRelation` must already
+include `"member_of"` (for `workspace-people-permissions.md`: a user is an entity, a
+membership is a `user member_of {workspace|project}` edge with `role` in the edge
+`metadata`). This means people/permissions land as **pure additions** later, zero
+reshape. Inspector guides stay in scene `graphJSON` metadata until specified (no
+table). Multiple screen types are already covered by `screenKind` (incl. `"custom"`).
+Builder stays out-of-band until an explicit import (unchanged).
+
+**D3 — `instance_usage` is derived in TypeScript, not Rust.** It is a *cache*
+(a stale/missing row only costs a rebuild, never a correctness divergence — see this
+doc's own framing). Therefore it does **not** need server-side same-transaction
+atomicity, and Rust must stay a dumb key-value + edge store with **zero graphJSON
+parsing.** On scene save, TS derives the `instance_usage` upserts/deletes from the
+scene's nodes and enqueues them in the **same `SaveQueue` batch** as the scene row.
+(This overrides the doc's earlier "same transaction" phrasing, which would have forced
+graph-parsing into Rust — slower to build, no benefit for a rebuildable cache.)
+
+**D4 — `GraphPersistencePort` extends, it does not replace.** Keep `PersistencePort`;
+add `GraphPersistencePort extends PersistencePort` with the graph/blob methods; the
+factory hands repos the graph-capable port. No breaking churn across existing repos.
+
+**D5 — Asset store reuses the on-disk pattern.** `storageKind` decides by size:
+`byteLength <= 256 KB` → `sqliteBlob` (a `blob` column in `asset_blobs`);
+`> 256 KB` → `file` in the app data dir keyed by `blobKey` (reuse the existing
+`write_reference_file` plumbing in `lib.rs`). Dedup by `contentHash`. Thumbnails/crops
+are regenerable caches (deletable). Web → `indexedDbBlob`.
+
+**D6 — `rev`-guarded upsert everywhere** (records *and* edges):
+`... ON CONFLICT(id) DO UPDATE SET ... WHERE excluded.rev > <table>.rev`. Uniform,
+cheap, and the single mechanism the future sync layer rides on.
+
+**D7 — Token links are a field, not an edge.** `TokenRow.instanceOf` is the source of
+truth for a project token that mirrors a workspace master. **Drop `instance_of` from
+`GraphRelation` entirely** — component instances live in `graphJSON`, token instances
+live in the `TokenRow` field, so no relation needs it. (Removes the doc's one
+ambiguity.)
+
+**D8 — VER-2 is fixed as part of the version-create rework**: capture children by
+iterating components owned via `sourceVariantId`, **not** by walking the source scene
+(so a never-saved subject still gets its children cloned/linkified). VER-3 stays
+as-is — linkability is a deliberate component property (Law 11), not ownership-derived.
+
+**D9 — The port contract test suite is written in Step 1 and is mandatory.** One
+suite, memory adapter as the reference, run against **all three** adapters
+(memory / sqlite / indexeddb), covering records, graph edges (both index directions +
+unique-live), `instance_usage`, asset blobs, and the `rev` guard. No step is "done"
+until its behavior is in this suite and green on all three.
+
+### Performance invariants (the whole point — never regress these)
+
+- **No full-table scan on any interactive path.** Every cross-entity question is an
+  index hit: `graph_edges` dual index (`idx_edges_from` / `idx_edges_to`),
+  `instance_usage` by `component_id`, derived caches invalidated on the table
+  subscription. This is what kills the `Better.md` SAVE-5 / RUST-4 cliffs.
+- **Edges live in the in-memory record-store cache like any table**, and a bidirectional
+  adjacency index is derived from them once and invalidated on the `graph_edges`
+  subscription (same pattern as `sceneDependencyIndexCache`). Ownership / containment /
+  usage resolution is therefore **in-memory O(1)** and never round-trips to SQLite on a
+  read.
+- **The 60fps path never touches edges, `instance_usage`, blobs, or Rust.** The scene
+  `graphJSON` stays an in-memory blob, `structuredClone`-cheap, serialized only on
+  discrete commits. Edges, `instance_usage`, and thumbnails update **off the critical
+  path** through the existing debounced owner-queues.
+- **Big binaries are never in row JSON** (asset store), so a bulk table read never drags
+  megabytes under the lock.
+- **In-memory record-store cache is the read source; all writes are async,
+  fire-and-forget through `SaveQueue`.** The UI never awaits persistence.
+
+### Fast-feature-building invariant
+
+A new cross-entity capability is **always** a new `EntityType` + new `GraphRelation` +
+edges — **never** a new nullable foreign-key field on a row. Expose one uniform edge
+repo API (`listEdges({from?,to?,relation?})`, `linkEdge`, `unlinkEdge`, `relinkEdge`);
+features compose edges. This is the real reason ownership-as-edges matters: it turns
+"add a relationship" from a schema change into a data write.
+
+### Execution order (do NOT one-shot)
+
+Follow the 6-step staging below **in sequence**, one commit per step, each
+compiling + reseeding + green on the contract suite (D9) before the next. A fresh agent
+may do all six in one session, but must checkpoint per step — a half-applied
+field→edge cutover (some code reads edges, some reads fields) corrupts ownership, so
+Step 2 lands as a single clean pass.
+
+---
+
 ## What stays from today (do not regress)
 
 These are shipped laws/decisions the model must preserve:
@@ -228,7 +336,10 @@ export type GraphRelation =
   | "has_cut"         // stack → cut
   | "attached_to"     // referenceAsset/cut → {workspace|project|screen|component|variant}
   | "derived_from"    // cut → component
-  | "instance_of";    // token(project) → token(workspace master)  [tokens only — see note]
+  | "member_of";      // user → {workspace|project}  (reserved for permissions; role in metadata — D2)
+  // NOTE: no `instance_of` relation — token links are a TokenRow field, component
+  // instances live in graphJSON (locked decision D7). `member_of` is reserved now so
+  // workspace-people-permissions lands as pure additions (D2).
 
 export type GraphEdgeRow = RowEnvelope & {
   fromType: EntityType; fromId: string;
@@ -239,10 +350,11 @@ export type GraphEdgeRow = RowEnvelope & {
 };
 ```
 
-> **Note on `instance_of`.** Component instances are **not** edges — they are
-> `instanceOf` nodes in `graphJSON` (see below). `instance_of` as an edge is used
-> only for **tokens** (a project token that is a live instance of a workspace master
-> token), because a token instance is a row, not a scene node.
+> **Note on instances (locked decision D7).** Neither component nor token instances are
+> edges. A component instance is an `instanceOf` node in the host `graphJSON`; a token
+> instance is the `TokenRow.instanceOf` field (a project token mirroring a workspace
+> master). There is **no** `instance_of` relation — it was tokens-only and the field
+> covers it, so the relation is dropped to remove ambiguity.
 
 ```sql
 CREATE TABLE graph_edges (
@@ -471,8 +583,10 @@ export type GraphMutation =
 
 Coalescing keys (extends `mutationKey`): `up:record:{table}:{id}`,
 `del:record:{table}:{ids}`, `up:edge:{id}`, `del:edge:{ids}`. The `instance_usage`
-rebuild for a scene is part of that scene's save batch (same transaction), so the
-index can never lag the scene across a crash.
+rows are **derived in TypeScript** on scene save and enqueued in the **same `SaveQueue`
+batch** as the scene row (locked decision D3) — so the index rides the scene's atomic
+apply, while Rust stays a dumb store with no graphJSON parsing. It's a rebuildable
+cache: a lag after a crash self-heals on the next save, never a correctness divergence.
 
 ---
 
