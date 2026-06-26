@@ -1,5 +1,12 @@
 # Save Architecture v3 — Workspace Graph Storage
 
+> **Implementing agent: read "Locked decisions" (D1–D10) FIRST.** It resolves every
+> open question and overrides any older phrasing in the body below. Then follow
+> "Execution order" — the 6 staging steps in sequence, one commit each, green on the
+> tri-adapter contract suite (D9) before the next. Do not one-shot; the field→edge
+> cutover (Step 2) must land as a single clean pass. The only thing you may not change
+> is `Product.md`.
+
 ## What this document is
 
 The next storage model for the app. It builds on the **v2 persistence rewrite**
@@ -52,8 +59,9 @@ things connect), indexes the structure, and moves large binaries out of the row 
 
 1. **An entity row stores what the entity is.** No parent ids, no consumer lists as
    the *source of truth* for structure.
-2. **An edge row stores how entities connect.** Containment, ownership, attachment,
-   and token links are `graph_edges` rows — indexed both directions.
+2. **An edge row stores how entities connect.** Containment, ownership, and attachment
+   are `graph_edges` rows — indexed both directions. (Token links are the exception: a
+   `TokenRow.instanceOf` field, not an edge — D7.)
 3. **A scene's `graphJSON` stays the node tree of one subject** — including instance
    nodes (`instanceOf`). The node tree *within* a subject is a tree and stays a JSON
    blob, edited in memory and serialized (exactly like today; like Figma's layer
@@ -261,7 +269,7 @@ workspace ──contains──▶ project ──contains──▶ screen
    └─owns─▶ referenceAsset │                                          (nested) variant(component) ─owns─▶ component
                            │
 component ──has_version──▶ variant(component) ──owns_scene──▶ scene
-token(project) ──instance_of──▶ token(workspace master)        [live linked token]
+token(project).instanceOf ⇢ token(workspace master)   [field link, NOT an edge — D7]
 referenceAsset ──has_stack──▶ stack ──has_cut──▶ cut
 referenceAsset / cut ──attached_to──▶ {workspace|project|screen|component|variant}
 cut ──derived_from──▶ component
@@ -284,7 +292,7 @@ rest of the sync fields are **deferred** (see "Deferred").
 
 ```ts
 export type RowEnvelope = {
-  id: string;
+  id: string;                 // short client-gen id (~12-char nanoid, NOT UUID) — D10
   createdAt: number;
   updatedAt: number;
   deletedAt: number | null;   // tombstone; hard delete only in compaction
@@ -502,13 +510,15 @@ model must express **each verb** for each:
 | Capability | Linkable marker | Linked instance | Detach |
 | --- | --- | --- | --- |
 | **Component** | `ComponentRow.linkable` | `instanceOf` node in host `graphJSON` | materialize subtree, clear `instanceOf` (→ version-owned component if in a version) |
-| **Token** | `linkable` on the token | `instance_of` **edge** project-token → workspace master (or `instanceOf` on the token row) | copy master values locally, clear `instanceOf` |
+| **Token** | `linkable` on the token | `TokenRow.instanceOf` field → workspace master (a *field*, not an edge — D7) | copy master values locally, clear `instanceOf` |
 | **Reference** | `ReferenceRow.linkable` | master row + an `attached_to` edge per place | new local row (`detachedFrom`, `linkable:false`), remove that owner's `attached_to` edge |
 
 **Removing a linkable item used elsewhere** (`Product.md`): on unlink/delete with live
 usages, the app offers the per-place **keep-a-copy (detach) or delete** choice for all
-three. Storage supports it: the usage list comes from `idx_edges_to` (tokens,
-references) and `instance_usage` (components). *(The dialog/decision applier is
+three. Storage makes each usage list cheap: **references** from `idx_edges_to`,
+**components** from `instance_usage`, **tokens** by filtering `TokenRow`s whose
+`instanceOf.tokenId` is the master (tokens are few — an in-memory filter over the
+cached tokens table, no edge index needed — D7). *(The dialog/decision applier is
 app-level; storage only has to make the usage list cheap — it now is.)*
 
 ---
@@ -677,9 +687,12 @@ is acceptable and intended.
 
 Each step compiles, reseeds, and passes the port contract tests before the next:
 
-1. **Asset store + envelope.** Add `asset_blobs` + `RowEnvelope` (`rev`/`deletedAt`)
-   and the `rev`-guarded upsert. Move thumbnails/crops to `blobKey`. (Pure perf win;
-   no graph yet — this is the `Better.md` RUST-4 fix and is independently valuable.)
+1. **Asset store + envelope + the test harness.** Add `asset_blobs` + `RowEnvelope`
+   (`rev`/`deletedAt`) and the `rev`-guarded upsert. Move thumbnails/crops to `blobKey`.
+   **Write the tri-adapter port contract suite here (D9)** — it's the gate for every
+   later step. **Switch `newId()` to the short scheme (D10) now** so every row/edge/node
+   created from here on uses it. (Pure perf win; no graph yet — this is the `Better.md`
+   RUST-4 fix and is independently valuable.)
 2. **`graph_edges` + ownership.** Introduce edges; move containment + the uniform
    `owns` (workspace/project/variant → component) onto them; derive `componentScope`
    from the incoming edge. Drop `screenId`/`parentVariantId` as sources of truth.
@@ -689,8 +702,9 @@ Each step compiles, reseeds, and passes the port contract tests before the next:
    scan.)
 4. **Promote-to-main simplification.** With ownership on edges, delete the
    `screenId`↔`parentVariantId` re-home; promotion becomes reorder + edge repoint.
-5. **References + tokens as rows/edges.** `ReferenceRow`/stack/cut + `attached_to`;
-   `TokenRow` with `instanceOf`. Specify detach for all three.
+5. **References (rows + edges) and tokens (rows + field link).** `ReferenceRow`/stack/cut
+   + `attached_to` edges; `TokenRow` with the `instanceOf` field (no token edge — D7).
+   Specify detach for all three.
 6. **Reseed.** Bump `SCHEMA_VERSION`; seed emits the new shape.
 
 ---
@@ -756,6 +770,16 @@ Each `[LAW]` and how the model honors it:
       JSON.
 - [ ] All writes go through `SaveQueue` + outbox; the `instance_usage` rebuild rides
       the scene's save batch.
-- [ ] New rows carry `rev` + `deletedAt`; edges/large rows use the `rev` optimistic
-      guard.
+- [ ] New rows carry `rev` + `deletedAt`; **every** upsert (records and edges) uses the
+      `rev` optimistic guard (D6). Sync identity stays at the future SyncAdapter, not on
+      rows (D1).
+- [ ] One port contract suite runs green against **all three** adapters — records, edges
+      (both indexes + unique-live), `instance_usage`, blobs, `rev` guard (D9).
+- [ ] IDs are short client-gen (not UUID); node ids are scene-local; `graphJSON` omits
+      default fields canonically so the save-skip equality still holds (D10).
+- [ ] The edge adjacency index is maintained **incrementally** (O(1) per edge write);
+      tombstones are filtered at hydration with a periodic GC; edge mutations reuse the
+      SAVE-11 cross-op coalescing (graph hot-path).
+- [ ] `EntityType` includes `"user"` and `GraphRelation` includes `"member_of"` (reserved
+      for permissions); there is **no** `instance_of` relation (D2/D7).
 - [ ] No migration code — `SCHEMA_VERSION` bump + reseed produces the new shape.
