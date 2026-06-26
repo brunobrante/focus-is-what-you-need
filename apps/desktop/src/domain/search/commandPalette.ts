@@ -4,23 +4,19 @@
  *
  * This is intentionally a plain, declarative list so functions and settings can
  * be added without touching the search engine. Each command is available in all
- * scopes by default, or restricted to a subset via `scopes`. The `run` callback
- * receives a `CommandContext` with the capabilities a command might need
- * (navigation, closing the palette, etc.).
+ * scopes by default, or restricted to a subset via `scopes`.
  *
  * Scope-specific commands that need live state the registry cannot reach (e.g.
  * canvas tools that must dispatch into the active editor) are registered
  * dynamically at runtime through the search source API instead of living here.
+ *
+ * This module is pure data: a command's effect is described declaratively (e.g.
+ * `navigateTo`), not as a router callback, so the domain layer stays free of any
+ * React Router coupling. The application layer maps the declared target onto the
+ * real `navigate` (DOM-7).
  */
 
 import type { SearchScope } from "./searchTypes";
-
-export type CommandContext = {
-  /** React Router navigation. */
-  navigate: (to: string) => void;
-  /** The scope the palette was opened in. */
-  scope: SearchScope;
-};
 
 export type CommandDefinition = {
   id: string;
@@ -32,7 +28,8 @@ export type CommandDefinition = {
   keywords?: string[];
   /** Restrict availability to these scopes. Omit to expose everywhere. */
   scopes?: SearchScope[];
-  run: (ctx: CommandContext) => void;
+  /** Declarative navigation target; the application layer pushes this route. */
+  navigateTo: string;
 };
 
 export const PALETTE_COMMANDS: CommandDefinition[] = [
@@ -42,49 +39,49 @@ export const PALETTE_COMMANDS: CommandDefinition[] = [
     title: "Go to Home",
     section: "Navigation",
     keywords: ["start", "recent", "workspaces"],
-    run: (ctx) => ctx.navigate("/"),
+    navigateTo: "/",
   },
   {
     id: "nav.projects",
     title: "Go to Projects",
     section: "Navigation",
     keywords: ["workspace", "projects", "files"],
-    run: (ctx) => ctx.navigate("/projects"),
+    navigateTo: "/projects",
   },
   {
     id: "nav.canvas",
     title: "Open Canvas",
     section: "Navigation",
     keywords: ["editor", "edit", "design"],
-    run: (ctx) => ctx.navigate("/canvas"),
+    navigateTo: "/canvas",
   },
   {
     id: "nav.references",
     title: "Go to References",
     section: "Navigation",
     keywords: ["inspiration", "gallery", "library"],
-    run: (ctx) => ctx.navigate("/references"),
+    navigateTo: "/references",
   },
   {
     id: "nav.systemDesign",
     title: "Go to System Design",
     section: "Navigation",
     keywords: ["tokens", "design system", "styles"],
-    run: (ctx) => ctx.navigate("/system-design"),
+    navigateTo: "/system-design",
   },
   {
     id: "nav.components",
     title: "Go to Components",
     section: "Navigation",
     keywords: ["global components", "library"],
-    run: (ctx) => ctx.navigate("/components"),
+    navigateTo: "/components",
   },
   {
     id: "nav.builder",
     title: "Open Builder",
     section: "Navigation",
     keywords: ["generate", "tools", "cut", "stack", "crop"],
-    run: (ctx) => ctx.navigate("/generate"),
+    navigateTo: "/generate",
   },
   // ── Create ────────────────────────────────────────────────────────────────
   {
@@ -92,6 +89,6 @@ export const PALETTE_COMMANDS: CommandDefinition[] = [
     title: "New Project",
     section: "Create",
     keywords: ["add", "create project"],
-    run: (ctx) => ctx.navigate("/new"),
+    navigateTo: "/new",
   },
 ];

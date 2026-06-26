@@ -208,7 +208,7 @@ function BuiltInSearchSources() {
         name: cmd.title,
         subtitle: cmd.section,
         keywords: cmd.keywords,
-        run: () => cmd.run({ navigate, scope: activeScope }),
+        run: () => navigate(cmd.navigateTo),
       })),
     [activeScope, navigate],
   );
