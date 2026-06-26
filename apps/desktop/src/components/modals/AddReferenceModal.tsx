@@ -30,6 +30,7 @@ import { stackRootIds } from "@/lib/references/stackTypes";
 import { listReferenceLibraryMeta } from "@/lib/storage/repos/referenceLibrary.repo";
 import type { createOrAttachReference } from "@/lib/storage/repos/references.repo";
 import { addReferencesFromFiles } from "@/application/references/addReferencesFromFiles";
+import { KIND_BY_MEDIA } from "@/application/references/referenceKind";
 import { bakeOriginalThumbnail, bakeStackNodeThumbnail } from "@/lib/references/referenceThumbnails";
 
 /* ---------- Types ---------- */
@@ -345,8 +346,6 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
             : await bakeOriginalThumbnail({ sourceReferenceId: item.id, originalExt })
           : null;
 
-      const kindMap: Record<string, ReferenceRow["kind"]> = { image: "cards", video: "dash", figx: "hero" };
-
       await onAdd({
         title: node.stackNodeId ? node.name : item.name,
         source: item.sourceUrl || `${item.type} · local`,
@@ -354,7 +353,7 @@ export const AddReferenceModal = forwardRef<AddReferenceModalHandle, Props>(func
         visibility: "local",
         bg: "#101418",
         accent: "#FFFFFF",
-        kind: kindMap[item.mediaKind] ?? "cards",
+        kind: KIND_BY_MEDIA[item.mediaKind] ?? "cards",
         description: item.description ?? "",
         metadata: item.tags ?? [],
         thumbnailUrl,

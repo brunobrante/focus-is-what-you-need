@@ -1,13 +1,7 @@
 import type { ReferenceAttachment, ReferenceRow } from "@/lib/storage/schema";
 import { createOrAttachReference } from "@/lib/storage/repos/references.repo";
 import { listReferenceLibraryMeta } from "@/lib/storage/repos/referenceLibrary.repo";
-import type { MediaKind } from "@/routes/references/types";
-
-const KIND_BY_MEDIA: Record<MediaKind, ReferenceRow["kind"]> = {
-  image: "cards",
-  video: "dash",
-  figx: "hero",
-};
+import { KIND_BY_MEDIA } from "./referenceKind";
 
 /**
  * Link an existing library reference (the whole image, with its stack) into a

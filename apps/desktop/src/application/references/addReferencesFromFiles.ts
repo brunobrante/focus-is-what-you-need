@@ -3,13 +3,7 @@ import { createOrAttachReference } from "@/lib/storage/repos/references.repo";
 import { putReferenceLibraryMeta } from "@/lib/storage/repos/referenceLibrary.repo";
 import { extFromName, type StoredRefMeta } from "@/lib/tauri/referenceStorage";
 import { fileToReference } from "@/routes/references/lib/fileHelpers";
-import type { MediaKind } from "@/routes/references/types";
-
-const KIND_BY_MEDIA: Record<MediaKind, ReferenceRow["kind"]> = {
-  image: "cards",
-  video: "dash",
-  figx: "hero",
-};
+import { KIND_BY_MEDIA } from "./referenceKind";
 
 /**
  * Upload new files from inside a project/screen/component. Each file is saved to
