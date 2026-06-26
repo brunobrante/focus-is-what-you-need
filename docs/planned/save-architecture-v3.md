@@ -139,6 +139,32 @@ suite, memory adapter as the reference, run against **all three** adapters
 unique-live), `instance_usage`, asset blobs, and the `rev` guard. No step is "done"
 until its behavior is in this suite and green on all three.
 
+**D10 — Data encoding (decide the id scheme now; the rest is do-anytime).** The
+`graphJSON` blob is the hottest data in the app (structuredClone'd + parsed +
+serialized on every commit), and today every node carries a 36-char UUID for `id` and
+`parentId` plus the full ~26-field `style` object even at defaults. Decisions:
+
+- **IDs are short, client-generated, NOT UUIDv4.** Entity / edge / row ids are
+  ~12-char collision-resistant ids (nanoid-style; ~71 bits is ample for offline+online
+  client-gen — 122-bit UUID is overkill). Node ids *inside* `graphJSON` are
+  **scene-local** and short — they only need uniqueness within their own scene, and
+  `uniqueNodeId(preferred, usedIds)` already dedups against the target. **This is the
+  one encoding choice that must be decided NOW:** ids are referenced everywhere and have
+  no cheap post-launch migration, so v3's reseed is the moment to set the format. (Keeps
+  D1 — still client-generated strings, just shorter; no autoincrement.)
+- **Omit defaults on `graphJSON` serialization** (serialization-only, not
+  migration-critical — can land anytime). Persist only fields that differ from the type
+  defaults; drop the default `style` props, empty `cssId`/`className`/`text`/`imageUrl`,
+  and default `visible`/`locked`/`appearance`, rehydrating them on parse. Likely the
+  single biggest blob shrink. Serialization MUST stay **canonical/deterministic** (stable
+  key order, consistent omission) so the `documentsEqual` / string-equality save-skip
+  still holds.
+- **Round `bounds` to 2 decimals** on serialize — kills float noise and bytes; minor.
+- **Rejected (do not cargo-cult):** cryptic short key names (`p` for `parentId`) —
+  readability/tooling cost outweighs the bytes; binary serialization (MessagePack/CBOR)
+  — `JSON.parse` beats JS-land decoders at this scale and you lose debuggability;
+  integer/autoincrement ids — incompatible with offline-first client-gen (D1).
+
 ### Performance invariants (the whole point — never regress these)
 
 - **No full-table scan on any interactive path.** Every cross-entity question is an
