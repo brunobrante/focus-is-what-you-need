@@ -9,6 +9,7 @@ export const TABLES = {
   referenceLibraryGroups: "reference_library_groups",
   scenes: "scenes",
   thumbnails: "thumbnails",
+  graphEdges: "graph_edges",
   settings: "settings",
   workspaces: "workspaces",
   systemDesigns: "system_designs",
