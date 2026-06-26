@@ -108,6 +108,9 @@ type Params = {
   state: EditorState;
   dispatch: Dispatch;
   draftMode: boolean;
+  // Memoized in CanvasStage from the same state inputs — passed in so getCanvasPoint
+  // doesn't rebuild the identical transform on every pointer event (STAGE-3).
+  viewportTransform: ReturnType<typeof buildViewportTransform>;
   viewportRef: React.MutableRefObject<HTMLDivElement | null>;
   toolingRef: React.MutableRefObject<CanvasToolingRef | null>;
   interactionRef: React.MutableRefObject<Interaction | null>;
@@ -151,6 +154,7 @@ export function useCanvasPointerEvents({
   state,
   dispatch,
   draftMode,
+  viewportTransform,
   viewportRef,
   toolingRef,
   interactionRef,
@@ -187,16 +191,8 @@ export function useCanvasPointerEvents({
   const getCanvasPoint = (event: { clientX: number; clientY: number }): Point | null => {
     const viewport = viewportRef.current;
     if (!viewport) return null;
-    const transform = buildViewportTransform(
-      state.document,
-      getCurrentViewportSize(),
-      state.zoom,
-      state.offsetX,
-      state.offsetY,
-      state.viewportMode,
-    );
     const vpRect = getCurrentViewportRect();
-    return viewportPointToCanvas({ x: event.clientX - vpRect.left, y: event.clientY - vpRect.top }, transform);
+    return viewportPointToCanvas({ x: event.clientX - vpRect.left, y: event.clientY - vpRect.top }, viewportTransform);
   };
 
   const getInteractiveElementId = (target: EventTarget | null): string | null =>

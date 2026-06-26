@@ -284,6 +284,14 @@ export function CanvasStage({
     });
   }, [selectedIdsKey, state.canvasStageActive, state.document, state.offsetX, state.offsetY, state.zoom, canvasAlignmentDebugEnabled]);
 
+  // The viewport transform is memoized from state + measured size; pointer
+  // handlers reuse it instead of rebuilding it per event (STAGE-3). Defined
+  // before the pointer-events hook so it can be threaded in.
+  const viewportTransform = useMemo(
+    () => buildViewportTransform(state.document, viewportSize, state.zoom, state.offsetX, state.offsetY, state.viewportMode),
+    [state.document.canvas.height, state.document.canvas.rotation, state.document.canvas.width, state.offsetX, state.offsetY, state.viewportMode, state.zoom, viewportSize],
+  );
+
   const {
     marqueeRect,
     contextMenu,
@@ -300,6 +308,7 @@ export function CanvasStage({
     state,
     dispatch,
     draftMode,
+    viewportTransform,
     viewportRef,
     toolingRef,
     interactionRef,
@@ -342,10 +351,6 @@ export function CanvasStage({
   );
   const displayZoom = state.zoom * displayScale;
 
-  const viewportTransform = useMemo(
-    () => buildViewportTransform(state.document, viewportSize, state.zoom, state.offsetX, state.offsetY, state.viewportMode),
-    [state.document.canvas.height, state.document.canvas.rotation, state.document.canvas.width, state.offsetX, state.offsetY, state.viewportMode, state.zoom, viewportSize],
-  );
   const scaledDomProjection = useMemo(
     () => shouldUseScaledDomProjection({ canvasSize, displayZoom, canvasRotation: state.document.canvas.rotation ?? 0 }),
     [canvasSize, displayZoom, state.document.canvas.rotation],
