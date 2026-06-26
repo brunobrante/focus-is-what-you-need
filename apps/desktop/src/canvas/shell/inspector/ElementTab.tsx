@@ -168,7 +168,7 @@ export function ElementTab({
         </InsRow>
       </InsSection>
 
-      <InsSection title="Tamanho" disabled={locked}>
+      <InsSection title="Size" disabled={locked}>
         {node.type === "text" ? (
           <>
             <InsRow label="W mode">

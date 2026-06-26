@@ -13,7 +13,7 @@ export function SidebarTabs({
   return (
     <div className="flex shrink-0 items-center gap-1 border-b border-[var(--border)] px-2 py-2">
       <SidebarTabButton active={active === "components"} onClick={() => onChange("components")}>
-        Componentes
+        Components
       </SidebarTabButton>
       <SidebarTabButton active={active === "config"} onClick={() => onChange("config")}>
         Config
@@ -70,7 +70,7 @@ export function SidebarComponentsHeader({
     <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <h3 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">Componentes</h3>
+          <h3 className="m-0 text-[12.5px] font-semibold text-[var(--text)]">Components</h3>
           <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] tabular-nums text-[var(--text-faint)]">
             {scopedCount}
           </span>

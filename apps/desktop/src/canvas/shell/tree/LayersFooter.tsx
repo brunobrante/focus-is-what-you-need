@@ -122,7 +122,7 @@ export function LayersFooter({
               style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.45)" }}
             >
               <p className="m-0 mb-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-[#6B6B6B]">
-                Filtrar por tipo
+                Filter by type
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {LAYER_FILTER_KINDS.map((opt) => {
@@ -159,7 +159,7 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
       <button
         type="button"
         onClick={onRemove}
-        aria-label={`Remover filtro ${label}`}
+        aria-label={`Remove filter ${label}`}
         className="grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-full text-[#7A7A7A] hover:bg-[#2A2A2A] hover:text-[#F2F2F2]"
       >
         <IconClose size={9} strokeWidth={2} />
