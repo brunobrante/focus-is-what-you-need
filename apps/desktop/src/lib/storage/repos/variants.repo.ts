@@ -512,7 +512,10 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
       if (linked && linked !== oldMainScene.graphJSON) {
         await upsertScene(
           { ownerType: "variant", ownerId: oldMain.id, graphJSON: linked },
-          { propagate: false },
+          // The demoted old main's composition changed (embedded subtrees became
+          // linked instances), so its ancestors' thumbnails must regenerate too
+          // (Versioning.md §11) — propagate like the promoted scene above.
+          { propagate: true },
         );
       }
     }
