@@ -155,7 +155,12 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     }, [pickerOpen]);
 
     const treeOptions = useMemo(() => (scene ? flattenSceneTree(scene.root) : []), [scene]);
-    const selectedNode = scene ? (findSceneNode(scene.root, selectedId) ?? scene.root) : null;
+    // Memoized so the tree walk only runs when the scene or selection changes,
+    // not on the many re-renders fired while panning/zooming the modal (UI-9).
+    const selectedNode = useMemo(
+      () => (scene ? (findSceneNode(scene.root, selectedId) ?? scene.root) : null),
+      [scene, selectedId],
+    );
 
     const updateSelected = (patch: Partial<SceneNode>) => {
       if (!selectedNode || selectedNode.linked) return; // linked instances are read-only
