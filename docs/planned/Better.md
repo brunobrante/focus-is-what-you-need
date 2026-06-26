@@ -218,12 +218,69 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | SHELL-1 | ✅ `42ffda3` + `1abb5c9` | `useDismissable` gained `{ capture, escape }` options; 12 canvas shell/stage dismiss sites converged on it with behavior preserved (capture phase is load-bearing where pointer handlers stopPropagation). Left unconverted: `InsComponents` (commit-on-blur, different semantics) and `references/components/ui.tsx` + `FastEditModal` (document/`mousedown` — converting would change the event type). |
 | Mixed-language sweep (BLD-7 + theme) | ✅ `9a6511a` + `fd51bed` + `5ae077b` | All Portuguese UI copy translated to English across canvas shell/inspector/tree, the Builder, and shared modals/pages/routes/data. Only display labels touched — sibling logic keys (filter `value`s, shape `id`s, node `type` cases, `setTool` ids) left intact. Skipped: `Chat.tsx` + `GalleryPanel.tsx` (unrendered mock panels flagged for deletion — translating dead code is churn). Test fixtures and the "Nova Retail" mock brand name left as-is. |
 
-> Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
-> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2/3) and the cross-cutting duplication /
-> dead-code sweeps (the **mixed-language** sweep is now done). **VER-2** (version creation captures zero children
-> when the source has no saved scene) was deliberately left for a focused effort — the fix
-> must materialize/synthesize the missing scene and touches the law-sensitive versioning
-> core. With REF-1 landed (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
+### Medium/Low sweep (this pass)
+A one-commit-per-item sweep of the remaining Medium/Low backlog, each verified against the
+real code before fixing (several audit line numbers were stale, and a few claims were
+partly wrong — noted inline).
+
+| ID | Status | Note |
+| --- | --- | --- |
+| DOM-7 | ✅ `42df35e` | Command palette declares a `navigateTo` target; the application layer (SearchProvider) maps it to `navigate`. Domain no longer carries a router callback. |
+| DOM-8 | ✅ `b65993c` | `uniqueNodeId` loops without a fixed ceiling (both domain + infra twins) so it can't return an in-use id. |
+| DOM-9 | ✅ `7daa1d0` | Documented `updateKeyCommand`'s single-binding reset as intentional (the recorder has no add/remove-binding UI; append would accumulate unprunably). |
+| DOM-10 | ✅ `56183a3` | Documented why `clampPanAxis`'s `±scaled/2` is the exact center-origin equivalent of the canvas's `containerLength/2` clamp — adding a viewport term would *break* parity. |
+| DOM-11 | ✅ `bd2ab35` | `resolveSystemDesign` short-circuits the no-parent path (no empty per-category maps). |
+| RUST-3 | ✅ `d339dc3` | `db_apply` ack counts real affected rows, not `batch.len()`. |
+| RUST-9 | ✅ `f392d33` | `config_path` returns `Result` (no `.expect()` panic); `now_ms` 0-fallback documented. |
+| RUST-10 | ✅ `8f23871` | Florence-2 presence-check reuses `model_file_specs` (no desync). |
+| RUST-11 | ✅ `012660d` | `extract_video_frames` skips undecodable frames instead of emitting `0×0`. |
+| ENG-4 | ✅ `9bac489` | Reducer `reset` is pure — `stateForDocument` builds the reset state with no draft-cache port read. |
+| ENG-5 | ✅ `279528e` | `buildSnapCandidates` allocates the full node list lazily (not on the scoped drag path). |
+| ENG-9 | ✅ `8acf46a` | Dropped the unused `component` dep (and the disable) from the `currentDocument` memo. |
+| ENG-10 | ✅ `c8254c0` | Documented that shellBackground's seed + live-sync owners are non-redundant (equality guard prevents a double commit). |
+| SHELL-2 | ✅ `ed0cfbb` | `Tree` writes `localSelectedId` only when selection is uncontrolled. |
+| SHELL-3 | ✅ `82c87e0` | Tree `selectedIds` stabilized via ref + `stringArraysEqual` (exported), no per-render `JSON.stringify`. |
+| SHELL-6 | ✅ `71dcab8` | Removed the dead SVG/DIV render-mode toggle (kept the functional chevron). |
+| SHELL-7 | ✅ `61bdec4` | `dispatchAncestor` typed with `EditorAction`. |
+| SHELL-9 | ✅ `dd4612d` | Draft fallback extent tracks window size (resize listener) instead of capturing once at mount. |
+| SHELL-10 | ✅ `8b8aa45` | `removeExtraCurrent`/`closePreview` derive the split decision from one computed `nextWindows`. |
+| SHELL-11 | ✅ `b2640ef` | Removed dead `onTabChange`/`enabledTabs` Tree props + unused imports. `onReorderNode` kept (it *is* used — audit was stale). |
+| SHELL-12 | ✅ `dd4612d` | Window-surface fan-out narrows via a new `isFeatureWindowType` guard (renders nothing for an unhandled key, no cast). |
+| UI-9 | ✅ `cd74236` | `FastEditModal` memoizes the `findSceneNode` walk. |
+| UI-12 | ✅ `f16c33e` | One exported `KIND_BY_MEDIA` (was tripled across two app modules + an inline modal copy). |
+| UI-15 | ✅ `8b8aa45`→`8f8064c` | Viewer keyboard zoom routes through `matchesKeyCommand` (settings via `useGlobalSettings`, no caller plumbing); Cmd/Ctrl+wheel stays raw (no modifier command exists) and is documented. |
+| UI-18 | ✅ `20836f2` | Removed the dead `--after-bg` CSS var in `DeviceMock`. |
+| BLD-3 | ✅ `3a667c8` | View uses the threaded `handleRemoveComponent`; inline duplicate + its now-dead deps removed. |
+| BLD-6 | ✅ `957120f` | `ComponentTreeItem` imports the shared `IconButton`. |
+| BLD-8 | ✅ `5aea87f` | Tree/variant rows are keyboard-operable (`role`/`tabIndex`/Enter-Space). |
+| BLD-9 | ✅ `93261a0` | Type badge `text-[4.5px]`→`11.5px`; orphan separator dot removed. |
+| BLD-10 | ✅ `567f4de` | Load effect now keys on `referenceId` too (the one input not derived from `item.id`). |
+| BLD-12 | ✅ `5521034` | `GallerySlider` arrow keys use functional `setIndex` (listener no longer re-binds per keystroke). |
+| BLD-13 | ✅ `fe5882a` | `confirmationDialogCopy` is an exhaustive `switch` with a `never` default. |
+| SAVE-7 | ✅ `4b82b91` | Shared pure `buildSceneRow` for upsert/write paths (side-effect order preserved). The shadowed `removeComponentSubtreeInGraph` the audit cited no longer exists. |
+| SAVE-9 | ✅ `f5ebc49` | `getVariantDepth` no longer memoizes a depth computed through a cycle. |
+| SAVE-3 | ☑️ already fixed | `replayOutbox` already has the `if (!pending.has(key))` guard (audit was stale). |
+| ENG-2, STAGE-1 | 🟡 false positive | Re-confirmed from the verification table — not acted on. |
+| SHELL-8 | 🟡 false positive | Same `resolveMaster`-keyed-on-`graphJSON` pattern the verification "do-not-touch" table already cleared (LiveInstanceRefresh re-resolves). Not touched. |
+
+**Deferred (with rationale), not done this pass:**
+- **Save-path behavior changes — SAVE-4, SAVE-8, SAVE-10, SAVE-11, SAVE-12, SHELL-4.** Each alters
+  reseed-notify timing, retry/backoff, queue coalescing (SAVE-11 is a real ordering bug), the
+  `peekTable` contract, or merges the two scene-persistence hooks. All are data-loss-adjacent and the
+  sandbox has **no `bun`/test runner**, so they can't be runtime-verified — better as a focused,
+  test-backed effort.
+- **DOM-1 / DOM-4** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
+  `document.ts`→`nodeHelpers`→`styleUtils` and 32 importers; a focused architecture effort (audit phase 4).
+- **ENG-8** — the three ancestor-walk loops share only a trivial cycle-guard but diverge in early-exit
+  semantics (return null / break / return []) and data structure; a forced abstraction is net-negative.
+- **UI-17** — extracting `ProjectGrid`/`DeviceMock`/`SelectableCard` across 4 pages is a larger
+  component-consolidation effort.
+- **VER-2 / VER-3** — touch the law-sensitive versioning core (VER-2 must materialize a missing scene;
+  VER-3 reworks linkability lifecycle). Left for a focused effort.
+- **RUST-5/6/7/12** — `models.rs` perf refactors + a `tauri::State` config cache; no Rust toolchain in
+  the sandbox to compile-verify, so the larger ones are deferred (the safe trivial ones above were done).
+
+> With REF-1 landed (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
 
 ---
 
