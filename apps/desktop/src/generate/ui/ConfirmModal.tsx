@@ -24,7 +24,7 @@ export function ConfirmActionModal({
             onClick={onCancel}
             className="h-8 cursor-pointer rounded-[7px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
           >
-            Cancelar
+            Cancel
           </button>
           <button
             type="button"

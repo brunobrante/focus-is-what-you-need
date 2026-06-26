@@ -270,7 +270,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
           <aside className={["flex flex-col items-center gap-1 border-r border-[var(--border)] bg-[var(--bg)] px-2 py-3", cleanOriginal ? "pointer-events-none [&_button]:!border-transparent [&_button]:!bg-transparent [&_button]:!text-[var(--text-muted)] [&_button]:!opacity-40" : ""].join(" ")}>
             <RailToolButton
               active={currentTool === "move"}
-              label="Mover"
+              label="Move"
               shortcut="V"
               onClick={() => setTool("move")}
             >
@@ -279,7 +279,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             <RailToolButton
               active={currentTool === "crop"}
               disabled={!canCrop}
-              label="Recortar"
+              label="Crop"
               shortcut="C"
               onClick={() => setTool("crop")}
             >
@@ -432,7 +432,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     onClick={cancelSelection}
                     className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
                   >
-                    Cancelar
+                    Cancel
                   </button>
                   {canCrop ? (
                     <button
