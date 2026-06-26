@@ -115,11 +115,14 @@ export function linkifyChildComponentsInGraph(
 
   const removed = new Set<string>();
   const instanceByNodeId = new Map<string, { componentId: string; variantId: string }>();
+  // Build the parent→children index once and reuse it for every child, instead
+  // of rebuilding it inside collectDescendantIds per child (DOM-6).
+  const childrenByParent = groupNodesByParent(doc.nodes);
 
   for (const child of children) {
     const target = findChildTargetNode(doc.nodes, child, doc.rootId);
     if (!target || target.id === doc.rootId) continue;
-    for (const id of collectDescendantIds(doc.nodes, target.id)) removed.add(id);
+    for (const id of collectDescendantIdsFrom(childrenByParent, target.id)) removed.add(id);
     instanceByNodeId.set(target.id, { componentId: child.id, variantId: child.activeVariantId });
   }
 
@@ -244,7 +247,19 @@ export function collectDescendantIds(
   nodes: HtmlCanvasNode[],
   nodeId: string,
 ): Set<string> {
-  const childrenByParent = groupNodesByParent(nodes);
+  return collectDescendantIdsFrom(groupNodesByParent(nodes), nodeId);
+}
+
+/**
+ * Like `collectDescendantIds`, but reuses a `groupNodesByParent` map the caller
+ * already built. Callers that collect descendants for many nodes of the same
+ * graph (e.g. linkifying every child) should build the map once and pass it here
+ * instead of rebuilding it per call (DOM-6).
+ */
+function collectDescendantIdsFrom(
+  childrenByParent: Map<string, HtmlCanvasNode[]>,
+  nodeId: string,
+): Set<string> {
   const result = new Set<string>();
   const walk = (parentId: string) => {
     for (const child of childrenByParent.get(parentId) ?? []) {
