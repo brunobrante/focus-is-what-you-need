@@ -59,8 +59,6 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
         tag: variantVersionLabel(v),
         tpl: "detail",
         updated: "",
-        author: "You",
-        initials: "VC",
       })),
     [variants, component?.name],
   );

@@ -4,8 +4,6 @@ export type ScreenVersion = {
   device?: string;
   tpl: "hero" | "list" | "detail" | "form" | "profile";
   updated: string;
-  author: string;
-  initials: string;
   // When set, this version is backed by a real screen row; cards render its real
   // stored snapshot instead of a template mock.
   screenId?: string;
@@ -18,9 +16,9 @@ export type ScreenVersion = {
 };
 
 export const DEFAULT_SCREEN_VERSIONS: ScreenVersion[] = [
-  { id: "v3", title: "v3 · atual", device: "iPhone 15", tpl: "hero", updated: "agora", author: "You", initials: "VC" },
-  { id: "v2", title: "v2 · ontem", device: "iPhone XR", tpl: "hero", updated: "yesterday", author: "You", initials: "VC" },
-  { id: "v1", title: "v1 · inicial", device: "iPhone SE", tpl: "detail", updated: "3 d", author: "Marina", initials: "MR" },
+  { id: "v3", title: "v3 · atual", device: "iPhone 15", tpl: "hero", updated: "agora" },
+  { id: "v2", title: "v2 · ontem", device: "iPhone XR", tpl: "hero", updated: "yesterday" },
+  { id: "v1", title: "v1 · inicial", device: "iPhone SE", tpl: "detail", updated: "3 d" },
 ];
 
 export type GitChange = {

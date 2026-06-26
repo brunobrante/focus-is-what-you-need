@@ -169,8 +169,6 @@ export function useScreenDetail(screenId: string, projectId: string): ScreenDeta
         tag: variantVersionLabel(v),
         tpl: templateForScreenName(screen?.title ?? ""),
         updated: "",
-        author: "You",
-        initials: "VC",
       })),
     [screenVariants, screen?.id, screen?.title],
   );
