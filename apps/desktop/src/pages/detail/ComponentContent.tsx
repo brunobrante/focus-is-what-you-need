@@ -129,7 +129,7 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
       ) : null}
       meta={
         <>
-          {component.kind ? <span>{component.kind}</span> : <span>Componente</span>}
+          {component.kind ? <span>{component.kind}</span> : <span>Component</span>}
           <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
           <span>{variantCount} {variantCount === 1 ? "variante" : "variantes"}</span>
           <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />

@@ -395,7 +395,7 @@ export const ImportModal = forwardRef<ImportModalHandle>(
             ) : null}
             {isStaged ? (
               <>
-                <SmallButton type="button" onClick={doCancel}>Voltar</SmallButton>
+                <SmallButton type="button" onClick={doCancel}>Back</SmallButton>
                 <SmallButton type="button" primary disabled={staged.length === 0} onClick={handleConfirm}>
                   {config.targetGroupName
                     ? "Add to group"
@@ -405,7 +405,7 @@ export const ImportModal = forwardRef<ImportModalHandle>(
                 </SmallButton>
               </>
             ) : (
-              <SmallButton type="button" onClick={() => setIsOpen(false)}>Fechar</SmallButton>
+              <SmallButton type="button" onClick={() => setIsOpen(false)}>Close</SmallButton>
             )}
           </div>
         </div>

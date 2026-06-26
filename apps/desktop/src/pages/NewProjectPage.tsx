@@ -118,7 +118,7 @@ export function NewProjectPage() {
         <div className="flex gap-2">
           <button type="button" className="btn btn-ghost" onClick={back} disabled={stepIndex === 1}>
             <IconChevronLeft size={14} strokeWidth={1.8} />
-            Voltar
+            Back
           </button>
           {stepId === "advanced" ? (
             <button
@@ -357,7 +357,7 @@ function StepAdvanced({
               }}
               className="absolute right-4 top-4 inline-flex h-9 items-center rounded-lg border border-[var(--border-strong)] bg-black/75 px-3 text-[12px] text-white backdrop-blur"
             >
-              Remover
+              Remove
             </button>
           </div>
         ) : (

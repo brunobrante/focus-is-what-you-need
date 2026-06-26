@@ -682,7 +682,7 @@ function ComponentScreensModal({
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="btn btn-ghost">
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"

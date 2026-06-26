@@ -180,7 +180,7 @@ export const ProjectSettingsModal = forwardRef<ProjectSettingsModalHandle>(
                     onChange={(event) => setPreviewScreenId(event.target.value)}
                     className="h-11 cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[14px] font-medium text-[var(--text)] outline-none transition-colors focus:border-[var(--text)]"
                   >
-                    <option value="">Primeira tela do projeto</option>
+                    <option value="">First screen of the project</option>
                     {screens.map((screen) => (
                       <option key={screen.id} value={screen.id}>
                         {screen.title}
@@ -197,7 +197,7 @@ export const ProjectSettingsModal = forwardRef<ProjectSettingsModalHandle>(
 
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setIsOpen(false)} className="btn btn-ghost">
-                Cancelar
+                Cancel
               </button>
               <button type="button" onClick={() => void save()} disabled={!name.trim() || saving} className="btn btn-primary">
                 {saving ? "Saving…" : "Save changes"}
@@ -272,7 +272,7 @@ function ThumbnailField({
               }}
               className="absolute right-3 top-3 inline-flex h-8 items-center rounded-md border border-[var(--border-strong)] bg-black/70 px-2.5 text-[12px] text-white backdrop-blur"
             >
-              Remover
+              Remove
             </button>
           </div>
         ) : (
@@ -281,7 +281,7 @@ function ThumbnailField({
               <span className="grid h-12 w-12 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text)]">
                 <IconUpload size={18} strokeWidth={1.8} />
               </span>
-              <div className="text-[13px] font-medium text-[var(--text)]">Adicionar thumbnail</div>
+              <div className="text-[13px] font-medium text-[var(--text)]">Add thumbnail</div>
               <div className="text-[12px] leading-[1.5] text-[var(--text-muted)]">
                 Upload an image to represent the project in the listing and settings.
               </div>

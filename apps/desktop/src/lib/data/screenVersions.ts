@@ -16,8 +16,8 @@ export type ScreenVersion = {
 };
 
 export const DEFAULT_SCREEN_VERSIONS: ScreenVersion[] = [
-  { id: "v3", title: "v3 · atual", device: "iPhone 15", tpl: "hero", updated: "agora" },
-  { id: "v2", title: "v2 · ontem", device: "iPhone XR", tpl: "hero", updated: "yesterday" },
+  { id: "v3", title: "v3 · current", device: "iPhone 15", tpl: "hero", updated: "now" },
+  { id: "v2", title: "v2 · yesterday", device: "iPhone XR", tpl: "hero", updated: "yesterday" },
   { id: "v1", title: "v1 · inicial", device: "iPhone SE", tpl: "detail", updated: "3 d" },
 ];
 
@@ -44,7 +44,7 @@ export const DEFAULT_HISTORY: GitCommit[] = [
     msg: "Adjusted spacing and typography in hero",
     author: "You",
     initials: "VC",
-    when: "agora",
+    when: "now",
     current: true,
     changes: [
       { op: "M", file: "hero.tsx", add: 12, rem: 4 },

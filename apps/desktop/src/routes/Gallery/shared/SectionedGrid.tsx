@@ -254,7 +254,7 @@ export function SectionedGrid<T>({
           className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--border-strong)] bg-transparent px-3 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--text)] hover:text-[var(--text)]"
         >
           <IconPlus size={13} strokeWidth={1.8} />
-          Nova section
+          New section
         </button>
       </div>
       ) : null}
@@ -288,7 +288,7 @@ export function SectionedGrid<T>({
           </label>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={() => setSectionModalOpen(false)} className="btn btn-ghost">
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"
@@ -315,7 +315,7 @@ export function SectionedGrid<T>({
         <ModalBody>
           {sections.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg)] px-4 py-8 text-center text-[13px] text-[var(--text-muted)]">
-              Crie uma section antes de adicionar cards.
+              Create a section before adding cards.
             </div>
           ) : (
             <label className="flex flex-col gap-2">
@@ -338,7 +338,7 @@ export function SectionedGrid<T>({
           )}
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={() => setAssigningItemId(null)} className="btn btn-ghost">
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"
@@ -353,7 +353,7 @@ export function SectionedGrid<T>({
               }}
               className="btn btn-primary"
             >
-              Adicionar
+              Add
             </button>
           </div>
         </ModalBody>

@@ -218,7 +218,7 @@ export function useComponentDetail(componentId: string): ComponentDetailState {
 
   const type: ProjectType = project?.type ?? "desktop";
   const projectId = project?.id ?? component?.projectId ?? routeProjectId;
-  const projectName = project?.name ?? "Projeto";
+  const projectName = project?.name ?? "Project";
 
   const [sideTab, setSideTab] = useState<SideTab>("components");
   const [query, setQuery] = useState("");

@@ -127,7 +127,7 @@ function RecordingPill({ onCancel }: { onCancel: () => void }) {
         onClick={onCancel}
         className="text-[11px] text-[var(--text-faint)] hover:text-[var(--text-muted)] cursor-pointer transition-colors"
       >
-        cancelar
+        cancel
       </button>
     </div>
   );

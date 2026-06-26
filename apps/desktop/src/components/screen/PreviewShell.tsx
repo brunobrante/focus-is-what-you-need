@@ -147,7 +147,7 @@ export function PreviewShell({
           <button
             ref={deviceTriggerRef}
             type="button"
-            aria-label={`Dispositivo ativo: ${activeDevice.label}`}
+            aria-label={`Active device: ${activeDevice.label}`}
             aria-pressed={deviceActive}
             title={activeDevice.label}
             onClick={() => setDeviceActive((current) => !current)}
@@ -191,12 +191,12 @@ export function PreviewShell({
             <div
               ref={deviceMenuRef}
               role="menu"
-              aria-label="Dispositivos"
+              aria-label="Devices"
               className="fixed z-[80] min-w-[240px] overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1.5 shadow-[var(--shadow-pop)] backdrop-blur-md"
               style={{ top: deviceMenuPos.top, left: deviceMenuPos.left }}
             >
               <div className="border-b border-[var(--border)] px-3 py-2.5">
-                <div className="text-[12px] font-semibold text-[var(--text)]">Dispositivos</div>
+                <div className="text-[12px] font-semibold text-[var(--text)]">Devices</div>
                 <div className="mt-1 text-[11px] text-[var(--text-faint)]">Escolha o modelo para o preview</div>
               </div>
               <div className="max-h-[320px] overflow-y-auto py-1">

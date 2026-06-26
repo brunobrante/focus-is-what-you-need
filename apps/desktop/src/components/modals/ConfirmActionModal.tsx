@@ -70,7 +70,7 @@ export const ConfirmActionModal = forwardRef<ConfirmActionModalHandle, ConfirmAc
         <ModalBody>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={handleClose} className="btn btn-ghost">
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"

@@ -95,7 +95,7 @@ export const ReferencesModal = forwardRef<ReferencesModalHandle, Props>(function
         {total > 1 ? (
           <button
             type="button"
-            aria-label="Anterior"
+            aria-label="Previous"
             onClick={prev}
             className="absolute left-[18px] top-1/2 grid h-[38px] w-[38px] -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-[var(--border-strong)] bg-[rgba(20,20,20,0.85)] text-[var(--text)] backdrop-blur transition-colors hover:border-white hover:bg-white hover:text-[#111]"
           >

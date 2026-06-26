@@ -287,7 +287,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                     selectedNode.linked ? "pointer-events-none opacity-50" : "",
                   ].join(" ")}
                 >
-                  <Section title="Texto">
+                  <Section title="Text">
                     <Field label="Content">
                       <input
                         value={selectedNode.text}

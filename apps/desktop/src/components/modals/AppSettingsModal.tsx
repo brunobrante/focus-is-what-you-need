@@ -143,7 +143,7 @@ export function AppSettingsContent({
 
       <div className="shrink-0 border-t border-[var(--border)] px-[22px] py-4 flex justify-end gap-2">
         <button type="button" onClick={onDone} className="btn btn-ghost">
-          Cancelar
+          Cancel
         </button>
         <button
           type="button"

@@ -128,7 +128,7 @@ export function useGallery(projectId: string, workspaceId?: string | null): Gall
   const { data: references } = useReferencesByProject(project?.id);
   const { data: activeVariants } = useActiveVariants(components);
   const type: ProjectType = project?.type ?? "desktop";
-  const projectName = project?.name ?? "Projeto";
+  const projectName = project?.name ?? "Project";
 
   const [cmpFilter, setCmpFilter] = useState<CmpKindFilter>("all");
 

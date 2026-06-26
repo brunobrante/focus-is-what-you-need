@@ -183,7 +183,7 @@ export const NewScreenModal = forwardRef<NewScreenModalHandle, Props>(
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={close} className="btn btn-ghost">
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"
