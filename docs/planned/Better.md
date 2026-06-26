@@ -194,6 +194,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | STAGE-3 | ✅ `ecbf72d` | Pointer handler reuses the memoized viewport transform. |
 | UI-7 | ✅ `690b209` | Component source badges resolve screens via a precomputed `screenById`. |
 | RUST-2 | ✅ `7ef532a` | `db_apply` hoists `prepare_cached` statements out of the loop. |
+| UI-8 | ✅ `b89687c` | CompareVersions panels key by slot, not version id — no Snapshot remount on slot change. |
 | ENG-6 | ⏭️ deferred | Already memoized (per-scene-change, not per-render); mock-detection logic is subtle and untested. |
 | SAVE-5 | ⏭️ deferred | Needs a cached reverse instance index with invalidation; delete ops are infrequent. |
 | SAVE-6 | ⏭️ deferred | The double-stringify *is* the skip-unchanged diff on the incremental path; only the post-nuke seed would gain (dev-time only). |
@@ -201,8 +202,15 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | RUST-4 | ⏭️ deferred | Pagination changes the `PersistencePort` contract across 3 adapters + the hydration model. |
 | RUST-8 | ⏭️ deferred | Session cache needs interior mutability (`Session::run` is `&mut self`) + ONNX-state care. |
 
+### Quick wins (Medium/Low, post-REF-1)
+| ID | Status | Note |
+| --- | --- | --- |
+| UI-16 | ✅ `8269ff6` | "Create project" button gains `disabled={creating}` alongside `!canNext`. |
+| VID-1 | ✅ `df7a62c` | Extraction errors probe `ffmpegAvailable()` — ffmpeg-missing vs other-failure get distinct copy; the 0-frames success state already rendered separately. |
+| META-2 | ✅ `349fcca` | Dead `author`/`initials` stubs removed from `ScreenVersion` (never rendered; no identity system to wire). |
+
 > Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
-> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2..4, META-2, VID-1) and the
+> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2..4) and the
 > cross-cutting duplication / dead-code / mixed-language sweeps. With REF-1 landed
 > (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
 
