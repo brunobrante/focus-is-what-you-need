@@ -366,6 +366,12 @@ function CanvasPageContent() {
     onFocusVersionsTab: focusVersionsTab,
   });
 
+  // shellBackground has two non-redundant owners (ENG-10): `currentDocument`
+  // seeds it into the INITIAL document so the first paint has the right colour
+  // (no flash), while this effect is the live-sync owner that pushes later
+  // changes (a settings toggle, or a parent scene edit) into the already-seeded
+  // editor. The equality guard makes the two cooperate: when the seed already
+  // carries the current value, this effect no-ops, so there is no double commit.
   useEffect(() => {
     const editor = getEditor();
     if (!editor) return;
