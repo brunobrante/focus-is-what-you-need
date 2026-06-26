@@ -1,24 +1,6 @@
 import { ChevronRight, Layers, SquarePen, Trash2 } from "lucide-react";
-import type { ComponentProps } from "react";
 import type { ComponentTreeNode } from "../engine/types";
-
-function IconButton({
-  danger = false,
-  className = "",
-  ...props
-}: ComponentProps<"button"> & { danger?: boolean }) {
-  return (
-    <button
-      type="button"
-      {...props}
-      className={[
-        "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-[6px] border-0 bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-        danger ? "hover:text-[#ff8a8a]" : "",
-        className,
-      ].join(" ")}
-    />
-  );
-}
+import { IconButton } from "./RailTools";
 
 export function ComponentTreeItem({
   node,
