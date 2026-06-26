@@ -68,6 +68,8 @@ pub enum Mutation {
 
 #[derive(Serialize)]
 pub struct ApplyAck {
+    /// Number of rows actually inserted/updated/deleted by the batch, not the
+    /// number of mutations issued (RUST-3).
     applied: usize,
 }
 
@@ -81,7 +83,10 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
     tauri::async_runtime::spawn_blocking(move || {
         let mut conn = db.lock().unwrap_or_else(|e| e.into_inner());
         let tx = conn.transaction().map_err(|e| e.to_string())?;
-        let applied = batch.len();
+        // Count rows actually changed, not mutations issued: a multi-id delete is
+        // one mutation but N rows, and a delete of a missing id changes nothing
+        // (RUST-3). `execute` returns the affected-row count for each statement.
+        let mut applied = 0usize;
 
         {
             // Compile each statement once per transaction instead of re-parsing the
@@ -100,13 +105,13 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
             for mutation in &batch {
                 match mutation {
                     Mutation::UpsertRecord { table, id, json } => {
-                        upsert
+                        applied += upsert
                             .execute(params![table, id, json])
                             .map_err(|e| e.to_string())?;
                     }
                     Mutation::DeleteRecords { table, ids } => {
                         for id in ids {
-                            delete
+                            applied += delete
                                 .execute(params![table, id])
                                 .map_err(|e| e.to_string())?;
                         }
