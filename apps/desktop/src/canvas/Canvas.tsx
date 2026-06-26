@@ -256,8 +256,7 @@ function CanvasPageContent() {
         resolveMaster,
       }) ?? createBlankDocumentForProjectType(projectType);
     return { ...doc, shellBackground: effectiveShellBackground };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [component, projectType, resolvedSceneGraphJSON, effectiveShellBackground, resolveMaster]);
+  }, [projectType, resolvedSceneGraphJSON, effectiveShellBackground, resolveMaster]);
 
   const currentReady =
     (!sceneOwner || !sceneLoading) &&
