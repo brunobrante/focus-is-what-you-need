@@ -297,8 +297,19 @@ partly wrong — noted inline).
   component-consolidation effort.
 - **VER-2 / VER-3** — touch the law-sensitive versioning core (VER-2 must materialize a missing scene;
   VER-3 reworks linkability lifecycle). Left for a focused effort.
-- **RUST-5/6/7/12** — `models.rs` perf refactors + a `tauri::State` config cache; no Rust toolchain in
-  the sandbox to compile-verify, so the larger ones are deferred (the safe trivial ones above were done).
+- **RUST-12 — done (`eb44b1d`).** `WorkspaceConfig` is cached in a managed `ConfigCache`
+  (`Mutex<Option<…>>`), filled lazily and refreshed in `set_workspace_folder`, instead of re-reading +
+  re-parsing `workspace-config.json` on every one of ~20 reference/export commands. (Cargo *is* available
+  now; lib.rs compiles clean — a full `cargo check` is blocked by a pre-existing, unrelated
+  `eyedropper.rs`/objc2 version mismatch in this sandbox.)
+- **RUST-5 / RUST-6 / RUST-7 — analyzed, not changed.** All are in numerically-sensitive `models.rs`
+  inference preprocessing. RUST-6's 8 blocks genuinely differ (plain `/255` vs ImageNet-normalize, with/
+  without letterbox padding, fixed vs source resolution), so a single parameterized `rgb_to_nchw` would
+  *centralize* the off-by-one surface — and inference output **cannot be runtime-verified here** (no ONNX
+  execution / model files / images). Compile-checkable but not output-verifiable → too risky to change
+  blind. Leave for an effort that can run the models.
+- **RUST-8** — session cache still needs interior mutability (`Session::run` is `&mut self`) + ONNX-state
+  care; non-numerical but architecturally involved, and likewise not runtime-verifiable here.
 
 > With REF-1 landed (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
 
