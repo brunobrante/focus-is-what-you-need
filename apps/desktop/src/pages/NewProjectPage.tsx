@@ -130,7 +130,7 @@ export function NewProjectPage() {
               Save and skip
             </button>
           ) : null}
-          <button type="button" className="btn btn-primary" onClick={() => void next()} disabled={!canNext}>
+          <button type="button" className="btn btn-primary" onClick={() => void next()} disabled={!canNext || creating}>
             <span>{creating ? "Creating…" : stepId === "advanced" ? "Create project" : "Next"}</span>
             <IconChevronRight size={14} strokeWidth={1.8} />
           </button>
