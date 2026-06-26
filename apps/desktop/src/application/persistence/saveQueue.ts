@@ -1,5 +1,10 @@
 import type { PersistencePort } from "@/domain/persistence/persistencePort";
-import { mutationKey, type Mutation } from "@/domain/persistence/mutations";
+import {
+  eachRecordMutation,
+  mutationKey,
+  oppositeMutationKey,
+  type Mutation,
+} from "@/domain/persistence/mutations";
 
 /**
  * The single save queue. Record mutations (deltas) are coalesced by key, then
@@ -60,7 +65,7 @@ export class SaveQueue {
   }
 
   enqueue(mutation: Mutation): void {
-    this.pending.set(mutationKey(mutation), mutation);
+    this.acceptNewest(mutation);
     // While a flush is in flight the on-disk outbox predates this edit; persist
     // the full unflushed set so a crash during applyBatch cannot drop it (SAVE-1).
     if (this.flushing && this.outbox) {
@@ -75,9 +80,37 @@ export class SaveQueue {
   private unflushedSnapshot(): Mutation[] {
     if (this.inFlight.length === 0) return Array.from(this.pending.values());
     const merged = new Map<string, Mutation>();
-    for (const mutation of this.inFlight) merged.set(mutationKey(mutation), mutation);
-    for (const mutation of this.pending.values()) merged.set(mutationKey(mutation), mutation);
+    for (const mutation of this.inFlight)
+      for (const m of eachRecordMutation(mutation)) merged.set(mutationKey(m), m);
+    // Pending edits are newer than the in-flight batch, so they supersede the
+    // opposite op of the same record too (an upsert undone by a later delete, or
+    // vice versa) — otherwise the outbox could resurrect a deleted record (SAVE-11).
+    for (const mutation of this.pending.values())
+      for (const m of eachRecordMutation(mutation)) {
+        merged.delete(oppositeMutationKey(m));
+        merged.set(mutationKey(m), m);
+      }
     return Array.from(merged.values());
+  }
+
+  /** Accept a fresh (newest) edit: it supersedes any same-record op already
+   *  pending — the same op (last-write-wins) and the opposite op (SAVE-11). */
+  private acceptNewest(mutation: Mutation): void {
+    for (const m of eachRecordMutation(mutation)) {
+      this.pending.delete(oppositeMutationKey(m));
+      this.pending.set(mutationKey(m), m);
+    }
+  }
+
+  /** Re-admit an older edit (a re-queued batch or a replayed outbox entry)
+   *  without clobbering a newer pending edit of the same record — neither the
+   *  same op (SAVE-3) nor the opposite op (SAVE-11). */
+  private acceptIfFresh(mutation: Mutation): void {
+    for (const m of eachRecordMutation(mutation)) {
+      const key = mutationKey(m);
+      if (this.pending.has(key) || this.pending.has(oppositeMutationKey(m))) continue;
+      this.pending.set(key, m);
+    }
   }
 
   /** Number of coalesced mutations waiting to be sent. */
@@ -104,12 +137,9 @@ export class SaveQueue {
     if (!this.outbox) return;
     const saved = await this.outbox.load();
     if (saved.length === 0) return;
-    for (const mutation of saved) {
-      // Don't clobber a newer edit enqueued before replay ran (SAVE-3) — same
-      // guard as the retry re-queue path.
-      const key = mutationKey(mutation);
-      if (!this.pending.has(key)) this.pending.set(key, mutation);
-    }
+    // Don't clobber a newer edit enqueued before replay ran (SAVE-3) — same
+    // guard as the retry re-queue path.
+    for (const mutation of saved) this.acceptIfFresh(mutation);
     await this.flush();
   }
 
@@ -147,10 +177,7 @@ export class SaveQueue {
       } catch (error) {
         this.inFlight = [];
         // Re-queue without clobbering newer edits that arrived meanwhile.
-        for (const mutation of batch) {
-          const key = mutationKey(mutation);
-          if (!this.pending.has(key)) this.pending.set(key, mutation);
-        }
+        for (const mutation of batch) this.acceptIfFresh(mutation);
         this.retries += 1;
         if (this.retries > this.maxRetries) {
           this.setStatus("error");

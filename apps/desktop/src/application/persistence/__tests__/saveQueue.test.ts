@@ -106,6 +106,76 @@ test("edit enqueued during an in-flight flush is persisted to the outbox (SAVE-1
   expect(await outbox.load()).toHaveLength(0);
 });
 
+test("re-upsert after a delete wins — record is not resurrected-then-deleted (SAVE-11)", async () => {
+  const { port, batches } = recordingPort();
+  const queue = new SaveQueue(port, { autoFlush: false });
+
+  // create → delete → recreate the same record in one window.
+  queue.enqueue({ op: "upsertRecord", table: "scenes", id: "s1", json: "v1" });
+  queue.enqueue({ op: "deleteRecords", table: "scenes", ids: ["s1"] });
+  queue.enqueue({ op: "upsertRecord", table: "scenes", id: "s1", json: "v2" });
+
+  expect(queue.size()).toBe(1);
+  await queue.flush();
+  expect(batches[0]).toHaveLength(1);
+  expect(batches[0]![0]).toMatchObject({ op: "upsertRecord", id: "s1", json: "v2" });
+});
+
+test("delete after an upsert wins — the stale upsert does not survive (SAVE-11)", async () => {
+  const { port, batches } = recordingPort();
+  const queue = new SaveQueue(port, { autoFlush: false });
+
+  queue.enqueue({ op: "upsertRecord", table: "scenes", id: "s1", json: "v1" });
+  queue.enqueue({ op: "deleteRecords", table: "scenes", ids: ["s1"] });
+
+  expect(queue.size()).toBe(1);
+  await queue.flush();
+  expect(batches[0]).toHaveLength(1);
+  expect(batches[0]![0]).toMatchObject({ op: "deleteRecords", ids: ["s1"] });
+});
+
+test("a multi-id delete coalesces per record against a later upsert (SAVE-11)", async () => {
+  const { port, batches } = recordingPort();
+  const queue = new SaveQueue(port, { autoFlush: false });
+
+  queue.enqueue({ op: "deleteRecords", table: "scenes", ids: ["a", "b", "c"] });
+  queue.enqueue({ op: "upsertRecord", table: "scenes", id: "b", json: "kept" });
+
+  await queue.flush();
+  const ops = batches[0]!;
+  // b survives as an upsert; a and c survive as deletes.
+  expect(ops).toContainEqual({ op: "upsertRecord", table: "scenes", id: "b", json: "kept" });
+  expect(ops).toContainEqual({ op: "deleteRecords", table: "scenes", ids: ["a"] });
+  expect(ops).toContainEqual({ op: "deleteRecords", table: "scenes", ids: ["c"] });
+  expect(ops.some((m) => m.op === "deleteRecords" && m.ids.includes("b"))).toBe(false);
+});
+
+test("a delete during an in-flight upsert flush wins on the outbox (SAVE-11)", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  let firstCall = true;
+  const port = stubPort(async (batch) => {
+    if (firstCall) { firstCall = false; await gate; }
+    return { applied: batch.length };
+  });
+  const outbox = createMemoryOutbox();
+  const queue = new SaveQueue(port, { autoFlush: false, outbox });
+
+  queue.enqueue({ op: "upsertRecord", table: "scenes", id: "s1", json: "v1" });
+  const flushed = queue.flush(); // applyBatch([upsert s1]) is awaiting the gate
+
+  // The record is deleted while its upsert is still in flight.
+  queue.enqueue({ op: "deleteRecords", table: "scenes", ids: ["s1"] });
+
+  const saved = await outbox.load();
+  // The outbox must not carry both ops for s1; the newer delete wins.
+  expect(saved.some((m) => m.op === "deleteRecords" && m.ids.includes("s1"))).toBe(true);
+  expect(saved.some((m) => m.op === "upsertRecord" && m.id === "s1")).toBe(false);
+
+  release();
+  await flushed;
+});
+
 test("failed batch is retried and then succeeds", async () => {
   let calls = 0;
   const port = stubPort(async (batch) => {
