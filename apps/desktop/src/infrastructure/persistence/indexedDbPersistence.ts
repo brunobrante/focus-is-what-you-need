@@ -1,4 +1,7 @@
-import type { PersistencePort } from "@/domain/persistence/persistencePort";
+import type {
+  AssetBlobMeta,
+  GraphPersistencePort,
+} from "@/domain/persistence/persistencePort";
 import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
 
 /**
@@ -13,14 +16,17 @@ import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
  */
 
 const DB_NAME = "focus-persistence";
-const DB_VERSION = 1;
+// v2 adds the `asset_blobs` store (binaries out of the record JSON, RUST-4 / D5).
+const DB_VERSION = 2;
 const RECORDS = "records";
+const ASSET_BLOBS = "asset_blobs";
 
 type RecordRow = { table: string; id: string; json: string; rev?: number };
+type AssetBlobEntry = { blobKey: string; bytes: Uint8Array; meta: AssetBlobMeta };
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
-export function createIndexedDbPersistence(): PersistencePort {
+export function createIndexedDbPersistence(): GraphPersistencePort {
   return {
     async applyBatch(mutations) {
       const db = await openDatabase();
@@ -50,7 +56,42 @@ export function createIndexedDbPersistence(): PersistencePort {
       );
       return rows.map((row) => row.json);
     },
+
+    async getAssetBlob(blobKey) {
+      const db = await openDatabase();
+      const entry = await reqToPromise<AssetBlobEntry | undefined>(
+        db.transaction(ASSET_BLOBS, "readonly").objectStore(ASSET_BLOBS).get(blobKey),
+      );
+      return entry?.bytes ?? null;
+    },
+
+    async putAssetBlob(bytes, meta) {
+      const db = await openDatabase();
+      await txDone(
+        db.transaction(ASSET_BLOBS, "readwrite"),
+        (tx) =>
+          tx
+            .objectStore(ASSET_BLOBS)
+            .put({ blobKey: meta.blobKey, bytes, meta } satisfies AssetBlobEntry),
+      );
+    },
+
+    async deleteAssetBlob(blobKey) {
+      const db = await openDatabase();
+      await txDone(db.transaction(ASSET_BLOBS, "readwrite"), (tx) =>
+        tx.objectStore(ASSET_BLOBS).delete(blobKey),
+      );
+    },
   };
+}
+
+function txDone(tx: IDBTransaction, run: (tx: IDBTransaction) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    run(tx);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
 }
 
 function applyMutation(recordsStore: IDBObjectStore, mutation: Mutation): void {
@@ -96,6 +137,9 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = request.result;
       if (!db.objectStoreNames.contains(RECORDS)) {
         db.createObjectStore(RECORDS, { keyPath: ["table", "id"] });
+      }
+      if (!db.objectStoreNames.contains(ASSET_BLOBS)) {
+        db.createObjectStore(ASSET_BLOBS, { keyPath: "blobKey" });
       }
     };
     request.onsuccess = () => resolve(request.result);

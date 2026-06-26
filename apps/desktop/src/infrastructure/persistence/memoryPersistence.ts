@@ -1,4 +1,7 @@
-import type { PersistencePort } from "@/domain/persistence/persistencePort";
+import type {
+  AssetBlobMeta,
+  GraphPersistencePort,
+} from "@/domain/persistence/persistencePort";
 import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
 
 /**
@@ -11,8 +14,9 @@ import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
  */
 type Cell = { json: string; rev: number | undefined };
 
-export function createMemoryPersistence(): PersistencePort {
+export function createMemoryPersistence(): GraphPersistencePort {
   const tables = new Map<string, Map<string, Cell>>();
+  const blobs = new Map<string, { bytes: Uint8Array; meta: AssetBlobMeta }>();
 
   function table(name: string): Map<string, Cell> {
     let bucket = tables.get(name);
@@ -56,6 +60,15 @@ export function createMemoryPersistence(): PersistencePort {
     },
     async listRecords(name) {
       return Array.from(table(name).values(), (cell) => cell.json);
+    },
+    async getAssetBlob(blobKey) {
+      return blobs.get(blobKey)?.bytes ?? null;
+    },
+    async putAssetBlob(bytes, meta) {
+      blobs.set(meta.blobKey, { bytes, meta });
+    },
+    async deleteAssetBlob(blobKey) {
+      blobs.delete(blobKey);
     },
   };
 }

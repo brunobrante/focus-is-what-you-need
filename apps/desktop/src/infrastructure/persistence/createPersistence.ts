@@ -1,11 +1,15 @@
-import type { PersistencePort } from "@/domain/persistence/persistencePort";
+import type { GraphPersistencePort } from "@/domain/persistence/persistencePort";
 import { detectPersistenceRuntime } from "./runtime";
 import { createMemoryPersistence } from "./memoryPersistence";
 import { createIndexedDbPersistence } from "./indexedDbPersistence";
 import { createSqlitePersistence } from "./sqlitePersistence";
 
-/** Choose the record-store adapter for the current runtime. */
-export function createPersistencePort(): PersistencePort {
+/**
+ * Choose the record-store adapter for the current runtime. Every adapter is
+ * graph-capable (records + graph edges + asset blobs — D4), so the factory hands
+ * back the wider port; record-only consumers narrow to `PersistencePort`.
+ */
+export function createPersistencePort(): GraphPersistencePort {
   switch (detectPersistenceRuntime()) {
     case "desktop":
       return createSqlitePersistence();
@@ -17,9 +21,9 @@ export function createPersistencePort(): PersistencePort {
   }
 }
 
-let portSingleton: PersistencePort | null = null;
+let portSingleton: GraphPersistencePort | null = null;
 
-export function getPersistencePort(): PersistencePort {
+export function getPersistencePort(): GraphPersistencePort {
   if (!portSingleton) portSingleton = createPersistencePort();
   return portSingleton;
 }

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import type { PersistencePort } from "@/domain/persistence/persistencePort";
+import type {
+  AssetBlobMeta,
+  GraphPersistencePort,
+  PersistencePort,
+} from "@/domain/persistence/persistencePort";
 
 /**
  * The one persistence-port contract suite (save-architecture-v3 D9). The memory
@@ -105,6 +109,62 @@ export function runRecordPortContract(
         { op: "upsertRecord", table: "t", id: "a", json: "fresh", rev: 1 },
       ]);
       expect(await port.getRecord("t", "a")).toBe("fresh");
+    });
+  });
+}
+
+/**
+ * Asset-blob half of the port contract (D5). Same shape as above: the memory
+ * adapter is the reference; every graph-capable adapter must pass this.
+ */
+export function runAssetBlobContract(
+  name: string,
+  makePort: () => GraphPersistencePort,
+): void {
+  const meta = (blobKey: string, byteLength: number): AssetBlobMeta => ({
+    blobKey,
+    contentHash: null,
+    mimeType: "image/svg+xml",
+    byteLength,
+    width: null,
+    height: null,
+    storageKind: "sqliteBlob",
+  });
+
+  describe(`AssetBlob contract: ${name}`, () => {
+    test("put then get round-trips the exact bytes", async () => {
+      const port = makePort();
+      const bytes = new Uint8Array([1, 2, 3, 250, 0, 99]);
+      await port.putAssetBlob(bytes, meta("k1", bytes.byteLength));
+      expect(Array.from((await port.getAssetBlob("k1"))!)).toEqual(
+        Array.from(bytes),
+      );
+    });
+
+    test("get of an unknown key is null", async () => {
+      const port = makePort();
+      expect(await port.getAssetBlob("nope")).toBeNull();
+    });
+
+    test("put overwrites the same key", async () => {
+      const port = makePort();
+      await port.putAssetBlob(new Uint8Array([1]), meta("k", 1));
+      await port.putAssetBlob(new Uint8Array([9, 9]), meta("k", 2));
+      expect(Array.from((await port.getAssetBlob("k"))!)).toEqual([9, 9]);
+    });
+
+    test("delete removes the blob", async () => {
+      const port = makePort();
+      await port.putAssetBlob(new Uint8Array([7]), meta("k", 1));
+      await port.deleteAssetBlob("k");
+      expect(await port.getAssetBlob("k")).toBeNull();
+    });
+
+    test("blobs never surface as records", async () => {
+      const port = makePort();
+      await port.putAssetBlob(new Uint8Array([1, 2]), meta("k", 2));
+      // The asset store is a separate namespace — a record listing is untouched.
+      expect(await port.listRecords("asset_blobs")).toEqual([]);
     });
   });
 }

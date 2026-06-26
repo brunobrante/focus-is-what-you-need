@@ -1,5 +1,6 @@
-import type { PersistencePort } from "@/domain/persistence/persistencePort";
+import type { GraphPersistencePort } from "@/domain/persistence/persistencePort";
 import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
+import { base64ToBytes, bytesToBase64 } from "@/lib/encoding/base64";
 
 /**
  * Desktop PersistencePort: a thin bridge to the Rust backend. One `db_apply`
@@ -15,7 +16,7 @@ let invokePromise: Promise<Invoke> | null = null;
 
 type WireAck = { applied: number };
 
-export function createSqlitePersistence(): PersistencePort {
+export function createSqlitePersistence(): GraphPersistencePort {
   return {
     async applyBatch(mutations) {
       const invoke = await getInvoke();
@@ -32,6 +33,22 @@ export function createSqlitePersistence(): PersistencePort {
     async listRecords(table) {
       const invoke = await getInvoke();
       return invoke<string[]>("db_list_records", { table });
+    },
+
+    async getAssetBlob(blobKey) {
+      const invoke = await getInvoke();
+      const b64 = await invoke<string | null>("asset_get", { blobKey });
+      return b64 == null ? null : base64ToBytes(b64);
+    },
+
+    async putAssetBlob(bytes, meta) {
+      const invoke = await getInvoke();
+      await invoke("asset_put", { dataB64: bytesToBase64(bytes), meta });
+    },
+
+    async deleteAssetBlob(blobKey) {
+      const invoke = await getInvoke();
+      await invoke("asset_delete", { blobKey });
     },
   };
 }

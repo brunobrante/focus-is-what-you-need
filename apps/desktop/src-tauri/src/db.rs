@@ -11,6 +11,7 @@
 //! thumbnails are JSON/base64 inside that `json` column like everything else;
 //! there is no typed per-node table.
 
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -43,7 +44,17 @@ pub fn open_and_migrate(path: &Path) -> Result<Connection, String> {
             rev INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (tbl, id)
         );
-        CREATE INDEX IF NOT EXISTS idx_records_tbl ON records(tbl);",
+        CREATE INDEX IF NOT EXISTS idx_records_tbl ON records(tbl);
+        CREATE TABLE IF NOT EXISTS asset_blobs (
+            blob_key TEXT PRIMARY KEY,
+            content_hash TEXT,
+            mime_type TEXT NOT NULL,
+            byte_length INTEGER NOT NULL,
+            width INTEGER,
+            height INTEGER,
+            storage_kind TEXT NOT NULL,
+            data BLOB
+        );",
     )
     .map_err(|e| e.to_string())?;
     // `rev` is the optimistic-write guard (D6). A dev database created before this
@@ -191,6 +202,102 @@ pub async fn db_get_record(
         )
         .optional()
         .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ---------------------------------------------------------------------------
+// Asset blobs — binaries (thumbnails, crops, imports) kept OUT of `records` so a
+// bulk `db_list_records` never drags megabytes through one IPC (RUST-4 / D5).
+// ---------------------------------------------------------------------------
+
+/// Metadata mirror of the TS `AssetBlobMeta`. `rename_all = "camelCase"` so the
+/// nested object the renderer passes maps onto these snake_case fields.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetMeta {
+    blob_key: String,
+    content_hash: Option<String>,
+    mime_type: String,
+    byte_length: i64,
+    width: Option<i64>,
+    height: Option<i64>,
+    storage_kind: String,
+}
+
+#[tauri::command]
+pub async fn asset_put(
+    state: State<'_, Db>,
+    data_b64: String,
+    meta: AssetMeta,
+) -> Result<(), String> {
+    // Decode off the connection lock — the payload is renderer-supplied base64.
+    let bytes = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
+    let db = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+        // NOTE: large blobs (>256 KB) are stored in the column for now; offloading
+        // them to files keyed by blob_key (D5) is a follow-up and additive — the
+        // `storage_kind` is already recorded so a later GC/export can relocate.
+        conn.execute(
+            "INSERT INTO asset_blobs
+                (blob_key, content_hash, mime_type, byte_length, width, height, storage_kind, data)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(blob_key) DO UPDATE SET
+                content_hash = excluded.content_hash,
+                mime_type = excluded.mime_type,
+                byte_length = excluded.byte_length,
+                width = excluded.width,
+                height = excluded.height,
+                storage_kind = excluded.storage_kind,
+                data = excluded.data",
+            params![
+                meta.blob_key,
+                meta.content_hash,
+                meta.mime_type,
+                meta.byte_length,
+                meta.width,
+                meta.height,
+                meta.storage_kind,
+                bytes,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn asset_get(state: State<'_, Db>, blob_key: String) -> Result<Option<String>, String> {
+    let db = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+        let bytes: Option<Vec<u8>> = conn
+            .query_row(
+                "SELECT data FROM asset_blobs WHERE blob_key = ?1",
+                params![blob_key],
+                |row| row.get::<_, Option<Vec<u8>>>(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+            .flatten();
+        Ok(bytes.map(|b| BASE64.encode(b)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn asset_delete(state: State<'_, Db>, blob_key: String) -> Result<(), String> {
+    let db = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute("DELETE FROM asset_blobs WHERE blob_key = ?1", params![blob_key])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     })
     .await
     .map_err(|e| e.to_string())?
