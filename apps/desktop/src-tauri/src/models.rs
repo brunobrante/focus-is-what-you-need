@@ -1401,14 +1401,11 @@ fn florence2_text_check_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Resul
 
 fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str) -> Result<String, String> {
     let dir = model_storage_dir(app, FLORENCE2_ID)?;
-    for file in [
-        FLORENCE2_VISION_FILE,
-        FLORENCE2_EMBED_FILE,
-        FLORENCE2_ENCODER_FILE,
-        FLORENCE2_DECODER_FILE,
-        FLORENCE2_TOKENIZER_FILE,
-    ] {
-        if !dir.join(file).exists() {
+    // Reuse the install spec as the single source of truth for the file list so
+    // adding/renaming a Florence-2 file can't silently desync install vs the
+    // inference presence-check (RUST-10).
+    for file in model_file_specs(FLORENCE2_ID)? {
+        if !dir.join(file.name).exists() {
             return Err("model \"florence2\" is not installed".to_string());
         }
     }
