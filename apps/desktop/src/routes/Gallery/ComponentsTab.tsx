@@ -83,6 +83,10 @@ export function ComponentsTab({
   const [sectionFilter, setSectionFilter] = useState("all");
   const [createSectionRequest, setCreateSectionRequest] = useState(0);
   const [screenAssignmentComponent, setScreenAssignmentComponent] = useState<ComponentRow | null>(null);
+  // Index screens once so each card's source badge resolves its owner/linked
+  // screens by id instead of a screens.find + screens.filter per render — the
+  // pattern ReferencesTab already uses (UI-7).
+  const screenById = useMemo(() => new Map(screens.map((s) => [s.id, s] as const)), [screens]);
   const filtered = useMemo(() => {
     const loweredQuery = query.trim().toLowerCase();
     return components.filter((component) => {
@@ -192,7 +196,7 @@ export function ComponentsTab({
                 key={c.id}
                 component={c}
                 variant={variant}
-                screens={screens}
+                screenById={screenById}
                 projectId={projectId}
                 workspaceId={workspaceId}
                 type={type}
@@ -207,7 +211,7 @@ export function ComponentsTab({
                 key={c.id}
                 component={c}
                 variant={variant}
-                screens={screens}
+                screenById={screenById}
                 projectId={projectId}
                 workspaceId={workspaceId}
                 type={type}
@@ -345,7 +349,7 @@ function AddComponentCard({ onClick }: { onClick: () => void }) {
 function ComponentCard({
   component,
   variant,
-  screens,
+  screenById,
   projectId,
   workspaceId,
   type: _type,
@@ -357,7 +361,7 @@ function ComponentCard({
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
-  screens: ScreenRow[];
+  screenById: Map<string, ScreenRow>;
   projectId: string;
   workspaceId?: string | null;
   type: ProjectType;
@@ -388,7 +392,7 @@ function ComponentCard({
             display="card"
           />
         ) : null}
-        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} workspaceId={workspaceId} />
+        <ComponentSourceBadge component={component} screenById={screenById} projectId={projectId} workspaceId={workspaceId} />
         <CardMenu
           actions={[
             { id: "canvas", label: "Canvas", icon: <IconOpenCanvas size={13} strokeWidth={1.6} />, onClick: () => navigate(canvasHref) },
@@ -451,7 +455,7 @@ function ComponentCard({
 function ComponentListRow({
   component,
   variant,
-  screens,
+  screenById,
   projectId,
   workspaceId,
   type: _type,
@@ -463,7 +467,7 @@ function ComponentListRow({
 }: {
   component: ComponentRow;
   variant: VariantRow | null;
-  screens: ScreenRow[];
+  screenById: Map<string, ScreenRow>;
   projectId: string;
   workspaceId?: string | null;
   type: ProjectType;
@@ -625,7 +629,7 @@ function ComponentListRow({
       </div>
 
       <div className="hidden shrink-0 xl:block">
-        <ComponentSourceBadge component={component} screens={screens} projectId={projectId} workspaceId={workspaceId} inline />
+        <ComponentSourceBadge component={component} screenById={screenById} projectId={projectId} workspaceId={workspaceId} inline />
       </div>
     </Link>
   );
@@ -739,25 +743,26 @@ function ComponentScreensModal({
  */
 function ComponentSourceBadge({
   component,
-  screens,
+  screenById,
   projectId,
   workspaceId,
   inline = false,
 }: {
   component: ComponentRow;
-  screens: ScreenRow[];
+  screenById: Map<string, ScreenRow>;
   projectId: string;
   workspaceId?: string | null;
   inline?: boolean;
 }) {
   const navigate = useNavigate();
   const scope = scopeOf(component);
-  const mainScreen = component.screenId
-    ? screens.find((s) => s.id === component.screenId) ?? null
-    : null;
-  const linkedScreens = screens.filter(
-    (s) => component.assignedScreenIds.includes(s.id) && s.id !== component.screenId,
-  );
+  const mainScreen = component.screenId ? screenById.get(component.screenId) ?? null : null;
+  // Walk the component's own assigned ids (small) and look each up, instead of
+  // scanning all screens (UI-7).
+  const linkedScreens = component.assignedScreenIds
+    .filter((id) => id !== component.screenId)
+    .map((id) => screenById.get(id))
+    .filter((s): s is ScreenRow => s != null);
   const mainLabel =
     scope === "screen"
       ? mainScreen?.title ?? "Screen"
