@@ -293,8 +293,11 @@ partly wrong — noted inline).
   cycle guard. (Done independently of DOM-1, which still needs the full type move.)
 - **ENG-8** — the three ancestor-walk loops share only a trivial cycle-guard but diverge in early-exit
   semantics (return null / break / return []) and data structure; a forced abstraction is net-negative.
-- **UI-17** — extracting `ProjectGrid`/`DeviceMock`/`SelectableCard` across 4 pages is a larger
-  component-consolidation effort.
+- **UI-17 — done / partly stale (`2e2b9db`).** The genuine current duplication — the dot-grid
+  `DeviceMockTile` + `DeviceMock` placeholder, byte-identical in NewProjectPage/NewDraftPage — is now one
+  shared `pages/shared/DeviceMockTile` component. The audit's `ProjectGrid`/`SelectableCard` half was
+  **stale**: it cited `HomePage.tsx`, which no longer exists (consolidated away), and `ProjectCard`/
+  `AddProjectCard` now live only in `LandingPage` — no cross-page duplication remains to extract.
 - **VER-2 / VER-3** — touch the law-sensitive versioning core (VER-2 must materialize a missing scene;
   VER-3 reworks linkability lifecycle). Left for a focused effort.
 - **RUST-12 — done (`eb44b1d`).** `WorkspaceConfig` is cached in a managed `ConfigCache`
