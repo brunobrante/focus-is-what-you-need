@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
@@ -107,7 +108,29 @@ fn default_config(app: &tauri::AppHandle) -> WorkspaceConfig {
     }
 }
 
+/// In-memory cache of the workspace config, managed as Tauri state. The config
+/// only changes via `set_workspace_folder`, but ~20 reference/export commands read
+/// it on hot paths; without this each one re-read and re-parsed the JSON from disk
+/// (RUST-12). Lazily filled on first read, refreshed on `set_workspace_folder`.
+#[derive(Default)]
+struct ConfigCache {
+    cached: Mutex<Option<WorkspaceConfig>>,
+}
+
 fn read_config(app: &tauri::AppHandle) -> WorkspaceConfig {
+    if let Some(cache) = app.try_state::<ConfigCache>() {
+        let mut guard = cache.cached.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(cfg) = guard.as_ref() {
+            return cfg.clone();
+        }
+        let cfg = read_config_from_disk(app);
+        *guard = Some(cfg.clone());
+        return cfg;
+    }
+    read_config_from_disk(app)
+}
+
+fn read_config_from_disk(app: &tauri::AppHandle) -> WorkspaceConfig {
     let Ok(path) = config_path(app) else {
         return default_config(app);
     };
@@ -226,6 +249,10 @@ fn set_workspace_folder(app: tauri::AppHandle, base_folder: String) -> Result<()
     let mut cfg = read_config(&app);
     cfg.base_folder = base_folder;
     save_config(&app, &cfg)?;
+    // Keep the cache equal to what was just persisted so later reads see it.
+    if let Some(cache) = app.try_state::<ConfigCache>() {
+        *cache.cached.lock().unwrap_or_else(|e| e.into_inner()) = Some(cfg.clone());
+    }
     ensure_local_structure(&cfg)
 }
 
@@ -1046,6 +1073,7 @@ pub fn run() {
             let path = sqlite_path(app.handle())?;
             let conn = db::open_and_migrate(&path)?;
             app.manage(db::Db::new(conn));
+            app.manage(ConfigCache::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
