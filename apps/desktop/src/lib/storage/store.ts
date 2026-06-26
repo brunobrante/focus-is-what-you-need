@@ -8,6 +8,7 @@ export { TABLES, type TableKey } from "@/lib/storage/storeKeys";
 export {
   listTable,
   peekTable,
+  isTableHydrated,
   getRecordById,
   putRecord,
   removeRecords,

@@ -3,6 +3,9 @@ import { beforeEach, expect, test } from "bun:test";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import {
   TABLES,
+  isTableHydrated,
+  listTable,
+  peekTable,
   replaceTable,
   resetRecordStoreCache,
   subscribe,
@@ -47,4 +50,26 @@ test("replaceTable { silent: true } suppresses the per-table notify (SAVE-4)", a
   // a subscriber never observes a half-applied cross-table state.
   await replaceTable(TABLES.projects, [row("p1")], { silent: true });
   expect(calls).toBe(0);
+});
+
+test("isTableHydrated distinguishes not-loaded from loaded-but-empty (SAVE-12)", async () => {
+  expect(isTableHydrated(TABLES.projects)).toBe(false);
+  await listTable(TABLES.projects); // empty table, but now hydrated
+  expect(isTableHydrated(TABLES.projects)).toBe(true);
+});
+
+test("peekTable before hydration warns once (SAVE-12)", () => {
+  const original = console.warn;
+  const messages: string[] = [];
+  console.warn = (msg: string) => {
+    messages.push(msg);
+  };
+  try {
+    peekTable(TABLES.scenes); // not hydrated yet
+    peekTable(TABLES.scenes); // second read must not re-warn
+  } finally {
+    console.warn = original;
+  }
+  expect(messages).toHaveLength(1);
+  expect(messages[0]).toContain("before hydration");
 });

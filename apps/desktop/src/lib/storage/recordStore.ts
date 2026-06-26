@@ -25,6 +25,10 @@ type Row = { id: string } & Record<string, unknown>;
 
 const cache = new Map<string, Map<string, unknown>>();
 const hydration = new Map<string, Promise<void>>();
+/** Tables whose hydration promise has *resolved* (rows fully loaded into cache). */
+const hydrated = new Set<string>();
+/** Tables already warned about a pre-hydration `peekTable` — warn once each. */
+const peekedBeforeHydrated = new Set<string>();
 
 const listeners = new Map<string, Set<() => void>>();
 
@@ -51,9 +55,16 @@ async function ensureHydrated(table: string): Promise<void> {
         // Skip unparseable rows rather than failing the whole table load.
       }
     }
+    hydrated.add(table);
   })();
   hydration.set(table, promise);
   return promise;
+}
+
+/** Whether a table has finished hydrating (its rows are fully loaded). Lets a
+ *  synchronous `peekTable` reader tell "loaded but empty" from "not loaded yet". */
+export function isTableHydrated(table: TableKey): boolean {
+  return hydrated.has(table);
 }
 
 export async function listTable<T>(table: TableKey): Promise<T[]> {
@@ -74,8 +85,19 @@ export async function getRecordById<T>(
  * table without awaiting; an un-hydrated table yields an empty array. Use only where
  * the table is known to be hydrated already (e.g. instance resolution at canvas seed,
  * which runs after the current scene has loaded). Never use it as the primary loader.
+ *
+ * Reading before hydration would silently resolve instances against zero masters
+ * (blank render), so a first such read warns; gate on `isTableHydrated` if a caller
+ * can legitimately run early (SAVE-12).
  */
 export function peekTable<T>(table: TableKey): T[] {
+  if (!hydrated.has(table) && !peekedBeforeHydrated.has(table)) {
+    peekedBeforeHydrated.add(table);
+    console.warn(
+      `[recordStore] peekTable("${table}") read before hydration — got an ` +
+        `empty/partial table. Ensure the table is loaded first (isTableHydrated).`,
+    );
+  }
   return Array.from(bucket(table).values()) as T[];
 }
 
@@ -193,6 +215,8 @@ export function subscribe(table: TableKey, fn: () => void): () => void {
 export function resetRecordStoreCache(): void {
   cache.clear();
   hydration.clear();
+  hydrated.clear();
+  peekedBeforeHydrated.clear();
 }
 
 /** Force-flush pending writes (tests / shutdown). */
