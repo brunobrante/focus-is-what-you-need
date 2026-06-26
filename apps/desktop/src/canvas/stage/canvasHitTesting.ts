@@ -194,39 +194,46 @@ const cursorAt45: string[] = [
 
 const svgCursorCache = new Map<string, string>();
 
-function buildArrowSvg(angleDeg: number): string {
-  const size = 24;
-  const cx = size / 2;
-  const top = 4;
-  const bot = 20;
-  const hs = 3.5;
+// Figma-style "scale" cursor: a double-headed arrow with a center divider.
+// The exported asset points horizontally (east/west), so it is rotated by
+// (resize-axis angle − 90°) to align with each handle's drag direction.
+const SCALE_CURSOR_WHITE_PATH =
+  "M7.93934 9.93934C8.52513 9.35355 9.47487 9.35355 10.0607 9.93934L11.5607 11.4393C12.1464 12.0251 12.1464 12.9749 11.5607 13.5607L11.1213 14H20.8787L20.4393 13.5607C19.8536 12.9749 19.8536 12.0251 20.4393 11.4393L21.9393 9.93934C22.5251 9.35355 23.4749 9.35355 24.0607 9.93934L28.5607 14.4393C29.1464 15.0251 29.1464 15.9749 28.5607 16.5607L24.0607 21.0607C23.4749 21.6464 22.5251 21.6464 21.9393 21.0607L20.4393 19.5607C19.8536 18.9749 19.8536 18.0251 20.4393 17.4393L20.8787 17H11.1213L11.5607 17.4393C12.1464 18.0251 12.1464 18.9749 11.5607 19.5607L10.0607 21.0607C9.47487 21.6464 8.52513 21.6464 7.93934 21.0607L3.43934 16.5607C2.85355 15.9749 2.85355 15.0251 3.43934 14.4393L7.93934 9.93934Z";
+
+const SCALE_CURSOR_BLACK_PATH =
+  "M9.35355 10.6464C9.54882 10.8417 9.54882 11.1583 9.35355 11.3536L5.20711 15.5L9.35355 19.6464C9.54882 19.8417 9.54882 20.1583 9.35355 20.3536C9.15829 20.5488 8.84171 20.5488 8.64645 20.3536L4.14645 15.8536C3.95118 15.6583 3.95118 15.3417 4.14645 15.1464L8.64645 10.6464C8.84171 10.4512 9.15829 10.4512 9.35355 10.6464ZM22.6464 10.6464C22.8417 10.4512 23.1583 10.4512 23.3536 10.6464L27.8536 15.1464C28.0488 15.3417 28.0488 15.6583 27.8536 15.8536L23.3536 20.3536C23.1583 20.5488 22.8417 20.5488 22.6464 20.3536C22.4512 20.1583 22.4512 19.8417 22.6464 19.6464L26.7929 15.5L22.6464 11.3536C22.4512 11.1583 22.4512 10.8417 22.6464 10.6464ZM10.8536 12.1464C11.0488 12.3417 11.0488 12.6583 10.8536 12.8536L8.70711 15H23.2929L21.1464 12.8536C20.9512 12.6583 20.9512 12.3417 21.1464 12.1464C21.3417 11.9512 21.6583 11.9512 21.8536 12.1464L24.8536 15.1464C25.0488 15.3417 25.0488 15.6583 24.8536 15.8536L21.8536 18.8536C21.6583 19.0488 21.3417 19.0488 21.1464 18.8536C20.9512 18.6583 20.9512 18.3417 21.1464 18.1464L23.2929 16H8.70711L10.8536 18.1464C11.0488 18.3417 11.0488 18.6583 10.8536 18.8536C10.6583 19.0488 10.3417 19.0488 10.1464 18.8536L7.14645 15.8536C6.95118 15.6583 6.95118 15.3417 7.14645 15.1464L10.1464 12.1464C10.3417 11.9512 10.6583 11.9512 10.8536 12.1464Z";
+
+function buildScaleSvg(angleDeg: number): string {
+  const size = 32;
+  const c = size / 2;
   return (
-    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>` +
-    `<g transform='rotate(${angleDeg} ${cx} ${cx})'>` +
-    `<line x1='${cx}' y1='${top}' x2='${cx}' y2='${bot}' stroke='white' stroke-width='3' stroke-linecap='round'/>` +
-    `<polyline points='${cx - hs},${top + hs} ${cx},${top} ${cx + hs},${top + hs}' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>` +
-    `<polyline points='${cx - hs},${bot - hs} ${cx},${bot} ${cx + hs},${bot - hs}' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>` +
-    `<line x1='${cx}' y1='${top}' x2='${cx}' y2='${bot}' stroke='black' stroke-width='1.5' stroke-linecap='round'/>` +
-    `<polyline points='${cx - hs},${top + hs} ${cx},${top} ${cx + hs},${top + hs}' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/>` +
-    `<polyline points='${cx - hs},${bot - hs} ${cx},${bot} ${cx + hs},${bot - hs}' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/>` +
-    `</g></svg>`
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}' fill='none'>` +
+    `<g transform='rotate(${angleDeg} ${c} ${c})'>` +
+    `<g filter='url(#scaleShadow)'><path d='${SCALE_CURSOR_WHITE_PATH}' fill='white'/></g>` +
+    `<path d='${SCALE_CURSOR_BLACK_PATH}' fill='black'/>` +
+    `</g>` +
+    `<defs><filter id='scaleShadow' x='0' y='7.5' width='32' height='18' filterUnits='userSpaceOnUse' color-interpolation-filters='sRGB'>` +
+    `<feFlood flood-opacity='0' result='BackgroundImageFix'/>` +
+    `<feColorMatrix in='SourceAlpha' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0' result='hardAlpha'/>` +
+    `<feOffset dy='1'/><feGaussianBlur stdDeviation='1.5'/>` +
+    `<feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.35 0'/>` +
+    `<feBlend mode='normal' in2='BackgroundImageFix' result='effect1_dropShadow'/>` +
+    `<feBlend mode='normal' in='SourceGraphic' in2='effect1_dropShadow' result='shape'/>` +
+    `</filter></defs></svg>`
   );
 }
 
 export function getRotatedCursor(handle: ResizeHandle, rotation: number): string {
   const angle = ((handleAngle[handle] + rotation) % 360 + 360) % 360;
-  if (rotation === 0) {
-    const index = Math.round(angle / 45) % 8;
-    return cursorAt45[index];
-  }
-  const roundedAngle = Math.round(angle);
+  // The asset is horizontal (its axis = 90°); offset so it lies along the handle.
+  const roundedAngle = ((Math.round(angle) - 90) % 360 + 360) % 360;
   const key = `${roundedAngle}`;
   let cached = svgCursorCache.get(key);
   if (!cached) {
-    const svg = buildArrowSvg(roundedAngle);
+    const svg = buildScaleSvg(roundedAngle);
     const encoded = encodeURIComponent(svg);
-    const fallbackIndex = Math.round(roundedAngle / 45) % 8;
-    cached = `url("data:image/svg+xml,${encoded}") 12 12, ${cursorAt45[fallbackIndex]}`;
+    const fallbackIndex = Math.round(angle / 45) % 8;
+    cached = `url("data:image/svg+xml,${encoded}") 16 16, ${cursorAt45[fallbackIndex]}`;
     svgCursorCache.set(key, cached);
   }
   return cached;
