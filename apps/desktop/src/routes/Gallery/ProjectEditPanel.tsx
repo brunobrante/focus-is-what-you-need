@@ -27,6 +27,17 @@ function emojiToDataUrl(emoji: string): string {
   return canvas.toDataURL("image/png");
 }
 
+// The emoji → PNG data-URL mapping is constant, but each encode allocates a
+// canvas + toDataURL. Bake all 24 once (lazily, on first use) instead of on
+// every panel render / keystroke (UI-6).
+let emojiIconUrlsCache: ReadonlyArray<readonly [string, string]> | null = null;
+function emojiIconUrls(): ReadonlyArray<readonly [string, string]> {
+  if (!emojiIconUrlsCache) {
+    emojiIconUrlsCache = ICON_EMOJIS.map((emoji) => [emoji, emojiToDataUrl(emoji)] as const);
+  }
+  return emojiIconUrlsCache;
+}
+
 function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="flex flex-col gap-1">
@@ -175,8 +186,7 @@ export function ProjectEditPanel({
                     )}
                   </div>
                   <div className="grid grid-cols-6 gap-1">
-                    {ICON_EMOJIS.map((emoji) => {
-                      const dataUrl = emojiToDataUrl(emoji);
+                    {emojiIconUrls().map(([emoji, dataUrl]) => {
                       const isActive = currentIcon === dataUrl;
                       return (
                         <button
