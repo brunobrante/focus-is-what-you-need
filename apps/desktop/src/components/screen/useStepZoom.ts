@@ -8,6 +8,8 @@ import {
 } from "react";
 
 import { clampPanToCenter } from "@/domain/zoom";
+import { matchesKeyCommand } from "@/domain/settings/resolve";
+import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import { useElementScrollbars } from "@/components/ui/CanvasScrollbars";
 import { ZOOM_DEFAULT_IDX, ZOOM_STEPS } from "./ZoomControls";
 
@@ -47,6 +49,9 @@ export function useStepZoom(
   const keyboard = options?.keyboard ?? false;
   const enabled = options?.enabled ?? true;
   const contentRef = options?.contentRef;
+  // Resolve the zoom keyboard shortcuts through user settings rather than raw
+  // modifier reads, per the canvas input guardrail (UI-15).
+  const { settings } = useGlobalSettings();
   const [index, setIndex] = useState(ZOOM_DEFAULT_IDX);
   const zoom = ZOOM_STEPS[index] ?? 1;
 
@@ -115,6 +120,9 @@ export function useStepZoom(
     const el = targetRef.current;
     if (!enabled || !el) return;
     const onWheel = (event: WheelEvent) => {
+      // Cmd/Ctrl+wheel = zoom. This is a fixed, universal pinch-zoom gesture with
+      // no configurable modifier command to route through, so the raw mod read
+      // here is intentional (unlike the keyboard shortcuts below — UI-15).
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
         wheelAccum.current += event.deltaY;
@@ -141,21 +149,20 @@ export function useStepZoom(
   useEffect(() => {
     if (!enabled || !keyboard) return;
     const onKey = (event: KeyboardEvent) => {
-      if (!event.ctrlKey && !event.metaKey) return;
-      if (event.key === "=" || event.key === "+") {
+      if (matchesKeyCommand(event, settings, "canvas.viewport.zoomIn")) {
         event.preventDefault();
         zoomIn();
-      } else if (event.key === "-") {
+      } else if (matchesKeyCommand(event, settings, "canvas.viewport.zoomOut")) {
         event.preventDefault();
         zoomOut();
-      } else if (event.key === "0") {
+      } else if (matchesKeyCommand(event, settings, "canvas.viewport.zoomReset")) {
         event.preventDefault();
         reset();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, keyboard, zoomIn, zoomOut, reset]);
+  }, [enabled, keyboard, settings, zoomIn, zoomOut, reset]);
 
   // Drag-to-pan. Tracking starts on pointerdown but only becomes a pan once the
   // pointer passes the threshold, so a plain click still selects the node under
