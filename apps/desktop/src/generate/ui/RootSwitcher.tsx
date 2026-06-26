@@ -336,9 +336,19 @@ function ReferenceThumbnail({
     void loadReferenceFile(reference.id, reference.ext || extFromName(reference.name))
       .then((blob) => (blob ? blobToObjectUrl(blob) : null))
       .then((loaded) => {
-        if (!loaded || cancelled) return;
-        if (!thumbnailCache.has(reference.id)) thumbnailCache.set(reference.id, loaded);
-        if (!cancelled) setUrl(thumbnailCache.get(reference.id) ?? loaded);
+        if (!loaded) return;
+        const existing = thumbnailCache.get(reference.id);
+        // Another instance already cached one (concurrent load), or this component
+        // was cancelled before it could use the URL — either way `loaded` never
+        // enters the cache, so revoke it instead of leaking the blob.
+        if (existing) {
+          if (existing !== loaded) URL.revokeObjectURL(loaded);
+          if (!cancelled) setUrl(existing);
+          return;
+        }
+        if (cancelled) { URL.revokeObjectURL(loaded); return; }
+        thumbnailCache.set(reference.id, loaded);
+        setUrl(loaded);
       })
       .catch(() => {});
     return () => { cancelled = true; };
