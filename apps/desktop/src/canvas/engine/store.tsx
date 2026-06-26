@@ -170,6 +170,16 @@ function createInitialState(
     viewportMode,
     fallbackDocument,
   );
+  return stateForDocument(document, viewportMode);
+}
+
+/**
+ * Pure builder for a fresh editor state around a given document — no port / draft
+ * cache reads, so it is safe to call from the (pure) reducer. `createInitialState`
+ * reads storage first and then delegates here; `reset` calls it directly with a
+ * blank document (ENG-4).
+ */
+function stateForDocument(document: CanvasDocument, viewportMode: ViewportMode): EditorState {
   return {
     document,
     viewportMode,
@@ -465,7 +475,10 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     };
   },
   reset(state) {
-    return { ...createInitialState(STORAGE_KEY, undefined, true, state.viewportMode), document: createDefaultDocument() };
+    // Pure: build the reset state directly from a blank document instead of
+    // calling createInitialState, which would read the draft-cache port (I/O in
+    // a reducer that React may double-invoke) only to discard the result (ENG-4).
+    return stateForDocument(createDefaultDocument(), state.viewportMode);
   },
 };
 
