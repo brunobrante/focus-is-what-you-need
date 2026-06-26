@@ -1,7 +1,7 @@
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
 import type { Node, NodeType } from "./treeTypes";
 
-function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
+export function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let index = 0; index < a.length; index += 1) {

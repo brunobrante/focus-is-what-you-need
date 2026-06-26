@@ -40,6 +40,7 @@ import {
   initiallyOpen,
   isLayerFilterActive,
   openToDepth,
+  stringArraysEqual,
   structureKey,
   treeFromCanvasDocument,
   visibleNodeIds,
@@ -278,15 +279,22 @@ export function Tree({
   }, []);
 
   const pickerTree = projectTree ?? [];
-  const selectedIds =
+  const rawSelectedIds =
     selectedNodeIds ??
     (selectedNodeId != null
       ? [selectedNodeId]
       : localSelectedId
         ? [localSelectedId]
         : []);
-  const selectedIdsKey = JSON.stringify(selectedIds);
-  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIdsKey]);
+  // `rawSelectedIds` is rebuilt every render, so hold a stable reference while its
+  // contents are unchanged. Memos/effects below then depend on identity instead of
+  // re-stringifying the array each render purely to drive a memo key (SHELL-3).
+  const selectedIdsRef = useRef<readonly string[]>(rawSelectedIds);
+  if (!stringArraysEqual(selectedIdsRef.current, rawSelectedIds)) {
+    selectedIdsRef.current = rawSelectedIds;
+  }
+  const selectedIds = selectedIdsRef.current;
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const visibleLayerIds = useMemo(
     () => visibleNodeIds(displayRoot, rowsOpenSet),
     [displayRoot, rowsOpenSet],
@@ -334,7 +342,7 @@ export function Tree({
       for (const id of ancestorIds) next.add(id);
       return next;
     });
-  }, [autoRevealSelection, selectedIdsKey, tree.root, treeStructureKey]);
+  }, [autoRevealSelection, selectedIds, tree.root, treeStructureKey]);
 
   // Runs after an ancestor expansion is committed to the DOM (layout effect →
   // after mutation, before paint), so the just-revealed row already exists. The
