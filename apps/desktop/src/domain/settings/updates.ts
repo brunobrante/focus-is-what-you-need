@@ -62,6 +62,16 @@ export function updateTreeAutoRevealSelection(
   };
 }
 
+/**
+ * Reassigns a key command to a single binding, replacing any existing array.
+ *
+ * This deliberately collapses multi-binding commands (e.g. zoom-in shipping both
+ * `=` and `+`, or redo shipping `Ctrl+Shift+Z` and `Ctrl+Y`) down to the one combo
+ * the user just recorded (DOM-9). The Shortcuts recorder is a single-combo
+ * "reassign" affordance with no UI to add or remove individual bindings, so an
+ * append would let bindings accumulate with no way to prune them. Resetting to the
+ * captured binding keeps the displayed badges and the active shortcut in sync.
+ */
 export function updateKeyCommand(
   settings: GlobalSettings,
   commandId: CanvasKeyCommandId,
