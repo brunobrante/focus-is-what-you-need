@@ -8,6 +8,7 @@ import {
 import type { Dispatch, ReactNode } from "react";
 import { useEditor } from "./store";
 import type { NoticeStore } from "./noticeStore";
+import type { Clipboard } from "./clipboard";
 import type { EditorState } from "./types";
 
 export type EditorBridgeValue = {
@@ -17,6 +18,9 @@ export type EditorBridgeValue = {
   // Transient toolbar-notice store (e.g. "Wrapper added"). Lives on the editor,
   // surfaced here so the toolbar — rendered outside EditorProvider — can read it.
   noticeStore: NoticeStore;
+  // The editor's per-instance clipboard, so bridge consumers (layers tree paste,
+  // canvas commands) act on this editor's buffer rather than a shared one (ENG-3).
+  clipboard: Clipboard;
 };
 
 type Listener = () => void;

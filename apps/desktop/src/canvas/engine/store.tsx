@@ -14,6 +14,7 @@ import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
 import { createNoticeStore, type CanvasNotice, type NoticeStore } from "./noticeStore";
+import { createClipboard, type Clipboard } from "./clipboard";
 import { getDraftCachePort } from "./draftCachePort";
 import { CURRENT_CANVAS_STORAGE_KEY } from "./storageKeys";
 import { getInitialZoomForSubjectSize, getViewportZoomLimits, zoomViewportAroundCenter } from "./viewport";
@@ -56,6 +57,9 @@ type EditorContextValue = {
   dispatch: Dispatch<EditorAction>;
   hoverStore: HoverStore;
   noticeStore: NoticeStore;
+  // Per-editor copy buffer — never module-global, so split canvases don't share
+  // a clipboard (ENG-3).
+  clipboard: Clipboard;
 };
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -507,6 +511,10 @@ export function EditorProvider({
   if (noticeStoreRef.current === null) noticeStoreRef.current = createNoticeStore();
   const noticeStore = noticeStoreRef.current;
 
+  const clipboardRef = useRef<Clipboard | null>(null);
+  if (clipboardRef.current === null) clipboardRef.current = createClipboard();
+  const clipboard = clipboardRef.current;
+
   useEffect(() => {
     hydratedRef.current = !persistStorage;
     if (!persistStorage) return;
@@ -561,8 +569,8 @@ export function EditorProvider({
   }, [onDocumentChange, persistStorage, state.document, state.transientChangedIds, storageKey]);
 
   const value = useMemo(
-    () => ({ state, dispatch, hoverStore, noticeStore }),
-    [hoverStore, noticeStore, state],
+    () => ({ state, dispatch, hoverStore, noticeStore, clipboard }),
+    [hoverStore, noticeStore, clipboard, state],
   );
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }

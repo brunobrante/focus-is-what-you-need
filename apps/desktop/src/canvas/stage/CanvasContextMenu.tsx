@@ -8,7 +8,6 @@ import {
   setElementLocked,
   setElementVisible
 } from "@/canvas/engine/actions";
-import { copyElements, hasClipboard, pasteElements } from "@/canvas/engine/clipboard";
 import { useEditor } from "@/canvas/engine/store";
 import type { CanvasDocument } from "@/canvas/engine/types";
 
@@ -26,7 +25,7 @@ const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform
 const modLabel = isMac ? "⌘" : "Ctrl+";
 
 export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<ContextMenuState>; onClose: () => void }) {
-  const { state, dispatch } = useEditor();
+  const { state, dispatch, clipboard } = useEditor();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -69,8 +68,8 @@ export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<Context
   };
 
   const items: MenuItem[] = [
-    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: () => { copyElements(state.document, selectedIds); onClose(); } },
-    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !hasClipboard(), action: () => { const r = pasteElements(state.document); if (r) commit(r.document, r.selectedIds); else onClose(); } },
+    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: () => { clipboard.copy(state.document, selectedIds); onClose(); } },
+    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !clipboard.has(), action: () => { const r = clipboard.paste(state.document); if (r) commit(r.document, r.selectedIds); else onClose(); } },
     { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: () => { const r = duplicateElements(state.document, selectedIds); commit(r.document, r.selectedIds); } },
     { type: "separator" },
     { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: () => { if (singleId) commit(bringToFront(state.document, singleId)); } },

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
-import { copyElements, pasteElements } from "@/canvas/engine/clipboard";
+import type { Clipboard } from "@/canvas/engine/clipboard";
 import { deleteElements, duplicateElements } from "@/canvas/engine/actions";
 import { isEditableTarget } from "@/canvas/engine/hitTesting";
 import { clamp } from "@/canvas/engine/geometry";
@@ -16,6 +16,8 @@ import type { Interaction } from "../canvasInteractionTypes";
 
 type Params = {
   dispatch: (action: Record<string, unknown> & { type: string }) => void;
+  // This editor's clipboard (per-instance, not module-global) — ENG-3.
+  clipboard: Clipboard;
   viewportRef: MutableRefObject<HTMLDivElement | null>;
   interactionRef: MutableRefObject<Interaction | null>;
   latestStateRef: MutableRefObject<EditorState>;
@@ -30,6 +32,7 @@ type Params = {
 
 export function useKeyboardShortcuts({
   dispatch,
+  clipboard,
   viewportRef,
   interactionRef,
   latestStateRef,
@@ -126,10 +129,10 @@ export function useKeyboardShortcuts({
         });
         return;
       }
-      if (matchesKeyCommand(event, settings, "canvas.clipboard.copy")) { event.preventDefault(); copyElements(currentState.document, currentState.selectedIds); return; }
+      if (matchesKeyCommand(event, settings, "canvas.clipboard.copy")) { event.preventDefault(); clipboard.copy(currentState.document, currentState.selectedIds); return; }
       if (matchesKeyCommand(event, settings, "canvas.clipboard.paste")) {
         event.preventDefault();
-        const result = pasteElements(currentState.document);
+        const result = clipboard.paste(currentState.document);
         if (result) dispatch({ type: "commitDocument", document: result.document, selectedIds: result.selectedIds });
         return;
       }
@@ -201,6 +204,7 @@ export function useKeyboardShortcuts({
     };
   }, [
     dispatch,
+    clipboard,
     interactionRef,
     latestStateRef,
     onBackToParentShortcut,

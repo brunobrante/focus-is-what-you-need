@@ -9,7 +9,6 @@ import {
   setElementLocked,
   setElementVisible,
 } from "@/canvas/engine/actions";
-import { copyElements, pasteElements } from "@/canvas/engine/clipboard";
 import type { EditorBridgeValue } from "@/canvas/engine/bridge";
 
 /**
@@ -25,7 +24,7 @@ export function useCanvasCommands(
   editor: EditorBridgeValue,
   onCommit: () => void,
 ) {
-  const { state, dispatch } = editor;
+  const { state, dispatch, clipboard } = editor;
 
   return useMemo(() => {
     const selectedIds = state.selectedIds;
@@ -38,11 +37,11 @@ export function useCanvasCommands(
 
     return {
       copy: () => {
-        copyElements(state.document, selectedIds);
+        clipboard.copy(state.document, selectedIds);
         onCommit();
       },
       paste: () => {
-        const result = pasteElements(state.document);
+        const result = clipboard.paste(state.document);
         if (result) commit(result.document, result.selectedIds);
         else onCommit();
       },
@@ -72,5 +71,5 @@ export function useCanvasCommands(
         commit(deleteElements(state.document, selectedIds), []);
       },
     };
-  }, [state.document, state.selectedIds, dispatch, onCommit]);
+  }, [state.document, state.selectedIds, dispatch, clipboard, onCommit]);
 }

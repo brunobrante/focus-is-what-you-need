@@ -60,7 +60,7 @@ export function CanvasStage({
   onOpenSelectedComponentShortcut?: () => boolean | void;
   onBackToParentShortcut?: () => boolean | void;
 }) {
-  const { state, dispatch } = useEditor();
+  const { state, dispatch, clipboard } = useEditor();
   const hoverStore = useHoverStore();
   const noticeStore = useNoticeStore();
   const fontTokens = useElementFontTokens();
@@ -159,6 +159,7 @@ export function CanvasStage({
 
   const { spacePressedRef } = useKeyboardShortcuts({
     dispatch,
+    clipboard,
     viewportRef,
     interactionRef,
     latestStateRef,

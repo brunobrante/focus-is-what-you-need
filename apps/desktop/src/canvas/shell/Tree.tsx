@@ -19,7 +19,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { hasClipboard } from "@/canvas/engine/clipboard";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import {
   useEditorBridge,
@@ -831,7 +830,7 @@ function TreeContextMenuContent({
 
   const items: TreeContextMenuItem[] = [
     { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: commands.copy },
-    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !hasClipboard(), action: commands.paste },
+    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !editor.clipboard.has(), action: commands.paste },
     { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: commands.duplicate },
     { type: "separator" },
     { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: commands.bringToFront },
