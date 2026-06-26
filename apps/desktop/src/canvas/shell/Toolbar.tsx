@@ -185,7 +185,6 @@ function DropdownToolButton({
   const [menuOpen, setMenuOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const [pillVisible, setPillVisible] = useState(false);
-  const [renderMode, setRenderMode] = useState<"SVG" | "DIV">("SVG");
   const [selectedToolId, setSelectedToolId] = useState<CanvasToolId | null>(tools[0]?.id ?? null);
   const ref = useRef<HTMLDivElement>(null);
   const autoFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -270,17 +269,6 @@ function DropdownToolButton({
             className={`flex items-stretch overflow-hidden rounded-[5px] border border-[#333] bg-[#141414] transition-opacity duration-300 ${pillVisible ? "opacity-100" : "opacity-0"}`}
             style={{ boxShadow: "0 4px 14px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.4)" }}
           >
-            <button
-              type="button"
-              onClick={() => setRenderMode((m) => (m === "SVG" ? "DIV" : "SVG"))}
-              className="flex items-center border-0 bg-transparent px-2 py-[5px] transition-colors duration-[90ms] hover:bg-[#1E1E1E]"
-              aria-label="Toggle render mode"
-            >
-              <span className="font-mono text-[9px] font-semibold leading-none tracking-wide text-[#ADADAD]">
-                {renderMode}
-              </span>
-            </button>
-            <div className="w-px shrink-0 bg-[#2A2A2A]" />
             <button
               type="button"
               onClick={onBadgeClick}
