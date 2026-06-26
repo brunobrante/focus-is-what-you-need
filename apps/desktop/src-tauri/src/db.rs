@@ -83,24 +83,33 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
         let tx = conn.transaction().map_err(|e| e.to_string())?;
         let applied = batch.len();
 
-        for mutation in &batch {
-            match mutation {
-                Mutation::UpsertRecord { table, id, json } => {
-                    tx.execute(
-                        "INSERT INTO records (tbl, id, json)
-                         VALUES (?1, ?2, ?3)
-                         ON CONFLICT(tbl, id) DO UPDATE SET json = excluded.json",
-                        params![table, id, json],
-                    )
-                    .map_err(|e| e.to_string())?;
-                }
-                Mutation::DeleteRecords { table, ids } => {
-                    for id in ids {
-                        tx.execute(
-                            "DELETE FROM records WHERE tbl = ?1 AND id = ?2",
-                            params![table, id],
-                        )
-                        .map_err(|e| e.to_string())?;
+        {
+            // Compile each statement once per transaction instead of re-parsing the
+            // identical INSERT/DELETE for every row in the batch (RUST-2).
+            let mut upsert = tx
+                .prepare_cached(
+                    "INSERT INTO records (tbl, id, json)
+                     VALUES (?1, ?2, ?3)
+                     ON CONFLICT(tbl, id) DO UPDATE SET json = excluded.json",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut delete = tx
+                .prepare_cached("DELETE FROM records WHERE tbl = ?1 AND id = ?2")
+                .map_err(|e| e.to_string())?;
+
+            for mutation in &batch {
+                match mutation {
+                    Mutation::UpsertRecord { table, id, json } => {
+                        upsert
+                            .execute(params![table, id, json])
+                            .map_err(|e| e.to_string())?;
+                    }
+                    Mutation::DeleteRecords { table, ids } => {
+                        for id in ids {
+                            delete
+                                .execute(params![table, id])
+                                .map_err(|e| e.to_string())?;
+                        }
                     }
                 }
             }
