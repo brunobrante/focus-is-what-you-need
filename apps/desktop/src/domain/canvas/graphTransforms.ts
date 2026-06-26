@@ -1,9 +1,15 @@
 import {
   htmlCanvasDocumentFromJSON,
   serializeHtmlCanvasDocument,
-  type HtmlCanvasDocument,
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
+import {
+  collectDescendantIds,
+  collectDescendantIdsFrom,
+  groupNodesByParent,
+  subjectNodeForDocument,
+  uniqueNodeId,
+} from "@/lib/canvas/htmlScene/graphNodeHelpers";
 import type { ComponentRow } from "@/lib/storage/schema";
 
 /**
@@ -206,24 +212,6 @@ export function materializeInstancesInGraph(
   return serializeHtmlCanvasDocument({ ...doc, nodes, updatedAt: Date.now() });
 }
 
-export function subjectNodeForDocument(document: HtmlCanvasDocument): HtmlCanvasNode | null {
-  const root = document.nodes.find((node) => node.id === document.rootId);
-  if (!root) return null;
-  const rootChildren = document.nodes.filter((node) => node.parentId === root.id);
-  if (
-    root.name.endsWith(" Canvas") &&
-    rootChildren.length === 1 &&
-    rootChildren[0] &&
-    rootChildren[0].bounds.x === 0 &&
-    rootChildren[0].bounds.y === 0 &&
-    Math.round(rootChildren[0].bounds.width) === Math.round(root.bounds.width) &&
-    Math.round(rootChildren[0].bounds.height) === Math.round(root.bounds.height)
-  ) {
-    return rootChildren[0];
-  }
-  return root;
-}
-
 export function mergeSubjectIntoTarget(
   target: HtmlCanvasNode,
   subject: HtmlCanvasNode,
@@ -241,61 +229,6 @@ export function mergeSubjectIntoTarget(
     locked: target.locked,
     visible: target.visible,
   };
-}
-
-export function collectDescendantIds(
-  nodes: HtmlCanvasNode[],
-  nodeId: string,
-): Set<string> {
-  return collectDescendantIdsFrom(groupNodesByParent(nodes), nodeId);
-}
-
-/**
- * Like `collectDescendantIds`, but reuses a `groupNodesByParent` map the caller
- * already built. Callers that collect descendants for many nodes of the same
- * graph (e.g. linkifying every child) should build the map once and pass it here
- * instead of rebuilding it per call (DOM-6).
- */
-function collectDescendantIdsFrom(
-  childrenByParent: Map<string, HtmlCanvasNode[]>,
-  nodeId: string,
-): Set<string> {
-  const result = new Set<string>();
-  const walk = (parentId: string) => {
-    for (const child of childrenByParent.get(parentId) ?? []) {
-      result.add(child.id);
-      walk(child.id);
-    }
-  };
-  walk(nodeId);
-  return result;
-}
-
-export function groupNodesByParent(
-  nodes: HtmlCanvasNode[],
-): Map<string, HtmlCanvasNode[]> {
-  const groups = new Map<string, HtmlCanvasNode[]>();
-  for (const node of nodes) {
-    if (!node.parentId) continue;
-    const group = groups.get(node.parentId) ?? [];
-    group.push(node);
-    groups.set(node.parentId, group);
-  }
-  for (const group of groups.values()) {
-    group.sort((a, b) => a.order - b.order);
-  }
-  return groups;
-}
-
-export function uniqueNodeId(preferred: string, usedIds: Set<string>): string {
-  if (!usedIds.has(preferred)) return preferred;
-  // The used set is finite, so a suffix bump is guaranteed to terminate; loop
-  // without a fixed ceiling rather than fall back to an unchecked id that could
-  // already be in use (DOM-8).
-  for (let index = 1; ; index += 1) {
-    const candidate = `${preferred}-${index}`;
-    if (!usedIds.has(candidate)) return candidate;
-  }
 }
 
 export function normalizeName(value: string): string {

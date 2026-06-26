@@ -4,11 +4,11 @@ import {
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
 import {
-  collectDescendantIds,
   materializeInstancesInGraph,
   normalizeName,
   replaceComponentSubtreeInGraph,
 } from "@/domain/canvas/graphTransforms";
+import { collectDescendantIds } from "@/lib/canvas/htmlScene/graphNodeHelpers";
 import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/application/scenes/dependencyIndex";
 import { getCachedSceneDependencyIndex } from "@/application/scenes/sceneDependencyIndexCache";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";

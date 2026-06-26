@@ -1,5 +1,14 @@
 import { htmlCanvasDocumentFromJSON } from "./document";
+import {
+  collectDescendantIdsFrom,
+  groupNodesByParent,
+  subjectNodeForDocument,
+  uniqueNodeId,
+} from "./graphNodeHelpers";
 import type { HtmlCanvasDocument, HtmlCanvasInstanceRef, HtmlCanvasNode } from "./types";
+
+// Re-exported so the `htmlScene` barrel keeps exposing it from this module.
+export { subjectNodeForDocument };
 
 /**
  * Resolves linked instance nodes for DISPLAY only.
@@ -132,39 +141,12 @@ export function stripResolvedInstanceChildren(document: HtmlCanvasDocument): Htm
   for (const instanceId of instanceIds) {
     for (const child of byParent.get(instanceId) ?? []) {
       removed.add(child.id);
-      for (const id of collectDescendantIds(byParent, child.id)) removed.add(id);
+      for (const id of collectDescendantIdsFrom(byParent, child.id)) removed.add(id);
     }
   }
   if (removed.size === 0) return document;
 
   return { ...document, nodes: document.nodes.filter((node) => !removed.has(node.id)) };
-}
-
-// ─── Local copies of the subtree helpers used by scenes.repo (kept private here so
-//     the resolver stays a leaf module with no storage imports) ──────────────────
-
-/**
- * The "subject" node of a scene — the actual screen/component frame. Scenes wrap the
- * subject in a "<name> Canvas" root; when that wrapper is present the subject is its sole
- * full-bleed child, otherwise the root itself is the subject. Top-level subcomponents are
- * the subject's direct children, NOT the root's.
- */
-export function subjectNodeForDocument(document: HtmlCanvasDocument): HtmlCanvasNode | null {
-  const root = document.nodes.find((node) => node.id === document.rootId);
-  if (!root) return null;
-  const rootChildren = document.nodes.filter((node) => node.parentId === root.id);
-  if (
-    root.name.endsWith(" Canvas") &&
-    rootChildren.length === 1 &&
-    rootChildren[0] &&
-    rootChildren[0].bounds.x === 0 &&
-    rootChildren[0].bounds.y === 0 &&
-    Math.round(rootChildren[0].bounds.width) === Math.round(root.bounds.width) &&
-    Math.round(rootChildren[0].bounds.height) === Math.round(root.bounds.height)
-  ) {
-    return rootChildren[0];
-  }
-  return root;
 }
 
 /**
@@ -193,43 +175,4 @@ function mergeSubjectIntoInstance(
     locked: instanceNode.locked,
     instanceOf: instanceNode.instanceOf,
   };
-}
-
-function groupNodesByParent(nodes: HtmlCanvasNode[]): Map<string, HtmlCanvasNode[]> {
-  const groups = new Map<string, HtmlCanvasNode[]>();
-  for (const node of nodes) {
-    if (!node.parentId) continue;
-    const group = groups.get(node.parentId) ?? [];
-    group.push(node);
-    groups.set(node.parentId, group);
-  }
-  for (const group of groups.values()) group.sort((a, b) => a.order - b.order);
-  return groups;
-}
-
-function collectDescendantIds(
-  byParent: Map<string, HtmlCanvasNode[]>,
-  nodeId: string,
-): Set<string> {
-  const result = new Set<string>();
-  const walk = (parentId: string): void => {
-    for (const child of byParent.get(parentId) ?? []) {
-      if (result.has(child.id)) continue;
-      result.add(child.id);
-      walk(child.id);
-    }
-  };
-  walk(nodeId);
-  return result;
-}
-
-function uniqueNodeId(preferred: string, usedIds: Set<string>): string {
-  if (!usedIds.has(preferred)) return preferred;
-  // The used set is finite, so a suffix bump is guaranteed to terminate; loop
-  // without a fixed ceiling rather than fall back to an unchecked id that could
-  // already be in use (DOM-8).
-  for (let index = 1; ; index += 1) {
-    const candidate = `${preferred}-${index}`;
-    if (!usedIds.has(candidate)) return candidate;
-  }
 }
