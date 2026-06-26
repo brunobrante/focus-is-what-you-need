@@ -146,6 +146,66 @@ these — it would churn correct code or break a law. (All cite code, a `Product
 
 ---
 
+## Status (live)
+
+Tracks what has actually been actioned since the audit, overlaid on the findings below
+(the prose findings are left intact). Resolutions cite the commit that landed them. The
+P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
+
+**Legend:** ✅ fixed (this pass) · ☑️ already fixed before this pass (audit was stale) ·
+🟡 false positive (no action) · ⏭️ deferred (large/risky — needs its own focused effort).
+
+### P0 — data loss / corruption
+| ID | Status | Note |
+| --- | --- | --- |
+| UI-1 | ☑️ already fixed | FastEdit persists via `saveScene` (debounced + flush on close); `UX.md` already says so. |
+| SAVE-1 | ☑️ already fixed | `saveQueue.ts` keeps the outbox = in-flight + pending (`unflushedSnapshot`). |
+| SAVE-2 | ✅ `b9b515f` | Ancestor propagation writes atomically (reuse the just-read parent row, no await gap). |
+| VER-1 | ✅ `57e2d1c` (repo) + `195b6ec` (UI) | `deleteVariant` takes an `instanceStrategy`; version delete now opens the detach/cascade choice. |
+| RUST-1 | ☑️ already fixed | All three DB commands recover the poisoned guard via `unwrap_or_else(\|e\| e.into_inner())`. |
+| UI-5 | ✅ `9e797af` | `discardReferenceItem` moved out of the `setState` updaters (refs). |
+| UI-3 | ☑️ already fixed | Delete-screen usage count is resolved before the modal swaps to `InstanceDeleteModal`. |
+
+### P1 — correctness bugs with user-visible impact
+| ID | Status | Note |
+| --- | --- | --- |
+| ENG-1 | ☑️ already fixed | No-op commit preserves the existing `state.document` reference. |
+| ENG-2 | 🟡 false positive | Only seeds zoom before the viewport is measured; overwritten by the viewport-aware fit. |
+| ENG-3 | ✅ `0a6ab94` | Clipboard scoped per `EditorProvider` (was a module singleton shared across split editors). |
+| STAGE-1 | 🟡 false positive | The `prev===next` empty-diff path is unreachable under React's render/commit order. |
+| DOM-2 | ✅ `fd01c9d` | `"+"` zoom-in binding marked `shift:true` so it actually fires. |
+| DOM-3 | ✅ `fe3243f` | `isMacLike()` falls back `userAgentData → platform → UA`. |
+| BLD-1 | ✅ `fd5213a` | Stage wheel attached as a non-passive native listener. |
+| BLD-2 | ✅ `e904d2d` | Stack save staged in `stack.tmp` and swapped in only on full success. |
+| UI-2 | ✅ `2f3c516` | Section ids via `newId()` instead of `Date.now()`. |
+| UI-4 | ☑️ already fixed | `AddReferenceModal` registers + revokes object URLs on close. |
+| UI-10 | ✅ `4a01441` | "Move to"/"Make global" hidden until a handler is wired. |
+| UI-11 | ✅ `f3b1787` | `ReferenceCard` uses `formatSize`/`formatDuration`. |
+
+### P2 — performance cliffs
+| ID | Status | Note |
+| --- | --- | --- |
+| UI-6 | ✅ `1d7fcd9` | Emoji icon data-URLs baked once (module-scope lazy cache). |
+| DOM-5 | ✅ `244b6f5` | Settings `clone()` uses `structuredClone`. |
+| DOM-6 | ✅ `95b9ebb` | `linkify` builds the parent index once (new `collectDescendantIdsFrom`). |
+| ENG-7 | ✅ `d0b5b4b` | Subcomponent resolution indexed by `sourceNodeId`. |
+| STAGE-3 | ✅ `ecbf72d` | Pointer handler reuses the memoized viewport transform. |
+| UI-7 | ✅ `690b209` | Component source badges resolve screens via a precomputed `screenById`. |
+| RUST-2 | ✅ `7ef532a` | `db_apply` hoists `prepare_cached` statements out of the loop. |
+| ENG-6 | ⏭️ deferred | Already memoized (per-scene-change, not per-render); mock-detection logic is subtle and untested. |
+| SAVE-5 | ⏭️ deferred | Needs a cached reverse instance index with invalidation; delete ops are infrequent. |
+| SAVE-6 | ⏭️ deferred | The double-stringify *is* the skip-unchanged diff on the incremental path; only the post-nuke seed would gain (dev-time only). |
+| SHELL-5 | ⏭️ deferred | `React.memo` is inert unless the parent stabilizes its Set/callback props — needs a parallel refactor. |
+| RUST-4 | ⏭️ deferred | Pagination changes the `PersistencePort` contract across 3 adapters + the hydration model. |
+| RUST-8 | ⏭️ deferred | Session cache needs interior mutability (`Session::run` is `&mut self`) + ONNX-state care. |
+
+> Not yet scheduled: the remaining Medium/Low findings (SAVE-3/4/7-12, ENG-4/5/8-10, the
+> SHELL/UI/BLD/DOM/RUST mediums and lows, VER-2..4, REF-1, META-1/2, VID-1) and the
+> cross-cutting duplication / dead-code / mixed-language sweeps. REF-1 is the one remaining
+> confirmed `Product.md` LAW gap.
+
+---
+
 ## Storage & Save System
 
 ### SAVE-1 — [High] Outbox omits edits that arrive during an in-flight flush
