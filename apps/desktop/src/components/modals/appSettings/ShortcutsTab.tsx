@@ -95,7 +95,7 @@ export function ShortcutsTab({
                           <KeyBadge key={i}>{key}</KeyBadge>
                         ))}
                         <span className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[var(--text-faint)]">
-                          editar
+                          edit
                         </span>
                       </button>
                     )}
@@ -120,7 +120,7 @@ function RecordingPill({ onCancel }: { onCancel: () => void }) {
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-2 rounded-[8px] border border-[rgba(91,108,255,0.5)] bg-[rgba(91,108,255,0.12)] px-3 py-1.5">
         <span className="h-1.5 w-1.5 rounded-full bg-[#5b6cff] animate-pulse" />
-        <span className="text-[12px] text-[#8899ff]">Aguardando teclas…</span>
+        <span className="text-[12px] text-[#8899ff]">Waiting for keys…</span>
       </div>
       <button
         type="button"
