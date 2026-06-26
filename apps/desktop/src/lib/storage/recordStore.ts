@@ -23,6 +23,40 @@ import type { TableKey } from "@/lib/storage/storeKeys";
 
 type Row = { id: string } & Record<string, unknown>;
 
+/**
+ * The collaboration envelope the store manages on every persisted row (D1/D6):
+ * a monotonic `rev` (the optimistic-write guard) and a `deletedAt` tombstone
+ * field. Repos never set these — the store stamps them so every written row
+ * carries them and the adapter's `rev` guard has something to compare.
+ */
+const ENVELOPE_KEYS = ["rev", "deletedAt"] as const;
+
+function nextRev(prev: unknown): number {
+  const prevRev = (prev as { rev?: unknown } | undefined)?.rev;
+  return (typeof prevRev === "number" ? prevRev : 0) + 1;
+}
+
+/** Stamp the store-managed envelope onto a row about to be written. */
+function withEnvelope<T extends Row>(row: T, rev: number): T {
+  return {
+    ...row,
+    deletedAt: (row as { deletedAt?: number | null }).deletedAt ?? null,
+    rev,
+  };
+}
+
+/**
+ * Serialize a row for change-detection, ignoring the store-managed envelope so a
+ * bumped `rev` (or a defaulted `deletedAt`) never reads as a content change and
+ * defeats `replaceTable`'s diff-skip.
+ */
+function comparableJson(row: unknown): string {
+  if (!row || typeof row !== "object") return JSON.stringify(row);
+  const copy: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+  for (const key of ENVELOPE_KEYS) delete copy[key];
+  return JSON.stringify(copy);
+}
+
 const cache = new Map<string, Map<string, unknown>>();
 const hydration = new Map<string, Promise<void>>();
 /** Tables whose hydration promise has *resolved* (rows fully loaded into cache). */
@@ -110,12 +144,15 @@ export function peekTable<T>(table: TableKey): T[] {
 
 /** Synchronous single-row upsert: cache write + enqueue + notify, no await. */
 export function putRecord<T extends Row>(table: TableKey, row: T): void {
-  bucket(table).set(row.id, row);
+  const map = bucket(table);
+  const stored = withEnvelope(row, nextRev(map.get(row.id)));
+  map.set(row.id, stored);
   getSaveQueue().enqueue({
     op: "upsertRecord",
     table,
-    id: row.id,
-    json: JSON.stringify(row),
+    id: stored.id,
+    json: JSON.stringify(stored),
+    rev: stored.rev as number,
   });
   notify(table);
 }
@@ -158,11 +195,20 @@ export async function replaceTable<T extends Row>(
   }
 
   for (const row of rows) {
-    const json = JSON.stringify(row);
     const prev = map.get(row.id);
-    if (prev !== undefined && JSON.stringify(prev) === json) continue;
-    map.set(row.id, row);
-    queue.enqueue({ op: "upsertRecord", table, id: row.id, json });
+    // Compare content only — a bumped envelope must not count as a change.
+    if (prev !== undefined && comparableJson(prev) === comparableJson(row)) {
+      continue;
+    }
+    const stored = withEnvelope(row, nextRev(prev));
+    map.set(row.id, stored);
+    queue.enqueue({
+      op: "upsertRecord",
+      table,
+      id: stored.id,
+      json: JSON.stringify(stored),
+      rev: stored.rev as number,
+    });
   }
 
   for (const id of removed) map.delete(id);
@@ -186,13 +232,18 @@ export async function getMeta<T>(): Promise<T | null> {
 }
 
 export function setMeta<T>(value: T): void {
-  const row = { ...(value as object), id: META_ID } as Row;
-  bucket(META_TABLE).set(META_ID, row);
+  const map = bucket(META_TABLE);
+  const row = withEnvelope(
+    { ...(value as object), id: META_ID } as Row,
+    nextRev(map.get(META_ID)),
+  );
+  map.set(META_ID, row);
   getSaveQueue().enqueue({
     op: "upsertRecord",
     table: META_TABLE,
     id: META_ID,
     json: JSON.stringify(row),
+    rev: row.rev as number,
   });
   // Like putRecord, notify subscribers so meta-driven UI (seed/migration state)
   // re-reads instead of going stale until the next unrelated notify.

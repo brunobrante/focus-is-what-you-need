@@ -6,9 +6,16 @@
  *
  * The queue coalesces these by `mutationKey` before a single batched
  * `applyBatch`, so a 60fps drag of one scene collapses to one pending write.
+ *
+ * `upsertRecord.rev` is the optimistic-write guard (D6 in save-architecture-v3):
+ * a monotonic per-row revision the record store stamps on every write. Adapters
+ * apply an upsert only when `incoming.rev > stored.rev`, so a stale replay can
+ * never clobber a newer row — the single mechanism the future sync layer rides
+ * on. It is **optional** on the wire: a mutation without `rev` (legacy / tests)
+ * is applied unconditionally, preserving the prior last-write-wins behaviour.
  */
 export type Mutation =
-  | { op: "upsertRecord"; table: string; id: string; json: string }
+  | { op: "upsertRecord"; table: string; id: string; json: string; rev?: number }
   | { op: "deleteRecords"; table: string; ids: string[] };
 
 export type ApplyAck = {

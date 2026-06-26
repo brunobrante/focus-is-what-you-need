@@ -27,6 +27,23 @@ export type Meta = {
   seededAt: number | null;
 };
 
+/**
+ * The collaboration-ready row envelope (save-architecture-v3 D1/D6). Every
+ * persisted row carries `{ id, createdAt, updatedAt, deletedAt, rev }` — nothing
+ * more. `rev` is the optimistic-write guard and `deletedAt` the tombstone; both
+ * are **stamped by the record store** on write (repos don't set them), so the
+ * row types below need only declare them as optional. The remaining sync
+ * identity (clientId / mutationId / transport) lives in the future frame-commit
+ * envelope at the SyncAdapter layer, never on rows.
+ */
+export type RowEnvelope = {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt?: number | null;
+  rev?: number;
+};
+
 export type ProjectRow = {
   id: string;
   name: string;

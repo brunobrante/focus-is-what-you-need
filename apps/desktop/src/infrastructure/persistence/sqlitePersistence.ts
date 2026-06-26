@@ -44,6 +44,9 @@ function toWire(mutation: Mutation): Record<string, unknown> {
         table: mutation.table,
         id: mutation.id,
         json: mutation.json,
+        // Optimistic-write guard (D6). Defaults to 0 when the writer omits it, so
+        // legacy / un-revisioned writes keep last-write-wins semantics.
+        rev: mutation.rev ?? 0,
       };
     case "deleteRecords":
       return {

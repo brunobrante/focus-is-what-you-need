@@ -4,11 +4,17 @@ import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
 /**
  * In-memory PersistencePort. Backs the "memory" runtime (Bun tests) and is the
  * reference implementation the SQLite/IndexedDB adapters must match.
+ *
+ * Each cell keeps the row JSON alongside its `rev` so the optimistic-write guard
+ * (D6) can reject a stale upsert — `incoming.rev > stored.rev`. A mutation that
+ * omits `rev` is applied unconditionally (legacy / last-write-wins).
  */
-export function createMemoryPersistence(): PersistencePort {
-  const tables = new Map<string, Map<string, string>>();
+type Cell = { json: string; rev: number | undefined };
 
-  function table(name: string): Map<string, string> {
+export function createMemoryPersistence(): PersistencePort {
+  const tables = new Map<string, Map<string, Cell>>();
+
+  function table(name: string): Map<string, Cell> {
     let bucket = tables.get(name);
     if (!bucket) {
       bucket = new Map();
@@ -19,9 +25,18 @@ export function createMemoryPersistence(): PersistencePort {
 
   function apply(mutation: Mutation): void {
     switch (mutation.op) {
-      case "upsertRecord":
-        table(mutation.table).set(mutation.id, mutation.json);
+      case "upsertRecord": {
+        const bucket = table(mutation.table);
+        if (mutation.rev !== undefined) {
+          const stored = bucket.get(mutation.id);
+          // Reject a stale write: keep the row when its rev is >= the incoming one.
+          if (stored && stored.rev !== undefined && mutation.rev <= stored.rev) {
+            return;
+          }
+        }
+        bucket.set(mutation.id, { json: mutation.json, rev: mutation.rev });
         return;
+      }
       case "deleteRecords": {
         const bucket = table(mutation.table);
         for (const id of mutation.ids) bucket.delete(id);
@@ -37,10 +52,10 @@ export function createMemoryPersistence(): PersistencePort {
       return ack;
     },
     async getRecord(name, id) {
-      return table(name).get(id) ?? null;
+      return table(name).get(id)?.json ?? null;
     },
     async listRecords(name) {
-      return Array.from(table(name).values());
+      return Array.from(table(name).values(), (cell) => cell.json);
     },
   };
 }

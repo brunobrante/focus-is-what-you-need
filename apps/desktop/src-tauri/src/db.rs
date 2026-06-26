@@ -40,12 +40,50 @@ pub fn open_and_migrate(path: &Path) -> Result<Connection, String> {
             tbl TEXT NOT NULL,
             id TEXT NOT NULL,
             json TEXT NOT NULL,
+            rev INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (tbl, id)
         );
         CREATE INDEX IF NOT EXISTS idx_records_tbl ON records(tbl);",
     )
     .map_err(|e| e.to_string())?;
+    // `rev` is the optimistic-write guard (D6). A dev database created before this
+    // column existed is upgraded in place — the local-only app never carries real
+    // data, but an in-place ALTER avoids a forced reseed just to add a column.
+    ensure_column(&conn, "records", "rev", "INTEGER NOT NULL DEFAULT 0")?;
     Ok(conn)
+}
+
+/// Add `column` to `table` if it is not already present. `PRAGMA table_info`
+/// returns one row per column with the name in position 1; idempotent so it is
+/// safe to run on every boot.
+fn ensure_column(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    decl: &str,
+) -> Result<(), String> {
+    let mut present = false;
+    {
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(|e| e.to_string())?;
+        let names = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| e.to_string())?;
+        for name in names {
+            if name.map_err(|e| e.to_string())? == column {
+                present = true;
+            }
+        }
+    }
+    if !present {
+        conn.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {decl}"),
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +97,10 @@ pub enum Mutation {
         table: String,
         id: String,
         json: String,
+        /// Optimistic-write guard (D6). Absent on the wire → 0, preserving
+        /// last-write-wins for un-revisioned writers.
+        #[serde(default)]
+        rev: i64,
     },
     DeleteRecords {
         table: String,
@@ -93,9 +135,10 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
             // identical INSERT/DELETE for every row in the batch (RUST-2).
             let mut upsert = tx
                 .prepare_cached(
-                    "INSERT INTO records (tbl, id, json)
-                     VALUES (?1, ?2, ?3)
-                     ON CONFLICT(tbl, id) DO UPDATE SET json = excluded.json",
+                    "INSERT INTO records (tbl, id, json, rev)
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT(tbl, id) DO UPDATE SET json = excluded.json, rev = excluded.rev
+                     WHERE excluded.rev > records.rev",
                 )
                 .map_err(|e| e.to_string())?;
             let mut delete = tx
@@ -104,9 +147,14 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
 
             for mutation in &batch {
                 match mutation {
-                    Mutation::UpsertRecord { table, id, json } => {
+                    Mutation::UpsertRecord {
+                        table,
+                        id,
+                        json,
+                        rev,
+                    } => {
                         applied += upsert
-                            .execute(params![table, id, json])
+                            .execute(params![table, id, json, rev])
                             .map_err(|e| e.to_string())?;
                     }
                     Mutation::DeleteRecords { table, ids } => {

@@ -5,13 +5,18 @@ import type { ApplyAck, Mutation } from "@/domain/persistence/mutations";
  * Web PersistencePort over a real IndexedDB object store (not a blob KV). One
  * record per row keyed by `[table, id]`; an entire interaction applies in a
  * single `IDBTransaction`, so it is atomic with no IPC.
+ *
+ * Rows carry their `rev` so an upsert can enforce the optimistic-write guard
+ * (D6): a `get` then a conditional `put`, both within the one transaction, so a
+ * stale write (`incoming.rev <= stored.rev`) is dropped. A mutation without
+ * `rev` overwrites unconditionally (legacy / last-write-wins).
  */
 
 const DB_NAME = "focus-persistence";
 const DB_VERSION = 1;
 const RECORDS = "records";
 
-type RecordRow = { table: string; id: string; json: string };
+type RecordRow = { table: string; id: string; json: string; rev?: number };
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -50,13 +55,30 @@ export function createIndexedDbPersistence(): PersistencePort {
 
 function applyMutation(recordsStore: IDBObjectStore, mutation: Mutation): void {
   switch (mutation.op) {
-    case "upsertRecord":
-      recordsStore.put({
+    case "upsertRecord": {
+      const next: RecordRow = {
         table: mutation.table,
         id: mutation.id,
         json: mutation.json,
-      } satisfies RecordRow);
+        rev: mutation.rev,
+      };
+      if (mutation.rev === undefined) {
+        recordsStore.put(next);
+        return;
+      }
+      // Guarded upsert: read the stored row first, then put only if the incoming
+      // rev wins. Both requests stay on this readwrite transaction, so the read
+      // sees committed state and the write is atomic with the rest of the batch.
+      const getReq = recordsStore.get([mutation.table, mutation.id]);
+      getReq.onsuccess = () => {
+        const stored = getReq.result as RecordRow | undefined;
+        if (stored && stored.rev !== undefined && mutation.rev! <= stored.rev) {
+          return; // stale write — keep the newer row
+        }
+        recordsStore.put(next);
+      };
       return;
+    }
     case "deleteRecords":
       for (const id of mutation.ids) {
         recordsStore.delete([mutation.table, id]);
