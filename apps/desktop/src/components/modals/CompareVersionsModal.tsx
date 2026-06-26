@@ -272,7 +272,7 @@ function GridStage({
       <div className="grid h-full min-h-full w-full gap-3.5" style={gridStyle}>
         {selection.map((id, slotIdx) => (
           <Panel
-            key={`${id}-${slotIdx}`}
+            key={`slot-${slotIdx}`}
             slotIdx={slotIdx}
             versions={versions}
             current={byId.get(id) ?? null}
