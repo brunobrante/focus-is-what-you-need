@@ -636,8 +636,12 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     });
 
     return () => { cancelled = true; };
+  // Keyed by item.id — which componentKey and rootComponentId both derive from —
+  // plus referenceId, the one input read here that is NOT derived from item.id and
+  // can change independently (BLD-10). `item` and the setters are intentionally
+  // read fresh at fire time rather than retriggering this whole load effect.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+  }, [item.id, referenceId]);
 
   // Deselect when navigating away from a component that no longer exists.
   useEffect(() => {
