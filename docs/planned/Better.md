@@ -265,6 +265,7 @@ partly wrong — noted inline).
 | SAVE-12 | ✅ `815072f` + `98fa423` | A resolved-hydration flag now backs `isTableHydrated(table)`; `peekTable` warns once on a genuinely-ambiguous pre-hydration read (un-hydrated *and* no in-session rows). Return type unchanged. |
 | SAVE-8 | ✅ `8885b80` | Propagation + thumbnail queues share `createOwnerDebounceQueue({ delayMs, run })`; both modules are thin wrappers. Same write-chain serialization / flush drain / coalescing key. |
 | SAVE-10 | 🟡 analyzed, not changed | Real longest backoff is 8s (not 30s; cap unreachable at `maxRetries:6`), no edits lost (batched into the next retry). Decoupling can't speed newer edits without weakening durability — low value, regression risk. |
+| SHELL-4 | 🟡 analyzed, not merged | The two hooks are materially asymmetric (deferred hook owns 3 extra effects + a layout-flush + ref coupling, not "only the materializer"). Forced merge = net-negative in data-loss-adjacent, unit-untestable code. |
 | ENG-2, STAGE-1 | 🟡 false positive | Re-confirmed from the verification table — not acted on. |
 | SHELL-8 | 🟡 false positive | Same `resolveMaster`-keyed-on-`graphJSON` pattern the verification "do-not-touch" table already cleared (LiveInstanceRefresh re-resolves). Not touched. |
 
@@ -274,7 +275,14 @@ partly wrong — noted inline).
   (the 30s cap is unreachable), and re-queued + newer edits are batched into the next retry — **nothing is
   lost**, only delayed. Decoupling the sleep from the single-flight wouldn't let newer edits flush sooner
   without also weakening the backoff/durability semantics. Low value, real regression risk — left as-is.
-- **SHELL-4** (merge the two scene-persistence hooks) — still a focused refactor; not done this pass.
+- **SHELL-4 — analyzed, intentionally not merged.** The audit's "differing only in the materializer"
+  understates it: `useVersionScenePersistence` (91 lines) is lean, but `useDeferredPersistence` (200 lines)
+  additionally owns (a) `latestGraphJSON`/owner-key tracking woven *into* flush, (b) a mock-scene-sync
+  effect, (c) a structure-keyed component-materialize effect, and (d) a `useLayoutEffect` owner-change
+  flush deliberately timed differently from the version hook's effect-cleanup flush. Merging forces an
+  abstraction parameterized by flush-timing mode + Promise-vs-void + ref coupling — a net-negative in
+  data-loss-adjacent code that can't be unit-verified in this `bun:test`-only harness (no React testing).
+  Same precedent as ENG-8. Left as-is.
 - (**SAVE-11**, **SAVE-4**, **SAVE-12**, **SAVE-8** are now done — see below; `bun test` *is* available.)
 - **DOM-1 / DOM-4** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
   `document.ts`→`nodeHelpers`→`styleUtils` and 32 importers; a focused architecture effort (audit phase 4).
