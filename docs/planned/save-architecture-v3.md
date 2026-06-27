@@ -737,8 +737,9 @@ ownership/render corruption the derive-first strategy was built to avoid, and un
 don't cover the render path. Do them in the order below — flip 1 is the substantive one;
 2 and 3 are optional polish.
 
-- [~] **(1, main) Flip ownership reads to edges, then drop the fields.** — component ownership
-  **DONE & green** (commits `c4fe7de..d92773a`, stages 1–4); references + physical field-removal remain.
+- [x] **(1, main) Flip ownership reads to edges, then drop the fields.** — **COMPLETE & green**
+  (commits `c4fe7de..0dc4094`): components edge-authoritative with fields removed (stages 1–5) +
+  references on `attached_to` edges (flip 1b). Pending only your in-app render smoke-test.
   - *Done (components, edge-authoritative end-to-end):*
     - **Reads:** every reader of `screenId`/`parentVariantId` now resolves via the edge index —
       `componentScopeOf` + `screenIdOfComponent`/`parentVariantIdOf` (`application/graph/componentOwnership.ts`,
@@ -768,9 +769,13 @@ don't cover the render path. Do them in the order below — flip 1 is the substa
     dropped its `?? field` fallback. tsc one fewer than baseline, suite green (only the pre-existing
     `seedCanvasMocks` 'desktopForm' mock fails). **Still verify in `bunx tauri dev` + reseed** —
     unit tests don't exercise the canvas render path.
-  - *Remaining:* **References** are untouched: `ReferenceRow.attachments[]` → `attached_to` edges,
-    usage off `idx_edges_to` (lower value — references are few; the boot reconcile already derives
-    the edges).
+  - *Done (flip 1b, commit `0dc4094`) — references on edges:* every reference write keeps its
+    `attached_to` edges in step with `attachments[]` (eager `reconcileReferenceAttachments` on
+    create/attach/remove/detach), so the edges are the authoritative multi-attach mechanism in-session;
+    `listReferenceLinkUsages` reads usage off the edge index (`idx_edges_from`). `attachments[]`/
+    `projectIds` stay as a denormalized display mirror (read by `ReferenceCard`/`ReferencesTab` + the
+    `ReferenceAttachment` attach-input DTO) — consistent with keeping component `projectId`/`workspaceId`.
+    **Flip 1 is now complete.**
   - *Smoke-test:* reseed, open Gallery + a project — every component card's source badge
     (global/project/screen/nested) must match pre-flip, drafts stay unowned, and deleting a linked
     master still fires the per-instance keep/delete dialog; check canvas breadcrumbs, parent-frame
