@@ -1,5 +1,6 @@
 import { IconDiamond, IconFolder, IconGrid, IconScreen } from "@/components/icons";
-import { componentScope, type ComponentScope } from "@/lib/storage/defaults";
+import { type ComponentScope } from "@/lib/storage/defaults";
+import { componentScopeOf } from "@/application/graph/componentOwnership";
 import type { ComponentRow } from "@/lib/storage/schema";
 
 /**
@@ -19,11 +20,11 @@ export const SOURCE_SCOPE_LABEL: Record<ComponentScope, string> = {
 
 type ScopeSource = Pick<
   ComponentRow,
-  "workspaceId" | "projectId" | "screenId" | "parentVariantId"
+  "id" | "workspaceId" | "projectId" | "screenId" | "parentVariantId"
 >;
 
 export function scopeOf(component: ScopeSource): ComponentScope {
-  return componentScope(component);
+  return componentScopeOf(component);
 }
 
 export function sourceScopeIcon(

@@ -12,7 +12,7 @@ import {
   serializeHtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
-import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
+import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import { resetEdgeIndex } from "@/application/graph/edgeIndex";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
@@ -69,7 +69,9 @@ test("createComponent creates a component with a default variant under a screen"
 
   expect(result.component).toMatchObject({
     projectId: "project-1",
-    screenId: "screen-1",
+    // screenId/parentVariantId are vestigial (always null) — ownership is the edge,
+    // verified by listTopLevelByScreen below.
+    screenId: null,
     parentVariantId: null,
     name: "Header",
     kind: "Layout",
@@ -95,8 +97,9 @@ test("createComponent creates children under a variant", async () => {
     name: "Logo",
   });
 
+  // Vestigial fields stay null — ownership is the edge, verified below.
   expect(result.component.screenId).toBeNull();
-  expect(result.component.parentVariantId).toBe("variant-1");
+  expect(result.component.parentVariantId).toBeNull();
 
   const children = await listChildrenOfVariant("variant-1");
   expect(children.map((c) => c.id)).toEqual([result.component.id]);
@@ -119,20 +122,9 @@ test("createComponent rejects duplicate sibling names case-insensitively", async
 });
 
 test("deleteComponentTree removes a component, descendants, and their variants", async () => {
-  const parent = await createComponent({
-    projectId: "project-1",
-    parent: { kind: "screen", screenId: "screen-1" },
-    name: "Header",
-    sourceNodeId: "node-panel",
-  });
-  const child = await createComponent({
-    projectId: "project-1",
-    parent: { kind: "variant", variantId: parent.defaultVariant.id },
-    name: "Logo",
-  });
   // A screen's scene lives on its main variant; the top-level component's subtree is
-  // embedded there and must be removed on delete.
-  const existingVariants = await listTable<VariantRow>(TABLES.variants);
+  // embedded there. Seed the main variant FIRST so the screen-top-level component's
+  // `owns` edge points at it (ownership is the edge now).
   await replaceTable<VariantRow>(TABLES.variants, [
     {
       id: "variant-screen-1",
@@ -144,8 +136,18 @@ test("deleteComponentTree removes a component, descendants, and their variants",
       createdAt: 1,
       updatedAt: 1,
     },
-    ...existingVariants,
   ]);
+  const parent = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Header",
+    sourceNodeId: "node-panel",
+  });
+  const child = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: parent.defaultVariant.id },
+    name: "Logo",
+  });
   const screenDocument = createDefaultHtmlCanvasDocument({
     name: "Home",
     projectType: "mobile",

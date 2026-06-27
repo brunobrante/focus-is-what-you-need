@@ -3,6 +3,7 @@ import { materializeVersionNodeAsComponent } from "@/application/canvas/canvasMa
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
 import { listChildrenOfVariant } from "@/lib/storage/repos/components.repo";
+import { ownerOf } from "@/lib/storage/repos/edges.repo";
 import {
   HTML_CANVAS_FORMAT,
   HTML_CANVAS_VERSION,
@@ -97,8 +98,11 @@ test("opening a nested component from a version materializes a version-owned cop
   });
 
   expect(created).not.toBeNull();
-  // Owned by the version's variant — independent of any shared master.
-  expect(created!.parentVariantId).toBe(VERSION_VARIANT_ID);
+  // Owned by the version's variant (the edge) — independent of any shared master.
+  expect(await ownerOf({ type: "component", id: created!.id })).toEqual({
+    type: "variant",
+    id: VERSION_VARIANT_ID,
+  });
   const children = await listChildrenOfVariant(VERSION_VARIANT_ID);
   expect(children.map((c) => c.id)).toContain(created!.id);
 });

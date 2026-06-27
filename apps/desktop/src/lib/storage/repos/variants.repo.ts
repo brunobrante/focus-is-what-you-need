@@ -1,6 +1,7 @@
 import type { ComponentVariant } from "@/lib/data/types";
 import { normalizeComponentRow } from "@/lib/storage/defaults";
-import { reconcileAllGraphEdges } from "@/application/graph/ownershipReconcile";
+import { peekOwnerOf, primeEdgeIndex } from "@/application/graph/edgeIndex";
+import { parentVariantIdOf } from "@/application/graph/componentOwnership";
 import { setOwner } from "@/lib/storage/repos/edges.repo";
 import { newId, now } from "@/lib/storage/ids";
 import {
@@ -96,7 +97,11 @@ function collectVariantOwnedComponentIds(
   variants: VariantRow[],
 ): Set<string> {
   const ids = new Set<string>();
-  for (const child of components.filter((c) => c.parentVariantId === variantId)) {
+  const variantMap = new Map(variants.map((v) => [v.id, v]));
+  const children = components.filter(
+    (c) => (parentVariantIdOf(c.id, variantMap) ?? c.parentVariantId) === variantId,
+  );
+  for (const child of children) {
     collectComponentTreeIds(child.id, components, variants).forEach((id) => ids.add(id));
   }
   return ids;
@@ -375,14 +380,14 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
   if (!oldMain || oldMain.id === promoted.id) return;
 
   const components = await listTable<ComponentRow>(TABLES.components);
+  await primeEdgeIndex();
 
-  // The old main's OWNED child components — the ones it embeds as real content. For a
-  // screen these are its screen-owned top-level components; for a component they are the
-  // children parented to its main variant.
-  const ownedChildren =
-    promoted.ownerKind === "screen"
-      ? components.filter((c) => c.screenId === oldMain.ownerId && c.parentVariantId === null)
-      : components.filter((c) => c.parentVariantId === oldMain.id);
+  // The old main's OWNED child components, read off the graph: everything owned by the
+  // old main variant (screen-top-level OR component-nested — the edge unifies them).
+  const ownedChildren = components.filter((c) => {
+    const o = peekOwnerOf("component", c.id);
+    return o?.type === "variant" && o.id === oldMain.id;
+  });
   const ownedIds = new Set(ownedChildren.map((c) => c.id));
 
   const promotedScene = await getSceneByOwner("variant", promoted.id);
@@ -403,7 +408,6 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
     }
   }
   const sharedChildren = ownedChildren.filter((c) => sharedIds.has(c.id));
-  const unsharedChildren = ownedChildren.filter((c) => !sharedIds.has(c.id));
   // Linked promotion = the version still links at least one of the old main's children;
   // otherwise it is an independent (copy) version and promotion is a plain swap.
   const isLinkedVersion = sharedChildren.length > 0;
@@ -421,20 +425,14 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
   );
   notify(KEY);
 
-  // 2. The owner's active variant follows the crown; component ownership moves with it.
-  let nextComponents = components;
+  // 2. The owner's active variant follows the crown (a kept field — activeVariantId).
   if (promoted.ownerKind === "component") {
-    nextComponents = components.map((c) => {
-      if (c.id === promoted.ownerId) return { ...c, activeVariantId: promoted.id, updatedAt: t };
-      // Linked: only the children the version STILL shares become owned by the new main
-      // variant. Dropped children stay parented to the old main as its own local copy.
-      if (isLinkedVersion && sharedIds.has(c.id)) {
-        return normalizeComponentRow({ ...c, parentVariantId: promoted.id, updatedAt: t });
-      }
-      return c;
-    });
+    const nextComponents = components.map((c) =>
+      c.id === promoted.ownerId ? { ...c, activeVariantId: promoted.id, updatedAt: t } : c,
+    );
+    await replaceTable<ComponentRow>(TABLES.components, nextComponents);
+    notify(TABLES.components);
   } else {
-    // Screen owner: the active variant lives on the ScreenRow.
     const screens = await listTable<ScreenRow>(TABLES.screens);
     await replaceTable<ScreenRow>(
       TABLES.screens,
@@ -443,33 +441,20 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
       ),
     );
     notify(TABLES.screens);
-
-    // Re-home the screen's top-level component ownership around the new main. Everything the
-    // promoted variant owns becomes screen-owned (it is the new main's content); children that
-    // must stay with the demoted old main become version-owned by it. For a copy version that
-    // is ALL of the old main's children (it shares none); for a linked version it is only the
-    // ones the version dropped — the shared ones stay screen-owned and follow the new main.
-    // Without this, a demoted child would resolve its embedding scene to the new main and
-    // resurface there as a phantom.
-    const promotedClones = new Set(
-      components.filter((c) => c.parentVariantId === promoted.id).map((c) => c.id),
-    );
-    const keepOnOldIds = isLinkedVersion
-      ? new Set(unsharedChildren.map((c) => c.id))
-      : ownedIds;
-    nextComponents = components.map((c) => {
-      if (keepOnOldIds.has(c.id)) {
-        return normalizeComponentRow({ ...c, screenId: null, parentVariantId: oldMain.id, updatedAt: t });
-      }
-      if (promotedClones.has(c.id)) {
-        return normalizeComponentRow({ ...c, screenId: promoted.ownerId, parentVariantId: null, updatedAt: t });
-      }
-      return c;
-    });
   }
-  if (nextComponents !== components) {
-    await replaceTable<ComponentRow>(TABLES.components, nextComponents);
-    notify(TABLES.components);
+
+  // 2b. Ownership re-home is now a pure EDGE operation (no screenId/parentVariantId
+  // swap). The owner edges point at SPECIFIC variants, so:
+  //   - Copy version: nothing moves — the old main's children stay owned by the
+  //     demoted old main, the promoted variant's clones stay owned by it. Promotion is
+  //     a pure reorder (the doc's "Copy promote carries ownership for free").
+  //   - Linked version: only the children the version STILL shares re-home from the old
+  //     main onto the promoted (new main) variant — the crown carries the shared masters.
+  //     Dropped children stay owned by the demoted old main as its local copies.
+  if (isLinkedVersion) {
+    for (const child of sharedChildren) {
+      await setOwner({ type: "variant", id: promoted.id }, { type: "component", id: child.id });
+    }
   }
 
   // 3. Linked only: swap embed↔instance between the two scenes, for the SHARED children only.
@@ -522,13 +507,7 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
       }
     }
   }
-
-  // Re-derive the ownership edges from the just-swapped component fields so the
-  // promoted variant's `owns` edges are correct immediately, not only at the next
-  // boot backfill (save-architecture-v3 Step 4 — "promote carries ownership"). The
-  // edge re-home is what lets the screenId↔parentVariantId field swap above be
-  // deleted once componentScope reads edges (the app-gated final flip).
-  await reconcileAllGraphEdges();
+  // Ownership edges were re-homed directly above (2b) — no field-derived reconcile.
 }
 
 /**
@@ -549,6 +528,7 @@ async function cloneChildComponentsIntoVariant(input: {
 }): Promise<void> {
   if (input.sourceChildren.length === 0) return;
 
+  await primeEdgeIndex();
   const allComponents = await listTable<ComponentRow>(TABLES.components);
   const allVariants = await listTable<VariantRow>(KEY);
   const scenes = await listTable<SceneRow>(TABLES.scenes);
@@ -564,8 +544,11 @@ async function cloneChildComponentsIntoVariant(input: {
     allVariants
       .filter((v) => v.ownerKind === "component" && v.ownerId === componentId)
       .sort((a, b) => a.order - b.order);
+  const cloneVariantMap = new Map(allVariants.map((v) => [v.id, v]));
   const childrenOfVariant = (variantId: string) =>
-    allComponents.filter((c) => c.parentVariantId === variantId);
+    allComponents.filter(
+      (c) => (parentVariantIdOf(c.id, cloneVariantMap) ?? c.parentVariantId) === variantId,
+    );
 
   const cloneOne = (source: ComponentRow, parentVariantId: string): void => {
     const t = now();

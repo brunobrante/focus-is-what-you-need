@@ -5,6 +5,7 @@ import type {
   ReferenceAttachment,
   ReferenceRow,
 } from "@/lib/storage/schema";
+import { componentScopeOf } from "@/application/graph/componentOwnership";
 
 export function createDefaultDesignSystem(): ProjectDesignSystem {
   return {
@@ -53,7 +54,7 @@ export function normalizeProjectRow(row: ProjectRow): ProjectRow {
 }
 
 export function normalizeComponentRow(row: ComponentRow): ComponentRow {
-  const scope = componentScope(row);
+  const scope = componentScopeOf(row);
   return {
     ...row,
     workspaceId: row.workspaceId ?? null,

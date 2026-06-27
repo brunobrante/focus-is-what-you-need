@@ -12,6 +12,7 @@ import {
   promoteVariantToMain,
 } from "@/lib/storage/repos/variants.repo";
 import { getSceneByOwner, upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { ownerOf } from "@/lib/storage/repos/edges.repo";
 import {
   createDefaultHtmlCanvasDocument,
   htmlCanvasDocumentFromJSON,
@@ -123,7 +124,7 @@ test("copy-mode version clones child components into independent masters", async
   const clone = cloned[0]!;
   expect(clone.id).not.toBe(child.id);
   expect(clone.name).toBe("Title");
-  expect(clone.parentVariantId).toBe(copy.id);
+  expect(await ownerOf({ type: "component", id: clone.id })).toEqual({ type: "variant", id: copy.id });
   expect(clone.linkable).toBe(false);
 
   // Deleting the copied version's child must NOT delete the original.
@@ -237,7 +238,7 @@ test("promoteVariantToMain on a linked version moves the masters with the crown"
   expect((await getComponent(component.id))!.activeVariantId).toBe(version.id);
 
   // 2. The child master is now owned by the new main variant (a re-parent, not a clone).
-  expect((await getComponent(child.id))!.parentVariantId).toBe(version.id);
+  expect(await ownerOf({ type: "component", id: child.id })).toEqual({ type: "variant", id: version.id });
 
   // 3. The new main embeds real content; the demoted old main holds the linked instance.
   expect(nodeById((await getSceneByOwner("variant", version.id))!.graphJSON, "title-node")?.instanceOf)
@@ -311,8 +312,11 @@ test("promoteVariantToMain leaves a child the version dropped as the old main's 
   await promoteVariantToMain(version.id);
 
   // Kept child moves with the crown; dropped child stays owned by the demoted old main.
-  expect((await getComponent(kept.id))!.parentVariantId).toBe(version.id);
-  expect((await getComponent(dropped.id))!.parentVariantId).toBe(defaultVariant.id);
+  expect(await ownerOf({ type: "component", id: kept.id })).toEqual({ type: "variant", id: version.id });
+  expect(await ownerOf({ type: "component", id: dropped.id })).toEqual({
+    type: "variant",
+    id: defaultVariant.id,
+  });
 
   // The dropped child is NOT a phantom subcomponent of the new main…
   expect((await listChildrenOfVariant(version.id)).map((c) => c.id)).toEqual([kept.id]);
@@ -360,7 +364,7 @@ test("promoteVariantToMain on a copy version is a plain swap with independent ch
   expect(variants.find((v) => v.id === defaultVariant.id)!.order).toBeGreaterThan(0);
   expect((await getComponent(component.id))!.activeVariantId).toBe(copy.id);
   // The copy already owned its own child; promotion does not re-parent or clone again.
-  expect((await getComponent(copyChild.id))!.parentVariantId).toBe(copy.id);
+  expect(await ownerOf({ type: "component", id: copyChild.id })).toEqual({ type: "variant", id: copy.id });
 });
 
 test("createComponent supports workspace-global scope", async () => {

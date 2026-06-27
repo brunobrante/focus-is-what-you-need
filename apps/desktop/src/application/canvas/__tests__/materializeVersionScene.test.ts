@@ -2,7 +2,8 @@ import { beforeEach, expect, test } from "bun:test";
 
 import { materializeVersionScene } from "@/application/canvas/canvasMaterializer";
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
-import { listTopLevelByScreen } from "@/lib/storage/repos/components.repo";
+import { listChildrenOfVariant, listTopLevelByScreen } from "@/lib/storage/repos/components.repo";
+import { ownerOf } from "@/lib/storage/repos/edges.repo";
 import { promoteVariantToMain } from "@/lib/storage/repos/variants.repo";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import {
@@ -106,13 +107,19 @@ test("materializeVersionScene creates version-owned components for owned content
   // "Header" is owned content → a version-owned component (parented to the version variant).
   const header = components.find((c) => c.sourceNodeId === "header");
   expect(header).toBeTruthy();
-  expect(header!.parentVariantId).toBe(versionVariantId);
+  expect(await ownerOf({ type: "component", id: header!.id })).toEqual({
+    type: "variant",
+    id: versionVariantId,
+  });
   expect(header!.name).toBe("Header");
 
   // "Logo" (nested under Header) → owned by Header's own variant, not the version variant.
   const logo = components.find((c) => c.sourceNodeId === "logo");
   expect(logo).toBeTruthy();
-  expect(logo!.parentVariantId).toBe(header!.activeVariantId);
+  expect(await ownerOf({ type: "component", id: logo!.id })).toEqual({
+    type: "variant",
+    id: header!.activeVariantId,
+  });
 
   // "Hero" is a linked instance → never materialized into a component.
   expect(components.some((c) => c.sourceNodeId === "hero")).toBe(false);
@@ -161,20 +168,22 @@ test("a component unlinked in a version survives in the new main after promote (
   const versionDoc = canvasDocumentFromHtmlGraphJSON(versionJSON, { promoteSubjectRoot: true })!;
   await materializeVersionScene({ versionVariantId: "v", document: versionDoc, projectId });
 
-  const detachedCopy = (await listTable<ComponentRow>(TABLES.components)).find(
-    (c) => c.parentVariantId === "v" && c.sourceNodeId === "header",
+  const detachedCopy = (await listChildrenOfVariant("v")).find(
+    (c) => c.sourceNodeId === "header",
   );
   expect(detachedCopy).toBeTruthy();
 
   await promoteVariantToMain("v");
 
-  // The detached copy is now a screen-owned top-level component of the new main — it shows
+  // The detached copy is now a top-level component of the new main ("v") — it shows
   // up in the subcomponents list instead of vanishing.
   const topLevel = await listTopLevelByScreen(projectId, screenId);
   expect(topLevel.map((c) => c.id)).toContain(detachedCopy!.id);
-  const survivor = topLevel.find((c) => c.id === detachedCopy!.id)!;
-  expect(survivor.screenId).toBe(screenId);
-  expect(survivor.parentVariantId).toBeNull();
+  // Ownership is the edge: still owned by "v", which is now the screen's main variant.
+  expect(await ownerOf({ type: "component", id: detachedCopy!.id })).toEqual({
+    type: "variant",
+    id: "v",
+  });
 });
 
 test("materializeVersionScene is idempotent — re-running does not duplicate components", async () => {

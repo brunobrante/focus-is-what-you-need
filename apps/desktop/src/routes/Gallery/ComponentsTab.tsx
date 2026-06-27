@@ -19,7 +19,7 @@ import { Snapshot } from "@/components/Snapshot";
 import { Badge } from "@/components/ui/badge";
 import { scopeOf, sourceScopeIcon, SOURCE_SCOPE_LABEL } from "@/components/component/componentSource";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
-import { updateComponent } from "@/lib/storage/repos/components.repo";
+import { setComponentScreen, updateComponent } from "@/lib/storage/repos/components.repo";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
 import {
   IconChevronDown,
@@ -233,7 +233,8 @@ export function ComponentsTab({
         onClose={() => setScreenAssignmentComponent(null)}
         onSave={({ screenId, assignedScreenIds }) => {
           if (!screenAssignmentComponent) return;
-          void updateComponent(screenAssignmentComponent.id, { screenId, assignedScreenIds });
+          void updateComponent(screenAssignmentComponent.id, { assignedScreenIds });
+          void setComponentScreen(screenAssignmentComponent.id, screenId);
           setScreenAssignmentComponent(null);
         }}
       />

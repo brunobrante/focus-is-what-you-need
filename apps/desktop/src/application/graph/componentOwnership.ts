@@ -1,6 +1,7 @@
 import { peekOwnerOf } from "@/application/graph/edgeIndex";
 import { TABLES, peekTable } from "@/lib/storage/store";
-import type { VariantRow } from "@/lib/storage/schema";
+import type { ComponentRow, VariantRow } from "@/lib/storage/schema";
+import type { ComponentScope } from "@/lib/storage/defaults";
 
 /**
  * Sync, edge-authoritative replacements for the legacy `ComponentRow.screenId` /
@@ -51,4 +52,33 @@ export function parentVariantIdOf(
   const v = ownerVariant(componentId, variants ?? buildVariantLookup());
   if (!v || isScreenMainVariant(v)) return null;
   return v.id;
+}
+
+/**
+ * Edge-authoritative component scope (replaces the field-based `componentScope`):
+ * classify a component from its single incoming `owns` edge —
+ *   workspace → "workspace"; project → "project"; screen-main variant → "screen";
+ *   any other variant → "nested"; no owner edge → orphan, treated as "project".
+ * Falls back to the (still-written) owner fields when the edge index is cold.
+ */
+export function componentScopeOf(
+  row: Pick<ComponentRow, "id" | "workspaceId" | "projectId" | "screenId" | "parentVariantId">,
+  variants?: VariantLookup,
+): ComponentScope {
+  const owner = peekOwnerOf("component", row.id);
+  if (owner) {
+    if (owner.type === "workspace") return "workspace";
+    if (owner.type === "project") return "project";
+    if (owner.type === "variant") {
+      const v = (variants ?? buildVariantLookup()).get(owner.id);
+      return v?.ownerKind === "screen" ? "screen" : "nested";
+    }
+  }
+  // Cold index or no owner edge — fall back to the owner fields (removed once the
+  // fields are dropped). Orphan rows classify as project-global, as before.
+  if (row.parentVariantId) return "nested";
+  if (row.screenId) return "screen";
+  if (row.projectId) return "project";
+  if (row.workspaceId) return "workspace";
+  return "project";
 }

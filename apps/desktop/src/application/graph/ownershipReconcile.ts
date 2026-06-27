@@ -1,5 +1,5 @@
 import { TABLES, listTable } from "@/lib/storage/store";
-import { linkEdge, setEdges, setOwner } from "@/lib/storage/repos/edges.repo";
+import { linkEdge, ownerOf, setEdges, setOwner } from "@/lib/storage/repos/edges.repo";
 import type { EntityRef } from "@/domain/graph/edges";
 import type {
   ComponentRow,
@@ -57,11 +57,21 @@ function componentOwnerRef(
   return null; // Draft — no owner edge
 }
 
-/** Reconcile one component's `owns` edge from its fields. */
+/**
+ * Backfill one component's `owns` edge from its fields — ADDITIVE only. Edges are
+ * the source of truth now (write paths emit them directly), so reconcile must never
+ * CLOBBER an existing owner edge: a runtime-created component carries null
+ * screenId/parentVariantId and would be wrongly re-homed to a draft if the
+ * field-derived owner overwrote its real edge. So we only set the owner when the
+ * component has no live owner edge yet (e.g. freshly seeded rows that still encode
+ * ownership in fields). This keeps the seed bootstrap working while leaving every
+ * authoritative edge untouched.
+ */
 export async function reconcileComponentOwner(
   row: ComponentRow,
   variants?: VariantRow[],
 ): Promise<void> {
+  if (await ownerOf({ type: "component", id: row.id })) return; // already owned — never clobber
   const vs = variants ?? (await listTable<VariantRow>(TABLES.variants));
   const owner = componentOwnerRef(row, (sid) => mainVariantIdForScreen(vs, sid));
   await setOwner(owner, { type: "component", id: row.id });

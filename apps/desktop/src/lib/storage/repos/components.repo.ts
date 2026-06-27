@@ -3,8 +3,9 @@ import {
   normalizeComponentRow,
   normalizeReferenceRow,
 } from "@/lib/storage/defaults";
-import { reconcileComponentOwner } from "@/application/graph/ownershipReconcile";
-import { peekOwnerOf } from "@/application/graph/edgeIndex";
+import { peekOwnerOf, primeEdgeIndex } from "@/application/graph/edgeIndex";
+import { parentVariantIdOf } from "@/application/graph/componentOwnership";
+import { setComponentOwner } from "@/application/graph/ownership";
 import { listEdges } from "@/lib/storage/repos/edges.repo";
 import type { EntityRef } from "@/domain/graph/edges";
 import { newId, now } from "@/lib/storage/ids";
@@ -59,6 +60,43 @@ function mainVariantIdForScreen(
     if (!main || v.order < main.order) main = v;
   }
   return main?.id ?? null;
+}
+
+/**
+ * The single `owns`-edge source a `ComponentParent` maps to (the uniform rule):
+ * screen-top-level is owned by the screen's MAIN variant, so screen/nested/version
+ * collapse to one `variant owns component` edge; a draft has no owner. Returns null
+ * for a draft (and for a screen whose main variant isn't seeded yet).
+ */
+function parentOwnerRef(
+  parent: ComponentParent,
+  variants: VariantRow[],
+): EntityRef | null {
+  switch (parent.kind) {
+    case "workspace":
+      return { type: "workspace", id: parent.workspaceId };
+    case "project":
+      return parent.projectId ? { type: "project", id: parent.projectId } : null;
+    case "screen": {
+      const mainId = mainVariantIdForScreen(variants, parent.screenId);
+      return mainId ? { type: "variant", id: mainId } : null;
+    }
+    case "variant":
+      return { type: "variant", id: parent.variantId };
+    case "draft":
+      return null;
+  }
+}
+
+const sameOwner = (a: EntityRef | null, b: EntityRef | null): boolean =>
+  a === null || b === null ? a === b : a.type === b.type && a.id === b.id;
+
+/** Components currently owned by `owner` (null = the unowned drafts), via edges. */
+function componentsWithOwner(
+  components: ComponentRow[],
+  owner: EntityRef | null,
+): ComponentRow[] {
+  return components.filter((c) => sameOwner(peekOwnerOf("component", c.id), owner));
 }
 
 export type ComponentParent =
@@ -208,35 +246,16 @@ export async function findComponentByName(
   name: string,
 ): Promise<ComponentRow | null> {
   const rows = await listComponents();
+  const variants = await listTable<VariantRow>(VARIANTS_KEY);
+  await primeEdgeIndex();
+  const owner = parentOwnerRef(parent, variants);
   const lower = name.toLowerCase();
   return (
-    rows.find((r) => {
-      if (r.name.toLowerCase() !== lower) return false;
-      if (parent.kind === "workspace") {
-        return (
-          r.workspaceId === parent.workspaceId &&
-          r.projectId === null &&
-          r.screenId === null &&
-          r.parentVariantId === null
-        );
-      }
-      if (parent.kind === "project") {
-        return (
-          r.projectId === parent.projectId &&
-          r.screenId === null &&
-          r.parentVariantId === null
-        );
-      }
-      if (parent.kind === "screen") {
-        return r.screenId === parent.screenId && r.parentVariantId === null;
-      }
-      if (parent.kind === "draft") {
-        return (
-          !r.workspaceId && !r.projectId && !r.screenId && !r.parentVariantId
-        );
-      }
-      return r.parentVariantId === parent.variantId;
-    }) ?? null
+    rows.find(
+      (r) =>
+        r.name.toLowerCase() === lower &&
+        sameOwner(peekOwnerOf("component", r.id), owner),
+    ) ?? null
   );
 }
 
@@ -246,34 +265,15 @@ export async function findComponentBySourceNode(
 ): Promise<ComponentRow | null> {
   if (!sourceNodeId) return null;
   const rows = await listComponents();
+  const variants = await listTable<VariantRow>(VARIANTS_KEY);
+  await primeEdgeIndex();
+  const owner = parentOwnerRef(parent, variants);
   return (
-    rows.find((r) => {
-      if (r.sourceNodeId !== sourceNodeId) return false;
-      if (parent.kind === "workspace") {
-        return (
-          r.workspaceId === parent.workspaceId &&
-          r.projectId === null &&
-          r.screenId === null &&
-          r.parentVariantId === null
-        );
-      }
-      if (parent.kind === "project") {
-        return (
-          r.projectId === parent.projectId &&
-          r.screenId === null &&
-          r.parentVariantId === null
-        );
-      }
-      if (parent.kind === "screen") {
-        return r.screenId === parent.screenId && r.parentVariantId === null;
-      }
-      if (parent.kind === "draft") {
-        return (
-          !r.workspaceId && !r.projectId && !r.screenId && !r.parentVariantId
-        );
-      }
-      return r.parentVariantId === parent.variantId;
-    }) ?? null
+    rows.find(
+      (r) =>
+        r.sourceNodeId === sourceNodeId &&
+        sameOwner(peekOwnerOf("component", r.id), owner),
+    ) ?? null
   );
 }
 
@@ -310,36 +310,11 @@ export async function createComponent(input: {
 
   const components = await listTable<ComponentRow>(KEY);
   const variants = await listTable<VariantRow>(VARIANTS_KEY);
+  await primeEdgeIndex();
 
-  const siblings = components.filter((c) => {
-    if (input.parent.kind === "workspace") {
-      const workspaceId = input.parent.workspaceId;
-      return (
-        c.workspaceId === workspaceId &&
-        c.projectId === null &&
-        c.screenId === null &&
-        c.parentVariantId === null
-      );
-    }
-    if (input.parent.kind === "project") {
-      return (
-        c.projectId === input.projectId &&
-        c.screenId === null &&
-        c.parentVariantId === null
-      );
-    }
-    if (input.parent.kind === "screen") {
-      return (
-        c.screenId === input.parent.screenId && c.parentVariantId === null
-      );
-    }
-    if (input.parent.kind === "draft") {
-      return (
-        !c.workspaceId && !c.projectId && !c.screenId && !c.parentVariantId
-      );
-    }
-    return c.parentVariantId === input.parent.variantId;
-  });
+  // Siblings share the same owner edge (the parent), resolved off the graph.
+  const owner = parentOwnerRef(input.parent, variants);
+  const siblings = componentsWithOwner(components, owner);
   const duplicate = siblings.find(
     (c) => c.name.toLowerCase() === trimmedName.toLowerCase(),
   );
@@ -366,12 +341,15 @@ export async function createComponent(input: {
 
   const component = normalizeComponentRow({
     id: componentId,
+    // workspaceId/projectId stay as denormalized home pointers; precise ownership
+    // (screen-top-level / nested / version) is the `owns` edge emitted below. The
+    // screenId/parentVariantId fields are now vestigial (always null) — edges are
+    // the source of truth; the fields are removed from the type in a follow-up.
     workspaceId:
       input.parent.kind === "workspace" ? input.parent.workspaceId : null,
     projectId: input.parent.kind === "workspace" ? null : input.projectId ?? null,
-    screenId: input.parent.kind === "screen" ? input.parent.screenId : null,
-    parentVariantId:
-      input.parent.kind === "variant" ? input.parent.variantId : null,
+    screenId: null,
+    parentVariantId: null,
     name: trimmedName,
     kind: input.kind ?? null,
     category: input.category?.trim() || null,
@@ -394,11 +372,9 @@ export async function createComponent(input: {
   notify(VARIANTS_KEY);
   notify(KEY);
 
-  // Emit the `owns` edge eagerly so the graph is authoritative in-session, not
-  // only after the next boot reconcile (save-architecture-v3 flip 1 — close the
-  // create-path edge gap). Pass the variant list incl. the just-added Default so a
-  // screen-top-level component resolves to the screen's main variant.
-  await reconcileComponentOwner(component, [defaultVariant, ...variants]);
+  // Emit the `owns` edge from the resolved parent — the sole source of truth for
+  // ownership now that screenId/parentVariantId are gone.
+  await setComponentOwner(componentId, owner);
 
   // Seed a blank scene at the chosen size so the component opens at exactly W×H.
   const width = input.width ?? null;
@@ -416,7 +392,7 @@ export async function createComponent(input: {
 
 export async function updateComponent(
   componentId: string,
-  patch: Partial<Pick<ComponentRow, "assignedScreenIds" | "category" | "description" | "kind" | "linkable" | "name" | "screenId" | "sourceNodeId">>,
+  patch: Partial<Pick<ComponentRow, "assignedScreenIds" | "category" | "description" | "kind" | "linkable" | "name" | "sourceNodeId">>,
 ): Promise<ComponentRow | null> {
   const components = await listTable<ComponentRow>(KEY);
   const idx = components.findIndex((component) => component.id === componentId);
@@ -425,7 +401,6 @@ export async function updateComponent(
   const next = normalizeComponentRow({
     ...components[idx]!,
     ...patch,
-    screenId: patch.screenId === undefined ? components[idx]!.screenId : patch.screenId,
     assignedScreenIds: patch.assignedScreenIds
       ? Array.from(new Set(patch.assignedScreenIds))
       : components[idx]!.assignedScreenIds,
@@ -435,12 +410,36 @@ export async function updateComponent(
   nextComponents[idx] = next;
   await replaceTable<ComponentRow>(KEY, nextComponents);
   notify(KEY);
-  // A screenId change re-homes the component; keep its `owns` edge in step so the
-  // graph stays authoritative without waiting for the next boot reconcile.
-  if (patch.screenId !== undefined && patch.screenId !== components[idx]!.screenId) {
-    await reconcileComponentOwner(next);
-  }
   return next;
+}
+
+/**
+ * Re-home a component onto a screen (its top-level), or back to project-global
+ * when `screenId` is null — ownership is the `owns` edge now, so this just repoints
+ * it (screen → the screen's main variant; null → the component's home project, or
+ * its workspace). Replaces the old `updateComponent({ screenId })` field write.
+ */
+export async function setComponentScreen(
+  componentId: string,
+  screenId: string | null,
+): Promise<void> {
+  const components = await listTable<ComponentRow>(KEY);
+  const component = components.find((c) => c.id === componentId);
+  if (!component) return;
+  await primeEdgeIndex();
+  let owner: EntityRef | null;
+  if (screenId) {
+    const variants = await listTable<VariantRow>(VARIANTS_KEY);
+    const mainId = mainVariantIdForScreen(variants, screenId);
+    owner = mainId ? { type: "variant", id: mainId } : null;
+  } else if (component.projectId) {
+    owner = { type: "project", id: component.projectId };
+  } else if (component.workspaceId) {
+    owner = { type: "workspace", id: component.workspaceId };
+  } else {
+    owner = null;
+  }
+  await setComponentOwner(componentId, owner);
 }
 
 /**
@@ -563,6 +562,7 @@ export function collectComponentTreeIds(
 ): Set<string> {
   const result = new Set<string>();
   const queue = [rootComponentId];
+  const variantMap = new Map(variants.map((v) => [v.id, v]));
 
   while (queue.length > 0) {
     const currentId = queue.shift()!;
@@ -575,7 +575,8 @@ export function collectComponentTreeIds(
       .filter((v) => v.ownerKind === "component" && v.ownerId === currentId)
       .map((v) => v.id);
     for (const child of components) {
-      if (child.parentVariantId && ownedVariantIds.includes(child.parentVariantId)) {
+      const pv = parentVariantIdOf(child.id, variantMap) ?? child.parentVariantId;
+      if (pv && ownedVariantIds.includes(pv)) {
         queue.push(child.id);
       }
     }

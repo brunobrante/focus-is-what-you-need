@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import { TABLES, putRecord, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetEdgeIndex } from "@/application/graph/edgeIndex";
-import { createComponent, updateComponent } from "@/lib/storage/repos/components.repo";
+import { createComponent, setComponentScreen } from "@/lib/storage/repos/components.repo";
 import { ownerOf } from "@/lib/storage/repos/edges.repo";
 import type { ScreenRow, VariantRow } from "@/lib/storage/schema";
 
@@ -124,7 +124,7 @@ test("updateComponent re-homes the owner edge when screenId changes", async () =
     id: "v-s1",
   });
 
-  await updateComponent(component.id, { screenId: "s2" });
+  await setComponentScreen(component.id, "s2");
   expect(await ownerOf({ type: "component", id: component.id })).toEqual({
     type: "variant",
     id: "v-s2",
