@@ -1,9 +1,11 @@
 import { TABLES, listTable } from "@/lib/storage/store";
-import { linkEdge, setOwner } from "@/lib/storage/repos/edges.repo";
+import { linkEdge, setEdges, setOwner } from "@/lib/storage/repos/edges.repo";
 import type { EntityRef } from "@/domain/graph/edges";
 import type {
   ComponentRow,
   ProjectRow,
+  ReferenceAttachment,
+  ReferenceRow,
   SceneRow,
   ScreenRow,
   VariantRow,
@@ -69,15 +71,32 @@ export async function reconcileComponentOwner(
 export async function reconcileWorkspaceContainment(
   ws: WorkspaceRow,
 ): Promise<void> {
-  let order = 0;
-  for (const projectId of ws.projectIds ?? []) {
-    await linkEdge({
-      from: { type: "workspace", id: ws.id },
-      relation: "contains",
-      to: { type: "project", id: projectId },
-      order: order++,
-    });
-  }
+  await setEdges(
+    { type: "workspace", id: ws.id },
+    "contains",
+    (ws.projectIds ?? []).map((id) => ({ type: "project" as const, id })),
+  );
+}
+
+/** The single owner an attachment anchors to (component → screen → project →
+ *  workspace precedence — the `attached_to` target). */
+function attachmentOwner(a: ReferenceAttachment): EntityRef | null {
+  if (a.componentId) return { type: "component", id: a.componentId };
+  if (a.screenId) return { type: "screen", id: a.screenId };
+  if (a.projectId) return { type: "project", id: a.projectId };
+  if (a.workspaceId) return { type: "workspace", id: a.workspaceId };
+  return null;
+}
+
+/** Reconcile a reference's `attached_to` edges from its `attachments[]` (one
+ *  master, many places — multi-attach). The edge set mirrors the array. */
+export async function reconcileReferenceAttachments(
+  ref: ReferenceRow,
+): Promise<void> {
+  const targets = (ref.attachments ?? [])
+    .map(attachmentOwner)
+    .filter((o): o is EntityRef => o != null);
+  await setEdges({ type: "reference", id: ref.id }, "attached_to", targets);
 }
 
 /**
@@ -87,7 +106,7 @@ export async function reconcileWorkspaceContainment(
  * instance_usage cold rebuild.
  */
 export async function reconcileAllGraphEdges(): Promise<void> {
-  const [workspaces, projects, screens, components, variants, scenes] =
+  const [workspaces, projects, screens, components, variants, scenes, references] =
     await Promise.all([
       listTable<WorkspaceRow>(TABLES.workspaces),
       listTable<ProjectRow>(TABLES.projects),
@@ -95,6 +114,7 @@ export async function reconcileAllGraphEdges(): Promise<void> {
       listTable<ComponentRow>(TABLES.components),
       listTable<VariantRow>(TABLES.variants),
       listTable<SceneRow>(TABLES.scenes),
+      listTable<ReferenceRow>(TABLES.references),
     ]);
 
   // workspace ──contains──▶ project
@@ -134,6 +154,11 @@ export async function reconcileAllGraphEdges(): Promise<void> {
   // owner ──owns──▶ component (uniform rule, derived from fields)
   for (const c of components) {
     await reconcileComponentOwner(c, variants);
+  }
+
+  // reference/cut ──attached_to──▶ {workspace|project|screen|component} (multi-attach)
+  for (const ref of references) {
+    await reconcileReferenceAttachments(ref);
   }
 
   // `projects` is read to keep the backfill total even though project rows carry

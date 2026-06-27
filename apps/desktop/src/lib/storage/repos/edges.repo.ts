@@ -169,6 +169,28 @@ export async function setOwner(
   if (owner) await linkEdge({ from: owner, relation: "owns", to: target });
 }
 
+/**
+ * Reconcile the FULL set of `from --relation--> *` edges to exactly `targets`:
+ * tombstone live edges no longer wanted, link the rest (ordered). The multi-target
+ * primitive behind containment and reference attachment — idempotent.
+ */
+export async function setEdges(
+  from: EntityRef,
+  relation: GraphRelation,
+  targets: EntityRef[],
+): Promise<void> {
+  const desired = new Set(targets.map((t) => `${t.type}:${t.id}`));
+  for (const e of await edgesFrom(from, relation)) {
+    if (!desired.has(`${e.toType}:${e.toId}`)) {
+      await unlinkEdge(from, relation, { type: e.toType, id: e.toId });
+    }
+  }
+  let order = 0;
+  for (const target of targets) {
+    await linkEdge({ from, relation, to: target, order: order++ });
+  }
+}
+
 /** Make `container` the sole container of `target` (or loose when null). */
 export async function setContainer(
   container: EntityRef | null,

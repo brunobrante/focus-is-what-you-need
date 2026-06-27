@@ -8,6 +8,7 @@ import {
   listEdges,
   ownerOf,
   relatedTargets,
+  setEdges,
   setOwner,
   unlinkEdge,
 } from "@/lib/storage/repos/edges.repo";
@@ -83,6 +84,19 @@ test("setOwner re-homes the component to a new owner (promote shape)", async () 
   // Detach to a Draft: no owner edge at all.
   await setOwner(null, comp);
   expect(await ownerOf(comp)).toBeNull();
+});
+
+test("setEdges reconciles the full multi-target set (add + reap)", async () => {
+  const ref: EntityRef = { type: "reference", id: "r1" };
+  await setEdges(ref, "attached_to", [p1, p2]);
+  expect((await listEdges({ from: ref, relation: "attached_to" })).map((e) => e.toId).sort()).toEqual(
+    ["p1", "p2"],
+  );
+  // Drop p1, add a component target — the gone target is tombstoned.
+  await setEdges(ref, "attached_to", [p2, comp]);
+  expect(
+    (await listEdges({ from: ref, relation: "attached_to" })).map((e) => e.toId).sort(),
+  ).toEqual(["c1", "p2"]);
 });
 
 test("re-linking a tombstoned triple revives it as a fresh live edge", async () => {
