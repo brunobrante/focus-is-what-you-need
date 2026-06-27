@@ -25,6 +25,11 @@ type RecordRow = { table: string; id: string; json: string; rev?: number };
 type AssetBlobEntry = { blobKey: string; bytes: Uint8Array; meta: AssetBlobMeta };
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+// Sync handle to the live connection so test teardown can close it before the DB
+// is deleted (an open connection blocks `deleteDatabase`, which would then stall
+// the next `open` — see `resetIndexedDbForTests`). In production the connection
+// lives for the app's lifetime and is never closed.
+let openDb: IDBDatabase | null = null;
 
 export function createIndexedDbPersistence(): GraphPersistencePort {
   return {
@@ -131,6 +136,10 @@ function applyMutation(recordsStore: IDBObjectStore, mutation: Mutation): void {
 /** Test seam: drop the cached connection so the next open re-runs against a fresh
  *  (e.g. just-deleted) database. Pairs with `indexedDB.deleteDatabase` in tests. */
 export function resetIndexedDbForTests(): void {
+  // Close the live connection synchronously so the paired `deleteDatabase` isn't
+  // blocked (a blocked delete stalls the next open → every later test times out).
+  openDb?.close();
+  openDb = null;
   dbPromise = null;
 }
 
@@ -150,7 +159,10 @@ function openDatabase(): Promise<IDBDatabase> {
         db.createObjectStore(ASSET_BLOBS, { keyPath: "blobKey" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      openDb = request.result;
+      resolve(request.result);
+    };
   });
   return dbPromise;
 }
