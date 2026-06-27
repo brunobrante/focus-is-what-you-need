@@ -11,6 +11,8 @@ import {
 } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import { reconcileAllGraphEdges } from "@/application/graph/ownershipReconcile";
+import { sweepEdgeTombstones } from "@/application/graph/edgeIndex";
+import { primeInstanceUsage } from "@/application/scenes/instanceUsage";
 import {
   SCHEMA_VERSION,
   type ComponentRow,
@@ -55,6 +57,12 @@ export async function ensureSeededAndMigrated(): Promise<void> {
   // (save-architecture-v3 Step 2). Idempotent + self-healing: it backfills any
   // edge a not-yet-wired write path missed, so the graph is always consistent.
   await reconcileAllGraphEdges();
+  // Reclaim disk/hydration cost from edge tombstones a long-lived workspace
+  // accumulated (graph hot-path GC). In-memory reads already skip tombstones.
+  await sweepEdgeTombstones();
+  // Warm the instance_usage cache so the synchronous save-path reconcile sees a
+  // complete existing-row set via peekTable (cold-rebuilds from scenes if empty).
+  await primeInstanceUsage();
 }
 
 export async function resetToFactoryData(): Promise<void> {

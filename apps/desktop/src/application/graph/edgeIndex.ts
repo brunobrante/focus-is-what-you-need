@@ -5,7 +5,8 @@ import {
   type GraphEdgeRow,
   type GraphRelation,
 } from "@/domain/graph/edges";
-import { TABLES, listTable, subscribe } from "@/lib/storage/store";
+import { TABLES, listTable, removeRecords, subscribe } from "@/lib/storage/store";
+import { now } from "@/lib/storage/ids";
 
 /**
  * The bidirectional adjacency index over `graph_edges` (save-architecture-v3
@@ -16,7 +17,7 @@ import { TABLES, listTable, subscribe } from "@/lib/storage/store";
  * round-trips to SQLite on a read.
  *
  * Tombstones (`deletedAt != null`) are filtered at hydration and excluded from
- * the maps; a periodic GC hard-deletes old ones (see `sweepEdgeTombstones`).
+ * the maps; a periodic GC hard-deletes old ones (`sweepEdgeTombstones`, below).
  */
 type EdgeMaps = {
   from: Map<string, GraphEdgeRow[]>;
@@ -185,6 +186,31 @@ export function peekOwnerOf(type: string, id: string): EntityRef | null {
 /** Eagerly hydrate the index so subsequent sync peeks are authoritative. */
 export async function primeEdgeIndex(): Promise<void> {
   await ensureMaps();
+}
+
+/**
+ * Periodic GC: hard-delete edge tombstones older than `maxAgeMs` (graph hot-path
+ * decision). In-memory reads already filter tombstones, so this only reclaims
+ * disk + hydration cost — but without it a long-lived workspace's `graph_edges`
+ * table bloats with dead rows. The grace window keeps recent deletes around for a
+ * future sync layer to observe before they're reaped. Returns the count swept.
+ */
+const TOMBSTONE_GRACE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export async function sweepEdgeTombstones(
+  maxAgeMs: number = TOMBSTONE_GRACE_MS,
+): Promise<number> {
+  const cutoff = now() - maxAgeMs;
+  const edges = await listTable<GraphEdgeRow>(TABLES.graphEdges);
+  const stale = edges.filter(
+    (e) => e.deletedAt != null && e.deletedAt < cutoff,
+  );
+  if (stale.length === 0) return 0;
+  removeRecords(
+    TABLES.graphEdges,
+    stale.map((e) => e.id),
+  );
+  return stale.length;
 }
 
 /** Test seam: drop the index so the next query rebuilds from the store. */

@@ -1,5 +1,11 @@
 import { htmlCanvasDocumentFromJSON } from "@/lib/canvas/htmlScene";
-import { TABLES, listTable, putRecord, removeRecords } from "@/lib/storage/store";
+import {
+  TABLES,
+  listTable,
+  peekTable,
+  putRecord,
+  removeRecords,
+} from "@/lib/storage/store";
 import type { SceneRow } from "@/lib/storage/schema";
 
 /**
@@ -47,24 +53,15 @@ export function deriveSceneUsage(
   return rows;
 }
 
-/**
- * Reconcile a scene's usage rows after it is saved. Upserts changed/new rows and
- * removes stale ones — enqueued on the SAME SaveQueue as the scene write (D3), so
- * the index rides the scene's flush. Scenes are always variant-owned.
- */
-export async function reconcileSceneUsage(
-  ownerType: string,
-  ownerId: string,
-  graphJSON: string,
-): Promise<void> {
-  if (ownerType !== "variant") return;
-  const next = deriveSceneUsage(ownerId, graphJSON);
-  const existing = (await listTable<InstanceUsageRow>(KEY)).filter(
-    (r) => r.ownerVariantId === ownerId,
-  );
+/** Diff next-vs-existing usage rows for one scene and enqueue the delta. Pure
+ *  cache writes (putRecord/removeRecords are synchronous), so the caller controls
+ *  whether `existing` came from a sync peek or an async list. */
+function applyUsageDelta(
+  next: InstanceUsageRow[],
+  existing: InstanceUsageRow[],
+): void {
   const existingById = new Map(existing.map((r) => [r.id, r]));
   const nextIds = new Set(next.map((r) => r.id));
-
   for (const row of next) {
     const prev = existingById.get(row.id);
     if (
@@ -78,6 +75,41 @@ export async function reconcileSceneUsage(
   }
   const removed = existing.filter((r) => !nextIds.has(r.id)).map((r) => r.id);
   if (removed.length) removeRecords(KEY, removed);
+}
+
+/**
+ * Reconcile a scene's usage rows on save — SYNCHRONOUSLY, so the upserts/deletes
+ * are enqueued in the same tick as the scene `putRecord` and ride the SAME
+ * SaveQueue flush (D3, genuinely — not the next batch). Reads existing rows from
+ * the in-memory cache via `peekTable`; `primeInstanceUsage()` at boot keeps that
+ * cache warm so the stale-row diff is complete. A cold miss only delays reaping a
+ * stale row to the next save (rebuildable cache), never a correctness divergence.
+ */
+export function reconcileSceneUsageSync(
+  ownerType: string,
+  ownerId: string,
+  graphJSON: string,
+): void {
+  if (ownerType !== "variant") return;
+  const next = deriveSceneUsage(ownerId, graphJSON);
+  const existing = peekTable<InstanceUsageRow>(KEY).filter(
+    (r) => r.ownerVariantId === ownerId,
+  );
+  applyUsageDelta(next, existing);
+}
+
+/** Async reconcile (hydrates the table first) — for callers off the save hot path. */
+export async function reconcileSceneUsage(
+  ownerType: string,
+  ownerId: string,
+  graphJSON: string,
+): Promise<void> {
+  if (ownerType !== "variant") return;
+  const next = deriveSceneUsage(ownerId, graphJSON);
+  const existing = (await listTable<InstanceUsageRow>(KEY)).filter(
+    (r) => r.ownerVariantId === ownerId,
+  );
+  applyUsageDelta(next, existing);
 }
 
 let rebuilt = false;
@@ -113,6 +145,12 @@ export async function instanceUsageForComponents(
   if (componentIds.size === 0) return [];
   const rows = await ensureUsageIndex();
   return rows.filter((r) => componentIds.has(r.componentId));
+}
+
+/** Warm the index at boot so the sync save-path reconcile sees existing rows via
+ *  `peekTable` (and cold-rebuilds from scenes if the table is empty). */
+export async function primeInstanceUsage(): Promise<void> {
+  await ensureUsageIndex();
 }
 
 /** Test seam: force the next read to re-evaluate the cold-rebuild path. */

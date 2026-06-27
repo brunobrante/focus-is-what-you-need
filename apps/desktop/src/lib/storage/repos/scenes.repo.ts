@@ -15,7 +15,7 @@ import { notifyInvalidation, ownerInvalidationKey } from "@/application/persiste
 import { scheduleThumbnailRefresh } from "@/application/thumbnails/thumbnailQueue";
 import {
   instanceUsageForComponents,
-  reconcileSceneUsage,
+  reconcileSceneUsageSync,
 } from "@/application/scenes/instanceUsage";
 import { now } from "@/lib/storage/ids";
 import type { ComponentRow, SceneOwnerType, SceneRow, VariantRow } from "@/lib/storage/schema";
@@ -88,9 +88,10 @@ export async function upsertScene(input: {
   const row = buildSceneRow(existing, { ...input, t });
   putRecord<SceneRow>(KEY, row);
   // Derive the instance-usage index from this scene's nodes and enqueue the
-  // upserts/deletes on the SAME save batch as the scene row (D3) — a rebuildable
-  // cache, so it self-heals on the next save if a crash drops it.
-  void reconcileSceneUsage(input.ownerType, input.ownerId, input.graphJSON);
+  // upserts/deletes SYNCHRONOUSLY — same tick as the scene putRecord, so they ride
+  // the SAME SaveQueue flush (D3). A rebuildable cache: self-heals on the next save
+  // if a crash drops it.
+  reconcileSceneUsageSync(input.ownerType, input.ownerId, input.graphJSON);
   // Snapshot propagation (CLAUDE.md): regenerate this node's thumbnail from the
   // scene graph; propagation below regenerates ancestor thumbnails too.
   scheduleThumbnailRefresh({

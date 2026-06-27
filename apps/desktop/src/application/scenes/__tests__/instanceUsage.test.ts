@@ -10,7 +10,9 @@ import { makeNode } from "@/lib/canvas/htmlScene/nodeHelpers";
 import {
   deriveSceneUsage,
   instanceUsageForComponents,
+  primeInstanceUsage,
   reconcileSceneUsage,
+  reconcileSceneUsageSync,
   resetInstanceUsageRebuilt,
 } from "@/application/scenes/instanceUsage";
 
@@ -78,6 +80,27 @@ test("reconcile + index resolves usage by component", async () => {
   const rows = await instanceUsageForComponents(new Set(["c1"]));
   expect(rows.map((r) => r.ownerVariantId)).toEqual(["varA"]);
   expect(await instanceUsageForComponents(new Set(["other"]))).toHaveLength(0);
+});
+
+test("sync reconcile (warm cache) adds and reaps without awaiting a list", async () => {
+  // Warm the cache so the sync peek sees existing rows (the boot prime).
+  await primeInstanceUsage();
+  reconcileSceneUsageSync(
+    "variant",
+    "varB",
+    sceneWith([
+      { nodeId: "n1", componentId: "c1", variantId: "v1" },
+      { nodeId: "n2", componentId: "c1", variantId: "v1" },
+    ]),
+  );
+  expect(await instanceUsageForComponents(new Set(["c1"]))).toHaveLength(2);
+  // Re-save with n2 gone — the sync peek now sees the two rows it just wrote.
+  reconcileSceneUsageSync(
+    "variant",
+    "varB",
+    sceneWith([{ nodeId: "n1", componentId: "c1", variantId: "v1" }]),
+  );
+  expect(await instanceUsageForComponents(new Set(["c1"]))).toHaveLength(1);
 });
 
 test("reconcile removes stale rows when an instance is deleted", async () => {
