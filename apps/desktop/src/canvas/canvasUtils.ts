@@ -4,6 +4,11 @@ import { subjectNodeForDocument } from "@/lib/canvas/htmlScene";
 import { createBlankDocument } from "@/canvas/engine/actions";
 import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { listVariants } from "@/lib/storage/repos/variants.repo";
+import {
+  buildVariantLookup,
+  parentVariantIdOf,
+  screenIdOfComponent,
+} from "@/application/graph/componentOwnership";
 import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument } from "@/canvas/engine/types";
 import { DEFAULT_ANCESTOR_OVERLAY_ITEM } from "@/canvas/engine/types";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
@@ -317,16 +322,20 @@ export function componentPathFromRoot(
     if (visited.has(current.id)) return null;
     visited.add(current.id);
     names.unshift(current.name);
-    if (current.screenId) return { screenId: current.screenId, names };
-    if (!current.parentVariantId) return { screenId: null, names };
-    const parentComponent = byParentVariantId.get(current.parentVariantId);
+    // Owner resolved off graph edges (flip 1); `?? field` keeps cold-index safety
+    // while the screenId/parentVariantId fields are still written as a mirror.
+    const screenId = screenIdOfComponent(current.id) ?? current.screenId;
+    if (screenId) return { screenId, names };
+    const parentVariantId = parentVariantIdOf(current.id) ?? current.parentVariantId;
+    if (!parentVariantId) return { screenId: null, names };
+    const parentComponent = byParentVariantId.get(parentVariantId);
     if (parentComponent) {
       current = parentComponent;
       continue;
     }
     // The parent variant is not a component's — it belongs to a screen (its main or a
     // version). A component owned by a screen variant resolves to that screen.
-    const ownerVariant = variantById.get(current.parentVariantId);
+    const ownerVariant = variantById.get(parentVariantId);
     if (ownerVariant?.ownerKind === "screen") {
       return { screenId: ownerVariant.ownerId, names };
     }
@@ -383,12 +392,14 @@ export async function computeComponentAncestorFrames(
     visited.add(current.id);
     if (!current.sourceNodeId) break;
 
+    const parentVariantId = parentVariantIdOf(current.id) ?? current.parentVariantId;
+    const screenId = screenIdOfComponent(current.id) ?? current.screenId;
     let ownerId: string | null = null;
     let isScreenRoot = false;
-    if (current.parentVariantId) {
-      ownerId = current.parentVariantId;
-    } else if (current.screenId) {
-      ownerId = mainVariantIdForScreen(variants, current.screenId);
+    if (parentVariantId) {
+      ownerId = parentVariantId;
+    } else if (screenId) {
+      ownerId = mainVariantIdForScreen(variants, screenId);
       isScreenRoot = true;
     }
     if (!ownerId) break;
@@ -401,8 +412,8 @@ export async function computeComponentAncestorFrames(
     accY += bounds.y;
 
     const name = isScreenRoot
-      ? (current.screenId ? screensById.get(current.screenId)?.title ?? "Screen" : "Screen")
-      : (byActiveVariantId.get(current.parentVariantId as string)?.name ?? "Component");
+      ? (screenId ? screensById.get(screenId)?.title ?? "Screen" : "Screen")
+      : (byActiveVariantId.get(parentVariantId as string)?.name ?? "Component");
 
     frames.push({
       id: ownerId,
@@ -417,7 +428,7 @@ export async function computeComponentAncestorFrames(
     });
 
     if (isScreenRoot) break;
-    current = byActiveVariantId.get(current.parentVariantId as string);
+    current = byActiveVariantId.get(parentVariantId as string);
   }
 
   return frames;
@@ -491,8 +502,11 @@ export function findComponentByPath(
   screenId: string,
   names: string[],
 ): ComponentRow | null {
+  const variants = buildVariantLookup();
+  const screenOf = (c: ComponentRow) => screenIdOfComponent(c.id, variants) ?? c.screenId;
+  const parentOf = (c: ComponentRow) => parentVariantIdOf(c.id, variants) ?? c.parentVariantId;
   let siblings = components
-    .filter((c) => c.screenId === screenId && c.parentVariantId === null)
+    .filter((c) => screenOf(c) === screenId && parentOf(c) === null)
     .sort((a, b) => a.order - b.order);
   let current: ComponentRow | null = null;
 
@@ -500,7 +514,7 @@ export function findComponentByPath(
     current = siblings.find((c) => normalizeName(c.name) === normalizeName(name)) ?? null;
     if (!current) return null;
     siblings = components
-      .filter((c) => c.parentVariantId === current!.activeVariantId)
+      .filter((c) => parentOf(c) === current!.activeVariantId)
       .sort((a, b) => a.order - b.order);
   }
 
@@ -513,11 +527,14 @@ export function findComponentBySourceNodeInList(
   sourceNodeId: string | null | undefined,
 ): ComponentRow | null {
   if (!sourceNodeId) return null;
+  const variants = buildVariantLookup();
   return (
     components.find((c) => {
       if (c.sourceNodeId !== sourceNodeId) return false;
-      if (parent.kind === "screen") return c.screenId === parent.screenId && c.parentVariantId === null;
-      return c.parentVariantId === parent.variantId;
+      const screenId = screenIdOfComponent(c.id, variants) ?? c.screenId;
+      const parentVariantId = parentVariantIdOf(c.id, variants) ?? c.parentVariantId;
+      if (parent.kind === "screen") return screenId === parent.screenId && parentVariantId === null;
+      return parentVariantId === parent.variantId;
     }) ?? null
   );
 }
@@ -560,14 +577,17 @@ export function subcomponentsForVariantScene(input: {
   }
   // Resolve an owned (non-linked) node, preserving the original precedence:
   // version-owned (this variant) wins over the main variant's screen-owned child.
+  const variants = buildVariantLookup();
+  const screenOf = (c: ComponentRow) => screenIdOfComponent(c.id, variants) ?? c.screenId;
+  const parentOf = (c: ComponentRow) => parentVariantIdOf(c.id, variants) ?? c.parentVariantId;
   const resolveOwned = (nodeId: string): ComponentRow | null => {
     const candidates = bySourceNode.get(nodeId);
     if (!candidates) return null;
-    const variantMatch = candidates.find((c) => c.parentVariantId === input.variantId);
+    const variantMatch = candidates.find((c) => parentOf(c) === input.variantId);
     if (variantMatch) return variantMatch;
     if (input.screenId != null) {
       const screenMatch = candidates.find(
-        (c) => c.screenId === input.screenId && c.parentVariantId === null,
+        (c) => screenOf(c) === input.screenId && parentOf(c) === null,
       );
       if (screenMatch) return screenMatch;
     }
@@ -753,16 +773,19 @@ export function findTreeNodeById(nodes: ProjectTreeNode[], id: string): ProjectT
 export function buildProjectTree(screens: ScreenRow[], components: ComponentRow[]): ProjectTreeNode[] {
   const childrenByScreenId = new Map<string, ComponentRow[]>();
   const childrenByParentVariantId = new Map<string, ComponentRow[]>();
+  const variants = buildVariantLookup();
 
   for (const component of components) {
-    if (component.parentVariantId) {
-      const siblings = childrenByParentVariantId.get(component.parentVariantId) ?? [];
+    const parentVariantId = parentVariantIdOf(component.id, variants) ?? component.parentVariantId;
+    const screenId = screenIdOfComponent(component.id, variants) ?? component.screenId;
+    if (parentVariantId) {
+      const siblings = childrenByParentVariantId.get(parentVariantId) ?? [];
       siblings.push(component);
-      childrenByParentVariantId.set(component.parentVariantId, siblings);
-    } else if (component.screenId) {
-      const siblings = childrenByScreenId.get(component.screenId) ?? [];
+      childrenByParentVariantId.set(parentVariantId, siblings);
+    } else if (screenId) {
+      const siblings = childrenByScreenId.get(screenId) ?? [];
       siblings.push(component);
-      childrenByScreenId.set(component.screenId, siblings);
+      childrenByScreenId.set(screenId, siblings);
     }
   }
 
