@@ -74,10 +74,12 @@ export function useProjectFontTokens(
 
     void load();
     const unsubDesigns = subscribe(TABLES.systemDesigns, () => void load());
+    const unsubTokens = subscribe(TABLES.tokens, () => void load());
     const unsubWorkspaces = subscribe(TABLES.workspaces, () => void load());
     return () => {
       cancelled = true;
       unsubDesigns();
+      unsubTokens();
       unsubWorkspaces();
     };
   }, [projectId]);

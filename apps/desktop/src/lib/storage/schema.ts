@@ -27,7 +27,7 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // boot), `instance_usage` (derived from scene graphJSON on save), and `asset_blobs`
 // (binaries out of the records hot path). Nuke-and-reseed produces every row fresh
 // with a short id + envelope; the edge graph is reconciled right after seeding.
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 export type Meta = {
   schemaVersion: number;
@@ -293,10 +293,12 @@ import type {
   SpacingToken,
   RadiusToken,
   ImageToken,
+  AnySystemDesignToken,
   SystemDesignCategory,
   SystemDesignTokens,
   SystemDesignOwnerScope,
   SystemDesignRow,
+  TokenRow,
 } from "@/domain/system-design/types";
 export type {
   ColorToken,
@@ -306,10 +308,12 @@ export type {
   SpacingToken,
   RadiusToken,
   ImageToken,
+  AnySystemDesignToken,
   SystemDesignCategory,
   SystemDesignTokens,
   SystemDesignOwnerScope,
   SystemDesignRow,
+  TokenRow,
 };
 
 // ---------------------------------------------------------------------------

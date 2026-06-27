@@ -142,10 +142,14 @@ function useOwnedSystemDesign(
 
     void run();
     const unsubDesigns = subscribe(TABLES.systemDesigns, () => void run());
+    // Tokens are their own rows now — an external token write (e.g. another
+    // project's applyTokenLinkDecisions) must reload this design's assembled view.
+    const unsubTokens = subscribe(TABLES.tokens, () => void run());
     const unsubWorkspaces = subscribe(TABLES.workspaces, () => void run());
     return () => {
       cancelled = true;
       unsubDesigns();
+      unsubTokens();
       unsubWorkspaces();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

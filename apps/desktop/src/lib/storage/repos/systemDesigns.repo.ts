@@ -1,59 +1,143 @@
 import {
+  SYSTEM_DESIGN_CATEGORIES,
   createDefaultSystemDesignTokens,
   emptySystemDesignTokens,
 } from "@/domain/system-design/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import type {
+  AnySystemDesignToken,
   SystemDesignCategory,
   SystemDesignOwnerScope,
   SystemDesignRow,
   SystemDesignTokens,
+  TokenRow,
 } from "@/lib/storage/schema";
 import {
   TABLES,
   getRecordById,
   listTable,
+  peekTable,
   putRecord,
   removeRecords,
 } from "@/lib/storage/store";
 
 const KEY = TABLES.systemDesigns;
+const TOKENS_KEY = TABLES.tokens;
+
+// ─── Tokens-as-rows (save-architecture-v3 flip 2) ─────────────────────────────
+// Tokens are persisted as one `TokenRow` per token in the `tokens` table, never
+// nested on the design row. The repo is the only place that bridges the two:
+// `assembleTokens` rebuilds the in-memory `SystemDesignRow.tokens` view on read,
+// and `reconcileTokenRows` splits it back into per-row writes on save.
+
+/** Rebuild a design's `SystemDesignTokens` view from its persisted `TokenRow`s. */
+function assembleTokens(
+  designId: string,
+  allTokenRows: TokenRow[],
+): SystemDesignTokens {
+  const out = emptySystemDesignTokens();
+  const owned = allTokenRows
+    .filter((row) => row.systemDesignId === designId)
+    .sort((a, b) => a.order - b.order);
+  for (const row of owned) {
+    // Shallow-copy so the cached row object is never aliased into editable state.
+    (out[row.category] as AnySystemDesignToken[]).push({ ...row.token });
+  }
+  return out;
+}
 
 /**
- * Backfill any persisted row to the current shape. (A SCHEMA_VERSION bump nukes
- * and reseeds, so this only ever sees current-shaped rows; it stays defensive.)
- * - Rows with `tokens` pass through, with every category present.
- * - Rows with no tokens reset to a fresh default design, keeping identity/owner.
+ * Persist a design's tokens as one `TokenRow` per token. A row id is reused when
+ * the same `(category, token.id)` is still present (so its envelope/rev and
+ * `createdAt` survive an edit); tokens that disappeared are deleted. Unchanged
+ * tokens are skipped so a save touches O(changed) rows, not the whole set.
+ */
+function reconcileTokenRows(design: SystemDesignRow): void {
+  const existing = peekTable<TokenRow>(TOKENS_KEY).filter(
+    (row) => row.systemDesignId === design.id,
+  );
+  const byKey = new Map(
+    existing.map((row) => [`${row.category}:${row.token.id}`, row] as const),
+  );
+  const keptRowIds = new Set<string>();
+  const t = now();
+
+  for (const category of SYSTEM_DESIGN_CATEGORIES) {
+    const tokens = design.tokens[category] as AnySystemDesignToken[];
+    tokens.forEach((token, order) => {
+      const prev = byKey.get(`${category}:${token.id}`);
+      const rowId = prev?.id ?? newId();
+      keptRowIds.add(rowId);
+      if (
+        prev &&
+        prev.order === order &&
+        JSON.stringify(prev.token) === JSON.stringify(token)
+      ) {
+        return; // no change — skip the write
+      }
+      putRecord<TokenRow>(TOKENS_KEY, {
+        id: rowId,
+        systemDesignId: design.id,
+        category,
+        order,
+        token,
+        createdAt: prev?.createdAt ?? t,
+        updatedAt: t,
+      });
+    });
+  }
+
+  const removed = existing
+    .filter((row) => !keptRowIds.has(row.id))
+    .map((row) => row.id);
+  if (removed.length > 0) removeRecords(TOKENS_KEY, removed);
+}
+
+/** Row ids of every `TokenRow` owned by the given designs. */
+function tokenRowIdsForDesigns(designIds: Iterable<string>): string[] {
+  const ids = new Set(designIds);
+  return peekTable<TokenRow>(TOKENS_KEY)
+    .filter((row) => ids.has(row.systemDesignId))
+    .map((row) => row.id);
+}
+
+/** Persist the design row itself, with `tokens` stripped (tokens are rows). */
+function persistDesignRow(design: SystemDesignRow): void {
+  const { tokens: _tokens, ...rest } = design;
+  putRecord(KEY, rest as { id: string } & Record<string, unknown>);
+}
+
+/**
+ * Backfill a persisted design row's scalar fields to the current shape. (A
+ * SCHEMA_VERSION bump nukes and reseeds, so this only ever sees current-shaped
+ * rows; it stays defensive.) Tokens are NOT on the row anymore — they live in the
+ * `tokens` table — so `tokens` is returned empty here and overlaid by
+ * `assembleTokens` in the read paths below.
  */
 export function normalizeSystemDesignRow(raw: SystemDesignRow): SystemDesignRow {
   const candidate = raw as Partial<SystemDesignRow>;
-  const ownerScope = candidate.ownerScope ?? "workspace";
-
-  if (candidate.tokens) {
-    return {
-      ...(raw as SystemDesignRow),
-      ownerScope,
-      inheritsFromId: candidate.inheritsFromId ?? null,
-      tokens: { ...emptySystemDesignTokens(), ...candidate.tokens },
-    };
-  }
-
   const t = candidate.createdAt ?? now();
   return {
     id: raw.id,
     name: candidate.name || "Design system",
-    ownerScope,
+    ownerScope: candidate.ownerScope ?? "workspace",
     ownerId: candidate.ownerId ?? "",
-    inheritsFromId: null,
-    tokens: createDefaultSystemDesignTokens(),
+    inheritsFromId: candidate.inheritsFromId ?? null,
+    tokens: emptySystemDesignTokens(),
     createdAt: t,
     updatedAt: candidate.updatedAt ?? t,
   };
 }
 
 export async function listSystemDesigns(): Promise<SystemDesignRow[]> {
-  const rows = await listTable<SystemDesignRow>(KEY);
-  return rows.map(normalizeSystemDesignRow);
+  const [rows, tokenRows] = await Promise.all([
+    listTable<SystemDesignRow>(KEY),
+    listTable<TokenRow>(TOKENS_KEY),
+  ]);
+  return rows.map((raw) => {
+    const base = normalizeSystemDesignRow(raw);
+    return { ...base, tokens: assembleTokens(base.id, tokenRows) };
+  });
 }
 
 /** The single design owned by a workspace or project, or null if none yet. */
@@ -94,7 +178,10 @@ export async function getOrCreateSystemDesignByOwner(input: {
   if (owned.length > 0) {
     const [primary, ...extras] = owned;
     if (extras.length > 0) {
-      removeRecords(KEY, extras.map((row) => row.id));
+      const extraIds = extras.map((row) => row.id);
+      removeRecords(KEY, extraIds);
+      const orphanTokenIds = tokenRowIdsForDesigns(extraIds);
+      if (orphanTokenIds.length > 0) removeRecords(TOKENS_KEY, orphanTokenIds);
     }
     // Keep the parent link fresh for project designs (the project may have
     // joined or left a workspace since the design was created).
@@ -108,7 +195,7 @@ export async function getOrCreateSystemDesignByOwner(input: {
         inheritsFromId: input.inheritsFromId ?? null,
         updatedAt: now(),
       };
-      putRecord(KEY, next);
+      persistDesignRow(next); // link-only change; tokens unchanged
       return next;
     }
     return primary!;
@@ -134,24 +221,30 @@ export async function getOrCreateSystemDesignByOwner(input: {
     createdAt: t,
     updatedAt: t,
   };
-  putRecord(KEY, created);
+  reconcileTokenRows(created);
+  persistDesignRow(created);
   return created;
 }
 
 /** Persist a whole design row (fire-and-forget, optimistic). */
 export function saveSystemDesign(row: SystemDesignRow): SystemDesignRow {
   const next: SystemDesignRow = { ...row, updatedAt: now() };
-  putRecord(KEY, next);
+  reconcileTokenRows(next);
+  persistDesignRow(next);
   return next;
 }
 
 export async function getSystemDesign(id: string): Promise<SystemDesignRow | null> {
   const raw = await getRecordById<SystemDesignRow>(KEY, id);
-  return raw ? normalizeSystemDesignRow(raw) : null;
+  if (!raw) return null;
+  const tokenRows = await listTable<TokenRow>(TOKENS_KEY);
+  return { ...normalizeSystemDesignRow(raw), tokens: assembleTokens(id, tokenRows) };
 }
 
 export function deleteSystemDesign(id: string): void {
   removeRecords(KEY, [id]);
+  const tokenIds = tokenRowIdsForDesigns([id]);
+  if (tokenIds.length > 0) removeRecords(TOKENS_KEY, tokenIds);
 }
 
 type LinkableToken = {

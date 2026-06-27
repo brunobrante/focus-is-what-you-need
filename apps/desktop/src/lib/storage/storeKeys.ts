@@ -14,6 +14,7 @@ export const TABLES = {
   settings: "settings",
   workspaces: "workspaces",
   systemDesigns: "system_designs",
+  tokens: "tokens",
   history: "history",
   checklists: "checklists",
   galleryLayout: "gallery_layout",

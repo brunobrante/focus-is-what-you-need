@@ -172,6 +172,11 @@ async function firstBootSeedV5(): Promise<void> {
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails, silent);
   await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace], silent);
   await replaceTable<never>(TABLES.history, [], silent);
+  // System designs (and their tokens, now their own rows — flip 2) are created
+  // lazily, never seeded. Clear both so a reseed cannot leave a stale design from
+  // a prior schema shape behind; they re-materialize fresh on next access.
+  await replaceTable<never>(TABLES.systemDesigns, [], silent);
+  await replaceTable<never>(TABLES.tokens, [], silent);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -182,6 +187,8 @@ async function firstBootSeedV5(): Promise<void> {
   notify(TABLES.thumbnails);
   notify(TABLES.workspaces);
   notify(TABLES.history);
+  notify(TABLES.systemDesigns);
+  notify(TABLES.tokens);
 
   // Ownership is the edge now — emit the `variant owns component` edges the tree
   // collected (the rows carry no screenId/parentVariantId to derive from).

@@ -782,14 +782,33 @@ don't cover the render path. Do them in the order below — flip 1 is the substa
     overlays, sub-components list, project tree, and promote/copy versions.
   - *Why it matters:* this is the flip that makes edges the **authority** and ends the documented
     second-source-of-truth (core principle 4).
-- [ ] **(2) Split `SystemDesignRow.tokens` into per-row `TokenRow`s.**
-  - *Now:* tokens live nested in `SystemDesignRow.tokens`; `TokenRow.instanceOf` (D7's field link)
-    is defined and works but no token is its own row yet.
-  - *The flip:* emit one `TokenRow` per token (envelope + short id; `instanceOf` set on a project
-    token mirroring a workspace master), repoint `resolveSystemDesign` to read the rows. Pure
-    storage refactor — no behavior change intended.
+- [x] **(2) Split `SystemDesignRow.tokens` into per-row `TokenRow`s.** — **COMPLETE & green**
+  (zero new tsc errors; system-design + new token-row tests pass; only the pre-existing
+  `seedCanvasMocks` `desktopForm` test fails). Pending only your in-app reseed smoke-test.
+  - *What landed:* tokens are persisted as one `TokenRow` per token in a new `tokens` table
+    (`TABLES.tokens`), never nested on the design row. `TokenRow` (in `domain/system-design/types.ts`,
+    re-exported from `schema`) carries the store envelope (stamped by the record store), a short
+    client-gen row `id`, `systemDesignId`, `category`, `order`, and the richly-typed token payload
+    under `token` (the doc's flat `value: unknown` sketch was widened to keep the per-category
+    types; `token.id` is the stable `$$ref` key, shared by a linked instance with its master).
+  - *Decision — assemble-on-read / split-on-write, confined to the repo (mirrors flip 1's pattern):*
+    `SystemDesignRow.tokens` stays as an **assembled in-memory view only**. `systemDesigns.repo`
+    is the sole bridge: `assembleTokens` rebuilds the view on read (`listSystemDesigns`/
+    `getSystemDesign`), `reconcileTokenRows` splits it into per-row writes on save (reusing a row
+    id when `(category, token.id)` survives, so envelope/`createdAt` continuity holds; skipping
+    unchanged tokens; deleting vanished ones), and `persistDesignRow` writes the design row with
+    `tokens` stripped. This left **every consumer unchanged** — `resolveSystemDesign`, the
+    `useSystemDesign` mutators, `SystemDesignEditor`, `ElementTab`, `useNewProject`,
+    `applyTokenLinkDecisions` all still produce/consume a whole `SystemDesignRow`.
+  - *Other touch points:* `useSystemDesign` + `useProjectFontTokens` subscribe to `TABLES.tokens`
+    (an external token write must reload the assembled view); `localProjects` exports assembled
+    designs so the `.figx` archive stays self-contained; `deleteSystemDesign` / extra-row prune
+    cascade-delete owned token rows; the seed clears `system_designs` + `tokens` on reseed
+    (they re-materialize lazily). `SCHEMA_VERSION` bumped 22 → 23.
   - *Smoke-test:* reseed, open a scene with `$$ref` color/typography bindings — bound elements
-    still render the token value; detach a linked token and confirm it copies the master locally.
+    still render the token value; edit/add/delete a token in the System Design page; detach a
+    linked token and confirm it copies the master locally; "share by default" on new-project still
+    links every workspace token.
 - [ ] **(3) Thumbnail/image `dataUrl` consumers → `blobKey` — measure before shipping.**
   - *Now:* thumbnails are inline base64 `dataUrl`s; `asset_blobs` exists but consumers still read
     `dataUrl`. The RUST-4 cliff is **already gone** (blobs are out of `records`), so this is

@@ -95,7 +95,48 @@ export type SystemDesignRow = {
   // This design's tokens. For a project, this holds both its own local tokens
   // and the linked instances of workspace tokens it has chosen to link (each
   // carrying `instanceOf`).
+  //
+  // NOTE (save-architecture-v3 flip 2): `tokens` is an *assembled* in-memory view
+  // only — it is NOT persisted on the design row. Each token is stored as its own
+  // `TokenRow` in the `tokens` table; the systemDesigns repo splits this field out
+  // on write (`reconcileTokenRows`) and rebuilds it on read. Edits still go
+  // through the design controller, which produces a whole `SystemDesignRow`; the
+  // repo turns that into per-row token writes. Mirrors how flip 1 kept a
+  // denormalized field while the normalized store became authoritative.
   tokens: SystemDesignTokens;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Any of the seven concrete token shapes — the payload a `TokenRow` carries.
+export type AnySystemDesignToken =
+  | ColorToken
+  | GradientToken
+  | TypeStyleToken
+  | IconToken
+  | SpacingToken
+  | RadiusToken
+  | ImageToken;
+
+/**
+ * One persisted design token (save-architecture-v3 flip 2). Tokens used to live
+ * nested in `SystemDesignRow.tokens`; each is now its own row so it carries the
+ * store envelope (`rev`/`deletedAt`, stamped by the record store — not declared
+ * here) and is individually addressable.
+ *
+ * The row's `id` is a short client-gen row id. The token's *stable ref key* —
+ * the one `$$ref` bindings and linked-instance resolution use, and that a linked
+ * instance deliberately shares with its master — lives in `token.id`, which is
+ * only unique within a `(systemDesignId, category)`. (The doc sketches a
+ * flattened `value: unknown`; the app's tokens are richly typed per category, so
+ * the typed payload is nested under `token` instead.)
+ */
+export type TokenRow = {
+  id: string;
+  systemDesignId: string;
+  category: SystemDesignCategory;
+  order: number;
+  token: AnySystemDesignToken;
   createdAt: number;
   updatedAt: number;
 };

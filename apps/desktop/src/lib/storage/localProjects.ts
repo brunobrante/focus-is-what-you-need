@@ -5,6 +5,7 @@ import {
   normalizeReferenceRow,
 } from "@/lib/storage/defaults";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
+import { listSystemDesigns } from "@/lib/storage/repos/systemDesigns.repo";
 import {
   SCHEMA_VERSION,
   type ComponentRow,
@@ -105,7 +106,10 @@ async function buildLocalProjectArchives(): Promise<
   const scenes = await listTable<SceneRow>(TABLES.scenes);
   const thumbnails = await listTable<ThumbnailRow>(TABLES.thumbnails);
   const history = await listTable<HistoryEntryRow>(TABLES.history);
-  const systemDesigns = await listTable<SystemDesignRow>(TABLES.systemDesigns);
+  // Use the repo so each exported design carries its tokens (now stored as
+  // separate `TokenRow`s) assembled back into the row — keeps the `.figx`
+  // archive self-contained.
+  const systemDesigns = await listSystemDesigns();
 
   return projects.map((project) => {
     const projectScreens = screens.filter((screen) => screen.projectId === project.id);
