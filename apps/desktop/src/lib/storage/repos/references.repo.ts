@@ -1,9 +1,22 @@
 import { normalizeReferenceRow } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
+import { reconcileReferenceAttachments } from "@/application/graph/ownershipReconcile";
+import { listEdges } from "@/lib/storage/repos/edges.repo";
 import type { OwnerType, ReferenceAttachment, ReferenceRow } from "@/lib/storage/schema";
 import { TABLES, listTable, notify, replaceTable } from "@/lib/storage/store";
 
 const KEY = TABLES.references;
+
+/**
+ * Keep a reference's `attached_to` edges in step with its `attachments[]` after a
+ * write (save-architecture-v3 flip 1b). Edges are the authoritative multi-attach
+ * mechanism + the indexed usage source (`idx_edges_to`/`idx_edges_from`); the
+ * `attachments[]` array stays as a denormalized display mirror. A removed row is
+ * passed with empty attachments so its edges are cleared.
+ */
+async function syncAttachmentEdges(refs: ReferenceRow[]): Promise<void> {
+  for (const ref of refs) await reconcileReferenceAttachments(ref);
+}
 
 /** Distinct project ids backing a set of attachments (workspace-level attachments
  *  have no project, so they contribute nothing). */
@@ -108,6 +121,7 @@ export async function createOrAttachReference(input: {
     nextRows[idx] = updated;
     await replaceTable<ReferenceRow>(KEY, nextRows);
     notify(KEY);
+    await syncAttachmentEdges([updated]);
     return updated;
   }
 
@@ -133,6 +147,7 @@ export async function createOrAttachReference(input: {
   });
   await replaceTable<ReferenceRow>(KEY, [created, ...rows]);
   notify(KEY);
+  await syncAttachmentEdges([created]);
   return created;
 }
 
@@ -161,6 +176,7 @@ export async function updateReference(
 
 export async function removeReferenceFromProject(referenceId: string, projectId: string): Promise<void> {
   const rows = await listReferences();
+  const affected = rows.find((reference) => reference.id === referenceId);
   const nextRows = rows
     .map((reference) => {
       if (reference.id !== referenceId) return reference;
@@ -176,6 +192,11 @@ export async function removeReferenceFromProject(referenceId: string, projectId:
     .filter((reference) => reference.attachments.length > 0);
   await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
+  // Sync the affected ref's edges to its new (possibly empty → cleared) attachments.
+  if (affected) {
+    const remaining = affected.attachments.filter((a) => a.projectId !== projectId);
+    await syncAttachmentEdges([{ ...affected, attachments: remaining }]);
+  }
 }
 
 function attachmentMatchesOwner(
@@ -225,6 +246,7 @@ export async function removeReferenceFromOwner(
   ownerId: string,
 ): Promise<void> {
   const rows = await listReferences();
+  const affected = rows.find((reference) => reference.id === referenceId);
   const nextRows = rows
     .map((reference) => {
       if (reference.id !== referenceId) return reference;
@@ -240,6 +262,12 @@ export async function removeReferenceFromOwner(
     .filter((reference) => reference.attachments.length > 0);
   await replaceTable<ReferenceRow>(KEY, nextRows);
   notify(KEY);
+  if (affected) {
+    const remaining = affected.attachments.filter(
+      (a) => !attachmentMatchesOwner(a, ownerType, ownerId),
+    );
+    await syncAttachmentEdges([{ ...affected, attachments: remaining }]);
+  }
 }
 
 /** References that may be shared into other locations (linkable, not local copies). */
@@ -301,6 +329,9 @@ export async function detachReference(
   );
   await replaceTable<ReferenceRow>(KEY, [copy, ...nextRows]);
   notify(KEY);
+  // The detached copy gets its own `attached_to` edge; the master drops the edge it
+  // no longer holds.
+  await syncAttachmentEdges([copy, updatedMaster]);
   return copy;
 }
 
@@ -330,9 +361,22 @@ export async function listReferenceLinkUsages(
     ) {
       continue;
     }
-    for (const attachment of reference.attachments) {
-      const owner = ownerOfAttachment(attachment);
-      if (owner) usages.push({ referenceId: reference.id, ...owner });
+    // Per-place usage off the `attached_to` edge index (idx_edges_from) — the doc's
+    // named win. Falls back to the `attachments[]` mirror if a row's edges aren't
+    // reconciled yet (e.g. a fixture written without emitting edges).
+    const edges = await listEdges({
+      from: { type: "reference", id: reference.id },
+      relation: "attached_to",
+    });
+    if (edges.length > 0) {
+      for (const e of edges) {
+        usages.push({ referenceId: reference.id, ownerType: e.toType as OwnerType, ownerId: e.toId });
+      }
+    } else {
+      for (const attachment of reference.attachments) {
+        const owner = ownerOfAttachment(attachment);
+        if (owner) usages.push({ referenceId: reference.id, ...owner });
+      }
     }
   }
   return usages;
@@ -347,14 +391,17 @@ export async function removeReferenceLinksForLibraryId(
   libraryReferenceId: string,
 ): Promise<void> {
   const rows = await listReferences();
-  const next = rows.filter(
+  const removed = rows.filter(
     (reference) =>
-      reference.id !== libraryReferenceId &&
-      !reference.id.startsWith(`${libraryReferenceId}::`),
+      reference.id === libraryReferenceId ||
+      reference.id.startsWith(`${libraryReferenceId}::`),
   );
-  if (next.length === rows.length) return;
+  if (removed.length === 0) return;
+  const next = rows.filter((reference) => !removed.includes(reference));
   await replaceTable<ReferenceRow>(KEY, next);
   notify(KEY);
+  // Clear the deleted rows' `attached_to` edges.
+  await syncAttachmentEdges(removed.map((r) => ({ ...r, attachments: [] })));
 }
 
 export async function bulkInsertReferences(rows: ReferenceRow[]): Promise<void> {
