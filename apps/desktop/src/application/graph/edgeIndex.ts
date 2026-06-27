@@ -9,7 +9,7 @@ import { TABLES, listTable, removeRecords, subscribe } from "@/lib/storage/store
 import { now } from "@/lib/storage/ids";
 
 /**
- * The bidirectional adjacency index over `graph_edges` (save-architecture-v3
+ * The bidirectional adjacency index over `graph_edges` (Architecture.md
  * graph hot-path). Edges live in the record-store cache like any table; this
  * derives `from→edges` / `to→edges` maps once and then maintains them
  * **incrementally** — an edge write is O(1), never an O(E) full rebuild — so

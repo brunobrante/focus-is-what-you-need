@@ -10,7 +10,7 @@ import type {
 /**
  * The asset store: binaries (thumbnails, crop images, imported assets) keyed by
  * `blobKey`, kept OUT of the records table so a bulk `listRecords` never drags
- * megabytes through one IPC (RUST-4 / save-architecture-v3 D5). Rows store only a
+ * megabytes through one IPC (RUST-4 / Architecture.md D5). Rows store only a
  * `blobKey`; this module reads/writes the bytes.
  *
  * The adapter underneath decides physical placement: desktop keeps small blobs

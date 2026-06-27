@@ -5,7 +5,7 @@ import type { ComponentScope } from "@/lib/storage/defaults";
 
 /**
  * Sync, edge-authoritative replacements for the legacy `ComponentRow.screenId` /
- * `ComponentRow.parentVariantId` reads (save-architecture-v3 flip 1). They resolve
+ * `ComponentRow.parentVariantId` reads (Architecture.md, Storage ownership). They resolve
  * a component's owner from the in-memory `graph_edges` adjacency index
  * (`peekOwnerOf`) — O(1), no I/O, hydrated at boot — and classify it the same way
  * the two fields encoded it:

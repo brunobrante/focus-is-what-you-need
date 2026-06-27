@@ -36,7 +36,7 @@ const VARIANTS_KEY = TABLES.variants;
 
 /**
  * Component ids the owner directly owns, via the uniform `owns` edge
- * (save-architecture-v3 flip 1). The edge is the sole source of truth for
+ * (Architecture.md, Storage ownership). The edge is the sole source of truth for
  * containment now — the screenId/parentVariantId fields are gone.
  */
 async function componentIdsOwnedBy(owner: EntityRef): Promise<Set<string>> {

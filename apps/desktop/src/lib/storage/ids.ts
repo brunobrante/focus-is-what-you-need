@@ -1,4 +1,4 @@
-// Short, client-generated, collision-resistant ids (D10 in save-architecture-v3).
+// Short, client-generated, collision-resistant ids (D10 in Architecture.md).
 //
 // NOT UUIDv4. Entity / edge / row ids are ~12-char nanoid-style ids. ~71 bits of
 // entropy is ample for an offline+online client-generated id space (a 122-bit

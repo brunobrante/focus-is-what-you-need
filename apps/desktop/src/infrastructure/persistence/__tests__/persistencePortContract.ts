@@ -7,7 +7,7 @@ import type {
 } from "@/domain/persistence/persistencePort";
 
 /**
- * The one persistence-port contract suite (save-architecture-v3 D9). The memory
+ * The one persistence-port contract suite (Architecture.md D9). The memory
  * adapter is the reference; every adapter (memory / sqlite / indexeddb) must pass
  * the exact same spec. It is a reusable function so each adapter wires its own
  * factory: `runRecordPortContract("memory", createMemoryPersistence)`.

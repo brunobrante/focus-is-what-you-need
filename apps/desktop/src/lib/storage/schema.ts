@@ -20,7 +20,7 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // ComponentRow with every scope owner null, tagged with `draftKind`
 // ("screen" | "component") and a `draftType` device for sizing/canvas. Reseed
 // is harmless; no existing rows carry these fields.
-// v22: save-architecture-v3 storage graph. Every row carries the {rev, deletedAt}
+// v22: Architecture.md storage graph. Every row carries the {rev, deletedAt}
 // envelope (stamped by the record store); ids are short (~12-char, not UUID); new
 // derived/graph tables land — `graph_edges` (ownership/containment/version/scene +
 // reference attachment, derived from the row fields by reconcileAllGraphEdges on
@@ -35,7 +35,7 @@ export type Meta = {
 };
 
 /**
- * The collaboration-ready row envelope (save-architecture-v3 D1/D6). Every
+ * The collaboration-ready row envelope (Architecture.md D1/D6). Every
  * persisted row carries `{ id, createdAt, updatedAt, deletedAt, rev }` — nothing
  * more. `rev` is the optimistic-write guard and `deletedAt` the tombstone; both
  * are **stamped by the record store** on write (repos don't set them), so the
@@ -88,7 +88,7 @@ export type ComponentRow = {
   // Denormalized home pointers — NOT the ownership source of truth. Precise
   // ownership (workspace-global / project-global / screen-top-level / nested /
   // version-owned / draft) is the single incoming `owns` graph edge, resolved by
-  // `componentScopeOf` (save-architecture-v3 flip 1). workspaceId/projectId are
+  // `componentScopeOf` (Architecture.md, Storage ownership). workspaceId/projectId are
   // kept only as a fast "which workspace/project does this live in" lookup for
   // routing and listing; screenId/parentVariantId are gone (the edge subsumes them).
   workspaceId?: string | null;

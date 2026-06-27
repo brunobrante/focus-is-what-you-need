@@ -56,7 +56,7 @@ export async function ensureSeededAndMigrated(): Promise<void> {
   }
 
   // Derive the ownership/containment/version/scene edge graph from the row fields
-  // (save-architecture-v3 Step 2). Idempotent + self-healing: it backfills any
+  // (Architecture.md, Storage ownership). Idempotent + self-healing: it backfills any
   // edge a not-yet-wired write path missed, so the graph is always consistent.
   await reconcileAllGraphEdges();
   // Reclaim disk/hydration cost from edge tombstones a long-lived workspace

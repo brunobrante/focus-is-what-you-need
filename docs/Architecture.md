@@ -11,14 +11,12 @@ Paths written as `src/...` live under `apps/desktop/`.
 
 ## Storage ownership
 
-> The full design, rationale, and locked decisions live in
-> [`save-architecture-v3.md`](./save-architecture-v3.md). This section is the
-> concise living summary; that file is the source of record for *why*.
-
 Storage follows the same hierarchy as the UI, but **cross-entity structure is an
-indexed graph of edges, not fixed foreign-key fields** (save-architecture-v3). An
-entity row stores *what the thing is*; a `graph_edges` row stores *how things
-connect* (containment, ownership, attachment), indexed both directions.
+indexed graph of edges, not fixed foreign-key fields**. An entity row stores *what
+the thing is*; a `graph_edges` row stores *how things connect* (containment,
+ownership, attachment), indexed both directions. (The locked design decisions and
+performance invariants behind this model are recorded in "Storage model — locked
+decisions" below.)
 
 Screens and components are unified: both are masters that own a chain of
 `VariantRow`s (a `VariantRow` carries `ownerKind: "screen" | "component"` +
@@ -63,7 +61,7 @@ instance → detach** model (the product law is in `Product.md`). The data shape
   optional `linkable?: boolean` (a workspace token shareable into projects, on by
   default) and `instanceOf?: { systemDesignId, tokenId } | null` (a linked
   instance pointing at a master token). **Each token is persisted as its own
-  `TokenRow` in the `tokens` table** (save-architecture-v3 flip 2) — the row id is a
+  `TokenRow` in the `tokens` table** (tokens-as-rows) — the row id is a
   short client-gen id; the token's stable `$$ref` key lives on `token.id` (shared by
   a linked instance with its master). `SystemDesignRow.tokens` is an **assembled
   in-memory view only**, never persisted on the design row: `systemDesigns.repo` is
@@ -77,7 +75,7 @@ instance → detach** model (the product law is in `Product.md`). The data shape
 - **References** (`ReferenceRow`): `linkable?: boolean` (library references are
   linkable by default) and `detachedFrom?: string | null`. Multi-attach is the
   **authoritative `referenceAsset/cut attached_to {...}` edges** in `graph_edges`
-  (save-architecture-v3 flip 1b) — one master row, many places, usage read off the
+  — one master row, many places, usage read off the
   edge index (`listReferenceLinkUsages`). `attachments[]`/`projectIds` remain as a
   denormalized display mirror. **Detach** (`detachReference` in `references.repo.ts`)
   creates a new local row (`visibility: "local"`, `linkable: false`, `detachedFrom`)
@@ -87,6 +85,76 @@ instance → detach** model (the product law is in `Product.md`). The data shape
 A `SCHEMA_VERSION` bump reseeds (currently `25`); the app is local-only and
 pre-release, so schema changes nuke-and-reseed with no migration shims (see Data
 Lifecycle in `CLAUDE.md`).
+
+### Storage model — locked decisions
+
+The decisions below are binding; they shaped the schema and must not be
+re-litigated without a deliberate redesign. Rationale is **performance first**,
+**offline→online additive** (no row reshape once real user data exists), and
+**fast feature-building** (a new capability is a new edge, never a new field).
+None touch `Product.md`.
+
+- **D1 — Lean sync envelope.** Every row carries exactly
+  `{ id, createdAt, updatedAt, deletedAt, rev }`. Collaboration resolves conflicts
+  **per frame in the Versions UI** (not CRDT / field-merge / op-replay), so a single
+  monotonic `rev` (the optimistic-write guard) plus `updatedAt` (last-write-wins
+  tiebreak) is sufficient. All sync identity (`clientId`, `frameId`, transport) lives
+  in the future `SyncAdapter` frame-commit envelope, **never on rows**.
+- **D2 — The graph is the extensibility mechanism.** `EntityType` already includes
+  `"user"` and `GraphRelation` already includes `"member_of"` (reserved for
+  workspace people/permissions — a membership is a `user member_of {workspace|project}`
+  edge with `role` in the edge metadata), so permissions land as pure additions, zero
+  reshape. A new cross-entity capability is **always** a new `EntityType` + new
+  `GraphRelation` + edges — never a new nullable foreign-key field.
+- **D3 — `instance_usage` is derived in TypeScript, not Rust.** It is a rebuildable
+  cache (a stale/missing row only costs a rebuild, never a correctness divergence). On
+  scene save, TS derives the usage upserts/deletes from the scene's nodes and enqueues
+  them in the **same `SaveQueue` batch** as the scene row, so Rust stays a dumb store
+  with zero graphJSON parsing.
+- **D4 — `GraphPersistencePort extends PersistencePort`.** It does not replace it; it
+  only adds the asset-blob methods. No breaking churn across existing repos.
+- **D5 — Asset store decides by size.** `byteLength <= 256 KB` → a SQLite `blob`
+  column in `asset_blobs`; `> 256 KB` → a file in the app data dir keyed by `blobKey`.
+  Dedup by `contentHash`. Web → IndexedDB blob. Thumbnails/crops are regenerable
+  caches (deletable).
+- **D6 — `rev`-guarded upsert everywhere** (records *and* edges):
+  `... ON CONFLICT(id) DO UPDATE SET ... WHERE excluded.rev > <table>.rev`. Uniform,
+  cheap, and the single mechanism the future sync layer rides on.
+- **D7 — Token links are a field, not an edge.** `TokenRow.instanceOf` is the source
+  of truth for a project token mirroring a workspace master. There is **no**
+  `instance_of` relation — component instances live in `graphJSON`, token instances
+  live in the field.
+- **D8 — Version-create captures children via the owner edge.** Iterate components
+  owned through the source's `owns` edge, **not** by walking the source scene, so a
+  never-saved subject still gets its children cloned/linkified.
+- **D9 — One port contract suite is mandatory.** The memory adapter is the reference;
+  the records + asset-blob + `rev`-guard suite runs against memory **and** IndexedDB
+  (SQLite is integration-only via the Tauri IPC harness). Edge (both index directions
+  + unique-live) and `instance_usage` coverage live in their dedicated repo tests.
+- **D10 — Short ids + compact graph blob.** Entity/edge/row ids are ~12-char
+  client-generated collision-resistant ids (nanoid-style, **not** UUIDv4); node ids
+  inside `graphJSON` are scene-local. `graphJSON` serialization **omits default
+  fields** and rounds `bounds` to 2 decimals, and stays **canonical/deterministic** so
+  the `documentsEqual` / string-equality save-skip still holds.
+
+**Performance invariants (never regress):**
+
+- **No full-table scan on any interactive path.** Every cross-entity question is an
+  index hit: the `graph_edges` dual index, `instance_usage` by `component_id`, derived
+  caches invalidated on the table subscription.
+- **Edges live in the in-memory record-store cache.** A bidirectional adjacency index
+  is maintained **incrementally** (O(1) per edge write — apply only the changed edge,
+  never full-rebuild), so ownership/containment/usage resolution is in-memory O(1) and
+  never round-trips to SQLite on a read.
+- **The 60fps path never touches edges, `instance_usage`, blobs, or Rust.** The scene
+  `graphJSON` stays an in-memory blob, serialized only on discrete commits; edges,
+  usage, and thumbnails update off the critical path through debounced owner queues.
+- **Big binaries are never in row JSON** (asset store), so a bulk table read never
+  drags megabytes under the lock.
+- **Tombstones are filtered at hydration with a periodic GC sweep** (edge `deletedAt`
+  rows are hard-deleted after a grace window); edge mutations reuse the record cross-op
+  last-op-wins coalescing so a create-then-delete in one flush cannot resurrect a
+  deleted edge.
 
 **Tokens bound to canvas elements** — an element style can reference a token via a
 `$$ref` string (`"<category>:<tokenId>"`). The binding is stored as additive
@@ -183,8 +251,8 @@ their children. If a child changes but the parent snapshot still shows the old
 child, the hierarchy is broken. (Stale local rows are handled by nuke-and-reseed
 on a schema bump — see Data Lifecycle in `CLAUDE.md` — not by repair migrations.)
 
-A regenerated snapshot's **bytes live in the asset store, not the row**
-(save-architecture-v3 flip 3): `ThumbnailRow.dataBlobKey` and
+A regenerated snapshot's **bytes live in the asset store, not the row**:
+`ThumbnailRow.dataBlobKey` and
 `ProjectRow.thumbnailBlobKey` point at an `asset_blobs` entry (stable key per
 owner, overwritten in place). Readers resolve through `assetDataUrlLoader` — a
 DataLoader-style batcher that coalesces every key requested in one tick into a
@@ -232,7 +300,7 @@ run off the critical path, at idle, after the row is already written.
 | File | What it contains |
 | --- | --- |
 | `src/domain/persistence/mutations.ts` | `Mutation` union type (`upsertRecord` / `deleteRecords`), `ApplyAck`, and `mutationKey()` — the coalescing key function. A 60fps drag of one node → one key → one pending entry. |
-| `src/domain/persistence/persistencePort.ts` | `PersistencePort` interface: `applyBatch(mutations)`, `getRecord(table, id)`, `listRecords(table)`. `GraphPersistencePort extends PersistencePort` (save-architecture-v3 D4) adds the asset-blob methods `getAssetBlob` / `getAssetBlobs(keys[])` (batched) / `putAssetBlob` / `deleteAssetBlob`. Graph edges and instance-usage are plain `records` rows (see below), so they need no extra port methods. This is the only boundary all adapters must satisfy. |
+| `src/domain/persistence/persistencePort.ts` | `PersistencePort` interface: `applyBatch(mutations)`, `getRecord(table, id)`, `listRecords(table)`. `GraphPersistencePort extends PersistencePort` (D4) adds the asset-blob methods `getAssetBlob` / `getAssetBlobs(keys[])` (batched) / `putAssetBlob` / `deleteAssetBlob`. Graph edges and instance-usage are plain `records` rows (see below), so they need no extra port methods. This is the only boundary all adapters must satisfy. |
 
 #### Application — use cases, depend only on the port
 
@@ -274,7 +342,7 @@ per-node/per-scene table or node-delta path: the TS side only ever emits
 `upsert_record` / `delete_records`, so that is all the generic path implements.
 
 **Binaries are not in `records`.** Thumbnails, crop images, and imported assets live
-in the separate `asset_blobs` table (save-architecture-v3 D5 / flip 3), keyed by
+in the separate `asset_blobs` table (D5), keyed by
 `blobKey`; rows hold only the key. Small blobs (≤256 KB) sit in a SQLite column,
 larger ones spill to a file in the app data dir. This keeps a bulk `db_list_records`
 from dragging megabytes of base64 under the lock (the old RUST-4 cliff).

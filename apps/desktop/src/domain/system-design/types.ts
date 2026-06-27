@@ -96,7 +96,7 @@ export type SystemDesignRow = {
   // and the linked instances of workspace tokens it has chosen to link (each
   // carrying `instanceOf`).
   //
-  // NOTE (save-architecture-v3 flip 2): `tokens` is an *assembled* in-memory view
+  // NOTE (Architecture.md, Storage ownership): `tokens` is an *assembled* in-memory view
   // only — it is NOT persisted on the design row. Each token is stored as its own
   // `TokenRow` in the `tokens` table; the systemDesigns repo splits this field out
   // on write (`reconcileTokenRows`) and rebuilds it on read. Edits still go
@@ -119,7 +119,7 @@ export type AnySystemDesignToken =
   | ImageToken;
 
 /**
- * One persisted design token (save-architecture-v3 flip 2). Tokens used to live
+ * One persisted design token (Architecture.md, Storage ownership). Tokens used to live
  * nested in `SystemDesignRow.tokens`; each is now its own row so it carries the
  * store envelope (`rev`/`deletedAt`, stamped by the record store — not declared
  * here) and is individually addressable.

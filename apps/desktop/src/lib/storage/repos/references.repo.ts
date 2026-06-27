@@ -9,7 +9,7 @@ const KEY = TABLES.references;
 
 /**
  * Keep a reference's `attached_to` edges in step with its `attachments[]` after a
- * write (save-architecture-v3 flip 1b). Edges are the authoritative multi-attach
+ * write (Architecture.md, Storage ownership). Edges are the authoritative multi-attach
  * mechanism + the indexed usage source (`idx_edges_to`/`idx_edges_from`); the
  * `attachments[]` array stays as a denormalized display mirror. A removed row is
  * passed with empty attachments so its edges are cleared.

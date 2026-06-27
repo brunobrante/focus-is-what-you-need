@@ -18,7 +18,7 @@ export interface PersistencePort {
 }
 
 /**
- * Metadata for one stored binary (save-architecture-v3 D5). The bytes live in the
+ * Metadata for one stored binary (Architecture.md D5). The bytes live in the
  * asset store keyed by `blobKey`; rows hold only this metadata + the key, so a
  * bulk `listRecords` never drags megabytes of base64 through one IPC (RUST-4).
  *

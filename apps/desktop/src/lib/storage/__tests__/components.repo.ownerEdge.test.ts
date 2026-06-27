@@ -29,7 +29,7 @@ beforeEach(() => {
 
 const t = 0;
 
-// flip 1 (save-architecture-v3): the create/update paths emit the `owns` edge
+// flip 1 (Architecture.md): the create/update paths emit the `owns` edge
 // eagerly, so the graph is authoritative in-session — no reconcileAllGraphEdges()
 // / reboot needed for a freshly created component to have its owner edge.
 

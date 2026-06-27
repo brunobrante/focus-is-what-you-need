@@ -58,7 +58,7 @@ function seedScreen(id: string, mainVariantId: string): void {
 }
 
 // The storage queries now read containment off `graph_edges`, not off the
-// screenId/parentVariantId/projectId row fields (save-architecture-v3 flip 1).
+// screenId/parentVariantId/projectId row fields (Architecture.md, Storage ownership).
 
 test("listTopLevelByScreenId returns components owned by the screen's main variant", async () => {
   seedScreen("s1", "v-s1");

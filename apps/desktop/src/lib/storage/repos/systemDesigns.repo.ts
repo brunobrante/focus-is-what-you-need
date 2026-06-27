@@ -24,7 +24,7 @@ import {
 const KEY = TABLES.systemDesigns;
 const TOKENS_KEY = TABLES.tokens;
 
-// ─── Tokens-as-rows (save-architecture-v3 flip 2) ─────────────────────────────
+// ─── Tokens-as-rows (Architecture.md, Storage ownership) ─────────────────────────────
 // Tokens are persisted as one `TokenRow` per token in the `tokens` table, never
 // nested on the design row. The repo is the only place that bridges the two:
 // `assembleTokens` rebuilds the in-memory `SystemDesignRow.tokens` view on read,

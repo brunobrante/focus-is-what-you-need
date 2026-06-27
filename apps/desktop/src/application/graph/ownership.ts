@@ -5,7 +5,7 @@ import type { EntityRef } from "@/domain/graph/edges";
 import type { VariantRow } from "@/lib/storage/schema";
 
 /**
- * Edge-authoritative component scope (save-architecture-v3 "Ownership as edges").
+ * Edge-authoritative component scope (Architecture.md, Storage ownership).
  * Replaces the field-based `componentScope`: scope is derived from the single
  * incoming `owns` edge, with **no** `screenId` / `parentVariantId` source of
  * truth. A component with no owner edge is a Draft.

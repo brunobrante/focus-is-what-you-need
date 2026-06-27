@@ -196,10 +196,10 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | RUST-2 | ✅ `7ef532a` | `db_apply` hoists `prepare_cached` statements out of the loop. |
 | UI-8 | ✅ `b89687c` | CompareVersions panels key by slot, not version id — no Snapshot remount on slot change. |
 | ENG-6 | ⏭️ deferred | Already memoized (per-scene-change, not per-render); mock-detection logic is subtle and untested. |
-| SAVE-5 | ⏭️ deferred | Needs a cached reverse instance index with invalidation; delete ops are infrequent. |
-| SAVE-6 | ⏭️ deferred | The double-stringify *is* the skip-unchanged diff on the incremental path; only the post-nuke seed would gain (dev-time only). |
+| SAVE-5 | ✅ storage graph model | Killed by the derived `instance_usage` index; `listInstanceUsages`/`countInstanceUsages` are now O(1) index hits, not scene scans. See "Storage ownership" in [`Architecture.md`](../Architecture.md). |
+| SAVE-6 | ✅ storage graph model | Largely neutralized — large blobs (scenes/thumbnails/crops) moved to the `asset_blobs` store (out of the `records` JSON), plus D10 omit-defaults shrank the graph blob. Only the dev-time post-nuke seed re-stringify remains, now trivial. |
 | SHELL-5 | ⏭️ deferred | `React.memo` is inert unless the parent stabilizes its Set/callback props — needs a parallel refactor. |
-| RUST-4 | ⏭️ deferred | Pagination changes the `PersistencePort` contract across 3 adapters + the hydration model. |
+| RUST-4 | ✅ storage graph model | Cliff gone — base64 thumbnails/crops/assets live in `asset_blobs`, not the bulk-listed `records` table, so a full table read no longer drags megabytes under the lock. See "Storage ownership" in [`Architecture.md`](../Architecture.md). |
 | RUST-8 | ⏭️ deferred | Session cache needs interior mutability (`Session::run` is `&mut self`) + ONNX-state care. |
 
 ### Quick wins (Medium/Low, post-REF-1)

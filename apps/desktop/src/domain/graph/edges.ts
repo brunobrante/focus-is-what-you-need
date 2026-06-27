@@ -1,4 +1,4 @@
-// The canonical graph-edge model (save-architecture-v3). Containment, ownership,
+// The canonical graph-edge model (Architecture.md). Containment, ownership,
 // versioning, and attachment are EDGES — indexed both directions — instead of
 // fixed foreign-key fields. A new cross-entity capability is always a new
 // EntityType + GraphRelation + edges, never a new nullable column (the

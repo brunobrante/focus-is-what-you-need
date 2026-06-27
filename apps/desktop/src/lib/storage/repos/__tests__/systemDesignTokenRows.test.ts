@@ -13,7 +13,7 @@ import {
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type { ColorToken, SystemDesignRow, TokenRow } from "@/lib/storage/schema";
 
-// Flip 2 (save-architecture-v3): tokens are persisted as one `TokenRow` per token
+// Flip 2 (Architecture.md): tokens are persisted as one `TokenRow` per token
 // in the `tokens` table, never nested on the design row. These guard the repo's
 // split-on-write / assemble-on-read bridge.
 

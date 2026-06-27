@@ -16,7 +16,7 @@ import type {
 const KEY = TABLES.graphEdges;
 
 /**
- * The one uniform edge API (save-architecture-v3 fast-feature-building
+ * The one uniform edge API (Architecture.md fast-feature-building
  * invariant): features compose `linkEdge` / `unlinkEdge` / `relinkEdge` /
  * `listEdges` instead of adding nullable foreign-key columns. Edges are rows in
  * the `graph_edges` table, so every write rides the SaveQueue + outbox + rev

@@ -14,7 +14,7 @@ import type {
 
 /**
  * Reconcile the ownership / containment / version / scene EDGES from the
- * authoritative row fields (save-architecture-v3 "Ownership as edges"). This is
+ * authoritative row fields (Architecture.md, Storage ownership). This is
  * the transitional bridge: edges are derived from the existing `projectId` /
  * `screenId` / `parentVariantId` / `ownerKind` / `projectIds` fields the same way
  * `instance_usage` is derived from `graphJSON` — so the edge graph is always

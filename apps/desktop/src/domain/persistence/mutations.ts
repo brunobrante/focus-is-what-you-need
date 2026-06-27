@@ -7,7 +7,7 @@
  * The queue coalesces these by `mutationKey` before a single batched
  * `applyBatch`, so a 60fps drag of one scene collapses to one pending write.
  *
- * `upsertRecord.rev` is the optimistic-write guard (D6 in save-architecture-v3):
+ * `upsertRecord.rev` is the optimistic-write guard (D6 in Architecture.md):
  * a monotonic per-row revision the record store stamps on every write. Adapters
  * apply an upsert only when `incoming.rev > stored.rev`, so a stale replay can
  * never clobber a newer row — the single mechanism the future sync layer rides

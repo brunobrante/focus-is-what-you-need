@@ -9,7 +9,7 @@ import {
 import type { SceneRow } from "@/lib/storage/schema";
 
 /**
- * The derived `instance_usage` index (save-architecture-v3 Step 3). Component
+ * The derived `instance_usage` index (Architecture.md, Storage ownership). Component
  * instances stay canonical in each host scene's `graphJSON`; this is a CACHE
  * rebuilt from that graph on every scene save (D3, derived in TypeScript), so
  * "which scenes use this master?" is an index hit instead of scanning + parsing
