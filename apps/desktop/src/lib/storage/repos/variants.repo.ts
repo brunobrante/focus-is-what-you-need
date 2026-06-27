@@ -1,5 +1,6 @@
 import type { ComponentVariant } from "@/lib/data/types";
 import { normalizeComponentRow } from "@/lib/storage/defaults";
+import { reconcileAllGraphEdges } from "@/application/graph/ownershipReconcile";
 import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
@@ -520,6 +521,13 @@ export async function promoteVariantToMain(variantId: string): Promise<void> {
       }
     }
   }
+
+  // Re-derive the ownership edges from the just-swapped component fields so the
+  // promoted variant's `owns` edges are correct immediately, not only at the next
+  // boot backfill (save-architecture-v3 Step 4 — "promote carries ownership"). The
+  // edge re-home is what lets the screenId↔parentVariantId field swap above be
+  // deleted once componentScope reads edges (the app-gated final flip).
+  await reconcileAllGraphEdges();
 }
 
 /**
