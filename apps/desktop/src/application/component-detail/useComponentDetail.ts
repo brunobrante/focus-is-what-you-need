@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getComponent, updateComponent } from "@/lib/storage/repos/components.repo";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import {
   createOrAttachReference,
   removeReferenceFromOwner,
@@ -125,9 +126,11 @@ async function resolveScreenAncestor(
   let current: ComponentRow | null = component;
   // Cap at a reasonable depth to avoid infinite loops on bad data.
   for (let i = 0; i < 64 && current; i++) {
-    if (current.screenId) return current.screenId;
-    if (!current.parentVariantId) return null;
-    const variant = await getVariant(current.parentVariantId);
+    const screenId = screenIdOfComponent(current.id) ?? current.screenId;
+    if (screenId) return screenId;
+    const parentVariantId = parentVariantIdOf(current.id) ?? current.parentVariantId;
+    if (!parentVariantId) return null;
+    const variant = await getVariant(parentVariantId);
     if (!variant) return null;
     current = await getComponent(variant.ownerId);
   }
@@ -153,16 +156,18 @@ function useAncestorTrail(component: ComponentRow | null): ComponentRow[] {
 async function resolveAncestorTrail(
   component: ComponentRow | null,
 ): Promise<ComponentRow[]> {
-  if (!component || !component.parentVariantId) return [];
+  if (!component) return [];
+  let parentVariantId: string | null =
+    parentVariantIdOf(component.id) ?? component.parentVariantId;
+  if (!parentVariantId) return [];
   const trail: ComponentRow[] = [];
-  let parentVariantId: string | null = component.parentVariantId;
   for (let i = 0; i < 64 && parentVariantId; i++) {
     const variant = await getVariant(parentVariantId);
     if (!variant) break;
     const parent = await getComponent(variant.ownerId);
     if (!parent) break;
     trail.unshift(parent);
-    parentVariantId = parent.parentVariantId;
+    parentVariantId = parentVariantIdOf(parent.id) ?? parent.parentVariantId;
   }
   return trail;
 }

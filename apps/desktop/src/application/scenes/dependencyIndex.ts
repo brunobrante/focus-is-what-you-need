@@ -1,4 +1,5 @@
 import type { ComponentRow, SceneOwnerType, VariantRow } from "@/lib/storage/schema";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 
 export type ParentSceneOwner = {
   ownerType: SceneOwnerType;
@@ -53,12 +54,14 @@ export function createSceneDependencyIndex(input: {
 
     const component = getComponentForVariant(variantId);
     if (!component) return null;
-    if (component.parentVariantId) {
-      return { ownerType: "variant", ownerId: component.parentVariantId };
+    const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
+    const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+    if (parentVariantId) {
+      return { ownerType: "variant", ownerId: parentVariantId };
     }
-    if (component.screenId) {
+    if (screenId) {
       // Top-level screen component → its embedding scene is the screen's main variant.
-      const mainVariantId = mainVariantByScreenId.get(component.screenId);
+      const mainVariantId = mainVariantByScreenId.get(screenId);
       if (mainVariantId) return { ownerType: "variant", ownerId: mainVariantId };
     }
     return null;

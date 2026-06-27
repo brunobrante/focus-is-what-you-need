@@ -4,6 +4,7 @@ import {
   normalizeReferenceRow,
 } from "@/lib/storage/defaults";
 import { reconcileComponentOwner } from "@/application/graph/ownershipReconcile";
+import { peekOwnerOf } from "@/application/graph/edgeIndex";
 import { listEdges } from "@/lib/storage/repos/edges.repo";
 import type { EntityRef } from "@/domain/graph/edges";
 import { newId, now } from "@/lib/storage/ids";
@@ -77,13 +78,12 @@ export type ComponentParent =
 export async function listDrafts(): Promise<ComponentRow[]> {
   const rows = await listComponents();
   return rows
-    .filter(
-      (r) =>
-        !r.workspaceId &&
-        !r.projectId &&
-        !r.screenId &&
-        !r.parentVariantId,
-    )
+    .filter((r) => {
+      // A draft has no owner edge. `?? fields` keeps cold-index safety while the
+      // owner fields are still written as a mirror.
+      if (peekOwnerOf("component", r.id)) return false;
+      return !r.workspaceId && !r.projectId && !r.screenId && !r.parentVariantId;
+    })
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 

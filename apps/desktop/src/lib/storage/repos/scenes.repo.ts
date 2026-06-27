@@ -9,6 +9,7 @@ import {
   replaceComponentSubtreeInGraph,
 } from "@/domain/canvas/graphTransforms";
 import { collectDescendantIds } from "@/lib/canvas/htmlScene/graphNodeHelpers";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/application/scenes/dependencyIndex";
 import { getCachedSceneDependencyIndex } from "@/application/scenes/sceneDependencyIndexCache";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
@@ -142,12 +143,14 @@ export async function removeComponentSubtreeFromParentScene(
   if (!component) return;
 
   let parentOwner: { ownerType: "variant"; ownerId: string } | null = null;
-  if (component.parentVariantId) {
-    parentOwner = { ownerType: "variant", ownerId: component.parentVariantId };
-  } else if (component.screenId) {
+  const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
+  const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+  if (parentVariantId) {
+    parentOwner = { ownerType: "variant", ownerId: parentVariantId };
+  } else if (screenId) {
     // Top-level screen component → its embedding scene is the screen's main variant.
     const variants = await listTable<VariantRow>(TABLES.variants);
-    const mainVariantId = mainVariantIdForScreen(variants, component.screenId);
+    const mainVariantId = mainVariantIdForScreen(variants, screenId);
     if (mainVariantId) parentOwner = { ownerType: "variant", ownerId: mainVariantId };
   }
   if (!parentOwner) return;

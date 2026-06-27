@@ -3,6 +3,7 @@ import { createDefaultDesignSystem, normalizeProjectRow, normalizeReferenceRow }
 import { deleteLocalFigxProjectFile, isLocalProject } from "@/lib/storage/localProjects";
 import { newId, now } from "@/lib/storage/ids";
 import { collectComponentTreeIds } from "@/lib/storage/repos/components.repo";
+import { parentVariantIdOf } from "@/application/graph/componentOwnership";
 import type {
   ComponentRow,
   ProjectDesignSystem,
@@ -100,8 +101,13 @@ export async function deleteProject(projectId: string): Promise<void> {
   const screenIds = new Set(
     screens.filter((s) => s.projectId === projectId).map((s) => s.id),
   );
+  const variantLookup = new Map(variants.map((v) => [v.id, v]));
   const roots = components
-    .filter((c) => c.projectId === projectId && c.parentVariantId === null)
+    .filter(
+      (c) =>
+        c.projectId === projectId &&
+        (parentVariantIdOf(c.id, variantLookup) ?? c.parentVariantId) === null,
+    )
     .map((c) => c.id);
   const componentIds = new Set<string>();
   for (const id of roots) {
