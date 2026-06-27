@@ -1074,6 +1074,8 @@ pub fn run() {
             let conn = db::open_and_migrate(&path)?;
             app.manage(db::Db::new(conn));
             app.manage(ConfigCache::default());
+            // Cache of loaded ONNX inference sessions (RUST-8).
+            app.manage(models::ModelSessions::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

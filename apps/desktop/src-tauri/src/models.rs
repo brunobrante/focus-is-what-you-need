@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use image::{DynamicImage, GenericImageView, GrayImage, ImageFormat, Luma, Rgb, RgbImage, Rgba, RgbaImage};
 use ndarray::Array4;
@@ -316,6 +317,8 @@ async fn download_file(
 
 #[tauri::command]
 pub fn model_uninstall(app: AppHandle, id: &str) -> Result<(), String> {
+    // Drop any cached sessions first so they cannot outlive the deleted files (RUST-8).
+    app.state::<ModelSessions>().invalidate(id);
     let dir = model_storage_dir(&app, id)?;
     let specs = model_file_specs(id)?;
     if specs.len() > 1 {
@@ -1388,6 +1391,34 @@ fn load_florence2_session(dir: &Path, file: &str) -> Result<Session, String> {
         .map_err(|e| e.to_string())
 }
 
+/// The four Florence-2 ONNX sessions, kept alive between calls.
+struct Florence2Sessions {
+    vision: Session,
+    embed: Session,
+    encoder: Session,
+    decoder: Session,
+}
+
+/// RUST-8: cached ONNX sessions held in `tauri::State` so inference does not
+/// re-parse/JIT hundreds of MB of immutable model graphs from disk on every call.
+/// `Session::run` takes `&mut self`, so the cache needs interior mutability — the
+/// group lives behind a `Mutex` (also serializing concurrent Florence-2 runs, which
+/// must not share a session anyway). Invalidated on `model_uninstall`, where the
+/// backing files are removed.
+#[derive(Default)]
+pub struct ModelSessions {
+    florence2: Mutex<Option<Florence2Sessions>>,
+}
+
+impl ModelSessions {
+    /// Drop any cached Florence-2 sessions (after the model is uninstalled/replaced).
+    fn invalidate(&self, id: &str) {
+        if id == FLORENCE2_ID {
+            *self.florence2.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        }
+    }
+}
+
 fn florence2_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<DetectedRegion>, String> {
     let text = florence2_decode_text(app, image_bytes, FLORENCE2_TASK_TEXT)?;
     Ok(parse_florence_regions(&text))
@@ -1412,6 +1443,24 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
 
     let tokenizer = SimpleTokenizer::from_file(&dir.join(FLORENCE2_TOKENIZER_FILE))?;
 
+    // Pull the cached sessions (RUST-8), lazily loading them on the first call. The
+    // guard is held for the whole pipeline — Florence-2 runs are inherently
+    // sequential and a session cannot be shared across them anyway.
+    let state = app.state::<ModelSessions>();
+    let mut guard = state
+        .florence2
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if guard.is_none() {
+        *guard = Some(Florence2Sessions {
+            vision: load_florence2_session(&dir, FLORENCE2_VISION_FILE)?,
+            embed: load_florence2_session(&dir, FLORENCE2_EMBED_FILE)?,
+            encoder: load_florence2_session(&dir, FLORENCE2_ENCODER_FILE)?,
+            decoder: load_florence2_session(&dir, FLORENCE2_DECODER_FILE)?,
+        });
+    }
+    let Florence2Sessions { vision, embed, encoder, decoder } = guard.as_mut().unwrap();
+
     // 1. Pre-process the image: resize to 768x768, ImageNet-normalize, NCHW.
     let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
     let rgb = img.to_rgb8();
@@ -1431,7 +1480,6 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     }
 
     // 2. Vision encoder: image -> visual feature embeddings [1, Ni, D].
-    let mut vision = load_florence2_session(&dir, FLORENCE2_VISION_FILE)?;
     let vision_input = vision.inputs()[0].name().to_string();
     let pixel_tensor = Tensor::from_array(pixels).map_err(|e| e.to_string())?;
     let vision_out = vision
@@ -1453,7 +1501,6 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     prompt_ids.extend(tokenizer.encode(task_text));
     prompt_ids.push(FLORENCE2_EOS);
     let num_text_tokens = prompt_ids.len();
-    let mut embed = load_florence2_session(&dir, FLORENCE2_EMBED_FILE)?;
     let embed_input = embed.inputs()[0].name().to_string();
     let ids_tensor = Tensor::from_array((vec![1, num_text_tokens as i64], prompt_ids))
         .map_err(|e| e.to_string())?;
@@ -1474,7 +1521,6 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     inputs_embeds.extend_from_slice(&image_features);
     inputs_embeds.extend_from_slice(&text_embeds);
 
-    let mut encoder = load_florence2_session(&dir, FLORENCE2_ENCODER_FILE)?;
     let encoder_input_names: Vec<String> =
         encoder.inputs().iter().map(|o| o.name().to_string()).collect();
     let mut encoder_inputs: Vec<(Cow<str>, SessionInputValue)> = Vec::new();
@@ -1504,7 +1550,6 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     let encoder_hidden: Vec<f32> = encoder_hidden.iter().copied().collect();
 
     // 5. Greedy-decode the region string from the merged decoder.
-    let mut decoder = load_florence2_session(&dir, FLORENCE2_DECODER_FILE)?;
     let decoder_inputs: Vec<String> =
         decoder.inputs().iter().map(|o| o.name().to_string()).collect();
 
@@ -1513,9 +1558,9 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     for _ in 0..FLORENCE2_MAX_NEW_TOKENS {
         // The merged decoder consumes pre-embedded tokens (`inputs_embeds`), so
         // the growing decoder sequence is run through embed_tokens each step.
-        let decoder_embeds = florence2_embed(&mut embed, &embed_input, &input_ids)?;
+        let decoder_embeds = florence2_embed(embed, &embed_input, &input_ids)?;
         let next = florence2_decode_step(
-            &mut decoder,
+            decoder,
             &decoder_inputs,
             &input_ids,
             &decoder_embeds,

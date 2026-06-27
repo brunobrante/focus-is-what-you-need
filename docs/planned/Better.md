@@ -202,7 +202,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | SAVE-6 | ✅ storage graph model | Largely neutralized — large blobs (scenes/thumbnails/crops) moved to the `asset_blobs` store (out of the `records` JSON), plus D10 omit-defaults shrank the graph blob. Only the dev-time post-nuke seed re-stringify remains, now trivial. |
 | SHELL-5 | ✅ fixed | `TreeRow` wrapped in `React.memo` with a drop-aware comparator: non-drop props compare referentially; when the global `dropTargetId`/`dropMode` change during a drag it re-renders only the target row and open internal rows (to keep the path to a deep target live), skipping the leaf/collapsed majority. Parent stabilized: `selectLayer` + `onContextMenuNode` are now `useCallback`s (the Set props were already ref-stable via SHELL-3). |
 | RUST-4 | ✅ storage graph model | Cliff gone — base64 thumbnails/crops/assets live in `asset_blobs`, not the bulk-listed `records` table, so a full table read no longer drags megabytes under the lock. See "Storage ownership" in [`Architecture.md`](../Architecture.md). |
-| RUST-8 | ⏭️ deferred | Session cache needs interior mutability (`Session::run` is `&mut self`) + ONNX-state care. |
+| RUST-8 | ✅ fixed | Florence-2's four ONNX sessions (vision/embed/encoder/decoder) are cached in a managed `ModelSessions` (`Mutex<Option<Florence2Sessions>>`) in `tauri::State`, lazily loaded once and reused instead of re-committing hundreds of MB from disk every `florence2_decode_text` call; the guard is held for the whole (sequential) pipeline. Invalidated in `model_uninstall`. (`Session::run` is `&mut self` → the `Mutex` supplies the interior mutability.) Only the tokenizer JSON is still re-read (cheap). Not cargo-verifiable in this sandbox (no cargo + pre-existing `eyedropper.rs`/objc2 mismatch). |
 
 ### Quick wins (Medium/Low, post-REF-1)
 | ID | Status | Note |
@@ -318,8 +318,11 @@ partly wrong — noted inline).
   *centralize* the off-by-one surface — and inference output **cannot be runtime-verified here** (no ONNX
   execution / model files / images). Compile-checkable but not output-verifiable → too risky to change
   blind. Leave for an effort that can run the models.
-- **RUST-8** — session cache still needs interior mutability (`Session::run` is `&mut self`) + ONNX-state
-  care; non-numerical but architecturally involved, and likewise not runtime-verifiable here.
+- **RUST-8 — done.** Florence-2's four ONNX sessions are cached in a managed `ModelSessions`
+  (`Mutex<Option<Florence2Sessions>>`) in `tauri::State` and reused across calls instead of being
+  re-committed from disk every time; the `Mutex` provides the interior mutability `Session::run`'s
+  `&mut self` needs, and the cache is invalidated on `model_uninstall`. Not cargo-verifiable in this
+  sandbox (no cargo + the pre-existing `eyedropper.rs`/objc2 mismatch).
 
 > With REF-1 landed (`1fa8e9b`), there is no remaining confirmed `Product.md` LAW gap.
 
