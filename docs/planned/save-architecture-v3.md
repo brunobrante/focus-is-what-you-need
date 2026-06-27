@@ -731,22 +731,49 @@ in-memory adjacency index, tombstone filter, idempotent reconcile, promote edge 
 (SAVE-5 dead). `GraphPersistencePort` extends; `asset_blobs` out of the `records` hot table
 (RUST-4 cliff gone).
 
-**Remaining — the app-gated flips (primitives all in place):**
+**Remaining — the app-gated flips (primitives all in place).** Each needs a runnable app
+(`bunx tauri dev`) + a reseed smoke-test to verify: a blind flip risks the exact
+ownership/render corruption the derive-first strategy was built to avoid, and unit tests
+don't cover the render path. Do them in the order below — flip 1 is the substantive one;
+2 and 3 are optional polish.
 
-- [ ] **(main) Flip ownership reads to edges, then drop the fields.** `componentScopeFromEdges`
-      / `setComponentOwner` exist but are **dormant** — production `componentScope` still reads
-      `screenId`/`parentVariantId` (see the `variants.repo.ts` "app-gated final flip" comment).
-      Point the ~3 render sites at the edge resolver (a `useComponentScope` hook), then delete
-      `screenId`/`parentVariantId`/`projectId` as sources of truth. Same for references:
-      `ReferenceRow.attachments[]` → `attached_to` edges. This ends the documented
-      second-source-of-truth (core principle 4).
-- [ ] **Split `SystemDesignRow.tokens` into per-row `TokenRow`s.** Pure storage refactor —
-      D7's token field-link already works; no behavior change.
-- [ ] **Thumbnail/image `dataUrl` consumers → `blobKey`s — verify perf first.** Correct caution
-      already applied: a per-thumbnail `getAssetBlob` may lose to one bulk list, so it was not
-      shipped blind. Decide: a batched `getAssetBlobs(keys[])` for grid views, or keep small
-      thumbnails inline for the list path. (RUST-4 is already fixed — this is a read-path
-      optimization, not a correctness item.)
+- [ ] **(1, main) Flip ownership reads to edges, then drop the fields.**
+  - *Now:* `componentScope(row)` (`defaults.ts`) classifies a component
+    (workspace/project/screen/nested/draft) by reading `screenId`/`parentVariantId`/`projectId`.
+    `componentScopeFromEdges` / `setComponentOwner` (`application/graph/ownership.ts`) exist but
+    are **dormant**; edges already self-heal via boot reconcile (`variants.repo.ts:529` marks the
+    pending flip).
+  - *The flip:* point the ~3 read sites (`components/component/componentSource.tsx`, the
+    `components.repo.ts` scope filters, the `ComponentRow` discriminator) at the edge resolver via
+    a `useComponentScope` hook, then delete `screenId`/`parentVariantId`/`projectId` from
+    `ComponentRow` and every write path that sets them. Same shape for references:
+    `ReferenceRow.attachments[]` → `attached_to` edges, usage read off `idx_edges_to`.
+  - *Gotcha:* `componentScope` is **sync** today (field read) but `componentScopeFromEdges` is
+    **async** (edge lookup) — that ripples into render code, hence the hook. Memoize per component
+    id; the in-memory adjacency index keeps the lookup O(1) with no I/O on the hot path.
+  - *Smoke-test:* reseed, open Gallery + a project — every component card's source badge
+    (global/project/screen/nested) must match pre-flip, drafts stay unowned, and deleting a linked
+    master still fires the per-instance keep/delete dialog.
+  - *Why it matters:* this is the flip that makes edges the **authority** and ends the documented
+    second-source-of-truth (core principle 4).
+- [ ] **(2) Split `SystemDesignRow.tokens` into per-row `TokenRow`s.**
+  - *Now:* tokens live nested in `SystemDesignRow.tokens`; `TokenRow.instanceOf` (D7's field link)
+    is defined and works but no token is its own row yet.
+  - *The flip:* emit one `TokenRow` per token (envelope + short id; `instanceOf` set on a project
+    token mirroring a workspace master), repoint `resolveSystemDesign` to read the rows. Pure
+    storage refactor — no behavior change intended.
+  - *Smoke-test:* reseed, open a scene with `$$ref` color/typography bindings — bound elements
+    still render the token value; detach a linked token and confirm it copies the master locally.
+- [ ] **(3) Thumbnail/image `dataUrl` consumers → `blobKey` — measure before shipping.**
+  - *Now:* thumbnails are inline base64 `dataUrl`s; `asset_blobs` exists but consumers still read
+    `dataUrl`. The RUST-4 cliff is **already gone** (blobs are out of `records`), so this is
+    read-path perf, not correctness.
+  - *The caveat:* a grid of N thumbnails would do **N** `getAssetBlob` round-trips vs today's
+    **one** `listRecords` that brings every `dataUrl` inline — a naive flip can be *slower*. Decide
+    with real numbers: add a batched `getAssetBlobs(keys[])` for grids, or keep small thumbnails
+    inline for list views and only blob-key the large originals.
+  - *Smoke-test:* reseed, scroll a project/gallery grid — thumbnails render and the grid is not
+    slower than before (measure, don't eyeball).
 
 **Gaps the post-landing review surfaced — ALL FIXED (`ff33a3a..db6fbce`):**
 
@@ -756,6 +783,10 @@ in-memory adjacency index, tombstone filter, idempotent reconcile, promote edge 
       `bun install`). SQLite remains integration-only (Tauri IPC harness). Edge (both index
       directions + unique-live) and `instance_usage` coverage live in their dedicated repo tests
       (`edges.repo.test`, `instanceUsage.test`); the port itself only knows records + blobs.
+      **Note (`61235ff`):** the IndexedDB suite hung at first (the adapter never closed its
+      connection, so the per-test `deleteDatabase` blocked and the next `open` stalled);
+      `resetIndexedDbForTests` now closes the live connection synchronously. 13/13 green after
+      `bun install`; full suite 312 pass / 1 pre-existing fail.
 - [x] **`instance_usage` is now genuinely same-batch (D3).** `reconcileSceneUsageSync` derives
       usage from the in-memory doc and reads existing rows via `peekTable`, enqueuing the delta
       synchronously in the same tick as the scene `putRecord` — so it rides the same flush.
