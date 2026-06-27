@@ -761,13 +761,16 @@ don't cover the render path. Do them in the order below — flip 1 is the substa
     they back routing/listing (`useComponentDetail`, `useGallery`, `SearchProvider`, `projects.repo`,
     `localProjects`) and the edge graph doesn't cheaply replace a "which project/workspace does this
     live in" lookup. They are no longer consulted for *scope* (that's the edge).
-  - *Remaining (app-gated):* **physically remove** `screenId`/`parentVariantId` from `ComponentRow`.
-    Attempted; the tsc blast radius is ~50 sites across UI (`ComponentsTab`, `screens.repo`) **plus a
-    seed rewrite** — `seedComponentTree` bootstraps ownership via the fields and must instead emit
-    owner edges directly (it already has `mainVariantByScreenId`). Reverted to keep green; do this
-    with `bunx tauri dev` + reseed to verify the seed produces correct ownership. **References** are
-    untouched: `ReferenceRow.attachments[]` → `attached_to` edges, usage off `idx_edges_to` (lower
-    value — references are few; the boot reconcile already derives the edges).
+  - *Done (stage 5, commit `d8de39f`) — fields physically removed:* `screenId`/`parentVariantId`
+    are GONE from `ComponentRow`. The seed emits `variant owns component` edges directly
+    (`seedComponentTree` + `emitSeedOwnerEdges`); `reconcileAllGraphEdges` no longer derives
+    component owners from fields (`componentOwnerRef`/`reconcileComponentOwner` deleted); every reader
+    dropped its `?? field` fallback. tsc one fewer than baseline, suite green (only the pre-existing
+    `seedCanvasMocks` 'desktopForm' mock fails). **Still verify in `bunx tauri dev` + reseed** —
+    unit tests don't exercise the canvas render path.
+  - *Remaining:* **References** are untouched: `ReferenceRow.attachments[]` → `attached_to` edges,
+    usage off `idx_edges_to` (lower value — references are few; the boot reconcile already derives
+    the edges).
   - *Smoke-test:* reseed, open Gallery + a project — every component card's source badge
     (global/project/screen/nested) must match pre-flip, drafts stay unowned, and deleting a linked
     master still fires the per-instance keep/delete dialog; check canvas breadcrumbs, parent-frame

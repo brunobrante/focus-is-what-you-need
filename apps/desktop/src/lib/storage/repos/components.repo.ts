@@ -36,11 +36,8 @@ const VARIANTS_KEY = TABLES.variants;
 
 /**
  * Component ids the owner directly owns, via the uniform `owns` edge
- * (save-architecture-v3 flip 1). This is the edge-authoritative replacement for
- * the field reads (`parentVariantId === v` / `screenId === s` / project-global):
- * containment is read off `graph_edges`, not off the row fields. The fields stay
- * written as a mirror until the canvas readers are migrated too, but the storage
- * queries no longer consult them.
+ * (save-architecture-v3 flip 1). The edge is the sole source of truth for
+ * containment now — the screenId/parentVariantId fields are gone.
  */
 async function componentIdsOwnedBy(owner: EntityRef): Promise<Set<string>> {
   const edges = await listEdges({ from: owner, relation: "owns" });
