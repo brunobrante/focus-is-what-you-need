@@ -302,6 +302,30 @@ export async function duplicateVariant(input: {
       : await listChildrenOfVariant(input.sourceVariantId);
 
   const sourceScene = await getSceneByOwner("variant", input.sourceVariantId);
+
+  // Child capture is an OWNER-EDGE operation: it must run whenever the subject has
+  // children, even if it was never saved (no scene yet). Gating it on `sourceScene`
+  // meant a Copy version owned NONE of the parent's children and a Linked version
+  // referenced none — silently diverging from the Versioning law (VER-2). The
+  // graph-level work (linkifying the instance nodes, copying the source graph) still
+  // applies only when a scene exists.
+  if (input.mode === "linked") {
+    // The child masters become this version's linked instances — make them pickable
+    // from the canvas "Add components" picker regardless of scene presence.
+    if (children.length > 0) {
+      await markComponentsLinkable(children.map((c) => c.id));
+    }
+  } else {
+    // "copy": a fully independent version. Deep-clone every child component master
+    // (its whole variant chain + scenes + nested children) into NEW masters owned
+    // by the new variant, so the version owns its components outright — editing or
+    // DELETING one never touches the original it was copied from.
+    await cloneChildComponentsIntoVariant({
+      sourceChildren: children,
+      targetVariantId: created.id,
+    });
+  }
+
   if (sourceScene) {
     let graphJSON = sourceScene.graphJSON;
     if (input.mode === "linked") {
@@ -314,21 +338,7 @@ export async function duplicateVariant(input: {
           name: c.name,
         })),
       );
-      if (linked) {
-        graphJSON = linked;
-        // The child masters are now referenced as linked instances — make them
-        // pickable from the canvas "Add components" picker.
-        await markComponentsLinkable(children.map((c) => c.id));
-      }
-    } else {
-      // "copy": a fully independent version. Deep-clone every child component master
-      // (its whole variant chain + scenes + nested children) into NEW masters owned
-      // by the new variant, so the version owns its components outright — editing or
-      // DELETING one never touches the original it was copied from.
-      await cloneChildComponentsIntoVariant({
-        sourceChildren: children,
-        targetVariantId: created.id,
-      });
+      if (linked) graphJSON = linked;
     }
     await upsertScene(
       { ownerType: "variant", ownerId: created.id, graphJSON },

@@ -101,7 +101,6 @@ test("copy-mode version clones child components into independent masters", async
     name: "Title",
   });
 
-  // duplicateVariant only clones when the source variant has a scene.
   await upsertScene({
     ownerType: "variant",
     ownerId: defaultVariant.id,
@@ -131,6 +130,69 @@ test("copy-mode version clones child components into independent masters", async
   await deleteComponentTree(clone.id);
   expect(await getComponent(child.id)).not.toBeNull();
   expect(await getComponent(clone.id)).toBeNull();
+});
+
+test("copy-mode version clones children even when the source has no scene yet (VER-2)", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  // A nested child owned by the source variant, but the subject was never saved
+  // (no scene exists for the source variant).
+  const { component: child } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  expect(await getSceneByOwner("variant", defaultVariant.id)).toBeNull();
+
+  const copy = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "copy",
+  });
+
+  // The version owns a fresh clone of the child via the owner edge — not the original
+  // — despite there being no scene to copy.
+  const cloned = await listChildrenOfVariant(copy.id);
+  expect(cloned).toHaveLength(1);
+  const clone = cloned[0]!;
+  expect(clone.id).not.toBe(child.id);
+  expect(clone.name).toBe("Title");
+  expect(await ownerOf({ type: "component", id: clone.id })).toEqual({ type: "variant", id: copy.id });
+
+  // Deleting the clone must not touch the original.
+  await deleteComponentTree(clone.id);
+  expect(await getComponent(child.id)).not.toBeNull();
+});
+
+test("linked-mode version makes children linkable even when the source has no scene yet (VER-2)", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  const { component: child } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  expect((await getComponent(child.id))!.linkable).toBe(false);
+  expect(await getSceneByOwner("variant", defaultVariant.id)).toBeNull();
+
+  await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "linked",
+  });
+
+  // The child master is now pickable as a linked instance.
+  expect((await getComponent(child.id))!.linkable).toBe(true);
 });
 
 test("duplicateVariant works when the source variant has no scene yet", async () => {

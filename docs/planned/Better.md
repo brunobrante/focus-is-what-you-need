@@ -211,6 +211,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | VID-1 | ✅ `df7a62c` | Extraction errors probe `ffmpegAvailable()` — ffmpeg-missing vs other-failure get distinct copy; the 0-frames success state already rendered separately. |
 | META-2 | ✅ `349fcca` | Dead `author`/`initials` stubs removed from `ScreenVersion` (never rendered; no identity system to wire). |
 | VER-4 | ✅ `68cb8f6` | Linked-promote linkifies the demoted old main with `propagate:true` so ancestor thumbnails regenerate. |
+| VER-2 | ✅ fixed | `duplicateVariant` now captures the subject's children via owner edges **before** the `if (sourceScene)` guard: Copy clones them into version-owned masters and Linked marks them linkable, even when the source was never saved. Graph-level linkify/scene-copy still run only when a scene exists. Two regression tests added. |
 | BLD-4 | ✅ `c2235a4` | Deleted dead `OriginalSlideshow` + `ScreensPanel` Builder modules. |
 | dead route | ✅ `a2fdf1e` | Deleted unimported `routes/NewProject.tsx` (superseded by `NewProjectPage`). |
 | UI-13 | ✅ `e123307` | `ReferenceDetailModal` stackPreview release has a single owner (no double-revoke). |
