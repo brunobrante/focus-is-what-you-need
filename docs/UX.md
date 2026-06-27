@@ -878,6 +878,9 @@ To edit the contents, open the master or detach the instance first.
 - On a merged (maxed) handle the first drag direction commits the corner: the drag can be pulled back to the lock but cannot cross it into the opposite corner.
 - While dragging, a value tag showing the current radius is rendered just beside the dragged handle.
 
+**Escape cancels an in-progress transform:**
+- Pressing **Esc** while actively dragging, resizing, rotating, or dragging a corner-radius handle **aborts** the gesture: the element snaps back to where it was when the gesture began (no commit, nothing added to undo history), and any reparent drop-target highlight or alignment guide is cleared. This matches the existing Esc-to-cancel behavior of the pen/draw tools.
+
 **Drag ghost for invisible elements:**
 - An element that paints nothing on screen (e.g. an empty **wrapper** — a rect with no fill and no visible border, and whose whole subtree is also empty/hidden) has no visible body to follow while it is being moved.
 - While such an element is being dragged, the canvas overlay draws a **ghost** in its place: a soft blue drop shadow under a faint blue surface, framed with a dashed selection-blue outline, following the element's exact bounds (and corner radius / rotation). This lets the user see what they are moving.

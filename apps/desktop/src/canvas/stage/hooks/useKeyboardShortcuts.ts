@@ -22,6 +22,9 @@ type Params = {
   interactionRef: MutableRefObject<Interaction | null>;
   latestStateRef: MutableRefObject<EditorState>;
   setInteractionActive: (active: boolean) => void;
+  // Aborts an in-flight drag/resize/rotate/radius gesture (Escape). Held in a ref
+  // because the pointer-events hook that provides it runs after this one (STAGE-4).
+  cancelActiveInteractionRef?: MutableRefObject<(() => boolean) | null>;
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
@@ -37,6 +40,7 @@ export function useKeyboardShortcuts({
   interactionRef,
   latestStateRef,
   setInteractionActive,
+  cancelActiveInteractionRef,
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
@@ -105,6 +109,8 @@ export function useKeyboardShortcuts({
           dispatch({ type: "setTool", tool: "select" });
           return;
         }
+        // Abort an in-flight drag/resize/rotate/radius gesture (STAGE-4).
+        if (cancelActiveInteractionRef?.current?.()) return;
         if (currentState.tool !== "select") { dispatch({ type: "setTool", tool: "select" }); return; }
       }
 
@@ -207,6 +213,7 @@ export function useKeyboardShortcuts({
     clipboard,
     interactionRef,
     latestStateRef,
+    cancelActiveInteractionRef,
     onBackToParentShortcut,
     onCanvasToolShortcut,
     onOpenSelectedComponentShortcut,

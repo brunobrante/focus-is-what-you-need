@@ -85,6 +85,9 @@ export function CanvasStage({
   const previousRenderDocumentRef = useRef<CanvasDocument | null>(null);
   const viewportInitializedSubjectRef = useRef<string | null>(null);
   const commandModeRef = useRef(false);
+  // Filled by useCanvasPointerEvents below; consumed by the (earlier) keyboard
+  // hook so Escape can abort an in-flight drag/resize/rotate/radius (STAGE-4).
+  const cancelActiveInteractionRef = useRef<(() => boolean) | null>(null);
   const [interactionActive, setInteractionActive] = useState(false);
 
   useEffect(() => {
@@ -164,6 +167,7 @@ export function CanvasStage({
     interactionRef,
     latestStateRef,
     setInteractionActive,
+    cancelActiveInteractionRef,
     settings,
     onCanvasToolShortcut,
     onOpenSelectedComponentShortcut,
@@ -304,6 +308,7 @@ export function CanvasStage({
     handleContextMenu,
     onDragOver,
     onDrop,
+    cancelActiveInteraction,
   } = useCanvasPointerEvents({
     state,
     dispatch,
@@ -329,6 +334,7 @@ export function CanvasStage({
     fontTokens,
     navigableBounds,
   });
+  cancelActiveInteractionRef.current = cancelActiveInteraction;
 
   const affectedElementIds = useMemo(
     () =>

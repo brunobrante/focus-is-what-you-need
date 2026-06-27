@@ -148,6 +148,8 @@ export type CanvasPointerEventsResult = {
   handleContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
   onDrop: (event: ReactDragEvent<HTMLDivElement>) => void;
+  /** Aborts an in-flight drag/resize/rotate/radius gesture (Escape). Returns true if one was active. */
+  cancelActiveInteraction: () => boolean;
 };
 
 export function useCanvasPointerEvents({
@@ -583,6 +585,41 @@ export function useCanvasPointerEvents({
     }
   };
 
+  // STAGE-4: Escape aborts an in-flight pointer gesture (drag/resize/rotate/
+  // radius, plus the canvas-frame variants). Reverts to the gesture's
+  // beforeDocument and clears every gesture ref/class so no stale reparent
+  // drop-target highlight or command-mode flag survives. Pen/anchor/draw have
+  // their own dedicated cancel paths in useKeyboardShortcuts and are left alone.
+  const cancelActiveInteraction = (): boolean => {
+    const interaction = interactionRef.current;
+    if (
+      !interaction ||
+      interaction.type === "pan" ||
+      interaction.type === "marquee" ||
+      interaction.type === "draw" ||
+      interaction.type === "pen" ||
+      interaction.type === "pencil" ||
+      interaction.type === "anchor-edit"
+    ) {
+      return false;
+    }
+
+    const viewport = viewportRef.current;
+    if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
+    viewport?.classList.remove("is-rotating", "is-panning", "is-radius-dragging", "is-resizing");
+    viewport?.style.removeProperty("--resize-cursor");
+    viewport?.style.removeProperty("cursor");
+
+    interactionRef.current = null;
+    setInteractionActive(false);
+    commandModeRef.current = false;
+    updateDropTarget(null);
+
+    dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
+    dispatch({ type: "setGuides", guides: [] });
+    return true;
+  };
+
   const onDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     const viewport = viewportRef.current;
     if (viewport && toolingRef.current && !state.editingTextId) {
@@ -613,5 +650,6 @@ export function useCanvasPointerEvents({
     handleContextMenu,
     onDragOver,
     onDrop,
+    cancelActiveInteraction,
   };
 }

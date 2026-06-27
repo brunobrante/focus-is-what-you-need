@@ -175,6 +175,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | ENG-3 | ✅ `0a6ab94` | Clipboard scoped per `EditorProvider` (was a module singleton shared across split editors). |
 | STAGE-1 | 🟡 false positive | The `prev===next` empty-diff path is unreachable under React's render/commit order. |
 | STAGE-2 | ✅ fixed | `findChildAtPoint` only recurses into a subtree when the point is inside the node (gates on `isPointInElement`); no more full-tree scan per pointer-down, and a child clipped outside its parent is no longer returned. |
+| STAGE-4 | ✅ fixed | Escape aborts an in-flight drag/resize/rotate/radius gesture: `useCanvasPointerEvents` exposes `cancelActiveInteraction` (reverts to `beforeDocument`, clears `commandModeRef`/drop-target/classes), called from the keyboard cancel branch via a ref. `UX.md` updated. |
 | DOM-2 | ✅ `fd01c9d` | `"+"` zoom-in binding marked `shift:true` so it actually fires. |
 | DOM-3 | ✅ `fe3243f` | `isMacLike()` falls back `userAgentData → platform → UA`. |
 | BLD-1 | ✅ `fd5213a` | Stage wheel attached as a non-passive native listener. |
