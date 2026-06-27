@@ -431,6 +431,38 @@ export function useScene(
   );
 }
 
+/**
+ * Resolve a blob-keyed asset to its `data:` URL through the batching loader (flip
+ * 3): many keys requested in one tick collapse into a single round-trip. Pass a
+ * `cacheToken` (e.g. the owner row's `updatedAt`/`capturedAt`) so a rewrite under
+ * a reused stable key re-resolves. Returns null until loaded / when there's no key.
+ */
+export function useAssetDataUrl(
+  blobKey: string | null | undefined,
+  cacheToken?: number,
+): string | null {
+  const key = blobKey ?? null;
+  const [dataUrl, setDataUrl] = useState<string | null>(() =>
+    key ? peekAssetDataUrl(key) ?? null : null,
+  );
+  useEffect(() => {
+    if (!key) {
+      setDataUrl(null);
+      return;
+    }
+    const cached = peekAssetDataUrl(key);
+    if (cached !== undefined) setDataUrl(cached);
+    let active = true;
+    void loadAssetDataUrl(key).then((url) => {
+      if (active) setDataUrl(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, [key, cacheToken]);
+  return dataUrl;
+}
+
 /** A thumbnail row with its snapshot `data:` URL resolved from the asset store. */
 export type ResolvedThumbnail = ThumbnailRow & { dataUrl: string };
 
@@ -447,30 +479,8 @@ export function useThumbnail(
     [ownerType ?? "", ownerId ?? ""],
   );
 
-  // Resolve the snapshot data URL from the asset store via the batching loader
-  // (flip 3): a grid of thumbnails collapses into one round-trip. `capturedAt` is
-  // part of the dep so a regenerated snapshot (stable key, new bytes) re-resolves.
   const row = rowState.data;
-  const blobKey = row?.dataBlobKey ?? null;
-  const capturedAt = row?.capturedAt ?? 0;
-  const [dataUrl, setDataUrl] = useState<string | null>(() =>
-    blobKey ? peekAssetDataUrl(blobKey) ?? null : null,
-  );
-  useEffect(() => {
-    if (!blobKey) {
-      setDataUrl(null);
-      return;
-    }
-    const cached = peekAssetDataUrl(blobKey);
-    if (cached !== undefined) setDataUrl(cached);
-    let active = true;
-    void loadAssetDataUrl(blobKey).then((url) => {
-      if (active) setDataUrl(url);
-    });
-    return () => {
-      active = false;
-    };
-  }, [blobKey, capturedAt]);
+  const dataUrl = useAssetDataUrl(row?.dataBlobKey, row?.capturedAt);
 
   // Only surface a row once its image is resolved, so consumers reading
   // `data.dataUrl` keep a guaranteed string and show a placeholder until ready.

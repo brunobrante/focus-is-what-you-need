@@ -4,6 +4,7 @@ import { IconGrid } from "@/components/icons";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectRow, WorkspaceRow } from "@/lib/storage/schema";
+import { useAssetDataUrl } from "@/lib/storage/hooks";
 import { relativeTime } from "@/application/landing/useLanding";
 import type { RecentItem, WorkspaceCard } from "@/application/home/useHome";
 import { CardMenuIcons, CardMoreMenu } from "@/components/screen/CardMenu";
@@ -143,6 +144,7 @@ function ProjectThumb({
   project: ProjectRow;
   workspace: WorkspaceRow | null;
 }) {
+  const thumbnailUrl = useAssetDataUrl(project.thumbnailBlobKey, project.updatedAt);
   return (
     <div className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]">
       <span className="absolute left-2.5 top-2.5 z-[2] rounded border border-[var(--border)] bg-black/55 px-1.5 py-[3px] text-[10px] uppercase tracking-[0.5px] text-[var(--text-muted)] backdrop-blur-md">
@@ -157,9 +159,9 @@ function ProjectThumb({
           <span className="truncate">{workspace.name}</span>
         </span>
       ) : null}
-      {project.thumbnailDataUrl ? (
+      {thumbnailUrl ? (
         <img
-          src={project.thumbnailDataUrl}
+          src={thumbnailUrl}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
         />

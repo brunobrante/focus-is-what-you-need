@@ -9,6 +9,7 @@ import { CardMoreMenu, CardMenuIcons } from "@/components/screen/CardMenu";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import type { ProjectRow } from "@/lib/storage/schema";
+import { useAssetDataUrl } from "@/lib/storage/hooks";
 import { useLanding, relativeTime } from "@/application/landing/useLanding";
 import { projectBase, projectEditPath } from "@/lib/navigation/projectUrl";
 
@@ -307,6 +308,7 @@ function ProjectCard({
 function ProjectThumb({ project, children }: { project: ProjectRow; children?: ReactNode }) {
   const type = project.type;
   const count = type === "mobile" ? 4 : type === "tablet" ? 3 : 2;
+  const thumbnailUrl = useAssetDataUrl(project.thumbnailBlobKey, project.updatedAt);
   return (
     <div
       className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-[120ms] group-hover:border-[var(--border-strong)]"
@@ -315,8 +317,8 @@ function ProjectThumb({ project, children }: { project: ProjectRow; children?: R
         {PROJECT_TYPE_LABEL[type]}
       </span>
       {children}
-      {project.thumbnailDataUrl ? (
-        <img src={project.thumbnailDataUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      {thumbnailUrl ? (
+        <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div
           className={`absolute inset-0 flex items-center justify-center p-3.5 ${

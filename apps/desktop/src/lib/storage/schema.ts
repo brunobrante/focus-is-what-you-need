@@ -27,7 +27,7 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // boot), `instance_usage` (derived from scene graphJSON on save), and `asset_blobs`
 // (binaries out of the records hot path). Nuke-and-reseed produces every row fresh
 // with a short id + envelope; the edge graph is reconciled right after seeding.
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 export type Meta = {
   schemaVersion: number;
@@ -57,7 +57,10 @@ export type ProjectRow = {
   type: ProjectType;
   source?: "mock" | "local";
   icon: string | null;
-  thumbnailDataUrl: string | null;
+  // Project card thumbnail lives in the asset store (flip 3b), keyed by this
+  // blobKey, not inline — so a bulk projects read stays lean. Resolve through the
+  // batching `assetDataUrlLoader`; the key is stable per project (overwrite in place).
+  thumbnailBlobKey: string | null;
   description: string | null;
   previewScreenId: string | null;
   designSystem: ProjectDesignSystem;

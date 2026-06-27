@@ -809,10 +809,17 @@ don't cover the render path. Do them in the order below — flip 1 is the substa
     still render the token value; edit/add/delete a token in the System Design page; detach a
     linked token and confirm it copies the master locally; "share by default" on new-project still
     links every workspace token.
-- [~] **(3) Thumbnail/image `dataUrl` consumers → `blobKey`.** Chosen approach (user call): the
-  **proper batched** path, NOT the naive per-card flip — a batched `getAssetBlobs(keys[])` so a grid
-  pays one round-trip, never N. Landing in two green commits: **3a done** (infra + `ThumbnailRow`),
-  **3b pending** (`ProjectRow.thumbnailDataUrl`).
+- [x] **(3) Thumbnail/image `dataUrl` consumers → `blobKey`.** — **COMPLETE & green** (zero net new
+  tsc errors; contract + loader tests pass; only the pre-existing `seedCanvasMocks` fails). Pending
+  only your in-app reseed + grid-scroll smoke-test. Chosen approach (user call): the **proper batched**
+  path, NOT the naive per-card flip — a batched `getAssetBlobs(keys[])` so a grid pays one round-trip,
+  never N. Landed in two commits: **3a** (infra + `ThumbnailRow`), **3b** (`ProjectRow`).
+  - *3b — DONE:* `ProjectRow.thumbnailDataUrl` → `thumbnailBlobKey` (asset store, stable key
+    `project-thumb:{id}`). Home/landing cards resolve via a new reusable `useAssetDataUrl(blobKey,
+    cacheToken)` hook (which `useThumbnail` now also uses); `createProject`/`setProjectThumbnail`
+    write the blob and the edit forms (`ProjectSettingsModal`, `ProjectEditPanel`) save through
+    `setProjectThumbnail`; `regenerateProjectThumbnail` writes there and skip-compares against the
+    stored blob; `deleteProject` drops the blob. `SCHEMA_VERSION` 24 → 25.
   - *3a — DONE & green (zero new tsc errors; contract + loader tests pass; only the pre-existing
     `seedCanvasMocks` fails):* `ThumbnailRow.dataUrl` → `dataBlobKey` (the snapshot data URL lives in
     `asset_blobs`, stable key == record id so it overwrites in place). Added

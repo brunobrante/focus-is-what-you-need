@@ -46,7 +46,7 @@ export function normalizeProjectRow(row: ProjectRow): ProjectRow {
     ...row,
     source: row.source ?? "local",
     icon: row.icon ?? null,
-    thumbnailDataUrl: row.thumbnailDataUrl ?? null,
+    thumbnailBlobKey: row.thumbnailBlobKey ?? null,
     description: row.description ?? null,
     previewScreenId: row.previewScreenId ?? null,
     designSystem: row.designSystem ?? createDefaultDesignSystem(),

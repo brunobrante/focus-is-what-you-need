@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectRow, ScreenRow } from "@/lib/storage/schema";
-import { updateProject } from "@/lib/storage/repos/projects.repo";
+import { setProjectThumbnail, updateProject } from "@/lib/storage/repos/projects.repo";
 import { IconClose } from "@/components/icons";
 import { useProjectElementDefaults } from "@/application/settings/useScopedElementDefaults";
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
-import { useWorkspaces } from "@/lib/storage/hooks";
+import { useAssetDataUrl, useWorkspaces } from "@/lib/storage/hooks";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { projectLogoColor } from "./utils";
 
@@ -86,7 +86,10 @@ export function ProjectEditPanel({
   const logoColor = projectLogoColor(project.name);
   const initial = project.name[0]?.toUpperCase() ?? "P";
   const currentIcon = pendingIcon === undefined ? project.icon : pendingIcon;
-  const currentThumb = pendingThumb === undefined ? project.thumbnailDataUrl : pendingThumb;
+  // Existing thumbnail bytes live in the asset store (flip 3b); a pending pick
+  // (data URL or null-to-clear) overrides it until saved.
+  const savedThumb = useAssetDataUrl(project.thumbnailBlobKey, project.updatedAt);
+  const currentThumb = pendingThumb === undefined ? savedThumb : pendingThumb;
 
   useEffect(() => {
     const t1 = window.setTimeout(() => setVisible(true), 10);
@@ -110,8 +113,11 @@ export function ProjectEditPanel({
         previewScreenId: previewScreenId || null,
       };
       if (pendingIcon !== undefined) patch.icon = pendingIcon;
-      if (pendingThumb !== undefined) patch.thumbnailDataUrl = pendingThumb;
-      const updated = await updateProject(project.id, patch);
+      let updated = await updateProject(project.id, patch);
+      // The thumbnail's bytes are stored separately (flip 3b).
+      if (pendingThumb !== undefined) {
+        updated = (await setProjectThumbnail(project.id, pendingThumb)) ?? updated;
+      }
       if (updated) {
         onSaved(updated);
         onClose();

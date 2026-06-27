@@ -2,7 +2,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { IconUpload } from "@/components/icons";
 import { Modal, ModalBody, ModalHeader } from "./Modal";
 import { readFileAsDataUrl } from "@/lib/utils";
-import { updateProject } from "@/lib/storage/repos/projects.repo";
+import { setProjectThumbnail, updateProject } from "@/lib/storage/repos/projects.repo";
+import { loadAssetDataUrl } from "@/application/persistence/assetDataUrlLoader";
 import type { ProjectRow, ScreenRow } from "@/lib/storage/schema";
 
 type SettingsTab = "project" | "advanced";
@@ -40,7 +41,13 @@ export const ProjectSettingsModal = forwardRef<ProjectSettingsModalHandle>(
         setName(project.name);
         setDescription(project.description ?? "");
         setPreviewScreenId(project.previewScreenId ?? "");
-        setThumbnailDataUrl(project.thumbnailDataUrl ?? null);
+        // Thumbnail bytes live in the asset store (flip 3b) — resolve for editing.
+        setThumbnailDataUrl(null);
+        if (project.thumbnailBlobKey) {
+          void loadAssetDataUrl(project.thumbnailBlobKey).then((url) => {
+            if (projectRef.current?.id === project.id) setThumbnailDataUrl(url);
+          });
+        }
         setSaving(false);
         setIsOpen(true);
       },
@@ -68,12 +75,13 @@ export const ProjectSettingsModal = forwardRef<ProjectSettingsModalHandle>(
       if (!project || saving || !name.trim()) return;
       setSaving(true);
       try {
-        const updated = await updateProject(project.id, {
+        await updateProject(project.id, {
           name: name.trim(),
           description: description.trim() || null,
           previewScreenId: previewScreenId || null,
-          thumbnailDataUrl,
         });
+        // The thumbnail's bytes are stored separately (flip 3b).
+        const updated = await setProjectThumbnail(project.id, thumbnailDataUrl);
         if (updated) {
           onSavedRef.current?.(updated);
           setIsOpen(false);

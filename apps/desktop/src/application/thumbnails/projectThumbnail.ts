@@ -1,4 +1,4 @@
-import { getProject, listProjects, updateProject } from "@/lib/storage/repos/projects.repo";
+import { getProject, listProjects, setProjectThumbnail } from "@/lib/storage/repos/projects.repo";
 import { getScreen, listScreensByProject } from "@/lib/storage/repos/screens.repo";
 import { getThumbnailByOwner } from "@/lib/storage/repos/thumbnails.repo";
 import { getAssetText } from "@/application/persistence/assetStore";
@@ -10,7 +10,7 @@ import { renderProjectThumbnailDataUrl } from "@/lib/storage/projectThumbnail";
  * Project card thumbnails are derived from the first screen's snapshot. The
  * snapshot is produced by the canvas thumbnail pipeline; this module composes it
  * with the project name and a device mockup (see `lib/storage/projectThumbnail`)
- * and writes the result to `ProjectRow.thumbnailDataUrl`.
+ * and stores the result in the asset store, keyed by `ProjectRow.thumbnailBlobKey`.
  *
  * Generation runs off the critical path, debounced per project, and is a no-op
  * when no snapshot exists yet — there is nothing to render around.
@@ -44,9 +44,13 @@ export async function regenerateProjectThumbnail(projectId: string): Promise<boo
     type: project.type,
     snapshotDataUrl,
   });
-  if (thumbnailDataUrl === project.thumbnailDataUrl) return false;
+  // Skip a rewrite when the rendered card is byte-identical to the stored one.
+  const current = project.thumbnailBlobKey
+    ? await getAssetText(project.thumbnailBlobKey)
+    : null;
+  if (thumbnailDataUrl === current) return false;
 
-  await updateProject(projectId, { thumbnailDataUrl });
+  await setProjectThumbnail(projectId, thumbnailDataUrl);
   return true;
 }
 
