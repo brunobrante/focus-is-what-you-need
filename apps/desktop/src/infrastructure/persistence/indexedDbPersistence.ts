@@ -128,6 +128,14 @@ function applyMutation(recordsStore: IDBObjectStore, mutation: Mutation): void {
   }
 }
 
+/** Test seam: drop the cached connection so the next open re-runs against a fresh
+ *  (e.g. just-deleted) database. Pairs with `indexedDB.deleteDatabase` in tests. */
+export function resetIndexedDbForTests(): void {
+  dbPromise = null;
+}
+
+export const INDEXED_DB_NAME = DB_NAME;
+
 function openDatabase(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
