@@ -1,4 +1,6 @@
-import { IconClock, IconDatabase, IconFolder, IconShield } from "@/components/icons";
+import { useEffect, useState } from "react";
+import { IconClock, IconDatabase, IconFolder, IconShield, IconTrash } from "@/components/icons";
+import { resetToFactoryData } from "@/lib/storage/seed";
 
 export function StorageTab({
   folderPath,
@@ -75,7 +77,62 @@ export function StorageTab({
           </code>{" "}
           is an export format — use “Export .figx” on a project to write one to the workspace folder.
         </div>
+
+        <ResetSection />
       </div>
+    </div>
+  );
+}
+
+function ResetSection() {
+  const [confirming, setConfirming] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  // Auto-cancel the armed confirm after a few seconds so it can't fire by accident.
+  useEffect(() => {
+    if (!confirming) return;
+    const id = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirming]);
+
+  async function handleReset() {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
+    setResetting(true);
+    try {
+      await resetToFactoryData();
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-3 rounded-[12px] border border-[rgba(255,80,80,0.3)] bg-[rgba(255,80,80,0.05)] p-4">
+      <div className="text-[11px] uppercase tracking-[0.5px] text-[#ffb0b0] font-medium">
+        Danger zone
+      </div>
+      <p className="m-0 text-[12.5px] leading-[1.6] text-[var(--text-muted)]">
+        Reset all data back to the default mock workspace. This deletes every project,
+        scene, and edit and reseeds the factory data. This cannot be undone.
+      </p>
+      <button
+        type="button"
+        onClick={() => void handleReset()}
+        disabled={resetting}
+        className="flex h-10 w-fit cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(255,80,80,0.4)] bg-transparent px-4 text-[13px] font-medium text-[#ffb0b0] transition-colors hover:bg-[rgba(255,80,80,0.12)] disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+      >
+        <IconTrash size={14} strokeWidth={1.7} />
+        <span>
+          {resetting
+            ? "Resetting data…"
+            : confirming
+              ? "Click again to reset everything"
+              : "Reset to default data"}
+        </span>
+      </button>
     </div>
   );
 }

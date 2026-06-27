@@ -1329,7 +1329,11 @@ drift:
 - **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
 - **Keyboard shortcuts**: rebindable canvas commands
-- **Save location**: workspace base folder and storage details
+- **Save location**: workspace base folder and storage details, plus a **Danger
+  zone** with a **Reset to default data** button — wipes every project/scene/edit
+  and reseeds the factory mock workspace (same action as the TopBar user menu →
+  Factory reset). Two-click confirm ("Click again to reset everything", auto-cancels
+  after a few seconds); shows "Resetting data…" while running.
 
 **Element defaults editor** (shared component):
 
