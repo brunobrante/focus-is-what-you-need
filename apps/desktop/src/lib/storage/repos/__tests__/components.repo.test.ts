@@ -14,6 +14,7 @@ import {
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
+import { resetEdgeIndex } from "@/application/graph/edgeIndex";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
 class MemoryStorage {
@@ -35,8 +36,7 @@ class MemoryStorage {
 beforeEach(async () => {
   resetPersistenceSingletons();
   resetRecordStoreCache();
-  resetPersistenceSingletons();
-  resetRecordStoreCache();
+  resetEdgeIndex();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
   await replaceTable<ComponentRow>(TABLES.components, []);
   await replaceTable<SceneRow>(TABLES.scenes, []);
@@ -45,6 +45,21 @@ beforeEach(async () => {
 });
 
 test("createComponent creates a component with a default variant under a screen", async () => {
+  // A screen owns a main variant; its top-level components are owned by that
+  // variant (the edge the ownership queries read).
+  await replaceTable<VariantRow>(TABLES.variants, [
+    {
+      id: "variant-screen-1",
+      ownerKind: "screen",
+      ownerId: "screen-1",
+      name: "Default",
+      order: 0,
+      seedKey: null,
+      createdAt: 1,
+      updatedAt: 1,
+    } as VariantRow,
+  ]);
+
   const result = await createComponent({
     projectId: "project-1",
     parent: { kind: "screen", screenId: "screen-1" },

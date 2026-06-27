@@ -1,6 +1,7 @@
 import type { ComponentVariant } from "@/lib/data/types";
 import { normalizeComponentRow } from "@/lib/storage/defaults";
 import { reconcileAllGraphEdges } from "@/application/graph/ownershipReconcile";
+import { setOwner } from "@/lib/storage/repos/edges.repo";
 import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
@@ -615,6 +616,18 @@ async function cloneChildComponentsIntoVariant(input: {
   if (newComponents.length > 0) {
     await replaceTable<ComponentRow>(TABLES.components, [...newComponents, ...allComponents]);
     notify(TABLES.components);
+    // Emit each clone's `owns` edge (version-owned → `variant owns component`) so
+    // the edge-authoritative queries see them in-session, not only after the next
+    // boot reconcile (save-architecture-v3 flip 1). Clones always have a parent
+    // variant — they are version-scoped local copies.
+    for (const c of newComponents) {
+      if (c.parentVariantId) {
+        await setOwner(
+          { type: "variant", id: c.parentVariantId },
+          { type: "component", id: c.id },
+        );
+      }
+    }
   }
   for (const scene of newScenes) {
     await upsertScene(

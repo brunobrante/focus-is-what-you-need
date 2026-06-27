@@ -1,10 +1,11 @@
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import {
-  componentScope,
   normalizeComponentRow,
   normalizeReferenceRow,
 } from "@/lib/storage/defaults";
 import { reconcileComponentOwner } from "@/application/graph/ownershipReconcile";
+import { listEdges } from "@/lib/storage/repos/edges.repo";
+import type { EntityRef } from "@/domain/graph/edges";
 import { newId, now } from "@/lib/storage/ids";
 import {
   countInstanceUsages,
@@ -30,6 +31,34 @@ import { TABLES, listTable, notify, removeRecords, replaceTable } from "@/lib/st
 
 const KEY = TABLES.components;
 const VARIANTS_KEY = TABLES.variants;
+
+/**
+ * Component ids the owner directly owns, via the uniform `owns` edge
+ * (save-architecture-v3 flip 1). This is the edge-authoritative replacement for
+ * the field reads (`parentVariantId === v` / `screenId === s` / project-global):
+ * containment is read off `graph_edges`, not off the row fields. The fields stay
+ * written as a mirror until the canvas readers are migrated too, but the storage
+ * queries no longer consult them.
+ */
+async function componentIdsOwnedBy(owner: EntityRef): Promise<Set<string>> {
+  const edges = await listEdges({ from: owner, relation: "owns" });
+  return new Set(
+    edges.filter((e) => e.toType === "component").map((e) => e.toId),
+  );
+}
+
+/** The screen's main ("order 0") variant — owner of its top-level components. */
+function mainVariantIdForScreen(
+  variants: VariantRow[],
+  screenId: string,
+): string | null {
+  let main: VariantRow | null = null;
+  for (const v of variants) {
+    if (v.ownerKind !== "screen" || v.ownerId !== screenId) continue;
+    if (!main || v.order < main.order) main = v;
+  }
+  return main?.id ?? null;
+}
 
 export type ComponentParent =
   | { kind: "workspace"; workspaceId: string }
@@ -67,33 +96,33 @@ export async function listTopLevelByScreen(
   projectId: string,
   screenId: string,
 ): Promise<ComponentRow[]> {
-  const rows = await listComponents();
-  return rows
-    .filter(
-      (r) =>
-        r.projectId === projectId &&
-        r.screenId === screenId &&
-        r.parentVariantId === null,
-    )
-    .sort((a, b) => a.order - b.order);
+  // projectId is implied by the screen; kept in the signature for call sites.
+  void projectId;
+  return listTopLevelByScreenId(screenId);
 }
 
 /** Top-level components of a screen, by screen id alone (project is implied). */
 export async function listTopLevelByScreenId(
   screenId: string,
 ): Promise<ComponentRow[]> {
+  const variants = await listTable<VariantRow>(VARIANTS_KEY);
+  const mainVariantId = mainVariantIdForScreen(variants, screenId);
+  if (!mainVariantId) return [];
+  // A screen's top-level components are owned by its main variant.
+  const owned = await componentIdsOwnedBy({ type: "variant", id: mainVariantId });
   const rows = await listComponents();
   return rows
-    .filter((r) => r.screenId === screenId && r.parentVariantId === null)
+    .filter((r) => owned.has(r.id))
     .sort((a, b) => a.order - b.order);
 }
 
 export async function listChildrenOfVariant(
   variantId: string,
 ): Promise<ComponentRow[]> {
+  const owned = await componentIdsOwnedBy({ type: "variant", id: variantId });
   const rows = await listComponents();
   return rows
-    .filter((r) => r.parentVariantId === variantId)
+    .filter((r) => owned.has(r.id))
     .sort((a, b) => a.order - b.order);
 }
 
@@ -108,11 +137,10 @@ export async function listComponentsByProject(
 export async function listWorkspaceComponents(
   workspaceId: string,
 ): Promise<ComponentRow[]> {
+  const owned = await componentIdsOwnedBy({ type: "workspace", id: workspaceId });
   const rows = await listComponents();
   return rows
-    .filter(
-      (r) => componentScope(r) === "workspace" && r.workspaceId === workspaceId,
-    )
+    .filter((r) => owned.has(r.id))
     .sort((a, b) => a.order - b.order);
 }
 
@@ -120,9 +148,10 @@ export async function listWorkspaceComponents(
 export async function listProjectGlobalComponents(
   projectId: string,
 ): Promise<ComponentRow[]> {
+  const owned = await componentIdsOwnedBy({ type: "project", id: projectId });
   const rows = await listComponents();
   return rows
-    .filter((r) => componentScope(r) === "project" && r.projectId === projectId)
+    .filter((r) => owned.has(r.id))
     .sort((a, b) => a.order - b.order);
 }
 
