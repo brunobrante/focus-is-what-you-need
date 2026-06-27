@@ -1,6 +1,11 @@
 import type { ProjectType } from "@/lib/data/types";
 import type { CanvasInsertToolId } from "@/lib/canvas/tools";
-import type { HtmlCanvasDocument, HtmlCanvasNode, SubjectRootOptions } from "./types";
+import type {
+  HtmlCanvasDocument,
+  HtmlCanvasNode,
+  HtmlCanvasStyle,
+  SubjectRootOptions,
+} from "./types";
 import { HTML_CANVAS_FORMAT, HTML_CANVAS_VERSION } from "./types";
 import {
   boundsForTool,
@@ -12,6 +17,7 @@ import {
   textForTool,
   typeForTool,
 } from "./nodeHelpers";
+import { defaultStyle, slugClass, slugId } from "./styleUtils";
 
 export function normalizeHtmlCanvasDocument(document: HtmlCanvasDocument): HtmlCanvasDocument {
   const nodes = document.nodes.map((node, index) => normalizeNode(node, index));
@@ -63,8 +69,80 @@ export function htmlCanvasDocumentFromJSON(json: string | null): HtmlCanvasDocum
   }
 }
 
+// ---------------------------------------------------------------------------
+// Canonical compaction (D10): the `graphJSON` blob is the hottest data in the
+// app. We persist only what differs from the type defaults — `normalizeNode` /
+// `normalizeStyle` re-derive everything omitted on parse, so this is the EXACT
+// inverse of normalization. Serialization stays canonical/deterministic (stable
+// key order, consistent omission) so the string-equality save-skip still holds.
+// ---------------------------------------------------------------------------
+
+/** Round a coordinate to 2 decimals — kills float noise and bytes (D10). */
+function roundCoord(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** Drop style props equal to their default; keep custom + non-default extras
+ *  (token refs, effects, fills…). `normalizeStyle` refills the omitted defaults. */
+function compactStyle(style: HtmlCanvasStyle): Record<string, unknown> | undefined {
+  const def = defaultStyle() as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(style)) {
+    if (key in def && def[key] === value) continue;
+    out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Compact one already-normalized node: omit fields `normalizeNode` re-derives
+ *  (cssId/className from name, null text/imageUrl, default visible/locked/
+ *  appearance/instanceOf), round bounds. Key order is fixed → deterministic. */
+function compactNode(node: HtmlCanvasNode): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    id: node.id,
+    parentId: node.parentId,
+    name: node.name,
+    kind: node.kind,
+    tag: node.tag,
+    order: node.order,
+    bounds: {
+      x: roundCoord(node.bounds.x),
+      y: roundCoord(node.bounds.y),
+      width: roundCoord(node.bounds.width),
+      height: roundCoord(node.bounds.height),
+    },
+  };
+  if (node.cssId !== slugId(node.name)) out.cssId = node.cssId;
+  if (node.className !== slugClass(node.name)) out.className = node.className;
+  if (node.text != null) out.text = node.text;
+  if (node.imageUrl != null) out.imageUrl = node.imageUrl;
+  if (node.appearance !== "rect") out.appearance = node.appearance;
+  if (node.visible !== true) out.visible = node.visible;
+  if (node.locked !== false) out.locked = node.locked;
+  if (node.instanceOf != null) out.instanceOf = node.instanceOf;
+  const style = compactStyle(node.style);
+  if (style) out.style = style;
+  return out;
+}
+
+/** The serialization-shape (default-omitted) of a normalized document. */
+export function compactHtmlCanvasDocument(
+  document: HtmlCanvasDocument,
+): Record<string, unknown> {
+  return {
+    format: document.format,
+    version: document.version,
+    rootId: document.rootId,
+    viewport: document.viewport,
+    nodes: document.nodes.map(compactNode),
+    updatedAt: document.updatedAt,
+  };
+}
+
 export function serializeHtmlCanvasDocument(document: HtmlCanvasDocument): string {
-  return JSON.stringify(normalizeHtmlCanvasDocument(document));
+  // Normalize to the canonical full form first, then compact — so the omitted
+  // fields are exactly the ones parse re-derives.
+  return JSON.stringify(compactHtmlCanvasDocument(normalizeHtmlCanvasDocument(document)));
 }
 
 export function updateHtmlCanvasNode(
