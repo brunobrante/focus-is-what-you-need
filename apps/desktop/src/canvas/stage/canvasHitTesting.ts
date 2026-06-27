@@ -24,10 +24,13 @@ export function findChildAtPoint(
     for (const id of ids) {
       const node = document.elements[id];
       if (!node || node.visible === false || node.locked) continue;
+      // Only descend into a subtree when the point is inside the node itself —
+      // otherwise every pointer-down scans all descendants and a child clipped
+      // outside its parent could be returned (matches findDropTarget/marquee).
       if (isPointInElement(document, id, point)) {
         bestId = id;
+        walk(node.children);
       }
-      walk(node.children);
     }
   }
   walk(parent.children);
