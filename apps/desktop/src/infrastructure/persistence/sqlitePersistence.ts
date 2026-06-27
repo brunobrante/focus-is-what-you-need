@@ -41,6 +41,21 @@ export function createSqlitePersistence(): GraphPersistencePort {
       return b64 == null ? null : base64ToBytes(b64);
     },
 
+    async getAssetBlobs(blobKeys) {
+      const out = new Map<string, Uint8Array>();
+      if (blobKeys.length === 0) return out;
+      const invoke = await getInvoke();
+      // One IPC returns every found blob (base64), keyed by blobKey (Rust
+      // `asset_get_many`). Missing keys are absent from the map.
+      const found = await invoke<Record<string, string>>("asset_get_many", {
+        blobKeys,
+      });
+      for (const [key, b64] of Object.entries(found)) {
+        out.set(key, base64ToBytes(b64));
+      }
+      return out;
+    },
+
     async putAssetBlob(bytes, meta) {
       const invoke = await getInvoke();
       await invoke("asset_put", { dataB64: bytesToBase64(bytes), meta });

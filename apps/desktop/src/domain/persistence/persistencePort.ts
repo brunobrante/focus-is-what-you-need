@@ -49,6 +49,12 @@ export type AssetBlobMeta = {
 export interface GraphPersistencePort extends PersistencePort {
   /** Read raw bytes for a stored asset, or null if the key is unknown. */
   getAssetBlob(blobKey: string): Promise<Uint8Array | null>;
+  /**
+   * Batched read for grids (flip 3): resolve many keys in ONE round-trip instead
+   * of N `getAssetBlob` calls. Returns a map of the keys that were found (missing
+   * keys are simply absent), so a thumbnail grid never pays the per-card IPC cliff.
+   */
+  getAssetBlobs(blobKeys: string[]): Promise<Map<string, Uint8Array>>;
   /** Store (or replace) the bytes for `meta.blobKey`. Idempotent by key. */
   putAssetBlob(bytes: Uint8Array, meta: AssetBlobMeta): Promise<void>;
   /** Delete a stored asset (thumbnails/crops are regenerable — safe to drop). */

@@ -809,16 +809,26 @@ don't cover the render path. Do them in the order below — flip 1 is the substa
     still render the token value; edit/add/delete a token in the System Design page; detach a
     linked token and confirm it copies the master locally; "share by default" on new-project still
     links every workspace token.
-- [ ] **(3) Thumbnail/image `dataUrl` consumers → `blobKey` — measure before shipping.**
-  - *Now:* thumbnails are inline base64 `dataUrl`s; `asset_blobs` exists but consumers still read
-    `dataUrl`. The RUST-4 cliff is **already gone** (blobs are out of `records`), so this is
-    read-path perf, not correctness.
-  - *The caveat:* a grid of N thumbnails would do **N** `getAssetBlob` round-trips vs today's
-    **one** `listRecords` that brings every `dataUrl` inline — a naive flip can be *slower*. Decide
-    with real numbers: add a batched `getAssetBlobs(keys[])` for grids, or keep small thumbnails
-    inline for list views and only blob-key the large originals.
-  - *Smoke-test:* reseed, scroll a project/gallery grid — thumbnails render and the grid is not
-    slower than before (measure, don't eyeball).
+- [~] **(3) Thumbnail/image `dataUrl` consumers → `blobKey`.** Chosen approach (user call): the
+  **proper batched** path, NOT the naive per-card flip — a batched `getAssetBlobs(keys[])` so a grid
+  pays one round-trip, never N. Landing in two green commits: **3a done** (infra + `ThumbnailRow`),
+  **3b pending** (`ProjectRow.thumbnailDataUrl`).
+  - *3a — DONE & green (zero new tsc errors; contract + loader tests pass; only the pre-existing
+    `seedCanvasMocks` fails):* `ThumbnailRow.dataUrl` → `dataBlobKey` (the snapshot data URL lives in
+    `asset_blobs`, stable key == record id so it overwrites in place). Added
+    `getAssetBlobs(blobKeys[])` to `GraphPersistencePort` + all three adapters and Rust
+    `asset_get_many` (one IPC, `prepare_cached` loop). New `assetDataUrlLoader` is a DataLoader-style
+    batcher: every blob key requested within a microtask coalesces into one `getAssetTextMany` call,
+    results cached, `invalidateAssetDataUrl` on in-place rewrite. `useThumbnail` resolves the data URL
+    through it and only surfaces a row once the image is ready — so **every consumer (`Snapshot`,
+    `SceneCanvasViewer`, `NavTooltip`) is unchanged**. Write path (`upsertThumbnail`) and seed
+    (`createMockThumbnailRow` → blob sink + `writeSeedThumbnailBlobs`) store the blob; `projectThumbnail`
+    reads the snapshot via `getAssetText`. `SCHEMA_VERSION` 23 → 24.
+  - *3b — pending:* `ProjectRow.thumbnailDataUrl` → `thumbnailBlobKey` (home/landing cards read via the
+    loader; the upload/edit forms `putAsset` on save). Entangled with user-editable thumbnail forms, so
+    it lands as its own commit.
+  - *Smoke-test:* reseed, scroll a project/gallery grid — thumbnails render and the grid is not slower
+    than before (measure, don't eyeball); regenerate a screen snapshot and confirm its card updates.
 
 **Gaps the post-landing review surfaced — ALL FIXED (`ff33a3a..db6fbce`):**
 

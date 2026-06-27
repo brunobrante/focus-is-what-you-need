@@ -160,6 +160,23 @@ export function runAssetBlobContract(
       expect(await port.getAssetBlob("k")).toBeNull();
     });
 
+    test("getAssetBlobs batch-reads many keys, omitting the missing ones", async () => {
+      const port = makePort();
+      await port.putAssetBlob(new Uint8Array([1, 1]), meta("a", 2));
+      await port.putAssetBlob(new Uint8Array([2, 2, 2]), meta("b", 3));
+
+      const found = await port.getAssetBlobs(["a", "b", "missing"]);
+      expect(found.size).toBe(2);
+      expect(Array.from(found.get("a")!)).toEqual([1, 1]);
+      expect(Array.from(found.get("b")!)).toEqual([2, 2, 2]);
+      expect(found.has("missing")).toBe(false);
+    });
+
+    test("getAssetBlobs of an empty list is an empty map", async () => {
+      const port = makePort();
+      expect((await port.getAssetBlobs([])).size).toBe(0);
+    });
+
     test("blobs never surface as records", async () => {
       const port = makePort();
       await port.putAssetBlob(new Uint8Array([1, 2]), meta("k", 2));

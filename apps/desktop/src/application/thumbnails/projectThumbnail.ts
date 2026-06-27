@@ -1,6 +1,7 @@
 import { getProject, listProjects, updateProject } from "@/lib/storage/repos/projects.repo";
 import { getScreen, listScreensByProject } from "@/lib/storage/repos/screens.repo";
 import { getThumbnailByOwner } from "@/lib/storage/repos/thumbnails.repo";
+import { getAssetText } from "@/application/persistence/assetStore";
 import { getVariant } from "@/lib/storage/repos/variants.repo";
 import { getGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { renderProjectThumbnailDataUrl } from "@/lib/storage/projectThumbnail";
@@ -32,14 +33,16 @@ export async function regenerateProjectThumbnail(projectId: string): Promise<boo
   if (!firstScreen) return false;
 
   // The snapshot must already exist; we never rasterise the screen here. A screen's
-  // snapshot lives on its active variant.
+  // snapshot lives on its active variant — its data URL is now in the asset store.
   const snapshot = await getThumbnailByOwner("variant", firstScreen.activeVariantId);
-  if (!snapshot?.dataUrl) return false;
+  if (!snapshot) return false;
+  const snapshotDataUrl = await getAssetText(snapshot.dataBlobKey);
+  if (!snapshotDataUrl) return false;
 
   const thumbnailDataUrl = renderProjectThumbnailDataUrl({
     name: project.name,
     type: project.type,
-    snapshotDataUrl: snapshot.dataUrl,
+    snapshotDataUrl,
   });
   if (thumbnailDataUrl === project.thumbnailDataUrl) return false;
 

@@ -1086,6 +1086,7 @@ pub fn run() {
             db::db_list_records,
             db::asset_put,
             db::asset_get,
+            db::asset_get_many,
             db::asset_delete,
             write_reference_file,
             read_reference_file,

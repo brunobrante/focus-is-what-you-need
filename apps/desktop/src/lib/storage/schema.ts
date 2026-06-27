@@ -27,7 +27,7 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // boot), `instance_usage` (derived from scene graphJSON on save), and `asset_blobs`
 // (binaries out of the records hot path). Nuke-and-reseed produces every row fresh
 // with a short id + envelope; the edge graph is reconciled right after seeding.
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 export type Meta = {
   schemaVersion: number;
@@ -256,7 +256,11 @@ export type ThumbnailRow = {
   id: string;
   ownerType: SceneOwnerType;
   ownerId: string;
-  dataUrl: string;
+  // The snapshot `data:` URL lives in the asset store (flip 3), keyed by this
+  // blobKey, instead of inline in row JSON — so a bulk thumbnails read stays lean.
+  // Resolve it through the batching `assetDataUrlLoader`. The key is stable per
+  // owner (== the record id) so a regenerated snapshot overwrites in place.
+  dataBlobKey: string;
   capturedAt: number;
 };
 

@@ -80,6 +80,21 @@ export async function getAssetText(blobKey: string): Promise<string | null> {
   return bytes == null ? null : decoder.decode(bytes);
 }
 
+/**
+ * Batched UTF-8 read (flip 3): resolve many blob keys to strings in ONE port
+ * round-trip. Returns a map of the keys that were found; callers treat a missing
+ * key as "no asset". Backs the thumbnail grid loader so N cards cost one IPC.
+ */
+export async function getAssetTextMany(
+  blobKeys: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (blobKeys.length === 0) return out;
+  const bytesByKey = await getPersistencePort().getAssetBlobs(blobKeys);
+  for (const [key, bytes] of bytesByKey) out.set(key, decoder.decode(bytes));
+  return out;
+}
+
 /** Read a blob back as a `data:` URL of the given mime type. */
 export async function getAssetDataUrl(
   blobKey: string,

@@ -23,6 +23,10 @@ import { findScreenByTitle, getScreen, listScreens, listScreensByProject } from 
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
 import { getThumbnailByOwner } from "@/lib/storage/repos/thumbnails.repo";
 import {
+  loadAssetDataUrl,
+  peekAssetDataUrl,
+} from "@/application/persistence/assetDataUrlLoader";
+import {
   getVariant,
   listVariants,
   listVariantsByComponent,
@@ -427,16 +431,50 @@ export function useScene(
   );
 }
 
+/** A thumbnail row with its snapshot `data:` URL resolved from the asset store. */
+export type ResolvedThumbnail = ThumbnailRow & { dataUrl: string };
+
 export function useThumbnail(
   ownerType: SceneOwnerType | null | undefined,
   ownerId: string | null | undefined,
-): State<ThumbnailRow | null> {
+): State<ResolvedThumbnail | null> {
   const key = ownerType && ownerId ? ownerInvalidationKey("thumbnail", ownerType, ownerId) : "thumbnail:none";
-  return useInvalidationQuery<ThumbnailRow | null>(
+  const rowState = useInvalidationQuery<ThumbnailRow | null>(
     [key],
     async () =>
       ownerType && ownerId ? getThumbnailByOwner(ownerType, ownerId) : null,
     null,
     [ownerType ?? "", ownerId ?? ""],
   );
+
+  // Resolve the snapshot data URL from the asset store via the batching loader
+  // (flip 3): a grid of thumbnails collapses into one round-trip. `capturedAt` is
+  // part of the dep so a regenerated snapshot (stable key, new bytes) re-resolves.
+  const row = rowState.data;
+  const blobKey = row?.dataBlobKey ?? null;
+  const capturedAt = row?.capturedAt ?? 0;
+  const [dataUrl, setDataUrl] = useState<string | null>(() =>
+    blobKey ? peekAssetDataUrl(blobKey) ?? null : null,
+  );
+  useEffect(() => {
+    if (!blobKey) {
+      setDataUrl(null);
+      return;
+    }
+    const cached = peekAssetDataUrl(blobKey);
+    if (cached !== undefined) setDataUrl(cached);
+    let active = true;
+    void loadAssetDataUrl(blobKey).then((url) => {
+      if (active) setDataUrl(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, [blobKey, capturedAt]);
+
+  // Only surface a row once its image is resolved, so consumers reading
+  // `data.dataUrl` keep a guaranteed string and show a placeholder until ready.
+  const data: ResolvedThumbnail | null =
+    row && dataUrl ? { ...row, dataUrl } : null;
+  return { loading: rowState.loading, data };
 }

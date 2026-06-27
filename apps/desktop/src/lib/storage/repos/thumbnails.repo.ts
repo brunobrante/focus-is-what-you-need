@@ -1,9 +1,14 @@
 import { now } from "@/lib/storage/ids";
 import { notifyInvalidation, ownerInvalidationKey } from "@/application/persistence/invalidationBus";
+import { deleteAsset, putAssetText } from "@/application/persistence/assetStore";
+import { invalidateAssetDataUrl } from "@/application/persistence/assetDataUrlLoader";
 import type { SceneOwnerType, ThumbnailRow } from "@/lib/storage/schema";
 import { TABLES, getRecordById, listTable, notify, putRecord, removeRecords } from "@/lib/storage/store";
 
 const KEY = TABLES.thumbnails;
+// Snapshot data URLs are stored as text; the mime is cosmetic (the full data URL
+// is read back verbatim), but recorded for a future GC/export pass.
+const THUMBNAIL_MIME = "image/svg+xml";
 
 /**
  * Thumbnail rows are keyed deterministically by their owner (`ownerType:ownerId`),
@@ -30,18 +35,24 @@ export async function upsertThumbnail(input: {
   ownerId: string;
   dataUrl: string;
 }): Promise<ThumbnailRow> {
-  const existing = await getThumbnailByOwner(input.ownerType, input.ownerId);
+  const id = thumbnailRecordId(input.ownerType, input.ownerId);
   const t = now();
-  // One record per thumbnail — written as a single per-row delta.
-  const row: ThumbnailRow = existing
-    ? { ...existing, dataUrl: input.dataUrl, capturedAt: t }
-    : {
-        id: thumbnailRecordId(input.ownerType, input.ownerId),
-        ownerType: input.ownerType,
-        ownerId: input.ownerId,
-        dataUrl: input.dataUrl,
-        capturedAt: t,
-      };
+  // Stable blob key per owner (== the record id) so a regenerated snapshot
+  // overwrites in place — no orphaned blobs to GC. Write the bytes first, then
+  // drop the loader's stale cache entry, then the row (whose notify makes the UI
+  // re-resolve the now-fresh blob).
+  const dataBlobKey = await putAssetText(input.dataUrl, {
+    blobKey: id,
+    mimeType: THUMBNAIL_MIME,
+  });
+  invalidateAssetDataUrl(dataBlobKey);
+  const row: ThumbnailRow = {
+    id,
+    ownerType: input.ownerType,
+    ownerId: input.ownerId,
+    dataBlobKey,
+    capturedAt: t,
+  };
   putRecord<ThumbnailRow>(KEY, row);
   notifyInvalidation(ownerInvalidationKey("thumbnail", input.ownerType, input.ownerId));
   notify(KEY);
@@ -56,6 +67,8 @@ export async function deleteThumbnailByOwner(
   const existing = await getRecordById<ThumbnailRow>(KEY, id);
   if (!existing) return;
   removeRecords(KEY, [id]);
+  await deleteAsset(existing.dataBlobKey);
+  invalidateAssetDataUrl(existing.dataBlobKey);
   notifyInvalidation(ownerInvalidationKey("thumbnail", ownerType, ownerId));
   notify(KEY);
 }

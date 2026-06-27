@@ -29,6 +29,7 @@ import {
 import { TABLES, getMeta, listTable, notify, replaceTable, setMeta } from "@/lib/storage/store";
 import { sceneRecordId } from "@/lib/storage/repos/scenes.repo";
 import { thumbnailRecordId } from "@/lib/storage/repos/thumbnails.repo";
+import { putAssetText } from "@/application/persistence/assetStore";
 
 async function readMeta(): Promise<Meta> {
   return (
@@ -128,6 +129,7 @@ async function firstBootSeedV5(): Promise<void> {
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
   const scenes: SceneRow[] = [];
   const thumbnails: ThumbnailRow[] = [];
+  const thumbnailBlobs: SeedThumbnailBlob[] = [];
   const ownerEdges: SeedOwnerEdge[] = [];
 
   for (const screen of screens) {
@@ -137,7 +139,9 @@ async function firstBootSeedV5(): Promise<void> {
     if (!bundle) continue;
     const mainVariantId = mainVariantByScreenId.get(screen.id)!;
     scenes.push(createMockSceneRow(mainVariantId, "variant", bundle.screen, t));
-    thumbnails.push(createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t));
+    thumbnails.push(
+      createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t, thumbnailBlobs),
+    );
     seedComponentTree({
       projectId: screen.projectId,
       // Screen-top-level components are owned by the screen's MAIN variant.
@@ -147,6 +151,7 @@ async function firstBootSeedV5(): Promise<void> {
       variants,
       scenes,
       thumbnails,
+      thumbnailBlobs,
       ownerEdges,
       t,
     });
@@ -170,6 +175,7 @@ async function firstBootSeedV5(): Promise<void> {
   await replaceTable<ReferenceRow>(TABLES.references, references, silent);
   await replaceTable<SceneRow>(TABLES.scenes, scenes, silent);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails, silent);
+  await writeSeedThumbnailBlobs(thumbnailBlobs);
   await replaceTable<WorkspaceRow>(TABLES.workspaces, [workspace], silent);
   await replaceTable<never>(TABLES.history, [], silent);
   // System designs (and their tokens, now their own rows — flip 2) are created
@@ -198,6 +204,7 @@ async function firstBootSeedV5(): Promise<void> {
 async function ensureFactoryMocksPresent(): Promise<void> {
   const t = now();
   const ownerEdges: SeedOwnerEdge[] = [];
+  const thumbnailBlobs: SeedThumbnailBlob[] = [];
   let projects = await listTable<ProjectRow>(TABLES.projects);
   let screens = await listTable<ScreenRow>(TABLES.screens);
   let components = (await listTable<ComponentRow>(TABLES.components)).map(
@@ -283,7 +290,7 @@ async function ensureFactoryMocksPresent(): Promise<void> {
       scenes = [...scenes, createMockSceneRow(mainVariantId, "variant", bundle.screen, t)];
       thumbnails = [
         ...thumbnails,
-        createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t),
+        createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t, thumbnailBlobs),
       ];
       seedComponentTree({
         projectId: project.id,
@@ -293,6 +300,7 @@ async function ensureFactoryMocksPresent(): Promise<void> {
         variants,
         scenes,
         thumbnails,
+        thumbnailBlobs,
         ownerEdges,
         t,
       });
@@ -334,6 +342,7 @@ async function ensureFactoryMocksPresent(): Promise<void> {
   await replaceTable<VariantRow>(TABLES.variants, variants, silent);
   await replaceTable<SceneRow>(TABLES.scenes, scenes, silent);
   await replaceTable<ThumbnailRow>(TABLES.thumbnails, thumbnails, silent);
+  await writeSeedThumbnailBlobs(thumbnailBlobs);
   await replaceTable<WorkspaceRow>(TABLES.workspaces, workspaces, silent);
 
   notify(TABLES.projects);
@@ -367,19 +376,38 @@ function createMockSceneRow(
   };
 }
 
+// A snapshot blob the seed must write to the asset store (flip 3): thumbnails no
+// longer carry the data URL inline. Collected while rows are built, written after.
+type SeedThumbnailBlob = { blobKey: string; dataUrl: string };
+
 function createMockThumbnailRow(
   ownerId: string,
   ownerType: ThumbnailRow["ownerType"],
   mock: CanvasMockData,
   t: number,
+  blobSink: SeedThumbnailBlob[],
 ): ThumbnailRow {
+  const id = thumbnailRecordId(ownerType, ownerId);
+  // Stable blob key == record id (matches the runtime upsert), so the snapshot
+  // overwrites in place when a screen is later edited.
+  blobSink.push({ blobKey: id, dataUrl: mock.snapshot });
   return {
-    id: thumbnailRecordId(ownerType, ownerId),
+    id,
     ownerType,
     ownerId,
-    dataUrl: mock.snapshot,
+    dataBlobKey: id,
     capturedAt: t,
   };
+}
+
+/** Write the collected snapshot data URLs to the asset store. */
+async function writeSeedThumbnailBlobs(blobs: SeedThumbnailBlob[]): Promise<void> {
+  for (const blob of blobs) {
+    await putAssetText(blob.dataUrl, {
+      blobKey: blob.blobKey,
+      mimeType: "image/svg+xml",
+    });
+  }
 }
 
 /** An `owns` edge the seed must emit: `variant ──owns──▶ component`. Ownership is
@@ -397,6 +425,7 @@ function seedComponentTree(input: {
   variants: VariantRow[];
   scenes: SceneRow[];
   thumbnails: ThumbnailRow[];
+  thumbnailBlobs: SeedThumbnailBlob[];
   ownerEdges: SeedOwnerEdge[];
   t: number;
 }): void {
@@ -431,7 +460,13 @@ function seedComponentTree(input: {
       createMockSceneRow(variantId, "variant", node.canvas, input.t),
     );
     input.thumbnails.push(
-      createMockThumbnailRow(variantId, "variant", node.canvas, input.t),
+      createMockThumbnailRow(
+        variantId,
+        "variant",
+        node.canvas,
+        input.t,
+        input.thumbnailBlobs,
+      ),
     );
 
     // Children nest under this component's own Default variant.

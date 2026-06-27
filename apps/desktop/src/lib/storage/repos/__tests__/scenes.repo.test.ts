@@ -8,6 +8,7 @@ import {
 import { getCanvasMockBundleForScreen } from "@/components/mocks/data/canvasMocks";
 import { flushThumbnailJobs } from "@/application/thumbnails/thumbnailQueue";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { getAssetText } from "@/application/persistence/assetStore";
 import { setOwner } from "@/lib/storage/repos/edges.repo";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
@@ -60,8 +61,9 @@ test("upsertScene keeps the derived snapshot thumbnail in sync", async () => {
     ownerType: "variant",
     ownerId: "variant-1",
   });
-  expect(thumbnails[0]!.dataUrl).toStartWith("data:image/svg+xml;utf8,");
-  expect(decodeURIComponent(thumbnails[0]!.dataUrl)).toContain("Header");
+  const dataUrl = (await getAssetText(thumbnails[0]!.dataBlobKey))!;
+  expect(dataUrl).toStartWith("data:image/svg+xml;utf8,");
+  expect(decodeURIComponent(dataUrl)).toContain("Header");
 });
 
 test("upsertScene propagates connected component snapshots to parent screen", async () => {
@@ -153,8 +155,9 @@ test("upsertScene propagates connected component snapshots to parent screen", as
   const screenThumbnail = thumbnails.find(
     (thumbnail) => thumbnail.ownerType === "variant" && thumbnail.ownerId === "variant-home",
   );
-  expect(screenThumbnail?.dataUrl).toStartWith("data:image/svg+xml;utf8,");
-  expect(decodeURIComponent(screenThumbnail!.dataUrl)).toContain("Updated Summary");
+  const screenDataUrl = (await getAssetText(screenThumbnail!.dataBlobKey))!;
+  expect(screenDataUrl).toStartWith("data:image/svg+xml;utf8,");
+  expect(decodeURIComponent(screenDataUrl)).toContain("Updated Summary");
 });
 
 test("upsertScene propagates connected nested component snapshots through every parent", async () => {
@@ -289,8 +292,8 @@ test("upsertScene propagates connected nested component snapshots through every 
   const screenThumbnail = thumbnails.find(
     (thumbnail) => thumbnail.ownerType === "variant" && thumbnail.ownerId === "variant-home",
   );
-  expect(decodeURIComponent(headerThumbnail!.dataUrl)).toContain("ZX");
-  expect(decodeURIComponent(screenThumbnail!.dataUrl)).toContain("ZX");
+  expect(decodeURIComponent((await getAssetText(headerThumbnail!.dataBlobKey))!)).toContain("ZX");
+  expect(decodeURIComponent((await getAssetText(screenThumbnail!.dataBlobKey))!)).toContain("ZX");
 });
 
 test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () => {

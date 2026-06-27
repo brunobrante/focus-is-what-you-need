@@ -6,6 +6,7 @@ import {
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
+import { getAssetText } from "@/application/persistence/assetStore";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache, setMeta } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type {
@@ -103,7 +104,8 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
   expect(sceneFor(alignmentScreen!.id)?.graphJSON).toBe(
     mocks["mock-mobile-alignment-debug"].graphJSON,
   );
-  expect(thumbFor(mobileHome!.id)?.dataUrl).toBe(
+  const mobileHomeThumb = thumbFor(mobileHome!.id);
+  expect(await getAssetText(mobileHomeThumb!.dataBlobKey)).toBe(
     mocks["mock-mobile-home"].snapshot,
   );
 

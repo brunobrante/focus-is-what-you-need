@@ -70,6 +70,25 @@ export function createIndexedDbPersistence(): GraphPersistencePort {
       return entry?.bytes ?? null;
     },
 
+    async getAssetBlobs(blobKeys) {
+      const db = await openDatabase();
+      // One readonly transaction, one get per key (no full-store scan); the keys a
+      // grid asks for are a small set, and they all resolve on the same tx.
+      const store = db
+        .transaction(ASSET_BLOBS, "readonly")
+        .objectStore(ASSET_BLOBS);
+      const entries = await Promise.all(
+        blobKeys.map((key) =>
+          reqToPromise<AssetBlobEntry | undefined>(store.get(key)),
+        ),
+      );
+      const out = new Map<string, Uint8Array>();
+      entries.forEach((entry, i) => {
+        if (entry) out.set(blobKeys[i]!, entry.bytes);
+      });
+      return out;
+    },
+
     async putAssetBlob(bytes, meta) {
       const db = await openDatabase();
       await txDone(

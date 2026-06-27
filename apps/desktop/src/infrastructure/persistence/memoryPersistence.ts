@@ -64,6 +64,14 @@ export function createMemoryPersistence(): GraphPersistencePort {
     async getAssetBlob(blobKey) {
       return blobs.get(blobKey)?.bytes ?? null;
     },
+    async getAssetBlobs(blobKeys) {
+      const out = new Map<string, Uint8Array>();
+      for (const key of blobKeys) {
+        const entry = blobs.get(key);
+        if (entry) out.set(key, entry.bytes);
+      }
+      return out;
+    },
     async putAssetBlob(bytes, meta) {
       blobs.set(meta.blobKey, { bytes, meta });
     },

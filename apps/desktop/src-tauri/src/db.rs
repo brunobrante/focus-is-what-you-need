@@ -290,6 +290,38 @@ pub async fn asset_get(state: State<'_, Db>, blob_key: String) -> Result<Option<
     .map_err(|e| e.to_string())?
 }
 
+/// Batched read for grids: one IPC + one connection lock returns every requested
+/// blob (base64), keyed by `blob_key`. Missing keys are simply absent from the map.
+/// Avoids the N-round-trip cliff of calling `asset_get` once per thumbnail.
+#[tauri::command]
+pub async fn asset_get_many(
+    state: State<'_, Db>,
+    blob_keys: Vec<String>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    let db = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+        // One cached statement reused across the loop (RUST-2): no per-row prepare.
+        let mut stmt = conn
+            .prepare_cached("SELECT data FROM asset_blobs WHERE blob_key = ?1")
+            .map_err(|e| e.to_string())?;
+        let mut out = std::collections::HashMap::with_capacity(blob_keys.len());
+        for key in blob_keys {
+            let bytes: Option<Vec<u8>> = stmt
+                .query_row(params![key], |row| row.get::<_, Option<Vec<u8>>>(0))
+                .optional()
+                .map_err(|e| e.to_string())?
+                .flatten();
+            if let Some(b) = bytes {
+                out.insert(key, BASE64.encode(b));
+            }
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn asset_delete(state: State<'_, Db>, blob_key: String) -> Result<(), String> {
     let db = state.0.clone();
