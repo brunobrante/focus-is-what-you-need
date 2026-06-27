@@ -11,9 +11,18 @@ Paths written as `src/...` live under `apps/desktop/`.
 
 ## Storage ownership
 
-Storage follows the same hierarchy as the UI. Screens and components are unified:
-both are masters that own a chain of `VariantRow`s (a `VariantRow` carries
-`ownerKind: "screen" | "component"` + `ownerId`). A version is a variant.
+> The full design, rationale, and locked decisions live in
+> [`save-architecture-v3.md`](./save-architecture-v3.md). This section is the
+> concise living summary; that file is the source of record for *why*.
+
+Storage follows the same hierarchy as the UI, but **cross-entity structure is an
+indexed graph of edges, not fixed foreign-key fields** (save-architecture-v3). An
+entity row stores *what the thing is*; a `graph_edges` row stores *how things
+connect* (containment, ownership, attachment), indexed both directions.
+
+Screens and components are unified: both are masters that own a chain of
+`VariantRow`s (a `VariantRow` carries `ownerKind: "screen" | "component"` +
+`ownerId`). A version is a variant.
 
 - **all** scenes are stored with `ownerType: "variant"` and a variant id — there
   is no `"screen"` scene owner. `SceneOwnerType` is just `"variant"`.
@@ -23,9 +32,24 @@ both are masters that own a chain of `VariantRow`s (a `VariantRow` carries
 - a component owns its versions as `ownerKind: "component"` variants.
 - both screens and components carry an `activeVariantId` pointing at the variant
   whose scene is currently shown/edited.
-- a top-level component belongs to its source screen through `screenId`; its
-  embedding scene is that screen's main variant.
-- a nested component belongs to its parent component through `parentVariantId`.
+
+**Component ownership is an `owns` edge — there is no `screenId` /
+`parentVariantId` field anymore.** Every owned component has exactly one incoming
+`owns` edge, and `componentScope` is derived from it (`componentOwnership.ts`,
+`peekOwnerOf`, O(1) against the in-memory edge index):
+
+| Component | Owner edge |
+| --- | --- |
+| Workspace-global | `workspace owns component` |
+| Project-global | `project owns component` |
+| Screen top-level | `variant owns component` (the screen's **main** variant) |
+| Nested in a component | `variant owns component` (the parent component's variant) |
+| Copy-version child | `variant owns component` (the **version** variant) |
+| Draft (loose) | *no owner edge* |
+
+Top-level, nested, and version-owned components all use the **same** `variant owns
+component` edge — the old `screenId`↔`parentVariantId` asymmetry (and its
+promote-to-main re-home) is gone.
 
 Do not store any canvas scene under a screen id or a component id. Variants are
 the editable scene owners for **both** screens and components.
@@ -38,22 +62,31 @@ instance → detach** model (the product law is in `Product.md`). The data shape
 - **System Design tokens** (`domain/system-design/types.ts`): every token carries
   optional `linkable?: boolean` (a workspace token shareable into projects, on by
   default) and `instanceOf?: { systemDesignId, tokenId } | null` (a linked
-  instance pointing at a master token). A project's `SystemDesignRow.tokens` holds
-  both its local tokens and the linked instances it chose; there is **no**
-  per-category inheritance / `excludedShared`. `resolveSystemDesign(design, parent)`
-  refreshes a linked token's display values live from the master (keeping its id so
-  `$$ref` pointers stay valid) and exposes the workspace's unlinked linkable tokens
-  as `availableShared` for the picker. **Detach** (`detachToken` in
-  `useSystemDesign`) copies the master's values locally and clears `instanceOf`.
+  instance pointing at a master token). **Each token is persisted as its own
+  `TokenRow` in the `tokens` table** (save-architecture-v3 flip 2) — the row id is a
+  short client-gen id; the token's stable `$$ref` key lives on `token.id` (shared by
+  a linked instance with its master). `SystemDesignRow.tokens` is an **assembled
+  in-memory view only**, never persisted on the design row: `systemDesigns.repo` is
+  the sole bridge — `assembleTokens` rebuilds it on read, `reconcileTokenRows` splits
+  it into per-row writes on save. There is **no** per-category inheritance /
+  `excludedShared`. `resolveSystemDesign(design, parent)` refreshes a linked token's
+  display values live from the master (keeping its id so `$$ref` pointers stay valid)
+  and exposes the workspace's unlinked linkable tokens as `availableShared` for the
+  picker. **Detach** (`detachToken` in `useSystemDesign`) copies the master's values
+  locally and clears `instanceOf`.
 - **References** (`ReferenceRow`): `linkable?: boolean` (library references are
-  linkable by default) and `detachedFrom?: string | null`. A reference attached to
-  many owners via `attachments[]` **is** the linked-instance mechanism (one master
-  row, many places). **Detach** (`detachReference` in `references.repo.ts`) creates
-  a new local row (`visibility: "local"`, `linkable: false`, `detachedFrom`) owned
-  only by the current owner and removes that owner's attachment from the master,
+  linkable by default) and `detachedFrom?: string | null`. Multi-attach is the
+  **authoritative `referenceAsset/cut attached_to {...}` edges** in `graph_edges`
+  (save-architecture-v3 flip 1b) — one master row, many places, usage read off the
+  edge index (`listReferenceLinkUsages`). `attachments[]`/`projectIds` remain as a
+  denormalized display mirror. **Detach** (`detachReference` in `references.repo.ts`)
+  creates a new local row (`visibility: "local"`, `linkable: false`, `detachedFrom`)
+  owned only by the current owner and removes that owner's `attached_to` edge,
   preserving the master row.
 
-A SCHEMA_VERSION bump (→ 20) reseeds; no migration of the old inheritance shapes.
+A `SCHEMA_VERSION` bump reseeds (currently `25`); the app is local-only and
+pre-release, so schema changes nuke-and-reseed with no migration shims (see Data
+Lifecycle in `CLAUDE.md`).
 
 **Tokens bound to canvas elements** — an element style can reference a token via a
 `$$ref` string (`"<category>:<tokenId>"`). The binding is stored as additive
@@ -81,25 +114,26 @@ Get this right before changing any "open a component", "go to component", or
 "detach" behavior. (The product-level model is in `Product.md`; the full
 versioning model is in `Versioning.md`.)
 
-**Ownership — a component has exactly one owner, fixed at creation:**
+**Ownership — a component has exactly one owner, fixed at creation, expressed as
+one incoming `owns` edge** (no `screenId`/`parentVariantId` field):
 
-| Created where | Owner | Canonical location |
+| Created where | Owner edge | Canonical location |
 | --- | --- | --- |
-| Inside a screen | that screen (`screenId`) | `project/screen/component` |
-| Inside a **versioned** screen (e.g. by detach) | that **version** (`parentVariantId` = the screen's version variant) | `project/screen/version/component` |
-| Inside another component | that parent component (`parentVariantId` = the parent's variant) | nested |
-| Global project component | the project (or null) | `project/component` |
+| Inside a screen | the screen's **main** variant (`variant owns component`) | `project/screen/component` |
+| Inside a **versioned** screen (e.g. by detach) | that screen's **version** variant (`variant owns component`) | `project/screen/version/component` |
+| Inside another component | the parent component's variant (`variant owns component`) | nested |
+| Global project component | the project (`project owns component`) — or no edge (Draft) | `project/component` |
 
 A **linked instance** (`instanceOf`) placed inside any screen or version is only a
-**visual reference** — it does **not** transfer ownership.
+**visual reference** — it has no `owns` edge and does **not** transfer ownership.
 
 **A versioned screen is a normal screen in every way** — same storage, same
 operations, same component creation. It is only "versioned" in that it is linked
 to a main screen. Components created or detached inside it are owned by **that
-version**, not the main screen. Therefore a `parentVariantId` that points at a
-**screen variant** (a version, or the main) must resolve to that screen
-everywhere paths are walked (`componentPathFromRoot`, the Versions back footer,
-etc.) — never assume `parentVariantId` is always a *component's* variant.
+version**, not the main screen. Therefore an `owns` edge from a **screen variant**
+(a version, or the main) must resolve to that screen everywhere paths are walked
+(`componentPathFromRoot`, the Versions back footer, etc.) — never assume an owner
+variant is always a *component's* variant.
 
 **Navigation — "open" depends on whether the node is a link or owned content:**
 
@@ -149,6 +183,14 @@ their children. If a child changes but the parent snapshot still shows the old
 child, the hierarchy is broken. (Stale local rows are handled by nuke-and-reseed
 on a schema bump — see Data Lifecycle in `CLAUDE.md` — not by repair migrations.)
 
+A regenerated snapshot's **bytes live in the asset store, not the row**
+(save-architecture-v3 flip 3): `ThumbnailRow.dataBlobKey` and
+`ProjectRow.thumbnailBlobKey` point at an `asset_blobs` entry (stable key per
+owner, overwritten in place). Readers resolve through `assetDataUrlLoader` — a
+DataLoader-style batcher that coalesces every key requested in one tick into a
+single `getAssetBlobs` round-trip — surfaced by the `useThumbnail` /
+`useAssetDataUrl` hooks, so a grid of N cards costs one read, not N.
+
 ---
 
 ## Save Architecture
@@ -190,7 +232,7 @@ run off the critical path, at idle, after the row is already written.
 | File | What it contains |
 | --- | --- |
 | `src/domain/persistence/mutations.ts` | `Mutation` union type (`upsertRecord` / `deleteRecords`), `ApplyAck`, and `mutationKey()` — the coalescing key function. A 60fps drag of one node → one key → one pending entry. |
-| `src/domain/persistence/persistencePort.ts` | `PersistencePort` interface: `applyBatch(mutations)`, `getRecord(table, id)`, `listRecords(table)`. This is the only boundary all adapters must satisfy. |
+| `src/domain/persistence/persistencePort.ts` | `PersistencePort` interface: `applyBatch(mutations)`, `getRecord(table, id)`, `listRecords(table)`. `GraphPersistencePort extends PersistencePort` (save-architecture-v3 D4) adds the asset-blob methods `getAssetBlob` / `getAssetBlobs(keys[])` (batched) / `putAssetBlob` / `deleteAssetBlob`. Graph edges and instance-usage are plain `records` rows (see below), so they need no extra port methods. This is the only boundary all adapters must satisfy. |
 
 #### Application — use cases, depend only on the port
 
@@ -219,23 +261,35 @@ run off the critical path, at idle, after the row is already written.
 #### Rust backend — `src-tauri/src/db.rs`
 
 A single `Connection` lives in `tauri::State<Db>` (wrapped in `Arc<Mutex<>>`).
-`open_and_migrate` runs once at setup, creates the `records` table, and sets WAL
-+ NORMAL sync.
+`open_and_migrate` runs once at setup, creates the `records` and `asset_blobs`
+tables, and sets WAL + NORMAL sync.
 
-Every entity — including scenes and thumbnails — is one row in the generic
-`records(tbl, id, json)` table. A scene graph is JSON, a thumbnail is base64,
-both stored in the `json` column like any other record. There is **no** typed
+Every **row entity** is one row in the generic `records(tbl, id, json)` table — a
+scene graph is JSON like any other record. This includes the v3 graph: **`graph_edges`
+and `instance_usage` are logical tables *within* `records`** (one row each via
+`putRecord`), not separate SQLite tables — the bidirectional adjacency index and the
+usage index are derived/maintained on the **TS** side (in-memory, incremental), so
+Rust stays a dumb key-value store with **zero graph parsing**. There is **no** typed
 per-node/per-scene table or node-delta path: the TS side only ever emits
-`upsert_record` / `delete_records`, so that is all the backend implements.
+`upsert_record` / `delete_records`, so that is all the generic path implements.
+
+**Binaries are not in `records`.** Thumbnails, crop images, and imported assets live
+in the separate `asset_blobs` table (save-architecture-v3 D5 / flip 3), keyed by
+`blobKey`; rows hold only the key. Small blobs (≤256 KB) sit in a SQLite column,
+larger ones spill to a file in the app data dir. This keeps a bulk `db_list_records`
+from dragging megabytes of base64 under the lock (the old RUST-4 cliff).
 
 | Command | What it does |
 | --- | --- |
 | `db_apply(batch)` | Applies an entire coalesced batch in **one** `BEGIN…COMMIT` transaction. Handles `upsert_record` and `delete_records`. Returns `ApplyAck { applied }`. |
 | `db_get_record(table, id)` | Single-row read from the `records` table. |
 | `db_list_records(table)` | All JSON strings for one table from `records`. |
+| `asset_put(dataB64, meta)` | Upsert one blob into `asset_blobs` (rev-free; idempotent by `blobKey`). |
+| `asset_get(blobKey)` / `asset_get_many(blobKeys[])` | Read one / many blobs (base64). The batched form is one IPC + one lock with a `prepare_cached` loop — backs the thumbnail-grid loader. |
+| `asset_delete(blobKey)` | Drop a blob (thumbnails/crops are regenerable). |
 
-SQLite schema created in `open_and_migrate`: only `records` (with the
-`idx_records_tbl` index).
+SQLite schema created in `open_and_migrate`: `records` (with the `idx_records_tbl`
+index) and `asset_blobs`.
 
 #### Ancestor propagation
 

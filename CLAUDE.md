@@ -18,7 +18,8 @@ long as no law in `Product.md` is broken. When the idea and the code disagree,
 - [`UX.md`](./docs/UX.md) — living UI spec: every route, page, modal, and interaction.
 - [`Design.md`](./Design.md) — UI patterns, height scale, component conventions, visual tokens.
 - [`Versioning.md`](./docs/Versioning.md) — master / instance / detach / version model.
-- [`Architecture.md`](./docs/Architecture.md) — save system, settings, storage ownership, snapshot propagation, Rust backend.
+- [`Architecture.md`](./docs/Architecture.md) — save system, settings, storage ownership, snapshot propagation, Rust backend. The concise living implementation reference.
+- [`save-architecture-v3.md`](./docs/save-architecture-v3.md) — the storage model's full design record + rationale (graph edges, per-row tokens, asset store). Shipped; `Architecture.md` is the summary.
 
 Read the relevant doc before touching its area. Two are not optional to keep in
 sync:

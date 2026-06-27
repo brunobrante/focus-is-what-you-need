@@ -1,16 +1,12 @@
 # Save Architecture v3 — Workspace Graph Storage
 
-> **Implementing agent: read "Locked decisions" (D1–D10) FIRST.** It resolves every
-> open question and overrides any older phrasing in the body below. Then follow
-> "Execution order" — the 6 staging steps in sequence, one commit each, green on the
-> tri-adapter contract suite (D9) before the next. Do not one-shot; the field→edge
-> cutover (Step 2) must land as a single clean pass. The only thing you may not change
-> is `Product.md`.
->
-> **Already underway:** Steps 1–6 are committed as a *derived mirror* (edges self-heal
-> via boot reconcile; the authoritative field→edge flip is deferred). See
-> **"Landing status & remaining work"** near the end for the verified-done list and the
-> exact remaining checklist — start there if you're continuing the implementation.
+> **Status: SHIPPED.** This is the design record for the storage model now in the
+> code — it is no longer a plan. All six staging steps and the three app-gated flips
+> (ownership→edges, tokens→`TokenRow`s, thumbnails→`blobKey` with batched
+> `getAssetBlobs`) have landed. `Architecture.md` is the concise living implementation
+> reference; this file keeps the full rationale, the locked decisions (D1–D10), and the
+> landing history. The "Locked decisions" section still overrides any older phrasing in
+> the body below. The only thing that is law is `Product.md`.
 
 ## What this document is
 
