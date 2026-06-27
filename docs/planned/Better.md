@@ -197,7 +197,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | UI-7 | ✅ `690b209` | Component source badges resolve screens via a precomputed `screenById`. |
 | RUST-2 | ✅ `7ef532a` | `db_apply` hoists `prepare_cached` statements out of the loop. |
 | UI-8 | ✅ `b89687c` | CompareVersions panels key by slot, not version id — no Snapshot remount on slot change. |
-| ENG-6 | ⏭️ deferred | Already memoized (per-scene-change, not per-render); mock-detection logic is subtle and untested. |
+| ENG-6 | ✅ fixed | Persisted graph is parsed once into a plain `CanvasDocument` (`persistedPlainDoc`) and reused by `isFactoryMockDocument` + `shouldUseMockGraph` (both now take parsed docs); the mock graph parses once too. Removes the redundant persisted re-parse on a scene change. `currentDocument` still re-parses with `promoteSubjectRoot`+`resolveMaster` (a structurally different doc). Behavior preserved — string overload kept. |
 | SAVE-5 | ✅ storage graph model | Killed by the derived `instance_usage` index; `listInstanceUsages`/`countInstanceUsages` are now O(1) index hits, not scene scans. See "Storage ownership" in [`Architecture.md`](../Architecture.md). |
 | SAVE-6 | ✅ storage graph model | Largely neutralized — large blobs (scenes/thumbnails/crops) moved to the `asset_blobs` store (out of the `records` JSON), plus D10 omit-defaults shrank the graph blob. Only the dev-time post-nuke seed re-stringify remains, now trivial. |
 | SHELL-5 | ⏭️ deferred | `React.memo` is inert unless the parent stabilizes its Set/callback props — needs a parallel refactor. |

@@ -44,7 +44,7 @@ import {
   createBlankDocumentForProjectType,
   findTreeNodeById,
   isCurrentKey,
-  isFactoryMockGraphJSON,
+  isFactoryMockDocument,
   mockTargetKey,
   normalizeProjectType,
   shouldUseMockGraph,
@@ -189,15 +189,27 @@ function CanvasPageContent() {
     ? `desktop-canvas-editor:${sceneOwner.ownerType}:${sceneOwner.ownerId}:v1`
     : "desktop-canvas-editor:detached:v1";
   const currentSceneGraphJSON = scene?.graphJSON ?? null;
-  // Memoized so isFactoryMockGraphJSON parses the graph only when it actually
-  // changes, not on every Canvas render (and so the ref stays stable downstream).
+  // ENG-6: parse the persisted graph ONCE (plain, no instance resolution) and reuse
+  // the document for both the factory-mock check and the mock-vs-persisted decision,
+  // instead of re-parsing the same string in each. `currentDocument` below still
+  // re-parses with promoteSubjectRoot + resolveMaster (a structurally different doc).
+  const persistedPlainDoc = useMemo(
+    () => canvasDocumentFromHtmlGraphJSON(currentSceneGraphJSON),
+    [currentSceneGraphJSON],
+  );
+  // Memoized so the mock filter runs only when the graph actually changes, not on
+  // every Canvas render (and so the ref stays stable downstream).
   const effectiveSceneGraphJSON = useMemo(
     () =>
-      !canUseFactoryMocks && isFactoryMockGraphJSON(currentSceneGraphJSON)
+      !canUseFactoryMocks && isFactoryMockDocument(persistedPlainDoc)
         ? null
         : currentSceneGraphJSON,
-    [canUseFactoryMocks, currentSceneGraphJSON],
+    [canUseFactoryMocks, currentSceneGraphJSON, persistedPlainDoc],
   );
+  // The plain doc that matches `effectiveSceneGraphJSON` (null when the factory mock
+  // was filtered out above), passed to shouldUseMockGraph without a re-parse.
+  const effectivePersistedDoc =
+    effectiveSceneGraphJSON === null ? null : persistedPlainDoc;
 
   const currentMockTargetKey = useMemo(
     () => mockTargetKey({ canUseFactoryMocks, component, projectType, screen, projectComponents, projectScreens, variants: allVariants }),
@@ -216,12 +228,19 @@ function CanvasPageContent() {
     currentMockTargetKey,
   });
 
+  // Parse the mock graph once (plain) so shouldUseMockGraph compares two already-parsed
+  // documents (ENG-6).
+  const mockPlainDoc = useMemo(
+    () => canvasDocumentFromHtmlGraphJSON(mockScene.graphJSON ?? null),
+    [mockScene.graphJSON],
+  );
+
   const resolvedSceneGraphJSON = useMemo(() => {
     if (
       mockScene.graphJSON &&
       shouldUseMockGraph({
-        persistedGraphJSON: effectiveSceneGraphJSON,
-        mockGraphJSON: mockScene.graphJSON,
+        persistedDoc: effectivePersistedDoc,
+        mockDoc: mockPlainDoc,
         projectType,
         targetKind: component ? "component" : "screen",
       })
@@ -229,7 +248,7 @@ function CanvasPageContent() {
       return mockScene.graphJSON;
     }
     return effectiveSceneGraphJSON;
-  }, [component, effectiveSceneGraphJSON, mockScene.graphJSON, projectType]);
+  }, [component, effectivePersistedDoc, effectiveSceneGraphJSON, mockPlainDoc, mockScene.graphJSON, projectType]);
 
   const hasParent =
     !!component &&

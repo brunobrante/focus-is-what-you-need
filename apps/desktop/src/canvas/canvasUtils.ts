@@ -233,33 +233,43 @@ export function sameCanvasSize(
   return Math.round(a.width) === Math.round(b.width) && Math.round(a.height) === Math.round(b.height);
 }
 
-export function isFactoryMockGraphJSON(graphJSON: string | null): boolean {
-  if (!graphJSON) return false;
-  const doc = canvasDocumentFromHtmlGraphJSON(graphJSON);
+const MOCK_ROOT_NAMES = new Set([
+  "header", "hero banner", "category strip", "featured list",
+  "mobile app cart", "search bar", "filter chips", "product results",
+  "product gallery", "product summary", "options list",
+  "shipping form", "payment methods", "red alignment box",
+]);
+
+/**
+ * ENG-6: the document variants below operate on an ALREADY-PARSED `CanvasDocument`,
+ * so the render path can parse the persisted graph once and reuse it for both the
+ * factory-mock check and the mock-vs-persisted decision (instead of re-parsing the
+ * same `graphJSON` string in each). The string overloads are kept for any caller
+ * that only holds the JSON.
+ */
+export function isFactoryMockDocument(doc: CanvasDocument | null): boolean {
   if (!doc) return false;
   const rootNames = doc.rootIds
     .map((id) => doc.elements[id]?.name ?? "")
     .map(normalizeName);
-  const mockRootNames = new Set([
-    "header", "hero banner", "category strip", "featured list",
-    "mobile app cart", "search bar", "filter chips", "product results",
-    "product gallery", "product summary", "options list",
-    "shipping form", "payment methods", "red alignment box",
-  ]);
-  return rootNames.some((name) => mockRootNames.has(name));
+  return rootNames.some((name) => MOCK_ROOT_NAMES.has(name));
+}
+
+export function isFactoryMockGraphJSON(graphJSON: string | null): boolean {
+  if (!graphJSON) return false;
+  return isFactoryMockDocument(canvasDocumentFromHtmlGraphJSON(graphJSON));
 }
 
 export function shouldUseMockGraph(input: {
-  persistedGraphJSON: string | null;
-  mockGraphJSON: string;
+  persistedDoc: CanvasDocument | null;
+  mockDoc: CanvasDocument | null;
   projectType: ProjectType;
   // Whether the opened subject is a whole screen or a single component.
   targetKind: "screen" | "component";
 }): boolean {
-  const mockDoc = canvasDocumentFromHtmlGraphJSON(input.mockGraphJSON);
+  const { persistedDoc, mockDoc } = input;
   if (!mockDoc) return false;
 
-  const persistedDoc = canvasDocumentFromHtmlGraphJSON(input.persistedGraphJSON);
   if (!persistedDoc) return true;
   if (persistedDoc.rootIds.length === 0) return true;
   if (input.targetKind !== "component") return false;
