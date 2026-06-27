@@ -748,26 +748,29 @@ in-memory adjacency index, tombstone filter, idempotent reconcile, promote edge 
       thumbnails inline for the list path. (RUST-4 is already fixed — this is a read-path
       optimization, not a correctness item.)
 
-**Remaining — gaps the post-landing review surfaced:**
+**Gaps the post-landing review surfaced — ALL FIXED (`ff33a3a..db6fbce`):**
 
-- [ ] **Complete the D9 contract suite.** It currently runs against **memory only** and does not
-      cover edges / `instance_usage` specifically (they inherit generic record coverage). Wire it
-      to sqlite + indexeddb (fake-indexeddb for bun; SQLite needs an integration harness) and add
-      edge (both index directions + unique-live) + usage cases. The rev-guard — the highest
-      divergence risk — *is* already covered.
-- [ ] **`instance_usage` "same batch" is aspirational.** `void reconcileSceneUsage(...)` is
-      fire-and-forget after the scene `putRecord`; its `await listTable` can resolve after the
-      scene batch flushes, so usage may ride the *next* batch. Benign (rebuildable cache,
-      self-heals) but the inline comment overstates D3. Harden by `await`ing it, or derive usage
-      synchronously from the in-memory document before `putRecord`, or soften the comment.
-- [ ] **GC sweep is a dead reference.** `edgeIndex.ts` cites `sweepEdgeTombstones`, which does not
-      exist. Implement the periodic tombstone hard-delete (graph hot-path decision) or fix the
-      comment. In-memory reads already filter tombstones; this is disk/hydration bloat only.
-- [ ] **D10 blob-encoding wins not shipped.** Entity ids are short, but node ids inside
-      `graphJSON` are still `el-${UUID.slice(0,8)}` (not scene-local-short), and **omit-defaults
-      on graphJSON serialization** (the single biggest blob shrink) + round-bounds are not done.
-      D10 marked omit-defaults/bounds "do-anytime"; scene-local node ids it marked "decide now" —
-      revisit before real data, since graphJSON node ids bake into stored blobs.
+- [x] **D9 contract suite now runs on two adapters.** `runRecordPortContract` +
+      `runAssetBlobContract` (records, rev guard, asset blobs) are wired to **memory + IndexedDB**
+      (`indexedDbPersistence.test.ts`, per-test DB reset; `fake-indexeddb` added to devDeps — run
+      `bun install`). SQLite remains integration-only (Tauri IPC harness). Edge (both index
+      directions + unique-live) and `instance_usage` coverage live in their dedicated repo tests
+      (`edges.repo.test`, `instanceUsage.test`); the port itself only knows records + blobs.
+- [x] **`instance_usage` is now genuinely same-batch (D3).** `reconcileSceneUsageSync` derives
+      usage from the in-memory doc and reads existing rows via `peekTable`, enqueuing the delta
+      synchronously in the same tick as the scene `putRecord` — so it rides the same flush.
+      `primeInstanceUsage()` at boot keeps the peek cache warm; async `reconcileSceneUsage` kept
+      for off-hot-path callers.
+- [x] **GC sweep implemented.** `sweepEdgeTombstones` hard-deletes edge tombstones older than a
+      7-day grace window; wired into the boot path after reconcile. (In-memory reads already skip
+      tombstones; this reclaims disk/hydration bloat.)
+- [x] **D10 omit-defaults + round-bounds shipped** (the single biggest blob shrink).
+      `serializeHtmlCanvasDocument` = `compact(normalize(doc))`: drops default-equal style props,
+      name-derived `cssId`/`className`, null `text`/`imageUrl`/`instanceOf`, default
+      `visible`/`locked`/`appearance`; rounds bounds to 2 decimals. Canonical/deterministic so the
+      save-skip holds (idempotent round-trip test). **Still open (low value):** scene-local short
+      node ids — `el-${uuid.slice(0,8)}` is already ~11 chars; sequential ids add
+      collision-on-merge risk for marginal bytes.
 
 ---
 
