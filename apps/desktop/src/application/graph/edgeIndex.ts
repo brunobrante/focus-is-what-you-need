@@ -149,6 +149,44 @@ export async function liveEdgeForTriple(
   return m.byTriple.get(edgeTripleKey(fromType, fromId, relation, toType, toId)) ?? null;
 }
 
+// --- sync peeks (best-effort; null/empty until the index is hydrated) --------
+//
+// For render-path readers that cannot await. They read the CURRENT maps without
+// triggering hydration, so a caller must tolerate a miss before the graph_edges
+// table has loaded (e.g. fall back to a row field). Once any async edge query has
+// run, or `primeEdgeIndex()` has resolved, these are authoritative.
+
+export function peekEdgesTo(
+  type: string,
+  id: string,
+  relation?: GraphRelation,
+): GraphEdgeRow[] {
+  if (!hydrated) return [];
+  const all = maps.to.get(refKey(type, id)) ?? [];
+  return relation ? all.filter((e) => e.relation === relation) : all.slice();
+}
+
+export function peekEdgesFrom(
+  type: string,
+  id: string,
+  relation?: GraphRelation,
+): GraphEdgeRow[] {
+  if (!hydrated) return [];
+  const all = maps.from.get(refKey(type, id)) ?? [];
+  return relation ? all.filter((e) => e.relation === relation) : all.slice();
+}
+
+/** Sync owner ref of a target via its incoming `owns` edge (null if none/cold). */
+export function peekOwnerOf(type: string, id: string): EntityRef | null {
+  const [edge] = peekEdgesTo(type, id, "owns");
+  return edge ? { type: edge.fromType, id: edge.fromId } : null;
+}
+
+/** Eagerly hydrate the index so subsequent sync peeks are authoritative. */
+export async function primeEdgeIndex(): Promise<void> {
+  await ensureMaps();
+}
+
 /** Test seam: drop the index so the next query rebuilds from the store. */
 export function resetEdgeIndex(): void {
   maps = emptyMaps();

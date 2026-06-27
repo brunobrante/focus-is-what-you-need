@@ -10,6 +10,7 @@ import {
   normalizeProjectRow,
 } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
+import { reconcileAllGraphEdges } from "@/application/graph/ownershipReconcile";
 import {
   SCHEMA_VERSION,
   type ComponentRow,
@@ -44,17 +45,22 @@ export async function ensureSeededAndMigrated(): Promise<void> {
 
   if (meta.seededAt != null && meta.schemaVersion === SCHEMA_VERSION) {
     await ensureFactoryMocksPresent();
-    return;
+  } else {
+    // Fresh install or schema version mismatch: nuke and reseed.
+    await firstBootSeedV5();
+    await writeMeta({ schemaVersion: SCHEMA_VERSION, seededAt: now() });
   }
 
-  // Fresh install or schema version mismatch: nuke and reseed.
-  await firstBootSeedV5();
-  await writeMeta({ schemaVersion: SCHEMA_VERSION, seededAt: now() });
+  // Derive the ownership/containment/version/scene edge graph from the row fields
+  // (save-architecture-v3 Step 2). Idempotent + self-healing: it backfills any
+  // edge a not-yet-wired write path missed, so the graph is always consistent.
+  await reconcileAllGraphEdges();
 }
 
 export async function resetToFactoryData(): Promise<void> {
   await firstBootSeedV5();
   await writeMeta({ schemaVersion: SCHEMA_VERSION, seededAt: now() });
+  await reconcileAllGraphEdges();
   notify(TABLES.meta);
   notify(TABLES.workspaces);
 }
