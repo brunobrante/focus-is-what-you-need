@@ -737,23 +737,41 @@ ownership/render corruption the derive-first strategy was built to avoid, and un
 don't cover the render path. Do them in the order below — flip 1 is the substantive one;
 2 and 3 are optional polish.
 
-- [ ] **(1, main) Flip ownership reads to edges, then drop the fields.**
-  - *Now:* `componentScope(row)` (`defaults.ts`) classifies a component
-    (workspace/project/screen/nested/draft) by reading `screenId`/`parentVariantId`/`projectId`.
-    `componentScopeFromEdges` / `setComponentOwner` (`application/graph/ownership.ts`) exist but
-    are **dormant**; edges already self-heal via boot reconcile (`variants.repo.ts:529` marks the
-    pending flip).
-  - *The flip:* point the ~3 read sites (`components/component/componentSource.tsx`, the
-    `components.repo.ts` scope filters, the `ComponentRow` discriminator) at the edge resolver via
-    a `useComponentScope` hook, then delete `screenId`/`parentVariantId`/`projectId` from
-    `ComponentRow` and every write path that sets them. Same shape for references:
-    `ReferenceRow.attachments[]` → `attached_to` edges, usage read off `idx_edges_to`.
-  - *Gotcha:* `componentScope` is **sync** today (field read) but `componentScopeFromEdges` is
-    **async** (edge lookup) — that ripples into render code, hence the hook. Memoize per component
-    id; the in-memory adjacency index keeps the lookup O(1) with no I/O on the hot path.
+- [~] **(1, main) Flip ownership reads to edges, then drop the fields.** — component ownership
+  **DONE & green** (commits `c4fe7de..d92773a`, stages 1–4); references + physical field-removal remain.
+  - *Done (components, edge-authoritative end-to-end):*
+    - **Reads:** every reader of `screenId`/`parentVariantId` now resolves via the edge index —
+      `componentScopeOf` + `screenIdOfComponent`/`parentVariantIdOf` (`application/graph/componentOwnership.ts`,
+      sync `peekOwnerOf`, O(1)). No `useComponentScope` hook was needed: the sync peek API made the
+      async ripple a non-issue. Covers the badge, repo queries (`listChildrenOfVariant`,
+      `listTopLevelByScreen[Id]`, `listProjectGlobalComponents`, `listWorkspaceComponents`,
+      `listDrafts`, `findComponent*`), canvas (`canvasUtils`, `Canvas.tsx`, `useVersionsWindow`,
+      `ComponentPicker`), `useComponentDetail`, `scenes.repo`, `dependencyIndex`, `projects.repo`.
+    - **Writes:** `createComponent` / `setComponentScreen` (was `updateComponent({screenId})`) /
+      `promoteVariantToMain` / `cloneChildComponentsIntoVariant` emit the `owns` edge directly. The
+      promote `screenId↔parentVariantId` re-home is **gone** — Copy promote is a pure reorder, Linked
+      promote re-homes only the shared children's edges (the doc's payoff).
+    - **`reconcileComponentOwner` is now ADDITIVE** — it only backfills an owner edge when none
+      exists, so boot reconcile never clobbers an authoritative runtime edge. The seed still
+      field-bootstraps (its rows have no edge yet → additive fills them).
+    - `screenId`/`parentVariantId` are now **vestigial** (always null on new rows; edges are the
+      truth). Tests assert ownership via `ownerOf`/`listChildrenOfVariant`.
+  - *Decision — scope narrowed:* drop **only `screenId` + `parentVariantId`** (the asymmetry fields
+    the acceptance checklist names). **`projectId`/`workspaceId` stay** as denormalized home pointers —
+    they back routing/listing (`useComponentDetail`, `useGallery`, `SearchProvider`, `projects.repo`,
+    `localProjects`) and the edge graph doesn't cheaply replace a "which project/workspace does this
+    live in" lookup. They are no longer consulted for *scope* (that's the edge).
+  - *Remaining (app-gated):* **physically remove** `screenId`/`parentVariantId` from `ComponentRow`.
+    Attempted; the tsc blast radius is ~50 sites across UI (`ComponentsTab`, `screens.repo`) **plus a
+    seed rewrite** — `seedComponentTree` bootstraps ownership via the fields and must instead emit
+    owner edges directly (it already has `mainVariantByScreenId`). Reverted to keep green; do this
+    with `bunx tauri dev` + reseed to verify the seed produces correct ownership. **References** are
+    untouched: `ReferenceRow.attachments[]` → `attached_to` edges, usage off `idx_edges_to` (lower
+    value — references are few; the boot reconcile already derives the edges).
   - *Smoke-test:* reseed, open Gallery + a project — every component card's source badge
     (global/project/screen/nested) must match pre-flip, drafts stay unowned, and deleting a linked
-    master still fires the per-instance keep/delete dialog.
+    master still fires the per-instance keep/delete dialog; check canvas breadcrumbs, parent-frame
+    overlays, sub-components list, project tree, and promote/copy versions.
   - *Why it matters:* this is the flip that makes edges the **authority** and ends the documented
     second-source-of-truth (core principle 4).
 - [ ] **(2) Split `SystemDesignRow.tokens` into per-row `TokenRow`s.**
