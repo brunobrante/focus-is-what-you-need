@@ -1,4 +1,7 @@
-export type ProjectType = "desktop" | "tablet" | "mobile";
+// Defined in the domain layer (see the file for why); re-exported here so the many
+// existing `@/lib/data/types` importers keep working unchanged.
+export type { ProjectType } from "@/domain/canvas/projectType";
+import type { ProjectType } from "@/domain/canvas/projectType";
 
 export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
   desktop: "Desktop",

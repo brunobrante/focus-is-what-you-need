@@ -12,7 +12,7 @@ import {
   type HtmlCanvasDocument,
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
-import { defaultStyle } from "@/lib/canvas/htmlScene/styleUtils";
+import { defaultStyle } from "@/domain/canvas/htmlScene/styleUtils";
 import { TABLES, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";

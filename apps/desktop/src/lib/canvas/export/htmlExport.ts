@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { CanvasDocument, ElementNode } from "@/canvas/engine/types";
-import { escapeAttr, escapeXml, slugClass } from "@/lib/canvas/htmlScene/styleUtils";
+import { escapeAttr, escapeXml, slugClass } from "@/domain/canvas/htmlScene/styleUtils";
 import { composeElementCss } from "./elementCss";
 import { cssPropsToString, cssPropsToInline } from "./cssSerialize";
 import { svgForElement } from "./svgExport";

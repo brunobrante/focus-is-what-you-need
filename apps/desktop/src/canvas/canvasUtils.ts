@@ -1,5 +1,5 @@
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
-import { htmlCanvasDocumentFromJSON } from "@/lib/canvas/htmlScene/document";
+import { htmlCanvasDocumentFromJSON } from "@/domain/canvas/htmlScene/document";
 import { subjectNodeForDocument } from "@/lib/canvas/htmlScene";
 import { createBlankDocument } from "@/canvas/engine/actions";
 import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";

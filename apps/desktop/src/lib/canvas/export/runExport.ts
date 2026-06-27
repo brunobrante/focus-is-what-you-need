@@ -1,5 +1,5 @@
 import type { CanvasDocument } from "@/canvas/engine/types";
-import { slugClass } from "@/lib/canvas/htmlScene/styleUtils";
+import { slugClass } from "@/domain/canvas/htmlScene/styleUtils";
 import { saveExportArchive, saveExportFile } from "@/lib/tauri/exportFiles";
 import { buildHtmlExport } from "./htmlExport";
 import { svgForElement } from "./svgExport";

@@ -8,7 +8,7 @@ import {
   normalizeName,
   replaceComponentSubtreeInGraph,
 } from "@/domain/canvas/graphTransforms";
-import { collectDescendantIds } from "@/lib/canvas/htmlScene/graphNodeHelpers";
+import { collectDescendantIds } from "@/domain/canvas/htmlScene/graphNodeHelpers";
 import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { createSceneDependencyIndex, type SceneDependencyIndex } from "@/application/scenes/dependencyIndex";
 import { getCachedSceneDependencyIndex } from "@/application/scenes/sceneDependencyIndexCache";

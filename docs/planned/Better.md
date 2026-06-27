@@ -288,8 +288,16 @@ partly wrong — noted inline).
   data-loss-adjacent code that can't be unit-verified in this `bun:test`-only harness (no React testing).
   Same precedent as ENG-8. Left as-is.
 - (**SAVE-11**, **SAVE-4**, **SAVE-12**, **SAVE-8** are now done — see below; `bun test` *is* available.)
-- **DOM-1** — moving the `HtmlCanvas*` types + JSON helpers into `domain/` cascades through
-  `document.ts`→`nodeHelpers`→`styleUtils` and 32 importers; a focused architecture effort (audit phase 4).
+- **DOM-1 — done.** The whole `htmlScene/` module (types + JSON helpers + node/instance helpers) moved
+  from `@/lib/canvas/htmlScene/` to `@/domain/canvas/htmlScene/`; the lib barrel `@/lib/canvas/htmlScene`
+  now re-exports from there, so its 31 barrel importers are untouched (only direct sub-path importers were
+  repointed). The two type-only `lib`/app deps the move exposed were inverted: `CanvasInsertToolId` now
+  lives beside `CanvasToolId` in `@/domain/canvas/types` (`@/canvas/tools` re-exports it — this also fixed
+  the pre-existing broken `@/lib/canvas/tools` import), and `ProjectType` moved to
+  `@/domain/canvas/projectType` (re-exported from `@/lib/data/types`, so its ~44 importers are untouched).
+  `graphTransforms.ts` now imports only from `domain/` and uses a structural `EmbedTargetComponent` in
+  place of `ComponentRow`. `tsc` error count went **down** (144→142, the broken tools import fixed); no new
+  errors.
 - **DOM-4 — done (`17c1820`).** The shared graph-node helpers (`subjectNodeForDocument`,
   `groupNodesByParent`, `collectDescendantIds(From)`, `uniqueNodeId`) now live in one pure
   `lib/canvas/htmlScene/graphNodeHelpers` module (types-only deps → no cycle); domain + infra both import

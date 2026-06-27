@@ -7,7 +7,7 @@ import {
   type HtmlCanvasDocument,
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
-import { defaultStyle } from "@/lib/canvas/htmlScene/styleUtils";
+import { defaultStyle } from "@/domain/canvas/htmlScene/styleUtils";
 import { materializeInstancesInGraph } from "@/domain/canvas/graphTransforms";
 import { removeInstancesInGraph } from "@/lib/storage/repos/scenes.repo";
 

@@ -1,5 +1,5 @@
-import type { ProjectType } from "@/lib/data/types";
-import type { CanvasInsertToolId } from "@/lib/canvas/tools";
+import type { ProjectType } from "@/domain/canvas/projectType";
+import type { CanvasInsertToolId } from "@/domain/canvas/types";
 import type {
   HtmlCanvasDocument,
   HtmlCanvasNode,

@@ -292,3 +292,8 @@ export type CanvasToolId =
   | "image"
   | "svg"
   | "actions";
+
+// The insert tools — every tool except the non-creating cursor/hand/scale modes.
+// Lives here (not in the canvas app layer) so the pure htmlScene graph helpers can
+// reference it without a domain → lib/app import (DOM-1).
+export type CanvasInsertToolId = Exclude<CanvasToolId, "cursor" | "hand" | "scale">;

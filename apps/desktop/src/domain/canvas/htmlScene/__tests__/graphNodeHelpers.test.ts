@@ -6,8 +6,8 @@ import {
   groupNodesByParent,
   subjectNodeForDocument,
   uniqueNodeId,
-} from "@/lib/canvas/htmlScene/graphNodeHelpers";
-import type { HtmlCanvasDocument, HtmlCanvasNode } from "@/lib/canvas/htmlScene/types";
+} from "@/domain/canvas/htmlScene/graphNodeHelpers";
+import type { HtmlCanvasDocument, HtmlCanvasNode } from "@/domain/canvas/htmlScene/types";
 
 // The helpers read only id/parentId/name/bounds/order, so build minimal nodes.
 function node(partial: Partial<HtmlCanvasNode> & { id: string }): HtmlCanvasNode {

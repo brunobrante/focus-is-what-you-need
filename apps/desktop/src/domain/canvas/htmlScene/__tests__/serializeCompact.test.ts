@@ -4,10 +4,10 @@ import {
   createBlankHtmlCanvasDocument,
   htmlCanvasDocumentFromJSON,
   serializeHtmlCanvasDocument,
-} from "@/lib/canvas/htmlScene/document";
-import { makeNode } from "@/lib/canvas/htmlScene/nodeHelpers";
-import { defaultStyle } from "@/lib/canvas/htmlScene/styleUtils";
-import type { HtmlCanvasNode } from "@/lib/canvas/htmlScene/types";
+} from "@/domain/canvas/htmlScene/document";
+import { makeNode } from "@/domain/canvas/htmlScene/nodeHelpers";
+import { defaultStyle } from "@/domain/canvas/htmlScene/styleUtils";
+import type { HtmlCanvasNode } from "@/domain/canvas/htmlScene/types";
 
 function docWith(extra: HtmlCanvasNode[]): ReturnType<typeof createBlankHtmlCanvasDocument> {
   const doc = createBlankHtmlCanvasDocument({ name: "Frame", width: 200, height: 120 });

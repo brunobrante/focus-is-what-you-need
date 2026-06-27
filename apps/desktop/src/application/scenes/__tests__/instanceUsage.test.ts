@@ -5,8 +5,8 @@ import { resetRecordStoreCache } from "@/lib/storage/store";
 import {
   createBlankHtmlCanvasDocument,
   serializeHtmlCanvasDocument,
-} from "@/lib/canvas/htmlScene/document";
-import { makeNode } from "@/lib/canvas/htmlScene/nodeHelpers";
+} from "@/domain/canvas/htmlScene/document";
+import { makeNode } from "@/domain/canvas/htmlScene/nodeHelpers";
 import {
   deriveSceneUsage,
   instanceUsageForComponents,

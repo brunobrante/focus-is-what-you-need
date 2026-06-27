@@ -6,7 +6,7 @@ import {
   type HtmlCanvasDocument,
   type HtmlCanvasNode,
 } from "@/lib/canvas/htmlScene";
-import { defaultStyle } from "@/lib/canvas/htmlScene/styleUtils";
+import { defaultStyle } from "@/domain/canvas/htmlScene/styleUtils";
 import {
   canvasDocumentFromHtmlGraphJSON,
   htmlGraphJSONFromCanvasDocument,

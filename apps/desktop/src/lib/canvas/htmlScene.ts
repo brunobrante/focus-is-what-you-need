@@ -8,8 +8,8 @@ export type {
   HtmlCanvasDocument,
   SubjectRootOptions,
   HtmlCanvasLayerMove,
-} from "./htmlScene/types";
-export { HTML_CANVAS_FORMAT, HTML_CANVAS_VERSION } from "./htmlScene/types";
+} from "@/domain/canvas/htmlScene/types";
+export { HTML_CANVAS_FORMAT, HTML_CANVAS_VERSION } from "@/domain/canvas/htmlScene/types";
 
 export {
   normalizeHtmlCanvasDocument,
@@ -32,9 +32,9 @@ export {
   ensureHtmlCanvasSubjectRootJSON,
   createDefaultHtmlCanvasDocument,
   createBlankHtmlCanvasDocument,
-} from "./htmlScene/document";
+} from "@/domain/canvas/htmlScene/document";
 
-export { htmlCanvasDocumentFromMockTree } from "./htmlScene/mockTree";
-export { svgForHtmlCanvasDocument } from "./htmlScene/svgRenderer";
-export { resolveInstances, stripResolvedInstanceChildren, buildMasterResolver, subjectNodeForDocument } from "./htmlScene/resolveInstances";
-export type { MasterResolver } from "./htmlScene/resolveInstances";
+export { htmlCanvasDocumentFromMockTree } from "@/domain/canvas/htmlScene/mockTree";
+export { svgForHtmlCanvasDocument } from "@/domain/canvas/htmlScene/svgRenderer";
+export { resolveInstances, stripResolvedInstanceChildren, buildMasterResolver, subjectNodeForDocument } from "@/domain/canvas/htmlScene/resolveInstances";
+export type { MasterResolver } from "@/domain/canvas/htmlScene/resolveInstances";

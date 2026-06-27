@@ -1,16 +1,20 @@
 import {
   htmlCanvasDocumentFromJSON,
   serializeHtmlCanvasDocument,
-  type HtmlCanvasNode,
-} from "@/lib/canvas/htmlScene";
+} from "@/domain/canvas/htmlScene/document";
+import type { HtmlCanvasNode } from "@/domain/canvas/htmlScene/types";
 import {
   collectDescendantIds,
   collectDescendantIdsFrom,
   groupNodesByParent,
   subjectNodeForDocument,
   uniqueNodeId,
-} from "@/lib/canvas/htmlScene/graphNodeHelpers";
-import type { ComponentRow } from "@/lib/storage/schema";
+} from "@/domain/canvas/htmlScene/graphNodeHelpers";
+
+// Structural subset of a component master needed to locate its embed target — the
+// minimum `findChildTargetNode` reads. Avoids importing `ComponentRow` from
+// `@/lib/storage/schema`, which would point the layering arrow domain → lib (DOM-1).
+type EmbedTargetComponent = { sourceNodeId?: string | null; name: string };
 
 /**
  * Pure graph transforms for the master/instance versioning model.
@@ -46,7 +50,7 @@ export function findChildTargetNode<N extends { id: string; name: string }>(
 export function replaceComponentSubtreeInGraph(
   parentGraphJSON: string,
   childGraphJSON: string,
-  component: ComponentRow,
+  component: EmbedTargetComponent,
 ): string | null {
   const parent = htmlCanvasDocumentFromJSON(parentGraphJSON);
   const child = htmlCanvasDocumentFromJSON(childGraphJSON);

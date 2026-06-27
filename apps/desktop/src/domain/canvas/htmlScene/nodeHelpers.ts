@@ -1,4 +1,4 @@
-import type { CanvasInsertToolId } from "@/lib/canvas/tools";
+import type { CanvasInsertToolId } from "@/domain/canvas/types";
 import type { HtmlCanvasBounds, HtmlCanvasNode, HtmlCanvasNodeKind, HtmlCanvasTag } from "./types";
 import {
   alignFromMock,
