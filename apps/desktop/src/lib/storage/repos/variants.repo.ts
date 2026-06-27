@@ -193,17 +193,33 @@ export async function deleteVariant(
   );
   const deletedVariantIds = new Set([variantId, ...childVariantIds]);
 
+  const scenes = await listTable<SceneRow>(TABLES.scenes);
+
+  // VER-3: a linked version flips the masters it references to `linkable:true`
+  // (markComponentsLinkable). Deleting the version removes those references, so an
+  // auto-flipped master with no surviving instance anywhere must revert to
+  // non-linkable — otherwise it stays pickable project-wide forever. Computed
+  // before the scene rows are removed, by a direct scan of the graphs (the derived
+  // instance_usage index lags a removal).
+  const mastersToRevert = await collectAutoLinkableToRevert(
+    scenes,
+    deletedVariantIds,
+    childComponentIds,
+    components,
+  );
+
   await replaceTable<VariantRow>(KEY, variants.filter((v) => !deletedVariantIds.has(v.id)));
-  if (childComponentIds.size > 0) {
+  if (childComponentIds.size > 0 || mastersToRevert.size > 0) {
     await replaceTable<ComponentRow>(
       TABLES.components,
-      components.filter((c) => !childComponentIds.has(c.id)),
+      components
+        .filter((c) => !childComponentIds.has(c.id))
+        .map((c) => (mastersToRevert.has(c.id) ? { ...c, linkable: false, updatedAt: now() } : c)),
     );
   }
 
   // Delete only the affected scene/thumbnail rows; removeRecords enqueues
   // O(deleted) deletes instead of re-stringifying every surviving large blob.
-  const scenes = await listTable<SceneRow>(TABLES.scenes);
   removeRecords(
     TABLES.scenes,
     scenes.filter((s) => deletedVariantIds.has(s.ownerId)).map((s) => s.id),
@@ -218,6 +234,49 @@ export async function deleteVariant(
   notify(TABLES.components);
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
+}
+
+/**
+ * VER-3: masters that the deleted version's scenes referenced as linked instances and
+ * that NO surviving scene still references — restricted to **variant-owned** masters.
+ * Those are the ones a linked version auto-flipped to `linkable` via
+ * `markComponentsLinkable`; project/workspace-global components are linkable by design
+ * (created that way) and are owned by a project/workspace edge, so they are never
+ * auto-reverted. The owner edge is what distinguishes auto-flipped from user-opted,
+ * with no extra schema field.
+ */
+async function collectAutoLinkableToRevert(
+  scenes: SceneRow[],
+  deletedVariantIds: Set<string>,
+  deletedComponentIds: Set<string>,
+  components: ComponentRow[],
+): Promise<Set<string>> {
+  const referencedByDeleted = new Set<string>();
+  const survivingReferenced = new Set<string>();
+  for (const s of scenes) {
+    if (s.ownerType !== "variant") continue;
+    const doc = htmlCanvasDocumentFromJSON(s.graphJSON);
+    if (!doc) continue;
+    const target = deletedVariantIds.has(s.ownerId)
+      ? referencedByDeleted
+      : survivingReferenced;
+    for (const n of doc.nodes) {
+      if (n.instanceOf) target.add(n.instanceOf.componentId);
+    }
+  }
+
+  const result = new Set<string>();
+  if (referencedByDeleted.size === 0) return result;
+  await primeEdgeIndex();
+  for (const id of referencedByDeleted) {
+    if (deletedComponentIds.has(id)) continue; // the master itself is being deleted
+    if (survivingReferenced.has(id)) continue; // still linked somewhere else
+    const comp = components.find((c) => c.id === id);
+    if (!comp || comp.linkable !== true) continue;
+    const owner = peekOwnerOf("component", id);
+    if (owner?.type === "variant") result.add(id);
+  }
+  return result;
 }
 
 export async function findVariantByName(

@@ -7,6 +7,7 @@ import {
   listChildrenOfVariant,
 } from "@/lib/storage/repos/components.repo";
 import {
+  deleteVariant,
   duplicateVariant,
   listVariantsByComponent,
   promoteVariantToMain,
@@ -427,6 +428,111 @@ test("promoteVariantToMain on a copy version is a plain swap with independent ch
   expect((await getComponent(component.id))!.activeVariantId).toBe(copy.id);
   // The copy already owned its own child; promotion does not re-parent or clone again.
   expect(await ownerOf({ type: "component", id: copyChild.id })).toEqual({ type: "variant", id: copy.id });
+});
+
+test("deleting a linked version reverts its auto-flipped masters to non-linkable (VER-3)", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  const { component: child } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  const components = await listTable<ComponentRow>(TABLES.components);
+  await replaceTable<ComponentRow>(
+    TABLES.components,
+    components.map((c) => (c.id === child.id ? { ...c, sourceNodeId: "title-node" } : c)),
+  );
+
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: defaultVariant.id,
+    graphJSON: sceneWithChildNode("title-node", "Title"),
+  });
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: child.activeVariantId,
+    graphJSON: serializeHtmlCanvasDocument(
+      createDefaultHtmlCanvasDocument({ name: "Title", projectType: "mobile", targetKind: "variant" }),
+    ),
+  });
+
+  // The linked version captures the child as a linked instance → it becomes linkable.
+  const version = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "linked",
+  });
+  expect((await getComponent(child.id))!.linkable).toBe(true);
+
+  // Deleting the version removes the only instance referencing the child → it reverts.
+  await deleteVariant(version.id);
+
+  const reverted = await getComponent(child.id);
+  expect(reverted).not.toBeNull();
+  expect(reverted!.linkable).toBe(false);
+});
+
+test("deleting a linked version keeps a master linkable while it is still used elsewhere (VER-3)", async () => {
+  const { component, defaultVariant } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "screen", screenId: "screen-1" },
+    name: "Card",
+  });
+  const { component: child } = await createComponent({
+    projectId: "project-1",
+    parent: { kind: "variant", variantId: defaultVariant.id },
+    name: "Title",
+  });
+  const components = await listTable<ComponentRow>(TABLES.components);
+  await replaceTable<ComponentRow>(
+    TABLES.components,
+    components.map((c) => (c.id === child.id ? { ...c, sourceNodeId: "title-node" } : c)),
+  );
+
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: defaultVariant.id,
+    graphJSON: sceneWithChildNode("title-node", "Title"),
+  });
+  await upsertScene({
+    ownerType: "variant",
+    ownerId: child.activeVariantId,
+    graphJSON: serializeHtmlCanvasDocument(
+      createDefaultHtmlCanvasDocument({ name: "Title", projectType: "mobile", targetKind: "variant" }),
+    ),
+  });
+
+  const version = await duplicateVariant({
+    ownerKind: "component",
+    ownerId: component.id,
+    sourceVariantId: defaultVariant.id,
+    name: "Variant 2",
+    mode: "linked",
+  });
+  expect((await getComponent(child.id))!.linkable).toBe(true);
+
+  // A surviving scene (an unrelated screen variant) still holds a linked instance of
+  // the child — so deleting the version must NOT revert its linkability.
+  const otherDoc = htmlCanvasDocumentFromJSON(sceneWithChildNode("other-node", "Title"))!;
+  const withInstance = serializeHtmlCanvasDocument({
+    ...otherDoc,
+    nodes: otherDoc.nodes.map((n) =>
+      n.id === "other-node"
+        ? { ...n, instanceOf: { componentId: child.id, variantId: child.activeVariantId } }
+        : n,
+    ),
+  });
+  await upsertScene({ ownerType: "variant", ownerId: "other-variant", graphJSON: withInstance });
+
+  await deleteVariant(version.id);
+
+  expect((await getComponent(child.id))!.linkable).toBe(true);
 });
 
 test("createComponent supports workspace-global scope", async () => {

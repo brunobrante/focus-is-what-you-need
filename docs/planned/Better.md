@@ -212,6 +212,7 @@ P0/P1/P2 phases follow the **Suggested sequencing** at the bottom of this file.
 | META-2 | ✅ `349fcca` | Dead `author`/`initials` stubs removed from `ScreenVersion` (never rendered; no identity system to wire). |
 | VER-4 | ✅ `68cb8f6` | Linked-promote linkifies the demoted old main with `propagate:true` so ancestor thumbnails regenerate. |
 | VER-2 | ✅ fixed | `duplicateVariant` now captures the subject's children via owner edges **before** the `if (sourceScene)` guard: Copy clones them into version-owned masters and Linked marks them linkable, even when the source was never saved. Graph-level linkify/scene-copy still run only when a scene exists. Two regression tests added. |
+| VER-3 | ✅ fixed | `deleteVariant` reverts linkability auto-flipped for a linked version: a variant-owned master referenced only by the deleted version's scenes (none surviving) flips back to `linkable:false`; project/workspace-global masters (non-variant owner edge) are never auto-reverted. Direct scene-graph scan (the derived index lags a removal). Two regression tests added. |
 | BLD-4 | ✅ `c2235a4` | Deleted dead `OriginalSlideshow` + `ScreensPanel` Builder modules. |
 | dead route | ✅ `a2fdf1e` | Deleted unimported `routes/NewProject.tsx` (superseded by `NewProjectPage`). |
 | UI-13 | ✅ `e123307` | `ReferenceDetailModal` stackPreview release has a single owner (no double-revoke). |
@@ -301,8 +302,11 @@ partly wrong — noted inline).
   shared `pages/shared/DeviceMockTile` component. The audit's `ProjectGrid`/`SelectableCard` half was
   **stale**: it cited `HomePage.tsx`, which no longer exists (consolidated away), and `ProjectCard`/
   `AddProjectCard` now live only in `LandingPage` — no cross-page duplication remains to extract.
-- **VER-2 / VER-3** — touch the law-sensitive versioning core (VER-2 must materialize a missing scene;
-  VER-3 reworks linkability lifecycle). Left for a focused effort.
+- **VER-2 / VER-3 — done.** VER-2: `duplicateVariant` captures children via owner edges before the
+  `if (sourceScene)` guard (clone for Copy, mark-linkable for Linked), so a never-saved subject's children
+  are no longer dropped. VER-3: `deleteVariant` reverts the linkability a linked version auto-flipped — any
+  variant-owned master with no surviving instance anywhere flips back to `linkable:false` (project/
+  workspace-global masters, owned by a non-variant edge, are left untouched). Both repo-tested.
 - **RUST-12 — done (`eb44b1d`).** `WorkspaceConfig` is cached in a managed `ConfigCache`
   (`Mutex<Option<…>>`), filled lazily and refreshed in `set_workspace_folder`, instead of re-reading +
   re-parsing `workspace-config.json` on every one of ~20 reference/export commands. (Cargo *is* available
