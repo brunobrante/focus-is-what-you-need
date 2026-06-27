@@ -4,6 +4,7 @@ import {
   normalizeComponentRow,
   normalizeReferenceRow,
 } from "@/lib/storage/defaults";
+import { reconcileComponentOwner } from "@/application/graph/ownershipReconcile";
 import { newId, now } from "@/lib/storage/ids";
 import {
   countInstanceUsages,
@@ -364,6 +365,12 @@ export async function createComponent(input: {
   notify(VARIANTS_KEY);
   notify(KEY);
 
+  // Emit the `owns` edge eagerly so the graph is authoritative in-session, not
+  // only after the next boot reconcile (save-architecture-v3 flip 1 — close the
+  // create-path edge gap). Pass the variant list incl. the just-added Default so a
+  // screen-top-level component resolves to the screen's main variant.
+  await reconcileComponentOwner(component, [defaultVariant, ...variants]);
+
   // Seed a blank scene at the chosen size so the component opens at exactly W×H.
   const width = input.width ?? null;
   const height = input.height ?? null;
@@ -399,6 +406,11 @@ export async function updateComponent(
   nextComponents[idx] = next;
   await replaceTable<ComponentRow>(KEY, nextComponents);
   notify(KEY);
+  // A screenId change re-homes the component; keep its `owns` edge in step so the
+  // graph stays authoritative without waiting for the next boot reconcile.
+  if (patch.screenId !== undefined && patch.screenId !== components[idx]!.screenId) {
+    await reconcileComponentOwner(next);
+  }
   return next;
 }
 
