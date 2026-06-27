@@ -9,6 +9,7 @@ import { buildLinkedInstanceNode } from "@/canvas/engine/mutations/buildLinkedIn
 import { buildMasterResolver, withResolvedInstances } from "@/canvas/engine/htmlSceneAdapter";
 import { scopeOf, sourceScopeIcon, SOURCE_SCOPE_LABEL } from "@/components/component/componentSource";
 import { peekTable, TABLES } from "@/lib/storage/store";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import type { ComponentRow, SceneRow } from "@/lib/storage/schema";
 
 export type ComponentPickerContext = {
@@ -29,10 +30,12 @@ function isNativeToCurrentScene(
   row: Pick<ComponentRow, "id" | "screenId" | "parentVariantId">,
   ctx: ComponentPickerContext,
 ): boolean {
+  const screenId = screenIdOfComponent(row.id) ?? row.screenId;
+  const parentVariantId = parentVariantIdOf(row.id) ?? row.parentVariantId;
   return (
     row.id === ctx.openComponentId ||
-    (ctx.excludeScreenId != null && row.screenId === ctx.excludeScreenId) ||
-    (ctx.excludeParentVariantId != null && row.parentVariantId === ctx.excludeParentVariantId)
+    (ctx.excludeScreenId != null && screenId === ctx.excludeScreenId) ||
+    (ctx.excludeParentVariantId != null && parentVariantId === ctx.excludeParentVariantId)
   );
 }
 

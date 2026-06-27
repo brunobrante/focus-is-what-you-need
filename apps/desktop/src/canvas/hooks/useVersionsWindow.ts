@@ -9,6 +9,7 @@ import type { ComponentRow, SceneRow, ScreenRow, VariantRow } from "@/lib/storag
 import type { VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import type { ProjectTreeNode } from "@/canvas/shell/Tree";
 import { findTreeNodeById } from "../canvasUtils";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { useVersionScenePersistence } from "./useVersionScenePersistence";
 import { materializeVersionNodeAsComponent } from "@/application/canvas/canvasMaterializer";
 
@@ -169,12 +170,14 @@ export function useVersionsWindow({
     if (!versionsSubject || versionsSubject.kind !== "component") return null;
     const comp = projectComponents.find((c) => c.id === versionsSubject.id);
     if (!comp) return null;
-    if (!comp.parentVariantId && comp.screenId) {
-      return projectTree.find((n) => n.id === comp.screenId) ?? null;
+    const parentVariantId = parentVariantIdOf(comp.id) ?? comp.parentVariantId;
+    const screenId = screenIdOfComponent(comp.id) ?? comp.screenId;
+    if (!parentVariantId && screenId) {
+      return projectTree.find((n) => n.id === screenId) ?? null;
     }
-    if (comp.parentVariantId) {
+    if (parentVariantId) {
       const parentComponent = projectComponents.find(
-        (c) => c.activeVariantId === comp.parentVariantId,
+        (c) => c.activeVariantId === parentVariantId,
       );
       return parentComponent ? findTreeNodeById(projectTree, parentComponent.id) : null;
     }

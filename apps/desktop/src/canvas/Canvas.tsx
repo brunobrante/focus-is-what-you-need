@@ -29,6 +29,7 @@ import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { CanvasTabs } from "./CanvasTabs";
 import { useAllVariants, useScene } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
 import { useCanvasEntities } from "./hooks/useCanvasEntities";
 import { useMockScene } from "./hooks/useMockScene";
@@ -149,14 +150,16 @@ function CanvasPageContent() {
   const { data: allVariants } = useAllVariants();
   const parentSceneOwner = useMemo(() => {
     if (!component) return null;
-    if (component.parentVariantId) return { ownerType: "variant" as const, ownerId: component.parentVariantId };
-    if (component.screenId) {
+    const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
+    if (parentVariantId) return { ownerType: "variant" as const, ownerId: parentVariantId };
+    const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+    if (screenId) {
       // A top-level component's parent scene is the screen's main variant.
-      const mainVariantId = mainVariantIdForScreen(allVariants, component.screenId);
+      const mainVariantId = mainVariantIdForScreen(allVariants, screenId);
       if (mainVariantId) return { ownerType: "variant" as const, ownerId: mainVariantId };
     }
     return null;
-  }, [component?.parentVariantId, component?.screenId, allVariants]);
+  }, [component?.id, component?.parentVariantId, component?.screenId, allVariants]);
 
   const { data: parentScene } = useScene(parentSceneOwner?.ownerType ?? null, parentSceneOwner?.ownerId ?? null);
 
@@ -228,7 +231,10 @@ function CanvasPageContent() {
     return effectiveSceneGraphJSON;
   }, [component, effectiveSceneGraphJSON, mockScene.graphJSON, projectType]);
 
-  const hasParent = !!component && (!!component.parentVariantId || !!component.screenId);
+  const hasParent =
+    !!component &&
+    (!!(parentVariantIdOf(component.id) ?? component.parentVariantId) ||
+      !!(screenIdOfComponent(component.id) ?? component.screenId));
   const inheritParentBackground = settings.canvas.shell.inheritParentBackground;
 
   const effectiveShellBackground = useMemo(() => {
@@ -290,12 +296,14 @@ function CanvasPageContent() {
 
   const parentProjectNode = useMemo<ProjectTreeNode | null>(() => {
     if (!component) return null;
-    if (!component.parentVariantId && component.screenId) {
-      return projectTree.find((n) => n.id === component.screenId) ?? null;
+    const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
+    const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+    if (!parentVariantId && screenId) {
+      return projectTree.find((n) => n.id === screenId) ?? null;
     }
-    if (component.parentVariantId) {
+    if (parentVariantId) {
       const parentComponent = projectComponents.find(
-        (c) => c.activeVariantId === component.parentVariantId,
+        (c) => c.activeVariantId === parentVariantId,
       );
       if (!parentComponent) return null;
       return findTreeNodeById(projectTree, parentComponent.id);
