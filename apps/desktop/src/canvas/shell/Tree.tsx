@@ -358,10 +358,14 @@ export function Tree({
   // only then does localSelectedId go unread (see the selectedIds derivation above).
   // Writing it in controlled mode creates a second, divergent source of truth (SHELL-2).
   const selectionControlled = selectedNodeIds != null || selectedNodeId != null;
-  const selectLayer = (nodeId: string | null) => {
-    if (!selectionControlled) setLocalSelectedId(nodeId);
-    if (nodeId) onSelectNode?.(nodeId);
-  };
+  // Stable identity so the memoized TreeRow (SHELL-5) isn't invalidated every render.
+  const selectLayer = useCallback(
+    (nodeId: string | null) => {
+      if (!selectionControlled) setLocalSelectedId(nodeId);
+      if (nodeId) onSelectNode?.(nodeId);
+    },
+    [selectionControlled, onSelectNode],
+  );
   // Drag-and-drop drop intent. As the row is dragged we resolve whether it will land
   // before/after the hovered row (sibling reorder) or inside it (reparent/nest),
   // based on where the pointer sits within the hovered row's height.
@@ -422,6 +426,10 @@ export function Tree({
   const pickerOpen = openPicker !== null;
   const [pickerAnchor, setPickerAnchor] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<TreeContextMenuState>(null);
+  // Stable identity so the memoized TreeRow (SHELL-5) isn't invalidated every render.
+  const handleContextMenuNode = useCallback((nodeId: string, x: number, y: number) => {
+    setContextMenu({ x, y, targetId: nodeId });
+  }, []);
   const pickerRef = useRef<HTMLDivElement>(null);
   const pickerTriggerRef = useRef<HTMLDivElement>(null);
   const readEditor = useEditorBridgeReader();
@@ -606,9 +614,7 @@ export function Tree({
                     onDetachNode={onDetachNode}
                     showFocusButton={isDraftMode}
                     onFocusNode={focusNode}
-                    onContextMenuNode={(nodeId, x, y) => {
-                      setContextMenu({ x, y, targetId: nodeId });
-                    }}
+                    onContextMenuNode={handleContextMenuNode}
                   />
                 ))
               ) : filterActive ? (

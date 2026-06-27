@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import type { DropMode, Node } from "./treeTypes";
 import { TypeIcon } from "./TypeIcon";
@@ -8,27 +9,7 @@ import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 // single open-in-canvas link. Matches the canvas instance-selection purple.
 const EXTERNAL_COMPONENT_COLOR = LINKED_INSTANCE_COLOR;
 
-export function TreeRow({
-  node,
-  depth,
-  openSet,
-  setOpenSet,
-  selectedIds,
-  setSelectedId,
-  sortable = false,
-  onToggleVisible,
-  onToggleLocked,
-  canOpenNodeCanvas,
-  onOpenNodeCanvas,
-  showFocusButton,
-  onFocusNode,
-  onContextMenuNode,
-  onGoToInstance,
-  onDetachNode,
-  dropTargetId,
-  dropMode,
-  dragActive,
-}: {
+type TreeRowProps = {
   node: Node;
   depth: number;
   openSet: Set<string>;
@@ -54,7 +35,29 @@ export function TreeRow({
   // breaks the link, turning the instance into editable own content.
   onGoToInstance?: (variantId: string) => void;
   onDetachNode?: (nodeId: string) => void;
-}) {
+};
+
+function TreeRowComponent({
+  node,
+  depth,
+  openSet,
+  setOpenSet,
+  selectedIds,
+  setSelectedId,
+  sortable = false,
+  onToggleVisible,
+  onToggleLocked,
+  canOpenNodeCanvas,
+  onOpenNodeCanvas,
+  showFocusButton,
+  onFocusNode,
+  onContextMenuNode,
+  onGoToInstance,
+  onDetachNode,
+  dropTargetId,
+  dropMode,
+  dragActive,
+}: TreeRowProps) {
   const {
     attributes,
     listeners,
@@ -295,3 +298,51 @@ export function TreeRow({
     </>
   );
 }
+
+/**
+ * SHELL-5: without memoization, the global `dropTargetId`/`dropMode` thread to every
+ * descendant, so each pointer-move during a drag re-renders the ENTIRE visible tree.
+ * The parent (Tree.tsx) now passes referentially-stable callbacks/Sets, so this
+ * comparator can skip the per-frame churn for any row the drag doesn't touch:
+ *   - all non-drop props must be referentially equal (else a real change → re-render);
+ *   - if the drop state is unchanged, skip;
+ *   - if it changed, only re-render the target row (its indicator changes) and any
+ *     OPEN internal row (it must re-render to keep the render path to a possibly-deep
+ *     target alive). Leaves and collapsed non-target rows — the majority — are skipped.
+ */
+function arePropsEqual(prev: TreeRowProps, next: TreeRowProps): boolean {
+  if (
+    prev.node !== next.node ||
+    prev.depth !== next.depth ||
+    prev.openSet !== next.openSet ||
+    prev.setOpenSet !== next.setOpenSet ||
+    prev.selectedIds !== next.selectedIds ||
+    prev.setSelectedId !== next.setSelectedId ||
+    prev.sortable !== next.sortable ||
+    prev.onToggleVisible !== next.onToggleVisible ||
+    prev.onToggleLocked !== next.onToggleLocked ||
+    prev.canOpenNodeCanvas !== next.canOpenNodeCanvas ||
+    prev.onOpenNodeCanvas !== next.onOpenNodeCanvas ||
+    prev.showFocusButton !== next.showFocusButton ||
+    prev.onFocusNode !== next.onFocusNode ||
+    prev.onContextMenuNode !== next.onContextMenuNode ||
+    prev.onGoToInstance !== next.onGoToInstance ||
+    prev.onDetachNode !== next.onDetachNode ||
+    prev.dragActive !== next.dragActive
+  ) {
+    return false;
+  }
+
+  if (prev.dropTargetId === next.dropTargetId && prev.dropMode === next.dropMode) {
+    return true; // drop unchanged → nothing for this row to do
+  }
+
+  const node = next.node;
+  const isOpenInternal = (node.children?.length ?? 0) > 0 && next.openSet.has(node.id);
+  if (isOpenInternal) return false; // re-render so the path to the target stays live
+  const wasTarget = prev.dropTargetId === node.id;
+  const isTarget = next.dropTargetId === node.id;
+  return !(wasTarget || isTarget);
+}
+
+export const TreeRow = memo(TreeRowComponent, arePropsEqual);
