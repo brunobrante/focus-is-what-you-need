@@ -20,7 +20,14 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // ComponentRow with every scope owner null, tagged with `draftKind`
 // ("screen" | "component") and a `draftType` device for sizing/canvas. Reseed
 // is harmless; no existing rows carry these fields.
-export const SCHEMA_VERSION = 21;
+// v22: save-architecture-v3 storage graph. Every row carries the {rev, deletedAt}
+// envelope (stamped by the record store); ids are short (~12-char, not UUID); new
+// derived/graph tables land — `graph_edges` (ownership/containment/version/scene +
+// reference attachment, derived from the row fields by reconcileAllGraphEdges on
+// boot), `instance_usage` (derived from scene graphJSON on save), and `asset_blobs`
+// (binaries out of the records hot path). Nuke-and-reseed produces every row fresh
+// with a short id + envelope; the edge graph is reconciled right after seeding.
+export const SCHEMA_VERSION = 22;
 
 export type Meta = {
   schemaVersion: number;
