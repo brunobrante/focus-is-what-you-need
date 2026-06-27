@@ -376,6 +376,9 @@ test("createComponent supports workspace-global scope", async () => {
 
   expect(component.workspaceId).toBe("workspace-1");
   expect(component.projectId).toBeNull();
-  expect(component.screenId).toBeNull();
-  expect(component.parentVariantId).toBeNull();
+  // Ownership is the edge: a workspace-global component owned by the workspace.
+  expect(await ownerOf({ type: "component", id: component.id })).toEqual({
+    type: "workspace",
+    id: "workspace-1",
+  });
 });

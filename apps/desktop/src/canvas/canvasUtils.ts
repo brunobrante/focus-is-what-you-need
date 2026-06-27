@@ -324,9 +324,9 @@ export function componentPathFromRoot(
     names.unshift(current.name);
     // Owner resolved off graph edges (flip 1); `?? field` keeps cold-index safety
     // while the screenId/parentVariantId fields are still written as a mirror.
-    const screenId = screenIdOfComponent(current.id) ?? current.screenId;
+    const screenId = screenIdOfComponent(current.id);
     if (screenId) return { screenId, names };
-    const parentVariantId = parentVariantIdOf(current.id) ?? current.parentVariantId;
+    const parentVariantId = parentVariantIdOf(current.id);
     if (!parentVariantId) return { screenId: null, names };
     const parentComponent = byParentVariantId.get(parentVariantId);
     if (parentComponent) {
@@ -392,8 +392,8 @@ export async function computeComponentAncestorFrames(
     visited.add(current.id);
     if (!current.sourceNodeId) break;
 
-    const parentVariantId = parentVariantIdOf(current.id) ?? current.parentVariantId;
-    const screenId = screenIdOfComponent(current.id) ?? current.screenId;
+    const parentVariantId = parentVariantIdOf(current.id);
+    const screenId = screenIdOfComponent(current.id);
     let ownerId: string | null = null;
     let isScreenRoot = false;
     if (parentVariantId) {
@@ -503,8 +503,8 @@ export function findComponentByPath(
   names: string[],
 ): ComponentRow | null {
   const variants = buildVariantLookup();
-  const screenOf = (c: ComponentRow) => screenIdOfComponent(c.id, variants) ?? c.screenId;
-  const parentOf = (c: ComponentRow) => parentVariantIdOf(c.id, variants) ?? c.parentVariantId;
+  const screenOf = (c: ComponentRow) => screenIdOfComponent(c.id, variants);
+  const parentOf = (c: ComponentRow) => parentVariantIdOf(c.id, variants);
   let siblings = components
     .filter((c) => screenOf(c) === screenId && parentOf(c) === null)
     .sort((a, b) => a.order - b.order);
@@ -531,8 +531,8 @@ export function findComponentBySourceNodeInList(
   return (
     components.find((c) => {
       if (c.sourceNodeId !== sourceNodeId) return false;
-      const screenId = screenIdOfComponent(c.id, variants) ?? c.screenId;
-      const parentVariantId = parentVariantIdOf(c.id, variants) ?? c.parentVariantId;
+      const screenId = screenIdOfComponent(c.id, variants);
+      const parentVariantId = parentVariantIdOf(c.id, variants);
       if (parent.kind === "screen") return screenId === parent.screenId && parentVariantId === null;
       return parentVariantId === parent.variantId;
     }) ?? null
@@ -578,8 +578,8 @@ export function subcomponentsForVariantScene(input: {
   // Resolve an owned (non-linked) node, preserving the original precedence:
   // version-owned (this variant) wins over the main variant's screen-owned child.
   const variants = buildVariantLookup();
-  const screenOf = (c: ComponentRow) => screenIdOfComponent(c.id, variants) ?? c.screenId;
-  const parentOf = (c: ComponentRow) => parentVariantIdOf(c.id, variants) ?? c.parentVariantId;
+  const screenOf = (c: ComponentRow) => screenIdOfComponent(c.id, variants);
+  const parentOf = (c: ComponentRow) => parentVariantIdOf(c.id, variants);
   const resolveOwned = (nodeId: string): ComponentRow | null => {
     const candidates = bySourceNode.get(nodeId);
     if (!candidates) return null;
@@ -776,8 +776,8 @@ export function buildProjectTree(screens: ScreenRow[], components: ComponentRow[
   const variants = buildVariantLookup();
 
   for (const component of components) {
-    const parentVariantId = parentVariantIdOf(component.id, variants) ?? component.parentVariantId;
-    const screenId = screenIdOfComponent(component.id, variants) ?? component.screenId;
+    const parentVariantId = parentVariantIdOf(component.id, variants);
+    const screenId = screenIdOfComponent(component.id, variants);
     if (parentVariantId) {
       const siblings = childrenByParentVariantId.get(parentVariantId) ?? [];
       siblings.push(component);

@@ -150,16 +150,16 @@ function CanvasPageContent() {
   const { data: allVariants } = useAllVariants();
   const parentSceneOwner = useMemo(() => {
     if (!component) return null;
-    const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
+    const parentVariantId = parentVariantIdOf(component.id);
     if (parentVariantId) return { ownerType: "variant" as const, ownerId: parentVariantId };
-    const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+    const screenId = screenIdOfComponent(component.id);
     if (screenId) {
       // A top-level component's parent scene is the screen's main variant.
       const mainVariantId = mainVariantIdForScreen(allVariants, screenId);
       if (mainVariantId) return { ownerType: "variant" as const, ownerId: mainVariantId };
     }
     return null;
-  }, [component?.id, component?.parentVariantId, component?.screenId, allVariants]);
+  }, [component?.id, allVariants]);
 
   const { data: parentScene } = useScene(parentSceneOwner?.ownerType ?? null, parentSceneOwner?.ownerId ?? null);
 
@@ -233,8 +233,8 @@ function CanvasPageContent() {
 
   const hasParent =
     !!component &&
-    (!!(parentVariantIdOf(component.id) ?? component.parentVariantId) ||
-      !!(screenIdOfComponent(component.id) ?? component.screenId));
+    (!!(parentVariantIdOf(component.id)) ||
+      !!(screenIdOfComponent(component.id)));
   const inheritParentBackground = settings.canvas.shell.inheritParentBackground;
 
   const effectiveShellBackground = useMemo(() => {
@@ -296,8 +296,8 @@ function CanvasPageContent() {
 
   const parentProjectNode = useMemo<ProjectTreeNode | null>(() => {
     if (!component) return null;
-    const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
-    const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+    const parentVariantId = parentVariantIdOf(component.id);
+    const screenId = screenIdOfComponent(component.id);
     if (!parentVariantId && screenId) {
       return projectTree.find((n) => n.id === screenId) ?? null;
     }

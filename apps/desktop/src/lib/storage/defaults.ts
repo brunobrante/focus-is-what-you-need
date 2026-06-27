@@ -72,22 +72,9 @@ export function normalizeComponentRow(row: ComponentRow): ComponentRow {
 }
 
 export type ComponentScope = "workspace" | "project" | "screen" | "nested";
-
-/**
- * Derive a component's scope from its owner fields. Most specific wins, so a
- * nested component (parentVariantId set) reports "nested" even if it also
- * carries a projectId for convenience.
- */
-export function componentScope(
-  row: Pick<ComponentRow, "workspaceId" | "projectId" | "screenId" | "parentVariantId">,
-): ComponentScope {
-  if (row.parentVariantId) return "nested";
-  if (row.screenId) return "screen";
-  if (row.projectId) return "project";
-  if (row.workspaceId) return "workspace";
-  // Orphan rows (no owner) are treated as project-global to stay backward safe.
-  return "project";
-}
+// Scope is derived from the `owns` edge via `componentScopeOf`
+// (application/graph/componentOwnership.ts); the old field-based `componentScope`
+// is gone with the screenId/parentVariantId fields.
 
 function legacyAttachment(row: ReferenceRow): ReferenceAttachment[] {
   if (row.ownerType === "screen") {

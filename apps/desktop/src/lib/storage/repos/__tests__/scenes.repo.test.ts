@@ -8,8 +8,10 @@ import {
 import { getCanvasMockBundleForScreen } from "@/components/mocks/data/canvasMocks";
 import { flushThumbnailJobs } from "@/application/thumbnails/thumbnailQueue";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
+import { setOwner } from "@/lib/storage/repos/edges.repo";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
+import { resetEdgeIndex } from "@/application/graph/edgeIndex";
 import type { ComponentRow, SceneRow, ThumbnailRow, VariantRow } from "@/lib/storage/schema";
 
 class MemoryStorage {
@@ -27,8 +29,7 @@ class MemoryStorage {
 beforeEach(async () => {
   resetPersistenceSingletons();
   resetRecordStoreCache();
-  resetPersistenceSingletons();
-  resetRecordStoreCache();
+  resetEdgeIndex();
   await flushThumbnailJobs();
   globalThis.localStorage = new MemoryStorage() as unknown as Storage;
   await replaceTable<ComponentRow>(TABLES.components, []);
@@ -97,8 +98,6 @@ test("upsertScene propagates connected component snapshots to parent screen", as
     {
       id: "component-header",
       projectId: "project-1",
-      screenId: "screen-home",
-      parentVariantId: null,
       name: "Header",
       kind: "Layout",
       category: null,
@@ -110,6 +109,8 @@ test("upsertScene propagates connected component snapshots to parent screen", as
       updatedAt: 1,
     },
   ]);
+  // Screen-top-level master → owned by the screen's main variant (the edge).
+  await setOwner({ type: "variant", id: "variant-home" }, { type: "component", id: "component-header" });
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "variant:variant-home",
@@ -201,8 +202,6 @@ test("upsertScene propagates connected nested component snapshots through every 
     {
       id: "component-header",
       projectId: "project-1",
-      screenId: "screen-home",
-      parentVariantId: null,
       name: "Header",
       kind: "Layout",
       category: null,
@@ -216,8 +215,6 @@ test("upsertScene propagates connected nested component snapshots through every 
     {
       id: "component-logo",
       projectId: "project-1",
-      screenId: null,
-      parentVariantId: "variant-header",
       name: "Logo Design",
       kind: "Atom",
       category: null,
@@ -229,6 +226,10 @@ test("upsertScene propagates connected nested component snapshots through every 
       updatedAt: 1,
     },
   ]);
+  // Ownership edges: header is screen-top-level (owned by the screen's main
+  // variant), logo is nested under the header component's variant.
+  await setOwner({ type: "variant", id: "variant-home" }, { type: "component", id: "component-header" });
+  await setOwner({ type: "variant", id: "variant-header" }, { type: "component", id: "component-logo" });
   await replaceTable<SceneRow>(TABLES.scenes, [
     {
       id: "variant:variant-home",
@@ -319,8 +320,6 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
     {
       id: "component-green",
       projectId: "project-1",
-      screenId: "screen-1",
-      parentVariantId: null,
       name: "Rectangle",
       kind: "Custom",
       category: null,
@@ -333,6 +332,8 @@ test("upsertScene replaces duplicate-name siblings by sourceNodeId", async () =>
       updatedAt: 1,
     },
   ]);
+  // Screen-top-level master → owned by the screen's main variant.
+  await setOwner({ type: "variant", id: "variant-screen-1" }, { type: "component", id: "component-green" });
 
   await replaceTable<SceneRow>(TABLES.scenes, [
     {

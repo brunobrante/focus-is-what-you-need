@@ -82,18 +82,14 @@ export type ScreenRow = {
 
 export type ComponentRow = {
   id: string;
-  // Scope owners. A component belongs to exactly one of:
-  //   - a workspace (workspaceId set, projectId null)        → workspace-global
-  //   - a project   (projectId set, screenId/parent null)    → project-global
-  //   - a screen     (screenId set)                           → screen-level
-  //   - a variant    (parentVariantId set)                    → nested child
-  // Derive the discriminator with `componentScope(row)` in defaults.ts.
-  // Optional so existing rows / literals stay valid; normalizeComponentRow
-  // backfills it to null.
+  // Denormalized home pointers — NOT the ownership source of truth. Precise
+  // ownership (workspace-global / project-global / screen-top-level / nested /
+  // version-owned / draft) is the single incoming `owns` graph edge, resolved by
+  // `componentScopeOf` (save-architecture-v3 flip 1). workspaceId/projectId are
+  // kept only as a fast "which workspace/project does this live in" lookup for
+  // routing and listing; screenId/parentVariantId are gone (the edge subsumes them).
   workspaceId?: string | null;
   projectId: string | null;
-  screenId: string | null;
-  parentVariantId: string | null;
   name: string;
   kind: ComponentKind | null;
   category: string | null;

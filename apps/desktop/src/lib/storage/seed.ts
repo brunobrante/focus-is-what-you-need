@@ -11,6 +11,7 @@ import {
 } from "@/lib/storage/defaults";
 import { newId, now } from "@/lib/storage/ids";
 import { reconcileAllGraphEdges } from "@/application/graph/ownershipReconcile";
+import { linkEdge } from "@/lib/storage/repos/edges.repo";
 import { sweepEdgeTombstones } from "@/application/graph/edgeIndex";
 import { primeInstanceUsage } from "@/application/scenes/instanceUsage";
 import {
@@ -127,6 +128,7 @@ async function firstBootSeedV5(): Promise<void> {
   const projectTypeById = new Map(projects.map((p) => [p.id, p.type]));
   const scenes: SceneRow[] = [];
   const thumbnails: ThumbnailRow[] = [];
+  const ownerEdges: SeedOwnerEdge[] = [];
 
   for (const screen of screens) {
     const projectType = projectTypeById.get(screen.projectId);
@@ -138,12 +140,14 @@ async function firstBootSeedV5(): Promise<void> {
     thumbnails.push(createMockThumbnailRow(mainVariantId, "variant", bundle.screen, t));
     seedComponentTree({
       projectId: screen.projectId,
-      parent: { kind: "screen", screenId: screen.id },
+      // Screen-top-level components are owned by the screen's MAIN variant.
+      ownerVariantId: mainVariantId,
       nodes: bundle.components,
       components,
       variants,
       scenes,
       thumbnails,
+      ownerEdges,
       t,
     });
   }
@@ -178,10 +182,15 @@ async function firstBootSeedV5(): Promise<void> {
   notify(TABLES.thumbnails);
   notify(TABLES.workspaces);
   notify(TABLES.history);
+
+  // Ownership is the edge now — emit the `variant owns component` edges the tree
+  // collected (the rows carry no screenId/parentVariantId to derive from).
+  await emitSeedOwnerEdges(ownerEdges);
 }
 
 async function ensureFactoryMocksPresent(): Promise<void> {
   const t = now();
+  const ownerEdges: SeedOwnerEdge[] = [];
   let projects = await listTable<ProjectRow>(TABLES.projects);
   let screens = await listTable<ScreenRow>(TABLES.screens);
   let components = (await listTable<ComponentRow>(TABLES.components)).map(
@@ -271,12 +280,13 @@ async function ensureFactoryMocksPresent(): Promise<void> {
       ];
       seedComponentTree({
         projectId: project.id,
-        parent: { kind: "screen", screenId: screen.id },
+        ownerVariantId: mainVariantId,
         nodes: bundle.components,
         components,
         variants,
         scenes,
         thumbnails,
+        ownerEdges,
         t,
       });
     }
@@ -326,6 +336,8 @@ async function ensureFactoryMocksPresent(): Promise<void> {
   notify(TABLES.scenes);
   notify(TABLES.thumbnails);
   notify(TABLES.workspaces);
+
+  await emitSeedOwnerEdges(ownerEdges);
 }
 
 function projectKey(name: string, type: ProjectRow["type"]): string {
@@ -363,18 +375,22 @@ function createMockThumbnailRow(
   };
 }
 
-type SeedParent =
-  | { kind: "screen"; screenId: string }
-  | { kind: "variant"; variantId: string };
+/** An `owns` edge the seed must emit: `variant ──owns──▶ component`. Ownership is
+ *  the edge now (no screenId/parentVariantId fields), so the seed records the
+ *  owner of each component it builds and emits the edges after the rows land. */
+export type SeedOwnerEdge = { ownerVariantId: string; componentId: string };
 
 function seedComponentTree(input: {
   projectId: string;
-  parent: SeedParent;
+  // The variant that OWNS the nodes at this level: a screen's main variant for its
+  // top-level components, or the parent component's default variant for nested ones.
+  ownerVariantId: string;
   nodes: MockComponentSeed[];
   components: ComponentRow[];
   variants: VariantRow[];
   scenes: SceneRow[];
   thumbnails: ThumbnailRow[];
+  ownerEdges: SeedOwnerEdge[];
   t: number;
 }): void {
   for (const [order, node] of input.nodes.entries()) {
@@ -394,9 +410,6 @@ function seedComponentTree(input: {
     input.components.push({
       id: componentId,
       projectId: input.projectId,
-      screenId: input.parent.kind === "screen" ? input.parent.screenId : null,
-      parentVariantId:
-        input.parent.kind === "variant" ? input.parent.variantId : null,
       name: node.name,
       kind: node.kind,
       category: null,
@@ -406,6 +419,7 @@ function seedComponentTree(input: {
       createdAt: input.t,
       updatedAt: input.t,
     });
+    input.ownerEdges.push({ ownerVariantId: input.ownerVariantId, componentId });
     input.scenes.push(
       createMockSceneRow(variantId, "variant", node.canvas, input.t),
     );
@@ -413,10 +427,19 @@ function seedComponentTree(input: {
       createMockThumbnailRow(variantId, "variant", node.canvas, input.t),
     );
 
-    seedComponentTree({
-      ...input,
-      parent: { kind: "variant", variantId },
-      nodes: node.children,
+    // Children nest under this component's own Default variant.
+    seedComponentTree({ ...input, ownerVariantId: variantId, nodes: node.children });
+  }
+}
+
+/** Emit the `variant owns component` edges the seed collected (after the rows are
+ *  in the store), so component ownership is edge-authoritative from first boot. */
+async function emitSeedOwnerEdges(edges: SeedOwnerEdge[]): Promise<void> {
+  for (const e of edges) {
+    await linkEdge({
+      from: { type: "variant", id: e.ownerVariantId },
+      relation: "owns",
+      to: { type: "component", id: e.componentId },
     });
   }
 }

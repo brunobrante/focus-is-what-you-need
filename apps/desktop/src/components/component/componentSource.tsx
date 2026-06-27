@@ -18,10 +18,7 @@ export const SOURCE_SCOPE_LABEL: Record<ComponentScope, string> = {
   nested: "Component",
 };
 
-type ScopeSource = Pick<
-  ComponentRow,
-  "id" | "workspaceId" | "projectId" | "screenId" | "parentVariantId"
->;
+type ScopeSource = Pick<ComponentRow, "id" | "workspaceId" | "projectId">;
 
 export function scopeOf(component: ScopeSource): ComponentScope {
   return componentScopeOf(component);

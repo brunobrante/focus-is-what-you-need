@@ -170,8 +170,8 @@ export function useVersionsWindow({
     if (!versionsSubject || versionsSubject.kind !== "component") return null;
     const comp = projectComponents.find((c) => c.id === versionsSubject.id);
     if (!comp) return null;
-    const parentVariantId = parentVariantIdOf(comp.id) ?? comp.parentVariantId;
-    const screenId = screenIdOfComponent(comp.id) ?? comp.screenId;
+    const parentVariantId = parentVariantIdOf(comp.id);
+    const screenId = screenIdOfComponent(comp.id);
     if (!parentVariantId && screenId) {
       return projectTree.find((n) => n.id === screenId) ?? null;
     }

@@ -143,8 +143,8 @@ export async function removeComponentSubtreeFromParentScene(
   if (!component) return;
 
   let parentOwner: { ownerType: "variant"; ownerId: string } | null = null;
-  const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
-  const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+  const parentVariantId = parentVariantIdOf(component.id);
+  const screenId = screenIdOfComponent(component.id);
   if (parentVariantId) {
     parentOwner = { ownerType: "variant", ownerId: parentVariantId };
   } else if (screenId) {

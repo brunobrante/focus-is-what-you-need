@@ -116,7 +116,7 @@ function useScreenAncestor(component: ComponentRow | null): string | null {
     return () => {
       cancelled = true;
     };
-  }, [component?.id, component?.screenId, component?.parentVariantId]);
+  }, [component?.id]);
   return screenId;
 }
 
@@ -126,9 +126,9 @@ async function resolveScreenAncestor(
   let current: ComponentRow | null = component;
   // Cap at a reasonable depth to avoid infinite loops on bad data.
   for (let i = 0; i < 64 && current; i++) {
-    const screenId = screenIdOfComponent(current.id) ?? current.screenId;
+    const screenId = screenIdOfComponent(current.id);
     if (screenId) return screenId;
-    const parentVariantId = parentVariantIdOf(current.id) ?? current.parentVariantId;
+    const parentVariantId = parentVariantIdOf(current.id);
     if (!parentVariantId) return null;
     const variant = await getVariant(parentVariantId);
     if (!variant) return null;
@@ -149,7 +149,7 @@ function useAncestorTrail(component: ComponentRow | null): ComponentRow[] {
     return () => {
       cancelled = true;
     };
-  }, [component?.id, component?.parentVariantId]);
+  }, [component?.id]);
   return trail;
 }
 
@@ -158,7 +158,7 @@ async function resolveAncestorTrail(
 ): Promise<ComponentRow[]> {
   if (!component) return [];
   let parentVariantId: string | null =
-    parentVariantIdOf(component.id) ?? component.parentVariantId;
+    parentVariantIdOf(component.id);
   if (!parentVariantId) return [];
   const trail: ComponentRow[] = [];
   for (let i = 0; i < 64 && parentVariantId; i++) {
@@ -167,7 +167,7 @@ async function resolveAncestorTrail(
     const parent = await getComponent(variant.ownerId);
     if (!parent) break;
     trail.unshift(parent);
-    parentVariantId = parentVariantIdOf(parent.id) ?? parent.parentVariantId;
+    parentVariantId = parentVariantIdOf(parent.id);
   }
   return trail;
 }

@@ -63,10 +63,11 @@ test("deleteProject removes project-owned screens, components, variants, and ref
     {
       id: "component-1",
       projectId: project.id,
-      screenId: "screen-1",
-      parentVariantId: null,
       name: "Header",
       kind: "Layout",
+      category: null,
+      description: null,
+      assignedScreenIds: [],
       activeVariantId: "variant-1",
       order: 0,
       createdAt: 1,

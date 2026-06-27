@@ -57,13 +57,9 @@ test("reconcile derives containment, version, and ownership edges from fields", 
     createdAt: t,
     updatedAt: t,
   } as VariantRow);
-  // A screen-top-level component (screenId set) must be owned by the screen's MAIN
-  // variant — the asymmetry collapse.
   putRecord<ComponentRow>(TABLES.components, {
     id: "c1",
     projectId: "p1",
-    screenId: "s1",
-    parentVariantId: null,
     name: "Card",
     kind: null,
     category: null,
@@ -95,11 +91,9 @@ test("reconcile derives containment, version, and ownership edges from fields", 
       (e) => e.toId,
     ),
   ).toEqual(["v-main"]);
-  // component owned by the screen's MAIN variant (not the screen)
-  expect(await ownerOf({ type: "component", id: "c1" })).toEqual({
-    type: "variant",
-    id: "v-main",
-  });
+  // Component ownership is NOT reconciled from fields anymore (the seed + write
+  // paths emit the `owns` edge directly), so reconcile leaves c1 unowned.
+  expect(await ownerOf({ type: "component", id: "c1" })).toBeNull();
 });
 
 test("a draft component (no owner fields) gets no owner edge", async () => {

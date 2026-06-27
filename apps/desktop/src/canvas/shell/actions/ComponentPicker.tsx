@@ -27,11 +27,11 @@ export type ComponentPickerContext = {
 // A master is "native" to the scene being edited when its origin owner IS that scene —
 // inserting a link to it there would create a purple/locked instance in its own origin.
 function isNativeToCurrentScene(
-  row: Pick<ComponentRow, "id" | "screenId" | "parentVariantId">,
+  row: Pick<ComponentRow, "id">,
   ctx: ComponentPickerContext,
 ): boolean {
-  const screenId = screenIdOfComponent(row.id) ?? row.screenId;
-  const parentVariantId = parentVariantIdOf(row.id) ?? row.parentVariantId;
+  const screenId = screenIdOfComponent(row.id);
+  const parentVariantId = parentVariantIdOf(row.id);
   return (
     row.id === ctx.openComponentId ||
     (ctx.excludeScreenId != null && screenId === ctx.excludeScreenId) ||

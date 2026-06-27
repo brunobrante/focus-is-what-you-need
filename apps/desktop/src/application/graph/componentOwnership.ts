@@ -62,7 +62,7 @@ export function parentVariantIdOf(
  * Falls back to the (still-written) owner fields when the edge index is cold.
  */
 export function componentScopeOf(
-  row: Pick<ComponentRow, "id" | "workspaceId" | "projectId" | "screenId" | "parentVariantId">,
+  row: Pick<ComponentRow, "id" | "workspaceId" | "projectId">,
   variants?: VariantLookup,
 ): ComponentScope {
   const owner = peekOwnerOf("component", row.id);
@@ -74,10 +74,8 @@ export function componentScopeOf(
       return v?.ownerKind === "screen" ? "screen" : "nested";
     }
   }
-  // Cold index or no owner edge — fall back to the owner fields (removed once the
-  // fields are dropped). Orphan rows classify as project-global, as before.
-  if (row.parentVariantId) return "nested";
-  if (row.screenId) return "screen";
+  // Cold index / no owner edge — fall back to the denormalized home pointers
+  // (screen/nested can't be told apart without the edge; orphans → project-global).
   if (row.projectId) return "project";
   if (row.workspaceId) return "workspace";
   return "project";

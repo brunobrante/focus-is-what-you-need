@@ -99,7 +99,7 @@ function collectVariantOwnedComponentIds(
   const ids = new Set<string>();
   const variantMap = new Map(variants.map((v) => [v.id, v]));
   const children = components.filter(
-    (c) => (parentVariantIdOf(c.id, variantMap) ?? c.parentVariantId) === variantId,
+    (c) => (parentVariantIdOf(c.id, variantMap)) === variantId,
   );
   for (const child of children) {
     collectComponentTreeIds(child.id, components, variants).forEach((id) => ids.add(id));
@@ -547,8 +547,12 @@ async function cloneChildComponentsIntoVariant(input: {
   const cloneVariantMap = new Map(allVariants.map((v) => [v.id, v]));
   const childrenOfVariant = (variantId: string) =>
     allComponents.filter(
-      (c) => (parentVariantIdOf(c.id, cloneVariantMap) ?? c.parentVariantId) === variantId,
+      (c) => (parentVariantIdOf(c.id, cloneVariantMap)) === variantId,
     );
+
+  // (cloneComponentId → owner variant) — clones are version-owned; ownership is the
+  // edge now, so we track the owner here and emit `variant owns component` below.
+  const cloneOwnerEdges: Array<{ componentId: string; ownerVariantId: string }> = [];
 
   const cloneOne = (source: ComponentRow, parentVariantId: string): void => {
     const t = now();
@@ -571,15 +575,14 @@ async function cloneChildComponentsIntoVariant(input: {
       normalizeComponentRow({
         ...source,
         id: newComponentId,
-        // Owned by the new version's variant — a version-scoped local copy.
-        parentVariantId,
-        screenId: null,
         linkable: false,
         activeVariantId: newActiveVariantId,
         createdAt: t,
         updatedAt: t,
       }),
     );
+    // Owned by the new version's variant — a version-scoped local copy.
+    cloneOwnerEdges.push({ componentId: newComponentId, ownerVariantId: parentVariantId });
 
     // Recurse into the children nested under each source variant.
     for (const sv of sourceVariants) {
@@ -599,17 +602,12 @@ async function cloneChildComponentsIntoVariant(input: {
   if (newComponents.length > 0) {
     await replaceTable<ComponentRow>(TABLES.components, [...newComponents, ...allComponents]);
     notify(TABLES.components);
-    // Emit each clone's `owns` edge (version-owned → `variant owns component`) so
-    // the edge-authoritative queries see them in-session, not only after the next
-    // boot reconcile (save-architecture-v3 flip 1). Clones always have a parent
-    // variant — they are version-scoped local copies.
-    for (const c of newComponents) {
-      if (c.parentVariantId) {
-        await setOwner(
-          { type: "variant", id: c.parentVariantId },
-          { type: "component", id: c.id },
-        );
-      }
+    // Emit each clone's `owns` edge (version-owned → `variant owns component`).
+    for (const e of cloneOwnerEdges) {
+      await setOwner(
+        { type: "variant", id: e.ownerVariantId },
+        { type: "component", id: e.componentId },
+      );
     }
   }
   for (const scene of newScenes) {

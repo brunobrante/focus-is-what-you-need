@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { materializeVersionScene } from "@/application/canvas/canvasMaterializer";
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
 import { listChildrenOfVariant, listTopLevelByScreen } from "@/lib/storage/repos/components.repo";
-import { ownerOf } from "@/lib/storage/repos/edges.repo";
+import { ownerOf, setOwner } from "@/lib/storage/repos/edges.repo";
 import { promoteVariantToMain } from "@/lib/storage/repos/variants.repo";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import {
@@ -144,11 +144,13 @@ test("a component unlinked in a version survives in the new main after promote (
   // The original master "Header", screen-owned, embedded in the main.
   await replaceTable<ComponentRow>(TABLES.components, [
     {
-      id: "c", projectId, screenId, parentVariantId: null, name: "Header", kind: null, category: null,
+      id: "c", projectId, name: "Header", kind: null, category: null,
       description: null, assignedScreenIds: [], sourceNodeId: "header", activeVariantId: "cv", order: 0,
       createdAt: 1, updatedAt: 1,
     },
   ]);
+  // Screen-top-level master → owned by the screen's main variant (the edge).
+  await setOwner({ type: "variant", id: "m" }, { type: "component", id: "c" });
 
   const sceneNodes = (headerInstanceOf: HtmlCanvasNode["instanceOf"]) =>
     htmlDoc([

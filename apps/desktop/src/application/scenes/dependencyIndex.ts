@@ -54,8 +54,8 @@ export function createSceneDependencyIndex(input: {
 
     const component = getComponentForVariant(variantId);
     if (!component) return null;
-    const parentVariantId = parentVariantIdOf(component.id) ?? component.parentVariantId;
-    const screenId = screenIdOfComponent(component.id) ?? component.screenId;
+    const parentVariantId = parentVariantIdOf(component.id);
+    const screenId = screenIdOfComponent(component.id);
     if (parentVariantId) {
       return { ownerType: "variant", ownerId: parentVariantId };
     }

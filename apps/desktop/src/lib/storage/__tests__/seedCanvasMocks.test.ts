@@ -4,6 +4,7 @@ import {
   getCanvasMockDataset,
 } from "@/components/mocks/data/canvasMocks";
 import { canvasDocumentFromHtmlGraphJSON } from "@/canvas/engine/htmlSceneAdapter";
+import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { ensureSeededAndMigrated } from "@/lib/storage/seed";
 import { TABLES, listTable, replaceTable, resetRecordStoreCache, setMeta } from "@/lib/storage/store";
 import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
@@ -116,7 +117,7 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
 
   const mobileHomeComponents = components.filter(
     (component) =>
-      component.screenId === mobileHome!.id && component.parentVariantId === null,
+      screenIdOfComponent(component.id) === mobileHome!.id,
   );
   expect(mobileHomeComponents.map((component) => component.name)).toEqual([
     "Header",
@@ -131,7 +132,7 @@ test("fresh seed writes screen and component canvas scenes for hierarchical mock
 
   const alignmentComponents = components.filter(
     (component) =>
-      component.screenId === alignmentScreen!.id && component.parentVariantId === null,
+      screenIdOfComponent(component.id) === alignmentScreen!.id,
   );
   expect(alignmentComponents.map((component) => component.name)).toEqual([
     "Red Alignment Box",
@@ -202,7 +203,7 @@ test("v7 migration repairs missing mock hierarchy, scenes, and thumbnails", asyn
   expect(homeScreen).toBeDefined();
 
   const topLevel = components
-    .filter((c) => c.screenId === homeScreen!.id && c.parentVariantId === null)
+    .filter((c) => screenIdOfComponent(c.id) === homeScreen!.id)
     .sort((a, b) => a.order - b.order);
   expect(topLevel.map((c) => c.name)).toEqual([
     "Header",
@@ -212,7 +213,7 @@ test("v7 migration repairs missing mock hierarchy, scenes, and thumbnails", asyn
     "Mobile App Cart",
   ]);
   expect(
-    components.some((c) => c.parentVariantId === topLevel[0]!.activeVariantId),
+    components.some((c) => parentVariantIdOf(c.id) === topLevel[0]!.activeVariantId),
   ).toBe(true);
   // One variant per component, plus one main variant per screen.
   expect(variants).toHaveLength(components.length + screens.length);
@@ -261,7 +262,7 @@ test("v9 migration replaces stale full-screen component scenes with component-si
   expect(homeScreen).toBeDefined();
 
   const header = components.find(
-    (c) => c.screenId === homeScreen!.id && c.name === "Header",
+    (c) => screenIdOfComponent(c.id) === homeScreen!.id && c.name === "Header",
   );
   expect(header).toBeDefined();
 
@@ -278,7 +279,7 @@ test("v9 migration replaces stale full-screen component scenes with component-si
   expect(headerRoot?.locked).toBe(true);
 
   const logo = components.find(
-    (c) => c.parentVariantId === header!.activeVariantId && c.name === "Logo Design",
+    (c) => parentVariantIdOf(c.id) === header!.activeVariantId && c.name === "Logo Design",
   );
   expect(logo).toBeDefined();
   const logoScene = scenes.find(

@@ -117,10 +117,9 @@ export async function listDrafts(): Promise<ComponentRow[]> {
   const rows = await listComponents();
   return rows
     .filter((r) => {
-      // A draft has no owner edge. `?? fields` keeps cold-index safety while the
-      // owner fields are still written as a mirror.
+      // A draft has no owner edge and no home pointer (workspace/project).
       if (peekOwnerOf("component", r.id)) return false;
-      return !r.workspaceId && !r.projectId && !r.screenId && !r.parentVariantId;
+      return !r.workspaceId && !r.projectId;
     })
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -348,8 +347,6 @@ export async function createComponent(input: {
     workspaceId:
       input.parent.kind === "workspace" ? input.parent.workspaceId : null,
     projectId: input.parent.kind === "workspace" ? null : input.projectId ?? null,
-    screenId: null,
-    parentVariantId: null,
     name: trimmedName,
     kind: input.kind ?? null,
     category: input.category?.trim() || null,
@@ -575,7 +572,7 @@ export function collectComponentTreeIds(
       .filter((v) => v.ownerKind === "component" && v.ownerId === currentId)
       .map((v) => v.id);
     for (const child of components) {
-      const pv = parentVariantIdOf(child.id, variantMap) ?? child.parentVariantId;
+      const pv = parentVariantIdOf(child.id, variantMap);
       if (pv && ownedVariantIds.includes(pv)) {
         queue.push(child.id);
       }

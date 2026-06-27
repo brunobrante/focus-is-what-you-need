@@ -1,5 +1,5 @@
 import { TABLES, listTable } from "@/lib/storage/store";
-import { linkEdge, ownerOf, setEdges, setOwner } from "@/lib/storage/repos/edges.repo";
+import { linkEdge, setEdges } from "@/lib/storage/repos/edges.repo";
 import type { EntityRef } from "@/domain/graph/edges";
 import type {
   ComponentRow,
@@ -25,57 +25,11 @@ import type {
  * step; this makes the graph real and consistent in the meantime, idempotently.
  */
 
-/** The lowest-order ("main") variant id a screen owns — its embedding scene.
- *  Inlined (not imported from scenes.repo) to keep this module out of the
- *  scenes.repo → thumbnailQueue → projects.repo → seed import cycle. */
-function mainVariantIdForScreen(
-  variants: VariantRow[],
-  screenId: string,
-): string | null {
-  let main: VariantRow | null = null;
-  for (const v of variants) {
-    if (v.ownerKind !== "screen" || v.ownerId !== screenId) continue;
-    if (!main || v.order < main.order) main = v;
-  }
-  return main?.id ?? null;
-}
-
-/** Map a component's owner fields to the single `owns`-edge source (D: uniform
- *  `*owns* component`). A screen-top-level component is owned by the screen's
- *  MAIN variant, collapsing the old screenId/parentVariantId asymmetry. */
-function componentOwnerRef(
-  row: ComponentRow,
-  screenMainVariantId: (screenId: string) => string | null,
-): EntityRef | null {
-  if (row.parentVariantId) return { type: "variant", id: row.parentVariantId };
-  if (row.screenId) {
-    const mainId = screenMainVariantId(row.screenId);
-    return mainId ? { type: "variant", id: mainId } : null;
-  }
-  if (row.projectId) return { type: "project", id: row.projectId };
-  if (row.workspaceId) return { type: "workspace", id: row.workspaceId };
-  return null; // Draft — no owner edge
-}
-
-/**
- * Backfill one component's `owns` edge from its fields — ADDITIVE only. Edges are
- * the source of truth now (write paths emit them directly), so reconcile must never
- * CLOBBER an existing owner edge: a runtime-created component carries null
- * screenId/parentVariantId and would be wrongly re-homed to a draft if the
- * field-derived owner overwrote its real edge. So we only set the owner when the
- * component has no live owner edge yet (e.g. freshly seeded rows that still encode
- * ownership in fields). This keeps the seed bootstrap working while leaving every
- * authoritative edge untouched.
- */
-export async function reconcileComponentOwner(
-  row: ComponentRow,
-  variants?: VariantRow[],
-): Promise<void> {
-  if (await ownerOf({ type: "component", id: row.id })) return; // already owned — never clobber
-  const vs = variants ?? (await listTable<VariantRow>(TABLES.variants));
-  const owner = componentOwnerRef(row, (sid) => mainVariantIdForScreen(vs, sid));
-  await setOwner(owner, { type: "component", id: row.id });
-}
+// NOTE: component ownership is NOT reconciled from fields anymore — screenId /
+// parentVariantId are gone and every write path (seed, createComponent, promote,
+// clone, detach) emits the `owns` edge directly. Reconcile derives only the edges
+// that still have an authoritative field source (containment / version / scene /
+// reference attachment).
 
 /** Reconcile workspace→project containment from `WorkspaceRow.projectIds`. */
 export async function reconcileWorkspaceContainment(
@@ -161,10 +115,10 @@ export async function reconcileAllGraphEdges(): Promise<void> {
     });
   }
 
-  // owner ──owns──▶ component (uniform rule, derived from fields)
-  for (const c of components) {
-    await reconcileComponentOwner(c, variants);
-  }
+  // Component `owns` edges are emitted directly by the seed + write paths (no field
+  // source), so they are NOT reconciled here. `components` stays read for the other
+  // backfills' consistency.
+  void components;
 
   // reference/cut ──attached_to──▶ {workspace|project|screen|component} (multi-attach)
   for (const ref of references) {

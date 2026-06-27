@@ -18,6 +18,7 @@ import { CardMenuIcons as SharedCardMenuIcons } from "@/components/screen/CardMe
 import { Snapshot } from "@/components/Snapshot";
 import { Badge } from "@/components/ui/badge";
 import { scopeOf, sourceScopeIcon, SOURCE_SCOPE_LABEL } from "@/components/component/componentSource";
+import { screenIdOfComponent } from "@/application/graph/componentOwnership";
 import type { ComponentKind, ProjectType } from "@/lib/data/types";
 import { setComponentScreen, updateComponent } from "@/lib/storage/repos/components.repo";
 import type { ComponentRow, ScreenRow, VariantRow } from "@/lib/storage/schema";
@@ -98,7 +99,7 @@ export function ComponentsTab({
         component.category?.toLowerCase().includes(loweredQuery);
       const matchesScreen =
         screenFilter === "all" ||
-        component.screenId === screenFilter ||
+        screenIdOfComponent(component.id) === screenFilter ||
         component.assignedScreenIds.includes(screenFilter);
       const matchesSource =
         sourceFilter === "all" || scopeOf(component) === sourceFilter;
@@ -619,12 +620,12 @@ function ComponentScreensModal({
   onSave: (value: { screenId: string | null; assignedScreenIds: string[] }) => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const primaryScreenId = component?.screenId ?? null;
+  const primaryScreenId = component ? screenIdOfComponent(component.id) : null;
   const unlinkConfirmRef = useRef<ConfirmActionModalHandle>(null);
 
   useEffect(() => {
     if (!component) return;
-    setSelectedIds(Array.from(new Set([...(component.assignedScreenIds ?? []), ...(component.screenId ? [component.screenId] : [])])));
+    setSelectedIds(Array.from(new Set([...(component.assignedScreenIds ?? []), ...(primaryScreenId ? [primaryScreenId] : [])])));
   }, [component]);
 
   return (
@@ -728,11 +729,12 @@ function ComponentSourceBadge({
 }) {
   const navigate = useNavigate();
   const scope = scopeOf(component);
-  const mainScreen = component.screenId ? screenById.get(component.screenId) ?? null : null;
+  const ownerScreenId = screenIdOfComponent(component.id);
+  const mainScreen = ownerScreenId ? screenById.get(ownerScreenId) ?? null : null;
   // Walk the component's own assigned ids (small) and look each up, instead of
   // scanning all screens (UI-7).
   const linkedScreens = component.assignedScreenIds
-    .filter((id) => id !== component.screenId)
+    .filter((id) => id !== ownerScreenId)
     .map((id) => screenById.get(id))
     .filter((s): s is ScreenRow => s != null);
   const mainLabel =

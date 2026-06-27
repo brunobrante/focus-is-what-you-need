@@ -106,7 +106,7 @@ export async function deleteProject(projectId: string): Promise<void> {
     .filter(
       (c) =>
         c.projectId === projectId &&
-        (parentVariantIdOf(c.id, variantLookup) ?? c.parentVariantId) === null,
+        (parentVariantIdOf(c.id, variantLookup)) === null,
     )
     .map((c) => c.id);
   const componentIds = new Set<string>();

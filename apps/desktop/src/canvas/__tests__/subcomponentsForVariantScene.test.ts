@@ -1,6 +1,18 @@
-import { expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { subcomponentsForVariantScene } from "@/canvas/canvasUtils";
 import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
+import { resetPersistenceSingletons } from "@/application/persistence/saveQueueProvider";
+import { TABLES, putRecord, resetRecordStoreCache } from "@/lib/storage/store";
+import { primeEdgeIndex, resetEdgeIndex } from "@/application/graph/edgeIndex";
+import { setOwner } from "@/lib/storage/repos/edges.repo";
+import type { VariantRow } from "@/lib/storage/schema";
+
+class MemoryStorage {
+  private rows = new Map<string, string>();
+  getItem(k: string) { return this.rows.get(k) ?? null; }
+  setItem(k: string, v: string) { this.rows.set(k, v); }
+  removeItem(k: string) { this.rows.delete(k); }
+}
 import {
   HTML_CANVAS_FORMAT,
   HTML_CANVAS_VERSION,
@@ -61,8 +73,6 @@ function comp(p: Partial<ComponentRow> & { id: string }): ComponentRow {
     id: p.id,
     projectId: p.projectId ?? "proj",
     workspaceId: p.workspaceId ?? null,
-    screenId: p.screenId ?? "screen",
-    parentVariantId: p.parentVariantId ?? null,
     name: p.name ?? p.id,
     kind: p.kind ?? "Custom",
     activeVariantId: p.activeVariantId ?? `${p.id}-v`,
@@ -76,6 +86,29 @@ function comp(p: Partial<ComponentRow> & { id: string }): ComponentRow {
 const headerMaster = comp({ id: "c-header", name: "Header", sourceNodeId: "header", activeVariantId: "v-header" });
 const heroMaster = comp({ id: "c-hero", name: "Hero", sourceNodeId: "hero", activeVariantId: "v-hero" });
 const projectComponents = [headerMaster, heroMaster];
+
+// Ownership is the edge now: the masters are top-level on screen "screen", i.e.
+// owned by its main variant. Seed that variant and the `owns` edges so the
+// resolver inside subcomponentsForVariantScene resolves them as screen-owned.
+beforeEach(async () => {
+  resetPersistenceSingletons();
+  resetRecordStoreCache();
+  resetEdgeIndex();
+  globalThis.localStorage = new MemoryStorage() as unknown as Storage;
+  putRecord<VariantRow>(TABLES.variants, {
+    id: "v-screen-main",
+    ownerKind: "screen",
+    ownerId: "screen",
+    name: "Default",
+    order: 0,
+    seedKey: null,
+    createdAt: 1,
+    updatedAt: 1,
+  } as VariantRow);
+  await setOwner({ type: "variant", id: "v-screen-main" }, { type: "component", id: "c-header" });
+  await setOwner({ type: "variant", id: "v-screen-main" }, { type: "component", id: "c-hero" });
+  await primeEdgeIndex();
+});
 
 test("linked version: resolves the subject's children as linked subcomponents", () => {
   const linked = linkifyChildComponentsInGraph(screenJSON, [

@@ -69,10 +69,6 @@ test("createComponent creates a component with a default variant under a screen"
 
   expect(result.component).toMatchObject({
     projectId: "project-1",
-    // screenId/parentVariantId are vestigial (always null) — ownership is the edge,
-    // verified by listTopLevelByScreen below.
-    screenId: null,
-    parentVariantId: null,
     name: "Header",
     kind: "Layout",
     order: 0,
@@ -97,10 +93,7 @@ test("createComponent creates children under a variant", async () => {
     name: "Logo",
   });
 
-  // Vestigial fields stay null — ownership is the edge, verified below.
-  expect(result.component.screenId).toBeNull();
-  expect(result.component.parentVariantId).toBeNull();
-
+  // Ownership is the edge — verified below.
   const children = await listChildrenOfVariant("variant-1");
   expect(children.map((c) => c.id)).toEqual([result.component.id]);
 });

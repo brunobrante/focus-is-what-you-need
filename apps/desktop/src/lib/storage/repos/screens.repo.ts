@@ -1,5 +1,6 @@
 import type { ScreenVariant } from "@/lib/data/types";
 import { normalizeReferenceRow } from "@/lib/storage/defaults";
+import { peekOwnerOf } from "@/application/graph/edgeIndex";
 import { newId, now } from "@/lib/storage/ids";
 import {
   collectComponentTreeIds,
@@ -188,12 +189,13 @@ function collectScreenComponentIds(
   const screenVariantIds = new Set(
     variants.filter((v) => v.ownerKind === "screen" && v.ownerId === screenId).map((v) => v.id),
   );
+  // Owned (edge) by any of the screen's variants — main (top-level components) or a
+  // version variant (copy-version-owned children).
   const rootIds = components
-    .filter(
-      (c) =>
-        (c.screenId === screenId && c.parentVariantId === null) ||
-        (c.parentVariantId != null && screenVariantIds.has(c.parentVariantId)),
-    )
+    .filter((c) => {
+      const owner = peekOwnerOf("component", c.id);
+      return owner?.type === "variant" && screenVariantIds.has(owner.id);
+    })
     .map((c) => c.id);
   const ids = new Set<string>();
   for (const id of rootIds) {
