@@ -991,9 +991,12 @@ Reference image library for UI research.
     - **Separate into images** — dissolves the group into standalone references.
       A member that holds a single screen is just ungrouped; a member that bundles
       several screens (a multi-root stack) is split so each screen becomes its own
-      plain image (its full pixels, like a normal upload — cuts are flattened into
-      the screen image), and the bundling reference is removed. Because every
-      resulting image holds one screen, none re-promotes back into a group.
+      reference — a copy of the original image carrying that one screen's stack
+      (its cuts) — and the bundling reference is removed. It is a plain separation,
+      like duplicating the image once per screen; cut boxes are copied verbatim
+      (they are authored in the original image's space, so the copy renders them
+      identically). Because every resulting image holds one screen, none
+      re-promotes back into a group.
     - **Delete everything** — permanently removes the group and cascade-deletes
       every member image, screen, stack file, and cut (project links included).
 - **Card thumbnails** (grid + group gallery) render `contain`, so the whole image
