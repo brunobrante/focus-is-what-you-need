@@ -209,15 +209,16 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
           <>
           <div className="grid h-full min-h-[640px] grid-cols-[240px_minmax(0,1fr)_360px]">
             <div className="flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--bg)]">
-              <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Layers</span>
+              <div className="shrink-0 border-b border-[var(--border)] px-3 py-2.5">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Layers</div>
+                <div className="mt-0.5 truncate text-[12.5px] font-medium text-[var(--text)]">{scene.root.name}</div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto py-1">
-                {visibleLayers.map(({ node, depth }) => (
+                {visibleLayers.filter(({ depth }) => depth > 0).map(({ node, depth }) => (
                   <LayerRow
                     key={node.id}
                     node={node}
-                    depth={depth}
+                    depth={depth - 1}
                     active={node.id === selectedNode.id}
                     collapsed={collapsedIds.has(node.id)}
                     onSelect={setSelectedId}
