@@ -24,6 +24,12 @@ import {
 } from "@/canvas/canvasUtils";
 import type { SubjectOwner } from "@/canvas/hooks/useSubjectCanvasWindow";
 import type { ShellControlVisibility } from "./inspector/ShellTab";
+import {
+  DEFAULT_SHELL_CONTROLS_BY_WINDOW,
+  shellWindowTypeOf,
+  type ShellControlsByWindow,
+  type ShellWindowType,
+} from "./shellControls";
 import { CanvasReferencesWindow, type CanvasReferencesContext } from "./CanvasReferencesWindow";
 import { CanvasPreviewSurface } from "./PreviewSurface";
 import type { CanvasToolId } from "@/canvas/tools";
@@ -72,10 +78,7 @@ export function CanvasRender({
   isComponent = false,
   referencesContext = null,
   ancestorFrames = [],
-  shellDeviceVisibility = "show",
-  shellBackVisibility = "show",
-  shellZoomVisibility = "show",
-  shellExpandVisibility = "hover",
+  shellControls = DEFAULT_SHELL_CONTROLS_BY_WINDOW,
   previewSettings = DEFAULT_PREVIEW_SETTINGS,
   onClosePreview,
   onCurrentDocumentChange,
@@ -108,10 +111,7 @@ export function CanvasRender({
   isComponent?: boolean;
   referencesContext?: CanvasReferencesContext | null;
   ancestorFrames?: AncestorFrame[];
-  shellDeviceVisibility?: ShellControlVisibility;
-  shellBackVisibility?: ShellControlVisibility;
-  shellZoomVisibility?: ShellControlVisibility;
-  shellExpandVisibility?: ShellControlVisibility;
+  shellControls?: ShellControlsByWindow;
   previewSettings?: PreviewSettings;
   onClosePreview?: () => void;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
@@ -168,8 +168,12 @@ export function CanvasRender({
   const splitEnabled = split !== "none" && normalizedSplitWindows.length > 1;
   const renderedWindows = splitEnabled ? normalizedSplitWindows : [selectedTab];
   const activeWindow = renderedWindows.includes(selectedTab) ? selectedTab : renderedWindows[0];
-  const surfaceDeviceVisibility = splitEnabled ? "hidden" : shellDeviceVisibility;
-  const surfaceZoomVisibility = splitEnabled ? "hidden" : shellZoomVisibility;
+  // Each surface reads its own window type's controls; split forces device/zoom off.
+  const deviceVisFor = (type: ShellWindowType): ShellControlVisibility =>
+    splitEnabled ? "hidden" : shellControls[type].device;
+  const zoomVisFor = (type: ShellWindowType): ShellControlVisibility =>
+    splitEnabled ? "hidden" : shellControls[type].zoom;
+  const expandVisibility = shellControls[shellWindowTypeOf(selectedTab)].expand;
 
   const renderCurrentSurface = (active: boolean, showActiveBorder: boolean) => (
     <CanvasSurface
@@ -190,9 +194,9 @@ export function CanvasRender({
       parentTarget={parentTarget}
       isComponent={isComponent}
       ancestorFrames={ancestorFrames}
-      shellDeviceVisibility={surfaceDeviceVisibility}
-      shellBackVisibility={shellBackVisibility}
-      shellZoomVisibility={surfaceZoomVisibility}
+      shellDeviceVisibility={deviceVisFor("current")}
+      shellBackVisibility={shellControls.current.back}
+      shellZoomVisibility={zoomVisFor("current")}
       onBackToParent={onBackToParent}
       settings={settings}
       onCanvasToolShortcut={onCanvasToolShortcut}
@@ -220,8 +224,8 @@ export function CanvasRender({
           fallbackDocument={draftsFallbackDoc}
           activeTool={activeTool}
           projectType={projectType}
-          shellDeviceVisibility={surfaceDeviceVisibility}
-          shellZoomVisibility={surfaceZoomVisibility}
+          shellDeviceVisibility={deviceVisFor("sketch")}
+          shellZoomVisibility={zoomVisFor("sketch")}
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
           onOpenSelectedComponentShortcut={undefined}
@@ -244,8 +248,8 @@ export function CanvasRender({
           onDocumentChange={onVersionsDocumentChange}
           activeTool={activeTool}
           projectType={projectType}
-          shellDeviceVisibility={surfaceDeviceVisibility}
-          shellZoomVisibility={surfaceZoomVisibility}
+          shellDeviceVisibility={deviceVisFor("versions")}
+          shellZoomVisibility={zoomVisFor("versions")}
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
         />
@@ -259,7 +263,7 @@ export function CanvasRender({
           showActiveBorder={showActiveBorder}
           context={referencesContext}
           onClick={() => onActiveCanvasChange?.(windowType)}
-          shellZoomVisibility={surfaceZoomVisibility}
+          shellZoomVisibility={zoomVisFor("references")}
           expanded={expanded}
         />
       );
@@ -293,8 +297,8 @@ export function CanvasRender({
           onClick={() => onActiveCanvasChange?.(windowKey)}
           activeTool={activeTool}
           projectType={projectType}
-          shellDeviceVisibility={surfaceDeviceVisibility}
-          shellZoomVisibility={surfaceZoomVisibility}
+          shellDeviceVisibility={deviceVisFor("current")}
+          shellZoomVisibility={zoomVisFor("current")}
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
         />
@@ -358,9 +362,9 @@ export function CanvasRender({
         </div>
       )}
 
-      {!expanded && !splitEnabled && shellExpandVisibility !== "hidden" && (
+      {!expanded && !splitEnabled && expandVisibility !== "hidden" && (
         <ExpandButton
-          shellExpandVisibility={shellExpandVisibility}
+          shellExpandVisibility={expandVisibility}
           btnTop={btnTop}
           btnRight={btnRight}
           onClick={onToggleExpand}

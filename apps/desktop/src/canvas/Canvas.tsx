@@ -9,6 +9,13 @@ import { SearchToggle } from "@/canvas/shell/SearchPalette";
 import { CanvasRender, type ZoomSetter } from "@/canvas/shell/CanvasRender";
 import type { CanvasReferencesContext } from "@/canvas/shell/CanvasReferencesWindow";
 import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
+import {
+  DEFAULT_SHELL_CONTROLS_BY_WINDOW,
+  shellWindowTypeOf,
+  type ShellControlKey,
+  type ShellControlsByWindow,
+  type ShellWindowType,
+} from "@/canvas/shell/shellControls";
 import { EditorBridgeProvider, useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementToParent, setElementLocked, setElementVisible, updateShellBackground, wrapElements } from "@/canvas/engine/actions";
 import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph } from "@/canvas/engine/htmlSceneAdapter";
@@ -125,10 +132,20 @@ function CanvasPageContent() {
   const [treeOpen, setTreeOpen] = useState(true);
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
   const [canvasExpanded, setCanvasExpanded] = useState(false);
-  const [shellDeviceVisibility, setShellDeviceVisibility] = useState<ShellControlVisibility>("show");
-  const [shellBackVisibility, setShellBackVisibility] = useState<ShellControlVisibility>("show");
-  const [shellZoomVisibility, setShellZoomVisibility] = useState<ShellControlVisibility>("show");
-  const [shellExpandVisibility, setShellExpandVisibility] = useState<ShellControlVisibility>("hover");
+  // Shell chrome controls are per window type (current/sketch/versions/references),
+  // not shared — each window keeps its own device/back/zoom/expand visibility.
+  const [shellControls, setShellControls] = useState<ShellControlsByWindow>(
+    DEFAULT_SHELL_CONTROLS_BY_WINDOW,
+  );
+  const updateShellControl = useCallback(
+    (windowType: ShellWindowType, key: ShellControlKey, value: ShellControlVisibility) => {
+      setShellControls((prev) => ({
+        ...prev,
+        [windowType]: { ...prev[windowType], [key]: value },
+      }));
+    },
+    [],
+  );
   const [shellTabSignal, setShellTabSignal] = useState(0);
   const [sketchResetKey, setSketchResetKey] = useState(0);
   const clearSketch = useCallback(() => {
@@ -599,6 +616,10 @@ function CanvasPageContent() {
   const toolbarZoomChange = referencesFocused ? referencesZoom?.onChange : setActiveZoom;
   const toolbarZoomLimits = referencesFocused ? referencesZoom?.limits : activeZoomLimits;
 
+  // The Inspector's Shell tab edits the focused window's own controls.
+  const activeShellWindowType = shellWindowTypeOf(treeTab);
+  const activeShellControls = shellControls[activeShellWindowType];
+
   const backHref = component
     ? `/project/${encodeURIComponent(projectId)}/c/${component.id}`
     : screen
@@ -717,10 +738,7 @@ function CanvasPageContent() {
         isComponent={!!component}
         referencesContext={referencesContext}
         ancestorFrames={ancestorFrames}
-        shellDeviceVisibility={shellDeviceVisibility}
-        shellBackVisibility={shellBackVisibility}
-        shellZoomVisibility={shellZoomVisibility}
-        shellExpandVisibility={shellExpandVisibility}
+        shellControls={shellControls}
         previewSettings={previewSettings}
         onClosePreview={closePreview}
         onCurrentDocumentChange={handleCurrentDocumentChange}
@@ -905,14 +923,14 @@ function CanvasPageContent() {
         <Inspector
           open={inspectorOpen}
           onClose={() => setInspectorOpen(false)}
-          shellDeviceVisibility={shellDeviceVisibility}
-          shellBackVisibility={shellBackVisibility}
-          shellZoomVisibility={shellZoomVisibility}
-          shellExpandVisibility={shellExpandVisibility}
-          onShellDeviceVisibilityChange={setShellDeviceVisibility}
-          onShellBackVisibilityChange={setShellBackVisibility}
-          onShellZoomVisibilityChange={setShellZoomVisibility}
-          onShellExpandVisibilityChange={setShellExpandVisibility}
+          shellDeviceVisibility={activeShellControls.device}
+          shellBackVisibility={activeShellControls.back}
+          shellZoomVisibility={activeShellControls.zoom}
+          shellExpandVisibility={activeShellControls.expand}
+          onShellDeviceVisibilityChange={(v) => updateShellControl(activeShellWindowType, "device", v)}
+          onShellBackVisibilityChange={(v) => updateShellControl(activeShellWindowType, "back", v)}
+          onShellZoomVisibilityChange={(v) => updateShellControl(activeShellWindowType, "zoom", v)}
+          onShellExpandVisibilityChange={(v) => updateShellControl(activeShellWindowType, "expand", v)}
           openShellTabSignal={shellTabSignal}
           isComponent={!!component}
           inheritParentBackground={inheritParentBackground}

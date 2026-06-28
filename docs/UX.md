@@ -853,20 +853,27 @@ To edit the contents, open the master or detach the instance first.
 - Properties editor: X / Y position, W / H size, rotation, opacity
 - Visibility toggles: device, back, zoom, expand
 - When nothing is selected: canvas-level properties (background, grid settings)
+- **Shell controls are per window type, not global** (`shellControls.ts`): Current,
+  Sketch, Versions, and References each keep their own device/back/zoom/expand
+  visibility. The Shell tab edits the **focused** window's controls (`shellWindowTypeOf`
+  of the active tab); each surface reads its own type's config, and the floating expand
+  button reflects the focused window's `expand` setting. Extra Currents share the
+  "current" bucket. (Session state; not persisted.)
 - **References window**: when the focused window is References the Inspector follows
   it (via `activeCanvasTab`) and shows **Element | Shell** (Frame is hidden). **Element**
   (`ReferencesElementTab`) renders the selected stack node's **preview, name, type, and
   W×H** from the shared `ReferencesBridge` (empty states: "no reference open" / "no layer
   selected"). **Shell** (`ReferencesShellTab`) shows only the **Zoom** and **Expand**
-  visibility toggles — the same global `shellZoomVisibility`/`shellExpandVisibility` the
-  canvas windows use (no BG/Device/Back/Shapes, which don't apply to references).
+  visibility toggles — References's own per-window controls (no BG/Device/Back/Shapes,
+  which don't apply to references).
 - **References zoom + expand parity**: the references stage zoom honours
   `shellZoomVisibility` (show/hover/hidden) and only appears when a reference is open.
   Like the canvas windows, when the References window is **expanded** its bottom-left zoom
   hides and the **bottom-center toolbar** drives the zoom instead — the references stage
   publishes its step-zoom to the `ReferencesBridge`, and the toolbar reads it (in place of
   the editor zoom) while References is the focused window. The expand button is the shared
-  one; expand toggling and `shellExpandVisibility` work the same as for Current/Sketch/Versions.
+  one; expand toggling and References's own expand visibility work the same as for the
+  canvas windows.
 
 **Toolbar** (floating, bottom-center):
 - Rounded container with shadow
