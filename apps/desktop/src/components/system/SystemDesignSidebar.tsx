@@ -13,7 +13,7 @@ export function SystemDesignSidebar({
   onSelect?: (cat: SystemDesignCategory) => void;
 }) {
   return (
-    <aside className="flex w-[196px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
+    <aside className="flex w-[196px] shrink-0 flex-col border-r border-[var(--border)]">
       <div className="px-4 pb-3 pt-5">
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.9px] text-[var(--text-faint)]">
           Design System

@@ -94,6 +94,7 @@ export function SystemDesignPage() {
             </div>
             <AddButton label={ADD_LABEL[activeCategory]} onClick={() => setAddOpen(true)} />
           </nav>
+          <div className="mb-8 -mt-4 border-t border-[var(--border)]" />
 
           {controller.resolved ? (
             <TokenSection
