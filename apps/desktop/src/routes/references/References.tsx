@@ -256,7 +256,16 @@ export function References({
         onDeleteGroup={() => {
           if (!lib.selectedGroup) return;
           const group = lib.selectedGroup;
-          deleteGroupRef.current?.open(group, () => lib.confirmDeleteGroup(group.id));
+          const references = lib.selectedGroupReferences;
+          // A lone multi-root image only exists as a group, so "keep images" would
+          // just rebuild it — force a full delete in that case.
+          const canKeepImages = !(
+            references.length === 1 && (references[0]?.stack?.rootCount ?? 1) > 1
+          );
+          deleteGroupRef.current?.open(group, {
+            canKeepImages,
+            onConfirm: (deleteContents) => lib.confirmDeleteGroup(group.id, deleteContents),
+          });
         }}
       />
 

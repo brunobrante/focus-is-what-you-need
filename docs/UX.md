@@ -948,15 +948,19 @@ Reference image library for UI research.
 
 **Reference Detail Modal** (opens on card click — single reference or group):
 - **Original / Originals tab**: always shows the true source image (never the
-  stack composite). A single reference shows its image enlarged. A group shows a
-  gallery of its originals; a group with only one original opens it enlarged
-  directly (no one-cell grid).
+  stack composite or the screens within it). A single reference shows its image
+  enlarged. A group shows a gallery of **its originals only** (one card per source
+  image); a group with only one original opens it enlarged directly (no one-cell
+  grid). Opening an original here never dives into its screens — that is the
+  Screens tab's job.
 - **Screens tab** (labelled "Screens"; for a single reference the second tab is
-  also "Screens"): one image can hold several screens (roots). When there are
-  multiple screens the tab shows a card per screen; selecting one renders that
-  screen's composite (its background plus only its own cuts). A single screen
-  renders its composite directly. The composite draws each cut once — the root is
-  never re-painted over the background (fixes the prior duplicated image).
+  also "Screens"): one image can hold several screens (roots). A **group** grids
+  the same originals as the Originals tab, but opening one here drills into its
+  screens instead of showing the flat source. When there are multiple screens the
+  tab shows a card per screen; selecting one renders that screen's composite (its
+  background plus only its own cuts). A single screen renders its composite
+  directly. The composite draws each cut once — the root is never re-painted over
+  the background (fixes the prior duplicated image).
   - "All / Solo" toggle (composite overlay vs an isolated single cut) appears only
     when the screen in view actually holds cuts; a screen with just its root shows
     its image directly with no toggle. Solo with no cut selected falls back to the
@@ -982,6 +986,13 @@ Reference image library for UI research.
     Builder/Add/Edit/Delete actions. The three name layers are independent and
     separately editable: the group name (this panel), each original's name
     (Inspector), and each screen/cut name (stack tree).
+  - **Delete** opens a confirm dialog with two outcomes. By default it removes the
+    group only and keeps every image, screen, stack file, and cut (the originals
+    become loose references); a checkbox — "Also delete every screen, stack, and
+    image in this group" — instead cascade-deletes the whole collection (files,
+    cuts, and project links included). For a group that is just a single
+    multi-root image (which only exists *as* a group), "keep images" would merely
+    rebuild it, so the dialog drops the choice and deletes everything outright.
 - **Card thumbnails** (grid + group gallery) render `contain`, so the whole image
   is visible (letterboxed if needed) rather than cropped to fill.
 

@@ -460,12 +460,23 @@ export function useReferenceLibrary() {
     );
   }, []);
 
-  const confirmDeleteGroup = useCallback((groupId: string) => {
-    setGroups((prev) => prev.filter((g) => g.id !== groupId));
-    setLibrary((prev) =>
-      prev.map((item) => (item.groupId === groupId ? { ...item, groupId: null } : item)),
-    );
-  }, []);
+  const confirmDeleteGroup = useCallback(
+    (groupId: string, deleteContents = false) => {
+      if (deleteContents) {
+        const group = groupsRef.current.find((g) => g.id === groupId);
+        // Cascade-delete every member: removeItem drops the file, the project links,
+        // and prunes the now-empty group, so the whole collection disappears at once.
+        for (const referenceId of group?.referenceIds ?? []) removeItem(referenceId);
+        setGroups((prev) => prev.filter((g) => g.id !== groupId));
+        return;
+      }
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setLibrary((prev) =>
+        prev.map((item) => (item.groupId === groupId ? { ...item, groupId: null } : item)),
+      );
+    },
+    [removeItem],
+  );
 
   return {
     library,

@@ -113,7 +113,10 @@ export const ReferenceGroupModal = forwardRef<ReferenceGroupModalHandle>(
 );
 
 export interface DeleteGroupModalHandle {
-  open: (group: ReferenceGroup, onConfirm: () => void) => void;
+  open: (
+    group: ReferenceGroup,
+    opts: { canKeepImages: boolean; onConfirm: (deleteContents: boolean) => void },
+  ) => void;
   close: () => void;
 }
 
@@ -121,12 +124,18 @@ export const DeleteGroupModal = forwardRef<DeleteGroupModalHandle>(
   function DeleteGroupModal(_, ref) {
     const [isOpen, setIsOpen] = useState(false);
     const groupRef = useRef<ReferenceGroup | null>(null);
-    const onConfirmRef = useRef<(() => void) | null>(null);
+    const onConfirmRef = useRef<((deleteContents: boolean) => void) | null>(null);
+    const [canKeepImages, setCanKeepImages] = useState(true);
+    const [deleteContents, setDeleteContents] = useState(false);
 
     useImperativeHandle(ref, () => ({
-      open: (group, onConfirm) => {
+      open: (group, opts) => {
         groupRef.current = group;
-        onConfirmRef.current = onConfirm;
+        onConfirmRef.current = opts.onConfirm;
+        setCanKeepImages(opts.canKeepImages);
+        // A lone multi-root image only exists *as* a group, so keeping it would just
+        // rebuild this group — force a full delete for that degenerate case.
+        setDeleteContents(!opts.canKeepImages);
         setIsOpen(true);
       },
       close: () => setIsOpen(false),
@@ -135,6 +144,7 @@ export const DeleteGroupModal = forwardRef<DeleteGroupModalHandle>(
     if (!isOpen || !groupRef.current) return null;
 
     const group = groupRef.current;
+    const wipeEverything = canKeepImages ? deleteContents : true;
 
     return (
       <div
@@ -152,9 +162,26 @@ export const DeleteGroupModal = forwardRef<DeleteGroupModalHandle>(
           <div className="border-b border-[var(--border)] px-[18px] py-4">
             <h3 className="m-0 text-[15px] font-semibold text-[var(--text)]">Delete group?</h3>
             <p className="m-0 mt-2 text-[12px] leading-[1.5] text-[var(--text-muted)]">
-              This removes the group "{group.name}" but keeps every screen, stack file, and cut.
+              {canKeepImages
+                ? <>This removes the group "{group.name}" but keeps every screen, stack file, and cut.</>
+                : <>"{group.name}" only exists as this group, so deleting it removes the image with every screen, stack, and cut.</>}
             </p>
           </div>
+
+          {canKeepImages ? (
+            <label className="flex cursor-pointer items-start gap-2.5 border-b border-[var(--border)] px-[18px] py-3.5">
+              <input
+                type="checkbox"
+                checked={deleteContents}
+                onChange={(e) => setDeleteContents(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--accent)]"
+              />
+              <span className="text-[12px] leading-[1.5] text-[var(--text-muted)]">
+                Also delete every screen, stack, and image in this group. This can't be undone.
+              </span>
+            </label>
+          ) : null}
+
           <div className="flex justify-end gap-2 px-[18px] py-3">
             <SmallButton type="button" onClick={() => setIsOpen(false)}>
               Cancel
@@ -162,11 +189,11 @@ export const DeleteGroupModal = forwardRef<DeleteGroupModalHandle>(
             <SmallButton
               type="button"
               onClick={() => {
-                onConfirmRef.current?.();
+                onConfirmRef.current?.(wipeEverything);
                 setIsOpen(false);
               }}
             >
-              Delete group
+              {wipeEverything ? "Delete everything" : "Delete group"}
             </SmallButton>
           </div>
         </div>

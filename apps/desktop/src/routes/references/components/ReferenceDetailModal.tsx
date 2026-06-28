@@ -76,18 +76,23 @@ export function ReferenceDetailModal({
   const group = subject?.kind === "group" ? subject.group : null;
   const groupReferences = subject?.kind === "group" ? subject.references : [];
   const imageReferences = groupReferences.filter((r) => r.mediaKind === "image");
-  const stackedReferences = groupReferences.filter((r) => r.stack?.enabled);
 
   const currentItem: ReferenceItem | null =
     subject?.kind === "reference" ? subject.item : focusedItem;
   const canStack = Boolean(currentItem?.stack?.enabled);
 
-  const displayedItems = activeTab === "screens" || activeTab === "stacks" ? groupReferences : stackedReferences;
+  // Both group tabs grid the same originals; the tab only changes what opening one
+  // shows — Originals shows the plain source image, Screens drills into its screens.
+  const displayedItems = groupReferences;
   const focusedIndex = focusedItem
     ? displayedItems.findIndex((i) => i.id === focusedItem.id)
     : -1;
 
-  const showStackView = isGroup ? !!focusedItem && canStack : activeTab === "stack";
+  // The stack/roots view belongs to the Screens tab only — focusing an image from
+  // Originals shows the plain original, never its screens.
+  const showStackView = isGroup
+    ? activeTab === "stacks" && !!focusedItem && canStack
+    : activeTab === "stack";
 
   // ── reset on subject change ───────────────────────────────────────────────
   const subjectKey = subject
@@ -267,7 +272,7 @@ export function ReferenceDetailModal({
                 <div className="flex flex-col items-center gap-2 text-center">
                   <Folder size={32} strokeWidth={1.5} className="text-[var(--text-faint)]" />
                   <p className="m-0 text-[13px] text-[var(--text-muted)]">
-                    {activeTab === "stacks" ? "No stacks in this group" : "No screens in this group"}
+                    {activeTab === "stacks" ? "No screens in this group" : "No originals in this group"}
                   </p>
                 </div>
               </div>
