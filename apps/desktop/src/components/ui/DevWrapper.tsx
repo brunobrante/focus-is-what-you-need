@@ -27,13 +27,13 @@ export function DevWrapper({ platform, block, children }: DevWrapperProps) {
   const onDesktop = isDesktop();
 
   if (platform === "desktop" && !onDesktop) {
-    return <Outline label="Only dev mode - desktop only" block={block}>{children}</Outline>;
+    return <Outline label="DEV MODE: only desktop" block={block}>{children}</Outline>;
   }
   if (platform === "web" && onDesktop) {
-    return <Outline label="Only dev mode - web only" block={block}>{children}</Outline>;
+    return <Outline label="DEV MODE: only web" block={block}>{children}</Outline>;
   }
   if (!platform) {
-    return <Outline label="Only dev mode" block={block}>{children}</Outline>;
+    return <Outline label="DEV MODE" block={block}>{children}</Outline>;
   }
 
   return <>{children}</>;
