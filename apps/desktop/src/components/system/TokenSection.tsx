@@ -8,7 +8,7 @@ import type { SystemDesignCategory } from "@/lib/storage/schema";
 import { CATEGORY_ICON } from "@/system-design/shared";
 import { CATEGORY_LABEL } from "@/domain/system-design/defaults";
 
-const ADD_LABEL: Record<SystemDesignCategory, string> = {
+export const ADD_LABEL: Record<SystemDesignCategory, string> = {
   colors: "New color",
   gradients: "New gradient",
   typography: "Add style",
@@ -35,6 +35,9 @@ export function TokenSection({
   workspaceName: _workspaceName,
   onToggleLinkable,
   onDeleteToken,
+  hideHeader,
+  addOpen: addOpenProp,
+  onAddOpenChange,
 }: {
   category: SystemDesignCategory;
   resolved: ResolvedCategory;
@@ -42,34 +45,51 @@ export function TokenSection({
   workspaceName?: string | null;
   onToggleLinkable: (category: SystemDesignCategory, tokenId: string, nextLinkable: boolean) => void;
   onDeleteToken: (category: SystemDesignCategory, tokenId: string) => void;
+  /** Drop the section header (title + add button) when the page supplies its own. */
+  hideHeader?: boolean;
+  /** Controlled add-modal state; falls back to internal state when omitted. */
+  addOpen?: boolean;
+  onAddOpenChange?: (open: boolean) => void;
 }) {
-  const [addOpen, setAddOpen] = useState(false);
+  const [internalAddOpen, setInternalAddOpen] = useState(false);
+  const addOpen = addOpenProp ?? internalAddOpen;
+  const setAddOpen = (open: boolean) => {
+    onAddOpenChange?.(open);
+    if (addOpenProp === undefined) setInternalAddOpen(open);
+  };
   const [editing, setEditing] = useState<AnyToken | null>(null);
   const { tokens, hasWorkspace, availableShared } = resolved;
 
+  const grid =
+    tokens.length === 0 ? (
+      <EmptySlot label={EMPTY_LABEL[category]} />
+    ) : (
+      <CategoryGrid
+        category={category}
+        tokens={tokens}
+        scope={controller.scope}
+        showSource={hasWorkspace}
+        onEdit={(token) => setEditing(token)}
+        onDelete={(id) => onDeleteToken(category, id)}
+        onDetach={(id) => controller.detachToken(category, id)}
+        onToggleLinkable={(id, linkable) => onToggleLinkable(category, id, linkable)}
+      />
+    );
+
   return (
     <>
-      <SectionBlock
-        title={CATEGORY_LABEL[category]}
-        icon={CATEGORY_ICON[category]}
-        actionLabel={ADD_LABEL[category]}
-        onAction={() => setAddOpen(true)}
-      >
-        {tokens.length === 0 ? (
-          <EmptySlot label={EMPTY_LABEL[category]} />
-        ) : (
-          <CategoryGrid
-            category={category}
-            tokens={tokens}
-            scope={controller.scope}
-            showSource={hasWorkspace}
-            onEdit={(token) => setEditing(token)}
-            onDelete={(id) => onDeleteToken(category, id)}
-            onDetach={(id) => controller.detachToken(category, id)}
-            onToggleLinkable={(id, linkable) => onToggleLinkable(category, id, linkable)}
-          />
-        )}
-      </SectionBlock>
+      {hideHeader ? (
+        grid
+      ) : (
+        <SectionBlock
+          title={CATEGORY_LABEL[category]}
+          icon={CATEGORY_ICON[category]}
+          actionLabel={ADD_LABEL[category]}
+          onAction={() => setAddOpen(true)}
+        >
+          {grid}
+        </SectionBlock>
+      )}
 
       <AddTokenModal
         category={category}

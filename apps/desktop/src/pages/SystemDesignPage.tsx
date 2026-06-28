@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useWorkspaceSystemDesign } from "@/application/system-design/useSystemDesign";
 import { useUnlinkToken } from "@/application/system-design/useUnlinkToken";
-import { TokenSection } from "@/components/system/TokenSection";
-import { CATEGORY_ICON } from "@/system-design/shared";
+import { TokenSection, ADD_LABEL } from "@/components/system/TokenSection";
+import { CATEGORY_ICON, AddButton } from "@/system-design/shared";
 import { SYSTEM_DESIGN_CATEGORIES, CATEGORY_LABEL } from "@/domain/system-design/defaults";
 import { PageFooter } from "@/components/layout/PageFooter";
 import type { SystemDesignCategory } from "@/lib/storage/schema";
@@ -13,6 +13,7 @@ export function SystemDesignPage() {
   const { data: workspaces } = useWorkspaces();
   const workspace = workspaces.find((w) => w.id === controller.workspaceId) ?? null;
   const [activeCategory, setActiveCategory] = useState<SystemDesignCategory>("colors");
+  const [addOpen, setAddOpen] = useState(false);
   const { requestUnlink, requestDelete, modal: unlinkTokenModal } = useUnlinkToken();
 
   const handleToggleLinkable = (
@@ -67,28 +68,31 @@ export function SystemDesignPage() {
             </p>
           </header>
 
-          <nav className="mb-8 -mx-1 flex items-center gap-0.5">
-            {SYSTEM_DESIGN_CATEGORIES.map((category) => {
-              const isActive = category === activeCategory;
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setActiveCategory(category)}
-                  className={[
-                    "relative inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border-0 px-3 text-[13px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
-                    isActive
-                      ? "bg-[var(--surface)] text-[var(--text)]"
-                      : "bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
-                  ].join(" ")}
-                >
-                  <span className={isActive ? "opacity-80" : "opacity-50"}>
-                    {CATEGORY_ICON[category]}
-                  </span>
-                  {CATEGORY_LABEL[category]}
-                </button>
-              );
-            })}
+          <nav className="mb-8 flex items-center justify-between gap-3">
+            <div className="-mx-1 flex items-center gap-0.5">
+              {SYSTEM_DESIGN_CATEGORIES.map((category) => {
+                const isActive = category === activeCategory;
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setActiveCategory(category)}
+                    className={[
+                      "relative inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border-0 px-3 text-[13px] font-medium tracking-[0.1px] transition-colors duration-[120ms]",
+                      isActive
+                        ? "bg-[var(--surface)] text-[var(--text)]"
+                        : "bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
+                    ].join(" ")}
+                  >
+                    <span className={isActive ? "opacity-80" : "opacity-50"}>
+                      {CATEGORY_ICON[category]}
+                    </span>
+                    {CATEGORY_LABEL[category]}
+                  </button>
+                );
+              })}
+            </div>
+            <AddButton label={ADD_LABEL[activeCategory]} onClick={() => setAddOpen(true)} />
           </nav>
 
           {controller.resolved ? (
@@ -99,6 +103,9 @@ export function SystemDesignPage() {
               workspaceName={workspace?.name}
               onToggleLinkable={handleToggleLinkable}
               onDeleteToken={handleDeleteToken}
+              hideHeader
+              addOpen={addOpen}
+              onAddOpenChange={setAddOpen}
             />
           ) : null}
         </div>

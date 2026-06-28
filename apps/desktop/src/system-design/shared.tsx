@@ -65,20 +65,29 @@ export function SectionBlock({
         </div>
         <div className="flex items-center gap-2.5">
           {headerRight}
-          {!hideAction && (
-            <button
-              type="button"
-              onClick={onAction}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-            >
-              <IconPlus size={12} strokeWidth={2} />
-              {actionLabel}
-            </button>
-          )}
+          {!hideAction && <AddButton label={actionLabel} onClick={onAction} />}
         </div>
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * The bordered "+ Add …" action used to create a token. Shared so the System
+ * Design page can place it inline with its category tabs while the per-project
+ * System tab keeps it in the section header.
+ */
+export function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+    >
+      <IconPlus size={12} strokeWidth={2} />
+      {label}
+    </button>
   );
 }
 
