@@ -79,6 +79,11 @@ export const FEATURES: FeatureMeta[] = [
     name: "Font Detector",
     description: "Identifies the Google Font family used in a cut.",
   },
+  {
+    key: "iconDetection",
+    name: "Icon Detector",
+    description: "Identifies icons present in a cut.",
+  },
 ];
 
 export const FEATURE_KEYS: ProcessingFeatureKey[] = FEATURES.map((f) => f.key);

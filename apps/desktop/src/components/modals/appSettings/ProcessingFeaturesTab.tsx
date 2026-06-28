@@ -13,6 +13,7 @@ import {
   Maximize2,
   Palette,
   ScanText,
+  Shapes,
   Sparkles,
   Trash2,
   Type,
@@ -29,6 +30,7 @@ const FEATURE_ICON: Record<ProcessingFeatureKey, React.ReactNode> = {
   removeElement: <Wand2 size={16} strokeWidth={1.7} />,
   colorDetector: <Palette size={16} strokeWidth={1.7} />,
   fontDetection: <Type size={16} strokeWidth={1.7} />,
+  iconDetection: <Shapes size={16} strokeWidth={1.7} />,
 };
 
 export function ProcessingFeaturesTab() {
@@ -100,9 +102,15 @@ export function ProcessingFeaturesTab() {
               </div>
               {open && !feature.modelFree ? (
                 <div className="border-t border-[var(--border)] bg-[var(--bg)] py-1 pl-[58px] pr-3">
-                  {modelsForFeature(feature.key).map((m) => (
-                    <ModelListRow key={m.modelId} model={models[m.modelId]} />
-                  ))}
+                  {modelsForFeature(feature.key).length === 0 ? (
+                    <p className="my-2 text-[12px] text-[var(--text-faint)]">
+                      No models currently available.
+                    </p>
+                  ) : (
+                    modelsForFeature(feature.key).map((m) => (
+                      <ModelListRow key={m.modelId} model={models[m.modelId]} />
+                    ))
+                  )}
                 </div>
               ) : null}
             </div>

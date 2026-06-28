@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { Baseline, ChevronLeft, ChevronRight, LayoutGrid, Palette, Type } from "lucide-react";
+import { Baseline, ChevronLeft, ChevronRight, LayoutGrid, Palette, Shapes, Type } from "lucide-react";
 import type { SavedComponent } from "../engine/types";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
 import {
@@ -19,12 +19,14 @@ export function GallerySlider({
   showColors = false,
   showText = false,
   showFont = false,
+  showIcons = false,
   onFocusChange,
 }: {
   cuts: SavedComponent[];
   showColors?: boolean;
   showText?: boolean;
   showFont?: boolean;
+  showIcons?: boolean;
   /** Reports the cut currently in view so the Builder can open the same item. */
   onFocusChange?: (cutId: string | null) => void;
 }) {
@@ -221,6 +223,13 @@ export function GallerySlider({
               onClick={checkFont}
             />
           )}
+          <ActionButton
+            icon={<Shapes size={13} strokeWidth={1.8} />}
+            label="Icons"
+            loading={false}
+            onClick={() => {}}
+            disabled={!showIcons}
+          />
         </div>
       </div>
       )}
@@ -255,18 +264,25 @@ function ActionButton({
   label,
   loading,
   onClick,
+  disabled = false,
 }: {
   icon: React.ReactNode;
   label: string;
   loading: boolean;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      disabled={loading}
+      disabled={loading || disabled}
       onClick={onClick}
-      className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] px-3 text-[12px] font-medium text-[var(--text-muted)] backdrop-blur-[6px] transition-colors duration-[120ms] hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-wait disabled:opacity-50"
+      className={[
+        "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[rgba(12,12,13,0.92)] px-3 text-[12px] font-medium text-[var(--text-muted)] backdrop-blur-[6px] transition-colors duration-[120ms]",
+        disabled
+          ? "cursor-not-allowed opacity-40"
+          : "cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-wait disabled:opacity-50",
+      ].join(" ")}
     >
       {loading ? (
         <span className="h-3 w-3 animate-spin rounded-full border border-[var(--text-faint)] border-t-[var(--text)]" />

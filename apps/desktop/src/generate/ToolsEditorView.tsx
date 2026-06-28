@@ -373,6 +373,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   showColors={features.colorDetector.operational}
                   showText={features.textDetection.operational}
                   showFont={features.fontDetection.operational}
+                  showIcons={features.iconDetection.operational}
                   onFocusChange={focusGalleryCut}
                 />
               ) : null}

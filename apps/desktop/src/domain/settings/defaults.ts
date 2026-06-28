@@ -237,6 +237,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       removeElement: { enabled: false, activeModelId: null },
       colorDetector: { enabled: false, activeModelId: null },
       fontDetection: { enabled: false, activeModelId: null },
+      iconDetection: { enabled: false, activeModelId: null },
     },
   },
   projectThumbnails: {
