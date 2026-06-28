@@ -1,4 +1,7 @@
-import type { ReferenceGroup } from "@/lib/references/groupTypes";
+import {
+  newReferenceGroupId,
+  type ReferenceGroup,
+} from "@/lib/references/groupTypes";
 import type { ReferenceItem } from "../types";
 
 export function applyGroupsToLibrary(
@@ -43,6 +46,47 @@ export function normalizeGroupsForLibrary(
     );
     return withGroupReferences(group, referenceIds);
   });
+}
+
+/**
+ * Every image that owns more than one stack root is a collection and must be backed
+ * by a real `ReferenceGroup` — there is no separate "pseudo group" concept anymore.
+ * This auto-creates the missing group for any such item that is not already grouped,
+ * seeding the group name from the item's name (the two names then diverge freely).
+ *
+ * Idempotent: an item that already has a `groupId` is never touched, so it is safe to
+ * run on every load and on every library change without producing duplicate groups.
+ */
+export function ensureGroupsForMultiRootItems(
+  items: ReferenceItem[],
+  groups: ReferenceGroup[],
+  now: string,
+): { items: ReferenceItem[]; groups: ReferenceGroup[]; changed: boolean } {
+  let changed = false;
+  const nextGroups = [...groups];
+  const nextItems = items.map((item) => {
+    const rootCount = item.stack?.rootCount ?? 1;
+    if (rootCount <= 1 || item.groupId) return item;
+    const group: ReferenceGroup = {
+      id: newReferenceGroupId(),
+      name: item.name,
+      referenceIds: [item.id],
+      coverReferenceId: item.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    nextGroups.unshift(group);
+    changed = true;
+    return { ...item, groupId: group.id };
+  });
+  return { items: nextItems, groups: nextGroups, changed };
+}
+
+/** Drop groups left without any references — used after an item is deleted so an
+ * auto-created single-item group does not linger as an empty ghost card. */
+export function pruneEmptyGroups(groups: ReferenceGroup[]): ReferenceGroup[] {
+  const next = groups.filter((group) => group.referenceIds.length > 0);
+  return next.length === groups.length ? groups : next;
 }
 
 export function addReferencesToGroup(

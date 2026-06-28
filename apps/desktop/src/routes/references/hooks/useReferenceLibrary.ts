@@ -27,6 +27,8 @@ import type {
 import {
   applyGroupsToLibrary,
   normalizeGroupsForLibrary,
+  ensureGroupsForMultiRootItems,
+  pruneEmptyGroups,
   addReferencesToGroup,
   removeReferenceFromGroups,
   moveReferenceToGroup,
@@ -100,8 +102,15 @@ export function useReferenceLibrary() {
   useEffect(() => {
     void loadLibrary().then(({ items, groups: storedGroups }) => {
       const libraryWithGroups = applyGroupsToLibrary(items, storedGroups);
-      const nextGroups = normalizeGroupsForLibrary(storedGroups, libraryWithGroups);
-      setLibrary(libraryWithGroups);
+      // Back-fill a real ReferenceGroup for any multi-root image that predates the
+      // unified model (or gained a second screen while away from this page).
+      const seeded = ensureGroupsForMultiRootItems(
+        libraryWithGroups,
+        storedGroups,
+        new Date().toISOString(),
+      );
+      const nextGroups = normalizeGroupsForLibrary(seeded.groups, seeded.items);
+      setLibrary(seeded.items);
       setGroups(nextGroups);
       setLoading(false);
     });
@@ -122,6 +131,26 @@ export function useReferenceLibrary() {
       console.error("[references] failed to persist groups:", err);
     });
   }, [groups, loading]);
+
+  // A reference can grow a second stack root inside the Builder. The next time it is
+  // observed here, promote it to a real group. The `rootCount > 1 && !groupId` guard
+  // makes this self-terminating: once a group exists the item is skipped, so this never
+  // loops despite writing back into `library`.
+  useEffect(() => {
+    if (loading) return;
+    const needsGroup = library.some(
+      (item) => (item.stack?.rootCount ?? 1) > 1 && !item.groupId,
+    );
+    if (!needsGroup) return;
+    const seeded = ensureGroupsForMultiRootItems(
+      library,
+      groupsRef.current,
+      new Date().toISOString(),
+    );
+    if (!seeded.changed) return;
+    setLibrary(seeded.items);
+    setGroups(normalizeGroupsForLibrary(seeded.groups, seeded.items));
+  }, [library, loading]);
 
   useEffect(() => {
     if (!selectedSubject) return;
@@ -337,7 +366,7 @@ export function useReferenceLibrary() {
       if (item) releaseReferenceItemUrls(item);
       return prev.filter((i) => i.id !== id);
     });
-    setGroups((prev) => removeReferenceFromGroups(prev, id));
+    setGroups((prev) => pruneEmptyGroups(removeReferenceFromGroups(prev, id)));
     setStackThumbnailUrls((current) => {
       const url = current[id];
       if (!url) return current;
@@ -409,6 +438,17 @@ export function useReferenceLibrary() {
     setGroups((prev) => [group, ...prev]);
   }, []);
 
+  const renameGroup = useCallback((groupId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const now = new Date().toISOString();
+    setGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId ? { ...group, name: trimmed, updatedAt: now } : group,
+      ),
+    );
+  }, []);
+
   const updateGroup = useCallback((groupId: string, input: { name: string; description?: string }) => {
     const now = new Date().toISOString();
     setGroups((prev) =>
@@ -463,6 +503,7 @@ export function useReferenceLibrary() {
     updateSourceUrl,
     updateReferenceGroup,
     createGroup,
+    renameGroup,
     updateGroup,
     confirmDeleteGroup,
   };

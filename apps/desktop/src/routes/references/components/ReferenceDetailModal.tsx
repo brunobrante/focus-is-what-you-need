@@ -32,6 +32,7 @@ export function ReferenceDetailModal({
   onTagsChange,
   onSourceUrlChange,
   onGroupChange,
+  onRenameGroup,
   onExtractFrames,
   onUpload,
   onEditGroup,
@@ -48,6 +49,7 @@ export function ReferenceDetailModal({
   onTagsChange: (id: string, tags: string[]) => void;
   onSourceUrlChange: (id: string, url: string) => void;
   onGroupChange: (id: string, groupId: string | null) => void;
+  onRenameGroup: (id: string, name: string) => void;
   onExtractFrames: (item: ReferenceItem) => void;
   onUpload: () => void;
   onEditGroup: () => void;
@@ -79,10 +81,6 @@ export function ReferenceDetailModal({
   const currentItem: ReferenceItem | null =
     subject?.kind === "reference" ? subject.item : focusedItem;
   const canStack = Boolean(currentItem?.stack?.enabled);
-  const isImageGroup =
-    !isGroup &&
-    currentItem?.mediaKind === "image" &&
-    (currentItem?.stack?.rootCount ?? 1) > 1;
 
   const displayedItems = activeTab === "screens" || activeTab === "stacks" ? groupReferences : stackedReferences;
   const focusedIndex = focusedItem
@@ -412,7 +410,6 @@ export function ReferenceDetailModal({
           key={currentItem?.id ?? group?.id ?? "none"}
           item={currentItem}
           group={group}
-          imageGroup={isImageGroup}
           groupReferences={groupReferences}
           groups={groups}
           looseReferences={isGroup ? looseReferences : []}
@@ -439,6 +436,7 @@ export function ReferenceDetailModal({
           onTagsChange={onTagsChange}
           onSourceUrlChange={onSourceUrlChange}
           onGroupChange={onGroupChange}
+          onRenameGroup={onRenameGroup}
           onExtractFrames={() => { if (currentItem) onExtractFrames(currentItem); }}
           onUpload={onUpload}
           onEditGroup={onEditGroup}

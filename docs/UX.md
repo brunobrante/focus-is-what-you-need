@@ -972,11 +972,16 @@ Reference image library for UI research.
     Builder/Remove actions beneath. With multiple screens and none opened, it
     prompts "Select a screen to view its stack". Opening a screen always brings
     the Inspector forward.
-  - **Group** appears whenever the subject is a group — a real multi-image group
-    (group details + Add/Edit/Delete) **or** a single image split into multiple
-    screens (image-as-group: an **editable group name** plus details — Screens
-    count, format, dimensions, size, stack — and Builder/Remove). Mirrors the
-    two-image group: Inspector = what's being viewed, Group = group editing.
+  - **Group** appears whenever the subject is a group. Every collection is a real
+    `ReferenceGroup` — there is no longer a separate "image-as-group" pseudo path:
+    a single image split into multiple screens is auto-promoted to a real group
+    (seeded from the image's name on first sight), so it gets the same Group panel
+    as a multi-image group. The panel shows an **inline-editable group name**
+    (independent of the original's name), group details (Originals count, Screens
+    count = total stack roots, Updated, ID), an "Add loose screen" picker, and
+    Builder/Add/Edit/Delete actions. The three name layers are independent and
+    separately editable: the group name (this panel), each original's name
+    (Inspector), and each screen/cut name (stack tree).
 - **Card thumbnails** (grid + group gallery) render `contain`, so the whole image
   is visible (letterboxed if needed) rather than cropped to fill.
 

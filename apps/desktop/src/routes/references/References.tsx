@@ -222,6 +222,7 @@ export function References({
         onTagsChange={lib.updateTags}
         onSourceUrlChange={lib.updateSourceUrl}
         onGroupChange={lib.updateReferenceGroup}
+        onRenameGroup={lib.renameGroup}
         onExtractFrames={(video) =>
           lib.setFrameVideo({
             id: video.id,

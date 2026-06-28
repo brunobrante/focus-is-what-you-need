@@ -9,17 +9,16 @@ import { StackTreeRows } from "./StackView";
 import { findStackNode, countTreeNodes } from "./stackViewHelpers";
 
 export function DetailPanel({
-  item, group, imageGroup = false, groupReferences, groups, looseReferences,
+  item, group, groupReferences, groups, looseReferences,
   builderHref,
   stackTree = [], stackLoading = false, selectedStackComponentId = null,
   stackPreviewUrls, showStackView = false, awaitingScreenSelection = false,
   onSelectStackComponent, onIsolateStackComponent, onRenameStackComponent,
   onDelete, onNameChange, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
-  onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
+  onRenameGroup, onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
 }: {
   item: ReferenceItem | null;
   group: ReferenceGroup | null;
-  imageGroup?: boolean;
   groupReferences: ReferenceItem[];
   groups: ReferenceGroup[];
   looseReferences: ReferenceItem[];
@@ -39,6 +38,7 @@ export function DetailPanel({
   onTagsChange: (id: string, tags: string[]) => void;
   onSourceUrlChange: (id: string, url: string) => void;
   onGroupChange: (id: string, groupId: string | null) => void;
+  onRenameGroup: (id: string, name: string) => void;
   onExtractFrames: () => void;
   onUpload: () => void;
   onEditGroup: () => void;
@@ -48,7 +48,7 @@ export function DetailPanel({
   const hasStack = Boolean(item?.stack?.enabled);
   const defaultTab: SideTab = !item && group ? "group" : "inspector";
   const [tab, setTab] = useState<SideTab>(defaultTab);
-  const hasGroupTab = Boolean(group) || imageGroup;
+  const hasGroupTab = Boolean(group);
   const inspectorShowsStack = showStackView && hasStack;
   const showingStackTree = tab === "inspector" && inspectorShowsStack;
 
@@ -173,9 +173,8 @@ export function DetailPanel({
             references={groupReferences}
             looseReferences={looseReferences}
             onGroupChange={onGroupChange}
+            onRenameGroup={onRenameGroup}
           />
-        ) : tab === "group" && imageGroup && item ? (
-          <ImageGroupDetails item={item} onNameChange={onNameChange} />
         ) : null}
       </div>
 
@@ -201,13 +200,6 @@ export function DetailPanel({
               <Action icon={<Upload size={12} />} label="Add" onClick={onUpload} />
               <Action icon={<Edit3 size={12} />} label="Edit" onClick={onEditGroup} />
               <Action icon={<Trash2 size={12} />} label="Delete" danger onClick={onDeleteGroup} />
-            </>
-          ) : tab === "group" && imageGroup && item ? (
-            <>
-              {builderHref ? (
-                <ActionLink icon={<Layers size={12} />} label="Builder" to={builderHref} />
-              ) : null}
-              <Action icon={<Trash2 size={12} />} label="Remove" danger onClick={onDelete} />
             </>
           ) : null}
         </div>
@@ -336,20 +328,43 @@ function ItemDetails({
 }
 
 function GroupDetails({
-  group, references, looseReferences, onGroupChange,
+  group, references, looseReferences, onGroupChange, onRenameGroup,
 }: {
   group: ReferenceGroup;
   references: ReferenceItem[];
   looseReferences: ReferenceItem[];
   onGroupChange: (id: string, groupId: string | null) => void;
+  onRenameGroup: (id: string, name: string) => void;
 }) {
   const [addReferenceId, setAddReferenceId] = useState("");
-  const stackCount = references.filter((r) => r.stack?.enabled).length;
+  const [nameDraft, setNameDraft] = useState(group.name);
+  const prevIdRef = useRef(group.id);
+  // A "screen" is a stack root; an "original" is a reference item. Most references hold
+  // one root, but a single image can own several (each its own screen).
+  const screenCount = references.reduce(
+    (total, r) => total + (r.stack?.rootCount ?? 1),
+    0,
+  );
+
+  useEffect(() => {
+    if (prevIdRef.current === group.id) return;
+    prevIdRef.current = group.id;
+    setNameDraft(group.name);
+  }, [group.id, group.name]);
 
   return (
     <div className="flex flex-col gap-3.5">
       <div>
-        <div className="text-[13px] font-semibold text-[var(--text)]">{group.name}</div>
+        <input
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => { if (nameDraft.trim()) onRenameGroup(group.id, nameDraft.trim()); else setNameDraft(group.name); }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { setNameDraft(group.name); e.currentTarget.blur(); }
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          className="w-full rounded-[8px] border border-transparent bg-transparent px-0 text-[13px] font-semibold leading-[1.4] text-[var(--text)] outline-none hover:border-[var(--border)] hover:bg-[var(--surface)] hover:px-2.5 focus:border-[var(--text-muted)] focus:bg-[var(--surface)] focus:px-2.5 transition-[padding,background-color,border-color] duration-100"
+        />
         {group.description ? (
           <p className="m-0 mt-1 text-[12px] leading-[1.45] text-[var(--text-muted)]">{group.description}</p>
         ) : null}
@@ -358,8 +373,8 @@ function GroupDetails({
       <Section title="Details">
         <DetailList
           items={[
-            ["Screens", String(references.length)],
-            ["Stacks", String(stackCount)],
+            ["Originals", String(references.length)],
+            ["Screens", String(screenCount)],
             ["Updated", formatDateTime(group.updatedAt)],
             ["ID", group.id, true],
           ]}
@@ -386,57 +401,6 @@ function GroupDetails({
             </option>
           ))}
         </select>
-      </Section>
-    </div>
-  );
-}
-
-function ImageGroupDetails({
-  item, onNameChange,
-}: {
-  item: ReferenceItem;
-  onNameChange: (id: string, name: string) => void;
-}) {
-  const [nameDraft, setNameDraft] = useState(item.name);
-  const prevIdRef = useRef(item.id);
-  const screenCount = item.stack?.rootCount ?? 1;
-
-  useEffect(() => {
-    if (prevIdRef.current === item.id) return;
-    prevIdRef.current = item.id;
-    setNameDraft(item.name);
-  }, [item.id, item.name]);
-
-  return (
-    <div className="flex flex-col gap-3.5">
-      <Section title="Group name">
-        <input
-          type="text"
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={() => onNameChange(item.id, nameDraft)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") { setNameDraft(item.name); e.currentTarget.blur(); }
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-          placeholder="Group name"
-          className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-[13px] font-medium text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--text-muted)]"
-        />
-      </Section>
-
-      <Section title="Details">
-        <DetailList
-          items={[
-            ["Screens", String(screenCount)],
-            ["Format", item.type],
-            ...(item.w && item.h ? [["Dimensions", `${item.w} × ${item.h}`] as [string, string]] : []),
-            ["Size", formatSize(item.size || 0)],
-            ...(item.stack?.enabled
-              ? [["Stack", `${item.stack.itemCount} ${item.stack.itemCount === 1 ? "component" : "components"}`] as [string, string]]
-              : []),
-            ["Added", formatDateTime(item.added)],
-          ]}
-        />
       </Section>
     </div>
   );
