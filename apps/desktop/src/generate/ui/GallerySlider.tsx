@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 import { Baseline, ChevronLeft, ChevronRight, LayoutGrid, Palette, Shapes, Type } from "lucide-react";
 import type { SavedComponent } from "../engine/types";
 import { SceneCanvasViewer } from "@/components/screen/SceneCanvasViewer";
@@ -128,7 +129,7 @@ export function GallerySlider({
       </button>
 
       {/* Cut image + info */}
-      <div className={["flex max-h-full max-w-full flex-col items-center gap-3 px-16", showColors || showText || showFont ? "pb-24" : ""].join(" ")}>
+      <div className="flex max-h-full max-w-full flex-col items-center gap-3 px-16 pb-24">
         <div
           key={current.id}
           className="animate-in fade-in zoom-in-95 duration-150 overflow-hidden rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
@@ -140,8 +141,7 @@ export function GallerySlider({
       </div>
 
       {/* Bottom action bar */}
-      {(showColors || showText || showFont) && (
-      <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3">
+      <DevWrapper platform="desktop" className="absolute bottom-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
         {/* Results — each in its own titled box, sitting side by side above the buttons */}
         {(colorResult || textResult !== null || fontResult) && (
           <div className="flex flex-wrap items-end justify-center gap-2">
@@ -231,8 +231,7 @@ export function GallerySlider({
             disabled={!showIcons}
           />
         </div>
-      </div>
-      )}
+      </DevWrapper>
 
       {/* Right arrow */}
       <button

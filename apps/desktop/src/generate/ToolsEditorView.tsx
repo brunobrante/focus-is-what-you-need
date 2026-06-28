@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 import { GeneratorHeader } from "./ui/GeneratorHeader";
 
 import { ComponentTreeItem } from "./ui/ComponentTreeItem";
@@ -179,13 +180,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
 
   const { features } = useProcessingFeatures();
   // A feature is usable in the Builder only when enabled with an installed model.
-  const removeBackgroundOn = features.removeBackground.operational;
-  const upscaleOn = features.upscale.operational;
-  const autoDetectOn = features.autoDetect.operational;
-  // Active auto-detect model (OmniParser or Florence-2), or null when not enabled.
-  const autoDetectModelId = autoDetectOn ? features.autoDetect.activeModelId : null;
-  const removeElementOn = features.removeElement.operational;
-  const hasProcessingFeature = removeBackgroundOn || upscaleOn || removeElementOn;
+  const autoDetectModelId = features.autoDetect.activeModelId;
 
   // Which cut's variants panel is open in the sidebar (replaces the tree). Null
   // shows the normal component tree.
@@ -289,58 +284,50 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
             >
               <Pencil size={18} strokeWidth={1.7} />
             </RailToolButton>
-            {hasProcessingFeature ? (
-              <>
-                <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
-                {removeBackgroundOn ? (
-                  <RailToolButton
-                    label="Remove background"
-                    disabled={!activeCutId || running !== null}
-                    onClick={() => void runProcessing("birefnet")}
-                  >
-                    {runningKind === "birefnet" ? (
-                      <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
-                    ) : (
-                      <Eraser size={18} strokeWidth={1.7} />
-                    )}
-                  </RailToolButton>
-                ) : null}
-                {upscaleOn ? (
-                  <RailToolButton
-                    label="Upscale 4×"
-                    disabled={!activeCutId || running !== null}
-                    onClick={() => void runProcessing("realEsrgan")}
-                  >
-                    {runningKind === "realEsrgan" ? (
-                      <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
-                    ) : (
-                      <Maximize2 size={18} strokeWidth={1.7} />
-                    )}
-                  </RailToolButton>
-                ) : null}
-                {removeElementOn ? (
-                  <RailToolButton
-                    label="Remove element"
-                    active={masking}
-                    disabled={!activeCutId || running !== null}
-                    onClick={() => (masking ? lama.cancel() : lama.startMasking())}
-                  >
-                    {runningKind === "lama" ? (
-                      <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
-                    ) : (
-                      <Wand2 size={18} strokeWidth={1.7} />
-                    )}
-                  </RailToolButton>
-                ) : null}
-                <RailToolButton
-                  label="Variants"
-                  disabled={!activeCutId || (selectedComponent?.variants?.length ?? 0) <= 1}
-                  onClick={() => activeCutId && setVariantsPanelCutId(activeCutId)}
-                >
-                  <Layers size={18} strokeWidth={1.7} />
-                </RailToolButton>
-              </>
-            ) : null}
+            <DevWrapper platform="desktop">
+              <span className="my-1.5 h-px w-7 bg-[var(--border)]" />
+              <RailToolButton
+                label="Remove background"
+                disabled={!activeCutId || running !== null}
+                onClick={() => void runProcessing("birefnet")}
+              >
+                {runningKind === "birefnet" ? (
+                  <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+                ) : (
+                  <Eraser size={18} strokeWidth={1.7} />
+                )}
+              </RailToolButton>
+              <RailToolButton
+                label="Upscale 4×"
+                disabled={!activeCutId || running !== null}
+                onClick={() => void runProcessing("realEsrgan")}
+              >
+                {runningKind === "realEsrgan" ? (
+                  <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+                ) : (
+                  <Maximize2 size={18} strokeWidth={1.7} />
+                )}
+              </RailToolButton>
+              <RailToolButton
+                label="Remove element"
+                active={masking}
+                disabled={!activeCutId || running !== null}
+                onClick={() => (masking ? lama.cancel() : lama.startMasking())}
+              >
+                {runningKind === "lama" ? (
+                  <Loader2 size={18} strokeWidth={1.7} className="animate-spin" />
+                ) : (
+                  <Wand2 size={18} strokeWidth={1.7} />
+                )}
+              </RailToolButton>
+              <RailToolButton
+                label="Variants"
+                disabled={!activeCutId || (selectedComponent?.variants?.length ?? 0) <= 1}
+                onClick={() => activeCutId && setVariantsPanelCutId(activeCutId)}
+              >
+                <Layers size={18} strokeWidth={1.7} />
+              </RailToolButton>
+            </DevWrapper>
           </aside>
 
           <section
@@ -370,10 +357,10 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               {viewMode === "gallery" ? (
                 <GallerySlider
                   cuts={scopedComponents}
-                  showColors={features.colorDetector.operational}
-                  showText={features.textDetection.operational}
-                  showFont={features.fontDetection.operational}
-                  showIcons={features.iconDetection.operational}
+                  showColors={true}
+                  showText={true}
+                  showFont={true}
+                  showIcons={true}
                   onFocusChange={focusGalleryCut}
                 />
               ) : null}
@@ -640,7 +627,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     disabled={!canSaveSelection || drawAction !== null}
                     onClick={() => void commitDraw("crop")}
                   />
-                  {removeBackgroundOn ? (
+                  <DevWrapper platform="desktop">
                     <DrawActionButton
                       label="Remove BG"
                       icon={<Eraser size={12} strokeWidth={1.9} />}
@@ -648,8 +635,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       disabled={!canSaveSelection || drawAction !== null}
                       onClick={() => void commitDraw("birefnet")}
                     />
-                  ) : null}
-                  {upscaleOn ? (
+                  </DevWrapper>
+                  <DevWrapper platform="desktop">
                     <DrawActionButton
                       label="Upscale"
                       icon={<Maximize2 size={12} strokeWidth={1.9} />}
@@ -657,7 +644,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       disabled={!canSaveSelection || drawAction !== null}
                       onClick={() => void commitDraw("realEsrgan")}
                     />
-                  ) : null}
+                  </DevWrapper>
 
                   <button
                     type="button"
@@ -677,7 +664,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
 
             <div className="sticky bottom-0 z-20 flex min-h-[56px] shrink-0 items-center gap-2.5 border-t border-[var(--border)] bg-[rgba(15,15,16,0.82)] px-3.5 py-2.5 backdrop-blur-[8px]">
               <div className="inline-flex shrink-0 items-center gap-1.5">
-                {autoDetectOn ? (
+                <DevWrapper platform="desktop">
                   <ModeButton
                     onClick={() => void autoDetect(autoDetectModelId)}
                     disabled={!canCrop || autoDetecting}
@@ -689,7 +676,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     )}
                     {autoDetecting ? "Detecting…" : "Auto-detect"}
                   </ModeButton>
-                ) : null}
+                </DevWrapper>
               </div>
 
               <div className="ml-auto min-w-0 truncate text-right text-[11px] text-[var(--text-faint)]">
