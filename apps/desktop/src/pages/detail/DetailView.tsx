@@ -1,6 +1,4 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { IconOpenCanvas } from "@/components/icons";
 import { PreviewShell } from "@/components/screen/PreviewShell";
 import { SideReferencesTab } from "@/components/screen/SideReferencesTab";
 import { VersionSwitcher } from "@/components/screen/VersionSwitcher";
@@ -129,12 +127,6 @@ export function DetailView<T extends string>({
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]" data-type={type}>
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5">
         {breadcrumb}
-        <div className="flex items-center gap-2">
-          <Link to={canvasHref} className="btn btn-ghost">
-            <IconOpenCanvas size={14} strokeWidth={1.6} />
-            {canvasLabel}
-          </Link>
-        </div>
       </header>
 
       <div className="grid min-h-0 flex-1 border-t border-[var(--border)]" style={{ gridTemplateColumns: "minmax(360px, 40%) minmax(0, 1fr)" }}>
