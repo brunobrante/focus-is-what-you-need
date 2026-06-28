@@ -155,6 +155,42 @@ const FLORENCE2_LOC_BINS: f32 = 1000.0;
 const IMAGENET_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const IMAGENET_STD: [f32; 3] = [0.229, 0.224, 0.225];
 
+/// Per-channel normalization for an image → NCHW tensor fill.
+#[derive(Clone, Copy)]
+enum NchwNorm {
+    /// Rescale to `[0, 1]` (`v / 255`).
+    Div255,
+    /// Rescale then ImageNet-normalize (`(v/255 - mean) / std`).
+    ImageNet,
+}
+
+impl NchwNorm {
+    #[inline]
+    fn apply(self, value: u8, channel: usize) -> f32 {
+        let v = value as f32 / 255.0;
+        match self {
+            NchwNorm::Div255 => v,
+            NchwNorm::ImageNet => (v - IMAGENET_MEAN[channel]) / IMAGENET_STD[channel],
+        }
+    }
+}
+
+/// Writes an RGB image into a pre-allocated NCHW `[1, 3, H, W]` tensor at the
+/// `(pad_x, pad_y)` offset, applying `norm` per channel. This replaces the
+/// per-model copies of the same fill loop — the blocks differed only in the
+/// normalization and the letterbox offset, which are now parameters.
+fn fill_nchw_rgb(input: &mut Array4<f32>, img: &RgbImage, pad_x: u32, pad_y: u32, norm: NchwNorm) {
+    let (w, h) = img.dimensions();
+    for y in 0..h {
+        for x in 0..w {
+            let px = img.get_pixel(x, y);
+            for c in 0..3 {
+                input[[0, c, (y + pad_y) as usize, (x + pad_x) as usize]] = norm.apply(px[c], c);
+            }
+        }
+    }
+}
+
 /// One downloadable file inside a model package. Single-file models have one
 /// entry; Florence-2 has three.
 struct ModelFile {
@@ -380,14 +416,7 @@ fn birefnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, S
     let resized =
         image::imageops::resize(&rgb, size, size, image::imageops::FilterType::Triangle);
     let mut input = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
-    for y in 0..size {
-        for x in 0..size {
-            let px = resized.get_pixel(x, y);
-            input[[0, 0, y as usize, x as usize]] = px[0] as f32 / 255.0;
-            input[[0, 1, y as usize, x as usize]] = px[1] as f32 / 255.0;
-            input[[0, 2, y as usize, x as usize]] = px[2] as f32 / 255.0;
-        }
-    }
+    fill_nchw_rgb(&mut input, &resized, 0, 0, NchwNorm::Div255);
 
     let mut session = load_session(app, BIREFNET_ID)?;
     let input_name = session.inputs()[0].name().to_string();
@@ -446,14 +475,7 @@ fn real_esrgan_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>
 
     // Pre-process: normalize to [0, 1], NCHW layout at the source resolution.
     let mut input = Array4::<f32>::zeros((1, 3, h as usize, w as usize));
-    for y in 0..h {
-        for x in 0..w {
-            let px = rgb.get_pixel(x, y);
-            input[[0, 0, y as usize, x as usize]] = px[0] as f32 / 255.0;
-            input[[0, 1, y as usize, x as usize]] = px[1] as f32 / 255.0;
-            input[[0, 2, y as usize, x as usize]] = px[2] as f32 / 255.0;
-        }
-    }
+    fill_nchw_rgb(&mut input, &rgb, 0, 0, NchwNorm::Div255);
 
     let mut session = load_session(app, REAL_ESRGAN_ID)?;
     let input_name = session.inputs()[0].name().to_string();
@@ -523,15 +545,7 @@ fn dbnet_blocking(app: &AppHandle, model_id: &str, image_bytes: Vec<u8>) -> Resu
     let resized =
         image::imageops::resize(&rgb, size, size, image::imageops::FilterType::Triangle);
     let mut input = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
-    for y in 0..size {
-        for x in 0..size {
-            let px = resized.get_pixel(x, y);
-            for c in 0..3 {
-                let value = px[c] as f32 / 255.0;
-                input[[0, c, y as usize, x as usize]] = (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
-            }
-        }
-    }
+    fill_nchw_rgb(&mut input, &resized, 0, 0, NchwNorm::ImageNet);
 
     let mut session = load_session(app, model_id)?;
     let input_name = session.inputs()[0].name().to_string();
@@ -583,15 +597,7 @@ fn craft_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<bool, String>
 
     // ImageNet normalization, NCHW [1, 3, H, W].
     let mut input = Array4::<f32>::zeros((1, 3, target_h as usize, target_w as usize));
-    for y in 0..target_h {
-        for x in 0..target_w {
-            let px = resized.get_pixel(x, y);
-            for c in 0..3 {
-                let value = px[c] as f32 / 255.0;
-                input[[0, c, y as usize, x as usize]] = (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
-            }
-        }
-    }
+    fill_nchw_rgb(&mut input, &resized, 0, 0, NchwNorm::ImageNet);
 
     let mut session = load_session(app, CRAFT_ID)?;
     let input_name = session.inputs()[0].name().to_string();
@@ -714,16 +720,7 @@ fn lama_blocking(
 
     // Image tensor: ImageNet-normalized NCHW [1, 3, 512, 512].
     let mut image_input = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
-    for y in 0..size {
-        for x in 0..size {
-            let px = resized.get_pixel(x, y);
-            for c in 0..3 {
-                let value = px[c] as f32 / 255.0;
-                image_input[[0, c, y as usize, x as usize]] =
-                    (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
-            }
-        }
-    }
+    fill_nchw_rgb(&mut image_input, &resized, 0, 0, NchwNorm::ImageNet);
 
     // Mask tensor: [1, 1, 512, 512] in [0, 1] (white = remove).
     let mut mask_input = Array4::<f32>::zeros((1, 1, size as usize, size as usize));
@@ -871,14 +868,7 @@ fn omniparser_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<Dete
     // color, then overlay the resized image at its offset.
     let pad_value = OMNIPARSER_PAD as f32 / 255.0;
     let mut input = Array4::<f32>::from_elem((1, 3, size as usize, size as usize), pad_value);
-    for y in 0..new_h {
-        for x in 0..new_w {
-            let px = resized.get_pixel(x, y);
-            for c in 0..3 {
-                input[[0, c, (y + pad_y) as usize, (x + pad_x) as usize]] = px[c] as f32 / 255.0;
-            }
-        }
-    }
+    fill_nchw_rgb(&mut input, &resized, pad_x, pad_y, NchwNorm::Div255);
 
     let mut session = load_session(app, OMNIPARSER_ID)?;
     let input_name = session.inputs()[0].name().to_string();
@@ -1088,16 +1078,7 @@ fn font_detect_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<Fon
             }
         }
     }
-    for y in 0..nh {
-        for x in 0..nw {
-            let px = resized.get_pixel(x, y);
-            for c in 0..3 {
-                let value = px[c] as f32 / 255.0;
-                input[[0, c, (y + pad_y) as usize, (x + pad_x) as usize]] =
-                    (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
-            }
-        }
-    }
+    fill_nchw_rgb(&mut input, &resized, pad_x, pad_y, NchwNorm::ImageNet);
 
     let mut session = load_font_session(app)?;
     let input_name = session.inputs()[0].name().to_string();
@@ -1468,16 +1449,7 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     let resized =
         image::imageops::resize(&rgb, size, size, image::imageops::FilterType::Triangle);
     let mut pixels = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
-    for y in 0..size {
-        for x in 0..size {
-            let px = resized.get_pixel(x, y);
-            for c in 0..3 {
-                let value = px[c] as f32 / 255.0;
-                pixels[[0, c, y as usize, x as usize]] =
-                    (value - IMAGENET_MEAN[c]) / IMAGENET_STD[c];
-            }
-        }
-    }
+    fill_nchw_rgb(&mut pixels, &resized, 0, 0, NchwNorm::ImageNet);
 
     // 2. Vision encoder: image -> visual feature embeddings [1, Ni, D].
     let vision_input = vision.inputs()[0].name().to_string();
