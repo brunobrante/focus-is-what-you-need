@@ -1,13 +1,10 @@
-import { useState, type CSSProperties } from "react";
-import { Link } from "react-router-dom";
-import { IconFastEdit, IconLink, IconTrash, IconUnlink } from "@/components/icons";
+import { type CSSProperties } from "react";
 import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
-import { SYSTEM_DESIGN_CATEGORIES, CATEGORY_LABEL } from "@/domain/system-design/defaults";
-import type { ResolvedCategory, SourcedToken, TokenSource } from "@/domain/system-design/resolve";
+import { IconFastEdit, IconLink, IconTrash, IconUnlink } from "@/components/icons";
+import { TokenAction } from "@/system-design/shared";
+import { SourceBadge } from "./SourceBadge";
+import type { SourcedToken, TokenSource } from "@/domain/system-design/resolve";
 import type { SystemDesignController } from "@/application/system-design/useSystemDesign";
-import { CATEGORY_ICON, EmptySlot, SectionBlock, TokenAction } from "@/system-design/shared";
-import { AddTokenModal, EditTokenModal } from "@/system-design/modals";
-import { useUnlinkToken } from "@/application/system-design/useUnlinkToken";
 import type {
   ColorToken,
   GradientToken,
@@ -19,240 +16,9 @@ import type {
   TypeStyleToken,
 } from "@/lib/storage/schema";
 
-type AnyToken = { id: string };
+export type AnyToken = { id: string };
 
-const ADD_LABEL: Record<SystemDesignCategory, string> = {
-  colors: "New color",
-  gradients: "New gradient",
-  typography: "Add style",
-  icons: "Add icon",
-  spacing: "Add token",
-  radius: "Add token",
-  images: "Add image",
-};
-
-const EMPTY_LABEL: Record<SystemDesignCategory, string> = {
-  colors: "No colors yet",
-  gradients: "No gradients yet",
-  typography: "No type styles yet",
-  icons: "No icons yet",
-  spacing: "No spacing tokens yet",
-  radius: "No radius tokens yet",
-  images: "No images yet",
-};
-
-export function SystemDesignEditor({
-  controller,
-  workspaceName,
-  category: controlledCategory,
-  systemBase,
-}: {
-  controller: SystemDesignController;
-  workspaceName?: string | null;
-  category?: SystemDesignCategory;
-  systemBase?: string;
-}) {
-  const [localTab, setLocalTab] = useState<SystemDesignCategory>("colors");
-  const tab = controlledCategory ?? localTab;
-  const { resolved } = controller;
-  const { requestUnlink, requestDelete, modal: unlinkTokenModal } = useUnlinkToken();
-
-  // Toggling linkable ON just sets the flag. Toggling OFF runs the unlink flow:
-  // if projects link this token, confirm copy/delete per project before disabling.
-  const handleToggleLinkable = (
-    category: SystemDesignCategory,
-    tokenId: string,
-    nextLinkable: boolean,
-  ) => {
-    if (nextLinkable) {
-      controller.setTokenLinkable(category, tokenId, true);
-      return;
-    }
-    const token = (controller.design?.tokens[category] as { id: string }[] | undefined)?.find(
-      (t) => t.id === tokenId,
-    );
-    const disable = () => controller.setTokenLinkable(category, tokenId, false);
-    if (!token) {
-      disable();
-      return;
-    }
-    void requestUnlink({ category, token, onDisable: disable });
-  };
-
-  // Deleting a workspace master token that projects still link runs the same per-project
-  // copy/delete flow as unlink, then removes the master. Project-scope tokens (locals and
-  // linked instances) just delete in place.
-  const handleDeleteToken = (category: SystemDesignCategory, tokenId: string) => {
-    const remove = () => controller.deleteToken(category, tokenId);
-    if (controller.scope !== "workspace") {
-      remove();
-      return;
-    }
-    const token = (controller.design?.tokens[category] as { id: string }[] | undefined)?.find(
-      (t) => t.id === tokenId,
-    );
-    if (!token) {
-      remove();
-      return;
-    }
-    void requestDelete({ category, token, onDelete: remove });
-  };
-
-  if (!resolved) return null;
-
-  return (
-    <>
-      <div className="flex flex-1 min-h-0">
-        <aside className="flex w-[196px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
-          <div className="px-4 pb-3 pt-5">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.9px] text-[var(--text-faint)]">
-              Design System
-            </span>
-          </div>
-          <nav className="flex flex-col gap-0.5 px-2">
-            {SYSTEM_DESIGN_CATEGORIES.map((category) => {
-              const isActive = category === tab;
-              const cls = [
-                "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-[9px] text-[13px] font-medium transition-colors no-underline",
-                isActive
-                  ? "bg-[var(--surface-hover)] text-[var(--text)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-              ].join(" ");
-              const content = (
-                <>
-                  <span className={isActive ? "opacity-80" : "opacity-50"}>{CATEGORY_ICON[category]}</span>
-                  {CATEGORY_LABEL[category]}
-                </>
-              );
-              return systemBase ? (
-                <Link key={category} to={`${systemBase}/${category}`} replace className={cls}>
-                  {content}
-                </Link>
-              ) : (
-                <button key={category} type="button" onClick={() => setLocalTab(category)} className={[cls, "border-0"].join(" ")}>
-                  {content}
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <main className="flex flex-1 flex-col overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1000px] px-8 py-8">
-            <TokenSection
-              category={tab}
-              resolved={resolved[tab]}
-              controller={controller}
-              workspaceName={workspaceName}
-              onToggleLinkable={handleToggleLinkable}
-              onDeleteToken={handleDeleteToken}
-            />
-          </div>
-        </main>
-      </div>
-      {unlinkTokenModal}
-    </>
-  );
-}
-
-// ─── One category ──────────────────────────────────────────────────────────────
-
-function TokenSection({
-  category,
-  resolved,
-  controller,
-  workspaceName,
-  onToggleLinkable,
-  onDeleteToken,
-}: {
-  category: SystemDesignCategory;
-  resolved: ResolvedCategory;
-  controller: SystemDesignController;
-  workspaceName?: string | null;
-  onToggleLinkable: (
-    category: SystemDesignCategory,
-    tokenId: string,
-    nextLinkable: boolean,
-  ) => void;
-  onDeleteToken: (category: SystemDesignCategory, tokenId: string) => void;
-}) {
-  const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState<AnyToken | null>(null);
-  const { tokens, hasWorkspace, availableShared } = resolved;
-
-  return (
-    <>
-      <SectionBlock
-        title={CATEGORY_LABEL[category]}
-        icon={CATEGORY_ICON[category]}
-        actionLabel={ADD_LABEL[category]}
-        onAction={() => setAddOpen(true)}
-      >
-        {tokens.length === 0 ? (
-          <EmptySlot label={EMPTY_LABEL[category]} />
-        ) : (
-          <CategoryGrid
-            category={category}
-            tokens={tokens}
-            scope={controller.scope}
-            showSource={hasWorkspace}
-            onEdit={(token) => setEditing(token)}
-            onDelete={(id) => onDeleteToken(category, id)}
-            onDetach={(id) => controller.detachToken(category, id)}
-            onToggleLinkable={(id, linkable) => onToggleLinkable(category, id, linkable)}
-          />
-        )}
-      </SectionBlock>
-
-      <AddTokenModal
-        category={category}
-        open={addOpen}
-        hasWorkspace={hasWorkspace}
-        availableShared={availableShared as AnyToken[]}
-        onClose={() => setAddOpen(false)}
-        onCreate={(token) => controller.upsertToken(category, token)}
-        onPickShared={(id) => controller.linkToken(category, id)}
-      />
-      <EditTokenModal
-        category={category}
-        open={editing !== null}
-        token={editing ?? undefined}
-        onClose={() => setEditing(null)}
-        onSave={(token) => controller.upsertToken(category, token)}
-      />
-    </>
-  );
-}
-
-// ─── Source badge ──────────────────────────────────────────────────────────────
-
-function SourceBadge({ source }: { source: TokenSource }) {
-  if (source === "linked") {
-    return (
-      <span
-        title="Linked from workspace — read-only, detach to edit"
-        style={{ color: LINKED_INSTANCE_COLOR, borderColor: LINKED_INSTANCE_COLOR }}
-        className="inline-flex items-center gap-1 rounded-full border bg-black/60 px-1.5 py-0.5 text-[8.5px] font-medium uppercase tracking-[0.3px] backdrop-blur"
-      >
-        <IconLink size={9} />
-        Linked
-      </span>
-    );
-  }
-  return (
-    <span
-      title="Project token"
-      className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-black/60 px-1.5 py-0.5 text-[8.5px] font-medium uppercase tracking-[0.3px] text-[var(--text-faint)] backdrop-blur"
-    >
-      <span className="h-2 w-2 rounded-[2px] border border-[var(--text-faint)]" />
-      Local
-    </span>
-  );
-}
-
-// ─── Grid ──────────────────────────────────────────────────────────────────────
-
-function CategoryGrid({
+export function CategoryGrid({
   category,
   tokens,
   scope,
@@ -271,10 +37,6 @@ function CategoryGrid({
   onDetach: (id: string) => void;
   onToggleLinkable: (id: string, linkable: boolean) => void;
 }) {
-  // The hover actions for one token, by scope and source:
-  // - workspace: a linkable toggle + edit + delete.
-  // - project / local token: edit + delete.
-  // - project / linked instance: detach (make local copy) + remove the link.
   const tokenActions = ({ token, source }: SourcedToken, sz = 11) => {
     if (scope === "workspace") {
       const linkable = (token as { linkable?: boolean }).linkable === true;
@@ -315,19 +77,20 @@ function CategoryGrid({
       </>
     );
   };
-  // Overlay actions for card-style categories (absolute top-right).
+
   const cardActions = (entry: SourcedToken) => (
     <div className="absolute right-1.5 top-1.5 hidden gap-1 group-hover:flex">
       {tokenActions(entry)}
     </div>
   );
-  // Inline actions for list-style categories (trailing on hover).
+
   const rowActions = (entry: SourcedToken) => (
     <div className="hidden gap-1 group-hover:flex">{tokenActions(entry)}</div>
   );
+
   const corner = (source: TokenSource) =>
     showSource ? <div className="absolute left-1.5 top-1.5">{<SourceBadge source={source} />}</div> : null;
-  // A purple inset ring marks a linked instance — the same accent components use.
+
   const ringFor = (source: TokenSource): CSSProperties | undefined =>
     source === "linked"
       ? { boxShadow: `inset 0 0 0 1.5px ${LINKED_INSTANCE_COLOR}`, borderColor: "transparent" }
@@ -461,7 +224,6 @@ function CategoryGrid({
     );
   }
 
-  // images
   return (
     <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
       {tokens.map((entry) => {
