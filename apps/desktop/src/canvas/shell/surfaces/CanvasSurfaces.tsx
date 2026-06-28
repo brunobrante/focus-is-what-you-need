@@ -54,21 +54,21 @@ export function CanvasPlaceholderSurface({
       }}
       className="relative flex flex-1 cursor-default items-center justify-center overflow-hidden rounded-xl border text-left transition-all duration-150"
       style={{
-        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
-        backgroundColor: "#141615",
+        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "var(--border)",
+        backgroundColor: "#171717",
         boxShadow: active && showActiveBorder
           ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
           : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
       }}
     >
       <span className="flex flex-col items-center gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
+        <span className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
           <IconWindow />
         </span>
-        <span className="text-[13px] font-semibold text-[#E6E6E6]">
+        <span className="text-[13px] font-semibold text-[var(--text)]">
           {CANVAS_WINDOW_LABELS[windowType]}
         </span>
-        <span className="rounded border border-[#2C2C2C] bg-[#1A1A1A] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#737373]">
+        <span className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--text-faint)]">
           No canvas yet
         </span>
       </span>
@@ -124,19 +124,19 @@ export function VersionsWindowSurface({
         }}
         className="relative flex flex-1 cursor-default items-center justify-center overflow-hidden rounded-xl border text-left transition-all duration-150"
         style={{
-          borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
-          backgroundColor: "#141615",
+          borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "var(--border)",
+          backgroundColor: "#171717",
           boxShadow: active && showActiveBorder
             ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
             : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
         }}
       >
         <span className="flex flex-col items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] text-[#888]">
+          <span className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]">
             <IconWindow />
           </span>
-          <span className="text-[13px] font-semibold text-[#E6E6E6]">Versions</span>
-          <span className="rounded border border-[#2C2C2C] bg-[#1A1A1A] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[#737373]">
+          <span className="text-[13px] font-semibold text-[var(--text)]">Versions</span>
+          <span className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--text-faint)]">
             No versions yet
           </span>
         </span>

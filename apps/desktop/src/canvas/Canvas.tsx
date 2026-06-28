@@ -738,7 +738,7 @@ function CanvasPageContent() {
       </div>
 
       <div
-        className="fixed left-3 top-3 z-[5] inline-flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] tracking-[0.2px] text-[var(--text-muted)]"
+        className="fixed left-3 top-3 z-[5] inline-flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[#171717] px-3 py-2 text-[12px] tracking-[0.2px] text-[var(--text-muted)]"
         style={{ boxShadow: "var(--shadow-pop)" }}
       >
         <Link

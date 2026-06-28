@@ -55,8 +55,8 @@ export function CanvasReferencesWindow({
     <div
       className="relative flex flex-1 flex-col overflow-hidden rounded-xl border text-left transition-all duration-150"
       style={{
-        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "#2A2A2A",
-        backgroundColor: "#141615",
+        borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "var(--border)",
+        backgroundColor: "#171717",
         boxShadow:
           active && showActiveBorder
             ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
