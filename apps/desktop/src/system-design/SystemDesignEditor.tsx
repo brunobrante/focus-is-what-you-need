@@ -102,58 +102,54 @@ export function SystemDesignEditor({
 
   return (
     <>
-      <nav role="tablist" className="flex gap-1 border-b border-[var(--border)] px-7">
-        {SYSTEM_DESIGN_CATEGORIES.map((category) => {
-          const isActive = category === tab;
-          const itemClass = [
-            "relative inline-flex cursor-pointer items-center gap-1.5 px-3.5 py-3 text-[13px] font-medium tracking-[0.1px]",
-            isActive ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
-          ].join(" ");
-          const inner = (
-            <>
-              <span className="opacity-75">{CATEGORY_ICON[category]}</span>
-              {CATEGORY_LABEL[category]}
-              {isActive && <span className="absolute -bottom-px left-2.5 right-2.5 h-0.5 rounded-[2px] bg-[var(--text)]" />}
-            </>
-          );
-          return systemBase ? (
-            <Link
-              key={category}
-              to={`${systemBase}/${category}`}
-              role="tab"
-              aria-selected={isActive}
-              replace
-              className={`${itemClass} no-underline`}
-            >
-              {inner}
-            </Link>
-          ) : (
-            <button
-              key={category}
-              role="tab"
-              type="button"
-              aria-selected={isActive}
-              onClick={() => setLocalTab(category)}
-              className={`${itemClass} border-0 bg-transparent`}
-            >
-              {inner}
-            </button>
-          );
-        })}
-      </nav>
+      <div className="flex flex-1 min-h-0">
+        <aside className="flex w-[196px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
+          <div className="px-4 pb-3 pt-5">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.9px] text-[var(--text-faint)]">
+              Design System
+            </span>
+          </div>
+          <nav className="flex flex-col gap-0.5 px-2">
+            {SYSTEM_DESIGN_CATEGORIES.map((category) => {
+              const isActive = category === tab;
+              const cls = [
+                "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-[9px] text-[13px] font-medium transition-colors no-underline",
+                isActive
+                  ? "bg-[var(--surface-hover)] text-[var(--text)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
+              ].join(" ");
+              const content = (
+                <>
+                  <span className={isActive ? "opacity-80" : "opacity-50"}>{CATEGORY_ICON[category]}</span>
+                  {CATEGORY_LABEL[category]}
+                </>
+              );
+              return systemBase ? (
+                <Link key={category} to={`${systemBase}/${category}`} replace className={cls}>
+                  {content}
+                </Link>
+              ) : (
+                <button key={category} type="button" onClick={() => setLocalTab(category)} className={[cls, "border-0"].join(" ")}>
+                  {content}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-      <main className="flex flex-1 flex-col overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1100px] px-7 py-10">
-          <TokenSection
-            category={tab}
-            resolved={resolved[tab]}
-            controller={controller}
-            workspaceName={workspaceName}
-            onToggleLinkable={handleToggleLinkable}
-            onDeleteToken={handleDeleteToken}
-          />
-        </div>
-      </main>
+        <main className="flex flex-1 flex-col overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1000px] px-8 py-8">
+            <TokenSection
+              category={tab}
+              resolved={resolved[tab]}
+              controller={controller}
+              workspaceName={workspaceName}
+              onToggleLinkable={handleToggleLinkable}
+              onDeleteToken={handleDeleteToken}
+            />
+          </div>
+        </main>
+      </div>
       {unlinkTokenModal}
     </>
   );
@@ -192,13 +188,6 @@ function TokenSection({
         actionLabel={ADD_LABEL[category]}
         onAction={() => setAddOpen(true)}
       >
-        {hasWorkspace && (
-          <p className="-mt-1 text-[11.5px] text-[var(--text-faint)]">
-            Showing this project's own tokens and the{" "}
-            {workspaceName ? `“${workspaceName}”` : "workspace"} tokens it links. Linked
-            tokens are read-only — detach one to edit it as a local copy.
-          </p>
-        )}
         {tokens.length === 0 ? (
           <EmptySlot label={EMPTY_LABEL[category]} />
         ) : (
