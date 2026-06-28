@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Home } from "lucide-react";
 
 import { PageFooter } from "@/components/layout/PageFooter";
 import { AppSettingsModal } from "@/components/modals/AppSettingsModal";
@@ -9,7 +10,6 @@ import {
   IconFrame,
   IconGrid,
   IconImage,
-  IconLayoutVertical,
   IconPencil,
   IconPlus,
   IconSettings,
@@ -197,7 +197,7 @@ function HomeSidebar() {
       <nav className="flex flex-col gap-0.5">
         {/* All rows but Learn reach real routes inside this layout; Learn is a
             placeholder until its feature lands. */}
-        <SidebarLink to="/" end icon={<IconLayoutVertical size={15} strokeWidth={1.7} />}>
+        <SidebarLink to="/" end icon={<Home size={15} strokeWidth={1.7} />}>
           Home
         </SidebarLink>
         <SidebarLink to="/workspaces" icon={<IconGrid size={15} strokeWidth={1.7} />}>
