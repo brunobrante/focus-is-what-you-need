@@ -13,7 +13,7 @@ import type { SceneRow } from "@/lib/storage/schema";
  * instances stay canonical in each host scene's `graphJSON`; this is a CACHE
  * rebuilt from that graph on every scene save (D3, derived in TypeScript), so
  * "which scenes use this master?" is an index hit instead of scanning + parsing
- * every scene (the Better.md SAVE-5 cliff).
+ * every scene.
  *
  * Because it is derived, a stale/missing row only costs a rebuild, never a
  * correctness divergence — so the first read self-heals from a cold table.
