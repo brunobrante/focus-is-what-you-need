@@ -320,12 +320,30 @@ partly wrong — noted inline).
   re-parsing `workspace-config.json` on every one of ~20 reference/export commands. (Cargo *is* available
   now; lib.rs compiles clean — a full `cargo check` is blocked by a pre-existing, unrelated
   `eyedropper.rs`/objc2 version mismatch in this sandbox.)
-- **RUST-5 / RUST-6 / RUST-7 — analyzed, not changed.** All are in numerically-sensitive `models.rs`
-  inference preprocessing. RUST-6's 8 blocks genuinely differ (plain `/255` vs ImageNet-normalize, with/
-  without letterbox padding, fixed vs source resolution), so a single parameterized `rgb_to_nchw` would
-  *centralize* the off-by-one surface — and inference output **cannot be runtime-verified here** (no ONNX
-  execution / model files / images). Compile-checkable but not output-verifiable → too risky to change
-  blind. Leave for an effort that can run the models.
+- **RUST-6 — done (`9bf823b`).** The 8 copy-pasted image→NCHW fill loops collapse into one
+  `fill_nchw_rgb(input, img, pad_x, pad_y, norm)` parameterized by `NchwNorm {Div255, ImageNet}` + a
+  letterbox offset. The arithmetic per cell is moved verbatim (behavior-preserving by construction); the
+  letterbox prefills (OmniParser `from_elem`, font-classify per-channel) stay. `cargo check` clean.
+  Output not runtime-verifiable here (no ONNX / model files) — verified by mechanical-extraction equivalence
+  + compile only.
+- **RUST-5 — done (`0fdfe7e`).** `fill_nchw_rgb` writes through `input.as_slice_mut()` with computed flat
+  offsets (`c*plane + y*width + x`) instead of ndarray `[[0,c,y,x]]` indexing, dropping the per-axis
+  stride math + bounds checks per pixel. Tensors are always standard C layout (from `zeros`/`from_elem`).
+  Same cells, same values. `cargo check` clean.
+- **RUST-7 — done (`f091b2a`), allocation half only.** `merge_ranks` is now keyed by `a\0b` instead of a
+  `(String, String)` tuple, so `bpe()` looks up each pair through one reused `&str` buffer — no per-pair
+  clones. Same ranks / leftmost-min tie-break / tokenization. The O(n²) full rescan is **kept**: the
+  "affected-region only" rewrite needs a heap and risks changing the tie-break, which is not
+  runtime-verifiable here. `cargo check` clean.
+- **BLD-5 — analyzed, intentionally not changed (inert in current topology).** `useToolsEditor` is a
+  composition root: it only aggregates ~10 sub-hooks (whose handlers are already stable) + `useState`
+  setters (stable by React), and its **single** consumer `ToolsEditorView` destructures the whole bag
+  inline. So memoizing the return object is inert (no memoized consumer reads its identity), and there is
+  **zero** `React.memo` anywhere in `generate/ui/` — so stabilizing props would skip no renders either.
+  The only version with real benefit is a two-part refactor (wrap the heavy Builder children in
+  `React.memo` **and** stabilize every prop they receive) — large, speculative, output-unverifiable
+  without running the app, real regression risk. Same precedent as SHELL-5 / SHELL-4 / ENG-8. Wrapping the
+  return in `useMemo` would add a 110-entry dep array (stale-closure footgun) for no gain — net-negative.
 - **RUST-8 — done.** Florence-2's four ONNX sessions are cached in a managed `ModelSessions`
   (`Mutex<Option<Florence2Sessions>>`) in `tauri::State` and reused across calls instead of being
   re-committed from disk every time; the `Mutex` provides the interior mutability `Session::run`'s
