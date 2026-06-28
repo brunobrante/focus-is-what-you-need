@@ -61,6 +61,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     const [selectedId, setSelectedId] = useState("");
     const stageRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
+    const layerListRef = useRef<HTMLDivElement>(null);
     const zoomCtl = useStepZoom(stageRef, { keyboard: true, enabled: isOpen, contentRef });
 
     // Persistence: edits are mapped back onto the original (unresolved) document
@@ -155,6 +156,26 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
         return true;
       });
     }, [treeOptions, collapsedIds]);
+    // Expand any collapsed ancestors when selection changes (e.g. from canvas click).
+    useEffect(() => {
+      if (!scene || !selectedId) return;
+      const ancestors = findAncestorIds(scene.root, selectedId);
+      if (!ancestors) return;
+      setCollapsedIds((prev) => {
+        if (!ancestors.some((id) => prev.has(id))) return prev;
+        const next = new Set(prev);
+        ancestors.forEach((id) => next.delete(id));
+        return next;
+      });
+    }, [selectedId, scene]);
+
+    // Scroll the active layer row into view after it becomes visible.
+    useEffect(() => {
+      if (!layerListRef.current) return;
+      const el = layerListRef.current.querySelector('[aria-selected="true"]');
+      el?.scrollIntoView({ block: "nearest" });
+    }, [selectedId]);
+
     // Memoized so the tree walk only runs when the scene or selection changes,
     // not on the many re-renders fired while panning/zooming the modal (UI-9).
     const selectedNode = useMemo(
@@ -213,7 +234,7 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                 <div className="text-[10px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Layers</div>
                 <div className="mt-0.5 truncate text-[12.5px] font-medium text-[var(--text)]">{scene.root.name}</div>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+              <div ref={layerListRef} className="min-h-0 flex-1 overflow-y-auto py-1">
                 {visibleLayers.filter(({ depth }) => depth > 0).map(({ node, depth }) => (
                   <LayerRow
                     key={node.id}
@@ -360,6 +381,15 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     );
   },
 );
+
+function findAncestorIds(node: SceneNode, targetId: string): string[] | null {
+  if (node.id === targetId) return [];
+  for (const child of node.children) {
+    const path = findAncestorIds(child, targetId);
+    if (path !== null) return [node.id, ...path];
+  }
+  return null;
+}
 
 function LayerRow({
   node,
