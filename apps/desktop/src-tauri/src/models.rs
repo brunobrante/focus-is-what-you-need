@@ -1160,7 +1160,11 @@ fn char_class(ch: char) -> CharClass {
 struct SimpleTokenizer {
     id_to_token: HashMap<i64, String>,
     token_to_id: HashMap<String, i64>,
-    merge_ranks: HashMap<(String, String), usize>,
+    // Keyed by the two merge symbols joined with a NUL separator (`a\0b`). NUL
+    // never appears in GPT-2 byte-encoded symbols, so it disambiguates the pair
+    // while letting `bpe()` look up with a single reused `&str` buffer — no
+    // per-pair tuple/String clones (RUST-7).
+    merge_ranks: HashMap<String, usize>,
     byte_encoder: HashMap<u8, char>,
     byte_decoder: HashMap<char, u8>,
 }
@@ -1199,31 +1203,31 @@ impl SimpleTokenizer {
 
         // Merge ranks. The json stores merges either as "A B" strings or as
         // ["A", "B"] pairs depending on the export version.
-        let mut merge_ranks: HashMap<(String, String), usize> = HashMap::new();
+        let mut merge_ranks: HashMap<String, usize> = HashMap::new();
         if let Some(merges) = value
             .get("model")
             .and_then(|m| m.get("merges"))
             .and_then(|v| v.as_array())
         {
             for (rank, merge) in merges.iter().enumerate() {
-                let pair = match merge {
+                let key = match merge {
                     serde_json::Value::String(s) => {
                         let mut it = s.splitn(2, ' ');
                         match (it.next(), it.next()) {
-                            (Some(a), Some(b)) => Some((a.to_string(), b.to_string())),
+                            (Some(a), Some(b)) => Some(format!("{a}\u{0}{b}")),
                             _ => None,
                         }
                     }
                     serde_json::Value::Array(parts) => {
                         match (parts.first().and_then(|v| v.as_str()), parts.get(1).and_then(|v| v.as_str())) {
-                            (Some(a), Some(b)) => Some((a.to_string(), b.to_string())),
+                            (Some(a), Some(b)) => Some(format!("{a}\u{0}{b}")),
                             _ => None,
                         }
                     }
                     _ => None,
                 };
-                if let Some(pair) = pair {
-                    merge_ranks.entry(pair).or_insert(rank);
+                if let Some(key) = key {
+                    merge_ranks.entry(key).or_insert(rank);
                 }
             }
         }
@@ -1260,12 +1264,17 @@ impl SimpleTokenizer {
         if symbols.is_empty() {
             return Vec::new();
         }
+        // Reused across every pair lookup so the scan allocates nothing (RUST-7).
+        let mut key = String::new();
         loop {
             let mut best_rank = usize::MAX;
             let mut best_index: Option<usize> = None;
             for i in 0..symbols.len() - 1 {
-                let pair = (symbols[i].clone(), symbols[i + 1].clone());
-                if let Some(&rank) = self.merge_ranks.get(&pair) {
+                key.clear();
+                key.push_str(&symbols[i]);
+                key.push('\u{0}');
+                key.push_str(&symbols[i + 1]);
+                if let Some(&rank) = self.merge_ranks.get(key.as_str()) {
                     if rank < best_rank {
                         best_rank = rank;
                         best_index = Some(i);
