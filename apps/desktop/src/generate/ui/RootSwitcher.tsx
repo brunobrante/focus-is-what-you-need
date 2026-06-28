@@ -315,7 +315,32 @@ function RootCard({
   );
 }
 
-const thumbnailCache = new Map<string, string>();
+// Refcounted cache of one `blob:` object URL per reference id, shared across
+// every mounted `ReferenceThumbnail` for that id. The URL is revoked only when
+// the last user unmounts (BLD-11) — a plain revoke-on-unmount would blank
+// thumbnails in sibling instances still showing the same shared URL. Data URLs
+// carried inline on `reference.url` are not ours, so they are never cached or
+// revoked here.
+const thumbnailCache = new Map<string, { url: string; refs: number }>();
+
+/// Bumps the refcount and returns the cached URL, or null if not cached.
+function acquireThumbnail(id: string): string | null {
+  const entry = thumbnailCache.get(id);
+  if (!entry) return null;
+  entry.refs += 1;
+  return entry.url;
+}
+
+/// Drops one ref; revokes + evicts the object URL once the last user is gone.
+function releaseThumbnail(id: string): void {
+  const entry = thumbnailCache.get(id);
+  if (!entry) return;
+  entry.refs -= 1;
+  if (entry.refs <= 0) {
+    URL.revokeObjectURL(entry.url);
+    thumbnailCache.delete(id);
+  }
+}
 
 function ReferenceThumbnail({
   reference,
@@ -325,33 +350,48 @@ function ReferenceThumbnail({
   className?: string;
 }) {
   const [url, setUrl] = useState<string | null>(
-    thumbnailCache.get(reference.id) ?? reference.url ?? null,
+    thumbnailCache.get(reference.id)?.url ?? reference.url ?? null,
   );
 
   useEffect(() => {
-    const cached = thumbnailCache.get(reference.id) ?? reference.url ?? null;
-    if (cached) { setUrl(cached); return; }
+    const id = reference.id;
+    // Already cached (a blob URL we own) → take a ref, release it on unmount.
+    const cached = acquireThumbnail(id);
+    if (cached) {
+      setUrl(cached);
+      return () => releaseThumbnail(id);
+    }
+    // No cache, but an inline data URL is available → use it directly. It is not
+    // ours to revoke, so it takes no ref.
+    if (reference.url) { setUrl(reference.url); return; }
 
     let cancelled = false;
-    void loadReferenceFile(reference.id, reference.ext || extFromName(reference.name))
+    let acquired = false;
+    void loadReferenceFile(id, reference.ext || extFromName(reference.name))
       .then((blob) => (blob ? blobToObjectUrl(blob) : null))
       .then((loaded) => {
         if (!loaded) return;
-        const existing = thumbnailCache.get(reference.id);
-        // Another instance already cached one (concurrent load), or this component
-        // was cancelled before it could use the URL — either way `loaded` never
-        // enters the cache, so revoke it instead of leaking the blob.
+        // Another instance cached one first (concurrent load) → drop ours, take
+        // a ref on theirs.
+        const existing = acquireThumbnail(id);
         if (existing) {
           if (existing !== loaded) URL.revokeObjectURL(loaded);
-          if (!cancelled) setUrl(existing);
+          if (cancelled) { releaseThumbnail(id); return; }
+          acquired = true;
+          setUrl(existing);
           return;
         }
+        // Cancelled before paint → never cache; revoke the orphan.
         if (cancelled) { URL.revokeObjectURL(loaded); return; }
-        thumbnailCache.set(reference.id, loaded);
+        thumbnailCache.set(id, { url: loaded, refs: 1 });
+        acquired = true;
         setUrl(loaded);
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (acquired) releaseThumbnail(id);
+    };
   }, [reference.id, reference.ext, reference.name, reference.url]);
 
   return (
