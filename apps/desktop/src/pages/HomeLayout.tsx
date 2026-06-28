@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Home } from "lucide-react";
 
 import { PageFooter } from "@/components/layout/PageFooter";
@@ -25,6 +25,10 @@ import { useDismissable } from "@/lib/hooks/useDismissable";
  * never copied. Routes nest under this layout in `App.tsx`.
  */
 export function HomeLayout() {
+  // Settings carries its own Cancel / Save changes action bar, so the global
+  // "design preview" footer is redundant there and is suppressed.
+  const onSettings = useMatch("/settings");
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]">
       <HomeHeader />
@@ -34,7 +38,7 @@ export function HomeLayout() {
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <Outlet />
-          <PageFooter />
+          {onSettings ? null : <PageFooter />}
         </main>
       </div>
 
