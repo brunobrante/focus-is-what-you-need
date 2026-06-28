@@ -11,6 +11,7 @@ import {
   openInFinder,
 } from "@/lib/tauri/workspace";
 import type { AppSettingsTab, RecordingCommand } from "./appSettings/types";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 import { CanvasTab } from "./appSettings/CanvasTab";
 import { ProjectThumbnailsTab } from "./appSettings/ProjectThumbnailsTab";
 import { ProcessingFeaturesTab } from "./appSettings/ProcessingFeaturesTab";
@@ -103,7 +104,7 @@ export function AppSettingsContent({
         <div className="flex gap-1 pt-3">
           {SETTINGS_TABS.map((item) => {
             const isActive = tab === item.id;
-            return (
+            const btn = (
               <button
                 key={item.id}
                 type="button"
@@ -121,6 +122,9 @@ export function AppSettingsContent({
                 ) : null}
               </button>
             );
+            return item.id === "processing" ? (
+              <DevWrapper key={item.id} platform="desktop">{btn}</DevWrapper>
+            ) : btn;
           })}
         </div>
       </div>
