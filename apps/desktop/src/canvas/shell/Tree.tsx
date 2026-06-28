@@ -52,6 +52,7 @@ import { VersionsSubjectHeader } from "./tree/VersionsSubjectHeader";
 import { PickerNode } from "./tree/PickerNode";
 import { TreeRow } from "./tree/TreeRow";
 import { TypeIcon } from "./tree/TypeIcon";
+import { StackTreePanel } from "./tree/StackTreePanel";
 import { IconClose, IconLayers, IconTrash } from "@/components/icons";
 
 export type { ProjectTreeNode };
@@ -462,6 +463,10 @@ export function Tree({
   // tag (e.g. "V1") and size come from the selected subject's chosen version, not from
   // whatever is open in Current.
   const isVersionsWindow = activeTab === "versions";
+  // The References window has no canvas-layer subject: its body is the open
+  // reference's stack tree (StackTreePanel, fed by the ReferencesBridge), not the
+  // editor document. So it suppresses the subject header and the layer filter/footer.
+  const isReferencesWindow = activeTab === "references";
   const headerVersionTag = isVersionsWindow
     ? versionOptions.find((v) => v.id === selectedVersionId)?.label ?? versionOptions[0]?.label
     : undefined;
@@ -519,7 +524,7 @@ export function Tree({
 
       <>
         <div ref={pickerTriggerRef}>
-          {isVersionsWindow ? (
+          {isDraftMode || isReferencesWindow ? null : isVersionsWindow ? (
             <VersionsSubjectHeader
               active={canvasActive}
               subjectName={versionsSubjectName ?? headerName}
@@ -561,6 +566,10 @@ export function Tree({
             />
           )}
         </div>
+        {isReferencesWindow ? (
+          <StackTreePanel />
+        ) : (
+        <>
         <BackFooter
           parentNode={isVersionsWindow ? versionsParentNode : parentNode}
           onBack={() => {
@@ -642,17 +651,21 @@ export function Tree({
             ) : null}
           </DragOverlay>
         </DndContext>
+        </>
+        )}
       </>
 
-      <LayersFooter
-        query={searchQuery}
-        onQueryChange={setSearchQuery}
-        kinds={kindFilters}
-        onToggleKind={toggleKindFilter}
-        onRemoveKind={removeKindFilter}
-        expandMode={expandMode}
-        onCycleExpand={cycleExpand}
-      />
+      {isReferencesWindow ? null : (
+        <LayersFooter
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          kinds={kindFilters}
+          onToggleKind={toggleKindFilter}
+          onRemoveKind={removeKindFilter}
+          expandMode={expandMode}
+          onCycleExpand={cycleExpand}
+        />
+      )}
     </aside>
 
     {pickerOpen && pickerAnchor && (

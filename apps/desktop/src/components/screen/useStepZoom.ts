@@ -58,6 +58,31 @@ export function useStepZoom(
   const zoomIn = useCallback(() => setIndex((i) => Math.min(i + 1, ZOOM_STEPS.length - 1)), []);
   const zoomOut = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
 
+  // Jump toward an arbitrary target zoom (e.g. the toolbar's continuous % control),
+  // snapping to the nearest discrete stop. A tiny delta — the toolbar's ± buttons,
+  // which nudge by a fraction that may round back to the same stop — still advances
+  // exactly one stop in its direction, so the control never feels stuck.
+  const setZoom = useCallback((next: number | ((zoom: number) => number)) => {
+    setIndex((i) => {
+      const current = ZOOM_STEPS[i] ?? 1;
+      const target = typeof next === "function" ? next(current) : next;
+      let best = 0;
+      let bestDist = Infinity;
+      for (let k = 0; k < ZOOM_STEPS.length; k += 1) {
+        const dist = Math.abs((ZOOM_STEPS[k] ?? 1) - target);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = k;
+        }
+      }
+      if (best === i) {
+        if (target > current) best = Math.min(i + 1, ZOOM_STEPS.length - 1);
+        else if (target < current) best = Math.max(i - 1, 0);
+      }
+      return best;
+    });
+  }, []);
+
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [canPan, setCanPan] = useState(false);
@@ -221,6 +246,7 @@ export function useStepZoom(
     zoom,
     zoomIn,
     zoomOut,
+    setZoom,
     reset,
     // Pan surface (active only when a contentRef is supplied).
     pan,

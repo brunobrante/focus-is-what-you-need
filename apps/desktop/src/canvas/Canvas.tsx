@@ -21,6 +21,7 @@ import { useProjectFontTokens } from "@/application/settings/useProjectFontToken
 import { ElementFontTokensProvider } from "@/canvas/stage/elementFontTokensContext";
 import { useProjectSystemDesign } from "@/application/system-design/useSystemDesign";
 import { ResolvedSystemDesignProvider } from "@/canvas/stage/resolvedSystemDesignContext";
+import { ReferencesBridgeProvider, useReferencesBridge } from "@/canvas/shell/references/ReferencesBridge";
 import { useSearch, useSearchSource } from "@/application/search/SearchProvider";
 import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
 import type { SearchItem } from "@/domain/search/searchTypes";
@@ -69,7 +70,9 @@ function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean 
 export function CanvasPage() {
   return (
     <EditorBridgeProvider>
-      <CanvasPageContent />
+      <ReferencesBridgeProvider>
+        <CanvasPageContent />
+      </ReferencesBridgeProvider>
     </EditorBridgeProvider>
   );
 }
@@ -496,6 +499,7 @@ function CanvasPageContent() {
     () => getViewportZoomLimits(activeViewportMode ?? "frame"),
     [activeViewportMode],
   );
+  const referencesZoom = useReferencesBridge().zoom;
 
   const handleToolChange = useCallback(
     (tool: CanvasToolId): boolean => {
@@ -583,6 +587,17 @@ function CanvasPageContent() {
     const zoom = typeof next === "function" ? next(editor.state.zoom) : next;
     editor.dispatch({ type: "setZoom", zoom });
   };
+
+  // When the focused window is References, the toolbar drives the references stage's
+  // step-zoom (published to the bridge) instead of the canvas editor zoom — so the
+  // expanded toolbar zoom works the same as it does for Current/Sketch/Versions.
+  // References focused with no open item → no zoom in the toolbar (the `?.` leaves it
+  // undefined, which the toolbar reads as "hide the zoom control"), matching the rule
+  // that the zoom only shows when there is an item.
+  const referencesFocused = treeTab === "references";
+  const toolbarZoom = referencesFocused ? referencesZoom?.value : activeZoom;
+  const toolbarZoomChange = referencesFocused ? referencesZoom?.onChange : setActiveZoom;
+  const toolbarZoomLimits = referencesFocused ? referencesZoom?.limits : activeZoomLimits;
 
   const backHref = component
     ? `/project/${encodeURIComponent(projectId)}/c/${component.id}`
@@ -905,6 +920,7 @@ function CanvasPageContent() {
           onInheritParentBackgroundChange={handleInheritParentBackgroundChange}
           ancestorFrames={ancestorFrames}
           onGoToInstance={goToInstanceMaster}
+          activeCanvasTab={treeTab}
         />
         </div>
       </div>
@@ -925,9 +941,9 @@ function CanvasPageContent() {
           onToolChange={handleToolChange}
           canvasExpanded={canvasExpanded}
           canvasControlsVisible={canvasExpanded || splitActive}
-          zoom={activeZoom}
-          onZoomChange={setActiveZoom}
-          zoomLimits={activeZoomLimits}
+          zoom={toolbarZoom}
+          onZoomChange={toolbarZoomChange}
+          zoomLimits={toolbarZoomLimits}
           projectType={projectType}
           parentTarget={parentProjectNode}
           onBackToParent={handleBackToParent}

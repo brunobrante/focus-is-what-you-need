@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { windowKeyLabel } from "@/canvas/canvasUtils";
+import { windowKeyLabel, type CanvasWindowKey } from "@/canvas/canvasUtils";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import type { EditorAction } from "@/canvas/engine/store";
 import {
@@ -27,8 +27,12 @@ import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { CanvasTab } from "./inspector/CanvasTab";
 import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
 import { EmptyState } from "./inspector/InsComponents";
+import { ReferencesElementTab } from "./inspector/ReferencesElementTab";
+import { ReferencesShellTab } from "./inspector/ReferencesShellTab";
+import { useReferencesBridge } from "@/canvas/shell/references/ReferencesBridge";
+import { findStackNode } from "@/routes/references/lib/stackHelpers";
 import { TypeIcon } from "./tree/TypeIcon";
-import { IconClose, IconEllipse } from "@/components/icons";
+import { IconClose, IconEllipse, IconImage } from "@/components/icons";
 
 type InspectorProps = {
   open: boolean;
@@ -51,6 +55,9 @@ type InspectorProps = {
   ancestorFrames?: AncestorFrame[];
   /** Opens the master variant a linked instance points to (used by the locked banner). */
   onGoToInstance?: (variantId: string) => void;
+  /** The focused canvas window. When "references" the Element tab inspects the
+   * selected reference stack node (via ReferencesBridge) instead of a canvas element. */
+  activeCanvasTab?: CanvasWindowKey;
 };
 
 const EMPTY_ANCESTOR_OVERLAY: AncestorOverlayState = { enabled: false, items: {} };
@@ -67,6 +74,7 @@ export function Inspector({
   onInheritParentBackgroundChange,
   ancestorFrames = [],
   onGoToInstance,
+  activeCanvasTab,
   shellDeviceVisibility,
   shellBackVisibility,
   shellZoomVisibility,
@@ -93,6 +101,16 @@ export function Inspector({
   const bridgeSourceId = useEditorBridge((v) => v?.sourceId ?? null);
   const bridgeAncestorOverlay = useEditorBridge((v) => v?.state.ancestorOverlay ?? null);
   const getEditorSnapshot = useEditorBridgeReader();
+
+  // References window: the Element tab inspects the selected stack node (shared via
+  // ReferencesBridge) rather than a canvas element. When active it overrides the
+  // editor-driven body/header below.
+  const referencesBridge = useReferencesBridge();
+  const isReferencesActive = activeCanvasTab === "references";
+  const referenceNode =
+    isReferencesActive && referencesBridge.stackMode && referencesBridge.selectedNodeId
+      ? findStackNode(referencesBridge.tree, referencesBridge.selectedNodeId)
+      : null;
 
   const document = editorProp !== undefined ? (editorProp?.state.document ?? null) : bridgeDocument;
   const ancestorOverlay =
@@ -193,12 +211,20 @@ export function Inspector({
     if (result) commitDocument(result.document, [result.selectedId]);
   };
 
-  const headerTitle = canvasStageActive ? "Frame" : node ? node.name : "Inspector";
-  const headerMeta = canvasStageActive
-    ? `${document?.canvas.width ?? 0}×${document?.canvas.height ?? 0}px`
-    : node
-      ? elementTypeLabel(node.type)
-      : sourceLabel;
+  const headerTitle = isReferencesActive
+    ? referenceNode?.component.name ?? "Inspector"
+    : canvasStageActive
+      ? "Frame"
+      : node
+        ? node.name
+        : "Inspector";
+  const headerMeta = isReferencesActive
+    ? referenceNode?.component.type ?? sourceLabel
+    : canvasStageActive
+      ? `${document?.canvas.width ?? 0}×${document?.canvas.height ?? 0}px`
+      : node
+        ? elementTypeLabel(node.type)
+        : sourceLabel;
 
   return (
     <aside
@@ -209,7 +235,9 @@ export function Inspector({
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] pl-3.5 pr-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="grid shrink-0 place-items-center text-[#9A9A9A]" style={{ width: 16, height: 16 }}>
-            {canvasStageActive || node ? (
+            {isReferencesActive ? (
+              <IconImage size={14} strokeWidth={1.7} />
+            ) : canvasStageActive || node ? (
               <TypeIcon type={node?.type ?? "frame"} />
             ) : (
               <IconEllipse size={14} strokeWidth={1.7} />
@@ -231,11 +259,17 @@ export function Inspector({
       </div>
 
       <div className="flex shrink-0 border-b border-[#2C2C2C] px-2">
-        {([
-          { id: "element", label: "Element" },
-          { id: "canvas", label: "Frame" },
-          { id: "shell", label: "Shell" },
-        ] as const).map((tab) => {
+        {(isReferencesActive
+          ? ([
+              { id: "element", label: "Element" },
+              { id: "shell", label: "Shell" },
+            ] as const)
+          : ([
+              { id: "element", label: "Element" },
+              { id: "canvas", label: "Frame" },
+              { id: "shell", label: "Shell" },
+            ] as const)
+        ).map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
@@ -260,7 +294,18 @@ export function Inspector({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-        {!document ? (
+        {isReferencesActive ? (
+          activeTab === "shell" ? (
+            <ReferencesShellTab
+              zoomVisibility={shellZoomVisibility}
+              expandVisibility={shellExpandVisibility}
+              onZoomVisibilityChange={onShellZoomVisibilityChange}
+              onExpandVisibilityChange={onShellExpandVisibilityChange}
+            />
+          ) : (
+            <ReferencesElementTab />
+          )
+        ) : !document ? (
           <EmptyState title="No active canvas" body="Select a canvas window to inspect." />
         ) : activeTab === "canvas" ? (
           <CanvasTab

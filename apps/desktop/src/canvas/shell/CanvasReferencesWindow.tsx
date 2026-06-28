@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { ChevronLeft, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, Plus } from "lucide-react";
 import { IconImage } from "@/components/icons";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
 import { useReferences } from "@/lib/storage/hooks";
@@ -9,6 +9,8 @@ import {
 } from "@/lib/storage/repos/references.repo";
 import { ReferenceCard } from "@/components/references/ReferenceCard";
 import { CanvasReferenceInspector } from "@/canvas/shell/CanvasReferenceInspector";
+import { useReferencesBridge } from "@/canvas/shell/references/ReferencesBridge";
+import type { ShellControlVisibility } from "@/canvas/shell/inspector/ShellTab";
 import {
   AddReferenceModal,
   type AddReferenceModalHandle,
@@ -32,11 +34,15 @@ export function CanvasReferencesWindow({
   showActiveBorder,
   context,
   onClick,
+  shellZoomVisibility = "show",
+  expanded = false,
 }: {
   active: boolean;
   showActiveBorder: boolean;
   context: CanvasReferencesContext;
   onClick?: () => void;
+  shellZoomVisibility?: ShellControlVisibility;
+  expanded?: boolean;
 }) {
   const { data: references } = useReferences(context.ownerType, context.ownerId);
   const addRef = useRef<AddReferenceModalHandle>(null);
@@ -45,6 +51,15 @@ export function CanvasReferencesWindow({
   // when the selected reference is removed.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? references.find((r) => r.id === selectedId) ?? null : null;
+
+  // Publish the open reference to the shared bridge so the stage (inspector) and the
+  // Layers stack-tree read one loaded stack + one selection. Only the focused window
+  // publishes (matters when a split shows two references panes); cleared on unmount.
+  const { setReference } = useReferencesBridge();
+  useEffect(() => {
+    if (active) setReference(selected);
+  }, [active, selected, setReference]);
+  useEffect(() => () => setReference(null), [setReference]);
 
   const removeOne = (id: string) =>
     void removeReferenceFromOwner(id, context.ownerType, context.ownerId);
@@ -67,32 +82,14 @@ export function CanvasReferencesWindow({
       {/* Toolbar */}
       <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5" onClick={stop}>
         {selected ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setSelectedId(null)}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#303030] bg-[#1B1B1B]/95 pl-2 pr-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222]"
-            >
-              <ChevronLeft size={14} strokeWidth={2} />
-              Back
-            </button>
-            <span
-              className="inline-flex h-8 max-w-[220px] items-center gap-1.5 truncate rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
-            >
-              {selected.title}
-            </span>
-            <button
-              type="button"
-              aria-label="Remove reference"
-              onClick={() => {
-                removeOne(selected.id);
-                setSelectedId(null);
-              }}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 text-[#A6A6A6] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[rgba(255,80,80,0.45)] hover:bg-[rgba(255,80,80,0.12)] hover:text-[#ff8a8a]"
-            >
-              <Trash2 size={14} strokeWidth={1.8} />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setSelectedId(null)}
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#303030] bg-[#1B1B1B]/95 pl-2 pr-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)] transition-colors duration-100 hover:border-[#3A3A3A] hover:bg-[#222]"
+          >
+            <ChevronLeft size={14} strokeWidth={2} />
+            Back
+          </button>
         ) : (
           <>
             <span className="inline-flex h-8 items-center rounded-lg border border-[#303030] bg-[#1B1B1B]/95 px-2.5 text-[11.5px] font-medium text-[#D8D8D8] shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
@@ -114,7 +111,7 @@ export function CanvasReferencesWindow({
       {selected ? (
         /* Inspector — image (zoom) or stack (tree + selection), inside the canvas. */
         <div className="absolute inset-0" onClick={stop}>
-          <CanvasReferenceInspector reference={selected} />
+          <CanvasReferenceInspector shellZoomVisibility={shellZoomVisibility} expanded={expanded} />
         </div>
       ) : references.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">

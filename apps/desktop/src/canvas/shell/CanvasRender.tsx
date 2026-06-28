@@ -259,6 +259,8 @@ export function CanvasRender({
           showActiveBorder={showActiveBorder}
           context={referencesContext}
           onClick={() => onActiveCanvasChange?.(windowType)}
+          shellZoomVisibility={surfaceZoomVisibility}
+          expanded={expanded}
         />
       );
     }

@@ -548,11 +548,14 @@ Full-screen visual editor with floating UI layers.
 - **Stack references** (a whole stacked image **or** a sub-screen root) open as an
   **interactive composite**, mirroring the Builder Stack tab: the background image
   with its cuts overlaid. Hovering a cut outlines it; clicking selects it; clicking
-  the background selects the **parent** screen/root. A left **stack tree** lists the
-  same nodes (also selectable). When a cut or the parent is selected, a **floating
-  card** at the **bottom-center** shows the selected node's name, type, and
-  dimensions. A reference pinned to a single leaf cut, and a plain image with no
-  stack, render as a flat image with **no card**.
+  the background selects the **parent** screen/root. The **stack tree** lives in the
+  **Layers sidebar** (not inside the window) — see the Layers-tree header note below;
+  selecting a node there selects+scopes that cut in the references canvas, and
+  selecting a cut on the canvas highlights it in the sidebar (one shared selection,
+  via the `ReferencesBridge`). The selected node's **preview, name, type, and size**
+  show in the **Inspector's Element tab** (`ReferencesElementTab`) — see the Inspector
+  note below; there is **no floating card on the canvas**. A reference pinned to a
+  single leaf cut, and a plain image with no stack, render as a flat image.
 - **Zoom**: every enlarged reference is zoom/pannable (shared step-zoom — wheel +
   drag, edge-to-center over-scroll). The **zoom control sits in the top-left**.
 - The window's **Add** button opens the standard `AddReferenceModal`, scoped to
@@ -622,6 +625,23 @@ header is a two-select block instead of the single subject row:
   not only screen versions.) Linked-instance rows instead keep their **"go to master"** link, which
   navigates to the master's own canonical location (shown in **Current**, its origin) regardless of
   where the instance is placed; they are never materialized.
+
+**Layers-tree header (Sketch window)**: the Sketch is a per-project freeform draft with no
+single subject, so when it is the focused window the layers panel shows **no subject row** —
+the `CurrentSceneTreeRow`/Versions header is suppressed in draft mode. The panel is just the
+"Not saved to the database — local to this device" notice followed by the sketch's own layers
+(and the clear-sketch trash control in the panel header). It never borrows the Current
+screen/component's name or size.
+
+**Layers sidebar (References window)**: the Layers panel is a **host** that renders the right
+tree per focused window — for References it shows the open reference's **stack tree** (its
+cuts/recortes) instead of a canvas-layer tree, and **suppresses the subject row** (References
+has no single screen/component subject, so it never borrows the Current name/size). The body
+is the `StackTreePanel`: a "N components" count line then the cut hierarchy; selecting a node
+selects+scopes that cut in the references canvas (and vice-versa) through the shared
+`ReferencesBridge`. The layer search/filter footer is hidden (it is canvas-layer specific).
+On the references **gallery** (no reference open) the panel shows a "Select a reference to see
+its layers" hint.
 
 **Binding a color to a System Design token (Appearance / Typography)**: the Fill, Border, and
 text Color controls (`InsColor`) each carry a **link button**. Clicking it lists the project's
@@ -833,6 +853,20 @@ To edit the contents, open the master or detach the instance first.
 - Properties editor: X / Y position, W / H size, rotation, opacity
 - Visibility toggles: device, back, zoom, expand
 - When nothing is selected: canvas-level properties (background, grid settings)
+- **References window**: when the focused window is References the Inspector follows
+  it (via `activeCanvasTab`) and shows **Element | Shell** (Frame is hidden). **Element**
+  (`ReferencesElementTab`) renders the selected stack node's **preview, name, type, and
+  W×H** from the shared `ReferencesBridge` (empty states: "no reference open" / "no layer
+  selected"). **Shell** (`ReferencesShellTab`) shows only the **Zoom** and **Expand**
+  visibility toggles — the same global `shellZoomVisibility`/`shellExpandVisibility` the
+  canvas windows use (no BG/Device/Back/Shapes, which don't apply to references).
+- **References zoom + expand parity**: the references stage zoom honours
+  `shellZoomVisibility` (show/hover/hidden) and only appears when a reference is open.
+  Like the canvas windows, when the References window is **expanded** its bottom-left zoom
+  hides and the **bottom-center toolbar** drives the zoom instead — the references stage
+  publishes its step-zoom to the `ReferencesBridge`, and the toolbar reads it (in place of
+  the editor zoom) while References is the focused window. The expand button is the shared
+  one; expand toggling and `shellExpandVisibility` work the same as for Current/Sketch/Versions.
 
 **Toolbar** (floating, bottom-center):
 - Rounded container with shadow
