@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { Switch } from "./Switch";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 
 const FEATURE_ICON: Record<ProcessingFeatureKey, React.ReactNode> = {
   removeBackground: <Eraser size={16} strokeWidth={1.7} />,
@@ -46,6 +47,7 @@ export function ProcessingFeaturesTab() {
     });
 
   return (
+    <DevWrapper platform="desktop" block>
     <div className="px-[22px] py-5">
       <div className="mb-2 text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)] font-medium">
         Processing Features
@@ -118,6 +120,7 @@ export function ProcessingFeaturesTab() {
         })}
       </div>
     </div>
+    </DevWrapper>
   );
 }
 
