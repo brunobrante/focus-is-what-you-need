@@ -179,13 +179,26 @@ impl NchwNorm {
 /// `(pad_x, pad_y)` offset, applying `norm` per channel. This replaces the
 /// per-model copies of the same fill loop — the blocks differed only in the
 /// normalization and the letterbox offset, which are now parameters.
+///
+/// The tensor is written through its contiguous backing slice with computed
+/// flat offsets, avoiding ndarray's per-axis stride math + bounds checks on
+/// every pixel write (RUST-5). `input` is always standard (C) layout here — it
+/// comes straight from `Array4::zeros` / `from_elem`.
 fn fill_nchw_rgb(input: &mut Array4<f32>, img: &RgbImage, pad_x: u32, pad_y: u32, norm: NchwNorm) {
+    let (_, _, height, width) = input.dim();
+    let plane = height * width;
+    let (pad_x, pad_y) = (pad_x as usize, pad_y as usize);
+    let buf = input
+        .as_slice_mut()
+        .expect("NCHW tensor must be standard contiguous layout");
     let (w, h) = img.dimensions();
-    for y in 0..h {
-        for x in 0..w {
-            let px = img.get_pixel(x, y);
+    for y in 0..h as usize {
+        let row = (pad_y + y) * width + pad_x;
+        for x in 0..w as usize {
+            let px = img.get_pixel(x as u32, y as u32);
+            let idx = row + x;
             for c in 0..3 {
-                input[[0, c, (y + pad_y) as usize, (x + pad_x) as usize]] = norm.apply(px[c], c);
+                buf[c * plane + idx] = norm.apply(px[c], c);
             }
         }
     }
