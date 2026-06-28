@@ -86,7 +86,7 @@ export function ElementDefaultsEditor({
   onChange,
 }: Props) {
   const allowInherit = scope !== "global";
-  const [open, setOpen] = useState<InsertTool | null>("text");
+  const [open, setOpen] = useState<InsertTool | null>(null);
 
   const effectiveTool = (tool: InsertTool): CanvasElementDefault =>
     mergeTool(inherited.tools[tool], override.tools?.[tool]);

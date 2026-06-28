@@ -5,6 +5,13 @@ import { updateWorkspace } from "@/lib/storage/repos/workspace.repo";
 import { useWorkspaceElementDefaults } from "@/application/settings/useScopedElementDefaults";
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 
+type Tab = "details" | "canvas";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "details", label: "Details" },
+  { id: "canvas", label: "Canvas" },
+];
+
 function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="flex flex-col gap-1">
@@ -14,7 +21,7 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle: string }
   );
 }
 
-function ToolbarConfigSection({ workspaceId }: { workspaceId: string }) {
+function CanvasSection({ workspaceId }: { workspaceId: string }) {
   const ws = useWorkspaceElementDefaults(workspaceId);
   return (
     <section className="flex flex-col gap-6">
@@ -39,6 +46,7 @@ export function WorkspaceEditPage() {
   const { data: workspaces } = useWorkspaces();
   const workspace = workspaces.find((w) => w.id === workspaceId) ?? null;
 
+  const [tab, setTab] = useState<Tab>("details");
   const [name, setName] = useState(workspace?.name ?? "");
   const [saving, setSaving] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -87,21 +95,49 @@ export function WorkspaceEditPage() {
       className="flex min-h-screen flex-col bg-[var(--bg)]"
       style={{ opacity: visible ? 1 : 0, transition: "opacity 160ms ease" }}
     >
-      {/* Action header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-7 py-3">
-        <span className="text-[13px] font-medium text-[var(--text)]">Edit workspace</span>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => navigate(back)} className="btn btn-ghost">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={!workspaceId || !name.trim() || saving}
-            className="btn btn-primary"
-          >
-            {saving ? "Saving…" : "Save changes"}
-          </button>
+      {/* Header */}
+      <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--bg)]">
+        <div className="flex items-center justify-between px-7 py-3">
+          <span className="text-[13px] font-medium text-[var(--text)]">Edit workspace</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => navigate(back)} className="btn btn-ghost">
+              Cancel
+            </button>
+            {tab === "details" && (
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={!workspaceId || !name.trim() || saving}
+                className="btn btn-primary"
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Tabs */}
+        <div role="tablist" className="flex gap-0.5 px-5">
+          {TABS.map((t) => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                type="button"
+                aria-selected={isActive}
+                onClick={() => setTab(t.id)}
+                className={[
+                  "relative cursor-pointer border-0 bg-transparent px-3 py-2.5 text-[12px] font-medium",
+                  isActive ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
+                ].join(" ")}
+              >
+                {t.label}
+                {isActive && (
+                  <span className="absolute -bottom-px left-3 right-3 h-0.5 rounded-[2px] bg-[var(--text)]" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -109,7 +145,7 @@ export function WorkspaceEditPage() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[880px] flex-col gap-9 px-7 py-9">
           {workspaceId ? (
-            <>
+            tab === "details" ? (
               <section className="flex flex-col gap-6">
                 <SectionHeading title="Details" subtitle="Name and overview of this workspace." />
                 <div className="flex flex-col gap-4">
@@ -139,11 +175,9 @@ export function WorkspaceEditPage() {
                   </div>
                 </div>
               </section>
-
-              <div className="border-t border-[var(--border)]" />
-
-              <ToolbarConfigSection workspaceId={workspaceId} />
-            </>
+            ) : (
+              <CanvasSection workspaceId={workspaceId} />
+            )
           ) : (
             <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-6 text-center text-[13px] text-[var(--text-muted)]">
               Workspace not found.
