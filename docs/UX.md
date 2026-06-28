@@ -999,6 +999,10 @@ Reference image library for UI research.
       re-promotes back into a group.
     - **Delete everything** — permanently removes the group and cascade-deletes
       every member image, screen, stack file, and cut (project links included).
+    This dialog is also reached from the Inspector's **Remove** when the group is
+    backed by a single reference (one image holding several stacks): removing that
+    lone reference would destroy the whole group, so it opens the same confirm
+    instead of silently deleting the backing image.
 - **Card thumbnails** (grid + group gallery) render `contain`, so the whole image
   is visible (letterboxed if needed) rather than cropped to fill.
 

@@ -432,6 +432,15 @@ export function ReferenceDetailModal({
             setStackViewMode("isolated");
           }}
           onDelete={() => {
+            // A group backed by a single reference (e.g. one image holding several
+            // stacks) IS that reference — removing it destroys the whole group, so
+            // route through the group's confirm modal (Separate / Delete everything)
+            // instead of silently deleting the backing image.
+            if (isGroup && groupReferences.length <= 1) {
+              onDeleteGroup();
+              onClose();
+              return;
+            }
             if (currentItem) onDelete(currentItem.id);
             if (isGroup) setFocusedItem(null);
             else onClose();
