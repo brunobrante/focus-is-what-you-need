@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom SVG Icons</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+      padding: 40px;
+    }
+
+    h1 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: #161616;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 20px 12px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      transition: border-color 0.15s;
+    }
+
+    .card:hover {
+      border-color: #444;
+    }
+
+    .card svg {
+      display: block;
+    }
+
+    .card span {
+      font-size: 10px;
+      color: #666;
+      text-align: center;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <h1>Custom SVG Icons — not lucide (28)</h1>
+  <div class="grid">
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 3 L5 18 L9.2 14.2 L11.6 19.6 L13.6 18.7 L11.2 13.4 L17 13.4 Z" fill="currentColor" stroke="none" />
+      </svg>
+      <span>IconCursor</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 5h6M5 5v6M5 5l6 6"/>
+        <rect x="11" y="11" width="8" height="8" rx="1"/>
+      </svg>
+      <span>IconScale</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 3v18M17 3v18M3 7h18M3 17h18"/>
+      </svg>
+      <span>IconWrapper</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="4" y="5" width="16" height="14" rx="1.5"/>
+      </svg>
+      <span>IconRectangle</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <ellipse cx="12" cy="12" rx="8" ry="7"/>
+      </svg>
+      <span>IconEllipse</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <line x1="5" y1="19" x2="19" y2="5"/>
+      </svg>
+      <span>IconLine</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="5" y1="19" x2="19" y2="5"/>
+        <path d="M14 5h5v5"/>
+      </svg>
+      <span>IconArrow</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2l3.5 6.5H20l-4.5 4 1.8 6.5L12 15.5 6.7 19l1.8-6.5L4 8.5h4.5Z"/>
+      </svg>
+      <span>IconSvgShape</span>
+    </div>
+
+    <div class="card">
+      <svg width="6" height="4" viewBox="0 0 6 4" fill="currentColor">
+        <path d="M0.5 0.5L3 3.5L5.5 0.5H0.5Z"/>
+      </svg>
+      <span>IconChevronDownFill</span>
+    </div>
+
+    <div class="card">
+      <svg width="7" height="5" viewBox="0 0 8 5" fill="currentColor" style="opacity:0.55">
+        <path d="M0 0.5L4 4.5L8 0.5H0Z"/>
+      </svg>
+      <span>IconChevronDownMed</span>
+    </div>
+
+    <div class="card">
+      <svg width="5" height="8" viewBox="0 0 5 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l3 3-3 3"/>
+      </svg>
+      <span>IconChevronRight</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <path d="M8 9h8"/>
+        <path d="M8 14h5"/>
+      </svg>
+      <span>IconWindow</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+      </svg>
+      <span>IconSpinner</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+      <span>IconListView</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="3" y="4" width="18" height="14" rx="2"/>
+        <path d="M3 9h18" stroke-linecap="round"/>
+      </svg>
+      <span>IconCanvasView</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5"/>
+        <path d="M5 12l7-7 7 7"/>
+      </svg>
+      <span>IconSend</span>
+    </div>
+
+    <div class="card">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="1" width="16" height="16" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="5.5" y="5.5" width="7" height="7" rx="1" fill="currentColor"/>
+      </svg>
+      <span>IconCenterAlign</span>
+    </div>
+
+    <div class="card">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="1" width="16" height="16" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="2.5" y="2.5" width="13" height="4" rx="0.8" fill="currentColor"/>
+      </svg>
+      <span>IconOriginAlign</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 2v6h-6"/>
+        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+        <path d="M3 22v-6h6"/>
+        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+      </svg>
+      <span>IconReplace</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a5 5 0 0 1 0 10 5 5 0 0 0 0 10"/>
+        <path d="M12 2v20"/>
+      </svg>
+      <span>IconColorStyles</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3h7v7H3z"/>
+        <path d="M14 3h7v7h-7z"/>
+        <path d="M3 14h7v7H3z"/>
+        <circle cx="17.5" cy="17.5" r="3.5"/>
+      </svg>
+      <span>IconTmbAssets</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="8" height="18" rx="1.5"/>
+        <rect x="13" y="3" width="8" height="18" rx="1.5"/>
+      </svg>
+      <span>IconLayoutVertical</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="8" rx="1.5"/>
+        <rect x="3" y="13" width="18" height="8" rx="1.5"/>
+      </svg>
+      <span>IconLayoutHorizontal</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l4 4-4 4-4-4 4-4z"/>
+        <path d="M12 13l4 4-4 4-4-4 4-4z"/>
+      </svg>
+      <span>IconDiamond</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 16 16" fill="none">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 5.83824L6.66041 4.5L8 3.16176L9.33959 4.5L8 5.83824ZM7.56946 2.17837L5.6796 4.06632C5.44013 4.30554 5.44013 4.69446 5.6796 4.93368L7.56946 6.82163C7.80753 7.05946 8.19247 7.05946 8.43054 6.82163L10.3204 4.93368C10.5599 4.69446 10.5599 4.30554 10.3204 4.06632L8.43054 2.17837C8.19247 1.94054 7.80753 1.94054 7.56946 2.17837ZM10.1618 8L11.5 6.66041L12.8382 8L11.5 9.33959L10.1618 8ZM9.17837 8.43054L11.0663 10.3204C11.3055 10.5599 11.6945 10.5599 11.9337 10.3204L13.8216 8.43054C14.0595 8.19247 14.0595 7.80753 13.8216 7.56946L11.9337 5.6796C11.6945 5.44013 11.3055 5.44013 11.0663 5.6796L9.17837 7.56946C8.94054 7.80753 8.94054 8.19247 9.17837 8.43054ZM6.66041 11.5L8 12.8382L9.33959 11.5L8 10.1618L6.66041 11.5ZM5.6796 11.0663L7.56946 9.17837C7.80753 8.94054 8.19247 8.94054 8.43054 9.17837L10.3204 11.0663C10.5599 11.3055 10.5599 11.6945 10.3204 11.9337L8.43054 13.8216C8.19247 14.0595 7.80753 14.0595 7.56946 13.8216L5.6796 11.9337C5.44013 11.6945 5.44013 11.3055 5.6796 11.0663ZM3.16176 8L4.5 6.66041L5.83824 8L4.5 9.33959L3.16176 8ZM2.17837 8.43054L4.06632 10.3204C4.30554 10.5599 4.69446 10.5599 4.93368 10.3204L6.82163 8.43054C7.05946 8.19247 7.05946 7.80753 6.82163 7.56946L4.93368 5.6796C4.69446 5.44013 4.30554 5.44013 4.06632 5.6796L2.17837 7.56946C1.94054 7.80753 1.94054 8.19247 2.17837 8.43054Z" fill="currentColor"/>
+      </svg>
+      <span>IconComponentLink</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+        <path d="M12 12l3 3-3 3"/>
+        <path d="M9 15h6"/>
+      </svg>
+      <span>IconMoveTo</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M9 3v18"/>
+      </svg>
+      <span>IconFrame</span>
+    </div>
+
+    <div class="card">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="8" height="14" rx="1"/>
+        <rect x="13" y="5" width="8" height="14" rx="1"/>
+      </svg>
+      <span>IconCompare</span>
+    </div>
+
+  </div>
+</body>
+</html>
