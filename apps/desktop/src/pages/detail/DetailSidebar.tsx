@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { IconHistory, IconPencil } from "@/components/icons";
 import type { CmpKindFilter as ScreenCmpKindFilter } from "@/application/screen-detail/useScreenDetail";
-import { EditableTitle, InlineInfoPanel, SideKindFilter, SideSearch, SideTabs } from "./detailUi";
+import { EditableTitle, SideOverlayPanel, SideKindFilter, SideSearch, SideTabs } from "./detailUi";
 
 /**
  * Shared aside scaffolding for the screen-detail and component-detail views.
@@ -63,7 +63,7 @@ export function DetailSidebar<T extends string>({
   children: ReactNode;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
+    <aside className="relative flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--surface)]">
       <div className="flex shrink-0 items-end justify-between gap-4 border-b border-[var(--border)] px-6 pb-[18px] pt-[22px]">
         <div>
           <div className="flex items-center gap-1.5">
@@ -92,27 +92,24 @@ export function DetailSidebar<T extends string>({
         </div>
       </div>
 
-      {infoOpen ? (
-        <InlineInfoPanel title={infoTitle} onClose={onCloseInfo}>
-          {infoPanel}
-        </InlineInfoPanel>
-      ) : (
-        <>
-          {beforeTabs}
-          <SideTabs tabs={tabs} active={sideTab} onChange={onTabChange} />
+      {beforeTabs}
+      <SideTabs tabs={tabs} active={sideTab} onChange={onTabChange} />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
+          <SideSearch query={query} onChange={onQueryChange} />
+          {showKindFilter ? <SideKindFilter value={filter} onChange={onFilterChange} /> : null}
+        </div>
+        <div className="grid min-h-0 flex-1 content-start gap-x-4 gap-y-[22px] overflow-y-auto px-6 pb-8 pt-[22px]"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
+        >
+          {children}
+        </div>
+      </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
-              <SideSearch query={query} onChange={onQueryChange} />
-              {showKindFilter ? <SideKindFilter value={filter} onChange={onFilterChange} /> : null}
-            </div>
-            <div className="grid min-h-0 flex-1 content-start gap-x-4 gap-y-[22px] overflow-y-auto px-6 pb-8 pt-[22px]"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
-            >
-              {children}
-            </div>
-          </div>
-        </>
+      {infoOpen && (
+        <SideOverlayPanel title={infoTitle} onClose={onCloseInfo}>
+          {infoPanel}
+        </SideOverlayPanel>
       )}
     </aside>
   );

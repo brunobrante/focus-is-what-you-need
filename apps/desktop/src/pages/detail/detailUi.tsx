@@ -127,13 +127,13 @@ export function EditableTitle({ value, label, onSave }: { value: string; label: 
   );
 }
 
-// ── Inline info panel ─────────────────────────────────────────────────────────
+// ── Side overlay panel (full-height overlay over the sidebar) ─────────────────
 
-export function InlineInfoPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function SideOverlayPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-3">
-        <span className="text-[13px] font-medium text-[var(--text)]">{title}</span>
+    <div className="absolute inset-0 z-10 flex flex-col bg-[var(--surface)]">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-3.5">
+        <span className="text-[13px] font-semibold text-[var(--text)]">{title}</span>
         <button
           type="button"
           aria-label="Close"
