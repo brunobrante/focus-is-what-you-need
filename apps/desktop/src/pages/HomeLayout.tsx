@@ -26,18 +26,18 @@ import { useDismissable } from "@/lib/hooks/useDismissable";
  */
 export function HomeLayout() {
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--bg)]">
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)]">
       <HomeHeader />
 
       <div className="flex min-h-0 flex-1">
         <HomeSidebar />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <Outlet />
+          <PageFooter />
         </main>
       </div>
 
-      <PageFooter />
       <AppSettingsModal />
     </div>
   );
