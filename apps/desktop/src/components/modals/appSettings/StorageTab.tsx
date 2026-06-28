@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 import { IconClock, IconDatabase, IconFolder, IconShield, IconTrash } from "@/components/icons";
 import { resetToFactoryData } from "@/lib/storage/seed";
 
@@ -94,7 +95,7 @@ export function StorageTab({
           is an export format — use “Export .figx” on a project to write one to the workspace folder.
         </div>
 
-        <ResetSection />
+        <DevWrapper><ResetSection /></DevWrapper>
       </div>
     </div>
   );

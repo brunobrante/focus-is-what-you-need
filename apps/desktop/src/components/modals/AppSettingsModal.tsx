@@ -122,7 +122,7 @@ export function AppSettingsContent({
                 ) : null}
               </button>
             );
-            return item.id === "processing" ? (
+            return item.id === "processing" || item.id === "storage" ? (
               <DevWrapper key={item.id} platform="desktop">{btn}</DevWrapper>
             ) : btn;
           })}
@@ -145,14 +145,16 @@ export function AppSettingsContent({
             onSettingsChange={setSettingsDraft}
           />
         ) : (
-          <StorageTab
-            folderPath={folderPath}
-            referencesPath={referencesPath}
-            workspaceName={workspaceName}
-            onPickFolder={() => void handlePickFolder()}
-            onOpenFolder={handleOpenFolder}
-            onOpenReferencesFolder={handleOpenReferencesFolder}
-          />
+          <DevWrapper platform="desktop" block>
+            <StorageTab
+              folderPath={folderPath}
+              referencesPath={referencesPath}
+              workspaceName={workspaceName}
+              onPickFolder={() => void handlePickFolder()}
+              onOpenFolder={handleOpenFolder}
+              onOpenReferencesFolder={handleOpenReferencesFolder}
+            />
+          </DevWrapper>
         )}
       </div>
 
