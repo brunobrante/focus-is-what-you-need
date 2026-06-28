@@ -371,8 +371,8 @@ function CardShell({
     <div className={["group relative w-full text-left align-top", footer ? "flex flex-col" : ""].join(" ")}>
       {stackedLayers ? (
         <>
-          <div className="pointer-events-none absolute inset-0 translate-x-[10px] translate-y-[10px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.7 }} />
-          <div className="pointer-events-none absolute inset-0 translate-x-[5px] translate-y-[5px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.85 }} />
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 top-[5%] translate-x-[10px] translate-y-[10px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.7 }} />
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 top-[7%] translate-x-[5px] translate-y-[5px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.85 }} />
         </>
       ) : null}
 
