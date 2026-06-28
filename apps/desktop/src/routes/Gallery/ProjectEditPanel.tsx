@@ -2,12 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectRow, ScreenRow } from "@/lib/storage/schema";
 import { setProjectThumbnail, updateProject } from "@/lib/storage/repos/projects.repo";
-import { IconClose } from "@/components/icons";
 import { useProjectElementDefaults } from "@/application/settings/useScopedElementDefaults";
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 import { useAssetDataUrl, useWorkspaces } from "@/lib/storage/hooks";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { projectLogoColor } from "./utils";
+
+type Tab = "details" | "canvas";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "details", label: "Details" },
+  { id: "canvas", label: "Canvas" },
+];
 
 const ICON_EMOJIS = [
   "🚀", "🎨", "📱", "💼", "🛍️", "🏠", "🎯", "⚡",
@@ -64,6 +69,7 @@ export function ProjectEditPanel({
   onClose: () => void;
   onSaved: (project: ProjectRow) => void;
 }) {
+  const [tab, setTab] = useState<Tab>("details");
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
   const [previewScreenId, setPreviewScreenId] = useState(project.previewScreenId ?? "");
@@ -139,19 +145,45 @@ export function ProjectEditPanel({
         transition: "opacity 160ms ease, transform 160ms ease",
       }}
     >
-      {/* Sticky action header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-7 py-3">
-        <span className="text-[13px] font-medium text-[var(--text)]">Edit project</span>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={!name.trim() || saving}
-            className="btn btn-primary"
-          >
-            {saving ? "Saving…" : "Save changes"}
-          </button>
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--bg)]">
+        <div className="flex items-center justify-between px-7 py-3">
+          <span className="text-[13px] font-medium text-[var(--text)]">Edit project</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={!name.trim() || saving}
+              className="btn btn-primary"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+        {/* Tabs */}
+        <div role="tablist" className="flex gap-0.5 px-5">
+          {TABS.map((t) => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                type="button"
+                aria-selected={isActive}
+                onClick={() => setTab(t.id)}
+                className={[
+                  "relative cursor-pointer border-0 bg-transparent px-3 py-2.5 text-[12px] font-medium",
+                  isActive ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
+                ].join(" ")}
+              >
+                {t.label}
+                {isActive && (
+                  <span className="absolute -bottom-px left-3 right-3 h-0.5 rounded-[2px] bg-[var(--text)]" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -159,7 +191,21 @@ export function ProjectEditPanel({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[880px] flex-col gap-9 px-7 py-9">
 
-          {/* Section: Details */}
+          {tab === "canvas" ? (
+            <section className="flex flex-col gap-6">
+              <SectionHeading
+                title="Element defaults"
+                subtitle={`Default styles for elements created on the canvas. Inherited from ${parentLabel}; toggle an element to Custom to override it for this project.`}
+              />
+              <ElementDefaultsEditor
+                scope="project"
+                inherited={inherited}
+                override={override}
+                parentLabel={parentLabel}
+                onChange={saveElementDefaults}
+              />
+            </section>
+          ) : (
           <section className="flex flex-col gap-6">
             <SectionHeading
               title="Details"
@@ -329,23 +375,7 @@ export function ProjectEditPanel({
             </div>
           </section>
 
-          <div className="border-t border-[var(--border)]" />
-
-          {/* Section: Element defaults */}
-          <section className="flex flex-col gap-6">
-            <SectionHeading
-              title="Element defaults"
-              subtitle={`Default styles for elements created on the canvas. Inherited from ${parentLabel}; toggle an element to Custom to override it for this project.`}
-            />
-            <ElementDefaultsEditor
-              scope="project"
-              inherited={inherited}
-              override={override}
-              parentLabel={parentLabel}
-              onChange={saveElementDefaults}
-            />
-          </section>
-
+          )}
         </div>
       </div>
     </div>
