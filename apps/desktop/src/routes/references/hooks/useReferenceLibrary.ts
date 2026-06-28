@@ -42,6 +42,7 @@ import {
 } from "../lib/utils";
 import type { FramePickerVideo } from "../../import/VideoFramePicker";
 import { createFrameGroup as createFrameGroupUseCase } from "@/application/references/createFrameGroup";
+import { separateReferenceGroup } from "@/application/references/separateReferenceGroup";
 
 // A stable signature of the stack state a cached cover was baked from. Drifts when
 // the main screen (`primaryComponentId`) or the stack itself (`updatedAt`) changes.
@@ -460,23 +461,28 @@ export function useReferenceLibrary() {
     );
   }, []);
 
-  const confirmDeleteGroup = useCallback(
-    (groupId: string, deleteContents = false) => {
-      if (deleteContents) {
-        const group = groupsRef.current.find((g) => g.id === groupId);
-        // Cascade-delete every member: removeItem drops the file, the project links,
-        // and prunes the now-empty group, so the whole collection disappears at once.
-        for (const referenceId of group?.referenceIds ?? []) removeItem(referenceId);
-        setGroups((prev) => prev.filter((g) => g.id !== groupId));
-        return;
-      }
+  // Delete the whole collection: removeItem drops each member's file, its project
+  // links, and prunes the now-empty group, so nothing lingers to re-promote.
+  const deleteGroupAndContents = useCallback(
+    (groupId: string) => {
+      const group = groupsRef.current.find((g) => g.id === groupId);
+      for (const referenceId of group?.referenceIds ?? []) removeItem(referenceId);
       setGroups((prev) => prev.filter((g) => g.id !== groupId));
-      setLibrary((prev) =>
-        prev.map((item) => (item.groupId === groupId ? { ...item, groupId: null } : item)),
-      );
     },
     [removeItem],
   );
+
+  // Break the group apart: every screen becomes its own standalone image (a
+  // multi-screen member is split into one image per screen), and the group is gone.
+  const separateGroup = useCallback((groupId: string) => {
+    void separateReferenceGroup(groupId, {
+      libraryRef,
+      groupsRef,
+      setLibrary,
+      setGroups,
+      setSelectedSubject,
+    });
+  }, []);
 
   return {
     library,
@@ -516,6 +522,7 @@ export function useReferenceLibrary() {
     createGroup,
     renameGroup,
     updateGroup,
-    confirmDeleteGroup,
+    deleteGroupAndContents,
+    separateGroup,
   };
 }

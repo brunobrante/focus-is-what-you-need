@@ -986,13 +986,16 @@ Reference image library for UI research.
     Builder/Add/Edit/Delete actions. The three name layers are independent and
     separately editable: the group name (this panel), each original's name
     (Inspector), and each screen/cut name (stack tree).
-  - **Delete** opens a confirm dialog with two outcomes. By default it removes the
-    group only and keeps every image, screen, stack file, and cut (the originals
-    become loose references); a checkbox — "Also delete every screen, stack, and
-    image in this group" — instead cascade-deletes the whole collection (files,
-    cuts, and project links included). For a group that is just a single
-    multi-root image (which only exists *as* a group), "keep images" would merely
-    rebuild it, so the dialog drops the choice and deletes everything outright.
+  - **Delete** always opens a confirm dialog (even for a single multi-root image)
+    with two outcomes:
+    - **Separate into images** — dissolves the group into standalone references.
+      A member that holds a single screen is just ungrouped; a member that bundles
+      several screens (a multi-root stack) is split so each screen becomes its own
+      plain image (its full pixels, like a normal upload — cuts are flattened into
+      the screen image), and the bundling reference is removed. Because every
+      resulting image holds one screen, none re-promotes back into a group.
+    - **Delete everything** — permanently removes the group and cascade-deletes
+      every member image, screen, stack file, and cut (project links included).
 - **Card thumbnails** (grid + group gallery) render `contain`, so the whole image
   is visible (letterboxed if needed) rather than cropped to fill.
 
