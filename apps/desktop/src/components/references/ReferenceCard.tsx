@@ -132,14 +132,24 @@ function GroupCard({ group, references, stackThumbnailUrls, selected, onSelect }
     (group.coverReferenceId
       ? imageReferences.find((item) => item.id === group.coverReferenceId)
       : null) ?? imageReferences[0] ?? null;
-  const stackCount = references.filter((item) => item.stack?.enabled).length;
-  const isGroup = stackCount > 1 || imageReferences.length > 1;
+  // A "screen" is a stack root; one image can own several, so count every root —
+  // not just how many references carry a stack (which misses a single multi-root
+  // image, the "1 image, many stacks" case).
+  const originalCount = imageReferences.length;
+  const screenCount = references.reduce(
+    (total, item) => total + (item.stack?.rootCount ?? 1),
+    0,
+  );
+  const isGroup = screenCount > 1 || originalCount > 1;
   const coverStackThumb = firstImage?.stack?.enabled ? stackThumbnailUrls[firstImage.id] : undefined;
   const { url: coverUrl, setRef } = useReferenceUrl(firstImage, {
     enabled: Boolean(firstImage) && !coverStackThumb,
   });
   const thumbnailUrl = firstImage ? coverStackThumb ?? coverUrl : null;
-  const subtitle = `${imageReferences.length} ${imageReferences.length === 1 ? "screen" : "screens"} · ${stackCount} ${stackCount === 1 ? "stack" : "stacks"}`;
+  const subtitle =
+    originalCount === screenCount
+      ? `${screenCount} ${screenCount === 1 ? "screen" : "screens"}`
+      : `${originalCount} ${originalCount === 1 ? "original" : "originals"} · ${screenCount} screens`;
 
   return (
     <CardShell

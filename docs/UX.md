@@ -942,9 +942,12 @@ Reference image library for UI research.
 - Responsive grid of image cards
 - Each card: image thumbnail, name, tags, hover actions (View / Delete)
 - **Group treatment**: a card is shown with stacked layers + a "Group" badge and a
-  "N screens" count whenever it represents more than one screen — either a
-  multi-image group **or** a single image that holds multiple screens (its stack
-  roots). A single-screen image keeps the plain card with its format/Stack badges.
+  screen count whenever it represents more than one screen — either a multi-image
+  group **or** a single image that holds multiple screens (its stack roots). The
+  screen count sums every reference's stack roots (so one image with three roots
+  reads as 3 screens, not 1); the subtitle is "N screens", or "M originals · N
+  screens" when the two differ. A single-screen image keeps the plain card with its
+  format/Stack badges.
 
 **Reference Detail Modal** (opens on card click — single reference or group):
 - **Original / Originals tab**: always shows the true source image (never the
