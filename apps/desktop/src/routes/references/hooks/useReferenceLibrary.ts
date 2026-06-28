@@ -133,26 +133,6 @@ export function useReferenceLibrary() {
     });
   }, [groups, loading]);
 
-  // A reference can grow a second stack root inside the Builder. The next time it is
-  // observed here, promote it to a real group. The `rootCount > 1 && !groupId` guard
-  // makes this self-terminating: once a group exists the item is skipped, so this never
-  // loops despite writing back into `library`.
-  useEffect(() => {
-    if (loading) return;
-    const needsGroup = library.some(
-      (item) => (item.stack?.rootCount ?? 1) > 1 && !item.groupId,
-    );
-    if (!needsGroup) return;
-    const seeded = ensureGroupsForMultiRootItems(
-      library,
-      groupsRef.current,
-      new Date().toISOString(),
-    );
-    if (!seeded.changed) return;
-    setLibrary(seeded.items);
-    setGroups(normalizeGroupsForLibrary(seeded.groups, seeded.items));
-  }, [library, loading]);
-
   useEffect(() => {
     if (!selectedSubject) return;
     if (selectedSubject.kind === "reference") {
