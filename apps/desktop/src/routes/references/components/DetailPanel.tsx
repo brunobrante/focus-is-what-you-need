@@ -13,7 +13,7 @@ export function DetailPanel({
   builderHref,
   stackTree = [], stackLoading = false, selectedStackComponentId = null,
   stackPreviewUrls, showStackView = false, awaitingScreenSelection = false,
-  onSelectStackComponent, onIsolateStackComponent,
+  onSelectStackComponent, onIsolateStackComponent, onRenameStackComponent,
   onDelete, onNameChange, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
   onExtractFrames, onUpload, onEditGroup, onDeleteGroup,
 }: {
@@ -32,6 +32,7 @@ export function DetailPanel({
   awaitingScreenSelection?: boolean;
   onSelectStackComponent?: (id: string) => void;
   onIsolateStackComponent?: (id: string) => void;
+  onRenameStackComponent?: (id: string, name: string) => void;
   onDelete: () => void;
   onNameChange: (id: string, name: string) => void;
   onDescriptionChange: (id: string, desc: string) => void;
@@ -108,6 +109,7 @@ export function DetailPanel({
                       selectedId={selectedStackComponentId}
                       onSelect={(id) => onSelectStackComponent?.(id)}
                       onIsolate={(id) => onIsolateStackComponent?.(id)}
+                      onRename={onRenameStackComponent}
                     />
                   ))
                 ) : (
@@ -157,6 +159,7 @@ export function DetailPanel({
           <ItemDetails
             item={item}
             groups={groups}
+            onNameChange={onNameChange}
             onDescriptionChange={onDescriptionChange}
             onTagsChange={onTagsChange}
             onSourceUrlChange={onSourceUrlChange}
@@ -214,15 +217,17 @@ export function DetailPanel({
 }
 
 function ItemDetails({
-  item, groups, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
+  item, groups, onNameChange, onDescriptionChange, onTagsChange, onSourceUrlChange, onGroupChange,
 }: {
   item: ReferenceItem;
   groups: ReferenceGroup[];
+  onNameChange: (id: string, name: string) => void;
   onDescriptionChange: (id: string, desc: string) => void;
   onTagsChange: (id: string, tags: string[]) => void;
   onSourceUrlChange: (id: string, url: string) => void;
   onGroupChange: (id: string, groupId: string | null) => void;
 }) {
+  const [nameDraft, setNameDraft] = useState(item.name);
   const [descDraft, setDescDraft] = useState(item.description ?? "");
   const [urlDraft, setUrlDraft] = useState(item.sourceUrl ?? "");
   const prevIdRef = useRef(item.id);
@@ -230,15 +235,23 @@ function ItemDetails({
   useEffect(() => {
     if (prevIdRef.current === item.id) return;
     prevIdRef.current = item.id;
+    setNameDraft(item.name);
     setDescDraft(item.description ?? "");
     setUrlDraft(item.sourceUrl ?? "");
-  }, [item.id, item.description, item.sourceUrl]);
+  }, [item.id, item.name, item.description, item.sourceUrl]);
 
   return (
     <div className="flex flex-col gap-3.5">
-      <div className="break-words text-[13px] font-semibold leading-[1.4] text-[var(--text)]">
-        {item.name}
-      </div>
+      <input
+        value={nameDraft}
+        onChange={(e) => setNameDraft(e.target.value)}
+        onBlur={() => { if (nameDraft.trim()) onNameChange(item.id, nameDraft.trim()); else setNameDraft(item.name); }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { setNameDraft(item.name); e.currentTarget.blur(); }
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="w-full rounded-[8px] border border-transparent bg-transparent px-0 text-[13px] font-semibold leading-[1.4] text-[var(--text)] outline-none hover:border-[var(--border)] hover:bg-[var(--surface)] hover:px-2.5 focus:border-[var(--text-muted)] focus:bg-[var(--surface)] focus:px-2.5 transition-[padding,background-color,border-color] duration-100"
+      />
 
       <Section title="Description">
         <textarea

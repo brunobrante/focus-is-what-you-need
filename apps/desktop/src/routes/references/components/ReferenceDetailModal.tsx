@@ -11,6 +11,7 @@ import { StackCompositeView, StackRootsGallery } from "./StackView";
 import {
   loadStackPreview, releaseStackUrls, buildStackTree, listStackRoots,
 } from "./stackViewHelpers";
+import { writeReferenceStackData } from "@/lib/tauri/referenceStorage";
 
 // ─── public API ──────────────────────────────────────────────────────────────
 
@@ -193,6 +194,24 @@ export function ReferenceDetailModal({
   const builderHref = builderSource
     ? `/tools?id=${encodeURIComponent(builderSource.id)}${group ? `&groupId=${encodeURIComponent(group.id)}` : ""}`
     : null;
+
+  // ── stack component rename ────────────────────────────────────────────────
+  function handleRenameStackComponent(id: string, name: string) {
+    if (!stackPreview || !currentItem) return;
+    const data = stackPreview.data;
+    const inRoots = data.roots?.some((r) => r.id === id);
+    const updated = {
+      ...data,
+      roots: inRoots
+        ? data.roots!.map((r) => r.id === id ? { ...r, name } : r)
+        : data.roots,
+      components: !inRoots
+        ? data.components.map((c) => c.id === id ? { ...c, name } : c)
+        : data.components,
+    };
+    setStackPreview((prev) => prev ? { ...prev, data: updated } : prev);
+    void writeReferenceStackData(currentItem.id, updated);
+  }
 
   // ── tabs config ───────────────────────────────────────────────────────────
   const tabs = isGroup
@@ -405,6 +424,7 @@ export function ReferenceDetailModal({
           showStackView={showStackView}
           awaitingScreenSelection={awaitingScreenSelection}
           onSelectStackComponent={setSelectedStackComponentId}
+          onRenameStackComponent={handleRenameStackComponent}
           onIsolateStackComponent={(id) => {
             setSelectedStackComponentId(id);
             setStackViewMode("isolated");
