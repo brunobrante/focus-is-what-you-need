@@ -192,7 +192,7 @@ export function TopBar({
                   className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-3 text-left text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
                 >
                   <IconPencil size={13} />
-                  <span>Edit workspace settings</span>
+                  <span>Edit workspace</span>
                 </button>
               )}
               <button
