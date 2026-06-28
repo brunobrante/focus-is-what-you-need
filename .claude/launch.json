@@ -5,8 +5,8 @@
     {
       "name": "desktop",
       "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "--cwd", "apps/desktop", "dev", "--port", "1420"],
-      "port": 1420
+      "runtimeArgs": ["run", "--cwd", "apps/desktop", "dev", "--port", "47329"],
+      "port": 47329
     },
     {
       "name": "canvas",
