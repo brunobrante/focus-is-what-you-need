@@ -237,14 +237,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                 cursor: zoomCtl.isPanning ? "grabbing" : zoomCtl.canPan ? "grab" : "default",
               }}
             >
-              <div className="absolute left-4 top-4 z-[10]">
-                <div className="flex items-center gap-1.5 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 backdrop-blur-sm">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--blue)] opacity-80" />
-                  <span className="text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                    {scene.size.label}
-                  </span>
-                </div>
-              </div>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div
                   ref={contentRef}
