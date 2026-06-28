@@ -182,7 +182,7 @@ export function CategoryGrid({
 
   if (category === "spacing") {
     return (
-      <div className="flex flex-col divide-y divide-[var(--border)]">
+      <div className="flex flex-col gap-2">
         {tokens.map((entry) => {
           const s = entry.token as SpacingToken;
           return (

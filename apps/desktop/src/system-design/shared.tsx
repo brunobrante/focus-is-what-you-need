@@ -6,7 +6,7 @@ import {
   IconImage,
   IconPlus,
   IconDiamond,
-  IconRectangle,
+  IconRadius,
   IconLayers,
 } from "@/components/icons";
 import type { SystemDesignCategory } from "@/lib/storage/schema";
@@ -19,7 +19,7 @@ export const CATEGORY_ICON: Record<SystemDesignCategory, ReactNode> = {
   typography: <IconText size={12} strokeWidth={1.8} />,
   icons: <IconGrid size={12} strokeWidth={1.7} />,
   spacing: <IconDiamond size={10} strokeWidth={2.4} />,
-  radius: <IconRectangle size={12} strokeWidth={1.6} />,
+  radius: <IconRadius size={12} strokeWidth={1.6} />,
   images: <IconImage size={12} strokeWidth={1.7} />,
 };
 
