@@ -377,30 +377,38 @@ function CardShell({
     </div>
   );
 
+  // When stacked, inset the front face on its bottom-right so the layers behind
+  // peek out *inside* the cell (two 5px steps) instead of spilling past the edges.
+  const frontFace = stackedLayers
+    ? "absolute left-0 top-0 right-[10px] bottom-[10px]"
+    : "absolute inset-0";
+
   return (
     <div className={["group relative w-full text-left align-top", footer ? "flex flex-col" : ""].join(" ")}>
-      {stackedLayers ? (
-        <>
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 top-[5%] translate-x-[10px] translate-y-[10px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.7 }} />
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 top-[7%] translate-x-[5px] translate-y-[5px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.85 }} />
-        </>
-      ) : null}
+      <div className="relative aspect-[4/3] w-full">
+        {stackedLayers ? (
+          <>
+            <div className="pointer-events-none absolute bottom-0 right-0 left-[10px] top-[10px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.7 }} />
+            <div className="pointer-events-none absolute inset-[5px] rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-raised)]" style={{ opacity: 0.85 }} />
+          </>
+        ) : null}
 
-      {onClick ? (
-        <button
-          ref={containerRef}
-          type="button"
-          onClick={onClick}
-          onDoubleClick={onDoubleClick}
-          className={["relative aspect-[4/3] w-full border-0 bg-transparent p-0 text-left text-inherit", cursorClass].join(" ")}
-        >
-          {innerCard}
-        </button>
-      ) : (
-        <div ref={containerRef} className={["relative aspect-[4/3] w-full", cursorClass].join(" ")}>
-          {innerCard}
-        </div>
-      )}
+        {onClick ? (
+          <button
+            ref={containerRef}
+            type="button"
+            onClick={onClick}
+            onDoubleClick={onDoubleClick}
+            className={[frontFace, "border-0 bg-transparent p-0 text-left text-inherit", cursorClass].join(" ")}
+          >
+            {innerCard}
+          </button>
+        ) : (
+          <div ref={containerRef} className={[frontFace, cursorClass].join(" ")}>
+            {innerCard}
+          </div>
+        )}
+      </div>
 
       {footer ? <div>{footer}</div> : null}
 
