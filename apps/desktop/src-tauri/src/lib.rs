@@ -270,6 +270,26 @@ async fn pick_folder_dialog() -> Option<String> {
 }
 
 #[tauri::command]
+fn open_in_finder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("explorer")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn ensure_workspace_folders(app: tauri::AppHandle) -> Result<String, String> {
     let cfg = read_config(&app);
     ensure_local_structure(&cfg)?;
@@ -1082,6 +1102,7 @@ pub fn run() {
             get_workspace_config,
             set_workspace_folder,
             pick_folder_dialog,
+            open_in_finder,
             ensure_workspace_folders,
             db::db_apply,
             db::db_get_record,

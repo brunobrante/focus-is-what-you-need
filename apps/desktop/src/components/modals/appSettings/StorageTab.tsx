@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FolderOpen } from "lucide-react";
 import { IconClock, IconDatabase, IconFolder, IconShield, IconTrash } from "@/components/icons";
 import { resetToFactoryData } from "@/lib/storage/seed";
 
@@ -7,11 +8,15 @@ export function StorageTab({
   referencesPath,
   workspaceName,
   onPickFolder,
+  onOpenFolder,
+  onOpenReferencesFolder,
 }: {
   folderPath: string;
   referencesPath: string;
   workspaceName: string;
   onPickFolder: () => void;
+  onOpenFolder: () => void;
+  onOpenReferencesFolder: () => void;
 }) {
   return (
     <div className="px-[22px] py-5 grid gap-6">
@@ -30,6 +35,16 @@ export function StorageTab({
               <span className="flex-1 text-[13.5px] font-medium text-[var(--text)] truncate">
                 {folderPath || "Loading…"}
               </span>
+              {folderPath && (
+                <button
+                  type="button"
+                  onClick={onOpenFolder}
+                  title="Abrir no Finder"
+                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded-[6px] text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+                >
+                  <FolderOpen size={13} strokeWidth={1.7} />
+                </button>
+              )}
             </div>
             <button
               type="button"
@@ -51,6 +66,7 @@ export function StorageTab({
               label="References folder"
               value={referencesPath || "—"}
               mono
+              onOpen={referencesPath ? onOpenReferencesFolder : undefined}
             />
             <InfoCard
               icon={<IconDatabase size={15} strokeWidth={1.7} />}
@@ -142,17 +158,29 @@ function InfoCard({
   label,
   value,
   mono = false,
+  onOpen,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   mono?: boolean;
+  onOpen?: () => void;
 }) {
   return (
     <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-4">
       <div className="mb-2.5 flex items-center gap-2 text-[var(--text-faint)]">
         {icon}
         <span className="text-[11px] uppercase tracking-[0.4px]">{label}</span>
+        {onOpen && (
+          <button
+            type="button"
+            onClick={onOpen}
+            title="Abrir no Finder"
+            className="ml-auto flex items-center justify-center w-5 h-5 rounded-[5px] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+          >
+            <FolderOpen size={12} strokeWidth={1.7} />
+          </button>
+        )}
       </div>
       <div
         className={[

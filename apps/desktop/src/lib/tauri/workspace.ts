@@ -17,6 +17,10 @@ export async function pickFolderDialog(): Promise<string | null> {
   return invoke<string | null>("pick_folder_dialog");
 }
 
+export async function openInFinder(path: string): Promise<void> {
+  return invoke("open_in_finder", { path });
+}
+
 export async function ensureWorkspaceFolders(): Promise<string> {
   return invoke<string>("ensure_workspace_folders");
 }

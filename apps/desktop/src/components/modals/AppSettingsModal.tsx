@@ -8,6 +8,7 @@ import {
   getWorkspaceConfig,
   setWorkspaceFolder,
   pickFolderDialog,
+  openInFinder,
 } from "@/lib/tauri/workspace";
 import type { AppSettingsTab, RecordingCommand } from "./appSettings/types";
 import { CanvasTab } from "./appSettings/CanvasTab";
@@ -67,6 +68,14 @@ export function AppSettingsContent({
   async function handlePickFolder() {
     const picked = await pickFolderDialog().catch(() => null);
     if (picked) setFolderPath(picked);
+  }
+
+  function handleOpenFolder() {
+    if (folderPath) void openInFinder(folderPath).catch(() => {});
+  }
+
+  function handleOpenReferencesFolder() {
+    if (referencesPath) void openInFinder(referencesPath).catch(() => {});
   }
 
   async function handleSave() {
@@ -137,6 +146,8 @@ export function AppSettingsContent({
             referencesPath={referencesPath}
             workspaceName={workspaceName}
             onPickFolder={() => void handlePickFolder()}
+            onOpenFolder={handleOpenFolder}
+            onOpenReferencesFolder={handleOpenReferencesFolder}
           />
         )}
       </div>
