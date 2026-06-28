@@ -4,7 +4,7 @@ import { Modal, ModalBody } from "@/components/modals/Modal";
 import { ZoomControls } from "@/components/screen/ZoomControls";
 import { useStepZoom } from "@/components/screen/useStepZoom";
 import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
-import { IconChevronDown, IconClose, IconComponentLink, IconOpenCanvas, IconSpinner } from "@/components/icons";
+import { IconClose, IconComponentLink, IconOpenCanvas, IconSpinner } from "@/components/icons";
 import type { ComponentRow, ScreenRow, SceneRow, VariantRow } from "@/lib/storage/schema";
 import type { ProjectType } from "@/lib/data/types";
 import { getSceneByOwner } from "@/lib/storage/repos/scenes.repo";
@@ -59,12 +59,9 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
 
     const [scene, setScene] = useState<Scene | null>(null);
     const [selectedId, setSelectedId] = useState("");
-    const [pickerOpen, setPickerOpen] = useState(false);
     const stageRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const zoomCtl = useStepZoom(stageRef, { keyboard: true, enabled: isOpen, contentRef });
-    const pickerTriggerRef = useRef<HTMLButtonElement>(null);
-    const pickerDropRef = useRef<HTMLDivElement>(null);
 
     // Persistence: edits are mapped back onto the original (unresolved) document
     // and saved to the owner variant's scene. The Scene shown is built from the
@@ -140,20 +137,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
       zoomCtl.reset();
     }, [isOpen, scene?.root.id]);
 
-    useEffect(() => {
-      if (!pickerOpen) return;
-      const handler = (e: MouseEvent) => {
-        if (
-          !pickerTriggerRef.current?.contains(e.target as globalThis.Node) &&
-          !pickerDropRef.current?.contains(e.target as globalThis.Node)
-        ) {
-          setPickerOpen(false);
-        }
-      };
-      document.addEventListener("mousedown", handler);
-      return () => document.removeEventListener("mousedown", handler);
-    }, [pickerOpen]);
-
     const treeOptions = useMemo(() => (scene ? flattenSceneTree(scene.root) : []), [scene]);
     // Memoized so the tree walk only runs when the scene or selection changes,
     // not on the many re-renders fired while panning/zooming the modal (UI-9).
@@ -207,7 +190,24 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
             </div>
           ) : (
           <>
-          <div className="grid h-full min-h-[640px] grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid h-full min-h-[640px] grid-cols-[200px_minmax(0,1fr)_360px]">
+            <div className="flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--bg)]">
+              <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Layers</span>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                {treeOptions.map(({ node, depth }) => (
+                  <LayerRow
+                    key={node.id}
+                    node={node}
+                    depth={depth}
+                    active={node.id === selectedNode.id}
+                    onSelect={setSelectedId}
+                  />
+                ))}
+              </div>
+            </div>
+
             <div
               ref={stageRef}
               {...zoomCtl.panHandlers}
@@ -218,31 +218,13 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
                 cursor: zoomCtl.isPanning ? "grabbing" : zoomCtl.canPan ? "grab" : "default",
               }}
             >
-              <div className="absolute left-4 top-4 z-[10] flex items-center gap-2">
+              <div className="absolute left-4 top-4 z-[10]">
                 <div className="flex items-center gap-1.5 rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 backdrop-blur-sm">
                   <span className="h-1.5 w-1.5 rounded-full bg-[var(--blue)] opacity-80" />
                   <span className="text-[10.5px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
                     {scene.size.label}
                   </span>
                 </div>
-                <button
-                  ref={pickerTriggerRef}
-                  type="button"
-                  onClick={() => setPickerOpen((v) => !v)}
-                  className="flex h-[26px] items-center gap-1.5 rounded-[8px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.05)] px-2.5 text-left backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.09)]"
-                  style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.35)" }}
-                >
-                  <span className="grid shrink-0 place-items-center" style={{ color: "#9A9A9A" }}>
-                    <NodeKindIcon kind={selectedNode.kind} hasChildren={selectedNode.children.length > 0} />
-                  </span>
-                  <span className="max-w-[160px] truncate text-[11.5px] font-medium" style={{ color: "#F2F2F2", letterSpacing: "0.05px" }}>
-                    {selectedNode.name}
-                  </span>
-                  <IconChevronDown
-                    size={9} strokeWidth={2.2}
-                    className={`ml-0.5 shrink-0 transition-transform duration-150 text-[#666] ${pickerOpen ? "rotate-180" : "rotate-0"}`}
-                  />
-                </button>
               </div>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div
@@ -359,18 +341,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
             </aside>
           </div>
 
-          {pickerOpen && (
-            <LayerPickerDropdown
-              ref={pickerDropRef}
-              triggerRef={pickerTriggerRef}
-              treeOptions={treeOptions}
-              selectedId={selectedNode.id}
-              onSelect={(id) => {
-                setSelectedId(id);
-                setPickerOpen(false);
-              }}
-            />
-          )}
           </>
           )}
         </ModalBody>
@@ -378,46 +348,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     );
   },
 );
-
-const LayerPickerDropdown = forwardRef<
-  HTMLDivElement,
-  {
-    triggerRef: React.RefObject<HTMLButtonElement | null>;
-    treeOptions: Array<{ node: SceneNode; depth: number }>;
-    selectedId: string;
-    onSelect: (id: string) => void;
-  }
->(function LayerPickerDropdown({ triggerRef, treeOptions, selectedId, onSelect }, ref) {
-  const rect = triggerRef.current?.getBoundingClientRect();
-  if (!rect) return null;
-  return (
-    <div
-      ref={ref}
-      className="overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#141414]"
-      style={{
-        position: "fixed",
-        top: rect.bottom + 2,
-        left: rect.left,
-        width: 260,
-        maxHeight: 320,
-        zIndex: 9999,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03) inset",
-      }}
-    >
-      <div className="overflow-y-auto" style={{ maxHeight: 320 }}>
-        {treeOptions.map(({ node, depth }) => (
-          <LayerRow
-            key={node.id}
-            node={node}
-            depth={depth}
-            active={node.id === selectedId}
-            onSelect={onSelect}
-          />
-        ))}
-      </div>
-    </div>
-  );
-});
 
 function LayerRow({
   node,
