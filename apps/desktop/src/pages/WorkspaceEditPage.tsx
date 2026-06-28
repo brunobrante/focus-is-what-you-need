@@ -103,16 +103,14 @@ export function WorkspaceEditPage() {
             <button type="button" onClick={() => navigate(back)} className="btn btn-ghost">
               Cancel
             </button>
-            {tab === "details" && (
-              <button
-                type="button"
-                onClick={() => void save()}
-                disabled={!workspaceId || !name.trim() || saving}
-                className="btn btn-primary"
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={!workspaceId || !name.trim() || saving}
+              className="btn btn-primary"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
           </div>
         </div>
         {/* Tabs */}
