@@ -133,7 +133,6 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     useEffect(() => {
       if (!isOpen || !scene) return;
       setSelectedId(scene.root.id);
-      setPickerOpen(false);
       zoomCtl.reset();
     }, [isOpen, scene?.root.id]);
 
