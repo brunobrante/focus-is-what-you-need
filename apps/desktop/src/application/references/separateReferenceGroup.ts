@@ -30,9 +30,9 @@ export interface SeparateGroupDeps {
 /**
  * Dissolve a group into standalone references. Members that hold a single screen
  * are simply ungrouped; a member that bundles several screens (a multi-root stack)
- * is split — each screen becomes its own reference, a copy of the original image
- * carrying that one screen's stack (its cuts) — and the bundling reference is
- * removed. It is a plain separation, like duplicating the image once per screen.
+ * is split — each screen becomes its own reference, a copy of that screen's image
+ * carrying its stack (its cuts) — and the bundling reference is removed. It is a
+ * plain separation, like duplicating the image once per screen.
  */
 export async function separateReferenceGroup(
   groupId: string,
@@ -81,17 +81,14 @@ export async function separateReferenceGroup(
 
 /**
  * Materialize each screen (stack root) of a multi-root reference as its own
- * reference: a copy of the original image plus that root's cuts. Cut boxes are
- * kept verbatim — they are authored in the original image's coordinate space, so
- * a copy of that image renders them in exactly the same place (see StackView).
+ * reference: a copy of that screen's image plus its cuts. Roots are always full
+ * image size, so cut boxes are kept verbatim — they are authored in the original
+ * image's coordinate space and the copy is the same size (see StackView).
  */
 async function splitMultiRootReference(item: ReferenceItem): Promise<ReferenceItem[]> {
   const data = await readReferenceStackData(item.id);
   const roots = data?.roots ?? [];
   if (!data || roots.length === 0) return [];
-
-  const originalBlob = await loadReferenceFile(item.id, item.ext ?? "png");
-  if (!originalBlob) return [];
 
   const rootIds = stackRootIds(data);
   const now = new Date().toISOString();
@@ -105,10 +102,17 @@ async function splitMultiRootReference(item: ReferenceItem): Promise<ReferenceIt
     index += 1;
     const newReferenceId = newId();
 
-    // Copy the original image — every screen shares it, just like the user's
-    // mental model of "a copy of the original".
-    const ext = await saveReferenceFile(newReferenceId, originalBlob);
-    const url = URL.createObjectURL(originalBlob);
+    // Use this screen's own pixels: the default root is the original image; a
+    // non-default root may have been edited, so it keeps its own rendered PNG —
+    // exactly the image shown for that screen in the modal (see loadStackPreview).
+    const screenBlob =
+      root.isDefault || !root.file
+        ? await loadReferenceFile(item.id, item.ext ?? "png")
+        : await loadReferenceStackFile(item.id, root.file, "image/png");
+    if (!screenBlob) continue;
+
+    const ext = await saveReferenceFile(newReferenceId, screenBlob);
+    const url = URL.createObjectURL(screenBlob);
     primeReferenceUrl(newReferenceId, url);
 
     const cuts = data.components.filter(
@@ -131,7 +135,7 @@ async function splitMultiRootReference(item: ReferenceItem): Promise<ReferenceIt
         mediaKind: "image",
         original: { ...data.original, ext },
         // The kept root becomes the default full-image root, sourced from the
-        // copied original — its cuts stay in the same coordinate space.
+        // copied screen image — its cuts stay in the same coordinate space.
         roots: [
           {
             id: root.id,
@@ -158,7 +162,7 @@ async function splitMultiRootReference(item: ReferenceItem): Promise<ReferenceIt
       type: inferType(`screen.${ext}`),
       w: width,
       h: height,
-      size: Math.max(1, Math.round(originalBlob.size / 1024)),
+      size: Math.max(1, Math.round(screenBlob.size / 1024)),
       ext,
       tags: item.tags ?? [],
       added: now,
