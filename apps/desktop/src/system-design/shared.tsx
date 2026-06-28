@@ -130,7 +130,7 @@ export function TokenAction({
           ? "border-[var(--border-strong)] bg-[rgba(20,20,20,0.9)] text-[#ff8080] hover:bg-[rgba(255,60,60,0.18)]"
           : active
             ? "border-[#8638E5] bg-[rgba(134,56,229,0.18)] text-[var(--text)]"
-            : "border-[var(--border-strong)] bg-[rgba(20,20,20,0.9)] text-[var(--text-muted)] hover:text-[var(--text)]",
+            : "border-[var(--border-strong)] bg-[rgba(20,20,20,0.9)] text-[var(--text)]",
       ].join(" ")}
     >
       {icon}
