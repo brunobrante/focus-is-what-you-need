@@ -137,6 +137,24 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
     }, [isOpen, scene?.root.id]);
 
     const treeOptions = useMemo(() => (scene ? flattenSceneTree(scene.root) : []), [scene]);
+    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
+    const toggleCollapse = (id: string) =>
+      setCollapsedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+    const visibleLayers = useMemo(() => {
+      let blockedDepth: number | null = null;
+      return treeOptions.filter(({ node, depth }) => {
+        if (blockedDepth !== null) {
+          if (depth > blockedDepth) return false;
+          blockedDepth = null;
+        }
+        if (collapsedIds.has(node.id) && node.children.length > 0) blockedDepth = depth;
+        return true;
+      });
+    }, [treeOptions, collapsedIds]);
     // Memoized so the tree walk only runs when the scene or selection changes,
     // not on the many re-renders fired while panning/zooming the modal (UI-9).
     const selectedNode = useMemo(
@@ -189,19 +207,21 @@ export const FastEditModal = forwardRef<FastEditModalHandle>(
             </div>
           ) : (
           <>
-          <div className="grid h-full min-h-[640px] grid-cols-[200px_minmax(0,1fr)_360px]">
+          <div className="grid h-full min-h-[640px] grid-cols-[240px_minmax(0,1fr)_360px]">
             <div className="flex min-h-0 flex-col border-r border-[var(--border)] bg-[var(--bg)]">
               <div className="shrink-0 border-b border-[var(--border)] px-3 py-2">
                 <span className="text-[10.5px] font-semibold uppercase tracking-[0.5px] text-[var(--text-faint)]">Layers</span>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto py-1">
-                {treeOptions.map(({ node, depth }) => (
+                {visibleLayers.map(({ node, depth }) => (
                   <LayerRow
                     key={node.id}
                     node={node}
                     depth={depth}
                     active={node.id === selectedNode.id}
+                    collapsed={collapsedIds.has(node.id)}
                     onSelect={setSelectedId}
+                    onToggleCollapse={toggleCollapse}
                   />
                 ))}
               </div>
@@ -352,13 +372,18 @@ function LayerRow({
   node,
   depth,
   active,
+  collapsed,
   onSelect,
+  onToggleCollapse,
 }: {
   node: SceneNode;
   depth: number;
   active: boolean;
+  collapsed: boolean;
   onSelect: (id: string) => void;
+  onToggleCollapse: (id: string) => void;
 }) {
+  const hasChildren = node.children.length > 0;
   return (
     <div
       role="option"
@@ -370,27 +395,37 @@ function LayerRow({
       onMouseLeave={(e) => {
         if (!active) e.currentTarget.style.background = "transparent";
       }}
-      className="relative flex h-[30px] cursor-default select-none items-center gap-1.5 pr-2.5 text-[13px]"
+      className="relative flex h-[30px] cursor-default select-none items-center gap-1 pr-2 text-[12.5px]"
       style={{
-        paddingLeft: 6 + depth * 14,
+        paddingLeft: 4 + depth * 14,
         color: active ? "#FFFFFF" : "#CFCFCF",
         background: active ? "rgba(255,255,255,0.07)" : "transparent",
       }}
     >
+      <span
+        className="grid h-4 w-4 shrink-0 place-items-center"
+        style={{ color: hasChildren ? "#666" : "transparent" }}
+        onClick={(e) => {
+          if (!hasChildren) return;
+          e.stopPropagation();
+          onToggleCollapse(node.id);
+        }}
+      >
+        {hasChildren && (
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 120ms" }}>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        )}
+      </span>
       <span className="grid h-4 w-4 shrink-0 place-items-center" style={{ color: "#9A9A9A" }}>
-        <NodeKindIcon kind={node.kind} hasChildren={node.children.length > 0} />
+        <NodeKindIcon kind={node.kind} hasChildren={hasChildren} />
       </span>
       <span
         className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
         style={{ fontWeight: node.kind === "frame" ? 500 : 400, letterSpacing: "0.05px" }}
       >
         {node.name}
-      </span>
-      <span
-        className="shrink-0 text-[10px] tabular-nums"
-        style={{ color: active ? "rgba(255,255,255,0.35)" : "#555" }}
-      >
-        {node.kind}
       </span>
     </div>
   );
