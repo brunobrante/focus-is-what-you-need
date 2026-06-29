@@ -964,6 +964,13 @@ To edit the contents, open the master or detach the instance first.
   - **Radius** — when on (default) the frame keeps the parent's corner radius; when off it is square. The border is never inherited or drawn.
 - When editing a screen (no ancestors) the section shows an empty state and the canvas button is hidden.
 
+**Selection chrome culls by on-screen size (Figma-style):**
+- The selection handles are hidden when the selected element is too small **on screen**, leaving progressively less chrome until only the outline remains. Because this canvas never zooms below 100% — at which point the frame already fills the viewport — an element's on-screen size reflects **how small it is relative to its parent frame**, and it grows as you zoom in, so the handles fade out on small/nested elements and **reappear as you zoom in**.
+- Two tiers, gated on the element's smaller on-screen side:
+  - **Corner-radius balls** drop out first (below ~40 px on screen) — by then they would overlap and smother the element.
+  - The **square resize/rotation handles** survive longer and drop only once the element is so small (below ~12 px on screen) that the handles would blanket it. Below this the element still shows its **selection outline** and can be moved, but to resize/rotate it you zoom in (or use the Inspector size fields).
+- The thresholds are screen-pixel constants (`RADIUS_MIN_ELEMENT_SCREEN`, `RESIZE_HANDLE_MIN_ELEMENT_SCREEN` in `canvasToolingRenderer.ts`); hit-testing follows the same gating, so a hidden handle is also not grabbable.
+
 **Corner radius handle:**
 - When a single radius-capable element is hovered (or while its handle is being dragged), a small circle appears inset from each corner; hovering it shows a custom "bend" cursor.
 - Dragging a handle sets a uniform corner radius for all four corners, clamped to half the shorter side. At the maximum the two handles on the short edge meet and the drag locks there.

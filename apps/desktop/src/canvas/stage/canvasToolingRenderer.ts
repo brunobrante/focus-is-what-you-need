@@ -36,7 +36,24 @@ const HANDLE_BORDER_RADIUS = 2;
 
 export const RADIUS_HANDLE_SIZE = 8;
 export const RADIUS_MIN_OFFSET = 12;
-export const RADIUS_MIN_ELEMENT_SCREEN = 24;
+// Figma-style detail culling by on-screen size. There is no zoom-out here, so an
+// element's viewport-space size already encodes how small it is relative to the
+// opened frame (the frame fills the viewport at 1x) and grows back as you zoom
+// in — so a single screen-pixel threshold gives the "handles vanish when the
+// element is far / tiny, reappear as you zoom in" behavior.
+//
+// Two tiers, each the element's *smaller* on-screen side, derived from the
+// handle geometry:
+//   - Radius balls drop out first. Two balls on one edge sit RADIUS_MIN_OFFSET
+//     (12px) in from each corner, so they only separate cleanly once the edge
+//     clears 2*offset + a ball (= 32px); 40 leaves a comfortable gap. Below this
+//     the balls would overlap and smother the element.
+//   - The square resize/rotation handles survive much longer (like Figma) and
+//     only drop once the element is so small the 8px handles would blanket it,
+//     leaving just the selection outline. Kept below RADIUS_MIN_ELEMENT_SCREEN
+//     so the balls always disappear before the corner handles do.
+export const RADIUS_MIN_ELEMENT_SCREEN = 40;
+export const RESIZE_HANDLE_MIN_ELEMENT_SCREEN = 12;
 
 export const ROTATION_OFFSET = 4;
 export const ROTATION_SIZE = 14;

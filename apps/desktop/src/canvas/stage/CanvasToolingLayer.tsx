@@ -18,6 +18,7 @@ import {
   INSTANCE_HOVER_COLOR,
   INSTANCE_SELECTION_COLOR,
   RADIUS_MIN_ELEMENT_SCREEN,
+  RESIZE_HANDLE_MIN_ELEMENT_SCREEN,
   SELECTION_COLOR,
   canvasRectToViewport,
   elementToViewportBox,
@@ -280,8 +281,22 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         transformIds.length === 1
           ? transformViewportBoxes[0] ?? null
           : boxFromRects(transformViewportRects);
-      const canResize = Boolean(selectionBox && canSelectionResize);
-      const canRotate = Boolean(selectionBox && canSelectionRotate);
+      // Once the selection is too small on screen the square resize / rotation
+      // handles would blanket it, so we drop them (keeping only the outline) —
+      // mirroring how the radius balls are gated by RADIUS_MIN_ELEMENT_SCREEN,
+      // just at a smaller threshold so the balls always vanish first. The
+      // on-screen size grows as the user zooms in, so the handles reappear.
+      const selectionScreenSize = selectionBox
+        ? Math.min(selectionBox.rect.width, selectionBox.rect.height)
+        : 0;
+      const transformHandlesFit =
+        selectionScreenSize >= RESIZE_HANDLE_MIN_ELEMENT_SCREEN;
+      const canResize = Boolean(
+        selectionBox && canSelectionResize && transformHandlesFit,
+      );
+      const canRotate = Boolean(
+        selectionBox && canSelectionRotate && transformHandlesFit,
+      );
       const singleElement = transformIds.length === 1 ? doc.elements[transformIds[0]] : null;
       const allowedResizeHandles = singleElement
         ? (() => {
