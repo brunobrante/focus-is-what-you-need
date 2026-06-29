@@ -43,26 +43,42 @@ export function useBuilderViewport({
   imgRef: RefObject<HTMLImageElement | null>;
   imageError: boolean;
 }) {
-  const [toolZoom, setToolZoom] = useState(MIN_TOOL_ZOOM);
-  const [toolPan, setToolPan] = useState<ToolPan>({ x: 0, y: 0 });
+  // Zoom and pan are held as one atomic state so a zoom step updates both in a
+  // single commit. Nesting `setToolPan` inside a `setToolZoom` updater double-
+  // applied the cursor anchor under React StrictMode (the outer updater runs
+  // twice, so the queued pan updater ran twice), making the view overshoot the
+  // cursor and feel off-centre.
+  const [viewport, setViewport] = useState<{ zoom: number; pan: ToolPan }>({
+    zoom: MIN_TOOL_ZOOM,
+    pan: { x: 0, y: 0 },
+  });
+  const toolZoom = viewport.zoom;
+  const toolPan = viewport.pan;
+
+  const setToolPan = useCallback(
+    (next: ToolPan | ((pan: ToolPan) => ToolPan)) => {
+      setViewport((v) => ({
+        ...v,
+        pan: typeof next === "function" ? next(v.pan) : next,
+      }));
+    },
+    [],
+  );
 
   const resetToolViewport = useCallback(() => {
-    setToolZoom(MIN_TOOL_ZOOM);
-    setToolPan({ x: 0, y: 0 });
+    setViewport({ zoom: MIN_TOOL_ZOOM, pan: { x: 0, y: 0 } });
   }, []);
 
   const changeToolZoom = useCallback((direction: 1 | -1, anchor?: ToolPan) => {
-    setToolZoom((current) => {
-      if (direction < 0 && current <= MIN_TOOL_ZOOM) return MIN_TOOL_ZOOM;
+    setViewport((v) => {
+      if (direction < 0 && v.zoom <= MIN_TOOL_ZOOM) return v;
       const multiplier = direction > 0 ? 1.14 : 1 / 1.14;
-      const next = Number(clamp(current * multiplier, MIN_TOOL_ZOOM, MAX_TOOL_ZOOM).toFixed(2));
-      setToolPan((pan) => {
-        // Anchor the zoom under the cursor (wheel) so the point stays put; with no
-        // anchor (the +/- buttons) the pan is kept, i.e. zoom about the centre.
-        const anchored = anchor ? zoomToCursorOffset(anchor, pan, current, next) : pan;
-        return clampToolPan(anchored, next, stageViewportRef.current, imgRef.current);
-      });
-      return next;
+      const next = Number(clamp(v.zoom * multiplier, MIN_TOOL_ZOOM, MAX_TOOL_ZOOM).toFixed(2));
+      // Anchor the zoom under the cursor (wheel) so the point stays put; with no
+      // anchor (the +/- buttons) the pan is kept, i.e. zoom about the centre.
+      const anchored = anchor ? zoomToCursorOffset(anchor, v.pan, v.zoom, next) : v.pan;
+      const pan = clampToolPan(anchored, next, stageViewportRef.current, imgRef.current);
+      return { zoom: next, pan };
     });
   }, [imgRef, stageViewportRef]);
 
