@@ -194,6 +194,11 @@ export type PaintOverlayArgs = {
   editingComponentId: string | null;
   selectionMatchesExistingCut: boolean;
   selectionCrop: CropBox | null;
+  /**
+   * The object silhouette from "Adjust crop", as a closed polygon in subject-
+   * pixel coordinates. Drawn as a non-destructive preview over the selection.
+   */
+  segmentationContour: { x: number; y: number }[] | null;
 };
 
 export type PaintCropsArgs = {

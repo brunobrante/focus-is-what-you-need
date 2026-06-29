@@ -52,6 +52,7 @@ import { useBuilderInteraction } from "./useBuilderInteraction";
 import { useBuilderNavigation } from "./useBuilderNavigation";
 import { useBuilderCutOperations } from "./useBuilderCutOperations";
 import { useAutoDetect } from "./useAutoDetect";
+import { useCropSegmentation } from "./useCropSegmentation";
 import { useStackPersist } from "./useStackPersist";
 import { useCutVariants } from "./useCutVariants";
 
@@ -94,6 +95,9 @@ export type ToolsEditorState = {
   uploading: boolean;
   autoDetecting: boolean;
   autoDetectMessage: string | null;
+  segmenting: boolean;
+  segmentError: string | null;
+  adjustCrop: (modelId: string | null) => void;
   imagePaintVersion: number;
   pendingConfirmation: PendingConfirmation | null;
   savingStack: boolean;
@@ -454,6 +458,25 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     resetToolViewport,
   });
 
+  // --- Adjust crop (object segmentation) -----------------------------------
+
+  const { segmenting, segmentError, segmentation, segment, clearSegmentation } =
+    useCropSegmentation({ activeSubject });
+
+  // The silhouette belongs to one specific crop rectangle; any change to the
+  // selection (drag, resize, cancel) makes the preview stale, so drop it.
+  useEffect(() => {
+    clearSegmentation();
+  }, [selection, clearSegmentation]);
+
+  const adjustCrop = useCallback(
+    (modelId: string | null) => {
+      if (!canCrop || !selectionCrop || segmenting) return;
+      void segment(modelId, selectionCrop);
+    },
+    [canCrop, segment, segmenting, selectionCrop],
+  );
+
   // --- Canvas painter ------------------------------------------------------
 
   const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
@@ -470,6 +493,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
+    segmentationContour: segmentation?.contour ?? null,
     drawingPath,
     brushSize,
     selectedComponentId,
@@ -720,6 +744,9 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     uploading,
     autoDetecting,
     autoDetectMessage,
+    segmenting,
+    segmentError,
+    adjustCrop,
     imagePaintVersion,
     pendingConfirmation,
     savingStack,

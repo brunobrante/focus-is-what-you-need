@@ -23,6 +23,8 @@ export type BuilderCanvasPainterInput = {
   isHoveringSelection: boolean;
   selectionCrop: CropBox | null;
   selectionMatchesExistingCut: boolean;
+  /** Object silhouette from "Adjust crop" (subject coords), or null. */
+  segmentationContour: { x: number; y: number }[] | null;
   drawingPath: DrawingPath | null;
   brushSize: number;
   selectedComponentId: string | null;
@@ -60,6 +62,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
+    segmentationContour,
     drawingPath,
     brushSize,
     selectedComponentId,
@@ -124,6 +127,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       editingComponentId,
       selectionMatchesExistingCut,
       selectionCrop,
+      segmentationContour,
     });
   }, [
     activeSubject,
@@ -141,6 +145,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     selectionCrop,
     selectionLocked,
     selectionMatchesExistingCut,
+    segmentationContour,
     stackedComponents,
     toolPan,
     toolZoom,

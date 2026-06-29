@@ -14,6 +14,7 @@ import {
   Move,
   Pencil,
   Plus,
+  Scissors,
   Sparkles,
   Wand2,
   X,
@@ -87,6 +88,9 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     imageError,
     autoDetecting,
     autoDetectMessage,
+    segmenting,
+    segmentError,
+    adjustCrop,
     pendingConfirmation,
     savingStack,
     stackSaveStatus,
@@ -181,6 +185,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
   const { features } = useProcessingFeatures();
   // A feature is usable in the Builder only when enabled with an installed model.
   const autoDetectModelId = features.autoDetect.activeModelId;
+  const objectSegmentationModelId = features.objectSegmentation.activeModelId;
 
   // Which cut's variants panel is open in the sidebar (replaces the tree). Null
   // shows the normal component tree.
@@ -401,6 +406,12 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 </div>
               ) : null}
 
+              {segmentError ? (
+                <div className="pointer-events-none absolute bottom-16 left-1/2 z-30 -translate-x-1/2 rounded-[8px] border border-[var(--border)] bg-[rgba(20,20,22,0.92)] px-3 py-2 text-[12px] text-[var(--text)] shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-[8px]">
+                  {segmentError}
+                </div>
+              ) : null}
+
               {selection && currentTool !== "draw" ? (
                 <div
                   data-selection-action
@@ -417,6 +428,29 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   >
                     Cancel
                   </button>
+                  {canCrop ? (
+                    <DevWrapper platform="desktop">
+                      <button
+                        type="button"
+                        data-selection-action
+                        disabled={segmenting || !objectSegmentationModelId}
+                        onClick={() => adjustCrop(objectSegmentationModelId)}
+                        title={
+                          objectSegmentationModelId
+                            ? "Snap the crop to the object's edges"
+                            : "Install a segmentation model in Settings first"
+                        }
+                        className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {segmenting ? (
+                          <Loader2 size={11} strokeWidth={2} className="animate-spin" />
+                        ) : (
+                          <Scissors size={11} strokeWidth={2} />
+                        )}
+                        {segmenting ? "Adjusting…" : "Adjust crop"}
+                      </button>
+                    </DevWrapper>
+                  ) : null}
                   {canCrop ? (
                     <button
                       type="button"

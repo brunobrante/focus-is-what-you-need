@@ -248,6 +248,28 @@ export function paintCropsCanvas(args: PaintCropsArgs) {
   }
 }
 
+/**
+ * Traces a closed path through `pts` with quadratic curves between edge
+ * midpoints, rounding the polygon into a smooth silhouette ("bordas com curvas").
+ */
+function drawSmoothClosedPath(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[]) {
+  const n = pts.length;
+  if (n < 3) return;
+  const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  });
+  ctx.beginPath();
+  const first = mid(pts[n - 1], pts[0]);
+  ctx.moveTo(first.x, first.y);
+  for (let i = 0; i < n; i += 1) {
+    const curr = pts[i];
+    const m = mid(curr, pts[(i + 1) % n]);
+    ctx.quadraticCurveTo(curr.x, curr.y, m.x, m.y);
+  }
+  ctx.closePath();
+}
+
 export function paintOverlayCanvas(args: PaintOverlayArgs) {
   const {
     canvas,
@@ -267,6 +289,7 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     editingComponentId,
     selectionMatchesExistingCut,
     selectionCrop,
+    segmentationContour,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
@@ -362,6 +385,26 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
         }
       }
     }
+  }
+
+  // "Adjust crop" silhouette preview: the segmentation contour (subject coords)
+  // mapped into image-client space, drawn smooth and in a distinct green so it
+  // reads as a refined, clickable cut area over the blue selection rectangle.
+  if (
+    segmentationContour &&
+    segmentationContour.length >= 3 &&
+    img.naturalWidth &&
+    img.naturalHeight
+  ) {
+    const fx = img.clientWidth / img.naturalWidth;
+    const fy = img.clientHeight / img.naturalHeight;
+    const pts = segmentationContour.map((p) => ({ x: p.x * fx, y: p.y * fy }));
+    drawSmoothClosedPath(ctx, pts);
+    ctx.fillStyle = "rgba(61,220,132,0.12)";
+    ctx.fill();
+    ctx.lineWidth = 2 * stroke;
+    ctx.strokeStyle = "#3DDC84";
+    ctx.stroke();
   }
 
   if (drawingPath && drawingPath.points.length > 1) {
