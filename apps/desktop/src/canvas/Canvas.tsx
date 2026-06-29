@@ -26,6 +26,7 @@ import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle
 import { useResolvedCanvasSettings } from "@/application/settings/useResolvedCanvasSettings";
 import { useProjectFontTokens } from "@/application/settings/useProjectFontTokens";
 import { ElementFontTokensProvider } from "@/canvas/stage/elementFontTokensContext";
+import { CanvasUiVisibilityProvider } from "@/canvas/CanvasUiVisibilityContext";
 import { useProjectSystemDesign } from "@/application/system-design/useSystemDesign";
 import { ResolvedSystemDesignProvider } from "@/canvas/stage/resolvedSystemDesignContext";
 import { ReferencesBridgeProvider, useReferencesBridge } from "@/canvas/shell/references/ReferencesBridge";
@@ -130,6 +131,22 @@ function CanvasPageContent() {
   const { open: openSearch } = useSearch();
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [treeOpen, setTreeOpen] = useState(true);
+  // Figma-style "Hide UI": collapses all floating chrome to a bare canvas.
+  const [uiHidden, setUiHidden] = useState(false);
+  const panelsOpen = treeOpen || inspectorOpen;
+  const uiVisibility = useMemo(
+    () => ({
+      uiHidden,
+      toggleUiHidden: () => setUiHidden((v) => !v),
+      panelsOpen,
+      togglePanels: () => {
+        const next = !panelsOpen;
+        setTreeOpen(next);
+        setInspectorOpen(next);
+      },
+    }),
+    [uiHidden, panelsOpen],
+  );
   const [activeTool, setActiveTool] = useState<CanvasToolId>("cursor");
   const [canvasExpanded, setCanvasExpanded] = useState(false);
   // Shell chrome controls are per window type (current/sketch/versions/references),
@@ -378,6 +395,35 @@ function CanvasPageContent() {
     closePreview,
     togglePreview,
   } = useCanvasWindows({ versionVariantParam, sceneOwner });
+
+  // Hide a single split pane (mirrors the Panels menu's per-pane "×"), keyed by
+  // window instead of index so the canvas context menu can close the pane it was
+  // opened in.
+  const hideWindow = useCallback(
+    (key: CanvasWindowKey) => {
+      // Extra Current instances ("current-2", …) are owned session state.
+      if (isCurrentKey(key) && key !== "current") {
+        removeExtraCurrent(key);
+        return;
+      }
+      // Any pane — including the primary "current" — is just dropped from the
+      // split. With ≥2 panes left the split continues; below 2 it collapses.
+      const next = normalizedSplitWindows.filter((windowKey) => windowKey !== key);
+      changeCanvasTab(next[0] ?? "current");
+      changeSplitWindows(next);
+      if (next.length < 2) changeSplitMode("none");
+      else if (split === "grid" && next.length < 3) changeSplitMode("vertical");
+    },
+    [normalizedSplitWindows, removeExtraCurrent, changeSplitWindows, changeCanvasTab, changeSplitMode, split],
+  );
+
+  // Only the Current window is live (no feature window enabled, no extra Currents):
+  // the top nav has nothing to switch between, so it's hidden and the window controls
+  // move into the Inspector's Layout tab instead. The canvas also rises to the top.
+  const onlyCurrentWindow =
+    !enabledCanvasTabs.some((tab) => tab !== "current" && tab !== "preview") &&
+    extraCurrents.length === 0;
+  const navbarVisible = !onlyCurrentWindow;
 
   const {
     versionsSubject,
@@ -712,18 +758,65 @@ function CanvasPageContent() {
   // tool on release; only an explicit Hand selection keeps it active.
   const toolbarActiveTool: CanvasToolId = editorPanning ? "hand" : activeTool;
 
+  // When the canvas has risen to the top (only the Current window) and a side panel
+  // is closed, its top-row chrome drops to the bottom corner next to that panel's
+  // reopen toggle: the header beside Layers (left), the Preview beside Inspector (right).
+  const dropHeaderToBottom = onlyCurrentWindow && !treeOpen;
+  const dropPreviewToBottom = onlyCurrentWindow && !inspectorOpen;
+
+  const headerChipClass =
+    "flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[#171717] px-3 py-2 text-[12px] tracking-[0.2px] text-[var(--text-muted)]";
+  const headerChipInner = (
+    <>
+      <Link
+        to={backHref}
+        aria-label="Back"
+        onClick={() => { void flushPendingSave(); }}
+        className="grid shrink-0 place-items-center text-[var(--text-muted)] hover:text-[var(--text)]"
+      >
+        <IconChevronLeft size={14} strokeWidth={1.6} />
+      </Link>
+      <span className="h-3.5 w-px shrink-0 bg-[var(--border)]" />
+      <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">
+        {componentName || screenTitle || projectName}
+      </span>
+      {projectType && (
+        <span className="shrink-0 rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+          {projectType}
+        </span>
+      )}
+      <span className="h-3.5 w-px shrink-0 bg-[var(--border)]" />
+      <SearchToggle onClick={openSearch} />
+    </>
+  );
+
+  const previewLauncher = (
+    <PreviewLauncher
+      previewOpen={previewOpen}
+      onToggle={togglePreview}
+      settings={previewSettings}
+      onSettingsChange={setPreviewSettings}
+      projectType={projectType}
+      compact={!inspectorOpen}
+      menuUp={dropPreviewToBottom}
+    />
+  );
+
   return (
     <ElementFontTokensProvider value={fontTokens ?? null}>
     <ResolvedSystemDesignProvider value={projectSystemDesign.resolved}>
+    <CanvasUiVisibilityProvider value={uiVisibility}>
     <div className="relative h-screen w-screen overflow-hidden bg-[var(--bg)]">
       <CanvasRender
-        treeOpen={treeOpen}
-        inspectorOpen={inspectorOpen}
+        treeOpen={treeOpen && !uiHidden}
+        inspectorOpen={inspectorOpen && !uiHidden}
         split={split}
         activeTab={activeTab}
         enabledTabs={enabledCanvasTabs}
         splitWindows={normalizedSplitWindows}
-        expanded={canvasExpanded}
+        navbarVisible={navbarVisible}
+        onHideWindow={hideWindow}
+        expanded={canvasExpanded || uiHidden}
         activeTool={activeTool}
         currentDocument={currentDocument}
         currentStorageKey={currentStorageKey}
@@ -751,6 +844,7 @@ function CanvasPageContent() {
         sketchResetKey={sketchResetKey}
       />
 
+      {!uiHidden && navbarVisible && (
       <div className="fixed left-1/2 top-3 z-[12] -translate-x-1/2">
         <CanvasTabs
           activeTab={activeTab}
@@ -769,42 +863,19 @@ function CanvasPageContent() {
           onCanvasFeatureChange={updateCanvasFeature}
         />
       </div>
+      )}
 
+      {!uiHidden && !dropHeaderToBottom && (
       <div
-        className="fixed left-3 top-3 z-[5] inline-flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[#171717] px-3 py-2 text-[12px] tracking-[0.2px] text-[var(--text-muted)]"
+        className={`fixed left-3 top-3 z-[5] ${headerChipClass} ${treeOpen ? "w-[300px]" : ""}`}
         style={{ boxShadow: "var(--shadow-pop)" }}
       >
-        <Link
-          to={backHref}
-          aria-label="Back"
-          onClick={() => { void flushPendingSave(); }}
-          className="grid place-items-center text-[var(--text-muted)] hover:text-[var(--text)]"
-        >
-          <IconChevronLeft size={14} strokeWidth={1.6} />
-        </Link>
-        <span className="h-3.5 w-px bg-[var(--border)]" />
-        <span className="font-medium text-[var(--text)]">{projectName}</span>
-        {screenTitle && (
-          <>
-            <span className="h-3.5 w-px bg-[var(--border)]" />
-            <span className="font-normal">{screenTitle}</span>
-          </>
-        )}
-        {componentName && (
-          <>
-            <span className="h-3.5 w-px bg-[var(--border)]" />
-            <span className="font-normal">{componentName}</span>
-          </>
-        )}
-        {projectType && (
-          <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-            {projectType}
-          </span>
-        )}
-        <span className="h-3.5 w-px bg-[var(--border)]" />
-        <SearchToggle onClick={openSearch} />
+        {headerChipInner}
       </div>
+      )}
 
+      {!uiHidden && (
+      <>
       <Tree
         open={treeOpen}
         onClose={() => setTreeOpen(false)}
@@ -909,16 +980,17 @@ function CanvasPageContent() {
         }}
         onClearSketch={clearSketch}
       />
-      <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
+      <div className="fixed bottom-6 left-3 z-[11] flex items-center gap-2">
+        <TreeToggle open={treeOpen} onClick={() => setTreeOpen(true)} />
+        {dropHeaderToBottom && (
+          <div className={headerChipClass} style={{ boxShadow: "var(--shadow-pop)" }}>
+            {headerChipInner}
+          </div>
+        )}
+      </div>
 
       <div className="pointer-events-none fixed bottom-3 right-3 top-3 z-[6] flex flex-col items-end gap-3">
-        <PreviewLauncher
-          previewOpen={previewOpen}
-          onToggle={togglePreview}
-          settings={previewSettings}
-          onSettingsChange={setPreviewSettings}
-          projectType={projectType}
-        />
+        {!dropPreviewToBottom && previewLauncher}
         <div className="flex min-h-0 flex-1">
         <Inspector
           open={inspectorOpen}
@@ -939,11 +1011,14 @@ function CanvasPageContent() {
           ancestorFrames={ancestorFrames}
           onGoToInstance={goToInstanceMaster}
           activeCanvasTab={treeTab}
+          canvasFeatures={canvasFeatures}
+          onCanvasFeatureChange={updateCanvasFeature}
         />
         </div>
       </div>
 
       <div className="fixed bottom-6 right-3 z-[11] flex items-center gap-2">
+        {dropPreviewToBottom && previewLauncher}
         {!inspectorOpen && (
           <FloatingToggle onClick={() => setInspectorOpen(true)} aria="Inspector">
             <IconPanelRight size={13} strokeWidth={1.7} />
@@ -951,7 +1026,10 @@ function CanvasPageContent() {
           </FloatingToggle>
         )}
       </div>
+      </>
+      )}
 
+      {!uiHidden && (
       <div className="fixed bottom-6 left-1/2 z-[10] -translate-x-1/2 flex items-end gap-2">
         <CanvasToolbarNotice />
         <Toolbar
@@ -995,9 +1073,11 @@ function CanvasPageContent() {
           }}
         />
       </div>
+      )}
 
       <VersionModeModal ref={versionModeRef} />
     </div>
+    </CanvasUiVisibilityProvider>
     </ResolvedSystemDesignProvider>
     </ElementFontTokensProvider>
   );

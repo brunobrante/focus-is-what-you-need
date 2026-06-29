@@ -21,6 +21,7 @@ import {
 import { useSubjectCanvasWindow, type SubjectOwner } from "@/canvas/hooks/useSubjectCanvasWindow";
 import type { ShellControlVisibility } from "../inspector/ShellTab";
 import { CanvasStage } from "../../stage/CanvasStage";
+import { useWindowContextMenu, WindowContextMenu } from "../../stage/WindowContextMenu";
 import type { CanvasToolId } from "@/canvas/tools";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
@@ -110,6 +111,7 @@ export function VersionsWindowSurface({
   settings: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
 }) {
+  const versionsMenu = useWindowContextMenu();
   // No version selected (the current subject has no versions yet) → empty state.
   if (!document) {
     return (
@@ -117,6 +119,7 @@ export function VersionsWindowSurface({
         role="button"
         tabIndex={0}
         onClick={onClick}
+        onContextMenu={versionsMenu.onContextMenu}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
@@ -140,6 +143,9 @@ export function VersionsWindowSurface({
             No versions yet
           </span>
         </span>
+        {versionsMenu.menu ? (
+          <WindowContextMenu menu={versionsMenu.menu} onClose={versionsMenu.closeMenu} />
+        ) : null}
       </div>
     );
   }

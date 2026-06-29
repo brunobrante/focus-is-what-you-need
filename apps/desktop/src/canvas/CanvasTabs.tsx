@@ -63,6 +63,9 @@ export function CanvasTabs({
   ];
   const addableTabs = enabledTabs.filter((tab) => !splitWindows.includes(tab));
   const quadrantsEnabled = canSplit && splitWindows.length >= 3;
+  // While split, more than one window is live on the canvas. Tabs use this to mark
+  // which windows are currently shown as panes (beyond the focused one).
+  const splitActive = split !== "none" && splitWindows.length > 1;
   const canAddPane =
     canSplit &&
     split !== "none" &&
@@ -83,8 +86,9 @@ export function CanvasTabs({
       return;
     }
 
-    // Current panes (primary or extra) can't be swapped to a feature window here.
-    if (isCurrentKey(currentWindow)) return;
+    // Extra Current instances ("current-2", …) can't be re-typed to a feature
+    // window; the primary Current pane can.
+    if (isCurrentKey(currentWindow) && currentWindow !== "current") return;
     const next = splitWindows.map((existing, existingIndex) =>
       existingIndex === index ? windowKey : existing,
     );
@@ -101,10 +105,11 @@ export function CanvasTabs({
 
   const removePane = (index: number) => {
     const removed = splitWindows[index];
-    // The primary Current pane is locked; an extra Current is removed through its
-    // owner (session state) which also drops it from the split.
-    if (removed === "current") return;
-    if (isCurrentKey(removed)) {
+    if (!removed) return;
+    // Extra Current instances are removed through their owner (session state),
+    // which also drops them from the split. Every other pane — including the
+    // primary Current — is just dropped here.
+    if (isCurrentKey(removed) && removed !== "current") {
       onRemoveCurrent?.(removed);
       return;
     }
@@ -120,7 +125,7 @@ export function CanvasTabs({
   return (
     <div
       ref={menuRef}
-      className="relative inline-flex items-center gap-0.5 rounded-lg border border-[#282828] bg-[#181818] p-1"
+      className="relative inline-flex h-[42px] items-center gap-0.5 rounded-lg border border-[#282828] bg-[#181818] px-1"
       style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset" }}
     >
       {/* Preview is a special view-only window (launched from above the Inspector);
@@ -130,6 +135,9 @@ export function CanvasTabs({
         const isActive = activeTab === tab;
         const currentTab = isCurrentKey(tab);
         const subject = currentTab ? currentSubjects[tab] : undefined;
+        // This window is currently a pane on the canvas (split mode). The focused
+        // tab is highlighted; the other live panes get an accent dot under them.
+        const onCanvas = splitActive && splitWindows.includes(tab);
         return (
           <div
             key={tab}
@@ -143,12 +151,19 @@ export function CanvasTabs({
               className="rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100"
               style={{
                 background: isActive ? "#2A2A2A" : "transparent",
-                color: isActive ? "#F2F2F2" : "#5A5A5A",
+                color: isActive ? "#F2F2F2" : onCanvas ? "#CFCFCF" : "#5A5A5A",
                 letterSpacing: "0.1px",
               }}
             >
               {windowKeyLabel(tab)}
             </button>
+            {onCanvas && !isActive ? (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
+                style={{ background: "rgba(13,153,255,0.85)" }}
+              />
+            ) : null}
             {currentTab && hoveredCurrent === tab ? (
               <CurrentTabPopover subject={subject} />
             ) : null}
@@ -326,23 +341,22 @@ function SplitPanePicker({
   onChange: (value: CanvasWindowKey) => void;
   onRemove: () => void;
 }) {
-  // A Current pane (primary or extra) can't be re-typed to a feature window: the
-  // select is locked and just shows its label. The primary Current also can't be
-  // removed; extra Currents can.
-  const currentKey = isCurrentKey(value);
-  const removable = value !== "current";
+  // Extra Current instances ("current-2", …) can't be re-typed to another window,
+  // so their select stays locked. The primary Current and feature panes are
+  // swappable, and every pane can be removed.
+  const isExtraCurrent = isCurrentKey(value) && value !== "current";
 
   return (
     <div className="flex h-7 w-full shrink-0 items-center overflow-hidden rounded-md border border-[#2C2C2C] bg-[#202020]">
       <select
-        value={currentKey ? "current" : value}
+        value={value}
         onChange={(event) => onChange(event.target.value as CanvasWindowKey)}
         aria-label={`Split pane ${index + 1}`}
-        disabled={currentKey}
+        disabled={isExtraCurrent}
         className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent pl-2 pr-3 text-[10.5px] font-medium text-[#CFCFCF] outline-none disabled:cursor-default disabled:opacity-100"
       >
-        {currentKey ? (
-          <option value="current">{windowKeyLabel(value)}</option>
+        {isExtraCurrent ? (
+          <option value={value}>{windowKeyLabel(value)}</option>
         ) : (
           enabledTabs.map((tab) => (
             <option key={tab} value={tab}>
@@ -351,16 +365,14 @@ function SplitPanePicker({
           ))
         )}
       </select>
-      {removable ? (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="grid h-7 w-6 place-items-center border-0 border-l border-[#2C2C2C] bg-transparent text-[#6B6B6B] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
-          aria-label={`Remove split pane ${index + 1}`}
-        >
-          <CloseIcon />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="grid h-7 w-6 place-items-center border-0 border-l border-[#2C2C2C] bg-transparent text-[#6B6B6B] transition-colors duration-100 hover:bg-[#2A2A2A] hover:text-[#CFCFCF]"
+        aria-label={`Remove split pane ${index + 1}`}
+      >
+        <CloseIcon />
+      </button>
     </div>
   );
 }

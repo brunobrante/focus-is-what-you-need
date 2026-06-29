@@ -15,6 +15,7 @@ import {
   AddReferenceModal,
   type AddReferenceModalHandle,
 } from "@/components/modals/AddReferenceModal";
+import { useWindowContextMenu, WindowContextMenu } from "@/canvas/stage/WindowContextMenu";
 
 // The current canvas subject: the screen or component being edited. The
 // references window shows references attached to exactly this subject, and Add
@@ -64,10 +65,11 @@ export function CanvasReferencesWindow({
   const removeOne = (id: string) =>
     void removeReferenceFromOwner(id, context.ownerType, context.ownerId);
 
-  const stop = (event: React.MouseEvent) => event.stopPropagation();
+  const { menu, onContextMenu, closeMenu } = useWindowContextMenu();
 
   return (
     <div
+      onContextMenu={onContextMenu}
       className="relative flex flex-1 flex-col overflow-hidden rounded-xl border text-left transition-all duration-150"
       style={{
         borderColor: active && showActiveBorder ? "rgba(13,153,255,0.55)" : "var(--border)",
@@ -77,10 +79,13 @@ export function CanvasReferencesWindow({
             ? "0 0 0 1px rgba(13,153,255,0.2) inset, 0 8px 32px rgba(0,0,0,0.4)"
             : "0 0 0 1px rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.4)",
       }}
-      onClick={onClick}
+      // Focus on pointer-down capture so a click anywhere — including over cards
+      // or the inspector, whose handlers stop click propagation — still focuses
+      // this window.
+      onPointerDownCapture={() => onClick?.()}
     >
       {/* Toolbar */}
-      <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5" onClick={stop}>
+      <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5">
         {selected ? (
           <button
             type="button"
@@ -110,7 +115,7 @@ export function CanvasReferencesWindow({
       {/* Body */}
       {selected ? (
         /* Inspector — image (zoom) or stack (tree + selection), inside the canvas. */
-        <div className="absolute inset-0" onClick={stop}>
+        <div className="absolute inset-0">
           <CanvasReferenceInspector shellZoomVisibility={shellZoomVisibility} expanded={expanded} />
         </div>
       ) : references.length === 0 ? (
@@ -133,7 +138,7 @@ export function CanvasReferencesWindow({
           </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-14" onClick={stop}>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-14">
           <div
             className="grid gap-3"
             style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
@@ -161,6 +166,8 @@ export function CanvasReferencesWindow({
         defaultComponentId={context.defaultComponentId}
         onAdd={(input) => createOrAttachReference(input)}
       />
+
+      {menu ? <WindowContextMenu menu={menu} onClose={closeMenu} /> : null}
     </div>
   );
 }

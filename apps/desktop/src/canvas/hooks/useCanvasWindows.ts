@@ -117,8 +117,11 @@ export function useCanvasWindows({
       if (nextWindows.filter((windowKey) => windowKey !== "preview").length < 2) {
         setSplit("none");
       }
-      setActiveTab((tab) => (tab === key ? "current" : tab));
-      setTreeTab((tab) => (tab === key ? "current" : tab));
+      // Focus a window that will still be visible — the split may no longer
+      // contain "current" (it isn't mandatory anymore).
+      const nextFocus = nextWindows.find((windowKey) => windowKey !== "preview") ?? "current";
+      setActiveTab((tab) => (tab === key ? nextFocus : tab));
+      setTreeTab((tab) => (tab === key ? nextFocus : tab));
     },
     [splitWindows],
   );

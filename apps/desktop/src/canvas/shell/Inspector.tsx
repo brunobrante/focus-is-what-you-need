@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { windowKeyLabel, type CanvasWindowKey } from "@/canvas/canvasUtils";
+import {
+  windowKeyLabel,
+  type CanvasWindowKey,
+  type CanvasFeatureFlags,
+  type CanvasFeatureWindowType,
+} from "@/canvas/canvasUtils";
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import type { EditorAction } from "@/canvas/engine/store";
 import {
@@ -25,6 +30,7 @@ import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils
 import { getInstanceRootId } from "@/canvas/engine/geometry";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { CanvasTab } from "./inspector/CanvasTab";
+import { LayoutTab } from "./inspector/LayoutTab";
 import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
 import { EmptyState } from "./inspector/InsComponents";
 import { ReferencesElementTab } from "./inspector/ReferencesElementTab";
@@ -58,11 +64,14 @@ type InspectorProps = {
   /** The focused canvas window. When "references" the Element tab inspects the
    * selected reference stack node (via ReferencesBridge) instead of a canvas element. */
   activeCanvasTab?: CanvasWindowKey;
+  /** Window controls for the Layout tab (always shown when provided). */
+  canvasFeatures?: CanvasFeatureFlags;
+  onCanvasFeatureChange?: (feature: CanvasFeatureWindowType, enabled: boolean) => void;
 };
 
 const EMPTY_ANCESTOR_OVERLAY: AncestorOverlayState = { enabled: false, items: {} };
 
-type InspectorTab = "element" | "canvas" | "shell";
+type InspectorTab = "element" | "canvas" | "shell" | "layout";
 
 export function Inspector({
   open,
@@ -84,8 +93,16 @@ export function Inspector({
   onShellZoomVisibilityChange,
   onShellExpandVisibilityChange,
   openShellTabSignal,
+  canvasFeatures,
+  onCanvasFeatureChange,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("element");
+  const layoutTabAvailable = !!canvasFeatures && !!onCanvasFeatureChange;
+  // The Layout tab vanishes once a second window is enabled (the nav takes over) —
+  // fall back to Element so the body never points at a missing tab.
+  useEffect(() => {
+    if (!layoutTabAvailable && activeTab === "layout") setActiveTab("element");
+  }, [layoutTabAvailable, activeTab]);
   const prevShellTabSignalRef = useRef(openShellTabSignal ?? 0);
   useEffect(() => {
     if (openShellTabSignal !== undefined && openShellTabSignal !== prevShellTabSignalRef.current) {
@@ -259,16 +276,17 @@ export function Inspector({
       </div>
 
       <div className="flex shrink-0 border-b border-[#2C2C2C] px-2">
-        {(isReferencesActive
-          ? ([
+        {((isReferencesActive
+          ? [
               { id: "element", label: "Element" },
               { id: "shell", label: "Shell" },
-            ] as const)
-          : ([
+            ]
+          : [
               { id: "element", label: "Element" },
               { id: "canvas", label: "Frame" },
               { id: "shell", label: "Shell" },
-            ] as const)
+              ...(layoutTabAvailable ? [{ id: "layout", label: "Layout" }] : []),
+            ]) as { id: InspectorTab; label: string }[]
         ).map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -305,6 +323,8 @@ export function Inspector({
           ) : (
             <ReferencesElementTab />
           )
+        ) : activeTab === "layout" && canvasFeatures && onCanvasFeatureChange ? (
+          <LayoutTab canvasFeatures={canvasFeatures} onCanvasFeatureChange={onCanvasFeatureChange} />
         ) : !document ? (
           <EmptyState title="No active canvas" body="Select a canvas window to inspect." />
         ) : activeTab === "canvas" ? (

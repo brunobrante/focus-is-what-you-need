@@ -467,20 +467,65 @@ Differences from Screen Detail:
 
 Full-screen visual editor with floating UI layers.
 
-**Center**: Canvas rendering area with a grid background pattern.
+**Center**: Canvas rendering area with a grid background pattern. When the **top nav
+is hidden** (only the Current window enabled) the canvas reaches up to the top margin
+and the header/preview chrome floats over it; once the nav is shown (a feature window
+enabled) it descends below that top row so the nav never covers a pane's top.
+
+**Right-click (canvas context menu)**: Copy / Paste / Duplicate · ordering (Bring to
+Front/Forward, Send Backward/Back) · Lock/Hide · Delete · **Hide this window** (only
+while split, on **any** pane including the primary Current — drops that pane from the
+split; with two or more panes left the split keeps going, otherwise it collapses to a
+single window) · **Open / Close panels**
+(toggles both side panels — Layers + Inspector — together; with them closed the
+header chip and Preview launcher collapse to their compact forms) · and a final
+**Hide UI** toggle (Figma-style). **Hide UI** collapses **all** floating chrome — the
+top-left header chip, the top-center canvas tabs/nav, the Layers sidebar (and its
+toggle), the Preview launcher, the Inspector (and its toggle), and the bottom toolbar
+— and **forces the canvas to its expanded (full-bleed) state** while hidden, leaving a
+bare canvas. The menu remains reachable on right-click, where the item reads **Show
+UI** to restore the chrome (panels return to their prior open/closed state, and the
+canvas returns to its prior expand state).
+
+Windows without an editable canvas — the **References** window and the **empty
+Versions** state — still get a right-click menu (even with no content), but only the
+window/UI group: **Hide this window** (when split) · **Open / Close panels** · **Hide
+UI**. The editing actions (Copy/Paste/ordering/Delete) are omitted there.
 
 **Top-left**:
-- Back button with breadcrumb: Project > Screen or Component name
-- Search toggle button — opens the [global search / command palette](#global-search--command-palette)
+- A compact chip: back button · the current subject's name (component / screen /
+  project, truncated) · the project-type badge · search toggle (opens the
+  [global search / command palette](#global-search--command-palette)). No full
+  breadcrumb trail.
+- It **tracks the Layers (left) sidebar**: with Layers open the chip is fixed to the
+  sidebar width (300px) so it lines up above the panel; when Layers is **closed** it
+  hugs its content.
+- When the canvas has risen to the top (only Current enabled) **and** Layers is closed,
+  the chip **drops to the bottom-left corner, beside the "Layers" reopen toggle**, so
+  the top stays clear. The Preview launcher does the same on the right (drops beside the
+  "Inspector" reopen toggle when the Inspector is closed).
 
 **Top-center**:
 - Canvas tabs: Current | Sketch | References (Versions when enabled)
+- The whole nav is **hidden when only Current is enabled** (no feature window, no extra
+  Current) — there is nothing to switch between. Windows are still enabled from the
+  Inspector's always-present **Layout** tab (see Right panel); enabling a feature window
+  there brings the nav back.
+- The focused window's tab is highlighted. While **split**, every window that is
+  currently a pane on the canvas is also marked — the non-focused live panes show a
+  small accent dot under their tab and brighter text, so you can see at a glance which
+  windows are open versus merely available.
 - Split mode selector: None | Vertical | Grid (icon buttons)
 - The Current tab always renders the opened screen/component itself; a screen
   **version** is never rendered in Current — it opens in the Versions window.
 - **Preview is not a nav tab and not a Features toggle** — it is launched from the
   Preview button above the Inspector (see below). It still appears as a selectable /
   addable pane in the split ("Panels") menu once it is open.
+- In the **Panels** menu every pane has a dropdown to swap which window it shows and a
+  **×** to remove it — **including the primary Current** (current is no longer forced
+  into a split). Only **extra Currents** (`current-2`, …) keep a locked dropdown, since
+  they can't be re-typed to a feature window; they are still removable. Removing a pane
+  keeps the split alive while ≥2 panes remain, otherwise it collapses to one window.
 
 **Multiple Current windows**:
 - While split, the **Panels** menu offers **Add Current** — it adds another Current
@@ -847,9 +892,15 @@ To edit the contents, open the master or detach the instance first.
 **Right panel** (collapsible):
 - **Preview launcher bar** sits above the Inspector (a play button + settings
   dropdown); the Inspector is shortened to make room. See the Preview window
-  section above.
+  section above. It **tracks the Inspector**: with the Inspector open it is a full
+  280px bar ("Preview"); when the Inspector is **closed** it collapses to an
+  icon-only pill (play glyph + caret) so it does not float as a lonely wide bar.
 - Inspector panel
-- Tabs: Element | Canvas | Shell
+- Tabs: Element | Frame | Shell | **Layout**. The Layout tab is always present and
+  holds the **Windows** toggles (enable Versions / Sketch / References) — the same
+  controls the nav's "…" Features menu offers. It's the only way to enable a window
+  while the top nav is hidden (only Current), and it stays available once the nav is
+  back too.
 - Properties editor: X / Y position, W / H size, rotation, opacity
 - Visibility toggles: device, back, zoom, expand
 - When nothing is selected: canvas-level properties (background, grid settings)

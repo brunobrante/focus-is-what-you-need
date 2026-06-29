@@ -166,7 +166,10 @@ export function normalizeCanvasSplitWindows(
     }
   }
 
-  if (enabledWindowTypes.includes("current") && !normalized.some(isCurrentKey)) {
+  // "current" is NOT mandatory: a split may consist of secondary windows only
+  // (e.g. after hiding the current pane from a 3-way split). It is only used to
+  // backfill a split that would otherwise have fewer than two panes.
+  if (normalized.length < 2 && enabledWindowTypes.includes("current") && !normalized.some(isCurrentKey)) {
     normalized.unshift("current");
   }
 

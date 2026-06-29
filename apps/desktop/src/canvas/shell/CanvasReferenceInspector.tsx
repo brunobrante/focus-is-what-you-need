@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { IconImage } from "@/components/icons";
-import { ZoomControls } from "@/components/screen/ZoomControls";
+import { ZoomControl } from "@/canvas/shell/ZoomControl";
 import { useStepZoom } from "@/components/screen/useStepZoom";
 import { CanvasScrollbars } from "@/components/ui/CanvasScrollbars";
 import { SceneCanvasInspector } from "@/components/screen/SceneCanvasInspector";
@@ -94,13 +94,13 @@ export function CanvasReferenceInspector({
       </div>
 
       {zoomVisible ? (
-        <ZoomControls
-          index={zoomCtl.index}
-          onZoomIn={zoomCtl.zoomIn}
-          onZoomOut={zoomCtl.zoomOut}
-          onReset={zoomCtl.reset}
-          position="left-3 bottom-3"
-        />
+        <div className="absolute bottom-3 left-3 z-[10]">
+          <ZoomControl
+            zoom={zoomCtl.zoom}
+            setZoom={zoomCtl.setZoom}
+            limits={getViewportZoomLimits("frame")}
+          />
+        </div>
       ) : null}
 
       <CanvasScrollbars x={zoomCtl.scroll.x} y={zoomCtl.scroll.y} />

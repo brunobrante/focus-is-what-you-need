@@ -10,6 +10,8 @@ import {
 } from "@/canvas/engine/actions";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { useEditor } from "@/canvas/engine/store";
+import { useCanvasUiVisibility } from "@/canvas/CanvasUiVisibilityContext";
+import { useCanvasWindow } from "@/canvas/CanvasWindowContext";
 import type { CanvasDocument } from "@/canvas/engine/types";
 
 export type ContextMenuState = {
@@ -27,6 +29,9 @@ const modLabel = isMac ? "⌘" : "Ctrl+";
 
 export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<ContextMenuState>; onClose: () => void }) {
   const { state, dispatch, clipboard } = useEditor();
+  const { uiHidden, toggleUiHidden, panelsOpen, togglePanels } = useCanvasUiVisibility();
+  const windowInfo = useCanvasWindow();
+  const canHideWindow = !!windowInfo && windowInfo.splitActive;
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useDismissable(true, onClose, [menuRef], { capture: true });
@@ -73,6 +78,14 @@ export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<Context
       { type: "separator" as const },
     ] : []),
     { type: "action", label: "Delete", shortcut: "Del", disabled: !hasSelection, action: () => commit(deleteElements(state.document, selectedIds), []) },
+    { type: "separator" },
+    ...(canHideWindow
+      ? [{ type: "action" as const, label: "Hide this window", action: () => { windowInfo!.onHideWindow(windowInfo!.windowKey); onClose(); } }]
+      : []),
+    ...(uiHidden
+      ? []
+      : [{ type: "action" as const, label: panelsOpen ? "Close panels" : "Open panels", action: () => { togglePanels(); onClose(); } }]),
+    { type: "action", label: uiHidden ? "Show UI" : "Hide UI", action: () => { toggleUiHidden(); onClose(); } },
   ];
 
   return (

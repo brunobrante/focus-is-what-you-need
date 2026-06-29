@@ -32,6 +32,7 @@ import {
 } from "./shellControls";
 import { CanvasReferencesWindow, type CanvasReferencesContext } from "./CanvasReferencesWindow";
 import { CanvasPreviewSurface } from "./PreviewSurface";
+import { CanvasWindowProvider } from "@/canvas/CanvasWindowContext";
 import type { CanvasToolId } from "@/canvas/tools";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
@@ -63,6 +64,7 @@ export function CanvasRender({
   activeTab = "current",
   enabledTabs = ["current", "sketch"],
   splitWindows = ["current", "sketch"],
+  navbarVisible = true,
   expanded,
   activeTool,
   currentDocument,
@@ -83,6 +85,7 @@ export function CanvasRender({
   onClosePreview,
   onCurrentDocumentChange,
   onActiveCanvasChange,
+  onHideWindow,
   onToggleExpand,
   onBackToParent,
   settings = DEFAULT_GLOBAL_SETTINGS,
@@ -96,6 +99,7 @@ export function CanvasRender({
   activeTab?: CanvasWindowKey;
   enabledTabs?: readonly CanvasWindowType[];
   splitWindows?: readonly CanvasWindowKey[];
+  navbarVisible?: boolean;
   expanded: boolean;
   activeTool?: string;
   currentDocument?: CanvasDocument;
@@ -116,6 +120,7 @@ export function CanvasRender({
   onClosePreview?: () => void;
   onCurrentDocumentChange?: (document: CanvasDocument) => void;
   onActiveCanvasChange?: (windowKey: CanvasWindowKey) => void;
+  onHideWindow?: (windowKey: CanvasWindowKey) => void;
   onToggleExpand?: () => void;
   onBackToParent?: () => void;
   settings?: GlobalSettings;
@@ -123,9 +128,18 @@ export function CanvasRender({
   onOpenSelectedComponentShortcut?: () => boolean | void;
   sketchResetKey?: number;
 }) {
+  const normalizedSplitWindows: CanvasSplitWindows = normalizeCanvasSplitWindows(
+    splitWindows,
+    enabledTabs,
+  );
+  const splitEnabled = split !== "none" && normalizedSplitWindows.length > 1;
+
   const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + TREE_WIDTH + GAP      : PANEL_MARGIN);
   const right  = expanded ? 0 : (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP : PANEL_MARGIN);
-  const top    = expanded ? 0 : HEADER_HEIGHT;
+  // With the top nav hidden (only the Current window), the canvas reaches up to the
+  // top margin and the header/preview chrome just floats over it. Once the nav is
+  // shown it descends below that row so the nav never covers a pane's top.
+  const top    = expanded ? 0 : (navbarVisible ? HEADER_HEIGHT : PANEL_MARGIN);
   const bottom = expanded ? 0 : BOTTOM_BAR_HEIGHT;
 
   const btnTop   = expanded ? HEADER_HEIGHT + PANEL_MARGIN : PANEL_MARGIN;
@@ -161,11 +175,6 @@ export function CanvasRender({
   const isKeyRenderable = (key: CanvasWindowKey) =>
     isCurrentKey(key) || enabledTabs.includes(windowTypeOfKey(key));
   const selectedTab = isKeyRenderable(activeTab) ? activeTab : "current";
-  const normalizedSplitWindows: CanvasSplitWindows = normalizeCanvasSplitWindows(
-    splitWindows,
-    enabledTabs,
-  );
-  const splitEnabled = split !== "none" && normalizedSplitWindows.length > 1;
   const renderedWindows = splitEnabled ? normalizedSplitWindows : [selectedTab];
   const activeWindow = renderedWindows.includes(selectedTab) ? selectedTab : renderedWindows[0];
   // Each surface reads its own window type's controls; split forces device/zoom off.
@@ -325,6 +334,15 @@ export function CanvasRender({
     // reaches here is a missing case to handle above, not something to coerce (SHELL-12).
     return null;
   };
+  // Wrap every pane with its window identity so the (deeply-nested) canvas context
+  // menu can offer "Hide this window" for the exact pane it was opened in.
+  const renderPane = (windowKey: CanvasWindowKey, active: boolean, showActiveBorder: boolean) => (
+    <CanvasWindowProvider
+      value={{ windowKey, splitActive: splitEnabled, onHideWindow: onHideWindow ?? (() => {}) }}
+    >
+      {renderWindowSurface(windowKey, active, showActiveBorder)}
+    </CanvasWindowProvider>
+  );
   const useGridSplit = split === "grid" && renderedWindows.length >= 3;
 
   return (
@@ -352,13 +370,13 @@ export function CanvasRender({
               className="flex min-h-0 min-w-0 flex-1"
               style={gridPaneStyle(index, renderedWindows.length)}
             >
-              {renderWindowSurface(windowKey, activeWindow === windowKey, true)}
+              {renderPane(windowKey, activeWindow === windowKey, true)}
             </div>
           ))}
         </div>
       ) : (
         <div className="absolute inset-0 flex">
-          {renderWindowSurface(selectedTab, true, false)}
+          {renderPane(selectedTab, true, false)}
         </div>
       )}
 

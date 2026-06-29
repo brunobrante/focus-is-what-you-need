@@ -16,12 +16,18 @@ export function PreviewLauncher({
   settings,
   onSettingsChange,
   projectType,
+  compact = false,
+  menuUp = false,
 }: {
   previewOpen: boolean;
   onToggle: () => void;
   settings: PreviewSettings;
   onSettingsChange: (next: PreviewSettings) => void;
   projectType: ProjectType;
+  /** When the Inspector below is closed, collapse to an icon-sized pill. */
+  compact?: boolean;
+  /** Open the settings popover upward — used when the launcher sits at the bottom. */
+  menuUp?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -31,14 +37,20 @@ export function PreviewLauncher({
   return (
     <div
       ref={rootRef}
-      className="pointer-events-auto relative flex h-9 w-[280px] shrink-0 items-stretch gap-1 rounded-xl border border-[#2C2C2C] bg-[#171717] p-1 text-[#F2F2F2]"
+      className={`pointer-events-auto relative flex h-[42px] ${compact ? "" : "w-[280px]"} shrink-0 items-stretch gap-1 rounded-xl border border-[#2C2C2C] bg-[#171717] p-1 text-[#F2F2F2]`}
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
       <button
         type="button"
         onClick={onToggle}
         aria-pressed={previewOpen}
-        className="flex flex-1 items-center justify-center gap-1.5 rounded-md text-[12px] font-medium transition-colors duration-100"
+        aria-label={compact ? (previewOpen ? "Previewing" : "Preview") : undefined}
+        title={compact ? (previewOpen ? "Previewing" : "Preview") : undefined}
+        className={
+          compact
+            ? "grid aspect-square h-full place-items-center rounded-md transition-colors duration-100"
+            : "flex flex-1 items-center justify-center gap-1.5 rounded-md text-[12px] font-medium transition-colors duration-100"
+        }
         style={{
           background: previewOpen ? "rgba(13,153,255,0.18)" : "#202020",
           color: previewOpen ? "#7CC4FF" : "#CFCFCF",
@@ -46,7 +58,7 @@ export function PreviewLauncher({
         }}
       >
         <IconPlay size={12} />
-        {previewOpen ? "Previewing" : "Preview"}
+        {compact ? null : previewOpen ? "Previewing" : "Preview"}
       </button>
 
       <button
@@ -62,7 +74,7 @@ export function PreviewLauncher({
 
       {menuOpen ? (
         <div
-          className="absolute right-0 top-[calc(100%+6px)] z-[30] w-[240px] overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] p-2 text-[#F2F2F2]"
+          className={`absolute right-0 ${menuUp ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"} z-[30] w-[240px] overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] p-2 text-[#F2F2F2]`}
           style={{ boxShadow: "0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03) inset" }}
         >
           <Section title="Size">
