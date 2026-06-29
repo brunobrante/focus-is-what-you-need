@@ -526,6 +526,15 @@ UI**. The editing actions (Copy/Paste/ordering/Delete) are omitted there.
   into a split). Only **extra Currents** (`current-2`, …) keep a locked dropdown, since
   they can't be re-typed to a feature window; they are still removable. Removing a pane
   keeps the split alive while ≥2 panes remain, otherwise it collapses to one window.
+- **Resizable panes**: split panes are no longer fixed to an equal share — an 8px
+  drag strip sits between adjacent panes. **Vertical** split → drag the vertical
+  dividers to re-proportion the columns; **Horizontal** → drag the horizontal
+  dividers between the stacked rows; **Grid** (2×2 for four panes, full-width bottom
+  cell for three) is a row/column mesh — drag the divider **between the two rows**
+  to re-proportion vertically and the divider **within a row** to re-proportion its
+  columns. Each pane has a 15% minimum. Built on shadcn's `resizable`
+  (`react-resizable-panels`). Sizes are session-only — switching layout or
+  adding/removing a pane resets panes to an equal split.
 
 **Multiple Current windows**:
 - While split, the **Panels** menu offers **Add Current** — it adds another Current

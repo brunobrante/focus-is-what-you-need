@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   IconExpand,
 } from "@/components/icons";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 
 import { CURRENT_CANVAS_STORAGE_KEY, SKETCH_CANVAS_STORAGE_KEY, VERSIONS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import { createDraftDocument } from "@/canvas/engine/actions";
@@ -51,6 +56,11 @@ const PANEL_MARGIN = 12;
 
 const HEADER_HEIGHT = 64;
 const BOTTOM_BAR_HEIGHT = 88;
+
+// Split panes sit flush against a transparent 8px drag strip that stands in for
+// the old `gap-2` spacing — invisible, but grabbable to resize adjacent panes.
+const SPLIT_HANDLE =
+  "w-2 bg-transparent data-[panel-group-direction=vertical]:h-2 data-[panel-group-direction=vertical]:w-full";
 
 type CanvasParentTarget = {
   name: string;
@@ -349,6 +359,31 @@ export function CanvasRender({
   );
   const useGridSplit = split === "grid" && renderedWindows.length >= 3;
 
+  // Each pane fills its ResizablePanel track. Handles are an 8px transparent
+  // strip so they read as the old `gap-2` spacing while staying draggable.
+  const paneCell = (windowKey: CanvasWindowKey) => (
+    <div className="flex h-full w-full min-h-0 min-w-0">
+      {renderPane(windowKey, activeWindow === windowKey, true)}
+    </div>
+  );
+  // A horizontal row of panes; a single key renders bare (no inner group/handle),
+  // which gives the 3-pane grid its full-width bottom cell.
+  const paneRow = (keys: CanvasWindowKey[], groupId: string) =>
+    keys.length === 1 ? (
+      paneCell(keys[0])
+    ) : (
+      <ResizablePanelGroup direction="horizontal" id={groupId}>
+        {keys.map((key, index) => (
+          <Fragment key={key}>
+            {index > 0 && <ResizableHandle className={SPLIT_HANDLE} />}
+            <ResizablePanel id={key} order={index} defaultSize={100 / keys.length} minSize={15}>
+              {paneCell(key)}
+            </ResizablePanel>
+          </Fragment>
+        ))}
+      </ResizablePanelGroup>
+    );
+
   return (
     <div
       className="fixed z-[2]"
@@ -358,25 +393,40 @@ export function CanvasRender({
       }}
     >
       {splitEnabled ? (
-        <div
-          className={
-            useGridSplit
-              ? "absolute inset-0 grid gap-2"
-              : split === "horizontal"
-                ? "absolute inset-0 flex flex-col gap-2"
-                : "absolute inset-0 flex gap-2"
-          }
-          style={useGridSplit ? { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" } : undefined}
-        >
-          {renderedWindows.map((windowKey, index) => (
-            <div
-              key={windowKey}
-              className="flex min-h-0 min-w-0 flex-1"
-              style={gridPaneStyle(index, renderedWindows.length)}
+        <div className="absolute inset-0">
+          {useGridSplit ? (
+            // 2×2 grid: an outer vertical group of two rows, each a horizontal
+            // group. With 3 panes the bottom row holds a single full-width pane.
+            <ResizablePanelGroup direction="vertical" id="canvas-split-grid">
+              <ResizablePanel id="canvas-split-grid-top" order={0} defaultSize={50} minSize={15}>
+                {paneRow(renderedWindows.slice(0, 2), "canvas-split-grid-top-row")}
+              </ResizablePanel>
+              <ResizableHandle className={SPLIT_HANDLE} />
+              <ResizablePanel id="canvas-split-grid-bottom" order={1} defaultSize={50} minSize={15}>
+                {paneRow(renderedWindows.slice(2), "canvas-split-grid-bottom-row")}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            // Vertical split → a row of panes; horizontal split → a column.
+            <ResizablePanelGroup
+              direction={split === "horizontal" ? "vertical" : "horizontal"}
+              id="canvas-split-linear"
             >
-              {renderPane(windowKey, activeWindow === windowKey, true)}
-            </div>
-          ))}
+              {renderedWindows.map((windowKey, index) => (
+                <Fragment key={windowKey}>
+                  {index > 0 && <ResizableHandle className={SPLIT_HANDLE} />}
+                  <ResizablePanel
+                    id={windowKey}
+                    order={index}
+                    defaultSize={100 / renderedWindows.length}
+                    minSize={15}
+                  >
+                    {paneCell(windowKey)}
+                  </ResizablePanel>
+                </Fragment>
+              ))}
+            </ResizablePanelGroup>
+          )}
         </div>
       ) : (
         <div className="absolute inset-0 flex">
@@ -396,10 +446,6 @@ export function CanvasRender({
   );
 }
 
-function gridPaneStyle(index: number, count: number): CSSProperties | undefined {
-  if (count === 3 && index === 2) return { gridColumn: "1 / span 2" };
-  return undefined;
-}
 
 
 function ExpandButton({
