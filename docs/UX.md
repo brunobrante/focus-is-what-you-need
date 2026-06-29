@@ -497,9 +497,9 @@ UI**. The editing actions (Copy/Paste/ordering/Delete) are omitted there.
   project, truncated) · the project-type badge · search toggle (opens the
   [global search / command palette](#global-search--command-palette)). No full
   breadcrumb trail.
-- It **tracks the Layers (left) sidebar**: with Layers open the chip is fixed to the
-  sidebar width (300px) so it lines up above the panel; when Layers is **closed** it
-  hugs its content.
+- It **tracks the Layers (left) sidebar**: with Layers open the chip matches the
+  sidebar's current width (default 300px, resizable) so it lines up above the panel;
+  when Layers is **closed** it hugs its content.
 - When the canvas has risen to the top (only Current enabled) **and** Layers is closed,
   the chip **drops to the bottom-left corner, beside the "Layers" reopen toggle**, so
   the top stays clear. The Preview launcher does the same on the right (drops beside the
@@ -858,7 +858,10 @@ dragged or resized** — only the instance **root** can be moved/resized/detache
 banner + "Ou clique aqui" link to open the master), so editing is blocked from every surface.
 To edit the contents, open the master or detach the instance first.
 
-**Left panel** (collapsible):
+**Left panel** (collapsible, resizable):
+- **Width is adjustable** by dragging the panel's inner (right) edge — default
+  **300px**, clamped **240–480px**. Width is session-only (resets on reload); the
+  canvas inset and the top-left chip track it live.
 - Layers / tree panel
 - Hierarchical list of nodes, each with: type icon, node name
 - Per-item controls: visibility toggle (eye icon), lock toggle (padlock icon), drag handle for reordering
@@ -889,7 +892,10 @@ To edit the contents, open the master or detach the instance first.
   - While a filter is active, reordering (drag) is disabled and an empty state
     ("Nenhuma camada encontrada") shows when nothing matches.
 
-**Right panel** (collapsible):
+**Right panel** (collapsible, resizable):
+- **Width is adjustable** by dragging the panel's inner (left) edge — default
+  **280px**, clamped **240–420px**. Width is session-only (resets on reload); the
+  canvas inset tracks it live.
 - **Preview launcher bar** sits above the Inspector (a play button + settings
   dropdown); the Inspector is shortened to make room. See the Preview window
   section above. It **tracks the Inspector**: with the Inspector open it is a full

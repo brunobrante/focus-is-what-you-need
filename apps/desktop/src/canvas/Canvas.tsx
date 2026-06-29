@@ -75,6 +75,14 @@ function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean 
   return true;
 }
 
+// Sidebar resize bounds (session-only). Defaults preserve the prior fixed sizes.
+const TREE_DEFAULT_WIDTH = 300;
+const TREE_MIN_WIDTH = 240;
+const TREE_MAX_WIDTH = 480;
+const INSPECTOR_DEFAULT_WIDTH = 280;
+const INSPECTOR_MIN_WIDTH = 240;
+const INSPECTOR_MAX_WIDTH = 420;
+
 export function CanvasPage() {
   return (
     <EditorBridgeProvider>
@@ -131,6 +139,11 @@ function CanvasPageContent() {
   const { open: openSearch } = useSearch();
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [treeOpen, setTreeOpen] = useState(true);
+  // Session-only sidebar widths. Defaults match the historical fixed sizes; a
+  // drag handle on each panel's inner edge mutates these and the canvas inset
+  // recomputes from them. Not persisted — they reset on reload by design.
+  const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_WIDTH);
+  const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT_WIDTH);
   // Figma-style "Hide UI": collapses all floating chrome to a bare canvas.
   const [uiHidden, setUiHidden] = useState(false);
   const panelsOpen = treeOpen || inspectorOpen;
@@ -810,6 +823,8 @@ function CanvasPageContent() {
       <CanvasRender
         treeOpen={treeOpen && !uiHidden}
         inspectorOpen={inspectorOpen && !uiHidden}
+        treeWidth={treeWidth}
+        inspectorWidth={inspectorWidth}
         split={split}
         activeTab={activeTab}
         enabledTabs={enabledCanvasTabs}
@@ -867,8 +882,8 @@ function CanvasPageContent() {
 
       {!uiHidden && !dropHeaderToBottom && (
       <div
-        className={`fixed left-3 top-3 z-[5] ${headerChipClass} ${treeOpen ? "w-[300px]" : ""}`}
-        style={{ boxShadow: "var(--shadow-pop)" }}
+        className={`fixed left-3 top-3 z-[5] ${headerChipClass}`}
+        style={{ boxShadow: "var(--shadow-pop)", width: treeOpen ? treeWidth : undefined }}
       >
         {headerChipInner}
       </div>
@@ -879,6 +894,10 @@ function CanvasPageContent() {
       <Tree
         open={treeOpen}
         onClose={() => setTreeOpen(false)}
+        width={treeWidth}
+        minWidth={TREE_MIN_WIDTH}
+        maxWidth={TREE_MAX_WIDTH}
+        onResize={setTreeWidth}
         componentName={
           treeExtraCurrent
             ? (currentSubjects[treeExtraCurrent.key]?.kind === "component" ? currentSubjects[treeExtraCurrent.key]?.name : undefined)
@@ -995,6 +1014,10 @@ function CanvasPageContent() {
         <Inspector
           open={inspectorOpen}
           onClose={() => setInspectorOpen(false)}
+          width={inspectorWidth}
+          minWidth={INSPECTOR_MIN_WIDTH}
+          maxWidth={INSPECTOR_MAX_WIDTH}
+          onResize={setInspectorWidth}
           shellDeviceVisibility={activeShellControls.device}
           shellBackVisibility={activeShellControls.back}
           shellZoomVisibility={activeShellControls.zoom}

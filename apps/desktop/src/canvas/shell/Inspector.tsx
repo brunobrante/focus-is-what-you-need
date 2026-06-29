@@ -39,10 +39,15 @@ import { useReferencesBridge } from "@/canvas/shell/references/ReferencesBridge"
 import { findStackNode } from "@/routes/references/lib/stackHelpers";
 import { TypeIcon } from "./tree/TypeIcon";
 import { IconClose, IconEllipse, IconImage } from "@/components/icons";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 
 type InspectorProps = {
   open: boolean;
   onClose: () => void;
+  width: number;
+  minWidth: number;
+  maxWidth: number;
+  onResize: (width: number) => void;
   editor?: EditorBridgeValue | null;
   shellDeviceVisibility: ShellControlVisibility;
   shellBackVisibility: ShellControlVisibility;
@@ -76,6 +81,10 @@ type InspectorTab = "element" | "canvas" | "shell" | "layout";
 export function Inspector({
   open,
   onClose,
+  width,
+  minWidth,
+  maxWidth,
+  onResize,
   editor: editorProp,
   isComponent = false,
   inheritParentBackground = false,
@@ -246,9 +255,16 @@ export function Inspector({
   return (
     <aside
       aria-label="Inspetor"
-      className="pointer-events-auto flex h-full w-[280px] shrink-0 flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
-      style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
+      className="pointer-events-auto relative flex h-full shrink-0 flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
+      style={{ width, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
+      <PanelResizeHandle
+        side="left"
+        width={width}
+        min={minWidth}
+        max={maxWidth}
+        onResize={onResize}
+      />
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] pl-3.5 pr-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="grid shrink-0 place-items-center text-[#9A9A9A]" style={{ width: 16, height: 16 }}>

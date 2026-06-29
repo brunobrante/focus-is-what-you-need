@@ -60,6 +60,8 @@ type CanvasParentTarget = {
 export function CanvasRender({
   treeOpen,
   inspectorOpen,
+  treeWidth = TREE_WIDTH,
+  inspectorWidth = INSPECTOR_WIDTH,
   split,
   activeTab = "current",
   enabledTabs = ["current", "sketch"],
@@ -95,6 +97,8 @@ export function CanvasRender({
 }: {
   treeOpen: boolean;
   inspectorOpen: boolean;
+  treeWidth?: number;
+  inspectorWidth?: number;
   split: SplitMode;
   activeTab?: CanvasWindowKey;
   enabledTabs?: readonly CanvasWindowType[];
@@ -134,8 +138,8 @@ export function CanvasRender({
   );
   const splitEnabled = split !== "none" && normalizedSplitWindows.length > 1;
 
-  const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + TREE_WIDTH + GAP      : PANEL_MARGIN);
-  const right  = expanded ? 0 : (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP : PANEL_MARGIN);
+  const left   = expanded ? 0 : (treeOpen     ? PANEL_MARGIN + treeWidth + GAP      : PANEL_MARGIN);
+  const right  = expanded ? 0 : (inspectorOpen ? PANEL_MARGIN + inspectorWidth + GAP : PANEL_MARGIN);
   // With the top nav hidden (only the Current window), the canvas reaches up to the
   // top margin and the header/preview chrome just floats over it. Once the nav is
   // shown it descends below that row so the nav never covers a pane's top.
@@ -144,7 +148,7 @@ export function CanvasRender({
 
   const btnTop   = expanded ? HEADER_HEIGHT + PANEL_MARGIN : PANEL_MARGIN;
   const btnRight = expanded
-    ? (inspectorOpen ? PANEL_MARGIN + INSPECTOR_WIDTH + GAP + PANEL_MARGIN : PANEL_MARGIN)
+    ? (inspectorOpen ? PANEL_MARGIN + inspectorWidth + GAP + PANEL_MARGIN : PANEL_MARGIN)
     : PANEL_MARGIN;
 
   // Track the window extent so a draft seeded after a resize uses the current
@@ -165,12 +169,12 @@ export function CanvasRender({
     // Approximate visible-canvas size with both panels open — derived from the
     // shell layout constants rather than hardcoded offsets. It's only a fallback
     // extent for a brand-new draft, so the Math.max floors keep it sane.
-    const horizontalChrome = TREE_WIDTH + INSPECTOR_WIDTH + GAP * 2 + PANEL_MARGIN * 2;
+    const horizontalChrome = treeWidth + inspectorWidth + GAP * 2 + PANEL_MARGIN * 2;
     const verticalChrome = HEADER_HEIGHT + BOTTOM_BAR_HEIGHT;
     const w = Math.floor(windowExtent.w - horizontalChrome);
     const h = Math.floor(windowExtent.h - verticalChrome);
     return createDraftDocument(Math.max(400, w), Math.max(300, h));
-  }, [windowExtent]);
+  }, [windowExtent, treeWidth, inspectorWidth]);
 
   const isKeyRenderable = (key: CanvasWindowKey) =>
     isCurrentKey(key) || enabledTabs.includes(windowTypeOfKey(key));

@@ -54,6 +54,7 @@ import { TreeRow } from "./tree/TreeRow";
 import { TypeIcon } from "./tree/TypeIcon";
 import { StackTreePanel } from "./tree/StackTreePanel";
 import { IconClose, IconLayers, IconTrash } from "@/components/icons";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 
 export type { ProjectTreeNode };
 
@@ -104,6 +105,10 @@ function scrollTreeNodeIntoView(container: HTMLDivElement | null, nodeId: string
 type Props = {
   open: boolean;
   onClose: () => void;
+  width: number;
+  minWidth: number;
+  maxWidth: number;
+  onResize: (width: number) => void;
   componentName?: string;
   screenName?: string;
   document?: CanvasDocument | null;
@@ -166,6 +171,10 @@ type Props = {
 export function Tree({
   open,
   onClose,
+  width,
+  minWidth,
+  maxWidth,
+  onResize,
   componentName,
   screenName,
   document: documentProp,
@@ -477,9 +486,16 @@ export function Tree({
     <>
     <aside
       aria-label="Layers"
-      className="pointer-events-auto fixed bottom-3 left-3 top-16 z-[6] flex w-[300px] flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
-      style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
+      className="pointer-events-auto fixed bottom-3 left-3 top-16 z-[6] flex flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
+      style={{ width, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
+      <PanelResizeHandle
+        side="right"
+        width={width}
+        min={minWidth}
+        max={maxWidth}
+        onResize={onResize}
+      />
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] bg-[#141414] pl-3.5 pr-2">
         <div className="flex min-w-0 flex-col">
           <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9A9A9A]">
