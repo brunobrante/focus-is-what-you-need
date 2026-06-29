@@ -222,7 +222,7 @@ export function resizeBoxFromHandle(
   startPointer: Point,
   currentPointer: Point,
   handle: ResizeHandle,
-  options: { shiftKey: boolean; altKey: boolean },
+  options: { shiftKey: boolean; altKey: boolean; minSize?: number },
 ): Rect {
   const dx = currentPointer.x - startPointer.x;
   const dy = currentPointer.y - startPointer.y;
@@ -231,12 +231,13 @@ export function resizeBoxFromHandle(
   const centerX = rectCenterX(startBox);
   const centerY = rectCenterY(startBox);
   const aspect = startBox.width / Math.max(startBox.height, 1);
+  const minSize = options.minSize ?? MIN_ELEMENT_SIZE;
 
   let width = dirX === 0 ? startBox.width : startBox.width + dx * dirX * (options.altKey ? 2 : 1);
   let height = dirY === 0 ? startBox.height : startBox.height + dy * dirY * (options.altKey ? 2 : 1);
 
-  width = Math.max(width, MIN_ELEMENT_SIZE);
-  height = Math.max(height, MIN_ELEMENT_SIZE);
+  width = Math.max(width, minSize);
+  height = Math.max(height, minSize);
 
   if (options.shiftKey) {
     if (dirX !== 0 && dirY !== 0) {

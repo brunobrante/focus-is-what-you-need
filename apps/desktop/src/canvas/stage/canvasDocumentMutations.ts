@@ -291,6 +291,11 @@ function scaleAnchor(box: Rect, handle: string, fromCenter: boolean): Point {
 /** Numeric style properties scaled alongside an element's geometry. */
 const SCALABLE_STYLE_KEYS = ["fontSize", "borderRadius", "borderWidth", "gap", "padding"] as const;
 
+// The Scale tool shrinks proportionally, so the normal 8px resize floor would make
+// elements "stick" at 8px instead of scaling smoothly down. Allow scaling far below
+// that — clamped only to keep dimensions positive (not zero/negative).
+const SCALE_MIN_ELEMENT_SIZE = 1;
+
 function applyScaledNode(
   doc: CanvasDocument,
   id: string,
@@ -301,8 +306,8 @@ function applyScaledNode(
   if (!node) return;
   node.x = roundPixel(geom.x);
   node.y = roundPixel(geom.y);
-  node.width = roundPixel(Math.max(geom.width, MIN_ELEMENT_SIZE));
-  node.height = roundPixel(Math.max(geom.height, MIN_ELEMENT_SIZE));
+  node.width = roundPixel(Math.max(geom.width, SCALE_MIN_ELEMENT_SIZE));
+  node.height = roundPixel(Math.max(geom.height, SCALE_MIN_ELEMENT_SIZE));
   for (const key of SCALABLE_STYLE_KEYS) {
     const value = node.styles[key];
     if (typeof value === "number") node.styles[key] = roundPixel(value * scale);
@@ -328,6 +333,7 @@ export function scaleDocument(
   const nextBox = resizeBoxFromHandle(interaction.startBox, interaction.startPoint, currentPoint, interaction.handle, {
     altKey: fromCenter,
     shiftKey: true,
+    minSize: SCALE_MIN_ELEMENT_SIZE,
   });
   const scale = nextBox.width / Math.max(interaction.startBox.width, 1);
   const anchor = scaleAnchor(interaction.startBox, interaction.handle, fromCenter);
