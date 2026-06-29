@@ -1135,6 +1135,7 @@ pub fn run() {
             models::run_birefnet,
             models::run_real_esrgan,
             models::run_auto_detect,
+            models::run_sam_segment,
             models::run_florence2_text_check,
             models::run_text_check,
             models::run_font_detect,

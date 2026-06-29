@@ -13,10 +13,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use image::{DynamicImage, GenericImageView, GrayImage, ImageFormat, Luma, Rgb, RgbImage, Rgba, RgbaImage};
-use ndarray::Array4;
+use ndarray::{Array3, Array4};
 use ort::session::{Session, SessionInputValue};
 use ort::value::Tensor;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Window};
 
 // fp32 ONNX exports with input layouts that match the pre-processing below:
@@ -155,6 +155,40 @@ const FLORENCE2_LOC_BINS: f32 = 1000.0;
 const IMAGENET_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const IMAGENET_STD: [f32; 3] = [0.229, 0.224, 0.225];
 
+// --- SAM (Segment Anything, multi-file packages) -------------------------
+//
+// Object segmentation for the "Adjust crop" action: given the user's crop
+// rectangle as a box prompt, SAM returns a tight mask of the object so the cut
+// can follow its silhouette instead of a plain rectangle. Two interchangeable
+// models share ONE inference path (the transformers.js SAM ONNX contract) — the
+// user picks which to run:
+//   - SlimSAM (~40 MB): a distilled, lightweight SAM. Fast on CPU.
+//   - SAM ViT-B (~375 MB): the full ViT-B backbone. Higher quality, slower.
+// Each ships as two files under `$APP_DATA/models/<id>/`:
+//   - vision_encoder.onnx: `pixel_values` [1,3,1024,1024] -> `image_embeddings`
+//     and `image_positional_embeddings`, both [1,256,64,64]. Pre-processing is
+//     the same as Florence-2's vision tower (resize longest side to 1024,
+//     ImageNet-normalize) plus a bottom-right zero pad to the 1024 square.
+//   - prompt_encoder_mask_decoder.onnx: the two embeddings + a point prompt
+//     (`input_points` [1,1,N,2] f32, `input_labels` [1,1,N] i64) -> `iou_scores`
+//     [1,1,3] and `pred_masks` [1,1,3,256,256] (3 low-res logit candidates; we
+//     keep the highest-IoU one). A box prompt is encoded as its two corner
+//     points labeled 2 (top-left) and 3 (bottom-right).
+const SLIMSAM_ID: &str = "slimsam";
+const SAM_VIT_B_ID: &str = "sam-vit-base";
+const SAM_ENCODER_FILE: &str = "vision_encoder.onnx";
+const SAM_DECODER_FILE: &str = "prompt_encoder_mask_decoder.onnx";
+const SLIMSAM_ENCODER_URL: &str =
+    "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/vision_encoder.onnx";
+const SLIMSAM_DECODER_URL: &str =
+    "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/prompt_encoder_mask_decoder.onnx";
+const SAM_VIT_B_ENCODER_URL: &str =
+    "https://huggingface.co/Xenova/sam-vit-base/resolve/main/onnx/vision_encoder.onnx";
+const SAM_VIT_B_DECODER_URL: &str =
+    "https://huggingface.co/Xenova/sam-vit-base/resolve/main/onnx/prompt_encoder_mask_decoder.onnx";
+// SAM operates on a fixed 1024 input; the mask decoder emits 256x256 low-res logits.
+const SAM_INPUT_SIZE: u32 = 1024;
+
 /// Per-channel normalization for an image → NCHW tensor fill.
 #[derive(Clone, Copy)]
 enum NchwNorm {
@@ -224,6 +258,14 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
             name: "omniparser-icon-detect.onnx",
             url: OMNIPARSER_URL,
         }]),
+        SLIMSAM_ID => Ok(vec![
+            ModelFile { name: SAM_ENCODER_FILE, url: SLIMSAM_ENCODER_URL },
+            ModelFile { name: SAM_DECODER_FILE, url: SLIMSAM_DECODER_URL },
+        ]),
+        SAM_VIT_B_ID => Ok(vec![
+            ModelFile { name: SAM_ENCODER_FILE, url: SAM_VIT_B_ENCODER_URL },
+            ModelFile { name: SAM_DECODER_FILE, url: SAM_VIT_B_DECODER_URL },
+        ]),
         FONT_CLASSIFY_ID => Ok(vec![
             ModelFile { name: FONT_CLASSIFY_MODEL_FILE, url: FONT_CLASSIFY_MODEL_URL },
             ModelFile { name: FONT_CLASSIFY_MAPPING_FILE, url: FONT_CLASSIFY_MAPPING_URL },
@@ -987,6 +1029,181 @@ fn nms(mut boxes: Vec<DetectedRegion>, iou_threshold: f32, max_out: usize) -> Ve
     kept
 }
 
+// --- SAM object segmentation ----------------------------------------------
+
+/// The active SAM model's two ONNX sessions, kept alive between calls (RUST-8).
+struct SamSessions {
+    /// Which catalog model these sessions belong to (`slimsam` / `sam-vit-base`).
+    model_id: String,
+    encoder: Session,
+    decoder: Session,
+}
+
+/// The crop rectangle, in the input image's pixel space, used as SAM's box prompt.
+#[derive(Deserialize)]
+pub struct SamBox {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+/// Segments the object inside `bbox` using the chosen SAM model and returns a
+/// PNG grayscale mask (white = object) at the input image's resolution. The
+/// frontend traces the mask into a contour preview and, on save, uses it as the
+/// cut's alpha. `model_id` selects SlimSAM or SAM ViT-B (same inference path).
+#[tauri::command]
+pub async fn run_sam_segment(
+    app: AppHandle,
+    model_id: String,
+    image_bytes: Vec<u8>,
+    bbox: SamBox,
+) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || sam_segment_blocking(&app, &model_id, image_bytes, bbox))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn sam_segment_blocking(
+    app: &AppHandle,
+    model_id: &str,
+    image_bytes: Vec<u8>,
+    bbox: SamBox,
+) -> Result<Vec<u8>, String> {
+    if model_id != SLIMSAM_ID && model_id != SAM_VIT_B_ID {
+        return Err(format!("unknown segmentation model: {model_id}"));
+    }
+    let dir = model_storage_dir(app, model_id)?;
+    // Reuse the install spec as the single source of truth for the file list so
+    // the presence-check can't silently desync from install (RUST-10).
+    for file in model_file_specs(model_id)? {
+        if !dir.join(file.name).exists() {
+            return Err(format!("model \"{model_id}\" is not installed"));
+        }
+    }
+
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let (orig_w, orig_h) = img.dimensions();
+    if orig_w == 0 || orig_h == 0 {
+        return Err("empty image".to_string());
+    }
+    let rgb = img.to_rgb8();
+
+    // Pre-process: resize the longest side to 1024 (preserving aspect), then sit
+    // the image at the top-left of a 1024 square zero-padded at bottom/right.
+    let size = SAM_INPUT_SIZE;
+    let scale = size as f32 / orig_w.max(orig_h) as f32;
+    let new_w = ((orig_w as f32 * scale).round() as u32).clamp(1, size);
+    let new_h = ((orig_h as f32 * scale).round() as u32).clamp(1, size);
+    let resized =
+        image::imageops::resize(&rgb, new_w, new_h, image::imageops::FilterType::Triangle);
+    let mut pixels = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
+    fill_nchw_rgb(&mut pixels, &resized, 0, 0, NchwNorm::ImageNet);
+
+    // Pull the cached sessions (RUST-8), (re)loading them when the model changed.
+    let state = app.state::<ModelSessions>();
+    let mut guard = state.sam.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.as_ref().map(|s| s.model_id != model_id).unwrap_or(true) {
+        *guard = Some(SamSessions {
+            model_id: model_id.to_string(),
+            encoder: load_package_session(&dir, SAM_ENCODER_FILE)?,
+            decoder: load_package_session(&dir, SAM_DECODER_FILE)?,
+        });
+    }
+    let SamSessions { encoder, decoder, .. } = guard.as_mut().unwrap();
+
+    // 1. Vision encoder: image -> image_embeddings + image_positional_embeddings,
+    //    both [1, 256, 64, 64]. Own them so the decoder can take them by value.
+    let (image_embeddings, image_positional_embeddings) = {
+        let enc_in = encoder.inputs()[0].name().to_string();
+        let pixel_tensor = Tensor::from_array(pixels).map_err(|e| e.to_string())?;
+        let enc_out = encoder
+            .run(ort::inputs![enc_in.as_str() => pixel_tensor])
+            .map_err(|e| e.to_string())?;
+        let emb = enc_out[0].try_extract_array::<f32>().map_err(|e| e.to_string())?.to_owned();
+        let pos = enc_out[1].try_extract_array::<f32>().map_err(|e| e.to_string())?.to_owned();
+        (emb, pos)
+    };
+
+    // 2. Box prompt -> the two corner points in the 1024 input space, labeled
+    //    2 (top-left) and 3 (bottom-right), as the SAM box-prompt convention.
+    let x0 = bbox.x * scale;
+    let y0 = bbox.y * scale;
+    let x1 = (bbox.x + bbox.w) * scale;
+    let y1 = (bbox.y + bbox.h) * scale;
+    let points = Array4::<f32>::from_shape_vec((1, 1, 2, 2), vec![x0, y0, x1, y1])
+        .map_err(|e| e.to_string())?;
+    let labels =
+        Array3::<i64>::from_shape_vec((1, 1, 2), vec![2, 3]).map_err(|e| e.to_string())?;
+
+    // 3. Mask decoder: embeddings + prompt -> iou_scores [1,1,3] and pred_masks
+    //    [1,1,3,256,256] (three low-res logit candidates).
+    let dec_out = decoder
+        .run(ort::inputs![
+            "input_points" => Tensor::from_array(points).map_err(|e| e.to_string())?,
+            "input_labels" => Tensor::from_array(labels).map_err(|e| e.to_string())?,
+            "image_embeddings" => Tensor::from_array(image_embeddings).map_err(|e| e.to_string())?,
+            "image_positional_embeddings" => Tensor::from_array(image_positional_embeddings).map_err(|e| e.to_string())?,
+        ])
+        .map_err(|e| e.to_string())?;
+
+    let iou = dec_out[0].try_extract_array::<f32>().map_err(|e| e.to_string())?;
+    let iou_scores: Vec<f32> = iou.iter().copied().collect();
+    let best = (0..iou_scores.len())
+        .max_by(|a, b| iou_scores[*a].total_cmp(&iou_scores[*b]))
+        .unwrap_or(0);
+
+    let masks = dec_out[1].try_extract_array::<f32>().map_err(|e| e.to_string())?;
+    let mshape = masks.shape();
+    if mshape.len() < 2 {
+        return Err(format!("unexpected SAM mask shape: {mshape:?}"));
+    }
+    let mh = mshape[mshape.len() - 2];
+    let mw = mshape[mshape.len() - 1];
+    let mdata: Vec<f32> = masks.iter().copied().collect();
+    let plane = mh * mw;
+    let offset = best * plane; // leading dims are [1, 1, num_masks, mh, mw].
+    let low = &mdata[offset..offset + plane];
+
+    // 4. Map each original-image pixel back to the low-res logit grid: the grid
+    //    covers the 1024 padded input, so a pixel `p` lands at `p * scale * mw/1024`.
+    //    Bilinear-sample, then threshold logit > 0 -> object. One pass folds the
+    //    upsample, the letterbox crop, and the resize-to-original together.
+    let fx = scale * (mw as f32 / size as f32);
+    let fy = scale * (mh as f32 / size as f32);
+    let mut mask = GrayImage::new(orig_w, orig_h);
+    for oy in 0..orig_h {
+        for ox in 0..orig_w {
+            let v = sample_bilinear(low, mw, mh, ox as f32 * fx, oy as f32 * fy);
+            mask.put_pixel(ox, oy, Luma([if v > 0.0 { 255 } else { 0 }]));
+        }
+    }
+    encode_png(DynamicImage::ImageLuma8(mask))
+}
+
+/// Bilinear sample of a row-major `w`×`h` f32 grid at fractional `(fx, fy)`,
+/// clamping to the grid edges.
+fn sample_bilinear(grid: &[f32], w: usize, h: usize, fx: f32, fy: f32) -> f32 {
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let x = fx.clamp(0.0, (w - 1) as f32);
+    let y = fy.clamp(0.0, (h - 1) as f32);
+    let x0 = x.floor() as usize;
+    let y0 = y.floor() as usize;
+    let x1 = (x0 + 1).min(w - 1);
+    let y1 = (y0 + 1).min(h - 1);
+    let dx = x - x0 as f32;
+    let dy = y - y0 as f32;
+    let v00 = grid[y0 * w + x0];
+    let v10 = grid[y0 * w + x1];
+    let v01 = grid[y1 * w + x0];
+    let v11 = grid[y1 * w + x1];
+    let top = v00 + (v10 - v00) * dx;
+    let bot = v01 + (v11 - v01) * dx;
+    top + (bot - top) * dy
+}
+
 // --- Font detector (EfficientNet-B3) --------------------------------------
 
 /// One predicted font and its softmax probability.
@@ -1387,7 +1604,9 @@ fn build_byte_tables() -> (HashMap<u8, char>, HashMap<char, u8>) {
     (encoder, decoder)
 }
 
-fn load_florence2_session(dir: &Path, file: &str) -> Result<Session, String> {
+/// Loads one ONNX session from a multi-file package directory (`dir/file`).
+/// Shared by the Florence-2 and SAM packages, whose files live in a subfolder.
+fn load_package_session(dir: &Path, file: &str) -> Result<Session, String> {
     Session::builder()
         .map_err(|e| e.to_string())?
         .commit_from_file(dir.join(file))
@@ -1411,13 +1630,23 @@ struct Florence2Sessions {
 #[derive(Default)]
 pub struct ModelSessions {
     florence2: Mutex<Option<Florence2Sessions>>,
+    // The active SAM model's encoder + decoder. Only one segmentation model is
+    // cached at a time (the user switches between SlimSAM and SAM ViT-B); the
+    // tagged id lets a run detect a model change and reload.
+    sam: Mutex<Option<SamSessions>>,
 }
 
 impl ModelSessions {
-    /// Drop any cached Florence-2 sessions (after the model is uninstalled/replaced).
+    /// Drop any cached sessions for `id` (after the model is uninstalled/replaced).
     fn invalidate(&self, id: &str) {
         if id == FLORENCE2_ID {
             *self.florence2.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        }
+        if id == SLIMSAM_ID || id == SAM_VIT_B_ID {
+            let mut guard = self.sam.lock().unwrap_or_else(|e| e.into_inner());
+            if guard.as_ref().is_some_and(|s| s.model_id == id) {
+                *guard = None;
+            }
         }
     }
 }
@@ -1456,10 +1685,10 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
         .unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         *guard = Some(Florence2Sessions {
-            vision: load_florence2_session(&dir, FLORENCE2_VISION_FILE)?,
-            embed: load_florence2_session(&dir, FLORENCE2_EMBED_FILE)?,
-            encoder: load_florence2_session(&dir, FLORENCE2_ENCODER_FILE)?,
-            decoder: load_florence2_session(&dir, FLORENCE2_DECODER_FILE)?,
+            vision: load_package_session(&dir, FLORENCE2_VISION_FILE)?,
+            embed: load_package_session(&dir, FLORENCE2_EMBED_FILE)?,
+            encoder: load_package_session(&dir, FLORENCE2_ENCODER_FILE)?,
+            decoder: load_package_session(&dir, FLORENCE2_DECODER_FILE)?,
         });
     }
     let Florence2Sessions { vision, embed, encoder, decoder } = guard.as_mut().unwrap();

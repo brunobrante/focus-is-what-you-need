@@ -64,6 +64,26 @@ export function runAutoDetect(
   });
 }
 
+// The crop rectangle, in the segmented image's pixel space, sent as SAM's box
+// prompt. SAM masks the object inside it.
+export type SamBox = { x: number; y: number; w: number; h: number };
+
+// Runs the active object-segmentation model (SlimSAM or SAM ViT-B) with `bbox`
+// as a box prompt. The backend dispatches on `modelId`. Returns a PNG grayscale
+// mask (white = object) at the input image's resolution.
+export async function runSamSegment(
+  modelId: string,
+  imageBytes: Uint8Array,
+  bbox: SamBox,
+): Promise<Uint8Array> {
+  const out = await invoke<number[]>("run_sam_segment", {
+    modelId,
+    imageBytes: Array.from(imageBytes),
+    bbox,
+  });
+  return new Uint8Array(out);
+}
+
 // Runs the active text detector (a DBNet variant or CRAFT) on a cut's image.
 // The backend dispatches on `modelId`. Returns true when text is detected.
 export function runTextCheck(

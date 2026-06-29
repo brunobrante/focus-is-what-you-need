@@ -42,6 +42,10 @@ export const FLORENCE2_FILES = [
   "tokenizer.json",
 ] as const;
 
+// SlimSAM and SAM ViT-B ship the same two files (encoder + prompt/mask decoder),
+// each in its own subfolder. Both run through one inference path in the backend.
+export const SAM_FILES = ["vision_encoder.onnx", "prompt_encoder_mask_decoder.onnx"] as const;
+
 export const FEATURES: FeatureMeta[] = [
   {
     key: "removeBackground",
@@ -57,6 +61,11 @@ export const FEATURES: FeatureMeta[] = [
     key: "autoDetect",
     name: "Auto-detect Components",
     description: "Proposes crop regions automatically from a UI screenshot.",
+  },
+  {
+    key: "objectSegmentation",
+    name: "Adjust Crop (Segment)",
+    description: "Snaps a crop to the object's silhouette using Segment Anything.",
   },
   {
     key: "textDetection",
@@ -117,6 +126,22 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     size: "~1.2 GB",
     description: "Dense region captioning for crop proposals.",
     files: FLORENCE2_FILES,
+  },
+  {
+    modelId: "slimsam",
+    feature: "objectSegmentation",
+    label: "SlimSAM (lightweight)",
+    size: "~40 MB",
+    description: "Distilled Segment Anything. Fast on-device crop adjustment.",
+    files: SAM_FILES,
+  },
+  {
+    modelId: "sam-vit-base",
+    feature: "objectSegmentation",
+    label: "SAM (ViT-B)",
+    size: "~375 MB",
+    description: "Full Segment Anything ViT-B. Higher quality, larger and slower.",
+    files: SAM_FILES,
   },
   {
     modelId: "dbnet-mobilenet-v3-large",

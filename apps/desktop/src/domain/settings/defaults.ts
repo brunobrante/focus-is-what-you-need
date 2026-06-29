@@ -233,6 +233,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
       removeBackground: { enabled: false, activeModelId: null },
       upscale: { enabled: false, activeModelId: null },
       autoDetect: { enabled: false, activeModelId: null },
+      objectSegmentation: { enabled: false, activeModelId: null },
       textDetection: { enabled: false, activeModelId: null },
       removeElement: { enabled: false, activeModelId: null },
       colorDetector: { enabled: false, activeModelId: null },

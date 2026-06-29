@@ -190,6 +190,7 @@ export type ProcessingFeatureKey =
   | "removeBackground"
   | "upscale"
   | "autoDetect"
+  | "objectSegmentation"
   | "textDetection"
   | "removeElement"
   | "colorDetector"
