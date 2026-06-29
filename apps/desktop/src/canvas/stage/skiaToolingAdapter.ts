@@ -115,7 +115,15 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
     const canvas = document.createElement("canvas");
     canvas.setAttribute("aria-hidden", "true");
-    canvas.style.position = "fixed";
+    // Positioned absolutely inside the tooling host (which is `absolute; inset: 0`
+    // within the `position: relative` canvas-shell), so the canvas sits exactly at
+    // the viewport-container origin and is laid out by the browser. A previous
+    // `position: fixed` pinned it to the window and required re-measuring the host's
+    // screen rect (getBoundingClientRect → rAF → React state) every frame; during a
+    // continuous resize (e.g. dragging a split-pane divider) that measurement lagged
+    // one frame behind the content, so the selection chrome trailed the element.
+    // Staying in the layout makes it move in lockstep with the content for free.
+    canvas.style.position = "absolute";
     canvas.style.top = "0px";
     canvas.style.left = "0px";
     canvas.style.width = "1px";
@@ -362,8 +370,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
   private syncCanvasStyle(frame: ToolingRenderFrame): void {
     if (!this.canvas) return;
-    this.canvas.style.left = `${frame.left}px`;
-    this.canvas.style.top = `${frame.top}px`;
+    // The canvas is `position: absolute` at the host origin (left/top stay 0, set at
+    // mount), so only its size tracks the frame. The drawing uses container-local
+    // coordinates, so `frame.left`/`frame.top` (the host's screen rect) are no longer
+    // needed to place it — that decoupling is what fixes the resize desync.
     this.canvas.style.width = `${Math.max(1, frame.width)}px`;
     this.canvas.style.height = `${Math.max(1, frame.height)}px`;
   }
