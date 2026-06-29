@@ -55,6 +55,7 @@ export type CanvasToolingLayerProps = {
   editingTextId: string | null;
   pathEditId: string | null;
   penToolActive: boolean;
+  scaleToolActive: boolean;
   canvasStageActive: boolean;
   guides: SnapGuide[];
   viewportTransform: ViewportTransform;
@@ -114,6 +115,7 @@ const EMPTY_GEOMETRY: ToolingGeometry = {
   canRotate: false,
   hasRadiusHandles: false,
   cursorRotation: 0,
+  scaleMode: false,
   allowedResizeHandles: null,
   pathEdit: null,
 };
@@ -156,6 +158,7 @@ type ToolingRenderData = {
   transformIds: string[];
   sizeLabelCanvasRect: Rect | null;
   sizeLabelViewportRect: Rect | null;
+  transformHandlesFit: boolean;
   hitGeometry: ToolingGeometry;
   outlines: ToolingOutlineCommand[];
   ghosts: ToolingGhostCommand[];
@@ -435,6 +438,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             canRotate: true,
             hasRadiusHandles: false,
             cursorRotation: doc.canvas.rotation ?? 0,
+            scaleMode: props.scaleToolActive,
             allowedResizeHandles: null,
             pathEdit: null,
           }
@@ -445,6 +449,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
             canRotate: suppressHandles ? false : canRotate,
             hasRadiusHandles: suppressHandles ? false : hasRadiusHandles,
             cursorRotation: selectionBox ? getToolingBoxRotation(selectionBox) : 0,
+            scaleMode: props.scaleToolActive,
             allowedResizeHandles: suppressHandles ? null : allowedResizeHandles,
             pathEdit: pathEditGeometry,
           };
@@ -473,6 +478,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         transformIds,
         sizeLabelCanvasRect,
         sizeLabelViewportRect,
+        transformHandlesFit,
         hitGeometry,
         ghosts,
         outlines: props.canvasStageActive
@@ -545,6 +551,9 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       !props.canvasStageActive &&
       !renderData.isDragging &&
       !renderData.isEditingText &&
+      // The WxH badge belongs to the resize chrome — when the element is too
+      // small on screen and the resize handles are culled, the badge goes too.
+      renderData.transformHandlesFit &&
       renderData.sizeLabelCanvasRect &&
       renderData.sizeLabelViewportRect
         ? {
@@ -567,6 +576,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       renderData.isDragging,
       renderData.isEditingText,
       renderData.isInstanceSelection,
+      renderData.transformHandlesFit,
       renderData.sizeLabelCanvasRect,
       renderData.sizeLabelViewportRect,
     ]);
