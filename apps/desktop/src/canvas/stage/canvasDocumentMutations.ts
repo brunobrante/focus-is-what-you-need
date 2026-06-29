@@ -501,6 +501,21 @@ function radiusEdgeCorners(
   return corner === "nw" || corner === "ne" ? ["nw", "ne"] : ["sw", "se"];
 }
 
+const ALL_RADIUS_CORNERS: RadiusCorner[] = ["nw", "ne", "se", "sw"];
+
+// The set of corners whose handles stack at the maximum radius and therefore compete
+// for the grab. A rectangle only stacks the two handles on the short edge. A perfect
+// square collapses ALL FOUR handles onto the center, so any corner is a valid target —
+// the grab must be allowed to commit toward any of them, not just one short-edge pair.
+function radiusStackedCorners(
+  corner: RadiusCorner,
+  width: number,
+  height: number,
+): RadiusCorner[] {
+  if (Math.abs(width - height) < 0.5) return ALL_RADIUS_CORNERS;
+  return radiusEdgeCorners(corner, width, height);
+}
+
 export function radiusDocument(
   interaction: RadiusInteraction,
   currentPoint: Point,
@@ -516,16 +531,15 @@ export function radiusDocument(
     ? rotatePoint(currentPoint, center, -element.rotation)
     : { x: currentPoint.x, y: currentPoint.y };
 
-  // When the grab starts at the maximum radius, the two handles on the short edge sit
-  // one on top of the other and we cannot yet tell which corner the user means. The
-  // FIRST drag that diverges toward one corner commits to it for the rest of the
-  // gesture; afterwards only that corner drives the radius, so the ball can be brought
-  // back to the lock (the clamped maximum) but cannot cross it into the other corner.
-  const pair = radiusEdgeCorners(interaction.corner, rect.width, rect.height);
+  // When the grab starts at the maximum radius, the handles that share the short edge
+  // (two of them for a rectangle, all four for a square) sit one on top of the other
+  // and we cannot yet tell which corner the user means. The FIRST drag that diverges
+  // toward one corner commits to it for the rest of the gesture; afterwards only that
+  // corner drives the radius, so the ball can be brought back to the lock (the clamped
+  // maximum) but cannot cross it into another corner.
+  const candidates = radiusStackedCorners(interaction.corner, rect.width, rect.height);
   const maxRadius = maxBorderRadiusForSize(rect.width, rect.height);
   const grabbedAtMax = (element.styles.borderRadius ?? 0) >= maxRadius - RADIUS_COMMIT_EPSILON;
-  const o0 = radiusCornerOffset(pair[0], local, rect);
-  const o1 = radiusCornerOffset(pair[1], local, rect);
 
   if (!interaction.committedCorner) {
     if (!grabbedAtMax) {
@@ -535,18 +549,27 @@ export function radiusDocument(
       const startLocal = element.rotation
         ? rotatePoint(interaction.startPoint, center, -element.rotation)
         : interaction.startPoint;
-      const s0 = radiusCornerOffset(pair[0], startLocal, rect);
-      const s1 = radiusCornerOffset(pair[1], startLocal, rect);
-      const relDiff = o0 - o1 - (s0 - s1);
-      if (Math.abs(relDiff) > RADIUS_COMMIT_EPSILON) {
-        interaction.committedCorner = relDiff < 0 ? pair[0] : pair[1];
+      // Pulling the ball toward a corner drives that corner's offset down fastest, so
+      // the candidate whose offset has dropped the most since the grab is the one the
+      // user is dragging toward. Commit to it once it clearly separates from the
+      // runner-up (the relative measure makes this immune to where the grab landed).
+      const deltas = candidates
+        .map((corner) => ({
+          corner,
+          delta:
+            radiusCornerOffset(corner, local, rect) -
+            radiusCornerOffset(corner, startLocal, rect),
+        }))
+        .sort((a, b) => a.delta - b.delta);
+      if (deltas.length > 1 && deltas[1].delta - deltas[0].delta > RADIUS_COMMIT_EPSILON) {
+        interaction.committedCorner = deltas[0].corner;
       }
     }
   }
 
   const offset = interaction.committedCorner
     ? radiusCornerOffset(interaction.committedCorner, local, rect)
-    : Math.min(o0, o1);
+    : Math.min(...candidates.map((corner) => radiusCornerOffset(corner, local, rect)));
   const newRadius = roundPixel(clampBorderRadiusForSize(offset, rect.width, rect.height));
   const next = shallowCloneDocument(interaction.beforeDocument);
   const node = mutateElementWithStyles(next, interaction.elementId);

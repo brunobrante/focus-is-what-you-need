@@ -206,6 +206,41 @@ test("stacked radius grab commits to the corner of the first drag (down → se)"
   expect(back.document.elements.node.styles.borderRadius).toBe(20);
 });
 
+// A square at the maximum radius collapses ALL FOUR handles onto the center
+// (40×40 → maxRadius 20, every handle at (120, 100)). The grab must be able to commit
+// toward any of the four corners, not just one short-edge pair.
+function createSquareStackedDocument(): CanvasDocument {
+  const document = createDocument();
+  document.elements.node.width = 40;
+  document.elements.node.height = 40;
+  document.elements.node.styles.borderRadius = 20;
+  return document;
+}
+
+test("square stacked radius grab commits to any of the four corners (up-right → ne)", () => {
+  // The hit test reported nw, but the first drag pulls up-right toward ne.
+  const interaction = createRadiusInteraction(createSquareStackedDocument(), "nw", { x: 120, y: 100 });
+
+  const upRight = radiusDocument(interaction, { x: 130, y: 90 });
+  expect(upRight.document.elements.node.styles.borderRadius).toBeLessThan(20);
+
+  // Once committed to ne, dragging toward the opposite (sw) corner only returns to the
+  // lock; it cannot cross the meeting point into another corner.
+  const back = radiusDocument(interaction, { x: 110, y: 110 });
+  expect(back.document.elements.node.styles.borderRadius).toBe(20);
+});
+
+test("square stacked radius grab commits toward the down-left (sw) corner", () => {
+  const interaction = createRadiusInteraction(createSquareStackedDocument(), "ne", { x: 120, y: 100 });
+
+  const downLeft = radiusDocument(interaction, { x: 110, y: 110 });
+  expect(downLeft.document.elements.node.styles.borderRadius).toBeLessThan(20);
+
+  // Cannot cross into the opposite (ne) corner.
+  const back = radiusDocument(interaction, { x: 130, y: 90 });
+  expect(back.document.elements.node.styles.borderRadius).toBe(20);
+});
+
 test("resizes a 180 degree element from the visual handle direction", () => {
   const document = createDocument();
   document.elements.node.rotation = 180;
