@@ -865,7 +865,10 @@ colour) instead of the usual blue, and they get **no transform handles and canno
 dragged or resized** — only the instance **root** can be moved/resized/detached as a whole
 (Versioning.md §3.2). Selecting any instance descendant also locks the Inspector (same purple
 banner + "Ou clique aqui" link to open the master), so editing is blocked from every surface.
-To edit the contents, open the master or detach the instance first.
+To edit the contents, open the master or detach the instance first. Holding **Option**
+over a selected linked instance summons the canvas quick toolbar with its **Flex layout**
+tool replaced by a purple **Detach instance** action (unlink icon) — clicking it detaches
+the instance in place (same effect as the layers-tree unlink button).
 
 **Left panel** (collapsible, resizable):
 - **Width is adjustable** by dragging the panel's inner (right) edge — default

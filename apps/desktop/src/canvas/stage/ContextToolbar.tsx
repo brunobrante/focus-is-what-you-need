@@ -3,12 +3,15 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { ALargeSmall, Check, Copy, FoldVertical, Pencil, Rows3, Trash2, X } from "lucide-react";
 import {
   deleteElements,
+  detachInstance,
   duplicateElements,
   fitTextElementToContent,
   renameElement,
   setTextElementSizing,
   updateElementStyles,
 } from "@/canvas/engine/actions";
+import { IconUnlink } from "@/components/icons";
+import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import type { CanvasDocument, ElementNode, ElementStyles, Rect } from "@/canvas/engine/types";
 
@@ -36,6 +39,7 @@ type ContextToolId =
   | "text-style"
   | "fit-text"
   | "layout-flex"
+  | "detach"
   | "duplicate"
   | "rename"
   | "delete";
@@ -46,6 +50,8 @@ type ContextTool = {
   icon: React.ReactNode;
   active?: boolean;
   destructive?: boolean;
+  // Accent color for the button (used by the purple linked-instance detach action).
+  accent?: string;
 } | "divider";
 
 type ToolbarPanel = "text-style" | "layout" | null;
@@ -140,6 +146,9 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
 
   const isTextSelection = selectedNode?.type === "text";
   const isBoxLayoutSelection = selectedNode?.type === "rect";
+  // A linked component instance (the purple, read-only treatment). Layout editing
+  // doesn't apply to it, so its toolbar swaps the Flex tool for a Detach action.
+  const isLinkedInstance = Boolean(selectedNode?.instanceOf);
   const isTextFitSelection =
     selectedNode?.type === "text" &&
     (selectedNode.sizing?.width === "fit" || selectedNode.sizing?.height === "fit");
@@ -189,7 +198,19 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
       );
     }
 
-    if (isBoxLayoutSelection) {
+    if (isLinkedInstance) {
+      // A linked instance is read-only: surface a Detach action in place of the
+      // layout/flex tool, accented purple to match the linked treatment.
+      tools.push(
+        {
+          id: "detach",
+          label: "Detach instance",
+          icon: <IconUnlink size={15} strokeWidth={1.8} />,
+          accent: LINKED_INSTANCE_COLOR,
+        },
+        "divider",
+      );
+    } else if (isBoxLayoutSelection) {
       tools.push(
         {
           id: "layout-flex",
@@ -221,7 +242,7 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
     );
 
     return tools;
-  }, [isBoxLayoutSelection, isFlexDisplaySelection, isTextFitSelection, isTextSelection, openPanel]);
+  }, [isBoxLayoutSelection, isFlexDisplaySelection, isLinkedInstance, isTextFitSelection, isTextSelection, openPanel]);
 
   const commitSelectedDocument = (document: CanvasDocument, selectedIds = selectedId ? [selectedId] : props.fallbackSelectedIds) => {
     props.onCommitDocument(document, selectedIds);
@@ -299,6 +320,11 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
             return;
           }
           setOpenPanel((current) => (current === "layout" ? null : "layout"));
+        }
+        return;
+      case "detach":
+        if (selectedNode.instanceOf) {
+          commitSelectedDocument(detachInstance(doc, selectedId));
         }
         return;
       case "duplicate": {
@@ -455,6 +481,7 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
                 tool.active ? "is-active" : "",
                 tool.destructive ? "is-danger" : "",
               ].filter(Boolean).join(" ")}
+              style={tool.accent ? { color: tool.accent } : undefined}
               aria-label={tool.label}
               title={tool.label}
               onPointerDown={stopToolbarPointer}
