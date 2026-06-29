@@ -119,6 +119,8 @@ export type ToolingGeometry = {
   canRotate: boolean;
   hasRadiusHandles: boolean;
   cursorRotation: number;
+  /** When the Scale tool is active, resize handles show the custom scale cursor. */
+  scaleMode: boolean;
   /** When set, only these handles are hit-tested. null = all handles. */
   allowedResizeHandles: readonly ResizeHandle[] | null;
   /** Present only while a path is in edit mode (takes hit-test priority). */
@@ -197,6 +199,28 @@ const cursorAt45: string[] = [
 
 const svgCursorCache = new Map<string, string>();
 
+// Plain-resize cursor used once the selection is rotated off-axis: a single
+// double-headed arrow rotated to lie along the handle's drag direction. (When
+// the selection is unrotated, native `cursorAt45` cursors are used instead.)
+function buildArrowSvg(angleDeg: number): string {
+  const size = 24;
+  const cx = size / 2;
+  const top = 4;
+  const bot = 20;
+  const hs = 3.5;
+  return (
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>` +
+    `<g transform='rotate(${angleDeg} ${cx} ${cx})'>` +
+    `<line x1='${cx}' y1='${top}' x2='${cx}' y2='${bot}' stroke='white' stroke-width='3' stroke-linecap='round'/>` +
+    `<polyline points='${cx - hs},${top + hs} ${cx},${top} ${cx + hs},${top + hs}' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>` +
+    `<polyline points='${cx - hs},${bot - hs} ${cx},${bot} ${cx + hs},${bot - hs}' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>` +
+    `<line x1='${cx}' y1='${top}' x2='${cx}' y2='${bot}' stroke='black' stroke-width='1.5' stroke-linecap='round'/>` +
+    `<polyline points='${cx - hs},${top + hs} ${cx},${top} ${cx + hs},${top + hs}' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/>` +
+    `<polyline points='${cx - hs},${bot - hs} ${cx},${bot} ${cx + hs},${bot - hs}' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/>` +
+    `</g></svg>`
+  );
+}
+
 // Figma-style "scale" cursor: a double-headed arrow with a center divider.
 // The exported asset points horizontally (east/west), so it is rotated by
 // (resize-axis angle − 90°) to align with each handle's drag direction.
@@ -226,17 +250,37 @@ function buildScaleSvg(angleDeg: number): string {
   );
 }
 
-export function getRotatedCursor(handle: ResizeHandle, rotation: number): string {
+export function getRotatedCursor(handle: ResizeHandle, rotation: number, scaleMode: boolean): string {
   const angle = ((handleAngle[handle] + rotation) % 360 + 360) % 360;
-  // The asset is horizontal (its axis = 90°); offset so it lies along the handle.
-  const roundedAngle = ((Math.round(angle) - 90) % 360 + 360) % 360;
-  const key = `${roundedAngle}`;
+  const fallbackIndex = Math.round(angle / 45) % 8;
+
+  // Scale tool: show the custom double-headed "scale" cursor for every handle.
+  if (scaleMode) {
+    // The asset is horizontal (its axis = 90°); offset so it lies along the handle.
+    const roundedAngle = ((Math.round(angle) - 90) % 360 + 360) % 360;
+    const key = `scale:${roundedAngle}`;
+    let cached = svgCursorCache.get(key);
+    if (!cached) {
+      const svg = buildScaleSvg(roundedAngle);
+      const encoded = encodeURIComponent(svg);
+      cached = `url("data:image/svg+xml,${encoded}") 16 16, ${cursorAt45[fallbackIndex]}`;
+      svgCursorCache.set(key, cached);
+    }
+    return cached;
+  }
+
+  // Plain resize: native double-arrow cursors when unrotated; a rotated arrow
+  // asset once the selection is turned off-axis.
+  if (rotation === 0) {
+    return cursorAt45[fallbackIndex];
+  }
+  const roundedAngle = Math.round(angle);
+  const key = `arrow:${roundedAngle}`;
   let cached = svgCursorCache.get(key);
   if (!cached) {
-    const svg = buildScaleSvg(roundedAngle);
+    const svg = buildArrowSvg(roundedAngle);
     const encoded = encodeURIComponent(svg);
-    const fallbackIndex = Math.round(angle / 45) % 8;
-    cached = `url("data:image/svg+xml,${encoded}") 16 16, ${cursorAt45[fallbackIndex]}`;
+    cached = `url("data:image/svg+xml,${encoded}") 12 12, ${cursorAt45[fallbackIndex]}`;
     svgCursorCache.set(key, cached);
   }
   return cached;
@@ -413,7 +457,7 @@ export function hitTestTooling(vx: number, vy: number, geometry: ToolingGeometry
         return {
           type: "resize",
           handle: cornerHandle,
-          cursor: getRotatedCursor(cornerHandle, geometry.cursorRotation),
+          cursor: getRotatedCursor(cornerHandle, geometry.cursorRotation, geometry.scaleMode),
         };
       }
     }
@@ -423,7 +467,7 @@ export function hitTestTooling(vx: number, vy: number, geometry: ToolingGeometry
       return {
         type: "resize",
         handle: edgeHandle,
-        cursor: getRotatedCursor(edgeHandle, geometry.cursorRotation),
+        cursor: getRotatedCursor(edgeHandle, geometry.cursorRotation, geometry.scaleMode),
       };
     }
   }

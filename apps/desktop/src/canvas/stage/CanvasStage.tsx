@@ -520,6 +520,7 @@ export function CanvasStage({
         editingTextId={state.editingTextId}
         pathEditId={state.pathEditId}
         penToolActive={state.tool === "pen"}
+        scaleToolActive={state.tool === "scale"}
         canvasStageActive={state.canvasStageActive}
         guides={state.guides}
         viewportTransform={viewportTransform}

@@ -17,6 +17,7 @@ test("hit-tests the local handle at its rotated visual position", () => {
     canRotate: true,
     hasRadiusHandles: false,
     cursorRotation: 180,
+    scaleMode: false,
     allowedResizeHandles: null,
   });
 
@@ -31,6 +32,7 @@ test("hit-tests radius handles with a larger target than the visual dot", () => 
     canRotate: false,
     hasRadiusHandles: true,
     cursorRotation: 0,
+    scaleMode: false,
     allowedResizeHandles: null,
   });
 
