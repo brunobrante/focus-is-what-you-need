@@ -461,7 +461,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   // --- Adjust crop (object segmentation) -----------------------------------
 
   const { segmenting, segmentError, segmentation, segment, clearSegmentation } =
-    useCropSegmentation({ activeSubject });
+    useCropSegmentation({ imgRef });
 
   // The silhouette belongs to one specific crop rectangle; any change to the
   // selection (drag, resize, cancel) makes the preview stale, so drop it.
