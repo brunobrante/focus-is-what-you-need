@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState, type RefObject } from "react";
 
 import { runSamSegment, urlToBytes } from "@/lib/models/modelCommands";
+import { CLASSIC_CV_MODEL_ID } from "@/lib/models/modelCatalog";
 import type { CropBox } from "../types";
 import { canvasToDataUrl, waitForImage } from "../engine/image";
+import { segmentByContrast } from "../engine/classicSegment";
 import { traceObjectContour, type Point } from "../engine/contour";
 
 // A decoded SAM mask: one byte per pixel (white = object), sized to the crop
@@ -107,13 +109,21 @@ export function useCropSegmentation({
         if (!ctx) throw new Error("canvas unavailable");
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(img, subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h, 0, 0, cw, ch);
-        const cropBytes = await urlToBytes(await canvasToDataUrl(canvas, "image/png"));
 
-        // SAM is prompted with a positive point at this box's centre (the object
-        // the user framed sits there); the backend ignores the box extent.
-        const bbox = { x: 0, y: 0, w: cw, h: ch };
-        const maskBytes = await runSamSegment(modelId, cropBytes, bbox);
-        const mask = await decodeMask(maskBytes);
+        let mask: SegmentationMask;
+        if (modelId === CLASSIC_CV_MODEL_ID) {
+          // Built-in classic CV: contrast-from-background, runs in-app.
+          const { data } = ctx.getImageData(0, 0, cw, ch);
+          const m = segmentByContrast(data, cw, ch);
+          if (!m) throw new Error("classic segmentation failed");
+          mask = { data: m, width: cw, height: ch };
+        } else {
+          // SAM is prompted with a positive point at the crop's centre (the
+          // object the user framed sits there); the backend ignores the box.
+          const cropBytes = await urlToBytes(await canvasToDataUrl(canvas, "image/png"));
+          const maskBytes = await runSamSegment(modelId, cropBytes, { x: 0, y: 0, w: cw, h: ch });
+          mask = await decodeMask(maskBytes);
+        }
         const local = traceObjectContour(mask.data, mask.width, mask.height);
         if (token !== runToken.current) return null; // superseded
         if (!local) {

@@ -20,7 +20,12 @@ export type ModelCatalogEntry = {
   description: string;
   /** File names for multi-file packages (Florence-2); single-file models omit it. */
   files?: readonly string[];
+  /** Built-in engine that runs in the app (no download, always available). */
+  builtin?: boolean;
 };
+
+/** The built-in classic-CV "Adjust crop" engine (no model download). */
+export const CLASSIC_CV_MODEL_ID = "classic-cv";
 
 export type FeatureMeta = {
   key: ProcessingFeatureKey;
@@ -126,6 +131,14 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     size: "~1.2 GB",
     description: "Dense region captioning for crop proposals.",
     files: FLORENCE2_FILES,
+  },
+  {
+    modelId: CLASSIC_CV_MODEL_ID,
+    feature: "objectSegmentation",
+    label: "Classic CV (contrast)",
+    size: "Built-in",
+    description: "Edge/contrast segmentation that runs in-app — no download. Best for solid-colour UI buttons & pills.",
+    builtin: true,
   },
   {
     modelId: "slimsam",

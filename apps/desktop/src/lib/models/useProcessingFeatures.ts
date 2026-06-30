@@ -24,6 +24,8 @@ import {
 
 // One downloadable model's live state plus its actions.
 export type ModelControls = ModelCatalogEntry & {
+  /** Always available, runs in-app — no download. */
+  builtin: boolean;
   installed: boolean;
   installing: boolean;
   /** Download progress in the [0, 1] range. */
@@ -112,7 +114,8 @@ export function useProcessingFeatures(): ProcessingState {
 
   const install = useCallback(async (modelId: string) => {
     const entry = catalogEntry(modelId);
-    if (!entry) return;
+    if (!entry || entry.builtin) return; // built-in engines need no download
+
     setInstalling((prev) => ({ ...prev, [modelId]: true }));
     setProgress((prev) => ({ ...prev, [modelId]: 0 }));
     setCurrentFile((prev) => ({ ...prev, [modelId]: "" }));
@@ -153,6 +156,7 @@ export function useProcessingFeatures(): ProcessingState {
 
   const uninstall = useCallback(async (modelId: string) => {
     const entry = catalogEntry(modelId);
+    if (entry?.builtin) return; // built-in engines cannot be removed
     try {
       await modelUninstall(modelId);
     } catch (error) {
@@ -181,7 +185,9 @@ export function useProcessingFeatures(): ProcessingState {
 
   const features = FEATURE_KEYS.reduce((acc, key) => {
     const meta = FEATURES.find((f) => f.key === key);
-    const installedModels = modelsForFeature(key).filter((m) => installedSet.has(m.modelId));
+    const installedModels = modelsForFeature(key).filter(
+      (m) => m.builtin || installedSet.has(m.modelId),
+    );
     const activeModelId = resolveActiveModelId(
       installedModels,
       persisted.features[key].activeModelId,
@@ -207,7 +213,8 @@ export function useProcessingFeatures(): ProcessingState {
     const active = features[entry.feature].activeModelId === entry.modelId;
     acc[entry.modelId] = {
       ...entry,
-      installed: installedSet.has(entry.modelId),
+      builtin: entry.builtin ?? false,
+      installed: (entry.builtin ?? false) || installedSet.has(entry.modelId),
       installing: installing[entry.modelId],
       progress: progress[entry.modelId],
       currentFile: currentFile[entry.modelId],

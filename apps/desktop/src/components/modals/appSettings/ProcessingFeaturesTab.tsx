@@ -159,7 +159,9 @@ function ModelListRow({ model }: { model: ModelControls }) {
         <span className="shrink-0 text-[11px] text-[var(--text-faint)]">{model.size}</span>
       </div>
 
-      {model.installing ? (
+      {model.builtin ? (
+        <span className="shrink-0 px-1 text-[11px] text-[var(--text-faint)]">Built-in</span>
+      ) : model.installing ? (
         <div className="flex items-center gap-2">
           <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{pct}%</span>
           <button
