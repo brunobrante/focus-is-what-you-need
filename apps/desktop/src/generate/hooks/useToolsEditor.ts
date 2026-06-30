@@ -52,6 +52,7 @@ import { usePenTool } from "./usePenTool";
 import { growPenPath, penBounds, penPathFromPolygon } from "../engine/pen";
 import { componentBoxes, foregroundBoundingBox, simplifyPath } from "../engine/contour";
 import { computeEdgeMargins, computeSpacing } from "../engine/measure";
+import { nextRingInset } from "../engine/radialRings";
 import { CLASSIC_CV_MODEL_ID } from "@/lib/models/modelCatalog";
 import type { MeasureOverlay } from "../engine/types";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
@@ -63,6 +64,30 @@ import { useAutoDetect } from "./useAutoDetect";
 import { useCropSegmentation } from "./useCropSegmentation";
 import { useStackPersist } from "./useStackPersist";
 import { useCutVariants } from "./useCutVariants";
+
+// Rasterizes a subject-pixel crop region of `img` to a grayscale buffer (Rec.601
+// luma) for in-app radial ring detection. Returns null if the box is degenerate
+// or a 2D context is unavailable.
+function rasterizeGray(
+  img: HTMLImageElement,
+  box: CropBox,
+): { gray: Uint8Array; width: number; height: number } | null {
+  const w = Math.max(1, Math.round(box.w));
+  const h = Math.max(1, Math.round(box.h));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const gray = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i += 1) {
+    gray[i] = (data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114) | 0;
+  }
+  return { gray, width: w, height: h };
+}
 
 export type ToolsEditorProps = {
   item: ToolReference;
@@ -547,6 +572,29 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       // Rectangle: snap the box to ALL significant foreground (the whole word /
       // multi-part subject, not just the largest blob), keeping the radius.
       if (selection && selectionCrop) {
+        // Round/concentric subjects first (badges, coins, circular logos): SAM
+        // fills the whole disc, so its bounds barely move and the crop looks
+        // stuck. Read the crop radially and peel to the next ring inward — runs
+        // in-app, no model, and clicking again peels the following ring.
+        const ras = rasterizeGray(img, selectionCrop);
+        const inset = ras ? nextRingInset(ras.gray, ras.width, ras.height) : null;
+        if (inset != null) {
+          const di = inset * fx; // crop-local subject px → content px
+          const w = selection.w - 2 * di;
+          const h = selection.h - 2 * di;
+          if (w >= 1 && h >= 1) {
+            setSelection({
+              x: selection.x + di,
+              y: selection.y + di,
+              w,
+              h,
+              r: Math.min(selection.r ?? 0, w / 2, h / 2),
+            });
+            setSelectionLocked(true);
+            return;
+          }
+        }
+
         const result = await segment(modelId, selectionCrop);
         if (!result) return;
         const bb = foregroundBoundingBox(result.mask.data, result.mask.width, result.mask.height);
