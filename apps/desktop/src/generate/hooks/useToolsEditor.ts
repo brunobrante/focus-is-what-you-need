@@ -19,7 +19,6 @@ import type {
   DrawingPath,
   EditorTool,
   PaddingSides,
-  PaddingSide,
   PaddingValues,
   SidebarTab,
   NewScreenSource,
@@ -109,7 +108,7 @@ export type ToolsEditorState = {
   adjustCrop: (modelId: string | null) => void;
   addPadding: (amount: number, sides: PaddingSides) => void;
   padding: PaddingValues | null;
-  setPaddingSide: (side: PaddingSide, value: number) => void;
+  setPaddingValues: (values: PaddingValues) => void;
   showSizes: () => void;
   showingSizes: boolean;
   penClosed: boolean;
@@ -639,28 +638,20 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         }
       : null;
 
-  // Sets one side's padding to an absolute value (subject px), growing the crop
-  // out from its base box and clamping to the image.
-  const setPaddingSide = useCallback(
-    (side: PaddingSide, value: number) => {
+  // Sets all four paddings to absolute values (subject px) at once, growing the
+  // crop out from its base box and clamping to the image. One setSelection so the
+  // sides don't fight stale state.
+  const setPaddingValues = useCallback(
+    (next: PaddingValues) => {
       const img = imgRef.current;
       if (!paddingBase || !selection || !img || !img.naturalWidth || !img.naturalHeight) return;
       if (!img.clientWidth || !img.clientHeight) return;
       const fx = img.clientWidth / img.naturalWidth;
       const fy = img.clientHeight / img.naturalHeight;
-      const sel = selectionToSubjectCoords(selection);
-      if (!sel) return;
-      const cur: PaddingValues = {
-        left: Math.max(0, paddingBase.x - sel.x),
-        top: Math.max(0, paddingBase.y - sel.y),
-        right: Math.max(0, sel.x + sel.w - (paddingBase.x + paddingBase.w)),
-        bottom: Math.max(0, sel.y + sel.h - (paddingBase.y + paddingBase.h)),
-      };
-      const next = { ...cur, [side]: Math.max(0, value) };
-      const x0 = Math.max(0, paddingBase.x - next.left);
-      const y0 = Math.max(0, paddingBase.y - next.top);
-      const x1 = Math.min(img.naturalWidth, paddingBase.x + paddingBase.w + next.right);
-      const y1 = Math.min(img.naturalHeight, paddingBase.y + paddingBase.h + next.bottom);
+      const x0 = Math.max(0, paddingBase.x - Math.max(0, next.left));
+      const y0 = Math.max(0, paddingBase.y - Math.max(0, next.top));
+      const x1 = Math.min(img.naturalWidth, paddingBase.x + paddingBase.w + Math.max(0, next.right));
+      const y1 = Math.min(img.naturalHeight, paddingBase.y + paddingBase.h + Math.max(0, next.bottom));
       if (x1 - x0 < 1 || y1 - y0 < 1) return;
       const w = (x1 - x0) * fx;
       const h = (y1 - y0) * fy;
@@ -677,7 +668,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       setSelection(nextSel);
       setSelectionLocked(true);
     },
-    [imgRef, paddingBase, selection, selectionToSubjectCoords, setSelection, setSelectionLocked],
+    [imgRef, paddingBase, selection, setSelection, setSelectionLocked],
   );
 
   // "Show sizes": segment the objects inside the crop (always the built-in
@@ -1004,7 +995,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     adjustCrop,
     addPadding,
     padding,
-    setPaddingSide,
+    setPaddingValues,
     showSizes,
     showingSizes: measurements !== null,
     penClosed: pen.penClosed,

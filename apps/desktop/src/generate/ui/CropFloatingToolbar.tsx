@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Expand, Loader2, Ruler, Scissors } from "lucide-react";
+import { ChevronDown, Expand, Loader2, Ruler, Scissors, SlidersHorizontal } from "lucide-react";
 
 import type { PaddingSide, PaddingValues } from "../types";
 import { DevWrapper } from "@/components/ui/DevWrapper";
@@ -30,7 +30,7 @@ export function CropFloatingToolbar({
   showingSizes: boolean;
   /** Current per-side padding (rectangle); null for the pen. */
   padding: PaddingValues | null;
-  onSetPadding: (side: PaddingSide, value: number) => void;
+  onSetPadding: (values: PaddingValues) => void;
   /** Uniform outward grow for the pen, in px. */
   onGrowPen: (amount: number) => void;
 }) {
@@ -129,15 +129,20 @@ export function CropFloatingToolbar({
 const inputClass =
   "h-7 w-[52px] rounded-[5px] border border-[var(--border-strong)] bg-[var(--surface)] px-1.5 text-center text-[11.5px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]";
 
-/** Per-side padding inputs laid out as a cross around a box icon. */
+/**
+ * Figma-style padding: one input that sets all sides, with a toggle to expand
+ * into per-side fields (laid out as a cross). The single input shows the common
+ * value when all sides match, or "Mixed" otherwise.
+ */
 function PaddingEditor({
   padding,
   onSetPadding,
 }: {
   padding: PaddingValues;
-  onSetPadding: (side: PaddingSide, value: number) => void;
+  onSetPadding: (values: PaddingValues) => void;
 }) {
-  // Local draft so the field stays editable while typing; resynced when the crop
+  const [detailed, setDetailed] = useState(false);
+  // Local draft so the fields stay editable while typing; resynced when the crop
   // (and thus the derived padding) changes by other means. Depend on the values,
   // not the object — `padding` is a fresh object each render, which would loop.
   const [draft, setDraft] = useState<PaddingValues>(padding);
@@ -146,6 +151,22 @@ function PaddingEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [padding.top, padding.right, padding.bottom, padding.left]);
 
+  const uniform =
+    draft.top === draft.right && draft.right === draft.bottom && draft.bottom === draft.left;
+
+  const setSide = (side: PaddingSide, raw: string) => {
+    const v = Math.max(0, Math.round(Number(raw) || 0));
+    const next = { ...draft, [side]: v };
+    setDraft(next);
+    onSetPadding(next);
+  };
+  const setAll = (raw: string) => {
+    const v = Math.max(0, Math.round(Number(raw) || 0));
+    const next = { top: v, right: v, bottom: v, left: v };
+    setDraft(next);
+    onSetPadding(next);
+  };
+
   const field = (side: PaddingSide) => (
     <input
       type="number"
@@ -153,31 +174,60 @@ function PaddingEditor({
       step={1}
       aria-label={`${side} padding`}
       value={draft[side]}
-      onChange={(e) => {
-        const v = Math.max(0, Math.round(Number(e.target.value) || 0));
-        setDraft((d) => ({ ...d, [side]: v }));
-        onSetPadding(side, v);
-      }}
+      onChange={(e) => setSide(side, e.target.value)}
       className={inputClass}
     />
   );
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Padding (px)</div>
-      <div className="grid grid-cols-3 items-center gap-1.5">
-        <span />
-        {field("top")}
-        <span />
-        {field("left")}
-        <span className="grid h-7 w-7 place-items-center rounded-[5px] border border-dashed border-[var(--border-strong)] text-[var(--text-faint)]">
-          <Expand size={12} strokeWidth={1.8} />
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
+          Padding (px)
         </span>
-        {field("right")}
-        <span />
-        {field("bottom")}
-        <span />
+        <button
+          type="button"
+          aria-label="Padding per side"
+          aria-pressed={detailed}
+          title="Set each side"
+          onClick={() => setDetailed((d) => !d)}
+          className={[
+            "grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] border transition-colors",
+            detailed
+              ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
+              : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)]",
+          ].join(" ")}
+        >
+          <SlidersHorizontal size={12} strokeWidth={1.9} />
+        </button>
       </div>
+
+      {detailed ? (
+        <div className="grid grid-cols-3 items-center gap-1.5">
+          <span />
+          {field("top")}
+          <span />
+          {field("left")}
+          <span className="grid h-7 w-7 place-items-center rounded-[5px] border border-dashed border-[var(--border-strong)] text-[var(--text-faint)]">
+            <Expand size={12} strokeWidth={1.8} />
+          </span>
+          {field("right")}
+          <span />
+          {field("bottom")}
+          <span />
+        </div>
+      ) : (
+        <input
+          type="number"
+          min={0}
+          step={1}
+          aria-label="Padding (all sides)"
+          value={uniform ? draft.top : ""}
+          placeholder={uniform ? undefined : "Mixed"}
+          onChange={(e) => setAll(e.target.value)}
+          className={`${inputClass} w-full text-left`}
+        />
+      )}
     </div>
   );
 }

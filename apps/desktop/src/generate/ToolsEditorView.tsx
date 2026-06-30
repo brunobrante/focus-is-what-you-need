@@ -94,7 +94,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     adjustCrop,
     addPadding,
     padding,
-    setPaddingSide,
+    setPaddingValues,
     showSizes,
     showingSizes,
     penClosed,
@@ -499,7 +499,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   onShowSizes={showSizes}
                   showingSizes={showingSizes}
                   padding={padding}
-                  onSetPadding={setPaddingSide}
+                  onSetPadding={setPaddingValues}
                   onGrowPen={(amount) => addPadding(amount, "all")}
                 />
               ) : null}
