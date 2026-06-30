@@ -1519,7 +1519,9 @@ A single **Auto-generate project thumbnails** switch (on by default). When on, e
 
 **Processing Features tab**:
 
-Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (downloadable implementations). A feature can have several models; **Text Detector** has four and **Auto-detect Components** has two, every other feature has one.
+Optional on-device AI models that run locally and are **off by default**. The tab separates **features** (capabilities) from **models** (implementations). A feature can have several models; **Text Detector** has four, **Auto-detect Components** has two, **Object Segmentation** (the "Adjust crop" engine) has three, every other feature has one. A model can be a download or **built-in** — a built-in engine runs in-app with no download (e.g. Object Segmentation's **Classic CV (contrast)**), is always available, and shows a "Built-in" tag instead of download/delete.
+
+These exact controls (feature switch, per-model active selection, install/delete) are **mirrored in the Builder's right-sidebar Config tab** (under the crop-overlay settings), so models can be downloaded and switched without leaving the Builder; changes apply live through the shared settings.
 
 A single list with one **accordion row per feature**. Each row shows:
 - a chevron **expand/collapse toggle** and the feature's icon + name + description on the left;

@@ -2,6 +2,8 @@ import { ChevronsDownUp, ChevronsUpDown, Image as ImageIcon, RotateCcw, Save } f
 import type { ReactNode } from "react";
 import type { SidebarTab } from "../types";
 import { CROPS_OVERLAY_PRESETS } from "../types";
+import { SidebarAiModels } from "./SidebarAiModels";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 
 export function SidebarTabs({
   active,
@@ -247,6 +249,12 @@ export function SidebarConfigPanel({
           className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[var(--border-strong)] accent-[var(--text)]"
         />
       </div>
+
+      <DevWrapper platform="desktop" block>
+        <div className="border-t border-[var(--border)] pt-4">
+          <SidebarAiModels />
+        </div>
+      </DevWrapper>
     </div>
   );
 }
