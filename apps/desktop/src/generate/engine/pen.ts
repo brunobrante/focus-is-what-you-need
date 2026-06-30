@@ -152,6 +152,30 @@ export function pointInPath(path: PenPath, point: Point, steps = 16): boolean {
 }
 
 /**
+ * Builds a smooth closed pen path through `points` (e.g. an object contour from
+ * "Adjust crop"). Each vertex becomes a smooth anchor whose mirrored handles are
+ * the Catmull-Rom tangents (`(next - prev) / 6`), so the curve passes through
+ * every point and stays editable. Fewer than 3 points → plain corner anchors.
+ */
+export function penPathFromPolygon(points: Point[], closed = true): PenPath {
+  const n = points.length;
+  if (n < 3) return { anchors: points.map((p) => ({ x: p.x, y: p.y })), closed };
+  const anchors: PenAnchor[] = points.map((p, i) => {
+    const prev = points[(i - 1 + n) % n];
+    const next = points[(i + 1) % n];
+    const tx = (next.x - prev.x) / 6;
+    const ty = (next.y - prev.y) / 6;
+    return {
+      x: p.x,
+      y: p.y,
+      in: { x: p.x - tx, y: p.y - ty },
+      out: { x: p.x + tx, y: p.y + ty },
+    };
+  });
+  return { anchors, closed };
+}
+
+/**
  * Maps every point of the path (each anchor and its handles) through `fn`. Used
  * to take a path from content space into the cut canvas's local pixel space when
  * rasterizing the silhouette.

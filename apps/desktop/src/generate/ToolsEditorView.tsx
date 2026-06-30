@@ -496,6 +496,27 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   >
                     Cancel
                   </button>
+                  <DevWrapper platform="desktop">
+                    <button
+                      type="button"
+                      data-selection-action
+                      disabled={segmenting || !objectSegmentationModelId || !penCrop}
+                      onClick={() => adjustCrop(objectSegmentationModelId)}
+                      title={
+                        objectSegmentationModelId
+                          ? "Redraw the pen along the object's edges"
+                          : "Install a segmentation model in Settings first"
+                      }
+                      className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {segmenting ? (
+                        <Loader2 size={11} strokeWidth={2} className="animate-spin" />
+                      ) : (
+                        <Scissors size={11} strokeWidth={2} />
+                      )}
+                      {segmenting ? "Adjusting…" : "Adjust crop"}
+                    </button>
+                  </DevWrapper>
                   <button
                     type="button"
                     data-selection-action

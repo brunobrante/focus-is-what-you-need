@@ -58,6 +58,14 @@ export function usePenTool({
     setPenCursor(null);
   }, []);
 
+  // Replace the path wholesale — used by "Adjust crop" to redraw the pen along a
+  // segmented object contour.
+  const replacePenPath = useCallback((path: PenPath) => {
+    dragRef.current = null;
+    setPenCursor(null);
+    setPenPath(path);
+  }, []);
+
   // Leaving the pen tool drops any in-progress path (kept simple until the cut
   // is wired to save).
   useEffect(() => {
@@ -206,5 +214,6 @@ export function usePenTool({
     onPenPointerMove,
     onPenPointerUp,
     resetPen,
+    replacePenPath,
   };
 }

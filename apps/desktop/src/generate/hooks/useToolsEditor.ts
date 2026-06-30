@@ -47,7 +47,8 @@ import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
 import { usePenTool } from "./usePenTool";
-import { penBounds } from "../engine/pen";
+import { penBounds, penPathFromPolygon } from "../engine/pen";
+import { simplifyPath } from "../engine/contour";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
@@ -471,21 +472,85 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   // --- Adjust crop (object segmentation) -----------------------------------
 
-  const { segmenting, segmentError, segmentation, segment, clearSegmentation } =
+  // The closed pen silhouette's bounds in subject pixels — the region to segment
+  // and the toolbar's size badge. Declared here so adjustCrop (below) can use it.
+  const penBox = pen.penClosed && pen.penPath ? penBounds(pen.penPath) : null;
+  const penCrop = penBox ? selectionToSubjectCoords(penBox) : null;
+
+  const { segmenting, segmentError, segment, clearSegmentation } =
     useCropSegmentation({ imgRef });
 
-  // The silhouette belongs to one specific crop rectangle; any change to the
-  // selection (drag, resize, cancel) makes the preview stale, so drop it.
+  // Reset any segmenting/error state when the rectangle selection changes.
   useEffect(() => {
     clearSegmentation();
   }, [selection, clearSegmentation]);
 
+  // "Adjust crop" segments the object inside the user's drawn area and reshapes
+  // the ACTIVE cut tool to it: the rectangle snaps to the object's bounds, the
+  // pen is redrawn as a smooth path along the object's silhouette.
   const adjustCrop = useCallback(
-    (modelId: string | null) => {
-      if (!canCrop || !selectionCrop || segmenting) return;
-      void segment(modelId, selectionCrop);
+    async (modelId: string | null) => {
+      if (!canCrop || segmenting) return;
+      const img = imgRef.current;
+      if (!img || !img.naturalWidth || !img.naturalHeight || !img.clientWidth || !img.clientHeight) {
+        return;
+      }
+      const fx = img.clientWidth / img.naturalWidth;
+      const fy = img.clientHeight / img.naturalHeight;
+
+      // Pen: redraw the path along the object contour (subject → content coords).
+      if (currentTool === "pen" && pen.penClosed && penCrop) {
+        const result = await segment(modelId, penCrop);
+        if (!result || result.contour.length < 3) return;
+        const eps = Math.max(2, Math.min(penCrop.w, penCrop.h) * 0.02);
+        const poly = simplifyPath(result.contour, eps).map((p) => ({ x: p.x * fx, y: p.y * fy }));
+        if (poly.length >= 3) pen.replacePenPath(penPathFromPolygon(poly));
+        clearSegmentation();
+        return;
+      }
+
+      // Rectangle: snap the box to the object's tight bounds (keeping the radius).
+      if (selection && selectionCrop) {
+        const result = await segment(modelId, selectionCrop);
+        if (!result || result.contour.length < 3) return;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const p of result.contour) {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        }
+        const w = (maxX - minX) * fx;
+        const h = (maxY - minY) * fy;
+        if (w < 1 || h < 1) return;
+        setSelection({
+          x: minX * fx,
+          y: minY * fy,
+          w,
+          h,
+          r: Math.min(selection.r ?? 0, w / 2, h / 2),
+        });
+        setSelectionLocked(true);
+        clearSegmentation();
+      }
     },
-    [canCrop, segment, segmenting, selectionCrop],
+    [
+      canCrop,
+      clearSegmentation,
+      currentTool,
+      imgRef,
+      pen,
+      penCrop,
+      segment,
+      segmenting,
+      selection,
+      selectionCrop,
+      setSelection,
+      setSelectionLocked,
+    ],
   );
 
   // --- Canvas painter ------------------------------------------------------
@@ -504,7 +569,9 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
-    segmentationContour: segmentation?.contour ?? null,
+    // Adjust crop now reshapes the active tool directly, so there is no separate
+    // green silhouette preview to draw.
+    segmentationContour: null,
     penPath: pen.penPath,
     penCursor: pen.penCursor,
     drawingPath,
@@ -597,10 +664,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     });
 
   // --- Pen cut toolbar (same flow as the rectangle) ------------------------
-
-  // The closed silhouette's size in subject pixels, for the toolbar's size badge.
-  const penBox = pen.penClosed && pen.penPath ? penBounds(pen.penPath) : null;
-  const penCrop = penBox ? selectionToSubjectCoords(penBox) : null;
 
   const cancelPen = useCallback(() => pen.resetPen(), [pen]);
   const savePen = useCallback(() => {

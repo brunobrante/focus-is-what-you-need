@@ -7,6 +7,7 @@ import {
   moveAnchor,
   nearFirstAnchor,
   penBounds,
+  penPathFromPolygon,
   pointInPath,
   transformPenPath,
   type PenPath,
@@ -94,6 +95,27 @@ test("pointInPath is true inside a closed triangle and false outside", () => {
 test("pointInPath returns false for an open or degenerate path", () => {
   const open: PenPath = { anchors: [{ x: 0, y: 0 }, { x: 10, y: 0 }], closed: false };
   expect(pointInPath(open, { x: 5, y: 0 })).toBe(false);
+});
+
+test("penPathFromPolygon builds a smooth closed path through every vertex", () => {
+  const square = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  const path = penPathFromPolygon(square);
+  expect(path.closed).toBe(true);
+  expect(path.anchors.length).toBe(4);
+  // Each anchor sits on its vertex with mirrored (smooth) handles.
+  path.anchors.forEach((a, i) => {
+    expect(a.x).toBe(square[i].x);
+    expect(a.y).toBe(square[i].y);
+    expect(a.in!.x + a.out!.x).toBeCloseTo(2 * a.x, 6);
+    expect(a.in!.y + a.out!.y).toBeCloseTo(2 * a.y, 6);
+  });
+  // Anchor 0 (0,0): prev=(0,10), next=(10,0) → tangent ((10-0)/6, (0-10)/6).
+  expect(path.anchors[0].out).toEqual({ x: 10 / 6, y: -10 / 6 });
+});
+
+test("penPathFromPolygon falls back to corner anchors below 3 points", () => {
+  const path = penPathFromPolygon([{ x: 0, y: 0 }, { x: 5, y: 5 }]);
+  expect(path.anchors).toEqual([{ x: 0, y: 0 }, { x: 5, y: 5 }]);
 });
 
 test("transformPenPath maps anchors and handles, preserving closed", () => {
