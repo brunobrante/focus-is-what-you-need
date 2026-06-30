@@ -120,27 +120,45 @@ export function usePenTool({
         return;
       }
 
+      // Translation drags (whole path or one anchor) read and advance `grab` on
+      // the ref OUTSIDE the state updater, so the updater stays pure — React
+      // StrictMode double-invokes it, and mutating `grab` inside would zero out
+      // the second pass and freeze the move.
+      if (drag.kind === "all" || drag.kind === "anchor") {
+        const dx = point.x - drag.grab.x;
+        const dy = point.y - drag.grab.y;
+        drag.grab = point;
+        if (drag.kind === "all") {
+          setPenPath((path) =>
+            path ? { ...path, anchors: path.anchors.map((an) => moveAnchor(an, dx, dy)) } : path,
+          );
+        } else {
+          const index = drag.index;
+          setPenPath((path) => {
+            if (!path) return path;
+            const a = path.anchors[index];
+            if (!a) return path;
+            const anchors = path.anchors.slice();
+            anchors[index] = moveAnchor(a, dx, dy);
+            return { ...path, anchors };
+          });
+        }
+        return;
+      }
+
+      // Handle drags set the handle absolutely from the cursor (already pure).
+      const kind = drag.kind; // "newHandle" | "in" | "out"
+      const index = drag.index;
       setPenPath((path) => {
         if (!path) return path;
-        if (drag.kind === "all") {
-          const dx = point.x - drag.grab.x;
-          const dy = point.y - drag.grab.y;
-          drag.grab = point;
-          return { ...path, anchors: path.anchors.map((an) => moveAnchor(an, dx, dy)) };
-        }
-        const anchors = path.anchors.slice();
-        const a = anchors[drag.index];
+        const a = path.anchors[index];
         if (!a) return path;
-        if (drag.kind === "anchor") {
-          const dx = point.x - drag.grab.x;
-          const dy = point.y - drag.grab.y;
-          anchors[drag.index] = moveAnchor(a, dx, dy);
-          drag.grab = point;
-        } else if (drag.kind === "in") {
-          anchors[drag.index] = { x: a.x, y: a.y, in: { ...point }, out: mirrorHandle(a, point) };
+        const anchors = path.anchors.slice();
+        if (kind === "in") {
+          anchors[index] = { x: a.x, y: a.y, in: { ...point }, out: mirrorHandle(a, point) };
         } else {
           // "newHandle" or "out": pull the outgoing handle, mirror the incoming one.
-          anchors[drag.index] = { x: a.x, y: a.y, out: { ...point }, in: mirrorHandle(a, point) };
+          anchors[index] = { x: a.x, y: a.y, out: { ...point }, in: mirrorHandle(a, point) };
         }
         return { ...path, anchors };
       });
