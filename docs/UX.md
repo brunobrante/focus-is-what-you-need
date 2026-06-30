@@ -1374,7 +1374,13 @@ again, or the canvas ×, returns to the editor.
   - Clicking a non-main row makes that variant the **main** one — the cut everywhere (tree thumbnail, canvas, Stack, Gallery, snapshot) switches to it
   - Delete is disabled for the **Original** and for the current **main** variant; deleting any other variant removes it. Selecting **Original** as main reverts the cut to the plain crop.
 
-**Left tool rail**: Move, Crop, Draw, plus (when models are installed) a processing group. Non-crop tools do not overwrite the cut — each run adds a **variant** and makes it the main one, keeping the plain crop available as **Original**:
+**Crop action toolbars** (shown once a crop is active — a locked rectangle selection or a closed pen path):
+- a cluster at the **top-right** of the stage with the crop's **size** (W × H), **Cancel**, and **Save** (Save rasterizes the cut — a rounded rectangle for the Crop tool, the silhouette for the Pen tool).
+- a **floating toolbar centred at the top** with two crop-shaping actions:
+  - **Adjust crop** (desktop-only; needs an Object Segmentation model) — segments the object the user framed and reshapes the active tool to it: the rectangle snaps to the object's bounds (the whole word for multi-part text, not one glyph); the pen is redrawn as a smooth path along the object's silhouette.
+  - **Add padding** — grows the crop area; a dropdown beside it picks which sides grow (All / Left+Right / Top+Bottom / each single side) and the amount in px. The rectangle expands the chosen edges (clamped to the image); the pen grows uniformly outward. Clicking again adds more.
+
+**Left tool rail**: Move, Crop, Draw, Pen, plus (when models are installed) a processing group. The **Pen** tool (`P`) is a Bézier cut: click drops a corner anchor, click-drag pulls mirrored curve handles, clicking the first anchor (or Enter) closes the path; once closed its anchors/handles drag to reshape and dragging the interior moves the whole path. Non-crop tools do not overwrite the cut — each run adds a **variant** and makes it the main one, keeping the plain crop available as **Original**:
 - **Remove background** — runs BiRefNet and adds a transparent-background PNG variant
 - **Upscale 4×** — runs Real-ESRGAN and adds an upscaled PNG variant
 - **Remove element** (Wand2 icon, only when the Remove Element feature is enabled) — enters a mask-drawing mode on the canvas: an overlay appears over the open cut's image and the cursor becomes a brush circle. Dragging paints a semi-transparent red mask over what to remove (the brush stays aligned to the image at any zoom). A floating **Apply / Cancel** toolbar shows at the bottom-center of the canvas: **Apply** runs LaMa inpainting and adds the result as a variant (the rail button shows a spinner while running); **Cancel** (or clicking the rail button again) discards the mask and exits. Crop/Draw selection is suspended while masking.

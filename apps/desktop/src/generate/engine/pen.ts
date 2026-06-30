@@ -195,6 +195,36 @@ export function transformPenPath(path: PenPath, fn: (p: Point) => Point): PenPat
   };
 }
 
+/**
+ * Grows (or shrinks, with a negative `distance`) a closed path outward from its
+ * centroid: every anchor (with its handles) is pushed `distance` along its radial
+ * direction. An approximate uniform padding for a freeform silhouette — exact for
+ * a circle, close enough for buttons/blobs.
+ */
+export function growPenPath(path: PenPath, distance: number): PenPath {
+  const n = path.anchors.length;
+  if (n === 0 || distance === 0) return path;
+  let cx = 0;
+  let cy = 0;
+  for (const a of path.anchors) {
+    cx += a.x;
+    cy += a.y;
+  }
+  cx /= n;
+  cy /= n;
+  return {
+    closed: path.closed,
+    anchors: path.anchors.map((a) => {
+      const dx = a.x - cx;
+      const dy = a.y - cy;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-6) return { ...a };
+      const k = distance / len;
+      return moveAnchor(a, dx * k, dy * k);
+    }),
+  };
+}
+
 /** Translates an anchor and its handles by (dx, dy) — used when dragging it. */
 export function moveAnchor(anchor: PenAnchor, dx: number, dy: number): PenAnchor {
   return {

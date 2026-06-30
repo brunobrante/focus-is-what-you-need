@@ -3,6 +3,17 @@ import { USER_MAX_ZOOM, USER_MIN_ZOOM } from "@/domain/zoom";
 export type SidebarTab = "components" | "config";
 export type EditorTool = "move" | "crop" | "draw" | "pen";
 
+// Which sides "Add padding" grows the crop on. For the pen the growth is always
+// uniform (it has no axis-aligned sides), so only "all" is meaningful there.
+export type PaddingSides =
+  | "all"
+  | "horizontal"
+  | "vertical"
+  | "top"
+  | "right"
+  | "bottom"
+  | "left";
+
 export type { ViewMode } from "./engine/types";
 export type {
   CropBox,

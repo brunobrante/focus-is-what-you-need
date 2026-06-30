@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   cubicAt,
   flattenPen,
+  growPenPath,
   hitTestPen,
   mirrorHandle,
   moveAnchor,
@@ -127,6 +128,37 @@ test("transformPenPath maps anchors and handles, preserving closed", () => {
   expect(scaled.closed).toBe(true);
   expect(scaled.anchors[0]).toEqual({ x: 20, y: 20, in: { x: 16, y: 20 }, out: { x: 24, y: 20 } });
   expect(scaled.anchors[1]).toEqual({ x: 40, y: 40, in: undefined, out: undefined });
+});
+
+test("growPenPath pushes every anchor outward from the centroid by `distance`", () => {
+  // Diamond centred at the origin; each anchor is 10 from the centre.
+  const path: PenPath = {
+    anchors: [{ x: 10, y: 0 }, { x: 0, y: 10 }, { x: -10, y: 0 }, { x: 0, y: -10 }],
+    closed: true,
+  };
+  const grown = growPenPath(path, 5);
+  // Each anchor moves 5 further out along its radial → magnitude 15.
+  expect(grown.anchors[0]).toEqual({ x: 15, y: 0, in: undefined, out: undefined });
+  expect(grown.anchors[1]).toEqual({ x: 0, y: 15, in: undefined, out: undefined });
+  expect(grown.anchors[2]).toEqual({ x: -15, y: 0, in: undefined, out: undefined });
+  expect(grown.anchors[3]).toEqual({ x: 0, y: -15, in: undefined, out: undefined });
+});
+
+test("growPenPath carries handles along with their anchor", () => {
+  // Symmetric diamond (centroid at origin); anchor 0 on the +x radial.
+  const path: PenPath = {
+    anchors: [
+      { x: 10, y: 0, in: { x: 10, y: -2 }, out: { x: 10, y: 2 } },
+      { x: 0, y: 10 },
+      { x: -10, y: 0 },
+      { x: 0, y: -10 },
+    ],
+    closed: true,
+  };
+  const grown = growPenPath(path, 3); // anchor 0 moves +3 in x; handles too
+  expect(grown.anchors[0].x).toBeCloseTo(13, 6);
+  expect(grown.anchors[0].in).toEqual({ x: 13, y: -2 });
+  expect(grown.anchors[0].out).toEqual({ x: 13, y: 2 });
 });
 
 test("moveAnchor translates the anchor and both handles together", () => {

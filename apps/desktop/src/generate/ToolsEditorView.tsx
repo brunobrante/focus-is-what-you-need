@@ -15,7 +15,6 @@ import {
   Pencil,
   PenTool,
   Plus,
-  Scissors,
   Sparkles,
   Wand2,
   X,
@@ -40,6 +39,7 @@ import {
   SidebarConfigPanel,
 } from "./ui/BuilderSidebar";
 import { ConfirmActionModal } from "./ui/ConfirmModal";
+import { CropFloatingToolbar } from "./ui/CropFloatingToolbar";
 import { RootSwitcher } from "./ui/RootSwitcher";
 import { GallerySlider } from "./ui/GallerySlider";
 import { VariantsPanel } from "./ui/VariantsPanel";
@@ -92,6 +92,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     segmenting,
     segmentError,
     adjustCrop,
+    addPadding,
     penClosed,
     penCrop,
     cancelPen,
@@ -443,29 +444,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     Cancel
                   </button>
                   {canCrop ? (
-                    <DevWrapper platform="desktop">
-                      <button
-                        type="button"
-                        data-selection-action
-                        disabled={segmenting || !objectSegmentationModelId}
-                        onClick={() => adjustCrop(objectSegmentationModelId)}
-                        title={
-                          objectSegmentationModelId
-                            ? "Snap the crop to the object's edges"
-                            : "Install a segmentation model in Settings first"
-                        }
-                        className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {segmenting ? (
-                          <Loader2 size={11} strokeWidth={2} className="animate-spin" />
-                        ) : (
-                          <Scissors size={11} strokeWidth={2} />
-                        )}
-                        {segmenting ? "Adjusting…" : "Adjust crop"}
-                      </button>
-                    </DevWrapper>
-                  ) : null}
-                  {canCrop ? (
                     <button
                       type="button"
                       data-selection-action
@@ -496,27 +474,6 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   >
                     Cancel
                   </button>
-                  <DevWrapper platform="desktop">
-                    <button
-                      type="button"
-                      data-selection-action
-                      disabled={segmenting || !objectSegmentationModelId || !penCrop}
-                      onClick={() => adjustCrop(objectSegmentationModelId)}
-                      title={
-                        objectSegmentationModelId
-                          ? "Redraw the pen along the object's edges"
-                          : "Install a segmentation model in Settings first"
-                      }
-                      className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {segmenting ? (
-                        <Loader2 size={11} strokeWidth={2} className="animate-spin" />
-                      ) : (
-                        <Scissors size={11} strokeWidth={2} />
-                      )}
-                      {segmenting ? "Adjusting…" : "Adjust crop"}
-                    </button>
-                  </DevWrapper>
                   <button
                     type="button"
                     data-selection-action
@@ -528,6 +485,15 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     Save
                   </button>
                 </div>
+              ) : null}
+
+              {(selection && currentTool !== "draw") || penClosed ? (
+                <CropFloatingToolbar
+                  onAdjustCrop={() => adjustCrop(objectSegmentationModelId)}
+                  adjusting={segmenting}
+                  canAdjust={!!objectSegmentationModelId}
+                  onAddPadding={addPadding}
+                />
               ) : null}
               </>
               )}

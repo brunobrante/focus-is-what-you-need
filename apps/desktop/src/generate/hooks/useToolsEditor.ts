@@ -18,6 +18,7 @@ import type {
   ViewMode,
   DrawingPath,
   EditorTool,
+  PaddingSides,
   SidebarTab,
   NewScreenSource,
   CutVariantTool,
@@ -47,7 +48,7 @@ import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
 import { usePenTool } from "./usePenTool";
-import { penBounds, penPathFromPolygon } from "../engine/pen";
+import { growPenPath, penBounds, penPathFromPolygon } from "../engine/pen";
 import { foregroundBoundingBox, simplifyPath } from "../engine/contour";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
@@ -101,6 +102,7 @@ export type ToolsEditorState = {
   segmenting: boolean;
   segmentError: string | null;
   adjustCrop: (modelId: string | null) => void;
+  addPadding: (amount: number, sides: PaddingSides) => void;
   penClosed: boolean;
   penCrop: CropBox | null;
   cancelPen: () => void;
@@ -547,6 +549,42 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     ],
   );
 
+  // Grows the active crop area by `amount` (subject px) on the chosen sides: the
+  // rectangle expands its edges (clamped to the image); the pen grows uniformly.
+  const addPadding = useCallback(
+    (amount: number, sides: PaddingSides) => {
+      if (!amount || amount <= 0 || !canCrop) return;
+      const img = imgRef.current;
+      if (!img || !img.clientWidth || !img.clientHeight || !img.naturalWidth || !img.naturalHeight) {
+        return;
+      }
+      const fx = img.clientWidth / img.naturalWidth;
+      const fy = img.clientHeight / img.naturalHeight;
+
+      if (currentTool === "pen" && pen.penClosed && pen.penPath) {
+        pen.replacePenPath(growPenPath(pen.penPath, amount * ((fx + fy) / 2)));
+        return;
+      }
+
+      if (selection) {
+        const left = sides === "all" || sides === "horizontal" || sides === "left";
+        const right = sides === "all" || sides === "horizontal" || sides === "right";
+        const top = sides === "all" || sides === "vertical" || sides === "top";
+        const bottom = sides === "all" || sides === "vertical" || sides === "bottom";
+        const x0 = Math.max(0, selection.x - (left ? amount * fx : 0));
+        const y0 = Math.max(0, selection.y - (top ? amount * fy : 0));
+        const x1 = Math.min(img.clientWidth, selection.x + selection.w + (right ? amount * fx : 0));
+        const y1 = Math.min(img.clientHeight, selection.y + selection.h + (bottom ? amount * fy : 0));
+        const w = x1 - x0;
+        const h = y1 - y0;
+        if (w < 1 || h < 1) return;
+        setSelection({ x: x0, y: y0, w, h, r: Math.min(selection.r ?? 0, w / 2, h / 2) });
+        setSelectionLocked(true);
+      }
+    },
+    [canCrop, currentTool, imgRef, pen, selection, setSelection, setSelectionLocked],
+  );
+
   // --- Canvas painter ------------------------------------------------------
 
   const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
@@ -832,6 +870,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     segmenting,
     segmentError,
     adjustCrop,
+    addPadding,
     penClosed: pen.penClosed,
     penCrop,
     cancelPen,
