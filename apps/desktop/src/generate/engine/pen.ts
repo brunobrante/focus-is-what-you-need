@@ -131,6 +131,26 @@ export function nearFirstAnchor(path: PenPath, point: Point, tol: number): boole
   return dist2(anchorPoint(path.anchors[0]), point) <= tol * tol;
 }
 
+/**
+ * Whether `point` lies inside the path's filled region (ray-casting over the
+ * flattened outline). Used to grab and move the whole closed path, like dragging
+ * the interior of the rectangle selection.
+ */
+export function pointInPath(path: PenPath, point: Point, steps = 16): boolean {
+  const poly = flattenPen(path, steps);
+  if (poly.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const a = poly[i];
+    const b = poly[j];
+    const crosses = a.y > point.y !== b.y > point.y;
+    if (crosses && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 /** Translates an anchor and its handles by (dx, dy) — used when dragging it. */
 export function moveAnchor(anchor: PenAnchor, dx: number, dy: number): PenAnchor {
   return {

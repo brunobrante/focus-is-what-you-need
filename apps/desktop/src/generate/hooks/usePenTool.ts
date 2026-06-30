@@ -6,6 +6,7 @@ import {
   mirrorHandle,
   moveAnchor,
   nearFirstAnchor,
+  pointInPath,
   type PenPath,
   type Point,
 } from "../engine/pen";
@@ -20,7 +21,8 @@ const HIT_TOLERANCE_PX = 11;
 type PenDrag =
   | { kind: "newHandle"; index: number } // pulling the handle of a just-placed anchor
   | { kind: "anchor"; index: number; grab: Point } // moving a closed-path anchor
-  | { kind: "in" | "out"; index: number }; // moving one of an anchor's handles
+  | { kind: "in" | "out"; index: number } // moving one of an anchor's handles
+  | { kind: "all"; grab: Point }; // moving the whole closed path
 
 /**
  * Owns the Bézier pen cut tool: the in-progress/closed path and its pointer +
@@ -82,13 +84,19 @@ export function usePenTool({
         return;
       }
 
-      // Editing a closed path: grab an anchor or a handle.
+      // Editing a closed path: grab an anchor or a handle; otherwise grab the
+      // interior to move the whole path (like dragging inside the rectangle).
       const hit = hitTestPen(path, point, tolerance);
-      if (!hit) return;
-      dragRef.current =
-        hit.type === "anchor"
-          ? { kind: "anchor", index: hit.index, grab: point }
-          : { kind: hit.type, index: hit.index };
+      if (hit) {
+        dragRef.current =
+          hit.type === "anchor"
+            ? { kind: "anchor", index: hit.index, grab: point }
+            : { kind: hit.type, index: hit.index };
+        return;
+      }
+      if (pointInPath(path, point)) {
+        dragRef.current = { kind: "all", grab: point };
+      }
     },
     [penPath, tolerance],
   );
@@ -99,10 +107,27 @@ export function usePenTool({
       if (!point) return;
       setPenCursor(point);
       const drag = dragRef.current;
-      if (!drag) return;
+      if (!drag) {
+        // Hover cursor: over a handle/anchor → grab, inside a closed path → move,
+        // otherwise the drawing crosshair.
+        const path = penPathRef.current;
+        let cursor = "crosshair";
+        if (path?.closed) {
+          if (hitTestPen(path, point, tolerance)) cursor = "grab";
+          else cursor = pointInPath(path, point) ? "move" : "default";
+        }
+        event.currentTarget.style.cursor = cursor;
+        return;
+      }
 
       setPenPath((path) => {
         if (!path) return path;
+        if (drag.kind === "all") {
+          const dx = point.x - drag.grab.x;
+          const dy = point.y - drag.grab.y;
+          drag.grab = point;
+          return { ...path, anchors: path.anchors.map((an) => moveAnchor(an, dx, dy)) };
+        }
         const anchors = path.anchors.slice();
         const a = anchors[drag.index];
         if (!a) return path;
@@ -120,7 +145,7 @@ export function usePenTool({
         return { ...path, anchors };
       });
     },
-    [imgRef, toolZoom],
+    [imgRef, toolZoom, tolerance],
   );
 
   const onPenPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {

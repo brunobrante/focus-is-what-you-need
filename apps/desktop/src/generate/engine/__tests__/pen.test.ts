@@ -7,6 +7,7 @@ import {
   moveAnchor,
   nearFirstAnchor,
   penBounds,
+  pointInPath,
   type PenPath,
 } from "../pen";
 
@@ -77,6 +78,21 @@ test("nearFirstAnchor gates closing on proximity to anchor 0", () => {
   };
   expect(nearFirstAnchor(path, { x: 6, y: 6 }, 5)).toBe(true);
   expect(nearFirstAnchor(path, { x: 40, y: 5 }, 5)).toBe(false);
+});
+
+test("pointInPath is true inside a closed triangle and false outside", () => {
+  const tri: PenPath = {
+    anchors: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 80 }],
+    closed: true,
+  };
+  expect(pointInPath(tri, { x: 50, y: 20 })).toBe(true); // interior
+  expect(pointInPath(tri, { x: 5, y: 70 })).toBe(false); // outside, below a leg
+  expect(pointInPath(tri, { x: 200, y: 200 })).toBe(false); // far away
+});
+
+test("pointInPath returns false for an open or degenerate path", () => {
+  const open: PenPath = { anchors: [{ x: 0, y: 0 }, { x: 10, y: 0 }], closed: false };
+  expect(pointInPath(open, { x: 5, y: 0 })).toBe(false);
 });
 
 test("moveAnchor translates the anchor and both handles together", () => {
