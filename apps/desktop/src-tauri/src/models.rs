@@ -1125,16 +1125,15 @@ fn sam_segment_blocking(
         (emb, pos)
     };
 
-    // 2. Box prompt -> the two corner points in the 1024 input space, labeled
-    //    2 (top-left) and 3 (bottom-right), as the SAM box-prompt convention.
-    let x0 = bbox.x * scale;
-    let y0 = bbox.y * scale;
-    let x1 = (bbox.x + bbox.w) * scale;
-    let y1 = (bbox.y + bbox.h) * scale;
-    let points = Array4::<f32>::from_shape_vec((1, 1, 2, 2), vec![x0, y0, x1, y1])
+    // 2. A single positive point at the box centre, in the 1024 input space. The
+    //    object the user framed sits there, and a point prompt segments THAT
+    //    object — a box prompt instead makes SAM return the whole enclosing
+    //    region (e.g. the card/panel the object sits on), filling the rectangle.
+    let px = (bbox.x + bbox.w / 2.0) * scale;
+    let py = (bbox.y + bbox.h / 2.0) * scale;
+    let points = Array4::<f32>::from_shape_vec((1, 1, 1, 2), vec![px, py])
         .map_err(|e| e.to_string())?;
-    let labels =
-        Array3::<i64>::from_shape_vec((1, 1, 2), vec![2, 3]).map_err(|e| e.to_string())?;
+    let labels = Array3::<i64>::from_shape_vec((1, 1, 1), vec![1]).map_err(|e| e.to_string())?;
 
     // 3. Mask decoder: embeddings + prompt -> iou_scores [1,1,3] and pred_masks
     //    [1,1,3,256,256] (three low-res logit candidates).
@@ -1149,9 +1148,6 @@ fn sam_segment_blocking(
 
     let iou = dec_out[0].try_extract_array::<f32>().map_err(|e| e.to_string())?;
     let iou_scores: Vec<f32> = iou.iter().copied().collect();
-    let best = (0..iou_scores.len())
-        .max_by(|a, b| iou_scores[*a].total_cmp(&iou_scores[*b]))
-        .unwrap_or(0);
 
     let masks = dec_out[1].try_extract_array::<f32>().map_err(|e| e.to_string())?;
     let mshape = masks.shape();
@@ -1161,9 +1157,32 @@ fn sam_segment_blocking(
     let mh = mshape[mshape.len() - 2];
     let mw = mshape[mshape.len() - 1];
     let mdata: Vec<f32> = masks.iter().copied().collect();
-    let plane = mh * mw;
-    let offset = best * plane; // leading dims are [1, 1, num_masks, mh, mw].
-    let low = &mdata[offset..offset + plane];
+    let plane = (mh * mw).max(1);
+    let count = iou_scores.len().min(mdata.len() / plane).max(1);
+
+    // SAM returns several candidates at different granularities. The coarsest is
+    // often the whole enclosing region, which fills the crop and touches every
+    // border. Prefer the highest-IoU mask that does NOT hug the border (an object
+    // inside the selection); fall back to plain max IoU when all of them do.
+    let mut best = 0usize;
+    let mut best_iou = f32::MIN;
+    let mut best_interior = false;
+    for k in 0..count {
+        let low = &mdata[k * plane..k * plane + plane];
+        let interior = border_fraction(low, mw, mh) <= 0.5;
+        let iou_k = iou_scores.get(k).copied().unwrap_or(f32::MIN);
+        let better = match (interior, best_interior) {
+            (true, false) => true,   // any interior mask beats a border-hugging one
+            (false, true) => false,  // never downgrade to a border-hugging mask
+            _ => iou_k > best_iou,    // same class: higher IoU wins
+        };
+        if better {
+            best = k;
+            best_iou = iou_k;
+            best_interior = interior;
+        }
+    }
+    let low = &mdata[best * plane..best * plane + plane];
 
     // 4. Map each original-image pixel back to the low-res logit grid: the grid
     //    covers the 1024 padded input, so a pixel `p` lands at `p * scale * mw/1024`.
@@ -1179,6 +1198,33 @@ fn sam_segment_blocking(
         }
     }
     encode_png(DynamicImage::ImageLuma8(mask))
+}
+
+/// Fraction of a low-res mask's border pixels that are foreground (logit > 0). A
+/// value near 1 means the mask fills its whole frame (the enclosing region), not
+/// a contained object.
+fn border_fraction(low: &[f32], mw: usize, mh: usize) -> f32 {
+    if mw == 0 || mh == 0 {
+        return 0.0;
+    }
+    let mut fg = 0usize;
+    for x in 0..mw {
+        if low[x] > 0.0 {
+            fg += 1;
+        }
+        if low[(mh - 1) * mw + x] > 0.0 {
+            fg += 1;
+        }
+    }
+    for y in 0..mh {
+        if low[y * mw] > 0.0 {
+            fg += 1;
+        }
+        if low[y * mw + (mw - 1)] > 0.0 {
+            fg += 1;
+        }
+    }
+    fg as f32 / (2 * (mw + mh)) as f32
 }
 
 /// Bilinear sample of a row-major `w`×`h` f32 grid at fractional `(fx, fy)`,

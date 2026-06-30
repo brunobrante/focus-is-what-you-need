@@ -23,11 +23,6 @@ export type CropSegmentation = {
   box: CropBox;
 };
 
-// How far inside the crop the SAM box prompt sits (fraction per side). A small
-// inset hints that the rectangle's very edges are background, so SAM returns the
-// object framed by the selection rather than the whole rectangle.
-const PROMPT_INSET = 0.04;
-
 // Decodes a PNG mask (as returned by `run_sam_segment`) into a single-channel
 // grayscale buffer via an offscreen canvas. The R channel carries the mask.
 async function decodeMask(bytes: Uint8Array): Promise<SegmentationMask> {
@@ -114,15 +109,9 @@ export function useCropSegmentation({
         ctx.drawImage(img, subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h, 0, 0, cw, ch);
         const cropBytes = await urlToBytes(await canvasToDataUrl(canvas, "image/png"));
 
-        const insetX = Math.min(Math.floor(cw / 2) - 1, Math.max(1, Math.round(cw * PROMPT_INSET)));
-        const insetY = Math.min(Math.floor(ch / 2) - 1, Math.max(1, Math.round(ch * PROMPT_INSET)));
-        const bbox = {
-          x: insetX,
-          y: insetY,
-          w: Math.max(1, cw - insetX * 2),
-          h: Math.max(1, ch - insetY * 2),
-        };
-
+        // SAM is prompted with a positive point at this box's centre (the object
+        // the user framed sits there); the backend ignores the box extent.
+        const bbox = { x: 0, y: 0, w: cw, h: ch };
         const maskBytes = await runSamSegment(modelId, cropBytes, bbox);
         const mask = await decodeMask(maskBytes);
         const local = traceObjectContour(mask.data, mask.width, mask.height);
