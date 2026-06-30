@@ -14,6 +14,10 @@ export type PaddingSides =
   | "bottom"
   | "left";
 
+// The rectangle crop's per-side padding (subject px) relative to its base box.
+export type PaddingSide = "top" | "right" | "bottom" | "left";
+export type PaddingValues = Record<PaddingSide, number>;
+
 export type { ViewMode } from "./engine/types";
 export type {
   CropBox,

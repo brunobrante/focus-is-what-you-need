@@ -1,45 +1,40 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Expand, Loader2, Ruler, Scissors } from "lucide-react";
 
-import type { PaddingSides } from "../types";
+import type { PaddingSide, PaddingValues } from "../types";
 import { DevWrapper } from "@/components/ui/DevWrapper";
-
-const PADDING_OPTIONS: { value: PaddingSides; label: string }[] = [
-  { value: "all", label: "All sides" },
-  { value: "horizontal", label: "Left + Right" },
-  { value: "vertical", label: "Top + Bottom" },
-  { value: "top", label: "Top" },
-  { value: "right", label: "Right" },
-  { value: "bottom", label: "Bottom" },
-  { value: "left", label: "Left" },
-];
 
 /**
  * Floating toolbar centred at the top of the stage while a crop (rectangle or
- * closed pen) is active: "Adjust crop" (segment the framed object) and "Add
- * padding" (grow the crop area), the latter with a dropdown to pick which sides
- * grow and by how many pixels.
+ * closed pen) is active: "Adjust crop" (segment the framed object), "Show sizes"
+ * (measure the spacing/padding), and a padding control. For the rectangle the
+ * padding control is a per-side editor — each input shows and SETS that side's
+ * padding (absolute, not an increment); for the pen it grows uniformly.
  */
 export function CropFloatingToolbar({
   onAdjustCrop,
   adjusting,
   canAdjust,
-  onAddPadding,
   onShowSizes,
   showingSizes,
+  padding,
+  onSetPadding,
+  onGrowPen,
 }: {
   onAdjustCrop: () => void;
   adjusting: boolean;
   /** Whether a segmentation model is available (else Adjust crop is disabled). */
   canAdjust: boolean;
-  onAddPadding: (amount: number, sides: PaddingSides) => void;
   onShowSizes: () => void;
   /** Whether the measurement overlay is currently shown (button acts as a toggle). */
   showingSizes: boolean;
+  /** Current per-side padding (rectangle); null for the pen. */
+  padding: PaddingValues | null;
+  onSetPadding: (side: PaddingSide, value: number) => void;
+  /** Uniform outward grow for the pen, in px. */
+  onGrowPen: (amount: number) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState(16);
-  const [sides, setSides] = useState<PaddingSides>("all");
 
   return (
     <div
@@ -90,22 +85,19 @@ export function CropFloatingToolbar({
         <button
           type="button"
           data-selection-action
-          onClick={() => onAddPadding(amount, sides)}
-          title={`Grow the crop by ${amount}px (${sides})`}
-          className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-l-[6px] border border-r-0 border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-        >
-          <Expand size={11} strokeWidth={2} />
-          Add padding
-        </button>
-        <button
-          type="button"
-          data-selection-action
-          aria-label="Padding options"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="inline-flex h-8 cursor-pointer items-center rounded-r-[6px] border border-[var(--border)] bg-[var(--surface)] px-1 text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
+          title="Padding"
+          className={[
+            "inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border px-2.5 text-[11.5px] font-medium transition-colors",
+            open
+              ? "border-[var(--border-strong)] bg-[var(--surface-hover)] text-[var(--text)]"
+              : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]",
+          ].join(" ")}
         >
-          <ChevronDown size={13} strokeWidth={2} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+          <Expand size={11} strokeWidth={2} />
+          Padding
+          <ChevronDown size={12} strokeWidth={2} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
         </button>
 
         {open ? (
@@ -119,45 +111,100 @@ export function CropFloatingToolbar({
             />
             <div
               data-selection-action
-              className="absolute right-0 top-[calc(100%+6px)] z-50 w-[180px] rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-2 shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
+              className="absolute right-0 top-[calc(100%+6px)] z-50 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
             >
-              <div className="mb-1 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
-                Sides
-              </div>
-              <div className="mb-2 flex flex-col gap-0.5">
-                {PADDING_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setSides(opt.value)}
-                    className={[
-                      "flex h-7 cursor-pointer items-center rounded-[5px] px-2 text-left text-[11.5px] transition-colors",
-                      sides === opt.value
-                        ? "bg-[var(--accent)] text-[var(--accent-fg)]"
-                        : "text-[var(--text)] hover:bg-[var(--surface-hover)]",
-                    ].join(" ")}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <label className="flex items-center justify-between gap-2 text-[11.5px] text-[var(--text-muted)]">
-                Amount
-                <span className="inline-flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={amount}
-                    onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
-                    className="h-7 w-[56px] rounded-[5px] border border-[var(--border-strong)] bg-[var(--surface)] px-1.5 text-right text-[11.5px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                  />
-                  <span className="text-[10.5px] text-[var(--text-faint)]">px</span>
-                </span>
-              </label>
+              {padding ? (
+                <PaddingEditor padding={padding} onSetPadding={onSetPadding} />
+              ) : (
+                <PenPaddingEditor onGrowPen={onGrowPen} />
+              )}
             </div>
           </>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+const inputClass =
+  "h-7 w-[52px] rounded-[5px] border border-[var(--border-strong)] bg-[var(--surface)] px-1.5 text-center text-[11.5px] tabular-nums text-[var(--text)] outline-none focus:border-[var(--accent)]";
+
+/** Per-side padding inputs laid out as a cross around a box icon. */
+function PaddingEditor({
+  padding,
+  onSetPadding,
+}: {
+  padding: PaddingValues;
+  onSetPadding: (side: PaddingSide, value: number) => void;
+}) {
+  // Local draft so the field stays editable while typing; resynced when the crop
+  // (and thus the derived padding) changes by other means. Depend on the values,
+  // not the object — `padding` is a fresh object each render, which would loop.
+  const [draft, setDraft] = useState<PaddingValues>(padding);
+  useEffect(() => {
+    setDraft({ top: padding.top, right: padding.right, bottom: padding.bottom, left: padding.left });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [padding.top, padding.right, padding.bottom, padding.left]);
+
+  const field = (side: PaddingSide) => (
+    <input
+      type="number"
+      min={0}
+      step={1}
+      aria-label={`${side} padding`}
+      value={draft[side]}
+      onChange={(e) => {
+        const v = Math.max(0, Math.round(Number(e.target.value) || 0));
+        setDraft((d) => ({ ...d, [side]: v }));
+        onSetPadding(side, v);
+      }}
+      className={inputClass}
+    />
+  );
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Padding (px)</div>
+      <div className="grid grid-cols-3 items-center gap-1.5">
+        <span />
+        {field("top")}
+        <span />
+        {field("left")}
+        <span className="grid h-7 w-7 place-items-center rounded-[5px] border border-dashed border-[var(--border-strong)] text-[var(--text-faint)]">
+          <Expand size={12} strokeWidth={1.8} />
+        </span>
+        {field("right")}
+        <span />
+        {field("bottom")}
+        <span />
+      </div>
+    </div>
+  );
+}
+
+/** A single uniform-grow input for the pen (no axis-aligned sides). */
+function PenPaddingEditor({ onGrowPen }: { onGrowPen: (amount: number) => void }) {
+  const [amount, setAmount] = useState(16);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">Grow path (px)</div>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          aria-label="Grow amount"
+          value={amount}
+          onChange={(e) => setAmount(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+          className={inputClass}
+        />
+        <button
+          type="button"
+          onClick={() => onGrowPen(amount)}
+          className="h-7 cursor-pointer rounded-[5px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white"
+        >
+          Grow
+        </button>
       </div>
     </div>
   );

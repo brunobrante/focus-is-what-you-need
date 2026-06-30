@@ -19,6 +19,8 @@ import type {
   DrawingPath,
   EditorTool,
   PaddingSides,
+  PaddingSide,
+  PaddingValues,
   SidebarTab,
   NewScreenSource,
   CutVariantTool,
@@ -106,6 +108,8 @@ export type ToolsEditorState = {
   segmentError: string | null;
   adjustCrop: (modelId: string | null) => void;
   addPadding: (amount: number, sides: PaddingSides) => void;
+  padding: PaddingValues | null;
+  setPaddingSide: (side: PaddingSide, value: number) => void;
   showSizes: () => void;
   showingSizes: boolean;
   penClosed: boolean;
@@ -487,6 +491,22 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   // "Show sizes" overlay (object boxes + gaps), in subject coords, or null.
   const [measurements, setMeasurements] = useState<MeasureOverlay | null>(null);
 
+  // Padding model: `paddingBase` is the rectangle crop (subject px) before any
+  // padding; the per-side padding is how far the current selection has grown
+  // beyond it. Captured fresh whenever the selection changes by non-padding means
+  // (draw/resize/move/adjust), so the toolbar inputs show — and SET — the actual
+  // padding on each side rather than blindly incrementing.
+  const [paddingBase, setPaddingBase] = useState<CropBox | null>(null);
+  const paddingApplyRef = useRef(false);
+
+  useEffect(() => {
+    if (paddingApplyRef.current) {
+      paddingApplyRef.current = false;
+      return;
+    }
+    setPaddingBase(selection ? selectionToSubjectCoords(selection) : null);
+  }, [selection, selectionToSubjectCoords]);
+
   const { segmenting, segmentError, segment, clearSegmentation } =
     useCropSegmentation({ imgRef });
 
@@ -597,6 +617,67 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       }
     },
     [canCrop, currentTool, imgRef, pen, selection, setSelection, setSelectionLocked],
+  );
+
+  // The rectangle crop's current per-side padding (subject px) = how far the
+  // selection has grown beyond its base box. Null for the pen (no axis-aligned
+  // sides) or before a base is captured.
+  const selectionSubject = selection ? selectionToSubjectCoords(selection) : null;
+  const padding: PaddingValues | null =
+    currentTool !== "pen" && paddingBase && selectionSubject
+      ? {
+          left: Math.max(0, Math.round(paddingBase.x - selectionSubject.x)),
+          top: Math.max(0, Math.round(paddingBase.y - selectionSubject.y)),
+          right: Math.max(
+            0,
+            Math.round(selectionSubject.x + selectionSubject.w - (paddingBase.x + paddingBase.w)),
+          ),
+          bottom: Math.max(
+            0,
+            Math.round(selectionSubject.y + selectionSubject.h - (paddingBase.y + paddingBase.h)),
+          ),
+        }
+      : null;
+
+  // Sets one side's padding to an absolute value (subject px), growing the crop
+  // out from its base box and clamping to the image.
+  const setPaddingSide = useCallback(
+    (side: PaddingSide, value: number) => {
+      const img = imgRef.current;
+      if (!paddingBase || !selection || !img || !img.naturalWidth || !img.naturalHeight) return;
+      if (!img.clientWidth || !img.clientHeight) return;
+      const fx = img.clientWidth / img.naturalWidth;
+      const fy = img.clientHeight / img.naturalHeight;
+      const sel = selectionToSubjectCoords(selection);
+      if (!sel) return;
+      const cur: PaddingValues = {
+        left: Math.max(0, paddingBase.x - sel.x),
+        top: Math.max(0, paddingBase.y - sel.y),
+        right: Math.max(0, sel.x + sel.w - (paddingBase.x + paddingBase.w)),
+        bottom: Math.max(0, sel.y + sel.h - (paddingBase.y + paddingBase.h)),
+      };
+      const next = { ...cur, [side]: Math.max(0, value) };
+      const x0 = Math.max(0, paddingBase.x - next.left);
+      const y0 = Math.max(0, paddingBase.y - next.top);
+      const x1 = Math.min(img.naturalWidth, paddingBase.x + paddingBase.w + next.right);
+      const y1 = Math.min(img.naturalHeight, paddingBase.y + paddingBase.h + next.bottom);
+      if (x1 - x0 < 1 || y1 - y0 < 1) return;
+      const w = (x1 - x0) * fx;
+      const h = (y1 - y0) * fy;
+      const nextSel = { x: x0 * fx, y: y0 * fy, w, h, r: Math.min(selection.r ?? 0, w / 2, h / 2) };
+      if (
+        Math.abs(nextSel.x - selection.x) < 0.01 &&
+        Math.abs(nextSel.y - selection.y) < 0.01 &&
+        Math.abs(nextSel.w - selection.w) < 0.01 &&
+        Math.abs(nextSel.h - selection.h) < 0.01
+      ) {
+        return; // no change → don't strand the apply flag
+      }
+      paddingApplyRef.current = true;
+      setSelection(nextSel);
+      setSelectionLocked(true);
+    },
+    [imgRef, paddingBase, selection, selectionToSubjectCoords, setSelection, setSelectionLocked],
   );
 
   // "Show sizes": segment the objects inside the crop (always the built-in
@@ -922,6 +1003,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     segmentError,
     adjustCrop,
     addPadding,
+    padding,
+    setPaddingSide,
     showSizes,
     showingSizes: measurements !== null,
     penClosed: pen.penClosed,

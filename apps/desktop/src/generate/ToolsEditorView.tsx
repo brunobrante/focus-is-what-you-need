@@ -93,6 +93,8 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     segmentError,
     adjustCrop,
     addPadding,
+    padding,
+    setPaddingSide,
     showSizes,
     showingSizes,
     penClosed,
@@ -494,9 +496,11 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                   onAdjustCrop={() => adjustCrop(objectSegmentationModelId)}
                   adjusting={segmenting}
                   canAdjust={!!objectSegmentationModelId}
-                  onAddPadding={addPadding}
                   onShowSizes={showSizes}
                   showingSizes={showingSizes}
+                  padding={padding}
+                  onSetPadding={setPaddingSide}
+                  onGrowPen={(amount) => addPadding(amount, "all")}
                 />
               ) : null}
               </>
