@@ -1,5 +1,4 @@
 import type {
-  CropBox,
   PaintOverlayArgs,
   PaintCropsArgs,
 } from "./types";
@@ -8,6 +7,7 @@ import { MIN_TOOL_ZOOM } from "../types";
 import {
   resizeHandleCenter,
   radiusHandleCenter,
+  maxCropRadius,
   componentBoxInSubject,
   imageClientFromSubjectBox,
   intersectCropBoxes,
@@ -15,6 +15,9 @@ import {
 import { nearFirstAnchor, type PenPath } from "./pen";
 
 const PEN_COLOR = "#A78BFA";
+// Matches the canvas selection box (canvasToolingRenderer SELECTION_COLOR) so the
+// crop selection's outline, resize squares, and radius balls look identical.
+const SELECTION_COLOR = "#0d99ff";
 
 /**
  * Draws the Bézier pen path: the curve (filled when closed), the rubber-band to
@@ -413,26 +416,30 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
   }
 
   if (selection) {
-    const imageBounds: CropBox = { x: 0, y: 0, w: cssW, h: cssH };
-    const visible = intersectCropBoxes(selection, imageBounds);
+    const sw = Math.max(0, selection.w);
+    const sh = Math.max(0, selection.h);
+    const radius = Math.min(selection.r ?? 0, maxCropRadius(selection));
+
+    // Dim everything OUTSIDE the rounded selection by filling the image with a
+    // rounded-rect hole (even-odd) — so the crop visibly takes the corner radius
+    // instead of leaving the bounding-box corners bright.
+    const visible = intersectCropBoxes(selection, { x: 0, y: 0, w: cssW, h: cssH });
     ctx.fillStyle = "rgba(0,0,0,0.42)";
     if (!visible) {
       ctx.fillRect(0, 0, cssW, cssH);
     } else {
-      ctx.fillRect(0, 0, cssW, visible.y);
-      ctx.fillRect(0, visible.y, visible.x, visible.h);
-      ctx.fillRect(visible.x + visible.w, visible.y, cssW - (visible.x + visible.w), visible.h);
-      ctx.fillRect(0, visible.y + visible.h, cssW, cssH - (visible.y + visible.h));
+      ctx.beginPath();
+      ctx.rect(0, 0, cssW, cssH);
+      ctx.roundRect(selection.x, selection.y, sw, sh, radius);
+      ctx.fill("evenodd");
     }
 
-    const sw = Math.max(0, selection.w);
-    const sh = Math.max(0, selection.h);
+    // Outline: native roundRect = true circular arcs, the same shape and 1px
+    // #0d99ff line the canvas selection box draws.
     ctx.beginPath();
-    roundedRectPath(ctx, selection.x, selection.y, sw, sh, selection.r ?? 0);
-    ctx.fillStyle = "rgba(100,180,255,0.06)";
-    ctx.fill();
-    ctx.lineWidth = 2.5 * stroke;
-    ctx.strokeStyle = "#89C4FF";
+    ctx.roundRect(selection.x, selection.y, sw, sh, radius);
+    ctx.lineWidth = stroke;
+    ctx.strokeStyle = SELECTION_COLOR;
     ctx.stroke();
 
     let badgeText: string;
@@ -448,16 +455,18 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     drawSizeBadge(ctx, badgeText, selection.x + sw / 2, selection.y + sh, toolZoom);
 
     if (selectionLocked) {
+      // White fill, blue border — the canvas handle styling (HANDLE_FILL +
+      // SELECTION_COLOR), not the Builder's previous inverted blue squares.
       const handleSize = HANDLE_DOT_SIZE / safeZoom;
       for (const handle of CORNER_HANDLES) {
         const center = resizeHandleCenter(handle, selection);
-        drawSquareHandle(ctx, center.x, center.y, handleSize, "#89C4FF", "#FFFFFF", stroke);
+        drawSquareHandle(ctx, center.x, center.y, handleSize, "#FFFFFF", SELECTION_COLOR, stroke);
       }
       if (args.isHoveringSelection) {
         const radiusRadius = RADIUS_DOT_SIZE / 2 / safeZoom;
         for (const handle of RADIUS_HANDLES) {
           const center = radiusHandleCenter(handle, selection, toolZoom);
-          drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#89C4FF", "#FFFFFF", stroke);
+          drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#FFFFFF", SELECTION_COLOR, stroke);
         }
       }
     }

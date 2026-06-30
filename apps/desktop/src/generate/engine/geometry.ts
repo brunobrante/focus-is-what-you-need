@@ -86,16 +86,22 @@ export function resizeHandleCenter(handle: ResizeHandle, box: CropBox): { x: num
   return { x, y };
 }
 
+// Radius-handle position, ported from the canvas (`getRadiusHandlePositions`):
+// the ball sits `offset` in from its corner, where `offset` is the radius clamped
+// to `[RADIUS_HANDLE_MIN_INSET screen px, maxRadius]`. No extra margin — so the
+// ball reaches the true maximum and the stacked handles collapse onto the centre
+// (the square/short-edge case the commit logic resolves). Coordinates are content
+// space, so the screen-px floor is divided by the zoom.
 export function radiusHandleCenter(
   handle: RadiusHandle,
   box: CropBox,
   zoom: number,
 ): { x: number; y: number } {
   const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const maxOffset = Math.max(0, maxCropRadius(box) - 4);
-  const inset = Math.min(maxOffset, Math.max(RADIUS_HANDLE_MIN_INSET / safeZoom, box.r ?? 0));
-  const x = handle.includes("w") ? box.x + inset : box.x + box.w - inset;
-  const y = handle.includes("n") ? box.y + inset : box.y + box.h - inset;
+  const minOffset = RADIUS_HANDLE_MIN_INSET / safeZoom;
+  const offset = Math.min(Math.max(box.r ?? 0, minOffset), maxCropRadius(box));
+  const x = handle.includes("w") ? box.x + offset : box.x + box.w - offset;
+  const y = handle.includes("n") ? box.y + offset : box.y + box.h - offset;
   return { x, y };
 }
 

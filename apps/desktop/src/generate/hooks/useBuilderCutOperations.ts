@@ -10,7 +10,6 @@ import type {
   ToolReference,
 } from "../types";
 import { COMPONENT_STORAGE_PREFIX } from "../types";
-import { roundedRectPath } from "../engine/drawing";
 import { ensureRootComponent } from "../engine/componentModel";
 import { componentSubtreeIds } from "../engine/componentTree";
 import { addVariant, setOriginalVariantImage } from "../engine/variants";
@@ -109,8 +108,11 @@ export function useBuilderCutOperations({
           const radius = Math.min(subjectBox.r ?? 0, canvas.width / 2, canvas.height / 2);
           ctx.imageSmoothingEnabled = false;
           if (radius > 0) {
+            // Native roundRect = true circular arcs, matching the selection box
+            // outline so the saved cut's corners are exactly the previewed shape.
             ctx.save();
-            roundedRectPath(ctx, 0, 0, canvas.width, canvas.height, radius);
+            ctx.beginPath();
+            ctx.roundRect(0, 0, canvas.width, canvas.height, radius);
             ctx.clip();
           }
           ctx.drawImage(

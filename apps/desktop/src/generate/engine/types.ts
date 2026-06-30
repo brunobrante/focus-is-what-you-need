@@ -130,7 +130,8 @@ export const CORNER_HANDLES = ["nw", "ne", "se", "sw"] as const;
 export const RADIUS_HANDLES = ["nw", "ne", "se", "sw"] as const;
 export const HANDLE_HIT_AREA = 28;
 export const HANDLE_DOT_SIZE = 8;
-export const RADIUS_DOT_SIZE = 10;
+// 8px balls, matching the canvas RADIUS_HANDLE_SIZE.
+export const RADIUS_DOT_SIZE = 8;
 export const RADIUS_HANDLE_MIN_INSET = 12;
 
 export type ResizeHandle = (typeof RESIZE_HANDLES)[number];
