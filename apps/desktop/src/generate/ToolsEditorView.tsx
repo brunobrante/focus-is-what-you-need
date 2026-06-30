@@ -13,6 +13,7 @@ import {
   Minus,
   Move,
   Pencil,
+  PenTool,
   Plus,
   Scissors,
   Sparkles,
@@ -288,6 +289,15 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               onClick={() => setTool("draw")}
             >
               <Pencil size={18} strokeWidth={1.7} />
+            </RailToolButton>
+            <RailToolButton
+              active={currentTool === "pen"}
+              disabled={!canCrop}
+              label="Pen (cut)"
+              shortcut="P"
+              onClick={() => setTool("pen")}
+            >
+              <PenTool size={18} strokeWidth={1.7} />
             </RailToolButton>
             <DevWrapper platform="desktop">
               <span className="my-1.5 h-px w-7 bg-[var(--border)]" />

@@ -62,6 +62,13 @@ export type BuilderInteractionInput = {
   components: SavedComponent[];
   imagePaintVersion: number;
   onSelectStackComponent: (id: string) => void;
+  // The pen tool's pointer handlers; this hook delegates stage events to them
+  // when the pen tool is active (the pen owns its own path + interaction state).
+  pen: {
+    onPenPointerDown: (event: PointerEvent<HTMLDivElement>, point: { x: number; y: number }) => void;
+    onPenPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
+    onPenPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+  };
 };
 
 export type BuilderInteractionState = {
@@ -123,6 +130,7 @@ export function useBuilderInteraction({
   components,
   imagePaintVersion,
   onSelectStackComponent,
+  pen,
 }: BuilderInteractionInput): BuilderInteractionState {
   const selectionInteractionRef = useRef<SelectionInteraction | null>(null);
 
@@ -161,7 +169,8 @@ export function useBuilderInteraction({
   // When the tool requires cropping but canCrop becomes false (e.g. navigating
   // away from a component view), fall back to move and drop the selection.
   useEffect(() => {
-    if ((currentTool !== "crop" && currentTool !== "draw") || canCrop) return;
+    const needsCrop = currentTool === "crop" || currentTool === "draw" || currentTool === "pen";
+    if (!needsCrop || canCrop) return;
     setCurrentTool("move");
     cancelSelection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -353,6 +362,13 @@ export function useBuilderInteraction({
     }
 
     if (!canCrop) return;
+
+    if (currentTool === "pen") {
+      event.preventDefault();
+      pen.onPenPointerDown(event, point);
+      return;
+    }
+
     if (currentTool !== "crop" && currentTool !== "draw") return;
 
     event.preventDefault();
@@ -414,6 +430,12 @@ export function useBuilderInteraction({
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     const interaction = selectionInteractionRef.current;
+    // The pen tool owns its own hover + drag, except while a middle-button pan
+    // is in progress (which uses the shared interaction ref).
+    if (currentTool === "pen" && interaction?.type !== "pan") {
+      pen.onPenPointerMove(event);
+      return;
+    }
     if (!drawing || !interaction) {
       updateIdleCursorAndHover(event);
       return;
@@ -481,8 +503,12 @@ export function useBuilderInteraction({
   }
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
-    if (!drawing || !selectionInteractionRef.current) return;
     const interaction = selectionInteractionRef.current;
+    if (currentTool === "pen" && interaction?.type !== "pan") {
+      pen.onPenPointerUp(event);
+      return;
+    }
+    if (!drawing || !interaction) return;
     event.currentTarget.releasePointerCapture(event.pointerId);
     setDrawing(false);
     selectionInteractionRef.current = null;

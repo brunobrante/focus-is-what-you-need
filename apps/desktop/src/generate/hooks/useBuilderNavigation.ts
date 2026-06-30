@@ -73,7 +73,7 @@ export function useBuilderNavigation({
 
   const setTool = useCallback(
     (tool: EditorTool) => {
-      if ((tool === "crop" || tool === "draw") && !canCrop) {
+      if ((tool === "crop" || tool === "draw" || tool === "pen") && !canCrop) {
         setCurrentTool("move");
         cancelSelection();
         return;

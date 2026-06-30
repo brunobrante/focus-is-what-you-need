@@ -46,6 +46,7 @@ import type { ReferenceAttachment } from "@/lib/storage/schema";
 import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
+import { usePenTool } from "./usePenTool";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
@@ -266,6 +267,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     zoomPercent,
   } = useBuilderViewport({ stageViewportRef, imgRef, imageError });
 
+  // --- Pen tool ------------------------------------------------------------
+
+  const pen = usePenTool({ imgRef, toolZoom, active: currentTool === "pen" });
+
   // --- Components ----------------------------------------------------------
 
   const {
@@ -435,6 +440,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     components,
     imagePaintVersion,
     onSelectStackComponent: selectStackComponent,
+    pen,
   });
 
   // Wire the stable forward-ref now that the real cancelSelection is available.
@@ -494,6 +500,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectionCrop,
     selectionMatchesExistingCut,
     segmentationContour: segmentation?.contour ?? null,
+    penPath: pen.penPath,
+    penCursor: pen.penCursor,
     drawingPath,
     brushSize,
     selectedComponentId,
@@ -692,6 +700,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         setTool("crop");
       } else if (event.key === "d" || event.key === "D") {
         setTool("draw");
+      } else if (event.key === "p" || event.key === "P") {
+        setTool("pen");
       } else if (event.key === "f" || event.key === "F") {
         beginRootCreation();
       } else if (event.key === "Escape") {

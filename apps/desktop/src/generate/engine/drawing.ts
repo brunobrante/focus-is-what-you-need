@@ -12,6 +12,80 @@ import {
   imageClientFromSubjectBox,
   intersectCropBoxes,
 } from "./geometry";
+import { nearFirstAnchor, type PenPath } from "./pen";
+
+const PEN_COLOR = "#A78BFA";
+
+/**
+ * Draws the Bézier pen path: the curve (filled when closed), the rubber-band to
+ * the live cursor while building, the control handles, and the anchor dots. The
+ * first anchor is highlighted when the cursor is near enough to close the path.
+ * Everything is in content space — the caller's ctx is already translated to the
+ * image origin and scaled by the zoom; sizes are pre-divided by the zoom.
+ */
+function drawPenPath(
+  ctx: CanvasRenderingContext2D,
+  path: PenPath,
+  cursor: { x: number; y: number } | null,
+  stroke: number,
+  dotSize: number,
+  closeTol: number,
+) {
+  const { anchors, closed } = path;
+  if (anchors.length === 0) return;
+
+  ctx.beginPath();
+  ctx.moveTo(anchors[0].x, anchors[0].y);
+  const segs = closed ? anchors.length : anchors.length - 1;
+  for (let i = 0; i < segs; i += 1) {
+    const a = anchors[i];
+    const b = anchors[(i + 1) % anchors.length];
+    ctx.bezierCurveTo(a.out?.x ?? a.x, a.out?.y ?? a.y, b.in?.x ?? b.x, b.in?.y ?? b.y, b.x, b.y);
+  }
+  if (closed) {
+    ctx.closePath();
+    ctx.fillStyle = "rgba(167,139,250,0.12)";
+    ctx.fill();
+  }
+  ctx.lineWidth = 2 * stroke;
+  ctx.strokeStyle = PEN_COLOR;
+  ctx.stroke();
+
+  // Rubber-band preview from the last anchor to the cursor while building.
+  if (!closed && cursor) {
+    const last = anchors[anchors.length - 1];
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(cursor.x, cursor.y);
+    ctx.setLineDash([4 * stroke, 3 * stroke]);
+    ctx.lineWidth = 1.5 * stroke;
+    ctx.strokeStyle = "rgba(167,139,250,0.7)";
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Control handles: a thin line from the anchor to a round handle dot.
+  ctx.lineWidth = stroke;
+  ctx.strokeStyle = "rgba(167,139,250,0.85)";
+  for (const a of anchors) {
+    for (const h of [a.in, a.out]) {
+      if (!h) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(h.x, h.y);
+      ctx.stroke();
+      drawCircleHandle(ctx, h.x, h.y, dotSize * 0.42, PEN_COLOR, "#FFFFFF", stroke);
+    }
+  }
+
+  // Anchor dots; highlight the first when the cursor is in closing range.
+  for (const a of anchors) {
+    drawSquareHandle(ctx, a.x, a.y, dotSize, PEN_COLOR, "#FFFFFF", stroke);
+  }
+  if (!closed && cursor && anchors.length >= 3 && nearFirstAnchor(path, cursor, closeTol)) {
+    drawCircleHandle(ctx, anchors[0].x, anchors[0].y, dotSize * 0.85, "#FFFFFF", PEN_COLOR, 1.5 * stroke);
+  }
+}
 
 export function hexToRgba(hex: string, alpha: number): string {
   const cleaned = hex.replace("#", "");
@@ -290,6 +364,8 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     selectionMatchesExistingCut,
     selectionCrop,
     segmentationContour,
+    penPath,
+    penCursor,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
@@ -405,6 +481,12 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     ctx.lineWidth = 2 * stroke;
     ctx.strokeStyle = "#3DDC84";
     ctx.stroke();
+  }
+
+  if (penPath) {
+    const dotSize = HANDLE_DOT_SIZE / safeZoom;
+    const closeTol = 11 / safeZoom;
+    drawPenPath(ctx, penPath, penCursor, stroke, dotSize, closeTol);
   }
 
   if (drawingPath && drawingPath.points.length > 1) {

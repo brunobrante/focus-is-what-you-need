@@ -1,7 +1,7 @@
 import { USER_MAX_ZOOM, USER_MIN_ZOOM } from "@/domain/zoom";
 
 export type SidebarTab = "components" | "config";
-export type EditorTool = "move" | "crop" | "draw";
+export type EditorTool = "move" | "crop" | "draw" | "pen";
 
 export type { ViewMode } from "./engine/types";
 export type {

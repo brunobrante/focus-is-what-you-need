@@ -8,6 +8,7 @@ import type {
   SavedComponent,
   ViewMode,
 } from "../types";
+import type { PenPath } from "../engine/pen";
 
 export type BuilderCanvasPainterInput = {
   imgRef: RefObject<HTMLImageElement | null>;
@@ -25,6 +26,10 @@ export type BuilderCanvasPainterInput = {
   selectionMatchesExistingCut: boolean;
   /** Object silhouette from "Adjust crop" (subject coords), or null. */
   segmentationContour: { x: number; y: number }[] | null;
+  /** In-progress / closed pen cut path (content coords), or null. */
+  penPath: PenPath | null;
+  /** Live pen cursor for the rubber-band segment while building, or null. */
+  penCursor: { x: number; y: number } | null;
   drawingPath: DrawingPath | null;
   brushSize: number;
   selectedComponentId: string | null;
@@ -63,6 +68,8 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     selectionCrop,
     selectionMatchesExistingCut,
     segmentationContour,
+    penPath,
+    penCursor,
     drawingPath,
     brushSize,
     selectedComponentId,
@@ -128,6 +135,8 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       selectionMatchesExistingCut,
       selectionCrop,
       segmentationContour,
+      penPath,
+      penCursor,
     });
   }, [
     activeSubject,
@@ -146,6 +155,8 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     selectionLocked,
     selectionMatchesExistingCut,
     segmentationContour,
+    penPath,
+    penCursor,
     stackedComponents,
     toolPan,
     toolZoom,

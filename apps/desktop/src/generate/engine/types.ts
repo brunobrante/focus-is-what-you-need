@@ -1,3 +1,5 @@
+import type { PenPath } from "./pen";
+
 export type CropBox = {
   x: number;
   y: number;
@@ -199,6 +201,10 @@ export type PaintOverlayArgs = {
    * pixel coordinates. Drawn as a non-destructive preview over the selection.
    */
   segmentationContour: { x: number; y: number }[] | null;
+  /** In-progress / closed pen cut path (content coords), or null. */
+  penPath: PenPath | null;
+  /** Live pen cursor for the rubber-band segment while building, or null. */
+  penCursor: { x: number; y: number } | null;
 };
 
 export type PaintCropsArgs = {
