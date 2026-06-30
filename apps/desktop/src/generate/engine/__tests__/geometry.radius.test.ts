@@ -58,6 +58,17 @@ test("a stacked (maxed) handle commits to the corner the drag heads toward", () 
   expect(next.r).toBeLessThan(maxCropRadius(wide));
 });
 
+test("on a square, a stacked grab commits to any of the four corners", () => {
+  // A perfect square maxes all four radius handles onto the centre, so the grab
+  // (reported as nw) must be able to commit to a corner off its short-edge pair.
+  const square: CropBox = { x: 0, y: 0, w: 100, h: 100, r: maxCropRadius({ x: 0, y: 0, w: 100, h: 100 }) };
+  const ix = interaction("nw", square, { x: 50, y: 50 });
+  // Drag toward the ne corner (right + up) — not the nw/sw pair the old math allowed.
+  const next = roundCropBox(ix, { x: 80, y: 20 });
+  expect(ix.committedCorner).toBe("ne");
+  expect(next.r).toBeLessThan(maxCropRadius(square)); // 20 < 50
+});
+
 test("once committed, the opposite corner cannot drive the radius", () => {
   const maxed: CropBox = { ...wide, r: maxCropRadius(wide) };
   const ix = interaction("nw", maxed, { x: 50, y: 50 });

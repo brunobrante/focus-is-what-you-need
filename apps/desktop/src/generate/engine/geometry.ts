@@ -170,9 +170,21 @@ function radiusEdgeHandles(handle: RadiusHandle, w: number, h: number): [RadiusH
   return handle === "nw" || handle === "ne" ? ["nw", "ne"] : ["sw", "se"];
 }
 
-// How far (canvas units) the cursor must travel toward one corner of a stacked pair
+const ALL_RADIUS_HANDLES: RadiusHandle[] = ["nw", "ne", "se", "sw"];
+
+// The set of handles that stack at the maximum radius and therefore compete for the
+// grab. A rectangle only stacks the two handles on the short edge; a perfect square
+// collapses ALL FOUR onto the centre, so any corner is a valid target — the grab must
+// be allowed to commit toward any of them, not just one short-edge pair. (Ported
+// verbatim from the canvas selection math, `radiusStackedCorners`.)
+function radiusStackedHandles(handle: RadiusHandle, w: number, h: number): RadiusHandle[] {
+  if (Math.abs(w - h) < 0.5) return ALL_RADIUS_HANDLES;
+  return radiusEdgeHandles(handle, w, h);
+}
+
+// How far (content units) the cursor must travel toward one corner of a stacked set
 // before the gesture commits to that corner. Measured as relative divergence between
-// the pair's offsets, so it is immune to where exactly the grab landed on the ball.
+// the candidates' offsets, so it is immune to where exactly the grab landed on the ball.
 const RADIUS_COMMIT_EPSILON = 0.5;
 
 export function roundCropBox(
@@ -187,33 +199,41 @@ export function roundCropBox(
   const box = interaction.startBox;
   const maxRadius = maxCropRadius(box);
 
-  // When the grab starts at the maximum radius, the two handles on the short edge
-  // sit one on top of the other and we cannot yet tell which corner the user means.
-  // The FIRST drag that diverges toward one corner commits to it for the rest of the
-  // gesture; afterwards only that corner drives the radius, so the ball can be brought
-  // back to the lock (the clamped maximum) but cannot cross it into the other corner.
-  const pair = radiusEdgeHandles(interaction.handle, box.w, box.h);
+  // When the grab starts at the maximum radius, the handles that stack there (two on a
+  // rectangle's short edge, all four on a square) sit one on top of the other and we
+  // cannot yet tell which corner the user means. The FIRST drag that diverges toward
+  // one corner commits to it for the rest of the gesture; afterwards only that corner
+  // drives the radius, so the ball can be brought back to the lock (the clamped maximum)
+  // but cannot cross it into another corner.
+  const candidates = radiusStackedHandles(interaction.handle, box.w, box.h);
   const grabbedAtMax = (box.r ?? 0) >= maxRadius - RADIUS_COMMIT_EPSILON;
-  const o0 = radiusCornerOffset(pair[0], point, box);
-  const o1 = radiusCornerOffset(pair[1], point, box);
 
   if (!interaction.committedCorner) {
     if (!grabbedAtMax) {
       // Unstacked grab: the reported corner is unambiguous, lock to it immediately.
       interaction.committedCorner = interaction.handle;
     } else {
-      const s0 = radiusCornerOffset(pair[0], interaction.startPoint, box);
-      const s1 = radiusCornerOffset(pair[1], interaction.startPoint, box);
-      const relDiff = o0 - o1 - (s0 - s1);
-      if (Math.abs(relDiff) > RADIUS_COMMIT_EPSILON) {
-        interaction.committedCorner = relDiff < 0 ? pair[0] : pair[1];
+      // Pulling the ball toward a corner drives that corner's offset down fastest, so
+      // the candidate whose offset dropped the most since the grab is the one being
+      // dragged toward. Commit once it clearly separates from the runner-up (the
+      // relative measure makes this immune to where the grab landed on the ball).
+      const deltas = candidates
+        .map((corner) => ({
+          corner,
+          delta:
+            radiusCornerOffset(corner, point, box) -
+            radiusCornerOffset(corner, interaction.startPoint, box),
+        }))
+        .sort((a, b) => a.delta - b.delta);
+      if (deltas.length > 1 && deltas[1].delta - deltas[0].delta > RADIUS_COMMIT_EPSILON) {
+        interaction.committedCorner = deltas[0].corner;
       }
     }
   }
 
   const offset = interaction.committedCorner
     ? radiusCornerOffset(interaction.committedCorner, point, box)
-    : Math.min(o0, o1);
+    : Math.min(...candidates.map((corner) => radiusCornerOffset(corner, point, box)));
   return { ...box, r: clamp(offset, 0, maxRadius) };
 }
 
