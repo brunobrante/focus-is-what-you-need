@@ -50,7 +50,7 @@ import { useBuilderViewport } from "./useBuilderViewport";
 import { usePenTool } from "./usePenTool";
 import { growPenPath, penBounds, penPathFromPolygon } from "../engine/pen";
 import { componentBoxes, foregroundBoundingBox, simplifyPath } from "../engine/contour";
-import { computeSpacing } from "../engine/measure";
+import { computeEdgeMargins, computeSpacing } from "../engine/measure";
 import { CLASSIC_CV_MODEL_ID } from "@/lib/models/modelCatalog";
 import type { MeasureOverlay } from "../engine/types";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
@@ -618,7 +618,9 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       w: b.w,
       h: b.h,
     }));
-    setMeasurements({ boxes, spacing: computeSpacing(boxes) });
+    // Gaps between objects + the four paddings to the crop frame (result.box).
+    const spacing = [...computeSpacing(boxes), ...computeEdgeMargins(boxes, result.box)];
+    setMeasurements({ boxes, spacing });
     clearSegmentation();
   }, [
     canCrop,

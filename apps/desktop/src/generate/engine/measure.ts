@@ -22,6 +22,47 @@ export type Spacing = {
 const cx = (b: MaskBox) => b.x + b.w / 2;
 const cy = (b: MaskBox) => b.y + b.h / 2;
 
+/** Union bounding box of the objects (their overall content extent). */
+function unionBox(boxes: MaskBox[]): MaskBox {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const b of boxes) {
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w);
+    maxY = Math.max(maxY, b.y + b.h);
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+/**
+ * The four margins between the objects' content extent and the crop frame — the
+ * padding on each side — drawn from the crop edge to the nearest content edge at
+ * the content's centre line. Only sides with a positive margin are returned.
+ */
+export function computeEdgeMargins(boxes: MaskBox[], crop: MaskBox): Spacing[] {
+  if (boxes.length === 0) return [];
+  const c = unionBox(boxes);
+  const midX = c.x + c.w / 2;
+  const midY = c.y + c.h / 2;
+  const cropRight = crop.x + crop.w;
+  const cropBottom = crop.y + crop.h;
+  const out: Spacing[] = [];
+
+  const left = c.x - crop.x;
+  if (left > 0.5) out.push({ axis: "x", ax: crop.x, ay: midY, bx: c.x, by: midY, distance: left });
+  const right = cropRight - (c.x + c.w);
+  if (right > 0.5) out.push({ axis: "x", ax: c.x + c.w, ay: midY, bx: cropRight, by: midY, distance: right });
+  const top = c.y - crop.y;
+  if (top > 0.5) out.push({ axis: "y", ax: midX, ay: crop.y, bx: midX, by: c.y, distance: top });
+  const bottom = cropBottom - (c.y + c.h);
+  if (bottom > 0.5) out.push({ axis: "y", ax: midX, ay: c.y + c.h, bx: midX, by: cropBottom, distance: bottom });
+
+  return out;
+}
+
 /**
  * Gaps between adjacent objects. The dominant axis is whichever spreads the box
  * centres more (so two side-by-side buttons measure horizontally); boxes are
