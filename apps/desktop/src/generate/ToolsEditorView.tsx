@@ -536,7 +536,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
               ) : viewMode === "stack" && imageStack && !cleanOriginal ? (
                 <div
                   ref={stageContentRef}
-                  className="relative inline-block overflow-visible rounded-[8px] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
+                  className="relative inline-block overflow-visible shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
                   style={{
                     transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
                     transformOrigin: "center center",
@@ -547,7 +547,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                     stack={imageStack}
                     selectedId={selectedComponentId}
                     onSelect={selectStackComponent}
-                    backgroundClassName="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px]"
+                    backgroundClassName="block max-h-[calc(100vh-220px)] max-w-full select-none"
                   />
                   {/* Hidden img keeps imgRef valid for mode transitions */}
                   <img
@@ -564,7 +564,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 <>
                   <div
                     ref={stageContentRef}
-                    className="relative max-h-full max-w-full overflow-visible rounded-[8px] bg-[#0E0E0E] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
+                    className="relative max-h-full max-w-full overflow-visible bg-[#0E0E0E] shadow-[0_14px_60px_rgba(0,0,0,0.55)]"
                     style={{
                       transform: `translate(${toolPan.x}px, ${toolPan.y}px) scale(${toolZoom})`,
                       transformOrigin: "center center",
@@ -581,7 +581,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                         bumpPaintVersion();
                       }}
                       onError={() => setImageError(true)}
-                      className="block max-h-[calc(100vh-220px)] max-w-full select-none rounded-[8px] transition-opacity"
+                      className="block max-h-[calc(100vh-220px)] max-w-full select-none transition-opacity"
                       style={{
                         imageRendering: toolZoom > MIN_TOOL_ZOOM ? "pixelated" : "auto",
                         opacity: autoDetecting ? 0.55 : 1,
@@ -592,7 +592,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                         ref={lama.canvasRef}
                         width={Math.max(Math.round(activeSubject.w), 1)}
                         height={Math.max(Math.round(activeSubject.h), 1)}
-                        className="absolute inset-0 z-30 h-full w-full rounded-[8px]"
+                        className="absolute inset-0 z-30 h-full w-full"
                         style={{ cursor: LAMA_BRUSH_CURSOR, touchAction: "none" }}
                       />
                     ) : null}
