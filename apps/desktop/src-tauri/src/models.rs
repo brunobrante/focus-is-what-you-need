@@ -1160,26 +1160,33 @@ fn sam_segment_blocking(
     let plane = (mh * mw).max(1);
     let count = iou_scores.len().min(mdata.len() / plane).max(1);
 
-    // SAM returns several candidates at different granularities. The coarsest is
-    // often the whole enclosing region, which fills the crop and touches every
-    // border. Prefer the highest-IoU mask that does NOT hug the border (an object
-    // inside the selection); fall back to plain max IoU when all of them do.
+    // SAM returns several candidates at different granularities around the prompt
+    // point. A point on a button's label segments the glyph (tiny, high IoU); the
+    // user wants the object they framed. So drop the trivial near-full mask (the
+    // whole crop / background) and pick the LARGEST remaining object by area —
+    // not the highest IoU. Fall back to max IoU if every candidate fills the crop.
     let mut best = 0usize;
-    let mut best_iou = f32::MIN;
-    let mut best_interior = false;
+    let mut best_fg: i64 = -1;
     for k in 0..count {
         let low = &mdata[k * plane..k * plane + plane];
-        let interior = border_fraction(low, mw, mh) <= 0.5;
-        let iou_k = iou_scores.get(k).copied().unwrap_or(f32::MIN);
-        let better = match (interior, best_interior) {
-            (true, false) => true,   // any interior mask beats a border-hugging one
-            (false, true) => false,  // never downgrade to a border-hugging mask
-            _ => iou_k > best_iou,    // same class: higher IoU wins
-        };
-        if better {
+        let fg = low.iter().filter(|&&v| v > 0.0).count();
+        if fg as f32 / plane as f32 >= 0.97 {
+            continue; // near-full mask: the whole crop, not an object inside it
+        }
+        if (fg as i64) > best_fg {
+            best_fg = fg as i64;
             best = k;
-            best_iou = iou_k;
-            best_interior = interior;
+        }
+    }
+    if best_fg < 0 {
+        // Every candidate (almost) fills the crop — fall back to the highest IoU.
+        let mut best_iou = f32::MIN;
+        for k in 0..count {
+            let iou_k = iou_scores.get(k).copied().unwrap_or(f32::MIN);
+            if iou_k > best_iou {
+                best_iou = iou_k;
+                best = k;
+            }
         }
     }
     let low = &mdata[best * plane..best * plane + plane];
@@ -1198,33 +1205,6 @@ fn sam_segment_blocking(
         }
     }
     encode_png(DynamicImage::ImageLuma8(mask))
-}
-
-/// Fraction of a low-res mask's border pixels that are foreground (logit > 0). A
-/// value near 1 means the mask fills its whole frame (the enclosing region), not
-/// a contained object.
-fn border_fraction(low: &[f32], mw: usize, mh: usize) -> f32 {
-    if mw == 0 || mh == 0 {
-        return 0.0;
-    }
-    let mut fg = 0usize;
-    for x in 0..mw {
-        if low[x] > 0.0 {
-            fg += 1;
-        }
-        if low[(mh - 1) * mw + x] > 0.0 {
-            fg += 1;
-        }
-    }
-    for y in 0..mh {
-        if low[y * mw] > 0.0 {
-            fg += 1;
-        }
-        if low[y * mw + (mw - 1)] > 0.0 {
-            fg += 1;
-        }
-    }
-    fg as f32 / (2 * (mw + mh)) as f32
 }
 
 /// Bilinear sample of a row-major `w`×`h` f32 grid at fractional `(fx, fy)`,
