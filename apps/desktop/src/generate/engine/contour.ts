@@ -54,6 +54,84 @@ export function traceObjectContour(
 }
 
 /**
+ * Bounding box of ALL significant foreground in a mask — the union of every
+ * 4-connected blob whose area clears a noise floor (8% of the largest blob).
+ * Unlike `traceObjectContour`, which follows only the biggest blob, this spans a
+ * multi-part subject like the separate glyphs of a word, so "Adjust crop" on text
+ * snaps the rectangle around the whole word, not just its first letter. Returns
+ * null when there is no foreground.
+ */
+export function foregroundBoundingBox(
+  mask: Uint8Array | Uint8ClampedArray | number[],
+  width: number,
+  height: number,
+  threshold = FG_THRESHOLD,
+): { x: number; y: number; w: number; h: number } | null {
+  if (width <= 0 || height <= 0 || mask.length < width * height) return null;
+  const labels = new Int32Array(width * height);
+  const stack: number[] = [];
+  const comps: { size: number; minX: number; minY: number; maxX: number; maxY: number }[] = [];
+  const isFg = (i: number) => mask[i] >= threshold;
+
+  let label = 0;
+  for (let seed = 0; seed < width * height; seed += 1) {
+    if (!isFg(seed) || labels[seed] !== 0) continue;
+    label += 1;
+    let size = 0;
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+    stack.length = 0;
+    stack.push(seed);
+    labels[seed] = label;
+    while (stack.length) {
+      const p = stack.pop() as number;
+      size += 1;
+      const x = p % width;
+      const y = (p - x) / width;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (x > 0 && isFg(p - 1) && labels[p - 1] === 0) {
+        labels[p - 1] = label;
+        stack.push(p - 1);
+      }
+      if (x < width - 1 && isFg(p + 1) && labels[p + 1] === 0) {
+        labels[p + 1] = label;
+        stack.push(p + 1);
+      }
+      if (y > 0 && isFg(p - width) && labels[p - width] === 0) {
+        labels[p - width] = label;
+        stack.push(p - width);
+      }
+      if (y < height - 1 && isFg(p + width) && labels[p + width] === 0) {
+        labels[p + width] = label;
+        stack.push(p + width);
+      }
+    }
+    comps.push({ size, minX, minY, maxX, maxY });
+  }
+
+  if (comps.length === 0) return null;
+  const maxSize = comps.reduce((m, c) => Math.max(m, c.size), 0);
+  const minKeep = Math.max(8, maxSize * 0.08);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const c of comps) {
+    if (c.size < minKeep) continue;
+    minX = Math.min(minX, c.minX);
+    minY = Math.min(minY, c.minY);
+    maxX = Math.max(maxX, c.maxX);
+    maxY = Math.max(maxY, c.maxY);
+  }
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+/**
  * Largest 4-connected foreground blob, as a 1/0 grid plus the flat index of its
  * top-most, then left-most pixel — a guaranteed boundary start whose west
  * neighbor is background, which the Moore tracer relies on.

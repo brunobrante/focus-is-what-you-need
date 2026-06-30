@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { simplifyPath, traceObjectContour, type Point } from "../contour";
+import {
+  foregroundBoundingBox,
+  simplifyPath,
+  traceObjectContour,
+  type Point,
+} from "../contour";
 
 // Builds a width×height mask (255 = foreground) from a predicate over (x, y).
 function mask(
@@ -79,6 +84,27 @@ test("picks the largest blob and ignores smaller specks", () => {
   // The contour belongs to the big square, nowhere near the speck.
   expect(b.maxX).toBeLessThanOrEqual(17);
   expect(b.maxY).toBeLessThanOrEqual(17);
+});
+
+test("foregroundBoundingBox spans separate blobs (whole word, not one glyph)", () => {
+  // Two separated squares, like two letters of a word.
+  const left = (x: number, y: number) => x >= 3 && x <= 9 && y >= 4 && y <= 12;
+  const right = (x: number, y: number) => x >= 20 && x <= 30 && y >= 3 && y <= 14;
+  const data = mask(40, 20, (x, y) => left(x, y) || right(x, y));
+  const bb = foregroundBoundingBox(data, 40, 20);
+  expect(bb).toEqual({ x: 3, y: 3, w: 28, h: 12 }); // covers both, 3..30 / 3..14
+});
+
+test("foregroundBoundingBox drops a tiny speck below the noise floor", () => {
+  const big = (x: number, y: number) => x >= 4 && x <= 24 && y >= 4 && y <= 24;
+  const speck = (x: number, y: number) => x === 38 && y === 1; // 1px noise
+  const data = mask(40, 30, (x, y) => big(x, y) || speck(x, y));
+  const bb = foregroundBoundingBox(data, 40, 30);
+  expect(bb).toEqual({ x: 4, y: 4, w: 21, h: 21 }); // speck ignored
+});
+
+test("foregroundBoundingBox returns null for an empty mask", () => {
+  expect(foregroundBoundingBox(new Uint8Array(64), 8, 8)).toBeNull();
 });
 
 test("simplifyPath collapses collinear points but keeps corners", () => {

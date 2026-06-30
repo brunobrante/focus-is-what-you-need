@@ -48,7 +48,7 @@ import { confirmationDialogCopy } from "../ui/ConfirmModal";
 import { useBuilderViewport } from "./useBuilderViewport";
 import { usePenTool } from "./usePenTool";
 import { penBounds, penPathFromPolygon } from "../engine/pen";
-import { simplifyPath } from "../engine/contour";
+import { foregroundBoundingBox, simplifyPath } from "../engine/contour";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
@@ -509,26 +509,20 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         return;
       }
 
-      // Rectangle: snap the box to the object's tight bounds (keeping the radius).
+      // Rectangle: snap the box to ALL significant foreground (the whole word /
+      // multi-part subject, not just the largest blob), keeping the radius.
       if (selection && selectionCrop) {
         const result = await segment(modelId, selectionCrop);
-        if (!result || result.contour.length < 3) return;
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        for (const p of result.contour) {
-          minX = Math.min(minX, p.x);
-          minY = Math.min(minY, p.y);
-          maxX = Math.max(maxX, p.x);
-          maxY = Math.max(maxY, p.y);
-        }
-        const w = (maxX - minX) * fx;
-        const h = (maxY - minY) * fy;
+        if (!result) return;
+        const bb = foregroundBoundingBox(result.mask.data, result.mask.width, result.mask.height);
+        if (!bb) return;
+        // Mask is crop-local at subject resolution → subject → content coords.
+        const w = bb.w * fx;
+        const h = bb.h * fy;
         if (w < 1 || h < 1) return;
         setSelection({
-          x: minX * fx,
-          y: minY * fy,
+          x: (bb.x + result.box.x) * fx,
+          y: (bb.y + result.box.y) * fy,
           w,
           h,
           r: Math.min(selection.r ?? 0, w / 2, h / 2),
