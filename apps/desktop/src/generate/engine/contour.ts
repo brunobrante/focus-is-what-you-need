@@ -116,7 +116,10 @@ export function foregroundBoundingBox(
 
   if (comps.length === 0) return null;
   const maxSize = comps.reduce((m, c) => Math.max(m, c.size), 0);
-  const minKeep = Math.max(8, maxSize * 0.08);
+  // Keep every real part — including small ones like an "i" dot or an accent, so
+  // the box still follows the tallest/lowest extent of a word — and drop only
+  // tiny stray specks (a few pixels of mask noise).
+  const minKeep = Math.max(6, maxSize * 0.02);
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
