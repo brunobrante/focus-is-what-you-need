@@ -92,6 +92,10 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     segmenting,
     segmentError,
     adjustCrop,
+    penClosed,
+    penCrop,
+    cancelPen,
+    savePen,
     pendingConfirmation,
     savingStack,
     stackSaveStatus,
@@ -473,6 +477,35 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       Save
                     </button>
                   ) : null}
+                </div>
+              ) : null}
+
+              {penClosed ? (
+                <div
+                  data-selection-action
+                  className="absolute right-3 top-3 z-30 inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-1"
+                >
+                  <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                    {penCrop ? `${Math.round(penCrop.w)} × ${Math.round(penCrop.h)}` : "outside image"}
+                  </span>
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={cancelPen}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    data-selection-action
+                    disabled={!penCrop}
+                    onClick={savePen}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--surface)] disabled:text-[var(--text-faint)]"
+                  >
+                    <Check size={10} strokeWidth={2.2} />
+                    Save
+                  </button>
                 </div>
               ) : null}
               </>

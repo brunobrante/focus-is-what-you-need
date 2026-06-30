@@ -151,6 +151,26 @@ export function pointInPath(path: PenPath, point: Point, steps = 16): boolean {
   return inside;
 }
 
+/**
+ * Maps every point of the path (each anchor and its handles) through `fn`. Used
+ * to take a path from content space into the cut canvas's local pixel space when
+ * rasterizing the silhouette.
+ */
+export function transformPenPath(path: PenPath, fn: (p: Point) => Point): PenPath {
+  return {
+    closed: path.closed,
+    anchors: path.anchors.map((a) => {
+      const moved = fn({ x: a.x, y: a.y });
+      return {
+        x: moved.x,
+        y: moved.y,
+        in: a.in ? fn(a.in) : undefined,
+        out: a.out ? fn(a.out) : undefined,
+      };
+    }),
+  };
+}
+
 /** Translates an anchor and its handles by (dx, dy) — used when dragging it. */
 export function moveAnchor(anchor: PenAnchor, dx: number, dy: number): PenAnchor {
   return {

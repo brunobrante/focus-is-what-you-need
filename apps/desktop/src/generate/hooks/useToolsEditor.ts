@@ -47,6 +47,7 @@ import { confirmationDialogCopy } from "../ui/ConfirmModal";
 
 import { useBuilderViewport } from "./useBuilderViewport";
 import { usePenTool } from "./usePenTool";
+import { penBounds } from "../engine/pen";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
@@ -99,6 +100,10 @@ export type ToolsEditorState = {
   segmenting: boolean;
   segmentError: string | null;
   adjustCrop: (modelId: string | null) => void;
+  penClosed: boolean;
+  penCrop: CropBox | null;
+  cancelPen: () => void;
+  savePen: () => void;
   imagePaintVersion: number;
   pendingConfirmation: PendingConfirmation | null;
   savingStack: boolean;
@@ -564,7 +569,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   // --- Operations ----------------------------------------------------------
 
-  const { fileInputRef, uploading, setUploading, saveSelection, uploadImage, handleRemoveComponent } =
+  const { fileInputRef, uploading, setUploading, saveSelection, savePenCut, uploadImage, handleRemoveComponent } =
     useBuilderCutOperations({
       imgRef,
       selection,
@@ -590,6 +595,19 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       openOriginal,
       onUploadedLocally,
     });
+
+  // --- Pen cut toolbar (same flow as the rectangle) ------------------------
+
+  // The closed silhouette's size in subject pixels, for the toolbar's size badge.
+  const penBox = pen.penClosed && pen.penPath ? penBounds(pen.penPath) : null;
+  const penCrop = penBox ? selectionToSubjectCoords(penBox) : null;
+
+  const cancelPen = useCallback(() => pen.resetPen(), [pen]);
+  const savePen = useCallback(() => {
+    const path = pen.penPath;
+    if (!path?.closed) return;
+    void savePenCut(path).then(() => pen.resetPen());
+  }, [pen, savePenCut]);
 
   // --- Effects -------------------------------------------------------------
 
@@ -757,6 +775,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     segmenting,
     segmentError,
     adjustCrop,
+    penClosed: pen.penClosed,
+    penCrop,
+    cancelPen,
+    savePen,
     imagePaintVersion,
     pendingConfirmation,
     savingStack,

@@ -11,6 +11,8 @@ import type {
 } from "../types";
 import { COMPONENT_STORAGE_PREFIX } from "../types";
 import { ensureRootComponent } from "../engine/componentModel";
+import { penBounds, transformPenPath, type PenPath } from "../engine/pen";
+import { tracePenPath } from "../engine/drawing";
 import { componentSubtreeIds } from "../engine/componentTree";
 import { addVariant, setOriginalVariantImage } from "../engine/variants";
 import { writeSavedComponents } from "../engine/storage";
@@ -212,6 +214,98 @@ export function useBuilderCutOperations({
     ],
   );
 
+  // Rasterizes a closed pen silhouette into a transparent-PNG cut, mirroring
+  // saveSelection's new-component path but clipping to the Bézier instead of a
+  // rounded rectangle. The path is in content coords; convert to subject pixels,
+  // bound it, and clip the drawn region to the silhouette.
+  const savePenCut = useCallback(
+    async (path: PenPath) => {
+      if (!path.closed || path.anchors.length < 3 || !canCrop) return;
+      const img = imgRef.current;
+      if (!img || !img.clientWidth || !img.clientHeight || !img.naturalWidth || !img.naturalHeight) {
+        return;
+      }
+      const sx = img.naturalWidth / img.clientWidth;
+      const sy = img.naturalHeight / img.clientHeight;
+      const subjectPath = transformPenPath(path, (p) => ({ x: p.x * sx, y: p.y * sy }));
+      const bounds = penBounds(subjectPath);
+      if (!bounds) return;
+
+      // Clamp the silhouette's bounds to the image so the cut canvas stays in range.
+      const x0 = Math.max(0, bounds.x);
+      const y0 = Math.max(0, bounds.y);
+      const x1 = Math.min(img.naturalWidth, bounds.x + bounds.w);
+      const y1 = Math.min(img.naturalHeight, bounds.y + bounds.h);
+      const subjectBox: CropBox = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      if (subjectBox.w < 1 || subjectBox.h < 1) return;
+      const sourceBox = toOriginalCoords(subjectBox);
+
+      let dataUrl = activeSubject.url;
+      try {
+        await waitForImage(img);
+        const cw = Math.max(1, Math.round(subjectBox.w));
+        const ch = Math.max(1, Math.round(subjectBox.h));
+        const canvas = document.createElement("canvas");
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas unavailable");
+        ctx.imageSmoothingEnabled = false;
+        const localPath = transformPenPath(subjectPath, (p) => ({
+          x: p.x - subjectBox.x,
+          y: p.y - subjectBox.y,
+        }));
+        ctx.save();
+        tracePenPath(ctx, localPath);
+        ctx.clip();
+        ctx.drawImage(img, subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h, 0, 0, cw, ch);
+        ctx.restore();
+        dataUrl = await canvasToDataUrl(canvas, "image/png");
+      } catch {
+        dataUrl = activeSubject.url;
+      }
+
+      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+      const parentId =
+        activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
+      const rootId = activeSubject.rootId ?? activeScopeId;
+      const cut: SavedComponent = {
+        id: nextId,
+        name: shortComponentName(nextId),
+        box: sourceBox,
+        dataUrl,
+        type: "PNG",
+        createdAt: new Date().toISOString(),
+        parentId,
+        kind: "cut",
+        rootId,
+      };
+      updateComponents((current) => [cut, ...current]);
+      setExpandedComponentIds((current) => {
+        const next = new Set(current);
+        next.add(parentId);
+        next.add(nextId);
+        return next;
+      });
+      setSelectedComponentId(nextId);
+      setViewMode("component");
+      resetToolViewport();
+    },
+    [
+      activeScopeId,
+      activeSubject,
+      canCrop,
+      imgRef,
+      resetToolViewport,
+      rootComponent.id,
+      setExpandedComponentIds,
+      setSelectedComponentId,
+      setViewMode,
+      toOriginalCoords,
+      updateComponents,
+    ],
+  );
+
   const uploadImage = useCallback(
     async (file: File | null | undefined) => {
       if (!file) return;
@@ -264,6 +358,7 @@ export function useBuilderCutOperations({
     uploading,
     setUploading,
     saveSelection,
+    savePenCut,
     uploadImage,
     handleRemoveComponent,
   };

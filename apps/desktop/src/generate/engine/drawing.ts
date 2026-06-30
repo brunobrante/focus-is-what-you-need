@@ -26,6 +26,25 @@ const SELECTION_COLOR = "#0d99ff";
  * Everything is in content space — the caller's ctx is already translated to the
  * image origin and scaled by the zoom; sizes are pre-divided by the zoom.
  */
+/**
+ * Builds the pen path as a Bézier subpath on `ctx` (beginPath → curves →
+ * closePath when closed). Shared by the overlay preview and the cut rasterizer's
+ * clip, so the saved silhouette is exactly the previewed shape.
+ */
+export function tracePenPath(ctx: CanvasRenderingContext2D, path: PenPath) {
+  const { anchors, closed } = path;
+  if (anchors.length === 0) return;
+  ctx.beginPath();
+  ctx.moveTo(anchors[0].x, anchors[0].y);
+  const segs = closed ? anchors.length : anchors.length - 1;
+  for (let i = 0; i < segs; i += 1) {
+    const a = anchors[i];
+    const b = anchors[(i + 1) % anchors.length];
+    ctx.bezierCurveTo(a.out?.x ?? a.x, a.out?.y ?? a.y, b.in?.x ?? b.x, b.in?.y ?? b.y, b.x, b.y);
+  }
+  if (closed) ctx.closePath();
+}
+
 function drawPenPath(
   ctx: CanvasRenderingContext2D,
   path: PenPath,
@@ -37,16 +56,8 @@ function drawPenPath(
   const { anchors, closed } = path;
   if (anchors.length === 0) return;
 
-  ctx.beginPath();
-  ctx.moveTo(anchors[0].x, anchors[0].y);
-  const segs = closed ? anchors.length : anchors.length - 1;
-  for (let i = 0; i < segs; i += 1) {
-    const a = anchors[i];
-    const b = anchors[(i + 1) % anchors.length];
-    ctx.bezierCurveTo(a.out?.x ?? a.x, a.out?.y ?? a.y, b.in?.x ?? b.x, b.in?.y ?? b.y, b.x, b.y);
-  }
+  tracePenPath(ctx, path);
   if (closed) {
-    ctx.closePath();
     ctx.fillStyle = "rgba(167,139,250,0.12)";
     ctx.fill();
   }

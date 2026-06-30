@@ -8,6 +8,7 @@ import {
   nearFirstAnchor,
   penBounds,
   pointInPath,
+  transformPenPath,
   type PenPath,
 } from "../pen";
 
@@ -93,6 +94,17 @@ test("pointInPath is true inside a closed triangle and false outside", () => {
 test("pointInPath returns false for an open or degenerate path", () => {
   const open: PenPath = { anchors: [{ x: 0, y: 0 }, { x: 10, y: 0 }], closed: false };
   expect(pointInPath(open, { x: 5, y: 0 })).toBe(false);
+});
+
+test("transformPenPath maps anchors and handles, preserving closed", () => {
+  const path: PenPath = {
+    anchors: [{ x: 10, y: 10, in: { x: 8, y: 10 }, out: { x: 12, y: 10 } }, { x: 20, y: 20 }],
+    closed: true,
+  };
+  const scaled = transformPenPath(path, (p) => ({ x: p.x * 2, y: p.y * 2 }));
+  expect(scaled.closed).toBe(true);
+  expect(scaled.anchors[0]).toEqual({ x: 20, y: 20, in: { x: 16, y: 20 }, out: { x: 24, y: 20 } });
+  expect(scaled.anchors[1]).toEqual({ x: 40, y: 40, in: undefined, out: undefined });
 });
 
 test("moveAnchor translates the anchor and both handles together", () => {
