@@ -102,26 +102,29 @@ export function useBuilderCutOperations({
       if (img) {
         try {
           await waitForImage(img);
+          // Snap the source rect to whole image pixels and copy it 1:1, so the
+          // cut never samples a sliver of the neighbouring pixels at its edge
+          // (the faint border the float source + nearest-neighbour produced).
+          const sx0 = Math.round(subjectBox.x);
+          const sy0 = Math.round(subjectBox.y);
+          const sw = Math.max(1, Math.round(subjectBox.w));
+          const sh = Math.max(1, Math.round(subjectBox.h));
           const canvas = document.createElement("canvas");
-          canvas.width = Math.max(1, Math.round(subjectBox.w));
-          canvas.height = Math.max(1, Math.round(subjectBox.h));
+          canvas.width = sw;
+          canvas.height = sh;
           const ctx = canvas.getContext("2d");
           if (!ctx) throw new Error("Canvas unavailable");
-          const radius = Math.min(subjectBox.r ?? 0, canvas.width / 2, canvas.height / 2);
+          const radius = Math.min(subjectBox.r ?? 0, sw / 2, sh / 2);
           ctx.imageSmoothingEnabled = false;
           if (radius > 0) {
             // Native roundRect = true circular arcs, matching the selection box
             // outline so the saved cut's corners are exactly the previewed shape.
             ctx.save();
             ctx.beginPath();
-            ctx.roundRect(0, 0, canvas.width, canvas.height, radius);
+            ctx.roundRect(0, 0, sw, sh, radius);
             ctx.clip();
           }
-          ctx.drawImage(
-            img,
-            subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h,
-            0, 0, canvas.width, canvas.height,
-          );
+          ctx.drawImage(img, sx0, sy0, sw, sh, 0, 0, sw, sh);
           if (radius > 0) ctx.restore();
           dataUrl = await canvasToDataUrl(canvas, "image/png");
         } catch {
@@ -243,6 +246,10 @@ export function useBuilderCutOperations({
       let dataUrl = activeSubject.url;
       try {
         await waitForImage(img);
+        // Snap to whole image pixels so the silhouette clip and the copied region
+        // share one integer origin (no sub-pixel edge sliver).
+        const sx0 = Math.round(subjectBox.x);
+        const sy0 = Math.round(subjectBox.y);
         const cw = Math.max(1, Math.round(subjectBox.w));
         const ch = Math.max(1, Math.round(subjectBox.h));
         const canvas = document.createElement("canvas");
@@ -251,14 +258,11 @@ export function useBuilderCutOperations({
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas unavailable");
         ctx.imageSmoothingEnabled = false;
-        const localPath = transformPenPath(subjectPath, (p) => ({
-          x: p.x - subjectBox.x,
-          y: p.y - subjectBox.y,
-        }));
+        const localPath = transformPenPath(subjectPath, (p) => ({ x: p.x - sx0, y: p.y - sy0 }));
         ctx.save();
         tracePenPath(ctx, localPath);
         ctx.clip();
-        ctx.drawImage(img, subjectBox.x, subjectBox.y, subjectBox.w, subjectBox.h, 0, 0, cw, ch);
+        ctx.drawImage(img, sx0, sy0, cw, ch, 0, 0, cw, ch);
         ctx.restore();
         dataUrl = await canvasToDataUrl(canvas, "image/png");
       } catch {
