@@ -49,7 +49,10 @@ import { confirmationDialogCopy } from "../ui/ConfirmModal";
 import { useBuilderViewport } from "./useBuilderViewport";
 import { usePenTool } from "./usePenTool";
 import { growPenPath, penBounds, penPathFromPolygon } from "../engine/pen";
-import { foregroundBoundingBox, simplifyPath } from "../engine/contour";
+import { componentBoxes, foregroundBoundingBox, simplifyPath } from "../engine/contour";
+import { computeSpacing } from "../engine/measure";
+import { CLASSIC_CV_MODEL_ID } from "@/lib/models/modelCatalog";
+import type { MeasureOverlay } from "../engine/types";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
 import { useBuilderComponents } from "./useBuilderComponents";
 import { useBuilderInteraction } from "./useBuilderInteraction";
@@ -103,6 +106,8 @@ export type ToolsEditorState = {
   segmentError: string | null;
   adjustCrop: (modelId: string | null) => void;
   addPadding: (amount: number, sides: PaddingSides) => void;
+  showSizes: () => void;
+  showingSizes: boolean;
   penClosed: boolean;
   penCrop: CropBox | null;
   cancelPen: () => void;
@@ -479,8 +484,17 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   const penBox = pen.penClosed && pen.penPath ? penBounds(pen.penPath) : null;
   const penCrop = penBox ? selectionToSubjectCoords(penBox) : null;
 
+  // "Show sizes" overlay (object boxes + gaps), in subject coords, or null.
+  const [measurements, setMeasurements] = useState<MeasureOverlay | null>(null);
+
   const { segmenting, segmentError, segment, clearSegmentation } =
     useCropSegmentation({ imgRef });
+
+  // The measurement overlay belongs to one crop position; drop it when the crop
+  // (rectangle or pen) moves.
+  useEffect(() => {
+    setMeasurements(null);
+  }, [selection, pen.penPath]);
 
   // Reset any segmenting/error state when the rectangle selection changes.
   useEffect(() => {
@@ -585,6 +599,40 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     [canCrop, currentTool, imgRef, pen, selection, setSelection, setSelectionLocked],
   );
 
+  // "Show sizes": segment the objects inside the crop (always the built-in
+  // classic-CV engine, which finds every foreground object — not SAM's single
+  // pick) and measure the gaps between them. Toggles the overlay off when shown.
+  const showSizes = useCallback(async () => {
+    if (measurements) {
+      setMeasurements(null);
+      return;
+    }
+    if (!canCrop || segmenting) return;
+    const region = currentTool === "pen" && pen.penClosed ? penCrop : selection ? selectionCrop : null;
+    if (!region) return;
+    const result = await segment(CLASSIC_CV_MODEL_ID, region);
+    if (!result) return;
+    const boxes = componentBoxes(result.mask.data, result.mask.width, result.mask.height).map((b) => ({
+      x: b.x + result.box.x,
+      y: b.y + result.box.y,
+      w: b.w,
+      h: b.h,
+    }));
+    setMeasurements({ boxes, spacing: computeSpacing(boxes) });
+    clearSegmentation();
+  }, [
+    canCrop,
+    clearSegmentation,
+    currentTool,
+    measurements,
+    pen.penClosed,
+    penCrop,
+    segment,
+    segmenting,
+    selection,
+    selectionCrop,
+  ]);
+
   // --- Canvas painter ------------------------------------------------------
 
   const { overlayCanvasRef, cropsCanvasRef } = useBuilderCanvasPainter({
@@ -606,6 +654,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     segmentationContour: null,
     penPath: pen.penPath,
     penCursor: pen.penCursor,
+    measurements,
     drawingPath,
     brushSize,
     selectedComponentId,
@@ -871,6 +920,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     segmentError,
     adjustCrop,
     addPadding,
+    showSizes,
+    showingSizes: measurements !== null,
     penClosed: pen.penClosed,
     penCrop,
     cancelPen,

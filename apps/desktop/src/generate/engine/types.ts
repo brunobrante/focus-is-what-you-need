@@ -1,4 +1,10 @@
 import type { PenPath } from "./pen";
+import type { MaskBox } from "./contour";
+import type { Spacing } from "./measure";
+
+/** "Show sizes" overlay data: the objects found in the crop and the gaps between
+ * them, all in subject-pixel coordinates. */
+export type MeasureOverlay = { boxes: MaskBox[]; spacing: Spacing[] };
 
 export type CropBox = {
   x: number;
@@ -206,6 +212,8 @@ export type PaintOverlayArgs = {
   penPath: PenPath | null;
   /** Live pen cursor for the rubber-band segment while building, or null. */
   penCursor: { x: number; y: number } | null;
+  /** "Show sizes" object boxes + gaps (subject coords), or null when off. */
+  measurements: MeasureOverlay | null;
 };
 
 export type PaintCropsArgs = {

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  componentBoxes,
   foregroundBoundingBox,
   simplifyPath,
   traceObjectContour,
@@ -101,6 +102,18 @@ test("foregroundBoundingBox drops a tiny speck below the noise floor", () => {
   const data = mask(40, 30, (x, y) => big(x, y) || speck(x, y));
   const bb = foregroundBoundingBox(data, 40, 30);
   expect(bb).toEqual({ x: 4, y: 4, w: 21, h: 21 }); // speck ignored
+});
+
+test("componentBoxes returns one box per significant blob", () => {
+  // Two separated squares = two objects (like two side-by-side buttons).
+  const a = (x: number, y: number) => x >= 3 && x <= 9 && y >= 4 && y <= 12;
+  const b = (x: number, y: number) => x >= 20 && x <= 30 && y >= 3 && y <= 14;
+  const data = mask(40, 20, (x, y) => a(x, y) || b(x, y));
+  const boxes = componentBoxes(data, 40, 20).sort((p, q) => p.x - q.x);
+  expect(boxes).toEqual([
+    { x: 3, y: 4, w: 7, h: 9 },
+    { x: 20, y: 3, w: 11, h: 12 },
+  ]);
 });
 
 test("foregroundBoundingBox returns null for an empty mask", () => {

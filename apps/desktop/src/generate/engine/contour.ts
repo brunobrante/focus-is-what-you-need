@@ -53,21 +53,23 @@ export function traceObjectContour(
   return simplified.length >= 3 ? simplified : boundary;
 }
 
+export type MaskBox = { x: number; y: number; w: number; h: number };
+
 /**
- * Bounding box of ALL significant foreground in a mask — the union of every
- * 4-connected blob whose area clears a noise floor (8% of the largest blob).
- * Unlike `traceObjectContour`, which follows only the biggest blob, this spans a
- * multi-part subject like the separate glyphs of a word, so "Adjust crop" on text
- * snaps the rectangle around the whole word, not just its first letter. Returns
- * null when there is no foreground.
+ * Bounding box of every SIGNIFICANT 4-connected foreground blob in a mask — each
+ * blob whose area clears a noise floor of `max(6px, 2% of the largest blob)`, so
+ * small-but-real parts count and stray specks don't. These are the individual
+ * objects inside a crop (the two buttons, the letters of a word), used both to
+ * find a multi-part subject's overall bounds and to measure the gaps between
+ * objects. Returned in scan order (no size sort).
  */
-export function foregroundBoundingBox(
+export function componentBoxes(
   mask: Uint8Array | Uint8ClampedArray | number[],
   width: number,
   height: number,
   threshold = FG_THRESHOLD,
-): { x: number; y: number; w: number; h: number } | null {
-  if (width <= 0 || height <= 0 || mask.length < width * height) return null;
+): MaskBox[] {
+  if (width <= 0 || height <= 0 || mask.length < width * height) return [];
   const labels = new Int32Array(width * height);
   const stack: number[] = [];
   const comps: { size: number; minX: number; minY: number; maxX: number; maxY: number }[] = [];
@@ -114,24 +116,39 @@ export function foregroundBoundingBox(
     comps.push({ size, minX, minY, maxX, maxY });
   }
 
-  if (comps.length === 0) return null;
+  if (comps.length === 0) return [];
   const maxSize = comps.reduce((m, c) => Math.max(m, c.size), 0);
-  // Keep every real part — including small ones like an "i" dot or an accent, so
-  // the box still follows the tallest/lowest extent of a word — and drop only
-  // tiny stray specks (a few pixels of mask noise).
   const minKeep = Math.max(6, maxSize * 0.02);
+  return comps
+    .filter((c) => c.size >= minKeep)
+    .map((c) => ({ x: c.minX, y: c.minY, w: c.maxX - c.minX + 1, h: c.maxY - c.minY + 1 }));
+}
+
+/**
+ * Bounding box of ALL significant foreground — the union of every `componentBoxes`
+ * blob. Spans a multi-part subject like the separate glyphs of a word, so "Adjust
+ * crop" on text snaps the rectangle around the whole word, not just its first
+ * letter. Returns null when there is no foreground.
+ */
+export function foregroundBoundingBox(
+  mask: Uint8Array | Uint8ClampedArray | number[],
+  width: number,
+  height: number,
+  threshold = FG_THRESHOLD,
+): MaskBox | null {
+  const boxes = componentBoxes(mask, width, height, threshold);
+  if (boxes.length === 0) return null;
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const c of comps) {
-    if (c.size < minKeep) continue;
-    minX = Math.min(minX, c.minX);
-    minY = Math.min(minY, c.minY);
-    maxX = Math.max(maxX, c.maxX);
-    maxY = Math.max(maxY, c.maxY);
+  for (const b of boxes) {
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w);
+    maxY = Math.max(maxY, b.y + b.h);
   }
-  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
 /**

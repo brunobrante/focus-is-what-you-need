@@ -165,6 +165,85 @@ export function drawLabelBadge(
   ctx.restore();
 }
 
+const MEASURE_COLOR = "#FF3B7B";
+
+/** A pill label centred on (x, y), for the spacing distance. */
+function drawMeasureLabel(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  zoom: number,
+) {
+  const scale = 1 / Math.max(MIN_TOOL_ZOOM, zoom);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.font =
+    '700 10.5px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  const width = ctx.measureText(text).width + 12;
+  const height = 18;
+  ctx.fillStyle = MEASURE_COLOR;
+  ctx.beginPath();
+  roundedRectPath(ctx, -width / 2, -height / 2, width, height, 5);
+  ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText(text, 0, 0.5);
+  ctx.restore();
+}
+
+/**
+ * "Show sizes" overlay: outlines each detected object and draws a pink gap line
+ * (with end ticks + a px label) between adjacent objects — the static-image
+ * analogue of the canvas's hold-to-measure spacing guides. Boxes/gaps are in
+ * subject coords, mapped here into image-client space.
+ */
+function drawMeasurements(
+  ctx: CanvasRenderingContext2D,
+  measurements: { boxes: { x: number; y: number; w: number; h: number }[]; spacing: { axis: "x" | "y"; ax: number; ay: number; bx: number; by: number; distance: number }[] },
+  img: HTMLImageElement,
+  stroke: number,
+  zoom: number,
+) {
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  const fx = img.clientWidth / img.naturalWidth;
+  const fy = img.clientHeight / img.naturalHeight;
+
+  ctx.lineWidth = stroke;
+  ctx.strokeStyle = "rgba(255,59,123,0.65)";
+  for (const b of measurements.boxes) {
+    ctx.strokeRect(b.x * fx, b.y * fy, b.w * fx, b.h * fy);
+  }
+
+  ctx.lineWidth = 1.5 * stroke;
+  ctx.strokeStyle = MEASURE_COLOR;
+  const tick = 4 * stroke;
+  for (const s of measurements.spacing) {
+    const ax = s.ax * fx;
+    const ay = s.ay * fy;
+    const bx = s.bx * fx;
+    const by = s.by * fy;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    if (s.axis === "x") {
+      ctx.moveTo(ax, ay - tick);
+      ctx.lineTo(ax, ay + tick);
+      ctx.moveTo(bx, by - tick);
+      ctx.lineTo(bx, by + tick);
+    } else {
+      ctx.moveTo(ax - tick, ay);
+      ctx.lineTo(ax + tick, ay);
+      ctx.moveTo(bx - tick, by);
+      ctx.lineTo(bx + tick, by);
+    }
+    ctx.stroke();
+    drawMeasureLabel(ctx, String(Math.round(s.distance)), (ax + bx) / 2, (ay + by) / 2, zoom);
+  }
+}
+
 export function drawSizeBadge(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -380,6 +459,7 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     segmentationContour,
     penPath,
     penCursor,
+    measurements,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
@@ -507,6 +587,10 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     const dotSize = HANDLE_DOT_SIZE / safeZoom;
     const closeTol = 11 / safeZoom;
     drawPenPath(ctx, penPath, penCursor, stroke, dotSize, closeTol);
+  }
+
+  if (measurements) {
+    drawMeasurements(ctx, measurements, img, stroke, toolZoom);
   }
 
   if (drawingPath && drawingPath.points.length > 1) {

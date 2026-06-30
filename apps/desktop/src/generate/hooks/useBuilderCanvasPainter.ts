@@ -9,6 +9,7 @@ import type {
   ViewMode,
 } from "../types";
 import type { PenPath } from "../engine/pen";
+import type { MeasureOverlay } from "../engine/types";
 
 export type BuilderCanvasPainterInput = {
   imgRef: RefObject<HTMLImageElement | null>;
@@ -30,6 +31,8 @@ export type BuilderCanvasPainterInput = {
   penPath: PenPath | null;
   /** Live pen cursor for the rubber-band segment while building, or null. */
   penCursor: { x: number; y: number } | null;
+  /** "Show sizes" object boxes + gaps (subject coords), or null when off. */
+  measurements: MeasureOverlay | null;
   drawingPath: DrawingPath | null;
   brushSize: number;
   selectedComponentId: string | null;
@@ -70,6 +73,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     segmentationContour,
     penPath,
     penCursor,
+    measurements,
     drawingPath,
     brushSize,
     selectedComponentId,
@@ -137,6 +141,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       segmentationContour,
       penPath,
       penCursor,
+      measurements,
     });
   }, [
     activeSubject,
@@ -157,6 +162,7 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     segmentationContour,
     penPath,
     penCursor,
+    measurements,
     stackedComponents,
     toolPan,
     toolZoom,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Expand, Loader2, Scissors } from "lucide-react";
+import { ChevronDown, Expand, Loader2, Ruler, Scissors } from "lucide-react";
 
 import type { PaddingSides } from "../types";
 import { DevWrapper } from "@/components/ui/DevWrapper";
@@ -25,12 +25,17 @@ export function CropFloatingToolbar({
   adjusting,
   canAdjust,
   onAddPadding,
+  onShowSizes,
+  showingSizes,
 }: {
   onAdjustCrop: () => void;
   adjusting: boolean;
   /** Whether a segmentation model is available (else Adjust crop is disabled). */
   canAdjust: boolean;
   onAddPadding: (amount: number, sides: PaddingSides) => void;
+  onShowSizes: () => void;
+  /** Whether the measurement overlay is currently shown (button acts as a toggle). */
+  showingSizes: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(16);
@@ -60,6 +65,24 @@ export function CropFloatingToolbar({
             <Scissors size={11} strokeWidth={2} />
           )}
           {adjusting ? "Adjusting…" : "Adjust crop"}
+        </button>
+      </DevWrapper>
+
+      <DevWrapper platform="desktop">
+        <button
+          type="button"
+          data-selection-action
+          onClick={onShowSizes}
+          title="Measure the spacing between objects inside the crop"
+          className={[
+            "inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border px-2.5 text-[11.5px] font-medium transition-colors",
+            showingSizes
+              ? "border-[#FF3B7B] bg-[#FF3B7B] text-white"
+              : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]",
+          ].join(" ")}
+        >
+          <Ruler size={11} strokeWidth={2} />
+          {showingSizes ? "Hide sizes" : "Show sizes"}
         </button>
       </DevWrapper>
 
