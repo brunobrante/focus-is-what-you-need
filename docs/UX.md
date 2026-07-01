@@ -12,10 +12,10 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 |-------|------|---------|
 | _(layout)_ | HomeLayout | The Home shell — one header + sidebar + footer, declared once. `/`, `/drafts`, `/references`, and `/settings` nest under it and render through its `<Outlet />` (no chrome is copied per page) |
 | `/` | DashboardPage | Home shell index — workspaces, loose projects, recent items |
-| `/workspaces` | WorkspacesPage | Home shell — full grid of every workspace; opening a card activates it and jumps to `/projects` |
-| `/my-projects` | ProjectsPage | Home shell — individual (loose) projects that belong to no workspace. Distinct from `/projects` (the workspace browser) |
+| `/workspaces` | WorkspacesPage | Home shell — full grid of every workspace; opening a card activates it and jumps to its project browser (`/workspace/:workspaceId/projects`) |
+| `/my-projects` | ProjectsPage | Home shell — individual (loose) projects that belong to no workspace. Distinct from `/workspace/:workspaceId/projects` (the workspace browser) |
 | `/settings` | SettingsPage | Standalone Settings inside the Home shell; reuses the same body (`AppSettingsContent`) as the global Settings modal |
-| `/projects` | LandingPage | Project browser for the active workspace |
+| `/workspace/:workspaceId/projects` | LandingPage | Project browser for the workspace (nested under WorkspaceLayout) |
 | `/new` | NewProjectPage | Multi-step project creation wizard. Links the project to a workspace only when launched with `?workspace=<id>` (from the workspace project browser); from Home it creates a loose, workspace-less project and skips the token-sharing step |
 | `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component/icon) creation wizard |
 | `/new-workspace` | NewWorkspacePage | Multi-step workspace creation wizard (name → optional description); on finish it makes the workspace active and opens its project browser |
@@ -79,7 +79,7 @@ header + sidebar stay mounted while the content swaps between **Dashboard** (`/`
 **Drafts** (`/drafts`), **Local References** (`/references`), and **Settings**
 (`/settings`) — none of those pages re-declares the header or sidebar. The
 Dashboard is the index: a shallow hub over the workspace, **not** the project
-browser (that is the Landing Page at `/projects`).
+browser (that is the Landing Page at `/workspace/:workspaceId/projects`).
 
 **Shell layout** (`HomeLayout`):
 - A **single header** (`HomeHeader`), deliberately separate from the workspace
@@ -110,7 +110,7 @@ same cards as full-page grids (`WorkspaceTile` / `ProjectCard` from
 **Workspaces section**: a grid of light `WorkspaceTile` cards — avatar initial,
 name, an **Active** badge on the current workspace, and a project count. A card
 is deliberately minimal (the project-focused detail lives in the browser); click
-sets that workspace active and navigates to `/projects`. Empty copy when none.
+sets that workspace active and navigates to `/workspace/:workspaceId/projects`. Empty copy when none.
 
 **My Projects section**: a card grid of **loose projects** — projects that
 belong to no workspace, created from Home. They live only here (never in a
@@ -127,7 +127,7 @@ project** add tile (`DashedAddTile` → `/new`) closes the grid.
 
 ---
 
-### 1. Landing Page `/projects`
+### 1. Landing Page `/workspace/:workspaceId/projects`
 
 Main project hub.
 
@@ -235,7 +235,7 @@ Wizard for creating a **workspace**, mirroring the New Project/Draft layout
 skipped.
 
 On **Create workspace**, the workspace is persisted, made the active workspace,
-and the app opens its (initially empty) project browser at `/projects`. Close
+and the app opens its (initially empty) project browser at `/workspace/:workspaceId/projects`. Close
 (`×`) returns to Home (`/`). Reached from Home's **Create → New workspace**.
 
 ---
@@ -273,7 +273,7 @@ Shows all screens, components, and references inside a project.
 
 **Header**:
 - Breadcrumb: Projects > ProjectName. The root crumb is **workspace-aware**: a
-  project in a workspace backs out to `Projects` (`/projects`); a **loose** project
+  project in a workspace backs out to `Projects` (`/workspace/:workspaceId/projects`); a **loose** project
   (no workspace) backs out to `Home` (`/`) instead, so it never dead-ends in a
   workspace it never belonged to. The same rule drives the screen/component detail
   breadcrumbs (via `useProjectBackTarget`) and the New Project wizard's close.
@@ -1454,7 +1454,7 @@ on the Home page (`/`), which has its own header.
 
 **Center**:
 - Navigation links: Projects | Components | System | References
-  (**Projects** → `/projects`, the project browser)
+  (**Projects** → `/workspace/:workspaceId/projects`, the project browser)
 
 **Right side**:
 - "Builder" button (primary style)

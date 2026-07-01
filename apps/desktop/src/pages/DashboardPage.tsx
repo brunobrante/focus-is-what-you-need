@@ -10,7 +10,7 @@ import { useHome, type RecentItem, type WorkspaceCard } from "@/application/home
 /**
  * Dashboard — the Home shell's index page. It surfaces the user's workspaces (as
  * light cards), loose projects, and recent items. It is a deliberately shallow
- * overview: the project-focused browser lives at `/projects`, and each workspace
+ * overview: the project-focused browser lives at `/workspace/:workspaceId/projects`, and each workspace
  * card jumps there with that workspace active. The header, sidebar, and footer
  * come from `HomeLayout`; this component renders only the content. The dedicated
  * Workspaces (`/workspaces`) and Projects (`/my-projects`) pages reuse the same

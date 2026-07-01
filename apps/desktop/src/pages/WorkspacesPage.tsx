@@ -12,7 +12,7 @@ import { deleteWorkspace } from "@/lib/storage/repos/workspace.repo";
  * WorkspacesPage (`/workspaces`) — the dedicated grid of every workspace, reached
  * from the Home sidebar. Renders inside the Home shell (`HomeLayout` supplies the
  * header + sidebar), so this is content only. Opening a card makes that workspace
- * active and jumps to its project browser (`/projects`).
+ * active and jumps to its project browser (`/workspace/:workspaceId/projects`).
  */
 export function WorkspacesPage() {
   const { workspaces, activeWorkspace, setActiveWorkspaceId } = useHome();

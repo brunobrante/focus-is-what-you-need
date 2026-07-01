@@ -53,7 +53,8 @@ export function NewProjectPage() {
   // Close returns where the wizard was opened from: the workspace browser when
   // launched from a workspace (?workspace=<id>), otherwise Home.
   const [searchParams] = useSearchParams();
-  const closeHref = searchParams.get("workspace") ? "/projects" : "/";
+  const workspaceParam = searchParams.get("workspace");
+  const closeHref = workspaceParam ? `/workspace/${workspaceParam}/projects` : "/";
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">

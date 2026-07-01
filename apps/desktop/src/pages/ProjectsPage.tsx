@@ -10,7 +10,7 @@ import { deleteProject } from "@/lib/storage/repos/projects.repo";
 
 /**
  * ProjectsPage (`/my-projects`) — individual projects that belong to no
- * workspace (the loose projects created from Home). Distinct from `/projects`,
+ * workspace (the loose projects created from Home). Distinct from `/workspace/:workspaceId/projects`,
  * which is a workspace's project browser. Reached from the Home sidebar and
  * rendered inside the Home shell, so this is content only.
  */

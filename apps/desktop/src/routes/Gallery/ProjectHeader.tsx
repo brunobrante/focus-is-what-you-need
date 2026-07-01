@@ -125,7 +125,7 @@ export function ProjectOverview({
 export function Crumbs({
   projectName,
   type,
-  backHref = "/projects",
+  backHref = "/my-projects",
   backLabel = "Projects",
 }: {
   projectName: string;

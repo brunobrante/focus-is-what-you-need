@@ -59,7 +59,7 @@ export function useNewWorkspace(): NewWorkspaceState {
     try {
       const created = await createWorkspace({ name, description });
       setActiveWorkspaceId(created.id);
-      navigate("/projects");
+      navigate(`/workspace/${created.id}/projects`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the workspace.");
       setCreating(false);

@@ -46,7 +46,7 @@ export const PALETTE_COMMANDS: CommandDefinition[] = [
     title: "Go to Projects",
     section: "Navigation",
     keywords: ["workspace", "projects", "files"],
-    navigateTo: "/projects",
+    navigateTo: "/my-projects",
   },
   {
     id: "nav.canvas",
