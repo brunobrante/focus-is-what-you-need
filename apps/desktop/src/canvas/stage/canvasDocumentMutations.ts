@@ -1,5 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { mutateElementShallow, mutateElementWithStyles, shallowCloneDocument } from "@/canvas/engine/actions";
+import { mutateElementShallow, mutateElementWithStyles, scaledPath, shallowCloneDocument } from "@/canvas/engine/actions";
 import {
   angleBetweenPoints,
   angleDelta,
@@ -27,7 +27,7 @@ import {
 import { buildSnapCandidates, snapRectWithCandidates } from "@/canvas/engine/snapping";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
-import type { CanvasDocument, Point, RadiusCorner, Rect, SnapGuide } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, Point, RadiusCorner, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
@@ -185,6 +185,21 @@ export function commitDragMove(
   return next;
 }
 
+// Bake a box resize into a path's anchors so no scale is left on the element
+// (Penpot's model). `node` already has its NEW width/height; `source` holds the
+// pre-resize dimensions. The path lives in a 1-unit = 1-px space, so multiplying
+// every coordinate by the box ratio keeps the stroke a uniform width instead of
+// stretching it (the "fat line" bug, B1). `node.path` is a shallow ref to the
+// source path, so we replace it with a fresh scaled graph rather than mutating.
+function bakePathResize(node: ElementNode, source: ElementNode): void {
+  if (node.type !== "path" || !node.path) return;
+  const sx = source.width ? node.width / source.width : 1;
+  const sy = source.height ? node.height / source.height : 1;
+  if (sx === 1 && sy === 1) return;
+  node.path = scaledPath(node.path, sx, sy);
+  node.viewBox = { width: node.width, height: node.height };
+}
+
 function resizeSingleElement(
   interaction: ResizeInteraction,
   currentPoint: Point,
@@ -262,6 +277,7 @@ function resizeSingleElement(
       }
       node.x = widthFit ? source.x : roundPixel(absX - parentBounds.x);
       node.y = heightFit ? source.y : roundPixel(absY - parentBounds.y);
+      bakePathResize(node, source);
       applyTextFitSizingInPlace(next, id);
     }
   }
@@ -304,10 +320,20 @@ function applyScaledNode(
 ): void {
   const node = mutateElementWithStyles(doc, id);
   if (!node) return;
+  const oldW = node.width;
+  const oldH = node.height;
   node.x = roundPixel(geom.x);
   node.y = roundPixel(geom.y);
   node.width = roundPixel(Math.max(geom.width, SCALE_MIN_ELEMENT_SIZE));
   node.height = roundPixel(Math.max(geom.height, SCALE_MIN_ELEMENT_SIZE));
+  if (node.type === "path" && node.path) {
+    const sx = oldW ? node.width / oldW : 1;
+    const sy = oldH ? node.height / oldH : 1;
+    if (sx !== 1 || sy !== 1) {
+      node.path = scaledPath(node.path, sx, sy);
+      node.viewBox = { width: node.width, height: node.height };
+    }
+  }
   for (const key of SCALABLE_STYLE_KEYS) {
     const value = node.styles[key];
     if (typeof value === "number") node.styles[key] = roundPixel(value * scale);
@@ -431,6 +457,7 @@ export function resizeDocument(
     );
     node.x = widthFit ? sourceNode.x : roundPixel(clampedRect.x - parentBounds.x);
     node.y = heightFit ? sourceNode.y : roundPixel(clampedRect.y - parentBounds.y);
+    bakePathResize(node, sourceNode);
     applyTextFitSizingInPlace(next, id);
   }
   return { document: next, guides: [] };

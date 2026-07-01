@@ -16,5 +16,6 @@ export {
   setHandleType,
   setFillRule,
   recomputePathBounds,
+  scaledPath,
 } from "./mutations/vectorPath";
 export { insertSvgDocument, flattenElementToPath, applyBooleanToSelection } from "./mutations/vectorOps";

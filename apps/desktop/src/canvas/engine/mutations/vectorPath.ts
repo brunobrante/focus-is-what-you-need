@@ -43,6 +43,30 @@ export function makePathNode(
   };
 }
 
+/**
+ * Deep-clone a path with every anchor + handle multiplied by (sx, sy). Used to
+ * BAKE a box resize into path-local coordinates (Penpot's model): the scale is
+ * absorbed into the geometry instead of being left on the element, so the stroke
+ * never distorts on a non-uniform resize. The result is a fresh object graph —
+ * safe to assign onto a shallow-cloned node without mutating the source. See B1.
+ */
+export function scaledPath(path: VectorPath, sx: number, sy: number): VectorPath {
+  return {
+    ...path,
+    subpaths: path.subpaths.map((sub) => ({
+      ...sub,
+      anchors: sub.anchors.map((a) => {
+        const na: VectorAnchor = { ...a, x: a.x * sx, y: a.y * sy };
+        if (a.inX !== undefined) na.inX = a.inX * sx;
+        if (a.inY !== undefined) na.inY = a.inY * sy;
+        if (a.outX !== undefined) na.outX = a.outX * sx;
+        if (a.outY !== undefined) na.outY = a.outY * sy;
+        return na;
+      }),
+    })),
+  };
+}
+
 /** Append an anchor to the end of a subpath. */
 export function appendAnchor(
   doc: CanvasDocument,

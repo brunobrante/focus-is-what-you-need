@@ -484,7 +484,6 @@ function ElementRendererImpl({
   }
 
   if (node.type === "path") {
-    const vb = node.viewBox ?? { width: node.width || 1, height: node.height || 1 };
     const base = detached
       ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
       : nodeStyle(node, false, renderScale, resolveRef);
@@ -512,8 +511,7 @@ function ElementRendererImpl({
         <svg
           width="100%"
           height="100%"
-          viewBox={`0 0 ${vb.width} ${vb.height}`}
-          preserveAspectRatio="none"
+          viewBox={`0 0 ${Math.max(node.width, 1)} ${Math.max(node.height, 1)}`}
           style={{ overflow: "visible", display: "block" }}
         >
           <path
