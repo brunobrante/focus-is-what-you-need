@@ -412,9 +412,31 @@ const ANCHOR_HIT = 9;
 const HANDLE_HIT = 8;
 const SEGMENT_HIT = 6;
 
+const CLOSE_RING_HIT = 8; // ring is drawn at r=6; grab the annulus with a small margin
+
 function hitTestPathEdit(vx: number, vy: number, geom: PathEditGeometry): ToolingHit | null {
   const p = { x: vx, y: vy };
-  // Handles take priority (drawn on top), then anchors, then segments.
+  // The pen's close ring extends beyond the anchor box, so clicking its outer
+  // annulus must still close the active subpath. Resolve to that subpath's first
+  // anchor (which the pen handler treats as "close"). B16.
+  if (geom.closeTarget) {
+    const ct = geom.closeTarget;
+    if (Math.hypot(vx - ct.x, vy - ct.y) <= CLOSE_RING_HIT) {
+      const first = geom.anchors.find(
+        (a) => a.anchorIndex === 0 && Math.abs(a.point.x - ct.x) < 0.5 && Math.abs(a.point.y - ct.y) < 0.5,
+      );
+      if (first) return { type: "path-anchor", subpathIndex: first.subpathIndex, anchorIndex: 0, cursor: "pointer" };
+    }
+  }
+  // Anchors take priority over handles: a handle knob that stacks on top of its
+  // anchor (zero-length handle) must not steal the grab. Extended handles sit away
+  // from the anchor, so they stay reachable. Then segments. (Figma/Penpot order.) B14.
+  const ar = ANCHOR_HIT / 2;
+  for (const a of geom.anchors) {
+    if (Math.abs(vx - a.point.x) <= ar && Math.abs(vy - a.point.y) <= ar) {
+      return { type: "path-anchor", subpathIndex: a.subpathIndex, anchorIndex: a.anchorIndex, cursor: "pointer" };
+    }
+  }
   const hr = HANDLE_HIT / 2;
   for (const a of geom.anchors) {
     if (a.outHandle && Math.hypot(vx - a.outHandle.x, vy - a.outHandle.y) <= hr) {
@@ -422,12 +444,6 @@ function hitTestPathEdit(vx: number, vy: number, geom: PathEditGeometry): Toolin
     }
     if (a.inHandle && Math.hypot(vx - a.inHandle.x, vy - a.inHandle.y) <= hr) {
       return { type: "path-handle", subpathIndex: a.subpathIndex, anchorIndex: a.anchorIndex, which: "in", cursor: "pointer" };
-    }
-  }
-  const ar = ANCHOR_HIT / 2;
-  for (const a of geom.anchors) {
-    if (Math.abs(vx - a.point.x) <= ar && Math.abs(vy - a.point.y) <= ar) {
-      return { type: "path-anchor", subpathIndex: a.subpathIndex, anchorIndex: a.anchorIndex, cursor: "pointer" };
     }
   }
   for (const seg of geom.segments) {
