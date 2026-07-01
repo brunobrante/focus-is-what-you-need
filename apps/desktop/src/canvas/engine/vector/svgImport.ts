@@ -36,10 +36,11 @@ function readStyles(el: Element): Partial<ElementStyles> {
   if (stroke !== null && stroke !== "none") styles.stroke = stroke;
   const sw = get("stroke-width");
   if (sw !== null) styles.strokeWidth = parseFloat(sw) || 0;
+  // Guard against "inherit"/"currentColor"/non-numeric values → parseFloat NaN.
   const fo = get("fill-opacity");
-  if (fo !== null) styles.fillOpacity = parseFloat(fo);
+  if (fo !== null && Number.isFinite(parseFloat(fo))) styles.fillOpacity = parseFloat(fo);
   const so = get("stroke-opacity");
-  if (so !== null) styles.strokeOpacity = parseFloat(so);
+  if (so !== null && Number.isFinite(parseFloat(so))) styles.strokeOpacity = parseFloat(so);
   const fr = get("fill-rule");
   if (fr === "evenodd" || fr === "nonzero") styles.fillRule = fr;
   const lc = get("stroke-linecap");
@@ -49,7 +50,7 @@ function readStyles(el: Element): Partial<ElementStyles> {
   const da = get("stroke-dasharray");
   if (da !== null && da !== "none") styles.strokeDasharray = da;
   const op = get("opacity");
-  if (op !== null) styles.opacity = parseFloat(op);
+  if (op !== null && Number.isFinite(parseFloat(op))) styles.opacity = parseFloat(op);
   return styles;
 }
 
