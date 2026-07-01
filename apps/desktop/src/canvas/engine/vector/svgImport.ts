@@ -12,11 +12,30 @@ const KAPPA = 0.5522847498307936;
 export type ImportedPath = { path: VectorPath; styles: Partial<ElementStyles>; name: string };
 export type ImportedSvg = { viewBox: { width: number; height: number }; paths: ImportedPath[] };
 
+// CSS absolute units → px (96dpi reference), per the CSS spec.
+const ABSOLUTE_UNIT_PX: Record<string, number> = {
+  px: 1,
+  pt: 96 / 72,
+  pc: 16,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+  q: 96 / 101.6,
+};
+
 function num(el: Element, name: string, fallback = 0): number {
   const v = el.getAttribute(name);
   if (v === null) return fallback;
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
+  const m = v.trim().match(/^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*([a-z%]*)$/i);
+  if (!m) return fallback;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return fallback;
+  const unit = m[2].toLowerCase();
+  if (unit === "" || unit === "px") return n;
+  if (unit in ABSOLUTE_UNIT_PX) return n * ABSOLUTE_UNIT_PX[unit];
+  // Percentages and font-relative units (em/ex/%) need a resolution context we
+  // don't have here — reject rather than mis-read "50%" as an absolute 50.
+  return fallback;
 }
 
 function readStyles(el: Element): Partial<ElementStyles> {
