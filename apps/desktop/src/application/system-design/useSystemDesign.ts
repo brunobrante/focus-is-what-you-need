@@ -25,7 +25,7 @@ import {
   type ResolvedSystemDesign,
 } from "@/domain/system-design/resolve";
 import type { IconToken } from "@/lib/storage/schema";
-import { deleteIconBacking } from "@/application/system-design/iconCanvas";
+import { deleteIcon } from "@/lib/storage/repos/icons.repo";
 
 // A token is anything with a stable id; the editor passes concrete token types.
 type AnyToken = { id: string };
@@ -190,17 +190,18 @@ function useOwnedSystemDesign(
 
   const deleteToken = useCallback(
     (category: SystemDesignCategory, tokenId: string) => {
-      // Cascade: an owned icon token owns a backing component holding its editable
-      // art — delete it so removing the token doesn't leak component/variant/scene.
-      // A *linked instance* (`instanceOf`) is skipped: it points at the master's
-      // backing, which lives with the master's design, not here. Runs before the
-      // pure `mutate` updater so no side effect happens inside a setState updater.
+      // Cascade: an owned icon token references an IconRow master holding its
+      // editable art — delete it so removing the token doesn't leak the master/
+      // variant/scene. A *linked instance* (`instanceOf`) is skipped: it points at
+      // the master's art, which lives with the master's design, not here. Runs
+      // before the pure `mutate` updater so no side effect happens inside a
+      // setState updater.
       if (category === "icons") {
         const token = designRef.current?.tokens.icons.find((t) => t.id === tokenId) as
           | IconToken
           | undefined;
-        if (token && !token.instanceOf && token.backingComponentId) {
-          void deleteIconBacking(token.backingComponentId);
+        if (token && !token.instanceOf && token.iconId) {
+          void deleteIcon(token.iconId);
         }
       }
       mutate((d) => {

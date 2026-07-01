@@ -47,12 +47,13 @@ export type IconToken = LinkableTokenFields & {
   svg: string;
   // Intrinsic authoring box (default 24×24). Used to size/scale renders.
   viewBox?: { width: number; height: number };
-  // The backing component whose variant scene holds this icon's editable vector
-  // art, **owned by this token** (`token owns component`) so its origin is
-  // unambiguous. Created lazily the first time the icon is drawn/edited on the
-  // canvas; the `svg` above is a cached render snapshot serialized from it.
-  // Cascade-deleted with the token (see `deleteIconBacking`).
-  backingComponentId?: string;
+  // The `IconRow` master (EntityType "icon") whose variant scene holds this
+  // icon's editable vector art. The master is a first-class subject (like a
+  // screen/component, never a component) owned by the design's scope owner
+  // (workspace/project). Created lazily the first time the icon is drawn/edited;
+  // the `svg` above is a cached render snapshot serialized from it. Cascade-
+  // deleted with the token (see `deleteIcon`).
+  iconId?: string;
   // Legacy emoji, kept only as a render fallback for tokens without `svg`.
   glyph?: string;
 };

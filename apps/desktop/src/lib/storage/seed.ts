@@ -183,6 +183,9 @@ async function firstBootSeedV5(): Promise<void> {
   // a prior schema shape behind; they re-materialize fresh on next access.
   await replaceTable<never>(TABLES.systemDesigns, [], silent);
   await replaceTable<never>(TABLES.tokens, [], silent);
+  // Icon masters (IconRow) are created lazily (drawn/imported), never seeded.
+  // Clear so a reseed cannot leave a stale icon from a prior schema shape behind.
+  await replaceTable<never>(TABLES.icons, [], silent);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -195,6 +198,7 @@ async function firstBootSeedV5(): Promise<void> {
   notify(TABLES.history);
   notify(TABLES.systemDesigns);
   notify(TABLES.tokens);
+  notify(TABLES.icons);
 
   // Ownership is the edge now — emit the `variant owns component` edges the tree
   // collected (the rows carry no screenId/parentVariantId to derive from).

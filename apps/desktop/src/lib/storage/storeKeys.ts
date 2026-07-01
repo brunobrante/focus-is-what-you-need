@@ -3,6 +3,7 @@ export const TABLES = {
   projects: "projects",
   screens: "screens",
   components: "components",
+  icons: "icons",
   variants: "variants",
   references: "references",
   referenceLibrary: "reference_library",

@@ -37,7 +37,7 @@ import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { svgForElement } from "@/lib/canvas/export/svgExport";
-import { writeIconSvgBack } from "@/application/system-design/iconCanvas";
+import { writeIconArtBack } from "@/application/system-design/iconCanvas";
 import { CanvasTabs } from "./CanvasTabs";
 import { useAllVariants, useScene } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
@@ -112,15 +112,16 @@ function CanvasPageContent() {
   // A screen version (a variant) to open in the dedicated "Versions" window instead
   // of the "Current" window. Current keeps showing the screen's active variant.
   const versionVariantParam = params.get("versionVariant") || "";
-  // When editing an icon token's backing draft, these carry the token + its design
-  // so each scene save refreshes the token's cached SVG snapshot (see save-back).
-  const iconParam = params.get("icon") || "";
+  // When editing an icon master, the optional `systemDesign` param lets the
+  // save-back also refresh the referencing token's cached SVG (a draft icon has
+  // no design, so this is empty and only the IconRow cache updates).
   const iconSystemDesignParam = params.get("systemDesign") || "";
 
   const {
     project,
     screen,
     component,
+    variant,
     scene,
     sceneOwner,
     projectScreens,
@@ -348,20 +349,24 @@ function CanvasPageContent() {
 
   const screenTitle = screen?.title ?? "";
   const componentName = component?.name ?? "";
+  // An icon master owns the opened variant (ownerKind "icon"); its id is the
+  // variant's ownerId. Drives the save-back and the window title.
+  const iconMasterId = variant?.ownerKind === "icon" ? variant.ownerId : null;
   const currentCanvasName = componentName || screenTitle || projectName || "Canvas";
 
-  // Icon save-back: when this canvas is a token's backing draft, serialize the
-  // artboard subtree after each scene save and refresh the token's cached SVG.
+  // Icon save-back: when this canvas edits an icon master, serialize the artboard
+  // subtree after each scene save and refresh the IconRow's cached SVG (and, when
+  // opened from a System Design, the referencing token's cached SVG).
   const onScenePersisted = useCallback(
     (doc: CanvasDocument) => {
-      if (!iconParam || !iconSystemDesignParam) return;
+      if (!iconMasterId) return;
       const rootId = doc.rootIds[0];
       if (!rootId) return;
       const raw = svgForElement(doc, rootId, currentCanvasName);
       if (!raw) return;
-      void writeIconSvgBack(iconSystemDesignParam, iconParam, raw);
+      void writeIconArtBack(iconMasterId, raw, iconSystemDesignParam || undefined);
     },
-    [iconParam, iconSystemDesignParam, currentCanvasName],
+    [iconMasterId, iconSystemDesignParam, currentCanvasName],
   );
 
   const { flushPendingSave, handleCurrentDocumentChange } = useDeferredPersistence({

@@ -27,7 +27,7 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // boot), `instance_usage` (derived from scene graphJSON on save), and `asset_blobs`
 // (binaries out of the records hot path). Nuke-and-reseed produces every row fresh
 // with a short id + envelope; the edge graph is reconciled right after seeding.
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 export type Meta = {
   schemaVersion: number;
@@ -122,8 +122,33 @@ export type ComponentRow = {
   updatedAt: number;
 };
 
-// A variant belongs to exactly one master — a screen or a component.
-export type VariantOwnerKind = "screen" | "component";
+// An icon master — a first-class editable subject, parallel to ScreenRow and
+// ComponentRow (see EntityType "icon"). It owns exactly one art variant (via
+// `activeVariantId`) whose scene holds the icon's editable vector art. `svg` is
+// the serialized render cache refreshed by the canvas save-back — the source used
+// wherever the icon is drawn without a token (e.g. a draft icon). An icon in a
+// System Design is referenced by an `IconToken` (which carries its own `svg`
+// cache + linkable state); a loose icon (no owner edge) is a Draft. Ownership is
+// the single incoming `owns` edge (workspace/project), exactly like a component —
+// or absent for a draft.
+export type IconRow = {
+  id: string;
+  name: string;
+  svg: string | null;
+  viewBox: { width: number; height: number } | null;
+  // Denormalized home pointer for fast "which workspace/project" lookups (routing
+  // and draft filtering), mirroring ComponentRow. Null on a draft icon.
+  workspaceId?: string | null;
+  projectId?: string | null;
+  activeVariantId: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// A variant belongs to exactly one master — a screen, a component, or an icon.
+// Icons own a single art variant (no version chain); the version machinery
+// (promote/duplicate) never runs for them.
+export type VariantOwnerKind = "screen" | "component" | "icon";
 
 export type VariantRow = {
   id: string;

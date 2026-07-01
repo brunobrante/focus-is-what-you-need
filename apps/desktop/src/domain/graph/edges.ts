@@ -17,6 +17,10 @@ export type EntityType =
   | "project"
   | "screen"
   | "component"
+  // An icon master (`IconRow`) — a first-class editable subject like screen/
+  // component: it owns an art variant that owns the icon's vector scene. Its
+  // public design-system face is an `IconToken`; a loose one is a draft.
+  | "icon"
   | "variant"
   | "scene"
   | "systemDesign"
@@ -33,8 +37,8 @@ export type EntityType =
  */
 export type GraphRelation =
   | "contains" // workspace→project, project→screen
-  | "owns" // workspace/project/variant → component; *→ systemDesign/reference
-  | "has_version" // screen/component → variant
+  | "owns" // workspace/project/variant → component; *→ systemDesign/reference; workspace/project → icon
+  | "has_version" // screen/component/icon → variant
   | "owns_scene" // variant → scene
   | "has_stack" // reference → stack
   | "has_cut" // stack → cut

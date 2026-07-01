@@ -10,16 +10,22 @@
 > own scenes" without a special editor mode. The restricted toolbar / chrome
 > gating was dropped (it would fight the "same as the canvas" pattern).
 >
-> **Ownership correction (post-first-cut).** The first implementation made the
-> backing component an *ownerless draft* (hidden from `/drafts` via a
-> `system-icon` category sentinel), linked to the token only by a one-way
-> `backingComponentId` pointer. That violated law 11 (origin must be
-> unambiguous) and leaked the component/variant/scene when the token or design
-> was deleted. The backing is now **owned by the token** (`token owns component`
-> edge, `ComponentParent.kind === "token"`); the sentinel is gone, and deleting a
-> token or a whole design cascade-deletes the backing (`deleteIconBacking`). See
-> `application/system-design/iconCanvas.ts` and `docs/UX.md` § 8. The
-> "Authoring path 2" section below is retained for history but is **superseded**.
+> **Ownership — final model (`IconRow` entity).** The art started as an ownerless
+> *draft component* (sentinel-hidden), then briefly a *token-owned component*.
+> Both made a design **token** masquerade as a **component**, which contradicts
+> law 6 ("a component is screen-derived, not a detached token") and risked the
+> art leaking into the component browser / "Add components" picker. The art is now
+> its own first-class entity: an **`IconRow` master** (`EntityType "icon"`,
+> `VariantOwnerKind "icon"`) that owns a variant+scene — parallel to
+> `ScreenRow`/`ComponentRow`, per Architecture.md **D2** (a new master is a new
+> EntityType, not a discriminator field). It is owned by the design's scope owner
+> (workspace/project) via an `owns` edge, so it shares the standard scope/
+> lifecycle of a component **without ever being one** (component queries only
+> return `ComponentRow`s). The `IconToken` references it by `iconId`; a loose
+> `IconRow` (no owner edge) is a Draft icon. Deleting a token or a whole design
+> cascade-deletes the master (`deleteIcon`). See `lib/storage/repos/icons.repo.ts`,
+> `application/system-design/iconCanvas.ts`, and `docs/UX.md` § 8. The "Authoring
+> path 2" section below is retained for history but is **superseded**.
 
 Replace the emoji-glyph icons in the system-design **Icons** tab with real,
 vector **SVG icons**. A user can either **import** an existing `.svg` file or

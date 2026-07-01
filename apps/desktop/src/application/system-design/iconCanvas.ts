@@ -1,13 +1,8 @@
 import type { NavigateFunction } from "react-router-dom";
-import type { IconToken } from "@/lib/storage/schema";
+import type { IconToken, SystemDesignRow } from "@/lib/storage/schema";
 import type { SystemDesignController } from "@/application/system-design/useSystemDesign";
-import {
-  createComponent,
-  deleteComponentTree,
-  getComponent,
-} from "@/lib/storage/repos/components.repo";
-import { setComponentOwner } from "@/application/graph/ownership";
-import { upsertScene } from "@/lib/storage/repos/scenes.repo";
+import type { EntityRef } from "@/domain/graph/edges";
+import { createIcon, getIcon, updateIconArt } from "@/lib/storage/repos/icons.repo";
 import {
   createBlankHtmlCanvasDocument,
   serializeHtmlCanvasDocument,
@@ -41,45 +36,45 @@ function blankIconGraph(name: string, size: { width: number; height: number }): 
 }
 
 /**
- * Seed a freshly created backing variant's scene: a transparent artboard, plus
- * the icon's existing vector art inserted when it already has an `svg` (so
+ * Build the seed scene graph for a fresh icon master: a transparent artboard,
+ * plus the icon's existing vector art inserted when it already has an `svg` (so
  * opening it on the canvas shows the current icon rather than a blank frame).
- * Always overwrites the white blank scene `createComponent` seeds.
  */
-async function seedBackingScene(
-  variantId: string,
+export function buildIconSceneGraphJSON(
   name: string,
   size: { width: number; height: number },
-  svg: string | undefined,
-): Promise<void> {
+  svg: string | null | undefined,
+): string {
   const blankGraph = blankIconGraph(name, size);
-  let graphJSON = blankGraph;
-
   const imported = svg ? parseSvg(svg) : null;
-  if (imported) {
-    const doc = canvasDocumentFromHtmlGraphJSON(blankGraph, { promoteSubjectRoot: true });
-    if (doc) {
-      const { document } = insertSvgDocument(doc, imported, 0, 0);
-      graphJSON = htmlGraphJSONFromCanvasDocument(document, blankGraph, name);
-    }
-  }
+  if (!imported) return blankGraph;
+  const doc = canvasDocumentFromHtmlGraphJSON(blankGraph, { promoteSubjectRoot: true });
+  if (!doc) return blankGraph;
+  const { document } = insertSvgDocument(doc, imported, 0, 0);
+  return htmlGraphJSONFromCanvasDocument(document, blankGraph, name);
+}
 
-  await upsertScene(
-    { ownerType: "variant", ownerId: variantId, graphJSON },
-    { propagate: false },
-  );
+/** The workspace/project owner a design's icon master is scoped under (same
+ *  standard scope logic as a component created in that scope). */
+function designScopeOwner(design: SystemDesignRow): {
+  owner: EntityRef;
+  workspaceId: string | null;
+  projectId: string | null;
+} {
+  return design.ownerScope === "workspace"
+    ? { owner: { type: "workspace", id: design.ownerId }, workspaceId: design.ownerId, projectId: null }
+    : { owner: { type: "project", id: design.ownerId }, workspaceId: null, projectId: design.ownerId };
 }
 
 /**
- * Open an icon token's editable art on the canvas. The art lives in a backing
- * component (a real component + Default variant owning a real scene) **owned by
- * the token** via a `token owns component` edge — so the icon's origin is
- * unambiguous (Product.md law 11) and it never shows up as a loose draft. The
- * icon opens in the normal canvas by variant, with no special editor mode. The
- * backing is created lazily and linked back onto the token; the token's cached
- * `svg` is refreshed by the canvas save-back keyed on the `icon`/`systemDesign`
- * query params. Deleting the token (or its design) cascade-deletes the backing
- * via `deleteIconBacking`.
+ * Open an icon token's editable art on the canvas. The art lives in an `IconRow`
+ * master (a first-class subject, like a screen/component — never a component) that
+ * owns a variant+scene; the master is **owned by the design's scope owner**
+ * (workspace/project), exactly like a component created in that scope. The token
+ * references the master by `iconId`; the token's cached `svg` is refreshed by the
+ * canvas save-back. The icon opens in the normal canvas by variant — no special
+ * editor mode. Deleting the token (or its design) cascade-deletes the master
+ * (see `deleteIcon`).
  */
 export async function openIconInCanvas({
   token,
@@ -90,41 +85,41 @@ export async function openIconInCanvas({
   controller: SystemDesignController;
   navigate: NavigateFunction;
 }): Promise<void> {
-  const designId = controller.design?.id;
-  if (!designId) return;
+  const design = controller.design;
+  if (!design) return;
+  const designId = design.id;
 
   const size = token.viewBox ?? DEFAULT_ICON_SIZE;
 
-  if (token.backingComponentId) {
-    // Existing backing: resolve its active variant via the component row.
-    const existing = await getComponent(token.backingComponentId);
+  if (token.iconId) {
+    const existing = await getIcon(token.iconId);
     if (existing) {
-      navigate(iconCanvasUrl(existing.activeVariantId, token.id, designId));
+      navigate(iconCanvasUrl(existing.activeVariantId, designId));
       return;
     }
-    // The backing was deleted out from under us — recreate below.
+    // The master was deleted out from under us — recreate below.
   }
 
-  const { component, defaultVariant } = await createComponent({
-    // The token owns its editable art — an unambiguous origin, not a loose draft.
-    parent: { kind: "token", tokenId: token.id },
-    // A unique, stable name is never user-visible (the backing is reachable only
-    // through the token, never listed on its own).
-    name: `icon:${token.id}`,
-    width: size.width,
-    height: size.height,
+  const scope = designScopeOwner(design);
+  const { icon } = await createIcon({
+    owner: scope.owner,
+    workspaceId: scope.workspaceId,
+    projectId: scope.projectId,
+    name: token.name,
+    size,
+    svg: token.svg ?? null,
+    viewBox: token.viewBox ?? null,
+    sceneGraphJSON: buildIconSceneGraphJSON(token.name, size, token.svg),
   });
-  const variantId = defaultVariant.id;
-  await seedBackingScene(variantId, token.name, size, token.svg);
 
-  const linked: IconToken = { ...token, backingComponentId: component.id };
+  const linked: IconToken = { ...token, iconId: icon.id };
   controller.upsertToken("icons", linked);
-  navigate(iconCanvasUrl(variantId, token.id, designId));
+  navigate(iconCanvasUrl(icon.activeVariantId, designId));
 }
 
 /**
- * Normalize a canvas-exported `<svg>` (from `svgForElement`) into bare token
- * markup: strips the XML prolog via re-parse and reads back the `viewBox`.
+ * Normalize a canvas-exported `<svg>` (from `svgForElement`) into bare markup:
+ * strips the XML prolog via re-parse and reads back the `viewBox`.
  */
 function normalizeExportedIconSvg(
   raw: string,
@@ -143,55 +138,48 @@ function normalizeExportedIconSvg(
 }
 
 /**
- * Save-back: refresh an icon token's cached `svg` from a serialized canvas scene.
- * Reads the design, patches only the matching icon (preserving name/backing/
- * linkable), and writes through `saveSystemDesign` — which splits to per-`TokenRow`
- * `putRecord`s (the approved persistence path; never the port directly).
+ * Save-back: refresh an icon **master**'s cached `svg` from a serialized canvas
+ * scene, and — when the master belongs to a System Design (`designId` given) —
+ * mirror it onto the design's icon token that references this master (`iconId`),
+ * so the Icons tab and every linked instance re-render. Writes through
+ * `saveSystemDesign` (per-`TokenRow` `putRecord`, the approved path).
  */
-export async function writeIconSvgBack(
-  designId: string,
-  tokenId: string,
+export async function writeIconArtBack(
+  iconMasterId: string,
   exportedSvg: string,
+  designId?: string,
 ): Promise<void> {
   const normalized = normalizeExportedIconSvg(exportedSvg);
   if (!normalized || !normalized.svg.trim()) return;
 
+  await updateIconArt(iconMasterId, {
+    svg: normalized.svg,
+    viewBox: normalized.viewBox ?? null,
+  });
+
+  if (!designId) return;
   const design = await getSystemDesign(designId);
   if (!design) return;
   const icons = design.tokens.icons;
-  const idx = icons.findIndex((t) => t.id === tokenId);
+  const idx = icons.findIndex((t) => t.iconId === iconMasterId);
   if (idx < 0) return;
 
   const current = icons[idx]!;
+  // Skip a write when nothing changed (avoids a save-loop echo).
+  if (current.svg === normalized.svg) return;
   const nextIcon: IconToken = {
     ...current,
     svg: normalized.svg,
     viewBox: normalized.viewBox ?? current.viewBox,
   };
-  // Skip a write when nothing changed (avoids a save-loop echo).
-  if (nextIcon.svg === current.svg) return;
-
   const nextIcons = icons.map((t, i) => (i === idx ? nextIcon : t));
   saveSystemDesign({ ...design, tokens: { ...design.tokens, icons: nextIcons } });
 }
 
-/**
- * Cascade-delete an icon token's backing component. Removing the token (or its
- * whole design) must not leak the backing component/variant/scene. Tombstones the
- * `token owns component` edge first, then removes the component subtree. Safe to
- * call with a stale id (a since-deleted backing is a no-op). Never call this for a
- * *linked instance* of an icon — that would delete the master's art from a project.
- */
-export async function deleteIconBacking(backingComponentId: string): Promise<void> {
-  await setComponentOwner(backingComponentId, null);
-  await deleteComponentTree(backingComponentId);
-}
-
-function iconCanvasUrl(variantId: string, tokenId: string, designId: string): string {
+function iconCanvasUrl(variantId: string, designId: string): string {
   const p = new URLSearchParams({
     variant: variantId,
     type: "desktop",
-    icon: tokenId,
     systemDesign: designId,
   });
   return `/canvas?${p.toString()}`;
