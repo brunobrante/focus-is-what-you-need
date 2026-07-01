@@ -105,7 +105,22 @@ export function nextRingInset(
       }
     }
     if (!isPeak) continue;
-    const inset = maxR - r;
+    // Sub-pixel edge: the true ring boundary sits in the middle of the
+    // anti-aliased band, not on the integer peak. Find where the mean profile
+    // crosses the midpoint between the inner and outer plateaus and interpolate.
+    const inner = mean[Math.max(0, r - win)];
+    const outer = mean[Math.min(R, r + win)];
+    const mid = (inner + outer) / 2;
+    let rEdge = r;
+    for (let j = Math.max(0, r - win); j < Math.min(R, r + win); j += 1) {
+      const a = mean[j];
+      const b = mean[j + 1];
+      if (a !== b && (a - mid) * (b - mid) <= 0) {
+        rEdge = j + (mid - a) / (b - a);
+        break;
+      }
+    }
+    const inset = maxR - rEdge;
     return inset >= 1 ? inset : null;
   }
   return null;
