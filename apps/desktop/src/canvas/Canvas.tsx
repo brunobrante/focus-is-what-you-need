@@ -36,10 +36,10 @@ import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
 import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
-import { svgForElement } from "@/lib/canvas/export/svgExport";
+import { svgForIconDocument } from "@/lib/canvas/export/svgExport";
 import { writeIconArtBack } from "@/application/system-design/iconCanvas";
 import { CanvasTabs } from "./CanvasTabs";
-import { useAllVariants, useScene } from "@/lib/storage/hooks";
+import { useAllVariants, useIcon, useScene } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
 import { parentVariantIdOf, screenIdOfComponent } from "@/application/graph/componentOwnership";
 import { VersionModeModal, type VersionModeModalHandle } from "@/components/modals/VersionModeModal";
@@ -350,19 +350,20 @@ function CanvasPageContent() {
   const screenTitle = screen?.title ?? "";
   const componentName = component?.name ?? "";
   // An icon master owns the opened variant (ownerKind "icon"); its id is the
-  // variant's ownerId. Drives the save-back and the window title.
+  // variant's ownerId. Drives the save-back and the canvas subject label.
   const iconMasterId = variant?.ownerKind === "icon" ? variant.ownerId : null;
-  const currentCanvasName = componentName || screenTitle || projectName || "Canvas";
+  const { data: iconRow } = useIcon(iconMasterId);
+  const iconName = iconRow?.name ?? "";
+  const currentCanvasName = componentName || screenTitle || iconName || projectName || "Canvas";
 
-  // Icon save-back: when this canvas edits an icon master, serialize the artboard
-  // subtree after each scene save and refresh the IconRow's cached SVG (and, when
-  // opened from a System Design, the referencing token's cached SVG).
+  // Icon save-back: when this canvas edits an icon master, serialize the whole
+  // artboard (its paths are direct children — no sealed container) after each scene
+  // save and refresh the IconRow's cached SVG (and, when opened from a System
+  // Design, the referencing token's cached SVG).
   const onScenePersisted = useCallback(
     (doc: CanvasDocument) => {
       if (!iconMasterId) return;
-      const rootId = doc.rootIds[0];
-      if (!rootId) return;
-      const raw = svgForElement(doc, rootId, currentCanvasName);
+      const raw = svgForIconDocument(doc, currentCanvasName);
       if (!raw) return;
       void writeIconArtBack(iconMasterId, raw, iconSystemDesignParam || undefined);
     },
@@ -1010,7 +1011,7 @@ function CanvasPageContent() {
         versionsParentNode={versionsBackNode}
         onVersionsBack={goBackVersions}
         subjectSize={selectedSubjectSize}
-        isIconCanvas={!!iconMasterId}
+        subjectName={iconName || undefined}
         versionOptions={versionsVariants}
         selectedVersionId={selectedVersionId}
         onSelectVersion={setSelectedVersionId}

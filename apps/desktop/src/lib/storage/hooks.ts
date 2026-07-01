@@ -46,7 +46,7 @@ import type {
   VariantRow,
   WorkspaceRow,
 } from "@/lib/storage/schema";
-import { listDraftIcons } from "@/lib/storage/repos/icons.repo";
+import { getIcon, listDraftIcons } from "@/lib/storage/repos/icons.repo";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 import { TABLES, type TableKey, subscribe } from "@/lib/storage/store";
 
@@ -304,6 +304,16 @@ export function useDrafts(): State<ComponentRow[]> {
     async () => listDrafts(),
     [],
     [],
+  );
+}
+
+/** A single icon master by id (e.g. to label the canvas when authoring its art). */
+export function useIcon(id: string | null | undefined): State<IconRow | null> {
+  return useTableQuery<IconRow | null>(
+    [TABLES.icons],
+    async () => (id ? getIcon(id) : null),
+    null,
+    [id ?? ""],
   );
 }
 

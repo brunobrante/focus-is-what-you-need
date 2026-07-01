@@ -12,6 +12,61 @@ import type { ImportedSvg } from "../vector/svgImport";
 
 // ─── SVG import ──────────────────────────────────────────────────────────────────
 
+/** Build a `path` element from an imported SVG path, parented to `parentId` and
+ *  filling the SVG's viewBox (shared by the sealed-container and icon imports). */
+function pathNodeFromImported(
+  ip: ImportedSvg["paths"][number],
+  parentId: string | null,
+  vbW: number,
+  vbH: number,
+): ElementNode {
+  const styles: ElementStyles = {
+    fill: ip.styles.fill ?? "#000000",
+    ...(ip.styles.stroke !== undefined ? { stroke: ip.styles.stroke } : {}),
+    ...(ip.styles.strokeWidth !== undefined ? { strokeWidth: ip.styles.strokeWidth } : {}),
+    ...(ip.styles.fillOpacity !== undefined ? { fillOpacity: ip.styles.fillOpacity } : {}),
+    ...(ip.styles.strokeOpacity !== undefined ? { strokeOpacity: ip.styles.strokeOpacity } : {}),
+    ...(ip.styles.strokeLinecap !== undefined ? { strokeLinecap: ip.styles.strokeLinecap } : {}),
+    ...(ip.styles.strokeLinejoin !== undefined ? { strokeLinejoin: ip.styles.strokeLinejoin } : {}),
+    ...(ip.styles.strokeDasharray !== undefined ? { strokeDasharray: ip.styles.strokeDasharray } : {}),
+    opacity: ip.styles.opacity ?? 1,
+  };
+  return {
+    id: createId("path"),
+    type: "path",
+    parentId,
+    children: [],
+    name: ip.name,
+    x: 0,
+    y: 0,
+    width: vbW,
+    height: vbH,
+    rotation: 0,
+    visible: true,
+    locked: false,
+    styles,
+    viewBox: { width: vbW, height: vbH },
+    path: ip.path,
+  };
+}
+
+/**
+ * Insert a parsed SVG's paths as DIRECT children of the document root — no sealed
+ * `svg` container. Used for icon authoring, where the artboard itself IS the SVG:
+ * the paths are the top-level, individually-editable content, so the layers tree
+ * shows them directly and the icon exports the whole artboard.
+ */
+export function insertSvgPathsAsRoot(doc: CanvasDocument, imported: ImportedSvg): CanvasDocument {
+  const next = cloneDocument(doc);
+  const { width: vbW, height: vbH } = imported.viewBox;
+  for (const ip of imported.paths) {
+    const node = pathNodeFromImported(ip, null, vbW, vbH);
+    next.elements[node.id] = node;
+    next.rootIds.push(node.id);
+  }
+  return next;
+}
+
 /** Insert a parsed SVG as a sealed container node with child path nodes. */
 export function insertSvgDocument(
   doc: CanvasDocument,
@@ -25,36 +80,9 @@ export function insertSvgDocument(
   const childIds: string[] = [];
 
   for (const ip of imported.paths) {
-    const id = createId("path");
-    childIds.push(id);
-    const styles: ElementStyles = {
-      fill: ip.styles.fill ?? "#000000",
-      ...(ip.styles.stroke !== undefined ? { stroke: ip.styles.stroke } : {}),
-      ...(ip.styles.strokeWidth !== undefined ? { strokeWidth: ip.styles.strokeWidth } : {}),
-      ...(ip.styles.fillOpacity !== undefined ? { fillOpacity: ip.styles.fillOpacity } : {}),
-      ...(ip.styles.strokeOpacity !== undefined ? { strokeOpacity: ip.styles.strokeOpacity } : {}),
-      ...(ip.styles.strokeLinecap !== undefined ? { strokeLinecap: ip.styles.strokeLinecap } : {}),
-      ...(ip.styles.strokeLinejoin !== undefined ? { strokeLinejoin: ip.styles.strokeLinejoin } : {}),
-      ...(ip.styles.strokeDasharray !== undefined ? { strokeDasharray: ip.styles.strokeDasharray } : {}),
-      opacity: ip.styles.opacity ?? 1,
-    };
-    next.elements[id] = {
-      id,
-      type: "path",
-      parentId: containerId,
-      children: [],
-      name: ip.name,
-      x: 0,
-      y: 0,
-      width: vbW,
-      height: vbH,
-      rotation: 0,
-      visible: true,
-      locked: false,
-      styles,
-      viewBox: { width: vbW, height: vbH },
-      path: ip.path,
-    };
+    const node = pathNodeFromImported(ip, containerId, vbW, vbH);
+    childIds.push(node.id);
+    next.elements[node.id] = node;
   }
 
   next.elements[containerId] = {

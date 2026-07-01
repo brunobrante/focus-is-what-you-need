@@ -3,11 +3,21 @@ import { getHtmlCanvasChildren, getHtmlCanvasNode, normalizeHtmlCanvasDocument }
 import { escapeAttr, escapeXml } from "./styleUtils";
 import { pathToSvgPathData } from "@/domain/canvas/vector";
 
-export function svgForHtmlCanvasDocument(document: HtmlCanvasDocument): string {
+export function svgForHtmlCanvasDocument(
+  document: HtmlCanvasDocument,
+  options: { skipRootShape?: boolean } = {},
+): string {
   const normalized = normalizeHtmlCanvasDocument(document);
   const root = getHtmlCanvasNode(normalized, normalized.rootId);
   if (!root) return "";
-  const body = renderSvgNode(normalized, root, 0, 0);
+  // `skipRootShape` emits only the root's content (children), not the artboard
+  // frame's own rect — used for icon export so the transparent artboard is never
+  // baked into the markup (which would re-import as a spurious rect each round-trip).
+  const body = options.skipRootShape
+    ? getHtmlCanvasChildren(normalized, root.id)
+        .map((child) => renderSvgNode(normalized, child, 0, 0))
+        .join("")
+    : renderSvgNode(normalized, root, 0, 0);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${root.bounds.width}" height="${root.bounds.height}" viewBox="0 0 ${root.bounds.width} ${root.bounds.height}" fill="none">`,
     body,

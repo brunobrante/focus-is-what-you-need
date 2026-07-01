@@ -12,6 +12,20 @@ const KAPPA = 0.5522847498307936;
 export type ImportedPath = { path: VectorPath; styles: Partial<ElementStyles>; name: string };
 export type ImportedSvg = { viewBox: { width: number; height: number }; paths: ImportedPath[] };
 
+// SVG presentation attributes that cascade to descendants (per the SVG spec). Note
+// `opacity` is deliberately absent — element opacity does not inherit.
+const INHERITABLE_STYLE_KEYS = [
+  "fill",
+  "fillOpacity",
+  "fillRule",
+  "stroke",
+  "strokeWidth",
+  "strokeOpacity",
+  "strokeLinecap",
+  "strokeLinejoin",
+  "strokeDasharray",
+] as const satisfies readonly (keyof ElementStyles)[];
+
 // CSS absolute units → px (96dpi reference), per the CSS spec.
 const ABSOLUTE_UNIT_PX: Record<string, number> = {
   px: 1,
@@ -52,7 +66,9 @@ function readStyles(el: Element): Partial<ElementStyles> {
   const fill = get("fill");
   if (fill !== null) styles.fill = fill;
   const stroke = get("stroke");
-  if (stroke !== null && stroke !== "none") styles.stroke = stroke;
+  // Record `stroke` even when "none" so it can OVERRIDE an inherited stroke (SVG
+  // presentation attributes cascade); the renderer treats "none" as no stroke.
+  if (stroke !== null) styles.stroke = stroke;
   const sw = get("stroke-width");
   if (sw !== null) styles.strokeWidth = parseFloat(sw) || 0;
   // Guard against "inherit"/"currentColor"/non-numeric values → parseFloat NaN.
@@ -235,22 +251,44 @@ export function parseSvg(markup: string): ImportedSvg | null {
 
   const paths: ImportedPath[] = [];
   let counter = 0;
-  const walk = (el: Element, parentMatrix: Mat): void => {
+  const walk = (el: Element, parentMatrix: Mat, inherited: Partial<ElementStyles>): void => {
     // Accumulate this element's own transform onto the inherited one.
     const matrix = matMul(parentMatrix, parseTransform(el.getAttribute("transform")));
+    // SVG presentation attributes cascade: a shape inherits fill/stroke/etc. from its
+    // ancestors (e.g. a Lucide icon sets `fill="none" stroke="currentColor"` on the
+    // root <svg>, not on each <path>). Merge own paint over the inherited paint;
+    // `opacity` is per-element in SVG, so it never inherits.
+    const own = readStyles(el);
+    const cascaded: Partial<ElementStyles> = { ...inherited };
+    for (const key of INHERITABLE_STYLE_KEYS) {
+      const value = own[key];
+      if (value !== undefined) (cascaded as Record<string, unknown>)[key] = value;
+    }
     const path = shapeElementToPath(el);
     if (path && path.subpaths.some((s) => s.anchors.length > 0)) {
       applyMatrixToPath(path, matrix);
-      const styles = readStyles(el);
+      const styles: Partial<ElementStyles> = { ...cascaded };
+      if (own.opacity !== undefined) styles.opacity = own.opacity;
+      // `currentColor` has no color context on import → resolve to black, matching
+      // Figma / paper.design. The vector stays fully recolorable afterwards.
+      if (styles.fill === "currentColor") styles.fill = "#000000";
+      if (styles.stroke === "currentColor") styles.stroke = "#000000";
       if (styles.fillRule) path.fillRule = styles.fillRule;
       counter += 1;
       paths.push({ path, styles, name: el.getAttribute("id") || `Path ${counter}` });
     }
-    for (const child of Array.from(el.children)) walk(child, matrix);
+    for (const child of Array.from(el.children)) walk(child, matrix, cascaded);
   };
-  // Seed with the viewBox origin offset so shapes normalize to a 0-based box.
+  // Seed with the viewBox origin offset so shapes normalize to a 0-based box, and
+  // with the root <svg>'s own presentation attributes as the initial cascade.
   const base: Mat = [1, 0, 0, 1, -minX, -minY];
-  for (const child of Array.from(svg.children)) walk(child, base);
+  const rootStyles = readStyles(svg);
+  const rootInherited: Partial<ElementStyles> = {};
+  for (const key of INHERITABLE_STYLE_KEYS) {
+    const value = rootStyles[key];
+    if (value !== undefined) (rootInherited as Record<string, unknown>)[key] = value;
+  }
+  for (const child of Array.from(svg.children)) walk(child, base, rootInherited);
 
   if (paths.length === 0) return null;
   return { viewBox: { width: vbW, height: vbH }, paths };

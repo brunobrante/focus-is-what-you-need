@@ -111,9 +111,9 @@ type Props = {
   onResize: (width: number) => void;
   componentName?: string;
   screenName?: string;
-  // When authoring an icon master, reveal the art SVG's path children in the tree
-  // (the vectors are the subject being edited, not a sealed graphic to leave alone).
-  isIconCanvas?: boolean;
+  // The subject name to show when the canvas is neither a component nor a screen
+  // (e.g. an icon master, labelled by the icon's name instead of a generic "Frame").
+  subjectName?: string;
   document?: CanvasDocument | null;
   selectedNodeId?: string | null;
   selectedNodeIds?: readonly string[];
@@ -180,7 +180,7 @@ export function Tree({
   onResize,
   componentName,
   screenName,
-  isIconCanvas,
+  subjectName,
   document: documentProp,
   selectedNodeId,
   selectedNodeIds,
@@ -225,15 +225,12 @@ export function Tree({
   );
   const document = documentProp !== undefined ? documentProp : bridgeDocument;
   const { settings: globalSettings } = useGlobalSettings();
-  // Icon authoring always reveals the art SVG's path children — editing them is the
-  // whole task — regardless of the global "reveal sealed children" preference.
-  const revealSealedSvg =
-    globalSettings.canvas.shell.tree.revealSealedComponentChildren || !!isIconCanvas;
+  const revealSealedSvg = globalSettings.canvas.shell.tree.revealSealedComponentChildren;
   const tree = useMemo(() => {
-    const label = componentName || screenName || "Canvas";
+    const label = componentName || screenName || subjectName || "Canvas";
     if (document) return treeFromCanvasDocument(document, label, revealSealedSvg);
     return treeFromCanvasDocument(null, label, revealSealedSvg);
-  }, [componentName, document, screenName, revealSealedSvg]);
+  }, [componentName, document, screenName, subjectName, revealSealedSvg]);
   const treeStructureKey = useMemo(() => structureKey(tree.root), [tree]);
 
   const [openSet, setOpenSet] = useState<Set<string>>(() => initiallyOpen(tree.root));
@@ -470,7 +467,7 @@ export function Tree({
 
   if (!open) return null;
 
-  const headerName = componentName || screenName || "Frame";
+  const headerName = componentName || screenName || subjectName || "Frame";
   const isScreen = !componentName && !!screenName;
   const focusedWindowLabel = activeTab === "current" ? null : windowKeyLabel(activeTab);
   const rowWidth = subjectSize?.width ?? document?.canvas.width;

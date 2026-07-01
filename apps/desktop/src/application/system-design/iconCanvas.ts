@@ -13,7 +13,7 @@ import {
   htmlGraphJSONFromCanvasDocument,
 } from "@/canvas/engine/htmlSceneAdapter";
 import { parseSvg } from "@/canvas/engine/vector/svgImport";
-import { insertSvgDocument } from "@/canvas/engine/mutations/vectorOps";
+import { insertSvgPathsAsRoot } from "@/canvas/engine/mutations/vectorOps";
 import { sanitizeSvg } from "@/canvas/engine/vector/sanitizeSvg";
 import { getSystemDesign, saveSystemDesign } from "@/lib/storage/repos/systemDesigns.repo";
 
@@ -34,7 +34,9 @@ export function buildIconSceneGraphJSON(
   if (!imported) return blankGraph;
   const doc = canvasDocumentFromHtmlGraphJSON(blankGraph, { promoteSubjectRoot: true });
   if (!doc) return blankGraph;
-  const { document } = insertSvgDocument(doc, imported, 0, 0);
+  // The artboard IS the icon's SVG: the paths are its direct children (no sealed
+  // container), so the tree shows the paths and the whole artboard is the icon.
+  const document = insertSvgPathsAsRoot(doc, imported);
   return htmlGraphJSONFromCanvasDocument(document, blankGraph, name);
 }
 

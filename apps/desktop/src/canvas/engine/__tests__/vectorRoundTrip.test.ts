@@ -8,7 +8,7 @@ import {
   canvasDocumentFromHtmlGraphJSON,
   htmlGraphJSONFromCanvasDocument,
 } from "@/canvas/engine/htmlSceneAdapter";
-import { svgForElement } from "@/lib/canvas/export/svgExport";
+import { svgForElement, svgForIconDocument } from "@/lib/canvas/export/svgExport";
 
 // A vector (svg container + child path) must survive the persisted scene format.
 // Before the format carried vector data, every path degraded to a full-bounds rect
@@ -97,4 +97,46 @@ test("the SVG export of a vector emits a real <path>", () => {
   expect(exported).toBeTruthy();
   expect(exported!).toContain("<path");
   expect(exported!).toContain('fill="#182033"');
+});
+
+// An icon's paths are DIRECT children of its artboard (no sealed svg container).
+// The icon export must serialize the whole artboard's content into one <svg>,
+// WITHOUT baking the transparent artboard frame as a <rect> — otherwise every
+// open→save cycle would re-import that rect and accumulate junk.
+test("svgForIconDocument emits the paths without the artboard rect", () => {
+  const blank = serializeHtmlCanvasDocument(
+    createBlankHtmlCanvasDocument({ name: "Bell", width: 24, height: 24 }),
+  );
+  const base = canvasDocumentFromHtmlGraphJSON(blank, { promoteSubjectRoot: true })!;
+  const path: ElementNode = {
+    id: "path-bell",
+    type: "path",
+    parentId: null,
+    children: [],
+    name: "Path 1",
+    x: 0,
+    y: 0,
+    width: 24,
+    height: 24,
+    rotation: 0,
+    visible: true,
+    locked: false,
+    styles: { fill: "none", stroke: "#000000", strokeWidth: 2, opacity: 1 },
+    viewBox: { width: 24, height: 24 },
+    path: { subpaths: [{ closed: false, anchors: [
+      { x: 6, y: 8, handleType: "corner" },
+      { x: 18, y: 8, handleType: "corner" },
+    ] }] },
+  };
+  const document: CanvasDocument = {
+    ...base,
+    rootIds: [...base.rootIds, "path-bell"],
+    elements: { ...base.elements, "path-bell": path },
+  };
+
+  const exported = svgForIconDocument(document, "Bell");
+  expect(exported).toBeTruthy();
+  expect(exported!).toContain("<path");
+  expect(exported!).toContain('stroke="#000000"');
+  expect(exported!).not.toContain("<rect");
 });
