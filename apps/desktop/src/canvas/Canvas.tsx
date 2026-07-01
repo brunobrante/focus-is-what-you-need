@@ -21,6 +21,7 @@ import { DEFAULT_SHELL_BACKGROUND, detachInstance, moveElementToParent, setEleme
 import { buildMasterResolver, canvasDocumentFromHtmlGraphJSON, getInheritedShellBackgroundFromGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { getScenesSnapshot } from "@/application/scenes/useScenesSnapshot";
 import type { CanvasToolId } from "@/canvas/tools";
+import type { CanvasDocument } from "@/canvas/engine/types";
 import { createToolbarConfig } from "@/canvas/toolbarConfig";
 import { EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP } from "@/canvas/stage/canvasShellStyle";
 import { useResolvedCanvasSettings } from "@/application/settings/useResolvedCanvasSettings";
@@ -35,6 +36,8 @@ import { CANVAS_COMMAND_GROUPS } from "@/domain/settings/commands";
 import type { SearchItem } from "@/domain/search/searchTypes";
 import { putGlobalSettings } from "@/lib/storage/repos/settings.repo";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
+import { svgForElement } from "@/lib/canvas/export/svgExport";
+import { writeIconSvgBack } from "@/application/system-design/iconCanvas";
 import { CanvasTabs } from "./CanvasTabs";
 import { useAllVariants, useScene } from "@/lib/storage/hooks";
 import { mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
@@ -109,6 +112,10 @@ function CanvasPageContent() {
   // A screen version (a variant) to open in the dedicated "Versions" window instead
   // of the "Current" window. Current keeps showing the screen's active variant.
   const versionVariantParam = params.get("versionVariant") || "";
+  // When editing an icon token's backing draft, these carry the token + its design
+  // so each scene save refreshes the token's cached SVG snapshot (see save-back).
+  const iconParam = params.get("icon") || "";
+  const iconSystemDesignParam = params.get("systemDesign") || "";
 
   const {
     project,
@@ -343,6 +350,20 @@ function CanvasPageContent() {
   const componentName = component?.name ?? "";
   const currentCanvasName = componentName || screenTitle || projectName || "Canvas";
 
+  // Icon save-back: when this canvas is a token's backing draft, serialize the
+  // artboard subtree after each scene save and refresh the token's cached SVG.
+  const onScenePersisted = useCallback(
+    (doc: CanvasDocument) => {
+      if (!iconParam || !iconSystemDesignParam) return;
+      const rootId = doc.rootIds[0];
+      if (!rootId) return;
+      const raw = svgForElement(doc, rootId, currentCanvasName);
+      if (!raw) return;
+      void writeIconSvgBack(iconSystemDesignParam, iconParam, raw);
+    },
+    [iconParam, iconSystemDesignParam, currentCanvasName],
+  );
+
   const { flushPendingSave, handleCurrentDocumentChange } = useDeferredPersistence({
     sceneOwner,
     currentReady,
@@ -356,6 +377,7 @@ function CanvasPageContent() {
     screen,
     canUseFactoryMocks,
     currentDocument,
+    onScenePersisted,
   });
 
   const projectTree = useMemo(

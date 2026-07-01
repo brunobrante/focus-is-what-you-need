@@ -1,8 +1,9 @@
 import { type CSSProperties } from "react";
 import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
-import { IconFastEdit, IconLink, IconTrash, IconUnlink } from "@/components/icons";
+import { IconFastEdit, IconLink, IconOpenCanvas, IconTrash, IconUnlink } from "@/components/icons";
 import { TokenAction } from "@/system-design/shared";
 import { SourceBadge } from "./SourceBadge";
+import { IconGlyph } from "./IconGlyph";
 import type { SourcedToken, TokenSource } from "@/domain/system-design/resolve";
 import type { SystemDesignController } from "@/application/system-design/useSystemDesign";
 import type {
@@ -27,6 +28,7 @@ export function CategoryGrid({
   onDelete,
   onDetach,
   onToggleLinkable,
+  onEditInCanvas,
 }: {
   category: SystemDesignCategory;
   tokens: SourcedToken[];
@@ -36,6 +38,8 @@ export function CategoryGrid({
   onDelete: (id: string) => void;
   onDetach: (id: string) => void;
   onToggleLinkable: (id: string, linkable: boolean) => void;
+  /** Icons only: open the token's editable vector art on the canvas. */
+  onEditInCanvas?: (token: IconToken) => void;
 }) {
   const tokenActions = ({ token, source }: SourcedToken, sz = 11) => {
     if (scope === "workspace") {
@@ -169,9 +173,12 @@ export function CategoryGrid({
             <div key={ic.id} style={ringFor(entry.source)} className="group relative grid aspect-square gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]">
               {corner(entry.source)}
               <div className="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
+                {onEditInCanvas && entry.source !== "linked" && (
+                  <TokenAction icon={<IconOpenCanvas size={10} />} title="Edit in canvas" onClick={() => onEditInCanvas(ic)} />
+                )}
                 {tokenActions(entry, 10)}
               </div>
-              <div className="grid place-items-center text-[22px]">{ic.glyph}</div>
+              <div className="grid place-items-center"><IconGlyph icon={ic} size={22} /></div>
               <div className="truncate text-center text-[11px] text-[var(--text-muted)]">{ic.name}</div>
             </div>
           );

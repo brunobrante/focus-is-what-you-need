@@ -6,6 +6,7 @@ import {
 } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import { DeviceMockTile } from "@/pages/shared/DeviceMockTile";
+import { IconGlyph } from "@/components/system/IconGlyph";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { useNewProject } from "@/application/new-project/useNewProject";
 import { SYSTEM_DESIGN_CATEGORIES, CATEGORY_LABEL } from "@/domain/system-design/defaults";
@@ -291,7 +292,7 @@ function ShareTokenVisual({ category, token }: { category: SystemDesignCategory;
     label = t.name;
   } else if (category === "icons") {
     const ic = token as IconToken;
-    swatch = <span className="grid h-5 w-5 shrink-0 place-items-center text-[15px]">{ic.glyph}</span>;
+    swatch = <span className="grid h-5 w-5 shrink-0 place-items-center"><IconGlyph icon={ic} size={15} /></span>;
     label = ic.name;
   } else if (category === "spacing") {
     const s = token as SpacingToken;

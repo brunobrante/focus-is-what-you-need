@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { SectionBlock, EmptySlot } from "@/system-design/shared";
 import { AddTokenModal, EditTokenModal } from "@/system-design/modals";
 import { CategoryGrid, type AnyToken } from "./CategoryGrid";
 import type { ResolvedCategory } from "@/domain/system-design/resolve";
 import type { SystemDesignController } from "@/application/system-design/useSystemDesign";
-import type { SystemDesignCategory } from "@/lib/storage/schema";
+import { openIconInCanvas } from "@/application/system-design/iconCanvas";
+import type { SystemDesignCategory, IconToken } from "@/lib/storage/schema";
 import { CATEGORY_ICON } from "@/system-design/shared";
 import { CATEGORY_LABEL } from "@/domain/system-design/defaults";
 
@@ -59,6 +61,14 @@ export function TokenSection({
   };
   const [editing, setEditing] = useState<AnyToken | null>(null);
   const { tokens, hasWorkspace, availableShared } = resolved;
+  const navigate = useNavigate();
+
+  // Icons only: open the token's editable vector art on the canvas (as an
+  // ownerless draft component). Available on own tokens, not linked instances.
+  const editIconInCanvas =
+    category === "icons"
+      ? (token: IconToken) => void openIconInCanvas({ token, controller, navigate })
+      : undefined;
 
   const grid =
     tokens.length === 0 ? (
@@ -73,6 +83,7 @@ export function TokenSection({
         onDelete={(id) => onDeleteToken(category, id)}
         onDetach={(id) => controller.detachToken(category, id)}
         onToggleLinkable={(id, linkable) => onToggleLinkable(category, id, linkable)}
+        onEditInCanvas={editIconInCanvas}
       />
     );
 
@@ -99,6 +110,7 @@ export function TokenSection({
         onClose={() => setAddOpen(false)}
         onCreate={(token) => controller.upsertToken(category, token)}
         onPickShared={(id) => controller.linkToken(category, id)}
+        onEditIcon={editIconInCanvas}
       />
       <EditTokenModal
         category={category}
@@ -106,6 +118,7 @@ export function TokenSection({
         token={editing ?? undefined}
         onClose={() => setEditing(null)}
         onSave={(token) => controller.upsertToken(category, token)}
+        onEditIcon={editIconInCanvas}
       />
     </>
   );

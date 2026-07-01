@@ -107,11 +107,39 @@ const SEED_TYPOGRAPHY: TypeStyleToken[] = [
   { id: "t-mono", name: "Mono", family: "JetBrains Mono", weight: "400", size: "13px", sample: "const value = 0x5EA2FF" },
 ];
 
+// Seed icons are real vector art, not emoji. Each is a tiny self-contained
+// 24×24 `<svg>` whose strokes use `currentColor`, so the Icons tab tints them to
+// the surface text color for free. Line-art paths (Lucide-style geometry).
+const ICON_SVG_ATTRS =
+  'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+
+const ICON_VIEWBOX = { width: 24, height: 24 };
+
 const SEED_ICONS: IconToken[] = [
-  { id: "i-bell", name: "Bell", glyph: "🔔" },
-  { id: "i-star", name: "Star", glyph: "⭐" },
-  { id: "i-heart", name: "Heart", glyph: "❤️" },
-  { id: "i-check", name: "Check", glyph: "✅" },
+  {
+    id: "i-bell",
+    name: "Bell",
+    svg: `<svg ${ICON_SVG_ATTRS}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+    viewBox: ICON_VIEWBOX,
+  },
+  {
+    id: "i-star",
+    name: "Star",
+    svg: `<svg ${ICON_SVG_ATTRS}><path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+    viewBox: ICON_VIEWBOX,
+  },
+  {
+    id: "i-heart",
+    name: "Heart",
+    svg: `<svg ${ICON_SVG_ATTRS}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7 7-7z"/></svg>`,
+    viewBox: ICON_VIEWBOX,
+  },
+  {
+    id: "i-check",
+    name: "Check",
+    svg: `<svg ${ICON_SVG_ATTRS}><path d="M20 6 9 17l-5-5"/></svg>`,
+    viewBox: ICON_VIEWBOX,
+  },
 ];
 
 const SEED_SPACING: SpacingToken[] = [

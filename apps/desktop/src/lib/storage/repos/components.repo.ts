@@ -116,6 +116,9 @@ export async function listDrafts(): Promise<ComponentRow[]> {
     .filter((r) => {
       // A draft has no owner edge and no home pointer (workspace/project).
       if (peekOwnerOf("component", r.id)) return false;
+      // Ownerless components that merely BACK an icon token are an implementation
+      // detail, not user-facing drafts — hide them (see ICON_BACKING_CATEGORY).
+      if (r.category === "system-icon") return false;
       return !r.workspaceId && !r.projectId;
     })
     .sort((a, b) => b.updatedAt - a.updatedAt);

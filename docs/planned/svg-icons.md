@@ -1,5 +1,19 @@
 # SVG Icons
 
+> **Status: implemented — with one deliberate deviation.** Phases 1–2 (vector
+> `IconToken`, seeds, `IconGlyph`, import) shipped as written. The canvas
+> authoring path (Phases 3–5) was **not** built as a bespoke ephemeral
+> `mode=icon` canvas. Instead, drawing/editing an icon reuses the existing
+> **draft** pattern: the art is an ownerless draft component (a variant-owned
+> scene) opened in the *normal* canvas by `/canvas?variant=…`, and the token
+> caches a serialized `<svg>` refreshed by a save-back keyed on
+> `icon=<tokenId>&systemDesign=<designId>` query params. This honors "variants
+> own scenes" without a special editor mode. The restricted toolbar / chrome
+> gating was dropped (it would fight the "same as drafts" pattern). See
+> `application/system-design/iconCanvas.ts` and `docs/UX.md` § 8. The
+> "Authoring path 2" section below is retained for history but is **superseded**
+> by the draft-backed design.
+
 Replace the emoji-glyph icons in the system-design **Icons** tab with real,
 vector **SVG icons**. A user can either **import** an existing `.svg` file or
 **draw** one in the canvas — but drawing an icon opens the canvas in a

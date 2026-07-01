@@ -4,6 +4,31 @@ import { readFileAsDataUrl, fileFormatLabel } from "@/lib/utils";
 import { newTokenId } from "@/application/system-design/useSystemDesign";
 import { CATEGORY_LABEL } from "@/domain/system-design/defaults";
 import { Field, inputCls } from "@/system-design/shared";
+import { IconGlyph } from "@/components/system/IconGlyph";
+import { sanitizeSvg } from "@/canvas/engine/vector/sanitizeSvg";
+import { parseSvg } from "@/canvas/engine/vector/svgImport";
+
+// Icons live inline on the token row, so cap raw markup to keep rows lean.
+const MAX_ICON_SVG_BYTES = 64 * 1024;
+
+/**
+ * Sanitize + validate imported SVG for an icon token. Rejects anything that
+ * yields zero drawable paths. Normalizes the box: guarantees a `viewBox` and
+ * strips fixed width/height that would fight it.
+ */
+function normalizeImportedIconSvg(
+  raw: string,
+): { svg: string; viewBox: { width: number; height: number } } | null {
+  const el = sanitizeSvg(raw);
+  if (!el) return null;
+  const parsed = parseSvg(raw);
+  if (!parsed || parsed.paths.length === 0) return null;
+  const { width, height } = parsed.viewBox;
+  if (!el.getAttribute("viewBox")) el.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  el.removeAttribute("width");
+  el.removeAttribute("height");
+  return { svg: el.outerHTML, viewBox: { width, height } };
+}
 import type {
   ColorToken,
   GradientToken,
@@ -134,21 +159,83 @@ function TypeForm({ token, onSave, onCancel }: FormProps<TypeStyleToken>) {
   );
 }
 
-function IconForm({ token, onSave, onCancel }: FormProps<IconToken>) {
+function IconForm({
+  token,
+  onSave,
+  onCancel,
+  onEditInCanvas,
+}: FormProps<IconToken> & { onEditInCanvas?: (token: IconToken) => void }) {
   const [name, setName] = useState(token?.name ?? "");
-  const [glyph, setGlyph] = useState(token?.glyph ?? "");
+  const [svg, setSvg] = useState(token?.svg ?? "");
+  const [viewBox, setViewBox] = useState(token?.viewBox ?? { width: 24, height: 24 });
+  const [error, setError] = useState<string | null>(null);
+
+  const buildToken = (): IconToken => ({
+    ...token,
+    id: token?.id ?? newTokenId(),
+    name: name.trim() || "Icon",
+    svg,
+    viewBox,
+  });
+
+  const importFile = (file: File) => {
+    void (async () => {
+      setError(null);
+      const text = await file.text();
+      if (text.length > MAX_ICON_SVG_BYTES) {
+        setError("SVG is too large (over 64 KB).");
+        return;
+      }
+      const normalized = normalizeImportedIconSvg(text);
+      if (!normalized) {
+        setError("Not a drawable SVG.");
+        return;
+      }
+      setSvg(normalized.svg);
+      setViewBox(normalized.viewBox);
+      if (!name.trim()) setName(file.name.replace(/\.[^.]+$/, ""));
+    })();
+  };
+
   return (
     <div className="grid gap-4">
       <Field label="Name">
         <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="e.g. Bell" />
       </Field>
-      <Field label="Glyph or emoji">
-        <input value={glyph} onChange={(e) => setGlyph(e.target.value)} className={`${inputCls} text-[22px]`} placeholder="🔔" maxLength={4} />
-      </Field>
-      {glyph && (
-        <div className="grid h-20 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[40px]">{glyph}</div>
+      <label className="grid min-h-[180px] cursor-pointer place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--bg)] p-4 text-center text-[var(--text)] transition-colors hover:border-[var(--text)]">
+        <input
+          type="file"
+          accept=".svg,image/svg+xml"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) importFile(file);
+          }}
+        />
+        {svg ? (
+          <IconGlyph icon={{ id: "preview", name, svg, viewBox }} size={64} />
+        ) : (
+          <div className="max-w-[240px] text-[12px] leading-[1.6] text-[var(--text-muted)]">
+            Click to import an <code>.svg</code> file from your disk.
+          </div>
+        )}
+      </label>
+      {error && <div className="text-[12px] text-[var(--danger,#e5484d)]">{error}</div>}
+      {onEditInCanvas && (
+        <button
+          type="button"
+          onClick={() => onEditInCanvas(buildToken())}
+          className="btn btn-ghost w-full justify-center"
+        >
+          {svg ? "Edit in canvas" : "Draw in canvas"}
+        </button>
       )}
-      <FormFooter onCancel={onCancel} onSave={() => onSave({ id: token?.id ?? newTokenId(), name: name.trim() || "Icon", glyph })} label="Save icon" />
+      <FormFooter
+        onCancel={onCancel}
+        disabled={!svg}
+        onSave={() => onSave(buildToken())}
+        label="Save icon"
+      />
     </div>
   );
 }
@@ -245,11 +332,13 @@ function TokenForm({
   token,
   onSave,
   onCancel,
+  onEditIcon,
 }: {
   category: SystemDesignCategory;
   token?: AnyToken;
   onSave: (token: AnyToken) => void;
   onCancel: () => void;
+  onEditIcon?: (token: IconToken) => void;
 }) {
   switch (category) {
     case "colors":
@@ -259,7 +348,7 @@ function TokenForm({
     case "typography":
       return <TypeForm token={token as TypeStyleToken | undefined} onSave={onSave} onCancel={onCancel} />;
     case "icons":
-      return <IconForm token={token as IconToken | undefined} onSave={onSave} onCancel={onCancel} />;
+      return <IconForm token={token as IconToken | undefined} onSave={onSave} onCancel={onCancel} onEditInCanvas={onEditIcon} />;
     case "spacing":
       return <SpacingForm token={token as SpacingToken | undefined} onSave={onSave} onCancel={onCancel} />;
     case "radius":
@@ -303,7 +392,7 @@ function TokenPreview({ category, token }: { category: SystemDesignCategory; tok
     const ic = token as IconToken;
     return (
       <>
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--border)] text-[18px]">{ic.glyph}</span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--border)]"><IconGlyph icon={ic} size={18} /></span>
         <PreviewLabel title={ic.name} />
       </>
     );
@@ -360,6 +449,7 @@ export function AddTokenModal({
   onClose,
   onCreate,
   onPickShared,
+  onEditIcon,
 }: {
   category: SystemDesignCategory;
   open: boolean;
@@ -368,6 +458,7 @@ export function AddTokenModal({
   onClose: () => void;
   onCreate: (token: AnyToken) => void;
   onPickShared: (id: string) => void;
+  onEditIcon?: (token: IconToken) => void;
 }) {
   const [tab, setTab] = useState<AddTab>("create");
   useEffect(() => {
@@ -396,6 +487,13 @@ export function AddTokenModal({
               onClose();
             }}
             onCancel={onClose}
+            onEditIcon={
+              onEditIcon &&
+              ((token) => {
+                onClose();
+                onEditIcon(token);
+              })
+            }
           />
         ) : null}
         {open && tab === "workspace" && hasWorkspace ? (
@@ -452,12 +550,14 @@ export function EditTokenModal({
   token,
   onClose,
   onSave,
+  onEditIcon,
 }: {
   category: SystemDesignCategory;
   open: boolean;
   token?: AnyToken;
   onClose: () => void;
   onSave: (token: AnyToken) => void;
+  onEditIcon?: (token: IconToken) => void;
 }) {
   const label = CATEGORY_LABEL[category].replace(/s$/, "").toLowerCase();
   return (
@@ -473,6 +573,13 @@ export function EditTokenModal({
               onClose();
             }}
             onCancel={onClose}
+            onEditIcon={
+              onEditIcon &&
+              ((next) => {
+                onClose();
+                onEditIcon(next);
+              })
+            }
           />
         )}
       </ModalBody>

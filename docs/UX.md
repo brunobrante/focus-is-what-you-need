@@ -1167,7 +1167,9 @@ Icons | Spacing | Radius | Images. Only the active category is shown at a time.
 - **Colors** — grid of swatch cards: color block, name, hex value
 - **Gradients** — grid of linear-gradient preview cards with name
 - **Typography** — list of type styles: name, family/weight/size descriptor, live sample
-- **Icons** — grid of glyph/emoji tiles with name
+- **Icons** — grid of real **vector SVG** tiles with name (tinted to the text
+  color via `currentColor`). Each tile reveals an extra **Edit in canvas** action
+  (see icon authoring below) alongside edit/delete
 - **Spacing** — list: token name, proportional bar, px value
 - **Radius** — grid of rounded-corner previews with name + px value
 - **Images** — grid of uploaded image cards (empty state when none)
@@ -1194,8 +1196,20 @@ create form. On a project (when a workspace exists) it has two tabs — **Create
 new** (the per-category form) and **From workspace** (a list of the workspace's
 **linkable** tokens not yet linked, click to **Link** one as a live instance).
 Editing a token uses `EditTokenModal`. Forms per category: color picker + hex;
-gradient from/to + angle; family/weight/size + sample; emoji/glyph; spacing
-slider; radius with "Full / Pill"; image upload.
+gradient from/to + angle; family/weight/size + sample; **icon** (see below);
+spacing slider; radius with "Full / Pill"; image upload.
+
+**Icon authoring.** An icon is a vector token whose `<svg>` markup is the source
+of truth. The icon form offers two ways to author it:
+- **Import** — an `.svg` dropzone (sanitized, must contain at least one path,
+  capped at 64 KB) with an inline preview, saved directly to the token.
+- **Draw / Edit in canvas** — a button in the form (and the per-icon **Edit in
+  canvas** tile action) opens the icon's art on the **normal canvas**. The art
+  lives in an ownerless **draft** component (a variant-owned scene, created
+  lazily), so the icon opens by variant just like a draft — there is **no
+  special editor mode or route**. Every scene save serializes the artboard back
+  into the token's cached `svg`, so the tab reflects edits automatically. These
+  icon-backing drafts are hidden from the `/drafts` list.
 
 ---
 

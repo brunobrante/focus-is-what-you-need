@@ -41,7 +41,18 @@ export type TypeStyleToken = LinkableTokenFields & {
 export type IconToken = LinkableTokenFields & {
   id: string;
   name: string;
-  glyph: string;
+  // Sanitized, self-contained `<svg>` markup — the source of truth for the icon
+  // (renderable, exportable, recolorable via `currentColor`). Authored by import
+  // or by the restricted `mode=icon` canvas.
+  svg: string;
+  // Intrinsic authoring box (default 24×24). Used to size/scale renders.
+  viewBox?: { width: number; height: number };
+  // The ownerless draft component whose variant scene holds this icon's editable
+  // vector art. Created lazily the first time the icon is drawn/edited on the
+  // canvas; the `svg` above is a cached render snapshot serialized from it.
+  backingComponentId?: string;
+  // Legacy emoji, kept only as a render fallback for tokens without `svg`.
+  glyph?: string;
 };
 export type SpacingToken = LinkableTokenFields & {
   id: string;

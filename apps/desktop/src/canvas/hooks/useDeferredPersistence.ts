@@ -19,6 +19,10 @@ interface Params {
   screen: ScreenRow | null;
   canUseFactoryMocks: boolean;
   currentDocument: CanvasDocument;
+  // Fired after each debounced scene persist with the just-saved document. Used
+  // by the icon editor to refresh a token's cached SVG snapshot. Kept in a ref so
+  // the stable `flushPendingSave` identity is preserved.
+  onScenePersisted?: (document: CanvasDocument) => void;
 }
 
 type PendingSave = {
@@ -47,8 +51,11 @@ export function useDeferredPersistence({
   screen,
   canUseFactoryMocks,
   currentDocument,
+  onScenePersisted,
 }: Params) {
   const saveTimerRef = useRef<number | null>(null);
+  const onScenePersistedRef = useRef(onScenePersisted);
+  onScenePersistedRef.current = onScenePersisted;
   const latestGraphJSONRef = useRef<string | null>(resolvedSceneGraphJSON);
   const latestOwnerKeyRef = useRef<string>(currentOwnerKey);
   const pendingSaveRef = useRef<PendingSave | null>(null);
@@ -77,6 +84,7 @@ export function useDeferredPersistence({
     }
 
     saveScene({ ownerType: pending.ownerType, ownerId: pending.ownerId, graphJSON });
+    onScenePersistedRef.current?.(pending.document);
     return materializeComponentsFromCanvasDocument({
       currentComponent: pending.currentComponent,
       document: pending.document,
