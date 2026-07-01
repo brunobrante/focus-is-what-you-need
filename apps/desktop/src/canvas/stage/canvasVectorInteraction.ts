@@ -111,10 +111,12 @@ export function penPointerDown(
   // No active path → start a new one with its first anchor at the click.
   const configured = settings.canvas.elementDefaults.tools.pen;
   const id = createId("path");
+  // Don't pixel-round the origin: later anchors are placed at sub-pixel canvas
+  // coords, so rounding only vertex 0 shifts it off by a fraction (B18).
   const node = makePathNode(
     id,
-    roundPixel(point.x),
-    roundPixel(point.y),
+    point.x,
+    point.y,
     { ...configured.styles },
     configured.name,
   );
