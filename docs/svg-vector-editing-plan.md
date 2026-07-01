@@ -1,8 +1,9 @@
 # SVG / Vector Editing — State & Correction Plan
 
-Status: **partially implemented** (see §1) — this doc now describes what the code
-actually does, the one architectural flaw to fix, and the remaining bug list.
-Scope: the canvas editor (`apps/desktop/src/canvas`), not the Builder (`/generate`).
+Status: **bug list resolved** (2026-07-01) — the rendering-model flaw (§3) and the
+correctness bugs in §4 are fixed (B1–B19; B4 subsumed by B1, B6 partial — see the
+tables). Scope: the canvas editor (`apps/desktop/src/canvas`), not the Builder
+(`/generate`).
 
 This is a rewrite. The previous version was a greenfield *proposal* that had
 already been built past — it described adding types/tools/renderers that now exist,
@@ -176,37 +177,37 @@ scale is the root cause of B1/B4/B6** — fixing it (§3.2 bake) resolves all th
 
 ### Critical / high
 
-| # | Where | Bug | Fix / reference |
-| --- | --- | --- | --- |
-| **B1** *(critical, root)* | `ElementRenderer.tsx` (`preserveAspectRatio="none"`) + `vector/vectorGeometry.ts` (anisotropic `sx/sy`) | Stroke distorts on non-uniform resize — the "fat line". | §3.2: bake coordinates, viewBox = box, drop `preserveAspectRatio="none"`. Penpot `impl-transform-segment`. |
-| **B2** | `mutations/vectorPath.ts` `insertAnchorOnSegment` | No De Casteljau split — drops a point on the curve with ~`0.0001` handles, leaves neighbors' handles untouched → **inserting a point on a curve deforms it**. | `splitSegmentAt(t)` via De Casteljau; re-derive `from.out`/`to.in`. Figma `splitSegmentAt`. |
-| **B3** | `mutations/vectorPath.ts` `recomputePathBounds` (~L260) | Ignores rotation: `node.x += b.minX * sx` re-bases in unrotated space → a rotated path **jumps** after an anchor edit. | Offset the origin along the rotated basis (`node.rotation`). |
-| **B4** | `vector/vectorGeometry.ts` `canvasDeltaToPathSpace` + `mutations/vectorPath.ts` `applyContinuity` | Mirrored/asymmetric continuity is computed in path space; on a non-uniformly scaled path (`sx≠sy`) the opposite handle renders **non-collinear / unequal** — visible asymmetry. | Subsumed by B1 (after bake `sx=sy=1`), or do continuity in canvas space. |
-| **B5** | `vector/svgImport.ts` (~L75-152) | Element/group `transform` (`translate/scale/rotate/matrix`) **ignored** on import → shapes land at wrong position/scale/rotation. Very common in real SVGs (Illustrator/Figma nest transformed groups). | Accumulate ancestor transforms; bake into imported anchor coords. |
-| **B6** *(design limitation)* | `vector/boolean.ts` + `mutations/vectorOps.ts` | Booleans flatten curves to 16-seg polygons and return **corner-only** anchors (all curves lost); use only the **largest subpath** per operand (holes/donuts dropped); force open subpaths closed; drop shared-vertex/coincident intersections (Greiner–Hormann degeneracy); `exclude` isn't a real XOR; `toCanvasPath` **ignores rotation**. | Rework on the segment model (Penpot `bool.cljc`) if real vector booleans are wanted; else document as approximate + fix rotation. |
+| # | Status | Where | Bug | Fix / reference |
+| --- | --- | --- | --- | --- |
+| **B1** *(critical, root)* | ✅ done | `ElementRenderer.tsx` (`preserveAspectRatio="none"`) + `vector/vectorGeometry.ts` (anisotropic `sx/sy`) | Stroke distorts on non-uniform resize — the "fat line". | §3.2: bake coordinates, viewBox = box, drop `preserveAspectRatio="none"`. Penpot `impl-transform-segment`. Baked in `canvasDocumentMutations.ts` (`scaledPath`/`bakePathResize`). |
+| **B2** | ✅ done | `mutations/vectorPath.ts` `insertAnchorOnSegment` | No De Casteljau split — drops a point on the curve with ~`0.0001` handles, leaves neighbors' handles untouched → **inserting a point on a curve deforms it**. | `splitSegmentAt(t)` via De Casteljau; re-derive `from.out`/`to.in`. Figma `splitSegmentAt`. |
+| **B3** | ✅ done | `mutations/vectorPath.ts` `recomputePathBounds` (~L260) | Ignores rotation: `node.x += b.minX * sx` re-bases in unrotated space → a rotated path **jumps** after an anchor edit. | Offset the origin along the rotated basis (`node.rotation`) — residual `(M−I)·d`. |
+| **B4** | ✅ subsumed by B1 | `vector/vectorGeometry.ts` `canvasDeltaToPathSpace` + `mutations/vectorPath.ts` `applyContinuity` | Mirrored/asymmetric continuity is computed in path space; on a non-uniformly scaled path (`sx≠sy`) the opposite handle renders **non-collinear / unequal** — visible asymmetry. | After bake `sx=sy=1`, so continuity is already collinear/equal — no separate change. |
+| **B5** | ✅ done | `vector/svgImport.ts` (~L75-152) | Element/group `transform` (`translate/scale/rotate/matrix`) **ignored** on import → shapes land at wrong position/scale/rotation. Very common in real SVGs (Illustrator/Figma nest transformed groups). | Accumulate ancestor transforms; bake into imported anchor coords (points by full affine, handles by linear part). |
+| **B6** *(design limitation)* | ⚠️ partial | `vector/boolean.ts` + `mutations/vectorOps.ts` | Booleans flatten curves to 16-seg polygons and return **corner-only** anchors (all curves lost); use only the **largest subpath** per operand (holes/donuts dropped); force open subpaths closed; drop shared-vertex/coincident intersections (Greiner–Hormann degeneracy); `exclude` isn't a real XOR; `toCanvasPath` **ignores rotation**. | Rotation now baked in `toCanvasPath` (fixed). The GH clipper rework on the segment model (Penpot `bool.cljc`) remains a **separate decision** — still approximate. |
 
 ### Medium
 
-| # | Where | Bug | Fix |
-| --- | --- | --- | --- |
-| **B7** | `vector/sanitizeSvg.ts` | Misses `<style>` element text and `url(...)` external refs (in stylesheets and `style=` attrs); prefixed tags (`svg:script`) bypass the tag set. `foreignObject` **is** stripped (good). | Strip `<style>`; scan text + `url()`; match on local name. |
-| **B8** | `vector/svgImport.ts` `num()` | `parseFloat` mis-parses `%` and unit suffixes (`50%`→50, physical units ignored) → wrong sizes / bogus 100×100 intrinsic box. | Resolve units against viewport; reject `%` where unsupported. |
-| **B9** | `vector/shapeToPath.ts` | `rectPath` ignores `borderRadius` (rounded rect flattens to sharp corners); `regularPolygonPath`/`starPath` hardcode **5 sides/points** and use half-box radius (distorts non-square). *(Confirm whether polygon/star nodes store a side count.)* | Honor radius + configured side/point count. |
-| **B10** | `canvasHitTesting.ts` (~L429) | Segment split `t` is **quantized to 12 values** (sample midpoints), discarding the exact projection → insert-point snaps coarsely on curves (compounds B2). | Use the exact projected `t` from `distanceToSegment`. |
-| **B11** | `useCanvasPointerEvents.ts` (~L498-520) | Tool switch **without a pointer move** leaves a stale `PEN_CURSOR` (cursor only rewritten on move). | Reset `viewport.style.cursor` on tool change (effect keyed on `state.tool`). |
-| **B12** | `mutations/vectorPath.ts` `deleteAnchor` + edit lifecycle | Alt-removing every anchor leaves an **orphan empty path node** and stays stuck in edit mode. | Delete the node / exit edit when the path becomes empty. |
-| **B13** | `mutations/vectorOps.ts` (~L138-155) | Boolean of 3+ selected folds only the **first two**; result reparented to **root**, losing the frame/container parent. | Fold all N in z-order; keep parent + stacking index. |
+| # | Status | Where | Bug | Fix |
+| --- | --- | --- | --- | --- |
+| **B7** | ✅ done | `vector/sanitizeSvg.ts` | Misses `<style>` element text and `url(...)` external refs (in stylesheets and `style=` attrs); prefixed tags (`svg:script`) bypass the tag set. `foreignObject` **is** stripped (good). | Strip `<style>`; reject attrs with external `url()`; match on local name. |
+| **B8** | ✅ done | `vector/svgImport.ts` `num()` | `parseFloat` mis-parses `%` and unit suffixes (`50%`→50, physical units ignored) → wrong sizes / bogus 100×100 intrinsic box. | Parse unit suffix: px/unitless pass, absolute units (pt/pc/in/cm/mm/Q) → px @96dpi, `%`/font-relative rejected. |
+| **B9** | ✅ done | `vector/shapeToPath.ts` | `rectPath` ignores `borderRadius` (rounded rect flattens to sharp corners); `regularPolygonPath`/`starPath` hardcode **5 sides/points** and use half-box radius (distorts non-square). *(Confirm whether polygon/star nodes store a side count.)* | `rectPath` honors radius (KAPPA corners). Polygon/star are fixed shapes with **no** stored side count → left as-is. |
+| **B10** | ✅ done | `canvasHitTesting.ts` (~L429) | Segment split `t` is **quantized to 12 values** (sample midpoints), discarding the exact projection → insert-point snaps coarsely on curves (compounds B2). | Use the exact projected `t` from `projectToSegment`. |
+| **B11** | ✅ done | `useCanvasPointerEvents.ts` (~L498-520) | Tool switch **without a pointer move** leaves a stale `PEN_CURSOR` (cursor only rewritten on move). | Reset `viewport.style.cursor` on tool change (effect keyed on `state.tool`). |
+| **B12** | ✅ done | `mutations/vectorPath.ts` `deleteAnchor` + edit lifecycle | Alt-removing every anchor leaves an **orphan empty path node** and stays stuck in edit mode. | Delete the node + exit edit when the path becomes empty. |
+| **B13** | ✅ done | `mutations/vectorOps.ts` (~L138-155) | Boolean of 3+ selected folds only the **first two**; result reparented to **root**, losing the frame/container parent. | Fold all N in z-order; keep parent + stacking index. |
 
 ### Low
 
-| # | Where | Bug |
-| --- | --- | --- |
-| **B14** | `canvasHitTesting.ts` (~L412-425) | Hit priority is **handle > anchor** (all handles before any anchor) → can't grab an anchor sitting under a knob. Figma/Penpot give the anchor priority. |
-| **B15** | `pathEditGeometry.ts:50` | `selected` hardcoded `false` → the active anchor **never renders highlighted**. |
-| **B16** | `canvasHitTesting.ts` | The close ring is drawn but **not hit-tested**; clicking the ring's outer annulus (beyond the 4.5px anchor box) doesn't close the subpath. |
-| **B17** | `vector/svgImport.ts` | `fill-opacity`/`opacity` = `"inherit"` → stored as `NaN`. |
-| **B18** | `canvasVectorInteraction.ts` (~L113) | First pen anchor is pixel-rounded (origin) while later anchors aren't → sub-pixel offset of vertex 0. |
-| **B19** | `useCanvasPointerEvents.ts` | Pressing/releasing Alt over an anchor doesn't update the remove-cursor until the pointer moves. |
+| # | Status | Where | Bug |
+| --- | --- | --- | --- |
+| **B14** | ✅ done | `canvasHitTesting.ts` (~L412-425) | Hit priority is **handle > anchor** (all handles before any anchor) → can't grab an anchor sitting under a knob. Figma/Penpot give the anchor priority. |
+| **B15** | ✅ done | `pathEditGeometry.ts:50` | `selected` hardcoded `false` → the active anchor **never renders highlighted**. Now highlights the last-placed anchor of the active open subpath while the pen is active. |
+| **B16** | ✅ done | `canvasHitTesting.ts` | The close ring is drawn but **not hit-tested**; clicking the ring's outer annulus (beyond the 4.5px anchor box) doesn't close the subpath. |
+| **B17** | ✅ done | `vector/svgImport.ts` | `fill-opacity`/`opacity` = `"inherit"` → stored as `NaN`. |
+| **B18** | ✅ done | `canvasVectorInteraction.ts` (~L113) | First pen anchor is pixel-rounded (origin) while later anchors aren't → sub-pixel offset of vertex 0. |
+| **B19** | ✅ done | `useCanvasPointerEvents.ts` | Pressing/releasing Alt over an anchor doesn't update the remove-cursor until the pointer moves. |
 
 ### Confirmed **not** bugs / already correct
 
@@ -220,9 +221,10 @@ scale is the root cause of B1/B4/B6** — fixing it (§3.2 bake) resolves all th
 - Pointer capture released on finish/cancel/Escape — no leak. Per-anchor undo works.
 - `handleType` mapping (§2); **center-only** stroke recommendation (§8).
 
-**Fix order:** B1 (fat line — unlocks B4) → B2 (+B10) (curve-preserving insert) →
-B3 (rotation) → B5 (import transforms) → B7 (sanitize) → B11/B12 (cursor + orphan)
-→ the rest. B6 (booleans) is a larger, separate decision.
+**Fix order (all landed 2026-07-01):** B1 (fat line — unlocks B4) → B2 (+B10)
+(curve-preserving insert) → B3 (rotation) → B5 (import transforms) → B7 (sanitize)
+→ B11/B12 (cursor + orphan) → the rest. Only B6's Greiner–Hormann clipper rework
+remains open (a larger, separate decision).
 
 ---
 
@@ -310,18 +312,18 @@ now, (b) later.** `strokeAlign` is stored regardless (forward-compatible).
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | 0 | Bridge tool systems (types, defs, creation, maps, commands) | **done** |
-| 1 | `path` data model + DOM render + fill/stroke inspector | **done, render model buggy → B1** |
-| 2 | Pen tool + overlay anchors/handles + cursors | **done** (minor: B11/B18/B19) |
-| 3 | Edit mode: move/insert/delete anchors, handle types | **done, bugs B2/B3/B4/B10/B12** |
+| 1 | `path` data model + DOM render + fill/stroke inspector | **done** (render model fixed — B1 ✅) |
+| 2 | Pen tool + overlay anchors/handles + cursors | **done** (B11/B18/B19 ✅) |
+| 3 | Edit mode: move/insert/delete anchors, handle types | **done** (B2/B3/B4/B10/B12 ✅) |
 | 4 | Snapping (pixel grid, anchor snap, angle constraint) | present; chrome-at-zoom **PASS** (C5) |
 | 5 | Pencil (freehand → simplified path) | **done** (`simplify.ts`) |
-| 6 | SVG import + convert shape → path | **done, bugs B5/B7/B8/B9** |
-| 7 | Boolean ops (multi-subpath results) | **done but lossy → B6** (rework vs Penpot `bool.cljc`) |
+| 6 | SVG import + convert shape → path | **done** (B5/B7/B8/B9 ✅) |
+| 7 | Boolean ops (multi-subpath results) | **done** (B13 ✅, B6 rotation ✅); GH clipper still lossy → B6 rework separate |
 | 8 | Stroke alignment, flip/mirror, dash presets | deferred (§8) |
 
-**Priority order:** B1 (fat line, unlocks B4) → B2/B10 (curve-preserving insert) →
-B3 (rotation) → B5 (import transforms) → B7 (sanitize) → B11/B12 → rest.
-B6 (booleans) is a larger separate decision.
+**Priority order (all landed 2026-07-01):** B1 (fat line, unlocks B4) → B2/B10
+(curve-preserving insert) → B3 (rotation) → B5 (import transforms) → B7 (sanitize)
+→ B11/B12 → rest. Only B6's boolean-clipper rework remains open (separate decision).
 
 ---
 
