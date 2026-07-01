@@ -314,10 +314,27 @@ export function recomputePathBounds(doc: CanvasDocument, id: string): CanvasDocu
       a.y -= b.minY;
     }
   }
+  const oldW = node.width;
+  const oldH = node.height;
+  const newW = sx * newVbW;
+  const newH = sy * newVbH;
   node.viewBox = { width: newVbW, height: newVbH };
-  node.width = sx * newVbW;
-  node.height = sy * newVbH;
-  node.x += b.minX * sx;
-  node.y += b.minY * sy;
+  node.width = newW;
+  node.height = newH;
+
+  // Re-basing the anchors keeps the PRE-rotation position invariant, but it also
+  // moves the box centre — which is the rotation pivot. Under a non-zero rotation
+  // that centre shift would swing the whole path around. Compensate by the residual
+  // (M − I)·d, where d is how far the centre moved and M is the rotation matrix, so
+  // the path stays put visually (a no-op when rotation is 0). See B3.
+  const dx = b.minX * sx + (newW - oldW) / 2;
+  const dy = b.minY * sy + (newH - oldH) / 2;
+  const rot = (node.rotation * Math.PI) / 180;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  const rdx = dx * cos - dy * sin;
+  const rdy = dx * sin + dy * cos;
+  node.x += b.minX * sx + (rdx - dx);
+  node.y += b.minY * sy + (rdy - dy);
   return next;
 }
