@@ -178,6 +178,9 @@ export function useCanvasPointerEvents({
   navigableBounds,
 }: Params): CanvasPointerEventsResult {
   const dropTargetRef = useRef<CanvasDropTarget | null>(null);
+  // Last free-space hover position (client coords), so we can re-evaluate the
+  // cursor when a modifier changes without the pointer moving. B19.
+  const lastHoverClientRef = useRef<{ x: number; y: number } | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [dropTarget, setDropTarget] = useState<CanvasDropTarget | null>(null);
@@ -240,7 +243,35 @@ export function useCanvasPointerEvents({
     const viewport = viewportRef.current;
     if (!viewport || interactionRef.current) return;
     viewport.style.cursor = state.tool === "pen" ? PEN_CURSOR : state.tool === "pencil" ? "crosshair" : "";
-  }, [state.tool, viewportRef]);
+  }, [state.tool, viewportRef, interactionRef]);
+
+  // In path edit mode, holding/releasing Alt over an anchor toggles the remove
+  // cursor. The hover cursor is otherwise only recomputed on pointer move, so
+  // re-evaluate it at the last hover position when Alt changes. B19.
+  useEffect(() => {
+    if (!state.pathEditId) return;
+    const onAltChange = (e: KeyboardEvent) => {
+      if (e.key !== "Alt") return;
+      const viewport = viewportRef.current;
+      const last = lastHoverClientRef.current;
+      if (!viewport || interactionRef.current || state.editingTextId || !toolingRef.current || !last) return;
+      const vpRect = getCurrentViewportRect();
+      const hit = toolingRef.current.hitTest(last.x - vpRect.left, last.y - vpRect.top);
+      if (!hit.cursor) return;
+      viewport.style.cursor =
+        hit.type === "radius"
+          ? RADIUS_CURSOR
+          : hit.type === "path-anchor" && e.altKey
+            ? PEN_REMOVE_CURSOR
+            : hit.cursor;
+    };
+    window.addEventListener("keydown", onAltChange);
+    window.addEventListener("keyup", onAltChange);
+    return () => {
+      window.removeEventListener("keydown", onAltChange);
+      window.removeEventListener("keyup", onAltChange);
+    };
+  }, [state.pathEditId, state.editingTextId, viewportRef, toolingRef, interactionRef, getCurrentViewportRect]);
 
   // Drop a photo/image file onto the frame → a new Image element holding that
   // file (planned/canvas-image-drop.md). Async because we decode the file into a
@@ -502,6 +533,7 @@ export function useCanvasPointerEvents({
     const interaction = interactionRef.current;
     if (!interaction) {
       const viewport = viewportRef.current;
+      lastHoverClientRef.current = { x: event.clientX, y: event.clientY };
       // Reset unconditionally: if text editing begins mid-hover the tooling branch
       // below is skipped, which would otherwise leave a stuck RADIUS_CURSOR.
       if (viewport) viewport.style.cursor = "";
