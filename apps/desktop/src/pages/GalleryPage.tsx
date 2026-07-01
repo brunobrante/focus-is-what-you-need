@@ -91,13 +91,18 @@ export function GalleryPage() {
 
   // Linked-instance usage counts for the master being deleted — drive whether the
   // delete shows the detach-all/cascade choice or a plain confirm.
-  const [screenDeleteUsage, setScreenDeleteUsage] = useState(0);
+  // null while the count is still resolving. No delete confirmation is shown
+  // until it lands, so a fast confirm can't bypass the per-instance
+  // detach/cascade choice for a screen that is used elsewhere (H6, Product law 11).
+  const [screenDeleteUsage, setScreenDeleteUsage] = useState<number | null>(null);
 
   useEffect(() => {
     if (!pendingScreenDelete) {
-      setScreenDeleteUsage(0);
+      setScreenDeleteUsage(null);
       return;
     }
+    // Reset to "unknown" for the new subject so a previous count can't leak in.
+    setScreenDeleteUsage(null);
     let cancelled = false;
     void countScreenInstanceUsages(pendingScreenDelete.id).then((n) => {
       if (!cancelled) setScreenDeleteUsage(n);
@@ -196,7 +201,7 @@ export function GalleryPage() {
       />
       <ProjectPreviewModal ref={previewRef} />
       <VersionModeModal ref={versionScreenRef} />
-      {pendingScreenDelete && screenDeleteUsage > 0 ? (
+      {pendingScreenDelete && screenDeleteUsage !== null && screenDeleteUsage > 0 ? (
         <InstanceDeleteModal
           open
           entityName={pendingScreenDelete.title}
@@ -207,7 +212,7 @@ export function GalleryPage() {
         />
       ) : (
         <ConfirmActionModal
-          open={Boolean(pendingScreenDelete)}
+          open={Boolean(pendingScreenDelete) && screenDeleteUsage === 0}
           title="Delete screen"
           message={
             pendingScreenDelete
