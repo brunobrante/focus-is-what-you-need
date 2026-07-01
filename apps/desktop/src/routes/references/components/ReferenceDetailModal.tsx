@@ -136,7 +136,16 @@ export function ReferenceDetailModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentItem?.id]);
 
-  useEffect(() => () => { releaseStackUrls(stackPreview); }, [stackPreview]);
+  // Revoke the preview's blob URLs when the owned set actually changes (new load
+  // / unmount) — NOT on every preview-object identity change. A stack-component
+  // rename swaps the preview object but keeps the very same `ownedUrls` array
+  // (and the URLs it still displays); keying on the object here revoked them out
+  // from under the renamed preview, blanking all its images (H8).
+  useEffect(() => {
+    const preview = stackPreview;
+    return () => { releaseStackUrls(preview); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stackPreview?.ownedUrls]);
 
   // ── keyboard ──────────────────────────────────────────────────────────────
   useEffect(() => {
