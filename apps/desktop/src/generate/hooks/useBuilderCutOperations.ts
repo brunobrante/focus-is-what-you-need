@@ -92,7 +92,11 @@ export function useBuilderCutOperations({
 
   const saveSelection = useCallback(
     async (postProcess?: ProcessingActionKind) => {
-      if (!selection || !selectionLocked || !canCrop) return;
+      // A locked selection is required to save a NEW cut, but in edit mode the
+      // projected box is the cut itself — its lock flag can still be settling, so
+      // only require a selection there (gating on the lock dropped edit saves).
+      if (!canCrop || !selection) return;
+      if (!selectionLocked && !editingComponentId) return;
       const img = imgRef.current;
       const subjectBox = selectionToSubjectCoords(selection);
       if (!subjectBox) return;

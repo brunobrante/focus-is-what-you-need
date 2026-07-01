@@ -1044,12 +1044,16 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       } else if (event.key === "Escape") {
         if (selection || drawingPath) cancelSelection();
       } else if (event.key === " ") {
-        if (selectionLocked) { event.preventDefault(); void saveSelection(); }
+        // In edit mode the box is the projected cut — save regardless of whether
+        // the async lock has settled yet (it briefly lags a fresh projection, so
+        // gating on selectionLocked made Space a silent no-op right after opening
+        // an edit).
+        if (selectionLocked || editingComponentId) { event.preventDefault(); void saveSelection(); }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [beginRootCreation, cancelSelection, drawingPath, saveSelection, selection, selectionLocked, setTool]);
+  }, [beginRootCreation, cancelSelection, drawingPath, editingComponentId, saveSelection, selection, selectionLocked, setTool]);
 
   // --- Derived display values ----------------------------------------------
 
