@@ -22,6 +22,7 @@ import { WorkspaceLayout } from "@/pages/WorkspaceLayout";
 import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { WorkspaceEditPage } from "@/pages/WorkspaceEditPage";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
+import { installQuitFlush } from "@/application/persistence/flushOnQuit";
 import { SearchProvider } from "@/application/search/SearchProvider";
 
 export default function App() {
@@ -29,6 +30,9 @@ export default function App() {
     // Storage lives in SQLite (the `records` table). Kick off seeding/migration
     // early; `.figx` files are no longer autosaved — they are an explicit export.
     void ensureLocalProjectsLoaded();
+    // Drain debounced edits + the save queue before the app exits so the last
+    // edit before Cmd+Q / window close isn't lost (H2).
+    installQuitFlush();
   }, []);
 
   return (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
 import { saveScene } from "@/application/scenes/saveScene";
+import { registerPendingFlusher } from "@/application/persistence/flushOnQuit";
 import { materializeComponentsFromCanvasDocument } from "@/application/canvas/canvasMaterializer";
 import { componentStructureKey } from "../canvasUtils";
 import type { CanvasDocument } from "@/canvas/engine/types";
@@ -203,6 +204,10 @@ export function useDeferredPersistence({
   useEffect(() => {
     return () => { void flushPendingSave(); };
   }, [flushPendingSave]);
+
+  // Drain the 300ms debounce into the save queue when the app is quitting (H2),
+  // otherwise the last canvas edit sits in this timer past every quit path.
+  useEffect(() => registerPendingFlusher(flushPendingSave), [flushPendingSave]);
 
   return { flushPendingSave, handleCurrentDocumentChange };
 }
