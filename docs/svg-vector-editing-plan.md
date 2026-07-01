@@ -1,553 +1,341 @@
-# SVG / Vector Editing — Implementation Plan
+# SVG / Vector Editing — State & Correction Plan
 
-Status: proposal (revised)
+Status: **partially implemented** (see §1) — this doc now describes what the code
+actually does, the one architectural flaw to fix, and the remaining bug list.
 Scope: the canvas editor (`apps/desktop/src/canvas`), not the Builder (`/generate`).
-References: https://paper.design/docs/svg — and the real paper.design DOM (below).
 
-This plan adds first-class **vector path editing** (pen/pencil, anchor/handle
-editing, fill + stroke, SVG import, boolean ops) to the canvas engine. It is
-modeled on paper.design because they use the same **Canvas + DOM hybrid** this
-project already uses, so their architecture transfers directly. Every section says
-**where** to put code and **how**, with exact files.
+This is a rewrite. The previous version was a greenfield *proposal* that had
+already been built past — it described adding types/tools/renderers that now exist,
+and it recommended a rendering model (`preserveAspectRatio="none"` over a fixed
+intrinsic viewBox) that is the **root cause** of the "stroke gets fat / distorted
+on resize" bug. The correct model, proven by the three reference tools, is
+documented in §3.
+
+Docs reference code as `src/...`, meaning `apps/desktop/src/...`.
 
 ---
 
-## 0. Ground truth from the real paper.design DOM
+## 0. Ground truth from the reference tools
 
-A captured node from paper.design's canvas:
+Three tools were researched. They **converge on one answer** for how a
+resize must be handled, and it is the opposite of what the old plan proposed.
 
-```html
-<div style="contain: strict;">                                 <!-- root -->
-  <div style="transform: matrix3d(...);">                      <!-- world layer: pan/zoom -->
-    <div inert style="background: #282828; transform: matrix3d(...);"></div>
-    <svg data-node-id="1P-0" viewBox="0 0 302 256" width="302" height="256"
-         style="left:-2189px; top:-1324px; position:absolute;">   <!-- container node -->
-      <path data-node-id="1Q-0" fill-rule="evenodd"
-            d="M 117.5 209.5 L 147 228 C 156 221 169.5 210.5 173 207 ..."
-            fill="none" stroke="#FFFFFF"></path>                  <!-- child path node -->
-    </svg>
-  </div>
-  <canvas aria-hidden="true" width="3284" height="1858"
-          style="position:fixed; top:0; left:0; width:1642px; height:929px;"></canvas>
-</div>                                                            <!-- tooling overlay -->
-```
+| Tool | Renderer | How it resizes a path | Stroke on non-uniform resize |
+| --- | --- | --- | --- |
+| **Penpot** (SVG in the DOM — our exact analog: ClojureScript + React + SVG) | real `<path d>`, coords in canvas space | **bakes**: multiplies the affine matrix into every coordinate (`impl-transform-segment`) | **uniform** — no scale is left on the element; no `vector-effect` |
+| **paper.design** (DOM) | real `<svg><path>` | rebakes the `d` (inferred) | uniform |
+| **Figma** (canvas / WebGL) | tessellated mesh | geometric offset | uniform; inside/center/outside native |
 
-Four hard facts this proves, which drive the design below:
+**None of the three keeps a fixed intrinsic viewBox and stretches it.** Penpot —
+which is literally our architecture — proves the pattern: **bake the coordinates on
+resize** so the scale never lives on the element (only rotation stays on a
+`<g transform>`). Then `stroke-width` is a plain scalar applied in a 1-unit = 1-px
+space and can never distort.
 
-1. **Content is DOM `<svg><path/></svg>`; tools are a `<canvas>` overlay** (`position:fixed`,
-   `aria-hidden`, device-pixel sized = 2× DPR). This is exactly our split:
-   `ElementRenderer.tsx` (DOM) + `canvasToolingRenderer.ts` (overlay canvas).
-2. **`viewBox` is intrinsic and separate from `width`/`height`.** The `d` lives in
-   viewBox space (`0 0 302 256`); resizing changes `width`/`height` and the path
-   scales for free. → §3.2 (NOT `viewBox="0 0 ${width} ${height}"`).
-3. **SVG is decomposed into nodes**: the `<svg>` is one node (`1P-0`) and the
-   `<path>` is its child node (`1Q-0`). → §3.4 (container node + child path nodes,
-   reusing our existing parent/child hierarchy — not a raw markup blob).
-4. **`fill-rule="evenodd"` is a default attribute on every path.** → §3.3.
+Critical web-platform fact (confirmed via MDN + the paper.design research):
+`vector-effect="non-scaling-stroke"` only counteracts an **SVG-space transform**,
+**not** a CSS/`width`/`height` resize of the element. So it cannot rescue the fixed
+viewBox + `preserveAspectRatio="none"` approach.
 
 | Concern | Layer | File |
 | --- | --- | --- |
 | Vector content | DOM / React | `canvas/stage/ElementRenderer.tsx` |
-| Anchors, handles, snap guides, selection | overlay canvas | `canvas/stage/canvasToolingRenderer.ts` |
-| Pan/zoom transform | world layer `matrix3d` | `canvas/stage/CanvasStage.tsx` |
+| Anchors, handles, selection | overlay | `canvas/stage/canvasToolingRenderer.ts` |
+| Pan/zoom transform | world layer | `canvas/stage/CanvasStage.tsx` |
 
-"Edit a vector" = render the path in the DOM layer + draw anchors/handles on the
-overlay. No new rendering tech — a new element type + a new overlay pass.
-
----
-
-## 1. What already exists (scaffolding) — and what's wrong
-
-The **UI tool union is already ahead of the engine**:
-
-- `canvas/tools.ts` → `INSERT_TOOLS` **already lists `"pen"`, `"pencil"`, `"svg"`**.
-- `canvas/toolbarConfig.tsx` → `ICONS` + `TOOL_ENTRIES` already have `pen`
-  (`IconPen`), `pencil` (`IconPencil`), `svg` (`IconSvgShape`, labeled **"Icon"**).
-- `domain/settings/commands.ts` → `CANVAS_TOOL_COMMANDS` already maps
-  `pen`/`pencil`/`svg` to `canvas.tool.*` command ids.
-
-But the **engine doesn't know them**, and two maps are wrong:
-
-- `canvas/engine/types.ts` → `ElementType` and `Tool` have **no** `path`/`svg`/`pen`/`pencil`.
-- `canvas/engine/mutations/elementCreate.ts` → `TOOL_TYPES` / `DEFAULT_SIZE_RANGES`: no entries.
-- `canvas/engine/elementDefinitions.ts` → `DEFINITIONS` / `TOOL_TO_ELEMENT_TYPE`: no entries.
-- `canvas/stage/canvasShellStyle.ts` → `TOOLBAR_TOOL_MAP` maps **`svg → "icon"`** (wrong;
-  that's the fixed-star icon element) and **has no `pen`/`pencil`**;
-  `EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP` likewise. → fix in §7.
-
-So clicking pen/pencil/svg today is a no-op at the engine level. **Phase 0 bridges
-the two tool systems**, then the vector element is built on top.
-
-Precedent: the `icon` element already renders inline `<svg viewBox="0 0 24 24"><path/></svg>`
-in `ElementRenderer.tsx` (~lines 310–323). The `path` element generalizes that with
-editable, persisted data. `ElementNode` already has a `content?: string` field
-(`canvas/engine/types.ts`) — reuse it; no new `svgContent` field needed.
+Sources:
+[Penpot common architecture](https://help.penpot.app/technical-guide/developer/architecture/common/),
+[Penpot path perf PR #6263](https://github.com/penpot/penpot/pull/6263),
+[Penpot stroke-scale issue #3340](https://github.com/penpot/penpot/issues/3340),
+[Figma vector networks (Alex Harri)](https://alexharri.com/blog/vector-networks),
+[Figma HandleMirroring](https://developers.figma.com/docs/plugins/api/HandleMirroring/),
+[MDN vector-effect](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/vector-effect),
+[Inner/outer strokes in SVG](https://alexwlchan.net/2021/inner-outer-strokes-svg/).
 
 ---
 
-## 2. Data model
+## 1. What is already implemented
 
-All additions are plain JSON (the persistence layer stringifies `CanvasDocument`;
-see `docs/save-architecture.md`). No binary, no circular refs.
+Contrary to the old draft, pen/pencil/svg/path are **wired end-to-end**. Verified
+against the code:
 
-### 2.1 New types — `canvas/engine/types.ts`
+- **Tools & toolbar:** `canvas/tools.ts` `INSERT_TOOLS` has `pen`/`pencil`/`svg`;
+  `canvas/toolbarConfig.tsx` has the icons and entries (the `svg` entry is labeled
+  **"SVG"**, not "Icon"); `domain/settings/commands.ts` `CANVAS_TOOL_COMMANDS`
+  maps them to `canvas.tool.*`.
+- **Engine types:** `canvas/engine/types.ts` `ElementType` includes `"path"` and
+  `"svg"`; `Tool` includes `pen`/`pencil`/`svg`; `ElementNode` has `content?`,
+  `viewBox?`, `path?`; `EditorState` has `pathEditId`; the `Interaction` union has
+  `PenInteraction` / `PencilInteraction` / `AnchorEditInteraction`.
+- **Definitions & creation:** `elementDefinitions.ts` has `path`/`svg` defs +
+  `TOOL_TO_ELEMENT_TYPE`; `mutations/elementCreate.ts` maps `pen`/`pencil → "path"`,
+  `svg → "svg"`, with `elementTypeLabel` returning "Path"/"SVG".
+- **Maps:** `canvas/stage/canvasShellStyle.ts` `TOOLBAR_TOOL_MAP` and
+  `EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP` already map `svg → "svg"` and include
+  `pen`/`pencil`. (The old plan claimed `svg → "icon"` and no pen/pencil — false.)
+- **Styles:** `domain/canvas/types.ts` `ElementStyles` already carries the full
+  vector block (`fill`, `fillOpacity`, `fillRule`, `stroke`, `strokeWidth`,
+  `strokeOpacity`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`,
+  `strokeAlign`, `strokeRef`) plus `fills?: Fill[]`.
+- **Render branches:** `ElementRenderer.tsx` has dedicated `path-element` (~509)
+  and `svg-element` (~547) branches.
+- **Vector library (all present):** `canvas/engine/vector/` has `pathData.ts`
+  (structured ↔ `d` codec, well-written), `boolean.ts`, `sanitizeSvg.ts`,
+  `shapeToPath.ts`, `simplify.ts`, `svgImport.ts`, `vectorGeometry.ts`; mutations
+  in `canvas/engine/mutations/vectorPath.ts` and `vectorOps.ts`.
+- **Hit-testing:** `canvasHitTesting.ts` `ToolingHit` already has `path-anchor` /
+  `path-handle` / `path-segment` / `path-empty` variants; `hitTestTooling` exported.
 
-```ts
-export type ElementType =
-  | "rect" | "ellipse" | "text" | "image" | "icon"
-  | "line" | "arrow" | "polygon" | "star"
-  | "path"   // one editable vector node (pen/pencil output, or a child of an svg)
-  | "svg";   // an imported SVG container that holds child "path" nodes
+So the tool-bridging "Phase 0" and most of Phases 1–7 exist. The work that remains
+is **correctness** (§4), not scaffolding.
 
-export type Tool =
-  | "select" | "hand" | "scale" | "wrapper"
-  | "rect" | "ellipse" | "text" | "image" | "icon"
-  | "line" | "arrow" | "polygon" | "star"
-  | "pen" | "pencil" | "svg";
-```
+---
 
-### 2.2 Path representation — structured anchors, multi-subpath
+## 2. Data model (as built — keep)
 
-Store **structured anchors** (the edit source of truth), not a raw `d` string. The
-`d` is derived for rendering. **Critically, a path holds many subpaths** so it can
-represent holes (boolean subtract, donuts), multi-`M` imported paths, and
-`fill-rule`. A single-subpath model would break Phases 6–7.
+`canvas/engine/types.ts`:
 
 ```ts
 export type VectorAnchor = {
-  x: number; y: number;            // position in INTRINSIC viewBox space (see 2.4)
-  inX?: number; inY?: number;      // in-handle, relative to anchor (absent = corner)
-  outX?: number; outY?: number;    // out-handle, relative to anchor
-  handleType?: "corner" | "mirrored" | "asymmetric"; // continuity when dragging a handle
+  x: number; y: number;               // path-local space (see §3)
+  inX?: number; inY?: number;         // in-handle, relative to anchor (absent = corner)
+  outX?: number; outY?: number;       // out-handle, relative to anchor
+  handleType?: "corner" | "mirrored" | "asymmetric";
 };
-
 export type VectorSubpath = { anchors: VectorAnchor[]; closed: boolean };
-
-export type VectorPath = {
-  subpaths: VectorSubpath[];
-  fillRule?: "nonzero" | "evenodd";   // default "nonzero"
-};
+export type VectorPath = { subpaths: VectorSubpath[]; fillRule?: "nonzero" | "evenodd" };
 ```
 
-Add to `ElementNode` (optional, vector types only):
+`handleType` maps cleanly onto Figma's `HandleMirroring`: `corner` = `NONE`,
+`mirrored` = `ANGLE_AND_LENGTH` (shared tangent + equal length), `asymmetric` =
+`ANGLE` (shared tangent line, independent lengths). This is correct — keep.
 
-```ts
-viewBox?: { width: number; height: number }; // intrinsic authoring space (see 2.4)
-path?: VectorPath;                            // present when type === "path"
-```
-
-For `type === "svg"` the node is a **container**: it has no `path`, only a
-`viewBox` and child `path` nodes via the existing `children`/`parentId` hierarchy.
-
-### 2.3 Stroke + fill styles — `domain/canvas/types.ts`
-
-> ⚠️ `ElementStyles` lives in **`domain/canvas/types.ts`** (re-exported through the
-> engine), not in `canvas/engine/types.ts`. Earlier drafts pointed at the wrong file.
-
-It already has `background`, `borderColor`, `borderWidth`, `opacity`, refs. Add
-vector semantics (cheap in SVG, high value — Figma/paper expose all of these):
-
-```ts
-fill?: string;            // path fill ("none" allowed); falls back to `background`
-fillOpacity?: number;     // 0..1
-fillRule?: "nonzero" | "evenodd";   // mirrors VectorPath.fillRule on the inspector
-stroke?: string;          // stroke color
-strokeWidth?: number;
-strokeOpacity?: number;   // 0..1
-strokeLinecap?: "butt" | "round" | "square";
-strokeLinejoin?: "miter" | "round" | "bevel";
-strokeDasharray?: string; // e.g. "4 2" — dashed/dotted strokes
-strokeAlign?: "center" | "inside" | "outside"; // see §9 (SVG caveat)
-strokeRef?: string;       // design-token ref, like backgroundRef/colorRef
-```
-
-For `path`/`svg`, these drive SVG attributes; for every other element type they're
-ignored (no behavior change).
-
-### 2.4 Intrinsic viewBox (the resize fix)
-
-Resize changes `node.width`/`node.height` **directly** (`resizeSingleElement`,
-`canvas/stage/canvasDocumentMutations.ts:258`). If the rendered `viewBox` were
-`0 0 width height`, the path would NOT scale — it would pin top-left at original
-size. The paper DOM proves the fix: keep `viewBox` **fixed at the authored intrinsic
-size** while `width`/`height` stretch the box.
-
-- Anchors are stored in **intrinsic viewBox coords** (`node.viewBox.width/height`),
-  not live element px.
-- Render with `viewBox="0 0 ${node.viewBox.width} ${node.viewBox.height}"` and
-  `width/height = "100%"`. Resize/rotate then reuse the **existing geometry
-  pipeline untouched** and the path scales like paper.design's "scale SVG".
-- Only **path edit mode** mutates anchors. `recomputePathBounds` (§5.4) normalizes
-  `viewBox` to the anchor bbox and re-bases anchors after structural edits, so the
-  box stays tight.
+Multi-subpath is required (holes, boolean results, multi-`M` imports, `fill-rule`)
+and is already modeled. Keep.
 
 ---
 
-## 3. Rendering (DOM layer) — `canvas/stage/ElementRenderer.tsx`
+## 3. The rendering model — the fix (C1)
 
-Add branches before the generic `<div>` fallback, mirroring the `icon` branch.
+### 3.1 What the code does today (the bug)
+
+`ElementRenderer.tsx` renders the path as `<svg viewBox="0 0 vb.w vb.h"
+preserveAspectRatio="none" width="100%" height="100%">`, and
+`vector/vectorGeometry.ts` computes an **anisotropic** scale
+(`sx = width / vb.width`, `sy = height / vb.height`, independent). A freshly-drawn
+path has `sx = sy = 1`, so it looks fine. The moment the user **resizes the box
+non-uniformly**, `sx ≠ sy`, and `preserveAspectRatio="none"` stretches the path
+*and its stroke*: a `strokeWidth: 2` renders as `2·sx` horizontally and `2·sy`
+vertically → a fat, lopsided line. **This is the "line got too big / weird" bug.**
+
+### 3.2 The correct model (bake — Penpot)
+
+Store anchors in **path-local pixel space where 1 unit = 1 px** and render with a
+viewBox that **matches the box**, default `preserveAspectRatio`:
 
 ```tsx
-if (node.type === "path") {
-  const vb = node.viewBox ?? { width: node.width, height: node.height };
-  return (
-    <div data-element-id={node.id} data-node-type="path"
-         className={elementClassName(...)} style={boxStyle}>
-      <svg width="100%" height="100%"
-           viewBox={`0 0 ${vb.width} ${vb.height}`}
-           preserveAspectRatio="none" style={{ overflow: "visible" }}>
-        <path d={pathToSvgPathData(node.path)}
-              fillRule={node.path?.fillRule ?? node.styles.fillRule}
-              fill={node.styles.fill ?? "none"} fillOpacity={node.styles.fillOpacity}
-              stroke={node.styles.stroke} strokeWidth={node.styles.strokeWidth}
-              strokeOpacity={node.styles.strokeOpacity}
-              strokeLinecap={node.styles.strokeLinecap}
-              strokeLinejoin={node.styles.strokeLinejoin}
-              strokeDasharray={node.styles.strokeDasharray}
-              vectorEffect={node.styles.strokeAlign ? undefined : undefined} />
-      </svg>
-    </div>
-  );
-}
-
-if (node.type === "svg") {
-  // Container: render its own <svg viewBox>, let child path nodes render inside.
-  // Children come through the normal hierarchy render — do NOT inject raw markup.
-}
+// viewBox tracks the box; NO preserveAspectRatio="none".
+<svg width="100%" height="100%" viewBox={`0 0 ${node.width} ${node.height}`}
+     style={{ overflow: "visible", display: "block" }}>
+  <path d={pathToSvgPathData(node.path)} /* fill/stroke as today */ />
+</svg>
 ```
 
-Details:
+On resize, **do not** leave a scale on the element. Instead **bake** the affine map
+into every coordinate:
 
-- **`pathToSvgPathData(path: VectorPath): string`** — pure fn, new file
-  `canvas/engine/vector/pathData.ts`. Walks every subpath: `M` first anchor; each
-  `a → b` is `C a.out, b.in, b` when handles exist, else `L b`; emits `Z` when
-  `subpath.closed`. Its inverse `svgPathDataToPath(d): VectorPath` parses imported
-  `d` (handles `M m L l C c S s Q q H h V v Z`) for §8 import + shape conversion.
-- `clipPath` must be `undefined` for path/svg (no polygon clip machinery).
-- `renderScale` (thumbnails) needs nothing special — viewBox scales automatically.
-- **Sanitize on import only**: when ingesting external SVG (§8), parse to nodes and
-  drop `<script>`, event handlers, and external refs in
-  `canvas/engine/vector/sanitizeSvg.ts`. Because we decompose into our own nodes
-  and never use `dangerouslySetInnerHTML`, there's no live-markup XSS surface.
+- `resizeSingleElement` (`canvas/stage/canvasDocumentMutations.ts`) currently sets
+  `node.width/height` directly. For a `path` node it must **also** multiply each
+  anchor + handle by the box scale ratio (`sx = newW/oldW`, `sy = newH/oldH`),
+  keeping the model in a 1-unit = 1-px space (`sx = sy = 1` afterward).
+- Because `stroke-width` is a scalar in that space, the stroke stays a **uniform
+  width** even when the geometry is stretched — exactly Penpot's behavior with
+  "scale stroke" off. (If we ever want Figma's "scale stroke on", multiply
+  `strokeWidth` by the scale too — a per-element toggle, not the default.)
+- **Rotation** stays as `node.rotation` on the wrapper transform, like every other
+  element. Only rotation lives on a matrix; scale/skew are baked.
 
----
+This deletes `vectorGeometry.ts`'s `sx/sy` split for rendering (it may stay as a
+helper for pointer→path-space mapping, but with `sx = sy = 1` it becomes a pure
+translate). It also removes `preserveAspectRatio="none"` — the single line that
+causes the distortion.
 
-## 4. Cursors (pen / insert / remove / snap)
+### 3.3 `svg` container
 
-paper.design and Figma swap the pen cursor by **context**. We already do custom SVG
-cursors: `useCanvasPointerEvents.ts:54` has
-`const RADIUS_CURSOR = "url(/cursor-bend.svg) 4 3, pointer";` and sets
-`viewport.style.cursor`. Same mechanism here.
-
-**Assets (already added to `public/`):** `cursor-pen.svg`, `cursor-pen-insert.svg`
-(pen + “＋”), `cursor-pen-remove.svg` (pen + “－”), `cursor-pen-snap.svg`
-(pen + target dot). All share the same nib tip → **use one hotspot for all four**
-so the tip doesn't jump between states. Nib tip ≈ `(4, 4)` in the `0 0 33 32`
-viewBox.
-
-**Where:** add constants next to `RADIUS_CURSOR` in
-`canvas/stage/hooks/useCanvasPointerEvents.ts`:
-
-```ts
-const PEN_CURSOR        = "url(/cursor-pen.svg) 4 4, crosshair";
-const PEN_INSERT_CURSOR = "url(/cursor-pen-insert.svg) 4 4, crosshair";
-const PEN_REMOVE_CURSOR = "url(/cursor-pen-remove.svg) 4 4, crosshair";
-const PEN_SNAP_CURSOR   = "url(/cursor-pen-snap.svg) 4 4, crosshair";
-```
-
-**When (state → cursor):** the hover handler already calls `toolingRef.hitTest(...)`
-and sets the cursor from the hit. Extend the pen branch / `hitTestTooling` (§6) to
-return one of these:
-
-| Context | Cursor |
-| --- | --- |
-| `tool === "pen"`, free space | `PEN_CURSOR` |
-| pen/edit mode, hovering an existing **segment** (will insert an anchor) | `PEN_INSERT_CURSOR` |
-| pen/edit mode, hovering an existing **anchor** (Alt/⌥ will remove it) | `PEN_REMOVE_CURSOR` |
-| pen, pointer **snapped** to a guide / anchor / pixel grid | `PEN_SNAP_CURSOR` |
-
-Snap state comes from the snapping pass (§9 Phase 4). Reset to `PEN_CURSOR` when
-none apply, and clear on tool switch in the existing cleanup block
-(`useCanvasPointerEvents.ts:375`).
+`type === "svg"` renders a transparent positioning box whose child `path` nodes
+render through the normal hierarchy (no raw markup injected). This is already
+correct — keep. Its children inherit the same baked-coordinate model.
 
 ---
 
-## 5. Interaction model
+## 4. Remaining bug list (the real work)
 
-Existing creation is **drag-a-bounding-box** (`DrawInteraction`). The pen is
-different: **click-to-place anchors**, multi-step, explicit commit. It needs its
-own interaction plus a path **edit mode**.
+Full audit of the vector code (render, mutations, import, sanitize, booleans,
+overlay, hit-testing, pen state machine). Ordered by severity. The **anisotropic
+scale is the root cause of B1/B4/B6** — fixing it (§3.2 bake) resolves all three.
 
-### 5.1 Two gestures (paper.design parity)
+### Critical / high
 
-1. **Pen (create/extend)** — click = corner anchor; click-drag = symmetric bezier
-   handles; click first anchor = close. (paper "P")
-2. **Edit mode (modify)** — with a path selected, double-click or `Enter` enters
-   edit mode; anchors + handles become draggable on the overlay; double-click a
-   segment inserts an anchor; Alt-click an anchor removes it. (paper "M" + double-click/Enter)
+| # | Where | Bug | Fix / reference |
+| --- | --- | --- | --- |
+| **B1** *(critical, root)* | `ElementRenderer.tsx` (`preserveAspectRatio="none"`) + `vector/vectorGeometry.ts` (anisotropic `sx/sy`) | Stroke distorts on non-uniform resize — the "fat line". | §3.2: bake coordinates, viewBox = box, drop `preserveAspectRatio="none"`. Penpot `impl-transform-segment`. |
+| **B2** | `mutations/vectorPath.ts` `insertAnchorOnSegment` | No De Casteljau split — drops a point on the curve with ~`0.0001` handles, leaves neighbors' handles untouched → **inserting a point on a curve deforms it**. | `splitSegmentAt(t)` via De Casteljau; re-derive `from.out`/`to.in`. Figma `splitSegmentAt`. |
+| **B3** | `mutations/vectorPath.ts` `recomputePathBounds` (~L260) | Ignores rotation: `node.x += b.minX * sx` re-bases in unrotated space → a rotated path **jumps** after an anchor edit. | Offset the origin along the rotated basis (`node.rotation`). |
+| **B4** | `vector/vectorGeometry.ts` `canvasDeltaToPathSpace` + `mutations/vectorPath.ts` `applyContinuity` | Mirrored/asymmetric continuity is computed in path space; on a non-uniformly scaled path (`sx≠sy`) the opposite handle renders **non-collinear / unequal** — visible asymmetry. | Subsumed by B1 (after bake `sx=sy=1`), or do continuity in canvas space. |
+| **B5** | `vector/svgImport.ts` (~L75-152) | Element/group `transform` (`translate/scale/rotate/matrix`) **ignored** on import → shapes land at wrong position/scale/rotation. Very common in real SVGs (Illustrator/Figma nest transformed groups). | Accumulate ancestor transforms; bake into imported anchor coords. |
+| **B6** *(design limitation)* | `vector/boolean.ts` + `mutations/vectorOps.ts` | Booleans flatten curves to 16-seg polygons and return **corner-only** anchors (all curves lost); use only the **largest subpath** per operand (holes/donuts dropped); force open subpaths closed; drop shared-vertex/coincident intersections (Greiner–Hormann degeneracy); `exclude` isn't a real XOR; `toCanvasPath` **ignores rotation**. | Rework on the segment model (Penpot `bool.cljc`) if real vector booleans are wanted; else document as approximate + fix rotation. |
 
-### 5.2 New interaction + state — `canvas/engine/types.ts`
+### Medium
 
-```ts
-export type PenInteraction = {
-  type: "pen"; pointerId: number; elementId: string;
-  draggingHandleOfAnchor?: number;
-  // + startPoint, beforeDocument, lastDocument, moved (like DrawInteraction)
-};
-export type AnchorEditInteraction = {
-  type: "anchor-edit"; pointerId: number; elementId: string;
-  subpathIndex: number; anchorIndex: number;
-  target: "anchor" | "in" | "out";
-  // + startPoint, beforeDocument, lastDocument, moved
-};
-```
+| # | Where | Bug | Fix |
+| --- | --- | --- | --- |
+| **B7** | `vector/sanitizeSvg.ts` | Misses `<style>` element text and `url(...)` external refs (in stylesheets and `style=` attrs); prefixed tags (`svg:script`) bypass the tag set. `foreignObject` **is** stripped (good). | Strip `<style>`; scan text + `url()`; match on local name. |
+| **B8** | `vector/svgImport.ts` `num()` | `parseFloat` mis-parses `%` and unit suffixes (`50%`→50, physical units ignored) → wrong sizes / bogus 100×100 intrinsic box. | Resolve units against viewport; reject `%` where unsupported. |
+| **B9** | `vector/shapeToPath.ts` | `rectPath` ignores `borderRadius` (rounded rect flattens to sharp corners); `regularPolygonPath`/`starPath` hardcode **5 sides/points** and use half-box radius (distorts non-square). *(Confirm whether polygon/star nodes store a side count.)* | Honor radius + configured side/point count. |
+| **B10** | `canvasHitTesting.ts` (~L429) | Segment split `t` is **quantized to 12 values** (sample midpoints), discarding the exact projection → insert-point snaps coarsely on curves (compounds B2). | Use the exact projected `t` from `distanceToSegment`. |
+| **B11** | `useCanvasPointerEvents.ts` (~L498-520) | Tool switch **without a pointer move** leaves a stale `PEN_CURSOR` (cursor only rewritten on move). | Reset `viewport.style.cursor` on tool change (effect keyed on `state.tool`). |
+| **B12** | `mutations/vectorPath.ts` `deleteAnchor` + edit lifecycle | Alt-removing every anchor leaves an **orphan empty path node** and stays stuck in edit mode. | Delete the node / exit edit when the path becomes empty. |
+| **B13** | `mutations/vectorOps.ts` (~L138-155) | Boolean of 3+ selected folds only the **first two**; result reparented to **root**, losing the frame/container parent. | Fold all N in z-order; keep parent + stacking index. |
 
-Add to `EditorState`: `pathEditId?: string | null;` (the path in edit mode; null = off).
-Add reducer actions `enterPathEdit` / `exitPathEdit` in `canvas/engine/store.tsx`,
-copying the **`editingTextId` lifecycle** (closest existing analog): enter on
-double-click/`Enter`, exit on `Esc` / empty-canvas click / tool switch.
+### Low
 
-### 5.3 Pen lifecycle — `canvas/stage/CanvasToolingLayer.tsx`
-
-The pointer handlers branch on `isInsertTool`. Add a `tool === "pen"` state machine:
-
-- down on empty space, no active path → create a `path` element with one anchor;
-  start `pen` interaction; set `pathEditId`.
-- drag → pull symmetric handles (`out = delta`, `in = -out`).
-- down near first anchor → `closed = true`, commit, exit pen.
-- `Enter`/`Esc`/tool switch → commit open path, exit pen.
-
-Each anchor placement is a `commitDocument` (per-anchor undo/redo, matching
-`canvas/engine/history.ts`).
-
-**Pencil** (Phase 5) is a thin variant: sample pointer-move points, then run
-Ramer–Douglas–Peucker simplify + curve-fit into `VectorAnchor[]` on pointer-up
-(`canvas/engine/vector/simplify.ts`). Same `path` type → shares all downstream code.
-
-### 5.4 Mutations — `canvas/engine/mutations/vectorPath.ts`
-
-Pure, immutable, return a new `CanvasDocument` (existing mutation style):
-
-- `appendAnchor(doc, id, subpath, anchor)`
-- `updateAnchor(doc, id, subpath, index, patch)`   // move anchor or a handle
-- `insertAnchorOnSegment(doc, id, subpath, segIndex, t)` // double-click segment → split
-- `deleteAnchor(doc, id, subpath, index)`
-- `closeSubpath(doc, id, subpath)`
-- `setHandleType(doc, id, subpath, index, type)`   // corner ↔ mirrored ↔ asymmetric
-- `recomputePathBounds(doc, id)` — normalize `node.viewBox` to the anchor bbox and
-  re-base anchors so move/resize/rotate keep working through the existing pipeline.
-
----
-
-## 6. Tooling overlay — `canvas/stage/canvasToolingRenderer.ts` + `canvasHitTesting.ts`
-
-The path renders in DOM; the **editing affordances render on the overlay canvas**,
-alongside selection handles. Add a path-edit pass that runs when `pathEditId` is set:
-
-- Anchors = small squares (filled = selected, hollow = idle) — reuse the existing
-  resize-handle primitives.
-- Handles = line anchor→control with a round knob; corner anchors show no handle.
-- Highlight hovered/active segment.
-- All positions go through the same world→screen matrix the overlay already uses,
-  so anchors stay glued during pan/zoom (same property that keeps selection glued).
-
-**Hit-testing** in `canvas/stage/canvasHitTesting.ts` (extend `hitTestTooling` →
-`ToolingHit`): when `pathEditId` is set, test anchor knobs and handle knobs first
-(top z), and segments second; return a hit descriptor whose `cursor` is one of the
-§4 pen cursors and whose `type` lets `CanvasToolingLayer.tsx` start an
-`anchor-edit` interaction.
-
-A selected path **not** in edit mode behaves like any element (normal box +
-resize/rotate handles) — no special casing.
-
----
-
-## 7. Toolbar / commands wiring (Phase 0) — exact edits
-
-UI scaffolding already exists (§1). The engine-side gaps:
-
-- **`canvas/stage/canvasShellStyle.ts`**
-  - `TOOLBAR_TOOL_MAP`: add `pen: "pen"`, `pencil: "pencil"`; change
-    **`svg: "icon"` → `svg: "svg"`** (see decision in §10).
-  - `EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP`: add `pen: "pen"`, `pencil: "pencil"`,
-    `svg: "svg"` (and keep `icon: ...` only if the legacy icon element stays).
-- **`canvas/engine/mutations/elementCreate.ts`**
-  - `TOOL_TYPES`: `pen → "path"`, `pencil → "path"`. (svg import is §8, not drag-create.)
-  - `DEFAULT_SIZE_RANGES`: `pen`/`pencil` → `{ width: [1, 4000], height: [1, 4000] }`
-    (only the pre-first-anchor box).
-  - `elementTypeLabel`: `path → "Path"`, `svg → "SVG"`.
-- **`canvas/engine/elementDefinitions.ts`**
-  - `DEFINITIONS`: add `path` and `svg` — `radius: false`, `radiusRole: "none"`,
-    `lockAspectRatio: false`, `resizeHandles: "all"`, `drawMode: "free"`,
-    `constraints: { width: { min: 1 }, height: { min: 1 } }`.
-  - `TOOL_TO_ELEMENT_TYPE`: `pen → "path"`, `pencil → "path"`, `svg → "svg"`.
-- **`domain/settings/defaults.ts`**
-  - `canvas.elementDefaults.tools`: add `pen`/`pencil`/`svg` defaults (fill `none`,
-    stroke `#000`, `strokeWidth` 2) — `createElementForTool` reads these.
-  - Keybindings: `P` → `canvas.tool.pen`, plus `canvas.tool.pencil` / a vector toggle.
-    `CANVAS_TOOL_COMMANDS` already has the ids; only defaults are missing.
-- **`canvas/stage/hooks/useKeyboardShortcuts.ts`**: `Enter` (enter edit / commit pen),
-  `Esc` (exit), `Alt` modifier (remove-anchor cursor/intent).
-- **`canvas/engine/store.tsx`**: `setTool` is already generic — no change beyond the
-  `enterPathEdit`/`exitPathEdit` actions from §5.2.
-
-No new persistence schema: `path`/`viewBox`/new style fields are plain JSON and flow
-through `putRecord` → `SaveQueue` → `applyBatch` (`docs/save-architecture.md`).
-Thumbnail/ancestor propagation (`scenes.repo.ts → propagateSceneToParents`) composes
-automatically since paths render via DOM like everything else.
-
----
-
-## 8. SVG import & shape conversion
-
-- **Paste / file import** → parse markup, **sanitize** (`sanitizeSvg.ts`), then
-  **decompose** into our nodes: one `svg` container node (carrying the source
-  `viewBox`) + one child `path` node per `<path>`/`<rect>`/`<circle>`/… converted via
-  `svgPathDataToPath`. This matches the paper DOM (container + child path nodes) and
-  the product's decomposition ethos in `CLAUDE.md`. Entry points: clipboard paste
-  handler in the canvas, and the `svg` toolbar tool.
-- **Convert shape → path**: `rect`/`ellipse`/`polygon`/`star` → `path` by emitting
-  their geometry as `VectorAnchor[]` (a "Flatten to path" inspector action).
-
-### 8.1 SVG behaves as a sealed component (tree + isolation)
-
-> **Business rule — "SVG is a sealed component" (planned).** The rule was moved
-> out of `Product.md` with the other planned features; until it ships this doc is
-> its home (indexed in `docs/planned/product-backlog.md`). This section is both the
-> behavior and the implementation mapping. Fold the behavior back into
-> `Product.md` as `[NOW]` when built.
-
-An inserted/imported `svg` is a container node with child `path` nodes (§2.4 / §3),
-so the existing **`hasChildren → component`** rule (`canvas/shell/tree/treeHelpers.ts:243`,
-`nodeTypeFromElement`) already classifies it as a component. Two behaviors make it
-*sealed* — both reuse machinery that already exists for linked instances and isolation:
-
-1. **Tree hides the internals (by default).** The `svg` node renders as a **single
-   leaf row** with an "open" affordance; its child `path` nodes are **not** expanded.
-   Implement exactly like a linked instance: in `treeFromCanvasDocument`
-   (`canvas/shell/tree/treeHelpers.ts`), treat `node.type === "svg"` the same way as
-   `linked` and return `children: []`. Surface the same open / "go to" button used by
-   instances (`canvas/shell/tree/TreeRow.tsx`, the `IconOpenCanvas` button). This
-   collapsing is the **default**, but the user can override it with a global canvas
-   setting (see §8.2) to expand the SVG's internals in the tree.
-2. **Edit only via isolation / its own page.** On the main canvas the `svg` renders
-   only its frame; its paths are not directly selectable from outside. To edit them
-   you **open/isolate the svg** (enter its page) — reuse the existing
-   `isolatedParentId` + open-node flow (`canvas/engine/store.tsx → setIsolatedParent`,
-   `canvas/hooks/useCanvasNavigation.ts → openCanvasForNode`). Pen / anchor editing
-   (§5–§6) is active **only** when the svg is the isolated/opened subject; otherwise
-   the svg behaves like any other element (move / resize / rotate as a whole). This
-   is **not** affected by the §8.2 setting — that setting only changes tree
-   *visibility*, never where the vectors can be edited.
-
-Net effect: the SVG default-inserts a placeholder (like Image/Icon), reads as one
-object in the structure, and exposes its vector internals only when explicitly
-focused — consistent with Product.md laws #8 (components form automatically) and
-#9 (edit in isolation).
-
-### 8.2 Config — reveal SVG internals in the tree (global canvas setting)
-
-By default the tree treats an SVG as sealed and **hides its internal `path` nodes**;
-they only become visible when the SVG is isolated/opened in the canvas (§8.1). The
-user can opt out of the collapsing with a **global canvas setting** so the SVG's
-vector children are always shown in the tree, even from outside isolation.
-
-- **Where it lives:** `canvas.shell.tree` in the settings model — alongside the
-  existing `autoRevealSelection` flag (`domain/settings/types.ts → CanvasShellSettings.tree`,
-  `domain/settings/defaults.ts`). Add a boolean, e.g.
-  `revealSealedComponentChildren: boolean`, **default `false`**.
-- **Scope:** it is a **global** canvas config (the `"global"` settings scope), not
-  per-project or per-SVG — one switch for the whole app, like the other
-  `canvas.shell` toggles.
-- **What it changes:** only the **tree rendering** in §8.1 behavior #1. When `true`,
-  `treeFromCanvasDocument` does **not** force `children: []` for `node.type === "svg"`
-  and instead recurses into its `path` children like a normal component; when `false`
-  (default) it collapses as described above.
-- **What it does NOT change:** behavior #2 stays intact regardless of the flag — the
-  vectors are still editable **only** when the SVG is the isolated/opened subject.
-  The setting is purely about visibility in the tree, never about the editing surface
-  (so Product.md laws #8/#9 hold either way).
-- **Surfacing:** expose it wherever the other `canvas.shell` settings are edited (the
-  canvas settings UI), worded as a reveal/expand toggle for sealed SVG internals.
-
----
-
-## 9. Maximum feature set — phased (Figma + paper.design parity)
-
-Each phase is independently shippable and leaves the editor working.
-
-| Phase | Deliverable | Figma / paper parallel |
+| # | Where | Bug |
 | --- | --- | --- |
-| **0** | Bridge tool systems (§7): types, definitions, creation, labels, maps, commands, defaults. No behavior. | groundwork |
-| **1** | `path` data model (subpaths + fillRule + intrinsic viewBox) + DOM render + fill/stroke/opacity/dash/linecap/linejoin/fill-rule in the inspector. Render-only. | Layer edits: fill, stroke, thickness |
-| **2** | **Pen tool**: click anchors, drag handles, close; per-anchor undo; overlay anchors/handles; **4 context cursors** (§4). | Pen (P), draw segments |
-| **3** | **Edit mode**: double-click/`Enter`; move anchors+handles; corner/mirrored/asymmetric; **insert anchor on segment**; **delete anchor** (Alt-click). | Move (M), modify; bend tool; add/remove point |
-| **4** | **Snapping**: pixel grid (`⌘⇧'` toggle), anchor snap, angle constraint (Shift) → `PEN_SNAP_CURSOR`; smart guides while editing. | Pixel snapping; snapping/guides |
-| **5** | **Pencil** (freehand → simplified path). | Pencil |
-| **6** | **SVG import** (paste + file → decomposed nodes); **convert shape → path**. | Import SVG; convert shapes to paths |
-| **7** | **Boolean ops** (union / subtract / intersect / exclude / flatten) producing multi-subpath results — relies on §2.2. | Boolean operations |
-| **8** | **Stroke alignment** inside/outside (see caveat below); **flip/mirror**; dashed-stroke presets. | Stroke align; mirroring |
-| **Later** | Repeating (lines/grids), vector networks (branching paths), anchoring, anneal brush, shape builder. | long-term roadmap |
+| **B14** | `canvasHitTesting.ts` (~L412-425) | Hit priority is **handle > anchor** (all handles before any anchor) → can't grab an anchor sitting under a knob. Figma/Penpot give the anchor priority. |
+| **B15** | `pathEditGeometry.ts:50` | `selected` hardcoded `false` → the active anchor **never renders highlighted**. |
+| **B16** | `canvasHitTesting.ts` | The close ring is drawn but **not hit-tested**; clicking the ring's outer annulus (beyond the 4.5px anchor box) doesn't close the subpath. |
+| **B17** | `vector/svgImport.ts` | `fill-opacity`/`opacity` = `"inherit"` → stored as `NaN`. |
+| **B18** | `canvasVectorInteraction.ts` (~L113) | First pen anchor is pixel-rounded (origin) while later anchors aren't → sub-pixel offset of vertex 0. |
+| **B19** | `useCanvasPointerEvents.ts` | Pressing/releasing Alt over an anchor doesn't update the remove-cursor until the pointer moves. |
 
-Phases 0–4 deliver the core editable-vector loop with the full pen UX (cursors
-included). 7 depends structurally on the multi-subpath model from Phase 1 — which is
-why §2.2 must land first.
+### Confirmed **not** bugs / already correct
 
-**Stroke alignment caveat (HTML/SVG limitation).** SVG has no native
-`stroke-alignment`; strokes are always centered. Figma offers inside/center/outside.
-Options for Phase 8: (a) ship **center-only** in v1 (simplest, honest); (b) emulate
-inside/outside by rendering the stroke on a duplicate path clipped to the fill via
-`clipPath` + doubled `strokeWidth`; (c) outline the stroke into a fill path at
-export. Recommend (a) now, (b) later. `strokeAlign` is stored regardless so the data
-is forward-compatible.
+- **C5 (chrome at zoom) — PASS.** The overlay projects anchors/handles to screen
+  space and draws with fixed pixel sizes (`ANCHOR_SIZE=7`, `HANDLE_KNOB_RADIUS=3.5`),
+  canvas scaled by DPR only — constant on-screen at every zoom (Penpot's outcome).
+- **StrictMode** — reducers are pure; interaction state lives on refs in event
+  handlers, outside the double-invoke scope. Clean.
+- `pathData.ts` codec (incl. arc/quadratic → cubic) — correct; `sampleSegment`
+  handles relative handles correctly.
+- Pointer capture released on finish/cancel/Escape — no leak. Per-anchor undo works.
+- `handleType` mapping (§2); **center-only** stroke recommendation (§8).
 
----
-
-## 10. File-change checklist
-
-**New files**
-- `canvas/engine/vector/pathData.ts` — `pathToSvgPathData`, `svgPathDataToPath`.
-- `canvas/engine/vector/sanitizeSvg.ts` — import sanitizer.
-- `canvas/engine/mutations/vectorPath.ts` — anchor/handle mutations + bounds recompute.
-- `canvas/engine/vector/simplify.ts` — pencil → anchors (Phase 5).
-- `canvas/engine/vector/boolean.ts` — boolean ops (Phase 7).
-
-**Assets (done)**
-- `public/cursor-pen.svg`, `public/cursor-pen-insert.svg`,
-  `public/cursor-pen-remove.svg`, `public/cursor-pen-snap.svg`.
-
-**Edited files**
-- `canvas/engine/types.ts` — `ElementType`, `Tool`, `ElementNode` (`path`,
-  `viewBox`), `EditorState.pathEditId`, `Interaction` (`PenInteraction`,
-  `AnchorEditInteraction`), `VectorAnchor`/`VectorSubpath`/`VectorPath`.
-- `domain/canvas/types.ts` — `ElementStyles` fill/stroke/opacity/dash/align/fill-rule.
-- `canvas/engine/elementDefinitions.ts` — `path`/`svg` defs + tool mapping.
-- `canvas/engine/mutations/elementCreate.ts` — tool→type, size ranges, labels.
-- `canvas/engine/store.tsx` — `enterPathEdit` / `exitPathEdit`.
-- `canvas/stage/canvasShellStyle.ts` — `TOOLBAR_TOOL_MAP` / `EDITOR_TOOL_TO_TOOLBAR_TOOL_MAP`
-  (`pen`/`pencil`/`svg`; fix `svg → "svg"`).
-- `canvas/stage/ElementRenderer.tsx` — `path` and `svg` render branches.
-- `canvas/stage/canvasToolingRenderer.ts` — anchor/handle overlay pass.
-- `canvas/stage/canvasHitTesting.ts` — anchor/handle/segment hit-testing + pen cursors.
-- `canvas/stage/CanvasToolingLayer.tsx` — pen state machine + anchor-edit drags.
-- `canvas/stage/hooks/useCanvasPointerEvents.ts` — 4 pen cursor constants + state map.
-- `canvas/stage/hooks/useKeyboardShortcuts.ts` — `Enter`/`Esc`/`Alt` lifecycle.
-- `domain/settings/defaults.ts` — pen/pencil/svg keybindings + element defaults.
-- Inspector panel — fill/stroke/opacity/dash/linecap/linejoin/fill-rule/align controls
-  + an "Edit path" affordance + "Flatten to path" + boolean-op buttons (Phase 7).
+**Fix order:** B1 (fat line — unlocks B4) → B2 (+B10) (curve-preserving insert) →
+B3 (rotation) → B5 (import transforms) → B7 (sanitize) → B11/B12 (cursor + orphan)
+→ the rest. B6 (booleans) is a larger, separate decision.
 
 ---
 
-## 11. Risks & decisions to confirm
+## 5. Interaction model (as built — keep, with C2/C3 fixes)
 
-- **`svg` tool naming.** The toolbar `svg` entry is labeled **"Icon"** today and
-  `TOOLBAR_TOOL_MAP` sends it to the fixed-star `icon` element. This plan repurposes
-  `svg` → SVG import/vector container. Decide: rename the label to "SVG", and either
-  retire the legacy `icon` element or keep it on a separate entry.
-- **Resize semantics.** Intrinsic-viewBox means resize **scales** the path (stroke
-  scales with it). If Figma's "stroke keeps width on resize" is wanted, add
-  `vector-effect="non-scaling-stroke"` — confirm desired behavior.
-- **Boolean ops dependency (Phase 7).** Needs a path-clipping algorithm; prefer a
-  small dependency-free impl or a vetted lib. Confirm before Phase 7.
-- **Cursor hotspot.** `4 4` is the nib estimate for the `0 0 33 32` art; tune by eye
-  on first run (all four must share it).
+- **Pen** — click = corner anchor; click-drag = symmetric handles; click first
+  anchor = close. Lives in `CanvasToolingLayer.tsx`, which branches on
+  `interactionType` (`"draw"`/`"drag"`), **not** `isInsertTool` (old plan was
+  wrong on this). Each anchor placement is a `commitDocument` (the reducer action
+  in `store.tsx`, **not** `history.ts`) for per-anchor undo.
+- **Edit mode** — `pathEditId` on `EditorState`; enter on double-click/`Enter`,
+  exit on `Esc`/tool switch (mirrors the `editingTextId` lifecycle). Anchors +
+  handles drawn on the overlay; hit-tested via `hitTestTooling`.
+- **Pencil** — freehand sampling → `vector/simplify.ts` (RDP + curve fit) → same
+  `path` type.
+- **Mutations** — `mutations/vectorPath.ts`: `appendAnchor`, `updateAnchor`,
+  `updateHandle` (with `applyContinuity`), `insertAnchorOnSegment` *(fix C2)*,
+  `deleteAnchor`, `closeSubpath`, `setHandleType`, `setFillRule`,
+  `recomputePathBounds` *(fix C3)*.
+
+Cursors: four pen states (`cursor-pen*.svg`, all present in `public/`) driven off
+`hitTestTooling`, next to `RADIUS_CURSOR` in `useCanvasPointerEvents.ts`.
+
+---
+
+## 6. SVG as a sealed component (planned — still valid)
+
+> **Business rule — "SVG is a sealed component" (planned).** Indexed in
+> `docs/planned/product-backlog.md`; fold back into `Product.md` as `[NOW]` when
+> built. Consistent with Product.md laws #8 (components form automatically) and #9
+> (edit in isolation).
+
+An imported/inserted `svg` is a container node with child `path` nodes, so the
+existing `hasChildren → component` rule (`canvas/shell/tree/treeHelpers.ts:245`)
+already classifies it as a component. Two behaviors make it *sealed*:
+
+1. **Tree hides internals by default.** In `treeFromCanvasDocument`, treat
+   `node.type === "svg"` like a `linked` instance and return `children: []`,
+   surfacing the same open/"go to" affordance (`TreeRow.tsx`, `IconOpenCanvas`).
+   Overridable by the §6.1 global setting.
+2. **Edit only via isolation.** On the main canvas the `svg` shows only its frame;
+   paths aren't directly selectable from outside. To edit them you open/isolate the
+   svg (`setIsolatedParent`, `useCanvasNavigation.ts → openCanvasForNode`). Pen /
+   anchor editing is active **only** when the svg is the isolated subject. **Not**
+   affected by §6.1 (that setting is tree visibility only).
+
+### 6.1 Config — reveal SVG internals in the tree
+
+Global canvas setting `canvas.shell.tree.revealSealedComponentChildren: boolean`,
+default `false`, alongside the existing `autoRevealSelection`
+(`domain/settings/types.ts` `CanvasShellSettings.tree`, `domain/settings/defaults.ts`).
+When `true`, `treeFromCanvasDocument` recurses into an svg's `path` children
+instead of forcing `children: []`. Changes **tree rendering only** — never the
+editing surface (behavior #2 holds regardless, so laws #8/#9 stand).
+
+---
+
+## 7. SVG import & shape conversion (as built)
+
+- **Paste / file import** → `vector/sanitizeSvg.ts` (drops `<script>`, event
+  handlers, external refs) → `vector/svgImport.ts` decomposes into one `svg`
+  container node + one child `path` per `<path>`/`<rect>`/`<circle>`/… via
+  `svgPathDataToPath` / `shapeToPath.ts`. Matches the paper.design container +
+  child-path shape and the product's decomposition ethos. Because we build our own
+  nodes and never use `dangerouslySetInnerHTML`, there is no live-markup XSS
+  surface.
+- **Convert shape → path** — `shapeToPath.ts` emits `rect`/`ellipse`/`polygon`/
+  `star` geometry as `VectorAnchor[]` (a "Flatten to path" inspector action).
+
+---
+
+## 8. Stroke alignment (deferred)
+
+SVG has no native `stroke-alignment`; strokes are always centered (Figma does
+inside/outside because it tessellates on a canvas). Options: (a) ship
+**center-only** now (honest, simplest); (b) later, emulate inside/outside by
+rendering the stroke on a duplicate path clipped/masked to the fill with doubled
+`strokeWidth`; (c) outline the stroke into a fill path at export. **Recommend (a)
+now, (b) later.** `strokeAlign` is stored regardless (forward-compatible).
+
+---
+
+## 9. Phase status
+
+| Phase | Deliverable | Status |
+| --- | --- | --- |
+| 0 | Bridge tool systems (types, defs, creation, maps, commands) | **done** |
+| 1 | `path` data model + DOM render + fill/stroke inspector | **done, render model buggy → B1** |
+| 2 | Pen tool + overlay anchors/handles + cursors | **done** (minor: B11/B18/B19) |
+| 3 | Edit mode: move/insert/delete anchors, handle types | **done, bugs B2/B3/B4/B10/B12** |
+| 4 | Snapping (pixel grid, anchor snap, angle constraint) | present; chrome-at-zoom **PASS** (C5) |
+| 5 | Pencil (freehand → simplified path) | **done** (`simplify.ts`) |
+| 6 | SVG import + convert shape → path | **done, bugs B5/B7/B8/B9** |
+| 7 | Boolean ops (multi-subpath results) | **done but lossy → B6** (rework vs Penpot `bool.cljc`) |
+| 8 | Stroke alignment, flip/mirror, dash presets | deferred (§8) |
+
+**Priority order:** B1 (fat line, unlocks B4) → B2/B10 (curve-preserving insert) →
+B3 (rotation) → B5 (import transforms) → B7 (sanitize) → B11/B12 → rest.
+B6 (booleans) is a larger separate decision.
+
+---
+
+## 10. Risks & decisions
+
+- **Resize semantics.** Baking (§3.2) means resize **stretches geometry** but keeps
+  **uniform stroke** (Penpot default). A per-element "scale stroke with resize"
+  toggle can be added later (multiply `strokeWidth` by the bake scale).
+- **`svg` vs legacy `icon`.** The `svg` tool is now vector import/container; the
+  legacy fixed-star `icon` element still exists on its own entry. Decide whether to
+  retire `icon` eventually.
+- **Boolean ops.** `boolean.ts` is hand-rolled (like Penpot's `bool.cljc`, which
+  uses no external lib). Audit its intersection/split correctness before relying on
+  it in production.
+- **Cursor hotspot.** `4 4` nib estimate for the `0 0 33 32` art; tune by eye (all
+  four pen cursors must share it).
+</content>
