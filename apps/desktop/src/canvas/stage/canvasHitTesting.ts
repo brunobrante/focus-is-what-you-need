@@ -308,16 +308,23 @@ function hitTestCornerHandles(vx: number, vy: number, box: ToolingBox): ResizeHa
   return null;
 }
 
-function distanceToSegment(point: Point, start: Point, end: Point): number {
+// Distance from `point` to segment [start,end] plus the clamped projection
+// parameter t ∈ [0,1] of the foot of the perpendicular — used to insert an anchor
+// exactly where the cursor projects onto a curve rather than at a coarse midpoint.
+function projectToSegment(point: Point, start: Point, end: Point): { distance: number; t: number } {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared <= 0.0001) return Math.hypot(point.x - start.x, point.y - start.y);
+  if (lengthSquared <= 0.0001) return { distance: Math.hypot(point.x - start.x, point.y - start.y), t: 0 };
   const t = Math.max(
     0,
     Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
   );
-  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+  return { distance: Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy)), t };
+}
+
+function distanceToSegment(point: Point, start: Point, end: Point): number {
+  return projectToSegment(point, start, end).distance;
 }
 
 function hitTestEdgeHandles(vx: number, vy: number, box: ToolingBox): ResizeHandle | null {
@@ -425,8 +432,11 @@ function hitTestPathEdit(vx: number, vy: number, geom: PathEditGeometry): Toolin
   }
   for (const seg of geom.segments) {
     for (let i = 1; i < seg.samples.length; i++) {
-      if (distanceToSegment(p, seg.samples[i - 1], seg.samples[i]) <= SEGMENT_HIT) {
-        const t = (i - 1 + 0.5) / (seg.samples.length - 1);
+      const proj = projectToSegment(p, seg.samples[i - 1], seg.samples[i]);
+      if (proj.distance <= SEGMENT_HIT) {
+        // Samples are uniform in the curve parameter, so the exact projection onto
+        // this sub-segment maps linearly back to the global t of the whole segment.
+        const t = (i - 1 + proj.t) / (seg.samples.length - 1);
         return { type: "path-segment", subpathIndex: seg.subpathIndex, segIndex: seg.segIndex, t, cursor: PEN_INSERT_CURSOR };
       }
     }

@@ -4,7 +4,7 @@
 
 import type { CanvasDocument, ElementNode, VectorAnchor, VectorPath } from "../types";
 import { cloneDocument } from "./coreUtils";
-import { pathBounds, sampleSegment } from "../vector/pathData";
+import { pathBounds } from "../vector/pathData";
 import { pathScale } from "../vector/vectorGeometry";
 
 function getPathNode(doc: CanvasDocument, id: string): ElementNode | null {
@@ -148,7 +148,12 @@ export function updateHandle(
   return next;
 }
 
-/** Split a segment at parameter t (0..1), inserting an anchor on the curve. */
+/**
+ * Split a segment at parameter t (0..1), inserting an anchor ON the curve without
+ * changing its shape. A straight segment gets a plain corner. A curved segment is
+ * split with De Casteljau: the two neighbours' facing handles are shortened and the
+ * new anchor receives the exact in/out tangents so the drawn curve is identical.
+ */
 export function insertAnchorOnSegment(
   doc: CanvasDocument,
   id: string,
@@ -164,23 +169,54 @@ export function insertAnchorOnSegment(
   const from = sub.anchors[segIndex];
   const to = sub.anchors[(segIndex + 1) % sub.anchors.length];
   if (!from || !to) return doc;
-  const p = sampleSegment(from, to, t);
-  // De Casteljau split would be ideal; a tangent-aligned smooth anchor is a good,
-  // simpler approximation that keeps the curve continuous at the insertion point.
-  const tangent = {
-    x: sampleSegment(from, to, Math.min(1, t + 0.01)).x - p.x,
-    y: sampleSegment(from, to, Math.min(1, t + 0.01)).y - p.y,
+
+  const curved =
+    from.outX !== undefined || from.outY !== undefined || to.inX !== undefined || to.inY !== undefined;
+  if (!curved) {
+    // Straight segment: the split point is a plain linear interpolation; neighbours
+    // stay untouched and the new anchor is a corner.
+    const newAnchor: VectorAnchor = {
+      x: from.x + (to.x - from.x) * t,
+      y: from.y + (to.y - from.y) * t,
+      handleType: "corner",
+    };
+    sub.anchors.splice(segIndex + 1, 0, newAnchor);
+    return next;
+  }
+
+  // Cubic control polygon in absolute coordinates.
+  const p0 = { x: from.x, y: from.y };
+  const p1 = { x: from.x + (from.outX ?? 0), y: from.y + (from.outY ?? 0) };
+  const p2 = { x: to.x + (to.inX ?? 0), y: to.y + (to.inY ?? 0) };
+  const p3 = { x: to.x, y: to.y };
+  const lerp = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  });
+  const p01 = lerp(p0, p1);
+  const p12 = lerp(p1, p2);
+  const p23 = lerp(p2, p3);
+  const p012 = lerp(p01, p12);
+  const p123 = lerp(p12, p23);
+  const mid = lerp(p012, p123); // the point on the curve at t
+
+  // Rewrite the two neighbours' facing handles (De Casteljau leaves the rest intact).
+  from.outX = p01.x - from.x;
+  from.outY = p01.y - from.y;
+  to.inX = p23.x - to.x;
+  to.inY = p23.y - to.y;
+
+  // The new anchor's tangents are collinear (curve is continuous) but generally of
+  // unequal length → asymmetric.
+  const newAnchor: VectorAnchor = {
+    x: mid.x,
+    y: mid.y,
+    inX: p012.x - mid.x,
+    inY: p012.y - mid.y,
+    outX: p123.x - mid.x,
+    outY: p123.y - mid.y,
+    handleType: "asymmetric",
   };
-  const len = Math.hypot(tangent.x, tangent.y) || 1;
-  const curved = from.outX !== undefined || from.outY !== undefined || to.inX !== undefined || to.inY !== undefined;
-  const newAnchor: VectorAnchor = curved
-    ? {
-        x: p.x, y: p.y,
-        inX: (-tangent.x / len) * 0.0001, inY: (-tangent.y / len) * 0.0001,
-        outX: (tangent.x / len) * 0.0001, outY: (tangent.y / len) * 0.0001,
-        handleType: "mirrored",
-      }
-    : { x: p.x, y: p.y, handleType: "corner" };
   sub.anchors.splice(segIndex + 1, 0, newAnchor);
   return next;
 }
