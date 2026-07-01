@@ -111,6 +111,9 @@ type Props = {
   onResize: (width: number) => void;
   componentName?: string;
   screenName?: string;
+  // When authoring an icon master, reveal the art SVG's path children in the tree
+  // (the vectors are the subject being edited, not a sealed graphic to leave alone).
+  isIconCanvas?: boolean;
   document?: CanvasDocument | null;
   selectedNodeId?: string | null;
   selectedNodeIds?: readonly string[];
@@ -177,6 +180,7 @@ export function Tree({
   onResize,
   componentName,
   screenName,
+  isIconCanvas,
   document: documentProp,
   selectedNodeId,
   selectedNodeIds,
@@ -221,7 +225,10 @@ export function Tree({
   );
   const document = documentProp !== undefined ? documentProp : bridgeDocument;
   const { settings: globalSettings } = useGlobalSettings();
-  const revealSealedSvg = globalSettings.canvas.shell.tree.revealSealedComponentChildren;
+  // Icon authoring always reveals the art SVG's path children — editing them is the
+  // whole task — regardless of the global "reveal sealed children" preference.
+  const revealSealedSvg =
+    globalSettings.canvas.shell.tree.revealSealedComponentChildren || !!isIconCanvas;
   const tree = useMemo(() => {
     const label = componentName || screenName || "Canvas";
     if (document) return treeFromCanvasDocument(document, label, revealSealedSvg);

@@ -790,7 +790,9 @@ function CanvasPageContent() {
     return null;
   }, [projectId, component, screen, projectScreens, projectComponents]);
 
-  const selectedSubjectSize = component
+  // A component or an icon master sizes its own artboard (an icon is 24×24, not a
+  // device). Only a screen's frame matches the project's device size.
+  const selectedSubjectSize = component || iconMasterId
     ? currentDocument.canvas
     : canvasSizeForProjectType(projectType);
   // While a transient pan gesture is active, surface the Hand tool in the toolbar
@@ -1008,6 +1010,7 @@ function CanvasPageContent() {
         versionsParentNode={versionsBackNode}
         onVersionsBack={goBackVersions}
         subjectSize={selectedSubjectSize}
+        isIconCanvas={!!iconMasterId}
         versionOptions={versionsVariants}
         selectedVersionId={selectedVersionId}
         onSelectVersion={setSelectedVersionId}
