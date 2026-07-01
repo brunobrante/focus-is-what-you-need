@@ -40,6 +40,19 @@ export function createOwnerDebounceQueue<J extends OwnerKeyed>(options: {
     await run(job);
   }
 
+  /**
+   * Append a job to the serialized write chain and return the new tail. The
+   * `.catch` is load-bearing: without it a single rejected job leaves `writeChain`
+   * in a rejected state, and every later `.then` is skipped — one failure would
+   * silently brick all subsequent propagation/thumbnail work for the session.
+   */
+  function enqueue(key: string): Promise<void> {
+    writeChain = writeChain.then(() => runJob(key)).catch((error) => {
+      console.error("[ownerDebounceQueue] job failed", error);
+    });
+    return writeChain;
+  }
+
   function schedule(job: J): void {
     const key = ownerKey(job);
     pendingJobs.set(key, job);
@@ -53,8 +66,7 @@ export function createOwnerDebounceQueue<J extends OwnerKeyed>(options: {
         timers.delete(key);
         // Serialize runs through the write chain — ordering is load-bearing for
         // ancestor snapshot propagation.
-        writeChain = writeChain.then(() => runJob(key));
-        void writeChain;
+        void enqueue(key);
       }, delayMs),
     );
   }
@@ -66,12 +78,17 @@ export function createOwnerDebounceQueue<J extends OwnerKeyed>(options: {
       for (const timer of timers.values()) clearTimeout(timer);
       timers.clear();
 
+      // Drain through the same write chain, not around it, so a flush can't run a
+      // job concurrently with an in-flight scheduled run and break ordering. New
+      // jobs may be scheduled while we drain, so loop until nothing is pending.
       while (pendingJobs.size > 0) {
         const keys = Array.from(pendingJobs.keys());
         for (const key of keys) {
-          await runJob(key);
+          await enqueue(key);
         }
       }
+      // Settle any tail already on the chain (e.g. a scheduled run in flight).
+      await writeChain;
     })().finally(() => {
       activeFlush = null;
     });
