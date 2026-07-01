@@ -6,12 +6,29 @@ import type { ElementNode, VectorAnchor, VectorPath } from "../types";
 
 const KAPPA = 0.5522847498307936;
 
-function rectPath(w: number, h: number): VectorPath {
+function rectPath(w: number, h: number, radius = 0): VectorPath {
+  const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+  if (r <= 0) {
+    const anchors: VectorAnchor[] = [
+      { x: 0, y: 0, handleType: "corner" },
+      { x: w, y: 0, handleType: "corner" },
+      { x: w, y: h, handleType: "corner" },
+      { x: 0, y: h, handleType: "corner" },
+    ];
+    return { subpaths: [{ anchors, closed: true }] };
+  }
+  // Rounded rect: each corner is a quarter-circle cubic (KAPPA handles); the edges
+  // between corners stay straight. Two anchors per corner, walked clockwise.
+  const k = r * KAPPA;
   const anchors: VectorAnchor[] = [
-    { x: 0, y: 0, handleType: "corner" },
-    { x: w, y: 0, handleType: "corner" },
-    { x: w, y: h, handleType: "corner" },
-    { x: 0, y: h, handleType: "corner" },
+    { x: r, y: 0, inX: -k, inY: 0, handleType: "asymmetric" },        // end of TL arc
+    { x: w - r, y: 0, outX: k, outY: 0, handleType: "asymmetric" },   // start of TR arc
+    { x: w, y: r, inX: 0, inY: -k, handleType: "asymmetric" },        // end of TR arc
+    { x: w, y: h - r, outX: 0, outY: k, handleType: "asymmetric" },   // start of BR arc
+    { x: w - r, y: h, inX: k, inY: 0, handleType: "asymmetric" },     // end of BR arc
+    { x: r, y: h, outX: -k, outY: 0, handleType: "asymmetric" },      // start of BL arc
+    { x: 0, y: h - r, inX: 0, inY: k, handleType: "asymmetric" },     // end of BL arc
+    { x: 0, y: r, outX: 0, outY: -k, handleType: "asymmetric" },      // start of TL arc
   ];
   return { subpaths: [{ anchors, closed: true }] };
 }
@@ -72,7 +89,7 @@ export function shapeToPath(node: ElementNode): VectorPath | null {
   const h = node.height;
   switch (node.type) {
     case "rect":
-      return rectPath(w, h);
+      return rectPath(w, h, node.styles.borderRadius ?? 0);
     case "ellipse":
       return ellipsePath(w, h);
     case "polygon":
