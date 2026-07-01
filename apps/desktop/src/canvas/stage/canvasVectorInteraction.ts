@@ -11,6 +11,7 @@ import {
   closeSubpath,
   createId,
   deleteAnchor,
+  deleteElements,
   insertAnchorOnSegment,
   insertElement,
   makePathNode,
@@ -262,6 +263,18 @@ export function anchorEditPointerDown(
     // Alt-click removes the anchor.
     if (event.altKey) {
       let next = deleteAnchor(doc, id, hit.subpathIndex, hit.anchorIndex);
+      const remaining = next.elements[id];
+      const isEmpty =
+        !remaining?.path || !remaining.path.subpaths.some((s) => s.anchors.length > 0);
+      if (isEmpty) {
+        // Removing the final anchor leaves an empty path node. Drop it and leave edit
+        // mode instead of stranding an invisible, uneditable node. B12.
+        const cleaned = deleteElements(next, [id]);
+        dispatch({ type: "commitDocument", beforeDocument: doc, document: cleaned, selectedIds: [] });
+        dispatch({ type: "exitPathEdit" });
+        event.preventDefault();
+        return true;
+      }
       next = recomputePathBounds(next, id);
       dispatch({ type: "commitDocument", beforeDocument: doc, document: next, selectedIds: [id] });
       event.preventDefault();
