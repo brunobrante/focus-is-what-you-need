@@ -809,19 +809,35 @@ function CanvasPageContent() {
 
   const headerChipClass =
     "flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[#171717] px-3 py-2 text-[12px] tracking-[0.2px] text-[var(--text-muted)]";
+  // An isolated subject (a draft/icon with no project) has no structural home to
+  // link to — its `backHref` would fall to "/". Return to wherever it was opened
+  // from (Drafts, a System Design, …) via history instead.
+  const isolatedSubject = !projectId;
+  const backButtonClass = "grid shrink-0 place-items-center text-[var(--text-muted)] hover:text-[var(--text)]";
   const headerChipInner = (
     <>
-      <Link
-        to={backHref}
-        aria-label="Back"
-        onClick={() => { void flushPendingSave(); }}
-        className="grid shrink-0 place-items-center text-[var(--text-muted)] hover:text-[var(--text)]"
-      >
-        <IconChevronLeft size={14} strokeWidth={1.6} />
-      </Link>
+      {isolatedSubject ? (
+        <button
+          type="button"
+          aria-label="Back"
+          onClick={() => { void flushPendingSave(); navigate(-1); }}
+          className={backButtonClass}
+        >
+          <IconChevronLeft size={14} strokeWidth={1.6} />
+        </button>
+      ) : (
+        <Link
+          to={backHref}
+          aria-label="Back"
+          onClick={() => { void flushPendingSave(); }}
+          className={backButtonClass}
+        >
+          <IconChevronLeft size={14} strokeWidth={1.6} />
+        </Link>
+      )}
       <span className="h-3.5 w-px shrink-0 bg-[var(--border)]" />
       <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">
-        {componentName || screenTitle || projectName}
+        {componentName || screenTitle || iconName || projectName}
       </span>
       {projectType && (
         <span className="shrink-0 rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-[var(--text-faint)]">
@@ -1012,6 +1028,8 @@ function CanvasPageContent() {
         onVersionsBack={goBackVersions}
         subjectSize={selectedSubjectSize}
         subjectName={iconName || undefined}
+        isIcon={!!iconMasterId}
+        isolated={!projectId}
         versionOptions={versionsVariants}
         selectedVersionId={selectedVersionId}
         onSelectVersion={setSelectedVersionId}

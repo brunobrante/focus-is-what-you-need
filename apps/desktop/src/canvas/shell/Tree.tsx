@@ -114,6 +114,11 @@ type Props = {
   // The subject name to show when the canvas is neither a component nor a screen
   // (e.g. an icon master, labelled by the icon's name instead of a generic "Frame").
   subjectName?: string;
+  // The subject is an icon master (drives the subject-row glyph).
+  isIcon?: boolean;
+  // Editing a standalone subject with no project context (a draft/icon) — the
+  // subject-switch dropdown is hidden since there is nothing to switch to.
+  isolated?: boolean;
   document?: CanvasDocument | null;
   selectedNodeId?: string | null;
   selectedNodeIds?: readonly string[];
@@ -181,6 +186,8 @@ export function Tree({
   componentName,
   screenName,
   subjectName,
+  isIcon,
+  isolated,
   document: documentProp,
   selectedNodeId,
   selectedNodeIds,
@@ -576,8 +583,10 @@ export function Tree({
               width={rowWidth}
               height={rowHeight}
               isScreen={isScreen}
+              isIcon={isIcon}
               projectType={projectType ?? "mobile"}
               pickerOpen={pickerOpen}
+              pickerEnabled={!isolated}
               onOpenPicker={(rect) => {
                 setPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
                 setOpenPicker((m) => (m === "current" ? null : "current"));
