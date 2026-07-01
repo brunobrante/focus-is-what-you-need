@@ -39,6 +39,14 @@ export function computePathEditGeometry(
   const segments: PathEditSegmentGeom[] = [];
   let closeTarget: Point | null = null;
 
+  // While drawing with the pen, the anchor just placed (the last one of the active,
+  // still-open subpath) is the "active" vertex — highlight it so it doesn't look
+  // identical to every other anchor. B15.
+  const activeSubpathIndex = node.path.subpaths.length - 1;
+  const activeSubpath = node.path.subpaths[activeSubpathIndex];
+  const activeAnchorIndex =
+    penToolActive && activeSubpath && !activeSubpath.closed ? activeSubpath.anchors.length - 1 : -1;
+
   node.path.subpaths.forEach((sub, subpathIndex) => {
     sub.anchors.forEach((a, anchorIndex) => {
       anchors.push({
@@ -47,7 +55,7 @@ export function computePathEditGeometry(
         point: toView(a.x, a.y),
         inHandle: a.inX !== undefined || a.inY !== undefined ? toView(a.x + (a.inX ?? 0), a.y + (a.inY ?? 0)) : null,
         outHandle: a.outX !== undefined || a.outY !== undefined ? toView(a.x + (a.outX ?? 0), a.y + (a.outY ?? 0)) : null,
-        selected: false,
+        selected: subpathIndex === activeSubpathIndex && anchorIndex === activeAnchorIndex,
       });
     });
 
