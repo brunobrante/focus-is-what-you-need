@@ -518,6 +518,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
                 outHandle: a.outHandle,
                 selected: a.selected,
               })),
+              segments: pathEditGeometry.segments.map((s) => s.samples),
               closeTarget: pathEditGeometry.closeTarget,
             }
           : null,

@@ -81,9 +81,10 @@ export type ToolingRadiusLabelCommand = {
 
 /**
  * Anchor + handle affordances drawn while a path is in edit mode. All points are
- * in viewport/overlay space. Anchors are squares (filled when selected); handles
- * are a line anchor→knob with a round knob; `closeTarget` highlights the first
- * anchor when the pen can close the subpath.
+ * in viewport/overlay space. `segments` are the sampled polylines connecting the
+ * anchors (the path skeleton, drawn under everything); anchors are squares
+ * (filled when selected); handles are a line anchor→knob with a round knob;
+ * `closeTarget` highlights the first anchor when the pen can close the subpath.
  */
 export type ToolingPathEditAnchor = {
   point: Point;
@@ -93,6 +94,7 @@ export type ToolingPathEditAnchor = {
 };
 export type ToolingPathEditCommand = {
   anchors: ToolingPathEditAnchor[];
+  segments: Point[][];
   closeTarget: Point | null;
 };
 

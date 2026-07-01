@@ -168,7 +168,8 @@ const ANCHOR_RADIUS = 1.5;
 const HANDLE_KNOB_RADIUS = 3.5;
 const CLOSE_TARGET_RADIUS = 6;
 
-// Anchor/handle affordances for path edit mode. Handle lines + knobs first, then
+// Anchor/handle affordances for path edit mode. Segment skeleton first (the
+// blue polylines connecting the anchors), then handle lines + knobs, then
 // anchor squares on top, then the close-target ring.
 export function drawPathEdit(
   ck: CanvasKit,
@@ -180,6 +181,20 @@ export function drawPathEdit(
   const knobFill = pool.getFill(HANDLE_FILL);
   const knobStroke = pool.getStroke(SELECTION_COLOR, 1);
   const half = ANCHOR_SIZE / 2;
+
+  if (cmd.segments.length > 0) {
+    const skeleton = new ck.Path();
+    try {
+      for (const samples of cmd.segments) {
+        if (samples.length < 2) continue;
+        skeleton.moveTo(samples[0].x, samples[0].y);
+        for (let i = 1; i < samples.length; i++) skeleton.lineTo(samples[i].x, samples[i].y);
+      }
+      canvas.drawPath(skeleton, linePaint);
+    } finally {
+      skeleton.delete();
+    }
+  }
 
   for (const a of cmd.anchors) {
     if (a.inHandle) {
