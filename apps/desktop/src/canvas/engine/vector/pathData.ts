@@ -7,49 +7,9 @@
 
 import type { VectorAnchor, VectorPath, VectorSubpath } from "../types";
 
-const fmt = (n: number): string => {
-  // Trim noise from float math without forcing a fixed precision on round values.
-  const rounded = Math.round(n * 1000) / 1000;
-  return Object.is(rounded, -0) ? "0" : String(rounded);
-};
-
-function anchorHasOut(a: VectorAnchor): boolean {
-  return a.outX !== undefined || a.outY !== undefined;
-}
-function anchorHasIn(a: VectorAnchor): boolean {
-  return a.inX !== undefined || a.inY !== undefined;
-}
-
-function segment(from: VectorAnchor, to: VectorAnchor): string {
-  if (anchorHasOut(from) || anchorHasIn(to)) {
-    const c1x = from.x + (from.outX ?? 0);
-    const c1y = from.y + (from.outY ?? 0);
-    const c2x = to.x + (to.inX ?? 0);
-    const c2y = to.y + (to.inY ?? 0);
-    return `C ${fmt(c1x)} ${fmt(c1y)} ${fmt(c2x)} ${fmt(c2y)} ${fmt(to.x)} ${fmt(to.y)}`;
-  }
-  return `L ${fmt(to.x)} ${fmt(to.y)}`;
-}
-
-function subpathToData(subpath: VectorSubpath): string {
-  const { anchors, closed } = subpath;
-  if (anchors.length === 0) return "";
-  const parts: string[] = [`M ${fmt(anchors[0].x)} ${fmt(anchors[0].y)}`];
-  for (let i = 1; i < anchors.length; i++) {
-    parts.push(segment(anchors[i - 1], anchors[i]));
-  }
-  if (closed && anchors.length > 1) {
-    parts.push(segment(anchors[anchors.length - 1], anchors[0]));
-    parts.push("Z");
-  }
-  return parts.join(" ");
-}
-
-/** Serialize a VectorPath to an SVG `d` attribute. */
-export function pathToSvgPathData(path: VectorPath | undefined): string {
-  if (!path) return "";
-  return path.subpaths.map(subpathToData).filter(Boolean).join(" ");
-}
+// The `d`-string serializer is pure and shared with the persisted htmlScene format,
+// so it lives in the domain layer; re-export it so engine call sites are unchanged.
+export { pathToSvgPathData } from "@/domain/canvas/vector";
 
 // ─── Parsing ────────────────────────────────────────────────────────────────────
 

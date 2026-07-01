@@ -75,22 +75,11 @@ export type ElementType =
 // it can represent holes (boolean subtract, donuts), multi-`M` imported paths, and
 // fill-rule. Anchor positions live in INTRINSIC viewBox space (see ElementNode.viewBox).
 
-export type VectorAnchor = {
-  x: number;
-  y: number;
-  inX?: number; // in-handle, relative to anchor (absent = corner)
-  inY?: number;
-  outX?: number; // out-handle, relative to anchor
-  outY?: number;
-  handleType?: "corner" | "mirrored" | "asymmetric"; // continuity when dragging a handle
-};
-
-export type VectorSubpath = { anchors: VectorAnchor[]; closed: boolean };
-
-export type VectorPath = {
-  subpaths: VectorSubpath[];
-  fillRule?: "nonzero" | "evenodd"; // default "nonzero"
-};
+// The vector data model lives in the pure domain layer so the persisted htmlScene
+// format can round-trip vector nodes without a domain → engine import. Imported for
+// local use below and re-exported so engine call sites keep importing from here.
+import type { VectorAnchor, VectorSubpath, VectorPath } from "@/domain/canvas/vector";
+export type { VectorAnchor, VectorSubpath, VectorPath };
 
 /** Selection-style tools: they pick/move existing elements rather than insert. */
 export function isSelectionTool(tool: Tool): boolean {

@@ -1,6 +1,7 @@
 import type { Box } from "@/domain/canvas/geometry";
 import type { BlendMode, Effect } from "@/domain/canvas/types";
 import type { Fill } from "@/domain/canvas/fill";
+import type { VectorPath } from "@/domain/canvas/vector";
 
 export const HTML_CANVAS_FORMAT = "html-css-canvas";
 export const HTML_CANVAS_VERSION = 1;
@@ -99,6 +100,20 @@ export type HtmlCanvasStyle = {
   textBoxTrim?: boolean;
   objectFit: "fill" | "contain" | "cover" | "none" | "scale-down";
   overflow: "visible" | "hidden";
+  // ── Vector paint (path nodes only; ignored by every other appearance) ──
+  // Optional + additive; absent on non-vector nodes and legacy scenes. Mirrors the
+  // engine's ElementStyles vector fields so a path round-trips its fill/stroke.
+  fill?: string;
+  fillOpacity?: number;
+  fillRule?: "nonzero" | "evenodd";
+  stroke?: string;
+  strokeWidth?: number;
+  strokeOpacity?: number;
+  strokeLinecap?: "butt" | "round" | "square";
+  strokeLinejoin?: "miter" | "round" | "bevel";
+  strokeDasharray?: string;
+  strokeAlign?: "center" | "inside" | "outside";
+  strokeRef?: string;
 };
 
 /**
@@ -124,11 +139,19 @@ export type HtmlCanvasNode = {
   style: HtmlCanvasStyle;
   text: string | null;
   imageUrl: string | null;
-  appearance: "rect" | "ellipse" | "line";
+  // "path" = one editable vector node (carries `vectorPath` + `viewBox`); "svg" = a
+  // sealed container whose child path nodes hold the art. Additive to the legacy
+  // rect/ellipse/line set; absent → "rect".
+  appearance: "rect" | "ellipse" | "line" | "path" | "svg";
   visible: boolean;
   locked: boolean;
   // Non-null only on linked instance nodes. Plain content nodes leave this null.
   instanceOf: HtmlCanvasInstanceRef | null;
+  // ── Vector fields (appearance "path"/"svg" only; absent otherwise) ──
+  // Intrinsic authoring box; anchors in `vectorPath` live in this space and the
+  // node bounds stretch it (mirrors the engine ElementNode.viewBox/path pair).
+  viewBox?: { width: number; height: number };
+  vectorPath?: VectorPath;
 };
 
 export type HtmlCanvasDocument = {

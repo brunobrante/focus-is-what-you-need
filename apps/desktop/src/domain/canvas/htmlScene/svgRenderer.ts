@@ -1,6 +1,7 @@
 import type { HtmlCanvasDocument, HtmlCanvasNode } from "./types";
 import { getHtmlCanvasChildren, getHtmlCanvasNode, normalizeHtmlCanvasDocument } from "./document";
 import { escapeAttr, escapeXml } from "./styleUtils";
+import { pathToSvgPathData } from "@/domain/canvas/vector";
 
 export function svgForHtmlCanvasDocument(document: HtmlCanvasDocument): string {
   const normalized = normalizeHtmlCanvasDocument(document);
@@ -57,6 +58,38 @@ function renderSvgNode(
     const text = escapeXml(node.text ?? node.name);
     return [
       `<text x="${x}" y="${y + node.style.fontSize}" fill="${escapeAttr(node.style.color)}" font-family="${escapeAttr(node.style.fontFamily)}" font-size="${node.style.fontSize}" font-weight="${node.style.fontWeight}"${opacity}>${text}</text>`,
+      children,
+    ].join("");
+  }
+
+  if (node.appearance === "svg") {
+    // Sealed container: paints nothing itself; its child path nodes carry the art
+    // and are already rendered above (with x/y accumulated).
+    return children;
+  }
+
+  if (node.appearance === "path") {
+    const d = pathToSvgPathData(node.vectorPath);
+    if (!d) return children;
+    const vb = node.viewBox ?? { width: node.bounds.width, height: node.bounds.height };
+    const sx = vb.width > 0 ? node.bounds.width / vb.width : 1;
+    const sy = vb.height > 0 ? node.bounds.height / vb.height : 1;
+    // Anchors live in viewBox space; map that box onto the node's absolute bounds.
+    const transform = ` transform="translate(${x} ${y}) scale(${sx || 1} ${sy || 1})"`;
+    const vfill = node.style.fill ?? (node.style.background === "transparent" ? "none" : node.style.background);
+    const fillAttr = ` fill="${escapeAttr(vfill ?? "none")}"`;
+    const fillRule = node.style.fillRule ? ` fill-rule="${node.style.fillRule}"` : "";
+    const fillOpacity = node.style.fillOpacity !== undefined ? ` fill-opacity="${node.style.fillOpacity}"` : "";
+    const vstroke = node.style.stroke;
+    const strokeAttrs = vstroke
+      ? ` stroke="${escapeAttr(vstroke)}" stroke-width="${node.style.strokeWidth ?? 1}"` +
+        (node.style.strokeOpacity !== undefined ? ` stroke-opacity="${node.style.strokeOpacity}"` : "") +
+        (node.style.strokeLinecap ? ` stroke-linecap="${node.style.strokeLinecap}"` : "") +
+        (node.style.strokeLinejoin ? ` stroke-linejoin="${node.style.strokeLinejoin}"` : "") +
+        (node.style.strokeDasharray ? ` stroke-dasharray="${escapeAttr(node.style.strokeDasharray)}"` : "")
+      : "";
+    return [
+      `<path d="${d}"${transform}${fillAttr}${fillRule}${fillOpacity}${strokeAttrs}${opacity}/>`,
       children,
     ].join("");
   }

@@ -120,6 +120,10 @@ function compactNode(node: HtmlCanvasNode): Record<string, unknown> {
   if (node.visible !== true) out.visible = node.visible;
   if (node.locked !== false) out.locked = node.locked;
   if (node.instanceOf != null) out.instanceOf = node.instanceOf;
+  // Vector payload (path/svg nodes). `normalizeNode` preserves them via spread, so
+  // emitting them here is the only thing needed to persist a vector round-trip.
+  if (node.viewBox) out.viewBox = node.viewBox;
+  if (node.vectorPath) out.vectorPath = node.vectorPath;
   const style = compactStyle(node.style);
   if (style) out.style = style;
   return out;

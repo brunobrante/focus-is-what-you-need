@@ -126,6 +126,10 @@ export function canvasDocumentFromHtmlDocument(
       locked: node.locked,
       visible: node.visible,
       instanceOf: node.instanceOf ?? null,
+      // Vector payload — hydrate the engine's viewBox/path pair so a path node
+      // renders as native SVG again instead of degrading to a rect.
+      ...(node.viewBox ? { viewBox: node.viewBox } : {}),
+      ...(node.vectorPath ? { path: node.vectorPath } : {}),
     };
   }
 
@@ -407,7 +411,13 @@ function htmlNodeFromElement(
     style: mergeStyle(previous?.style, styleFromElement(element, previous?.style)),
     text: element.type === "text" ? element.content ?? null : previous?.text ?? null,
     imageUrl: element.type === "image" ? element.src ?? null : previous?.imageUrl ?? null,
-    appearance: previous?.appearance ?? "rect",
+    appearance: appearanceFromElement(element, previous?.appearance),
+    // Vector payload — persist so the path survives a save+reload (and the SVG
+    // export). Only carried on the matching vector types.
+    ...(element.viewBox && (element.type === "path" || element.type === "svg")
+      ? { viewBox: element.viewBox }
+      : {}),
+    ...(element.type === "path" && element.path ? { vectorPath: element.path } : {}),
     visible: element.visible !== false,
     locked: element.locked === true,
     // The engine element's `instanceOf` is authoritative (it is always set on load
@@ -446,6 +456,10 @@ function htmlParentIdForCanvasElement(
 }
 
 function elementTypeFromHtmlNode(node: HtmlCanvasNode): ElementType {
+  // Vector appearance is authoritative — a persisted path/svg node reloads as the
+  // matching engine type (carrying viewBox + vectorPath), never a plain rect.
+  if (node.appearance === "path") return "path";
+  if (node.appearance === "svg") return "svg";
   if (node.kind === "text" || ["p", "h1", "h2", "span"].includes(node.tag)) return "text";
   if (node.kind === "image" || node.tag === "img") return "image";
   if (node.kind === "icon" || node.tag === "icon") return "icon";
@@ -504,6 +518,19 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
     objectFit: style.objectFit,
     effects: style.effects,
     fills: style.fills,
+    // Vector paint (path nodes) — round-tripped back onto the engine element so the
+    // renderer paints the path's own fill/stroke rather than the box background.
+    fill: style.fill,
+    fillOpacity: style.fillOpacity,
+    fillRule: style.fillRule,
+    stroke: style.stroke,
+    strokeWidth: style.strokeWidth,
+    strokeOpacity: style.strokeOpacity,
+    strokeLinecap: style.strokeLinecap,
+    strokeLinejoin: style.strokeLinejoin,
+    strokeDasharray: style.strokeDasharray,
+    strokeAlign: style.strokeAlign,
+    strokeRef: style.strokeRef,
   };
 }
 
@@ -576,7 +603,48 @@ function styleFromElement(
     textBoxTrim: styles.textBoxTrim,
     objectFit: styles.objectFit ?? previousStyle?.objectFit ?? "cover",
     overflow: styles.overflow ?? previousStyle?.overflow ?? "visible",
+    // Vector paint (path nodes) — read straight from engine state, no previousStyle
+    // fallback, so clearing a value persists instead of resurrecting the old one.
+    // Only defined fields are carried, so non-vector nodes stay byte-identical.
+    ...vectorPaintFromElement(styles),
   };
+}
+
+const VECTOR_PAINT_KEYS = [
+  "fill",
+  "fillOpacity",
+  "fillRule",
+  "stroke",
+  "strokeWidth",
+  "strokeOpacity",
+  "strokeLinecap",
+  "strokeLinejoin",
+  "strokeDasharray",
+  "strokeAlign",
+  "strokeRef",
+] as const;
+
+/** The defined vector-paint fields of an element's styles, as an HtmlCanvasStyle
+ *  patch. Omitting undefined keeps non-vector node serialization unchanged. */
+function vectorPaintFromElement(styles: ElementStyles): Partial<HtmlCanvasStyle> {
+  const out: Partial<HtmlCanvasStyle> = {};
+  for (const key of VECTOR_PAINT_KEYS) {
+    const value = styles[key];
+    if (value !== undefined) (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+}
+
+/** The persisted `appearance` for an element: authoritative for vector types,
+ *  otherwise the previously-stored appearance (ellipse/line) or "rect". Never lets
+ *  a stale vector appearance survive on a node that is no longer a path/svg. */
+function appearanceFromElement(
+  element: ElementNode,
+  previous: HtmlCanvasNode["appearance"] | undefined,
+): HtmlCanvasNode["appearance"] {
+  if (element.type === "path") return "path";
+  if (element.type === "svg") return "svg";
+  return previous && previous !== "path" && previous !== "svg" ? previous : "rect";
 }
 
 function htmlKindFromElement(element: ElementNode): HtmlCanvasNodeKind {
