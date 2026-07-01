@@ -9,6 +9,7 @@ import { MIN_TOOL_ZOOM } from "../types";
 import {
   resizeHandleCenter,
   radiusHandleCenter,
+  detectionCloseButtonCenter,
   componentBoxInSubject,
   imageClientFromSubjectBox,
 } from "./geometry";
@@ -56,6 +57,17 @@ export function selectionHitTest(
     return { kind: "move" };
   }
   return null;
+}
+
+export function detectionCloseHitTest(
+  point: { x: number; y: number },
+  box: CropBox,
+  zoom: number,
+): boolean {
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const hitArea = HANDLE_HIT_AREA / 2 / safeZoom;
+  const center = detectionCloseButtonCenter(box, zoom);
+  return Math.abs(point.x - center.x) <= hitArea && Math.abs(point.y - center.y) <= hitArea;
 }
 
 export function componentHitTest(

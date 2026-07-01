@@ -7,6 +7,7 @@ import { MIN_TOOL_ZOOM } from "../types";
 import {
   resizeHandleCenter,
   radiusHandleCenter,
+  detectionCloseButtonCenter,
   maxCropRadius,
   componentBoxInSubject,
   imageClientFromSubjectBox,
@@ -318,6 +319,29 @@ export function drawSquareHandle(
   ctx.stroke();
 }
 
+/** The small "×" discard control at a pending-detection box's top-right corner. */
+function drawDetectionCloseButton(
+  ctx: CanvasRenderingContext2D,
+  box: { x: number; y: number; w: number; h: number },
+  color: string,
+  stroke: number,
+  zoom: number,
+) {
+  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
+  const center = detectionCloseButtonCenter(box, zoom);
+  const radius = (HANDLE_DOT_SIZE / 2 / safeZoom) * 1.1;
+  drawCircleHandle(ctx, center.x, center.y, radius, "#FFFFFF", color, stroke);
+  const half = radius * 0.45;
+  ctx.beginPath();
+  ctx.moveTo(center.x - half, center.y - half);
+  ctx.lineTo(center.x + half, center.y + half);
+  ctx.moveTo(center.x + half, center.y - half);
+  ctx.lineTo(center.x - half, center.y + half);
+  ctx.lineWidth = 1.4 * stroke;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+}
+
 function prepareImageCanvas(
   canvas: HTMLCanvasElement,
   img: HTMLImageElement | null,
@@ -460,6 +484,8 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     penPath,
     penCursor,
     measurements,
+    pendingDetections,
+    activeDetectionId,
   } = args;
 
   const setup = prepareImageCanvas(canvas, img, toolZoom);
@@ -506,10 +532,32 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     }
   }
 
+  // Auto-detect review boxes: every pending detection except the active one is
+  // a plain colored, labeled rectangle (no handles — it isn't being edited).
+  // The active one renders through the `selection` block below so it gets the
+  // normal resize/radius handles.
+  const activeDetection = activeDetectionId
+    ? (pendingDetections.find((d) => d.id === activeDetectionId) ?? null)
+    : null;
+  for (const detection of pendingDetections) {
+    if (detection.id === activeDetectionId) continue;
+    const { x, y, w, h } = detection.box;
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.fillStyle = hexToRgba(detection.color, 0.12);
+    ctx.fill();
+    ctx.lineWidth = stroke;
+    ctx.strokeStyle = detection.color;
+    ctx.stroke();
+    drawLabelBadge(ctx, detection.label, x, y - 4 * stroke, toolZoom);
+    drawDetectionCloseButton(ctx, detection.box, detection.color, stroke, toolZoom);
+  }
+
   if (selection) {
     const sw = Math.max(0, selection.w);
     const sh = Math.max(0, selection.h);
     const radius = Math.min(selection.r ?? 0, maxCropRadius(selection));
+    const selectionColor = activeDetection?.color ?? SELECTION_COLOR;
 
     // Dim everything OUTSIDE the rounded selection by filling the image with a
     // rounded-rect hole (even-odd) — so the crop visibly takes the corner radius
@@ -530,7 +578,7 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     ctx.beginPath();
     ctx.roundRect(selection.x, selection.y, sw, sh, radius);
     ctx.lineWidth = stroke;
-    ctx.strokeStyle = SELECTION_COLOR;
+    ctx.strokeStyle = selectionColor;
     ctx.stroke();
 
     let badgeText: string;
@@ -551,15 +599,18 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
       const handleSize = HANDLE_DOT_SIZE / safeZoom;
       for (const handle of CORNER_HANDLES) {
         const center = resizeHandleCenter(handle, selection);
-        drawSquareHandle(ctx, center.x, center.y, handleSize, "#FFFFFF", SELECTION_COLOR, stroke);
+        drawSquareHandle(ctx, center.x, center.y, handleSize, "#FFFFFF", selectionColor, stroke);
       }
       if (args.isHoveringSelection) {
         const radiusRadius = RADIUS_DOT_SIZE / 2 / safeZoom;
         for (const handle of RADIUS_HANDLES) {
           const center = radiusHandleCenter(handle, selection, toolZoom);
-          drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#FFFFFF", SELECTION_COLOR, stroke);
+          drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#FFFFFF", selectionColor, stroke);
         }
       }
+    }
+    if (activeDetection) {
+      drawDetectionCloseButton(ctx, selection, activeDetection.color, stroke, toolZoom);
     }
   }
 

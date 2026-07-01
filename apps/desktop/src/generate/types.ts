@@ -32,6 +32,7 @@ export type {
   ComponentTreeNode,
   ActiveSubject,
   DrawingPath,
+  PendingDetectionBox,
   SelectionInteraction,
   SelectionHit,
   PaintOverlayArgs,
@@ -74,4 +75,16 @@ export const CROPS_OVERLAY_PRESETS = [
   "#F59E0B",
   "#EF4444",
   "#EC4899",
+] as const;
+
+// Distinct colors auto-detect assigns to pending review boxes, one per unique
+// detected label (cycling once there are more labels than colors).
+export const AUTO_DETECT_BOX_COLORS = [
+  "#4C8DFF",
+  "#22C55E",
+  "#F59E0B",
+  "#EF4444",
+  "#EC4899",
+  "#A855F7",
+  "#14B8A6",
 ] as const;

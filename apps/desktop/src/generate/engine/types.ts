@@ -131,6 +131,11 @@ export type ActiveSubject =
 
 export type DrawingPath = { points: Array<{ x: number; y: number }> };
 
+// One auto-detected region awaiting review: an editable, colored crop box (same
+// shape as the manual crop's CropBox) that hasn't been rasterized into a
+// SavedComponent yet. `box` is in image-client coordinates, like `selection`.
+export type PendingDetectionBox = { id: string; box: CropBox; label: string; color: string };
+
 export const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
 export const CORNER_HANDLES = ["nw", "ne", "se", "sw"] as const;
 export const RADIUS_HANDLES = ["nw", "ne", "se", "sw"] as const;
@@ -214,6 +219,10 @@ export type PaintOverlayArgs = {
   penCursor: { x: number; y: number } | null;
   /** "Show sizes" object boxes + gaps (subject coords), or null when off. */
   measurements: MeasureOverlay | null;
+  /** Auto-detected regions awaiting review (not yet cropped into cuts). */
+  pendingDetections: PendingDetectionBox[];
+  /** Which pending detection currently drives the `selection` handles, or null. */
+  activeDetectionId: string | null;
 };
 
 export type PaintCropsArgs = {

@@ -1314,9 +1314,10 @@ appears in the top-right of the canvas; the right panel stays fully populated
 again, or the canvas ×, returns to the editor.
 
 **Bottom canvas bar — image-level actions**: (when the Auto-detect Components feature is enabled) **Auto-detect**:
-- **Auto-detect** runs the active auto-detect model on the open subject and turns every detected region **directly into a saved cut** — no review or "Apply" step. The button shows a spinner and the image dims while it runs. Only available when a stack/component is open (croppable).
+- **Auto-detect** runs the active auto-detect model on the open subject and shows every detected region as an **editable, colored review box** on the canvas — the same rectangle crop box used for manual cropping (move/resize/radius handles), not a saved cut yet. Boxes sharing a detected label share a color; different labels get distinct colors. The button shows a spinner and the image dims while it runs. Only available when a stack/component is open (croppable).
 - The model is switchable in Settings → Processing → Auto-detect Components. **OmniParser (icon detect)** (~58 MB, YOLOv8, the default) is purpose-built for UI screenshots and proposes icon/element regions; **Florence-2** (~1.2 GB) proposes region-captioned crops and labels each cut with its caption. Whichever model is active is the one Auto-detect runs.
-- Detected regions are mapped into the open subject's coordinate space and obey the same bounds as a hand-drawn crop. Each becomes a normal cut in the stack, selected and opened on completion, and is editable afterward exactly like any manual cut (move/resize handles, rename, delete).
+- Click a box to make it the active one (its handles appear); drag to move or resize it like any manual crop. Each box has a small **× control** at its top-right corner to discard that one region without affecting the others.
+- A toolbar in the top-right reads "N detected" with **Cancel** (discards every pending box, no cuts created) and **Save all (N)** (crops every remaining box at once, in a single batch, into normal cuts — selected/opened like a manual crop, editable afterward exactly like any manual cut).
 - If no model is installed/enabled, a toast reads "Install an auto-detect model in Settings first". If nothing is detected, a toast reads "No components detected — try drawing regions manually".
 
 **Right panel — Tools and output**:

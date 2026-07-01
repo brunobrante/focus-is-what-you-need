@@ -5,6 +5,7 @@ import type {
   ActiveSubject,
   CropBox,
   DrawingPath,
+  PendingDetectionBox,
   SavedComponent,
   ViewMode,
 } from "../types";
@@ -25,6 +26,8 @@ export type BuilderCanvasPainterInput = {
   isHoveringSelection: boolean;
   selectionCrop: CropBox | null;
   selectionMatchesExistingCut: boolean;
+  pendingDetections: PendingDetectionBox[];
+  activeDetectionId: string | null;
   /** Object silhouette from "Adjust crop" (subject coords), or null. */
   segmentationContour: { x: number; y: number }[] | null;
   /** In-progress / closed pen cut path (content coords), or null. */
@@ -70,6 +73,8 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
+    pendingDetections,
+    activeDetectionId,
     segmentationContour,
     penPath,
     penCursor,
@@ -138,6 +143,8 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
       editingComponentId,
       selectionMatchesExistingCut,
       selectionCrop,
+      pendingDetections,
+      activeDetectionId,
       segmentationContour,
       penPath,
       penCursor,
@@ -159,6 +166,8 @@ export function useBuilderCanvasPainter(input: BuilderCanvasPainterInput) {
     selectionCrop,
     selectionLocked,
     selectionMatchesExistingCut,
+    pendingDetections,
+    activeDetectionId,
     segmentationContour,
     penPath,
     penCursor,

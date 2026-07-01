@@ -11,6 +11,7 @@ import type {
   CropBox,
   DrawingPath,
   EditorTool,
+  PendingDetectionBox,
   SavedComponent,
   SelectionInteraction,
   ToolReference,
@@ -35,7 +36,11 @@ import {
   resizeCursor,
   roundCropBox,
 } from "../engine/geometry";
-import { componentHitTest, selectionHitTest } from "../engine/hitTesting";
+import {
+  componentHitTest,
+  detectionCloseHitTest,
+  selectionHitTest,
+} from "../engine/hitTesting";
 import { componentAreaAlreadyExists } from "../engine/componentModel";
 import { readCropsOverlayAlpha, readCropsOverlayColor } from "../engine/storage";
 
@@ -76,6 +81,10 @@ export type BuilderInteractionState = {
   setSelection: React.Dispatch<React.SetStateAction<CropBox | null>>;
   selectionLocked: boolean;
   setSelectionLocked: React.Dispatch<React.SetStateAction<boolean>>;
+  pendingDetections: PendingDetectionBox[];
+  setPendingDetections: React.Dispatch<React.SetStateAction<PendingDetectionBox[]>>;
+  activeDetectionId: string | null;
+  setActiveDetectionId: React.Dispatch<React.SetStateAction<string | null>>;
   drawing: boolean;
   setDrawing: React.Dispatch<React.SetStateAction<boolean>>;
   drawingPath: DrawingPath | null;
@@ -136,6 +145,8 @@ export function useBuilderInteraction({
 
   const [selection, setSelection] = useState<CropBox | null>(null);
   const [selectionLocked, setSelectionLocked] = useState(false);
+  const [pendingDetections, setPendingDetections] = useState<PendingDetectionBox[]>([]);
+  const [activeDetectionId, setActiveDetectionId] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [drawingPath, setDrawingPath] = useState<DrawingPath | null>(null);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
@@ -228,7 +239,19 @@ export function useBuilderInteraction({
     setSelectionLocked(false);
     setDrawingPath(null);
     setEditingComponentId(null);
+    setPendingDetections([]);
+    setActiveDetectionId(null);
   }, []);
+
+  // Keep the active pending detection's box in sync with `selection` while the
+  // user drags/resizes it, without threading a write through every resize/move/
+  // radius branch below.
+  useEffect(() => {
+    if (!activeDetectionId || !selection) return;
+    setPendingDetections((current) =>
+      current.map((d) => (d.id === activeDetectionId ? { ...d, box: selection } : d)),
+    );
+  }, [selection, activeDetectionId]);
 
   const selectionToSubjectCoords = useCallback(
     (box: CropBox): CropBox | null => {
@@ -373,6 +396,76 @@ export function useBuilderInteraction({
 
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    if (currentTool === "crop" && pendingDetections.length > 0) {
+      // The × discard control takes priority over everything else, topmost box first.
+      for (let i = pendingDetections.length - 1; i >= 0; i -= 1) {
+        const detection = pendingDetections[i];
+        if (!detectionCloseHitTest(point, detection.box, toolZoom)) continue;
+        setPendingDetections((current) => current.filter((d) => d.id !== detection.id));
+        if (activeDetectionId === detection.id) {
+          setActiveDetectionId(null);
+          setSelection(null);
+          setSelectionLocked(false);
+        }
+        return;
+      }
+
+      // A hit on the already-active box falls through to the normal resize/move/
+      // radius handling below (it's already bound to `selection`).
+      const activeHit =
+        selection && selectionLocked ? selectionHitTest(point, selection, true, toolZoom) : null;
+      if (!activeHit) {
+        let activated = false;
+        for (let i = pendingDetections.length - 1; i >= 0; i -= 1) {
+          const detection = pendingDetections[i];
+          if (detection.id === activeDetectionId) continue;
+          const hit = selectionHitTest(point, detection.box, true, toolZoom);
+          if (!hit) continue;
+          setActiveDetectionId(detection.id);
+          setSelection(detection.box);
+          setSelectionLocked(true);
+          if (hit.kind === "radius") {
+            selectionInteractionRef.current = {
+              type: "radius",
+              pointerId: event.pointerId,
+              handle: hit.handle,
+              startPoint: point,
+              startBox: detection.box,
+            };
+            if (stageViewportRef.current) stageViewportRef.current.style.cursor = RADIUS_CURSOR;
+          } else if (hit.kind === "resize") {
+            selectionInteractionRef.current = {
+              type: "resize",
+              pointerId: event.pointerId,
+              handle: hit.handle,
+              startPoint: point,
+              startBox: detection.box,
+            };
+          } else {
+            selectionInteractionRef.current = {
+              type: "move",
+              pointerId: event.pointerId,
+              startPoint: point,
+              startBox: detection.box,
+            };
+          }
+          setDrawing(true);
+          activated = true;
+          break;
+        }
+        if (!activated) {
+          // Missed every box — just deselect, don't start a new manual crop draw
+          // while there are still auto-detected boxes to review.
+          if (activeDetectionId || selection) {
+            setActiveDetectionId(null);
+            setSelection(null);
+            setSelectionLocked(false);
+          }
+        }
+        return;
+      }
+    }
 
     if (selection && selectionLocked) {
       const hit = selectionHitTest(point, selection, true, toolZoom);
@@ -537,6 +630,19 @@ export function useBuilderInteraction({
       return;
     }
 
+    // Shrinking an active detection box below the minimum size discards it
+    // entirely (from the pending list, not just the live selection) — otherwise
+    // it would vanish from the canvas but still linger as a near-zero-size
+    // pending box that "Save all" would silently crop.
+    if (activeDetectionId && selection && (selection.w < 8 || selection.h < 8)) {
+      const discardedId = activeDetectionId;
+      setPendingDetections((current) => current.filter((d) => d.id !== discardedId));
+      setActiveDetectionId(null);
+      setSelection(null);
+      setSelectionLocked(false);
+      return;
+    }
+
     setSelection((current) => {
       if (!current || current.w < 8 || current.h < 8) {
         setSelectionLocked(false);
@@ -552,6 +658,10 @@ export function useBuilderInteraction({
     setSelection,
     selectionLocked,
     setSelectionLocked,
+    pendingDetections,
+    setPendingDetections,
+    activeDetectionId,
+    setActiveDetectionId,
     drawing,
     setDrawing,
     drawingPath,

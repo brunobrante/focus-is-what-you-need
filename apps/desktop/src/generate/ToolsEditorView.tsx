@@ -82,6 +82,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     selectedComponentId,
     selection,
     selectionLocked,
+    pendingDetections,
     brushSize,
     editingComponentId,
     showCropsOverlay,
@@ -167,6 +168,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     persistReferenceStack,
     canSaveSelection,
     saveSelection,
+    saveAllDetections,
     addCutVariant,
     setCutVariant,
     removeCutVariant,
@@ -431,7 +433,33 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                 </div>
               ) : null}
 
-              {selection && currentTool !== "draw" ? (
+              {pendingDetections.length > 0 ? (
+                <div
+                  data-selection-action
+                  className="absolute right-3 top-3 z-30 inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-1"
+                >
+                  <span className="px-1.5 font-mono text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                    {pendingDetections.length} detected
+                  </span>
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={cancelSelection}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11.5px] font-medium text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    data-selection-action
+                    onClick={() => void saveAllDetections()}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-medium text-[var(--accent-fg)] hover:bg-white"
+                  >
+                    <Check size={10} strokeWidth={2.2} />
+                    Save all ({pendingDetections.length})
+                  </button>
+                </div>
+              ) : selection && currentTool !== "draw" ? (
                 <div
                   data-selection-action
                   className="absolute right-3 top-3 z-30 inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-elev)] p-1"

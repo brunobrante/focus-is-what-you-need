@@ -14,6 +14,7 @@ import type {
   SavedComponent,
   ComponentState,
   PendingConfirmation,
+  PendingDetectionBox,
   ActiveSubject,
   ViewMode,
   DrawingPath,
@@ -137,6 +138,8 @@ export type ToolsEditorState = {
   selectedComponentId: string | null;
   selection: CropBox | null;
   selectionLocked: boolean;
+  pendingDetections: PendingDetectionBox[];
+  activeDetectionId: string | null;
   drawing: boolean;
   drawingPath: DrawingPath | null;
   brushSize: number;
@@ -265,6 +268,7 @@ export type ToolsEditorState = {
   selectionToSubjectCoords: (box: CropBox) => CropBox | null;
   toOriginalCoords: (subjectBox: CropBox) => CropBox;
   saveSelection: (postProcess?: ProcessingActionKind) => Promise<void>;
+  saveAllDetections: () => Promise<void>;
   addCutVariant: (cutId: string, input: { tool: CutVariantTool; dataUrl: string }) => void;
   setCutVariant: (cutId: string, variantId: string) => void;
   removeCutVariant: (cutId: string, variantId: string) => void;
@@ -452,6 +456,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     setSelection,
     selectionLocked,
     setSelectionLocked,
+    pendingDetections,
+    setPendingDetections,
+    activeDetectionId,
+    setActiveDetectionId,
     drawing,
     setDrawing,
     drawingPath,
@@ -510,18 +518,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   const { autoDetecting, autoDetectMessage, autoDetect } = useAutoDetect({
     canCrop,
-    activeSubject,
-    rootComponent,
-    activeScopeId,
+    activeSubjectUrl: activeSubject.url,
     imgRef,
-    selectionToSubjectCoords,
-    toOriginalCoords,
-    updateComponents,
-    setExpandedComponentIds,
-    setSelectedComponentId,
-    setViewMode,
-    cancelSelection,
-    resetToolViewport,
+    setPendingDetections,
+    setCurrentTool,
   });
 
   // --- Adjust crop (object segmentation) -----------------------------------
@@ -800,6 +800,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     isHoveringSelection,
     selectionCrop,
     selectionMatchesExistingCut,
+    pendingDetections,
+    activeDetectionId,
     // Adjust crop now reshapes the active tool directly, so there is no separate
     // green silhouette preview to draw.
     segmentationContour: null,
@@ -868,32 +870,43 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
 
   // --- Operations ----------------------------------------------------------
 
-  const { fileInputRef, uploading, setUploading, saveSelection, savePenCut, uploadImage, handleRemoveComponent } =
-    useBuilderCutOperations({
-      imgRef,
-      selection,
-      selectionLocked,
-      canCrop,
-      activeSubject,
-      activeScopeId,
-      rootComponentId,
-      rootComponent,
-      components,
-      editingComponentId,
-      selectedComponentId,
-      selectionToSubjectCoords,
-      toOriginalCoords,
-      updateComponents,
-      setEditingComponentId,
-      setExpandedComponentIds,
-      setSelectedComponentId,
-      setViewMode,
-      setActiveRootId,
-      cancelSelection,
-      resetToolViewport,
-      openOriginal,
-      onUploadedLocally,
-    });
+  const {
+    fileInputRef,
+    uploading,
+    setUploading,
+    saveSelection,
+    saveAllDetections,
+    savePenCut,
+    uploadImage,
+    handleRemoveComponent,
+  } = useBuilderCutOperations({
+    imgRef,
+    selection,
+    selectionLocked,
+    canCrop,
+    activeSubject,
+    activeScopeId,
+    rootComponentId,
+    rootComponent,
+    components,
+    editingComponentId,
+    selectedComponentId,
+    pendingDetections,
+    setPendingDetections,
+    setActiveDetectionId,
+    selectionToSubjectCoords,
+    toOriginalCoords,
+    updateComponents,
+    setEditingComponentId,
+    setExpandedComponentIds,
+    setSelectedComponentId,
+    setViewMode,
+    setActiveRootId,
+    cancelSelection,
+    resetToolViewport,
+    openOriginal,
+    onUploadedLocally,
+  });
 
   // --- Pen cut toolbar (same flow as the rectangle) ------------------------
 
@@ -1085,6 +1098,8 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectedComponentId,
     selection,
     selectionLocked,
+    pendingDetections,
+    activeDetectionId,
     drawing,
     drawingPath,
     brushSize,
@@ -1204,6 +1219,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     selectionToSubjectCoords,
     toOriginalCoords,
     saveSelection,
+    saveAllDetections,
     addCutVariant,
     setCutVariant,
     removeCutVariant,

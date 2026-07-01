@@ -8,6 +8,7 @@ import type {
   ViewMode,
   CutVariantTool,
   ToolReference,
+  PendingDetectionBox,
 } from "../types";
 import { COMPONENT_STORAGE_PREFIX } from "../types";
 import { ensureRootComponent } from "../engine/componentModel";
@@ -20,6 +21,7 @@ import {
   canvasToDataUrl,
   inferType,
   measureImage,
+  rasterizeCropBox,
   shortComponentName,
   waitForImage,
 } from "../engine/image";
@@ -50,6 +52,9 @@ export function useBuilderCutOperations({
   components,
   editingComponentId,
   selectedComponentId,
+  pendingDetections,
+  setPendingDetections,
+  setActiveDetectionId,
   selectionToSubjectCoords,
   toOriginalCoords,
   updateComponents,
@@ -74,6 +79,9 @@ export function useBuilderCutOperations({
   components: SavedComponent[];
   editingComponentId: string | null;
   selectedComponentId: string | null;
+  pendingDetections: PendingDetectionBox[];
+  setPendingDetections: React.Dispatch<React.SetStateAction<PendingDetectionBox[]>>;
+  setActiveDetectionId: React.Dispatch<React.SetStateAction<string | null>>;
   selectionToSubjectCoords: (box: CropBox) => CropBox | null;
   toOriginalCoords: (subjectBox: CropBox) => CropBox;
   updateComponents: (updater: (items: SavedComponent[]) => SavedComponent[]) => void;
@@ -101,40 +109,7 @@ export function useBuilderCutOperations({
       const subjectBox = selectionToSubjectCoords(selection);
       if (!subjectBox) return;
       const sourceBox = toOriginalCoords(subjectBox);
-      let dataUrl = activeSubject.url;
-
-      if (img) {
-        try {
-          await waitForImage(img);
-          // Snap the source rect to whole image pixels and copy it 1:1, so the
-          // cut never samples a sliver of the neighbouring pixels at its edge
-          // (the faint border the float source + nearest-neighbour produced).
-          const sx0 = Math.round(subjectBox.x);
-          const sy0 = Math.round(subjectBox.y);
-          const sw = Math.max(1, Math.round(subjectBox.w));
-          const sh = Math.max(1, Math.round(subjectBox.h));
-          const canvas = document.createElement("canvas");
-          canvas.width = sw;
-          canvas.height = sh;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) throw new Error("Canvas unavailable");
-          const radius = Math.min(subjectBox.r ?? 0, sw / 2, sh / 2);
-          ctx.imageSmoothingEnabled = false;
-          if (radius > 0) {
-            // Native roundRect = true circular arcs, matching the selection box
-            // outline so the saved cut's corners are exactly the previewed shape.
-            ctx.save();
-            ctx.beginPath();
-            ctx.roundRect(0, 0, sw, sh, radius);
-            ctx.clip();
-          }
-          ctx.drawImage(img, sx0, sy0, sw, sh, 0, 0, sw, sh);
-          if (radius > 0) ctx.restore();
-          dataUrl = await canvasToDataUrl(canvas, "image/png");
-        } catch {
-          dataUrl = activeSubject.url;
-        }
-      }
+      const dataUrl = await rasterizeCropBox(img, subjectBox, activeSubject.url);
 
       let processed: { tool: CutVariantTool; dataUrl: string } | null = null;
       if (postProcess) {
@@ -220,6 +195,70 @@ export function useBuilderCutOperations({
       updateComponents,
     ],
   );
+
+  // Commits every pending auto-detect box in one batch: rasterizes each region
+  // the same way saveSelection does, then creates all the cuts in a single
+  // updateComponents call so they land as one history entry.
+  const saveAllDetections = useCallback(async () => {
+    if (!canCrop || pendingDetections.length === 0) return;
+    const img = imgRef.current;
+    const parentId =
+      activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
+    const rootId = activeSubject.rootId ?? activeScopeId;
+    const createdAt = new Date().toISOString();
+
+    const created: SavedComponent[] = [];
+    for (const detection of pendingDetections) {
+      const subjectBox = selectionToSubjectCoords(detection.box);
+      if (!subjectBox) continue;
+      const sourceBox = toOriginalCoords(subjectBox);
+      const dataUrl = await rasterizeCropBox(img, subjectBox, activeSubject.url);
+      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+      created.push({
+        id: nextId,
+        name: detection.label || shortComponentName(nextId),
+        box: sourceBox,
+        dataUrl,
+        type: "PNG",
+        createdAt,
+        parentId,
+        kind: "cut",
+        rootId,
+      });
+    }
+    if (created.length === 0) return;
+
+    updateComponents((current) => [...created, ...current]);
+    setExpandedComponentIds((current) => {
+      const next = new Set(current);
+      next.add(parentId);
+      for (const c of created) next.add(c.id);
+      return next;
+    });
+    setSelectedComponentId(created[0].id);
+    setViewMode("component");
+    resetToolViewport();
+    setPendingDetections([]);
+    setActiveDetectionId(null);
+    cancelSelection();
+  }, [
+    activeScopeId,
+    activeSubject,
+    canCrop,
+    cancelSelection,
+    imgRef,
+    pendingDetections,
+    resetToolViewport,
+    rootComponent.id,
+    selectionToSubjectCoords,
+    setActiveDetectionId,
+    setExpandedComponentIds,
+    setPendingDetections,
+    setSelectedComponentId,
+    setViewMode,
+    toOriginalCoords,
+    updateComponents,
+  ]);
 
   // Rasterizes a closed pen silhouette into a transparent-PNG cut, mirroring
   // saveSelection's new-component path but clipping to the Bézier instead of a
@@ -366,6 +405,7 @@ export function useBuilderCutOperations({
     uploading,
     setUploading,
     saveSelection,
+    saveAllDetections,
     savePenCut,
     uploadImage,
     handleRemoveComponent,
