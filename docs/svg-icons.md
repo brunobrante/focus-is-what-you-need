@@ -46,51 +46,51 @@ vector tokens.
 ## Current state (what exists today)
 
 **The icon token (the live one).**
-`IconToken` in [`domain/system-design/types.ts:41`](../../apps/desktop/src/domain/system-design/types.ts) is
+`IconToken` in [`domain/system-design/types.ts:41`](../apps/desktop/src/domain/system-design/types.ts) is
 `{ id, name, glyph }`, where `glyph` is an emoji string. Seeded with
-`🔔 ⭐ ❤️ ✅` in [`domain/system-design/defaults.ts:110`](../../apps/desktop/src/domain/system-design/defaults.ts).
+`🔔 ⭐ ❤️ ✅` in [`domain/system-design/defaults.ts:110`](../apps/desktop/src/domain/system-design/defaults.ts).
 It is persisted per-row as a `TokenRow` (category `"icons"`) — not nested — via
 the system-design repo.
 
 > Note: a second, **legacy** icon shape `ProjectSystemIcon`
 > (`{ id, name, glyph, family }`) exists in
-> [`lib/storage/schema.ts:228`](../../apps/desktop/src/lib/storage/schema.ts) and is
-> seeded in [`lib/storage/defaults.ts:34`](../../apps/desktop/src/lib/storage/defaults.ts).
+> [`lib/storage/schema.ts:228`](../apps/desktop/src/lib/storage/schema.ts) and is
+> seeded in [`lib/storage/defaults.ts:34`](../apps/desktop/src/lib/storage/defaults.ts).
 > It is **not** what the Icons tab renders and should be treated as dead/parallel
 > — either delete it during this work or leave it untouched. The live path is
 > `IconToken`.
 
 **Where the glyph is consumed (every render site to update):**
 
-- [`components/system/CategoryGrid.tsx:174`](../../apps/desktop/src/components/system/CategoryGrid.tsx) — the Icons tab grid, renders `{ic.glyph}` as 22px text.
-- [`system-design/modals.tsx:137`](../../apps/desktop/src/system-design/modals.tsx) — `IconForm` create/edit: a text input (`maxLength=4`, placeholder `🔔`) + a 40px preview.
-- [`system-design/modals.tsx:306`](../../apps/desktop/src/system-design/modals.tsx) — token picker row, 18px glyph.
-- [`pages/NewProjectPage.tsx:294`](../../apps/desktop/src/pages/NewProjectPage.tsx) — 15px glyph swatch.
+- [`components/system/CategoryGrid.tsx:174`](../apps/desktop/src/components/system/CategoryGrid.tsx) — the Icons tab grid, renders `{ic.glyph}` as 22px text.
+- [`system-design/modals.tsx:137`](../apps/desktop/src/system-design/modals.tsx) — `IconForm` create/edit: a text input (`maxLength=4`, placeholder `🔔`) + a 40px preview.
+- [`system-design/modals.tsx:306`](../apps/desktop/src/system-design/modals.tsx) — token picker row, 18px glyph.
+- [`pages/NewProjectPage.tsx:294`](../apps/desktop/src/pages/NewProjectPage.tsx) — 15px glyph swatch.
 
 **The canvas vector pipeline (all already built — we reuse it):**
 
 - Element model: an `svg` node is a **container** (a `viewBox` + child `path`
   nodes); a `path` node holds one `VectorPath` (subpaths of bezier anchors).
-  [`canvas/engine/types.ts:66`](../../apps/desktop/src/canvas/engine/types.ts).
+  [`canvas/engine/types.ts:66`](../apps/desktop/src/canvas/engine/types.ts).
 - **Import:** `parseSvg(markup)` → sanitized structured `ImportedSvg`
-  ([`canvas/engine/vector/svgImport.ts`](../../apps/desktop/src/canvas/engine/vector/svgImport.ts)),
+  ([`canvas/engine/vector/svgImport.ts`](../apps/desktop/src/canvas/engine/vector/svgImport.ts)),
   then `insertSvgDocument()` builds the container + path nodes
-  ([`canvas/engine/mutations/vectorOps.ts:16`](../../apps/desktop/src/canvas/engine/mutations/vectorOps.ts)).
+  ([`canvas/engine/mutations/vectorOps.ts:16`](../apps/desktop/src/canvas/engine/mutations/vectorOps.ts)).
 - **Sanitize:** `sanitizeSvg()` strips `script`/`style`/`foreignObject`/`use`/
-  external refs ([`canvas/engine/vector/sanitizeSvg.ts`](../../apps/desktop/src/canvas/engine/vector/sanitizeSvg.ts)).
+  external refs ([`canvas/engine/vector/sanitizeSvg.ts`](../apps/desktop/src/canvas/engine/vector/sanitizeSvg.ts)).
 - **Export:** `pathToSvgPathData(path)` → `d` string
-  ([`canvas/engine/vector/pathData.ts`](../../apps/desktop/src/canvas/engine/vector/pathData.ts));
+  ([`canvas/engine/vector/pathData.ts`](../apps/desktop/src/canvas/engine/vector/pathData.ts));
   `svgForElement(document, nodeId)` → a standalone `<svg>` for a subtree
-  ([`lib/canvas/export/svgExport.ts`](../../apps/desktop/src/lib/canvas/export/svgExport.ts)).
+  ([`lib/canvas/export/svgExport.ts`](../apps/desktop/src/lib/canvas/export/svgExport.ts)).
 - **Edit:** pen/pencil, anchor/handle editing, boolean ops, and **bake-on-resize**
   (anchors are scaled in place — no `preserveAspectRatio="none"`, so strokes never
   distort). Path-edit mode (`pathEditId`) and isolation (`isolatedParentId`).
 - **Toolbar is injectable:** `<Toolbar config={...} />` takes a `ToolbarConfig`;
-  items filtered to `null` disappear ([`canvas/toolbarConfig.tsx:45`](../../apps/desktop/src/canvas/toolbarConfig.tsx), [`canvas/shell/Toolbar.tsx`](../../apps/desktop/src/canvas/shell/Toolbar.tsx)).
+  items filtered to `null` disappear ([`canvas/toolbarConfig.tsx:45`](../apps/desktop/src/canvas/toolbarConfig.tsx), [`canvas/shell/Toolbar.tsx`](../apps/desktop/src/canvas/shell/Toolbar.tsx)).
 - **Render is WKWebView-safe:** paths render as native inline `<svg><path>`; there
   is no `foreignObject`. (See [[project_wkwebview_no_foreignobject]].)
 - **Asset store:** `putAssetText` / `getAssetText` store SVG markup as UTF-8 blobs
-  with batched data-URL loading ([`application/persistence/assetStore.ts`](../../apps/desktop/src/application/persistence/assetStore.ts)).
+  with batched data-URL loading ([`application/persistence/assetStore.ts`](../apps/desktop/src/application/persistence/assetStore.ts)).
 
 **The canvas opens per query param**, and every persisted scene is **owned by a
 variant** (`sceneRecordId("variant", id)`). Icons are *not* screens/components,
@@ -134,7 +134,7 @@ Decisions:
 ## Authoring path 1 — Import an SVG
 
 Reuse the exact file-picker pattern already in `ImageForm`
-([`system-design/modals.tsx:208`](../../apps/desktop/src/system-design/modals.tsx),
+([`system-design/modals.tsx:208`](../apps/desktop/src/system-design/modals.tsx),
 `readFileAsDataUrl`), swapped to read text:
 
 1. `IconForm` gets an **Import SVG** dropzone (`<input type="file" accept=".svg,image/svg+xml">`).
@@ -222,7 +222,7 @@ rewrite hard-coded `fill` to `currentColor` behind a toggle. Not required for v1
 ## Consumption downstream (out of scope, note only)
 
 The canvas already has an aspect-locked `icon` element type
-([`canvas/engine/elementDefinitions.ts:72`](../../apps/desktop/src/canvas/engine/elementDefinitions.ts)).
+([`canvas/engine/elementDefinitions.ts:72`](../apps/desktop/src/canvas/engine/elementDefinitions.ts)).
 A natural follow-up is letting a canvas `icon` element *reference an icon token*
 and render its SVG (recolorable, crisp). Explicitly **not** part of this feature —
 list it in the backlog once icons are vectors.
@@ -263,13 +263,13 @@ the "draw it" path; 6 is polish.
 ## Product laws & docs to respect
 
 - Scenes are owned by variants — the icon editor must **not** create a scene
-  ([`CLAUDE.md`](../../CLAUDE.md) storage guardrails). Ephemeral document only.
+  ([`CLAUDE.md`](../CLAUDE.md) storage guardrails). Ephemeral document only.
 - Persist via `putRecord` / the system-design controller — never the port.
 - Native SVG only, no `foreignObject` ([[project_wkwebview_no_foreignobject]]).
 - No migrations; bump `SCHEMA_VERSION` and reseed ([[project_local_only_no_migrations]]).
-- **Update [`docs/UX.md`](../UX.md) before committing** — this adds the icon
+- **Update [`docs/UX.md`](UX.md) before committing** — this adds the icon
   import flow, the Draw/Edit actions, and the restricted `mode=icon` canvas.
-- Read [`Design.md`](../../Design.md) before building the dropzone/preview in the
+- Read [`Design.md`](../Design.md) before building the dropzone/preview in the
   modal and the tab grid cells.
 
 ## Testing
