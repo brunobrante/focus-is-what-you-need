@@ -1221,6 +1221,13 @@ of truth. The icon form offers two ways to author it:
   the token's) cached `svg`, so the tab reflects edits automatically. Deleting the
   icon (or its whole system design) cascade-deletes the master.
 
+**Icon color.** `currentColor` paints are preserved end-to-end: import keeps them
+as-is (never baked to a concrete color), the canvas renders them in the theme
+foreground (the same tint the Icons tab shows), and save-back writes
+`currentColor` back into the token's `svg` — so icons stay tintable and never
+"turn black" from an open→save round-trip. Explicit colors (`#hex`, `rgb()`)
+are preserved untouched; recoloring a path in the Inspector makes it concrete.
+
 ---
 
 ### 8a. Project System tab (project design system)

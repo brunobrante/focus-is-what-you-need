@@ -512,7 +512,10 @@ function ElementRendererImpl({
           width="100%"
           height="100%"
           viewBox={`0 0 ${Math.max(node.width, 1)} ${Math.max(node.height, 1)}`}
-          style={{ overflow: "visible", display: "block" }}
+          // Explicit color context so `currentColor` paints (fill/stroke) resolve to
+          // the theme foreground — the same tint the Icons tab shows — instead of
+          // whatever UI-chrome color happens to cascade into the stage DOM.
+          style={{ overflow: "visible", display: "block", color: "var(--text, #F2F2F2)" }}
         >
           <path
             d={pathToSvgPathData(node.path)}

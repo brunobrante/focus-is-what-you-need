@@ -269,10 +269,10 @@ export function parseSvg(markup: string): ImportedSvg | null {
       applyMatrixToPath(path, matrix);
       const styles: Partial<ElementStyles> = { ...cascaded };
       if (own.opacity !== undefined) styles.opacity = own.opacity;
-      // `currentColor` has no color context on import → resolve to black, matching
-      // Figma / paper.design. The vector stays fully recolorable afterwards.
-      if (styles.fill === "currentColor") styles.fill = "#000000";
-      if (styles.stroke === "currentColor") styles.stroke = "#000000";
+      // `currentColor` is kept AS-IS (svg-icons.md: icons stay tintable). Baking a
+      // concrete color here would round-trip into the icon token's svg and freeze
+      // it — the "icon always turns black" bug. The stage resolves it at render
+      // time via a CSS color context (see ElementRenderer's path branch).
       if (styles.fillRule) path.fillRule = styles.fillRule;
       counter += 1;
       paths.push({ path, styles, name: el.getAttribute("id") || `Path ${counter}` });
