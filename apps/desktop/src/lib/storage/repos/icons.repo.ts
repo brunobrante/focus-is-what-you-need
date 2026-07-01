@@ -32,6 +32,22 @@ import {
 const KEY = TABLES.icons;
 const VARIANTS_KEY = TABLES.variants;
 
+/**
+ * A blank icon artboard graph with a **transparent** background. Icons must not
+ * bake a white rect when serialized back (the SVG renderer emits `fill="none"`
+ * for a `"transparent"` frame). `createBlankHtmlCanvasDocument` hardcodes white,
+ * so override the root frame's fill.
+ */
+export function transparentIconArtboardGraphJSON(
+  name: string,
+  size: { width: number; height: number },
+): string {
+  const doc = createBlankHtmlCanvasDocument({ name, width: size.width, height: size.height });
+  const root = doc.nodes[0];
+  if (root) root.style = { ...root.style, background: "transparent" };
+  return serializeHtmlCanvasDocument(doc);
+}
+
 export async function listIcons(): Promise<IconRow[]> {
   return listTable<IconRow>(KEY);
 }
@@ -99,14 +115,7 @@ export async function createIcon(input: {
   await setOwner(input.owner, { type: "icon", id: iconId });
 
   const graphJSON =
-    input.sceneGraphJSON ??
-    serializeHtmlCanvasDocument(
-      createBlankHtmlCanvasDocument({
-        name: icon.name,
-        width: input.size.width,
-        height: input.size.height,
-      }),
-    );
+    input.sceneGraphJSON ?? transparentIconArtboardGraphJSON(icon.name, input.size);
   await upsertScene(
     { ownerType: "variant", ownerId: variantId, graphJSON },
     { propagate: false },

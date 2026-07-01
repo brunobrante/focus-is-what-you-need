@@ -248,18 +248,19 @@ header + sidebar), so the page itself is only the content column.
 
 - Content header: "Drafts" title with a count ("N drafts") on the left and a
   **New draft** button (→ `/new-draft`) on the right.
-- A responsive card grid. Each `DraftCard` shows a `Snapshot` of the draft's
-  scene, its name, and a meta line — **Screen · {Device}**, **Component**, or
-  **Icon** with a matching icon. Clicking the card (or its "Open in canvas" menu)
-  opens the global canvas; the card menu also offers **Delete draft** (instance-
-  aware, via the shared delete flow). A trailing `DashedAddTile` ("New draft")
-  closes the grid.
-- Empty state when there are no drafts.
+- A responsive card grid. Screen/component drafts render as `DraftCard`s and icon
+  drafts as `IconDraftCard`s — each shows a `Snapshot` of the draft's scene, its
+  name, and a meta line (**Screen · {Device}**, **Component**, or **Icon**) with a
+  matching glyph. Clicking a card (or its "Open in canvas" menu) opens the global
+  canvas; the card menu also offers **Delete draft**. A trailing `DashedAddTile`
+  ("New draft") closes the grid.
+- Empty state when there are no drafts of any kind.
 
-Drafts are stored as `ComponentRow`s with every scope owner null (no workspace,
-project, screen, or parent variant), tagged with `draftKind` ("screen" |
-"component" | "icon") and a `draftType` device. They never appear in project or
-workspace component views. A draft icon is just a small-frame draft edited on the
+Screen and component drafts are `ComponentRow`s with every scope owner null (no
+workspace, project, screen, or parent variant), tagged with `draftKind` ("screen"
+| "component") and a `draftType` device. An **icon draft is a loose `IconRow`**
+(its own entity, never a component) with no owner edge — so it, too, never appears
+in any component view. A draft icon is just a small icon master edited on the
 normal canvas; it is not (yet) a system-design token — pulling a draft icon into a
 System Design is a separate, later flow. (Not to be confused with the canvas
 **Sketch** window — the free scratch surface inside the editor.)

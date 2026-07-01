@@ -35,6 +35,7 @@ import {
 } from "@/lib/storage/repos/variants.repo";
 import type {
   ComponentRow,
+  IconRow,
   OwnerType,
   ProjectRow,
   ReferenceRow,
@@ -45,6 +46,7 @@ import type {
   VariantRow,
   WorkspaceRow,
 } from "@/lib/storage/schema";
+import { listDraftIcons } from "@/lib/storage/repos/icons.repo";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 import { TABLES, type TableKey, subscribe } from "@/lib/storage/store";
 
@@ -300,6 +302,16 @@ export function useDrafts(): State<ComponentRow[]> {
   return useTableQuery<ComponentRow[]>(
     [TABLES.components],
     async () => listDrafts(),
+    [],
+    [],
+  );
+}
+
+/** Loose icon masters (no owner edge) — the Draft icons shown on the Drafts page. */
+export function useDraftIcons(): State<IconRow[]> {
+  return useTableQuery<IconRow[]>(
+    [TABLES.icons],
+    async () => listDraftIcons(),
     [],
     [],
   );

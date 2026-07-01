@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { ProjectType } from "@/lib/data/types";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import { createComponent } from "@/lib/storage/repos/components.repo";
+import { createIcon } from "@/lib/storage/repos/icons.repo";
 
 /** What the user is drafting: a top-level Screen, a free-size Component, or an Icon. */
 export type DraftKind = "screen" | "component" | "icon";
@@ -130,18 +131,24 @@ export function useNewDraft(): NewDraftState {
     setCreating(true);
     setError(null);
     try {
-      const { component } = await createComponent({
-        parent: { kind: "draft" },
-        name: trimmed,
-        draftKind: kind,
-        draftType,
-        width: size.width,
-        height: size.height,
-      });
+      // A draft icon is its own entity (a loose `IconRow`), never a component —
+      // so it stays out of the component browser and linkable picker. Screens and
+      // components stay `ComponentRow`s.
+      const variantId =
+        kind === "icon"
+          ? (await createIcon({ owner: null, name: trimmed, size })).variant.id
+          : (
+              await createComponent({
+                parent: { kind: "draft" },
+                name: trimmed,
+                draftKind: kind,
+                draftType,
+                width: size.width,
+                height: size.height,
+              })
+            ).component.activeVariantId;
       // Drafts open in the global canvas by their variant alone — no project.
-      navigate(
-        `/canvas?variant=${encodeURIComponent(component.activeVariantId)}&type=${draftType}`,
-      );
+      navigate(`/canvas?variant=${encodeURIComponent(variantId)}&type=${draftType}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create draft");
       setCreating(false);

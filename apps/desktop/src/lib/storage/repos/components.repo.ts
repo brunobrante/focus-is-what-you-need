@@ -296,7 +296,7 @@ export async function createComponent(input: {
   width?: number | null;
   height?: number | null;
   // Draft markers, set only when parent.kind === "draft".
-  draftKind?: "screen" | "component" | "icon" | null;
+  draftKind?: "screen" | "component" | null;
   draftType?: ProjectType | null;
 }): Promise<{ component: ComponentRow; defaultVariant: VariantRow }> {
   const trimmedName = input.name.trim();

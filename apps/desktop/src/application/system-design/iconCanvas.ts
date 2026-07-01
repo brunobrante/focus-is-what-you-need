@@ -2,11 +2,12 @@ import type { NavigateFunction } from "react-router-dom";
 import type { IconToken, SystemDesignRow } from "@/lib/storage/schema";
 import type { SystemDesignController } from "@/application/system-design/useSystemDesign";
 import type { EntityRef } from "@/domain/graph/edges";
-import { createIcon, getIcon, updateIconArt } from "@/lib/storage/repos/icons.repo";
 import {
-  createBlankHtmlCanvasDocument,
-  serializeHtmlCanvasDocument,
-} from "@/lib/canvas/htmlScene";
+  createIcon,
+  getIcon,
+  updateIconArt,
+  transparentIconArtboardGraphJSON,
+} from "@/lib/storage/repos/icons.repo";
 import {
   canvasDocumentFromHtmlGraphJSON,
   htmlGraphJSONFromCanvasDocument,
@@ -19,23 +20,6 @@ import { getSystemDesign, saveSystemDesign } from "@/lib/storage/repos/systemDes
 const DEFAULT_ICON_SIZE = { width: 24, height: 24 };
 
 /**
- * A blank icon artboard graph with a **transparent** background — icons must not
- * bake a white rect when serialized back (the SVG renderer emits `fill="none"`
- * for a `"transparent"` frame). `createBlankHtmlCanvasDocument` hardcodes white,
- * so override the root frame's fill.
- */
-function blankIconGraph(name: string, size: { width: number; height: number }): string {
-  const doc = createBlankHtmlCanvasDocument({ name, width: size.width, height: size.height });
-  const root = doc.nodes[0];
-  if (root) {
-    // The renderer emits `fill="none"` only for a "transparent" background; the
-    // read-path (`normalizeNode`) preserves `style.background`, so this survives.
-    root.style = { ...root.style, background: "transparent" };
-  }
-  return serializeHtmlCanvasDocument(doc);
-}
-
-/**
  * Build the seed scene graph for a fresh icon master: a transparent artboard,
  * plus the icon's existing vector art inserted when it already has an `svg` (so
  * opening it on the canvas shows the current icon rather than a blank frame).
@@ -45,7 +29,7 @@ export function buildIconSceneGraphJSON(
   size: { width: number; height: number },
   svg: string | null | undefined,
 ): string {
-  const blankGraph = blankIconGraph(name, size);
+  const blankGraph = transparentIconArtboardGraphJSON(name, size);
   const imported = svg ? parseSvg(svg) : null;
   if (!imported) return blankGraph;
   const doc = canvasDocumentFromHtmlGraphJSON(blankGraph, { promoteSubjectRoot: true });
@@ -109,7 +93,9 @@ export async function openIconInCanvas({
     size,
     svg: token.svg ?? null,
     viewBox: token.viewBox ?? null,
-    sceneGraphJSON: buildIconSceneGraphJSON(token.name, size, token.svg),
+    // Seed the artboard with the icon's current art when it already has one; a
+    // token with no svg falls through to createIcon's blank transparent artboard.
+    sceneGraphJSON: token.svg ? buildIconSceneGraphJSON(token.name, size, token.svg) : undefined,
   });
 
   const linked: IconToken = { ...token, iconId: icon.id };
