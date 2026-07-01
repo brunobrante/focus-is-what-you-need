@@ -53,7 +53,6 @@ import { growPenPath, penBounds, penPathFromPolygon } from "../engine/pen";
 import { componentBoxes, foregroundBoundingBox, simplifyPath } from "../engine/contour";
 import { computeEdgeMargins, computeSpacing } from "../engine/measure";
 import { nextRingInset } from "../engine/radialRings";
-import { snapAspect } from "../engine/aspectSnap";
 import { CLASSIC_CV_MODEL_ID } from "@/lib/models/modelCatalog";
 import type { MeasureOverlay } from "../engine/types";
 import { useBuilderCanvasPainter } from "./useBuilderCanvasPainter";
@@ -573,36 +572,6 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       // Rectangle: snap the box to ALL significant foreground (the whole word /
       // multi-part subject, not just the largest blob), keeping the radius.
       if (selection && selectionCrop) {
-        // Commits a subject-space box as the new selection: snaps near-clean
-        // proportions onto the exact ratio (a 547×546 square → 547×547, undoing
-        // the 1px the anti-aliased edge cost it) keeping the centre, then maps
-        // subject → content px and clamps the radius. Returns false if degenerate.
-        const commitSubjectBox = (sx: number, sy: number, sw: number, sh: number): boolean => {
-          const snap = snapAspect(sw, sh);
-          let bx = sx;
-          let by = sy;
-          let bw = sw;
-          let bh = sh;
-          if (snap) {
-            bx -= (snap.w - sw) / 2;
-            by -= (snap.h - sh) / 2;
-            bw = snap.w;
-            bh = snap.h;
-          }
-          const w = bw * fx;
-          const h = bh * fy;
-          if (w < 1 || h < 1) return false;
-          setSelection({
-            x: bx * fx,
-            y: by * fy,
-            w,
-            h,
-            r: Math.min(selection.r ?? 0, w / 2, h / 2),
-          });
-          setSelectionLocked(true);
-          return true;
-        };
-
         // Round/concentric subjects first (badges, coins, circular logos): SAM
         // fills the whole disc, so its bounds barely move and the crop looks
         // stuck. Read the crop radially and peel to the next ring inward — runs
@@ -610,8 +579,18 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         const ras = rasterizeGray(img, selectionCrop);
         const inset = ras ? nextRingInset(ras.gray, ras.width, ras.height) : null;
         if (inset != null) {
-          const sb = selectionCrop;
-          if (commitSubjectBox(sb.x + inset, sb.y + inset, sb.w - 2 * inset, sb.h - 2 * inset)) {
+          const di = inset * fx; // crop-local subject px → content px
+          const w = selection.w - 2 * di;
+          const h = selection.h - 2 * di;
+          if (w >= 1 && h >= 1) {
+            setSelection({
+              x: selection.x + di,
+              y: selection.y + di,
+              w,
+              h,
+              r: Math.min(selection.r ?? 0, w / 2, h / 2),
+            });
+            setSelectionLocked(true);
             return;
           }
         }
@@ -621,7 +600,17 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
         const bb = foregroundBoundingBox(result.mask.data, result.mask.width, result.mask.height);
         if (!bb) return;
         // Mask is crop-local at subject resolution → subject → content coords.
-        if (!commitSubjectBox(bb.x + result.box.x, bb.y + result.box.y, bb.w, bb.h)) return;
+        const w = bb.w * fx;
+        const h = bb.h * fy;
+        if (w < 1 || h < 1) return;
+        setSelection({
+          x: (bb.x + result.box.x) * fx,
+          y: (bb.y + result.box.y) * fy,
+          w,
+          h,
+          r: Math.min(selection.r ?? 0, w / 2, h / 2),
+        });
+        setSelectionLocked(true);
         clearSegmentation();
       }
     },
