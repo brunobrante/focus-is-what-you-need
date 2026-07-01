@@ -110,9 +110,90 @@ function shapeElementToPath(el: Element): VectorPath | null {
   }
 }
 
-function translatePath(path: VectorPath, dx: number, dy: number): void {
-  if (dx === 0 && dy === 0) return;
-  for (const sub of path.subpaths) for (const a of sub.anchors) { a.x += dx; a.y += dy; }
+// ─── Affine transforms ────────────────────────────────────────────────────────
+// A 2×3 matrix [a,b,c,d,e,f] mapping a point (x,y) → (a·x + c·y + e, b·x + d·y + f).
+// Handles are RELATIVE vectors, so only the linear part [a,b,c,d] applies to them.
+
+type Mat = [number, number, number, number, number, number];
+const IDENTITY: Mat = [1, 0, 0, 1, 0, 0];
+
+function matMul(A: Mat, B: Mat): Mat {
+  return [
+    A[0] * B[0] + A[2] * B[1],
+    A[1] * B[0] + A[3] * B[1],
+    A[0] * B[2] + A[2] * B[3],
+    A[1] * B[2] + A[3] * B[3],
+    A[0] * B[4] + A[2] * B[5] + A[4],
+    A[1] * B[4] + A[3] * B[5] + A[5],
+  ];
+}
+
+// Parse an SVG `transform` list (translate/scale/rotate/skewX/skewY/matrix), applied
+// left-to-right to the coordinate system → point' = M₁·M₂·…·p.
+function parseTransform(value: string | null): Mat {
+  if (!value) return IDENTITY;
+  let m: Mat = IDENTITY;
+  const re = /(\w+)\s*\(([^)]*)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(value)) !== null) {
+    const name = match[1];
+    const a = match[2].match(/-?\d*\.?\d+(?:[eE][-+]?\d+)?/g)?.map(Number) ?? [];
+    let t: Mat | null = null;
+    switch (name) {
+      case "matrix":
+        if (a.length === 6) t = [a[0], a[1], a[2], a[3], a[4], a[5]];
+        break;
+      case "translate":
+        t = [1, 0, 0, 1, a[0] ?? 0, a[1] ?? 0];
+        break;
+      case "scale":
+        t = [a[0] ?? 1, 0, 0, a[1] ?? a[0] ?? 1, 0, 0];
+        break;
+      case "rotate": {
+        const rad = ((a[0] ?? 0) * Math.PI) / 180;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        const rot: Mat = [cos, sin, -sin, cos, 0, 0];
+        if (a.length >= 3) {
+          // rotate about (cx,cy): translate(c)·rotate·translate(-c)
+          const cx = a[1], cy = a[2];
+          t = matMul(matMul([1, 0, 0, 1, cx, cy], rot), [1, 0, 0, 1, -cx, -cy]);
+        } else {
+          t = rot;
+        }
+        break;
+      }
+      case "skewX":
+        t = [1, 0, Math.tan(((a[0] ?? 0) * Math.PI) / 180), 1, 0, 0];
+        break;
+      case "skewY":
+        t = [1, Math.tan(((a[0] ?? 0) * Math.PI) / 180), 0, 1, 0, 0];
+        break;
+    }
+    if (t) m = matMul(m, t);
+  }
+  return m;
+}
+
+// Bake a matrix into a path: points by the full affine, handles by the linear part.
+function applyMatrixToPath(path: VectorPath, m: Mat): void {
+  const [a, b, c, d, e, f] = m;
+  for (const sub of path.subpaths) {
+    for (const p of sub.anchors) {
+      const x = p.x, y = p.y;
+      p.x = a * x + c * y + e;
+      p.y = b * x + d * y + f;
+      if (p.inX !== undefined || p.inY !== undefined) {
+        const ix = p.inX ?? 0, iy = p.inY ?? 0;
+        p.inX = a * ix + c * iy;
+        p.inY = b * ix + d * iy;
+      }
+      if (p.outX !== undefined || p.outY !== undefined) {
+        const ox = p.outX ?? 0, oy = p.outY ?? 0;
+        p.outX = a * ox + c * oy;
+        p.outY = b * ox + d * oy;
+      }
+    }
+  }
 }
 
 /** Parse SVG markup into a structured, sanitized representation. */
@@ -134,18 +215,22 @@ export function parseSvg(markup: string): ImportedSvg | null {
 
   const paths: ImportedPath[] = [];
   let counter = 0;
-  const walk = (el: Element): void => {
+  const walk = (el: Element, parentMatrix: Mat): void => {
+    // Accumulate this element's own transform onto the inherited one.
+    const matrix = matMul(parentMatrix, parseTransform(el.getAttribute("transform")));
     const path = shapeElementToPath(el);
     if (path && path.subpaths.some((s) => s.anchors.length > 0)) {
-      translatePath(path, -minX, -minY);
+      applyMatrixToPath(path, matrix);
       const styles = readStyles(el);
       if (styles.fillRule) path.fillRule = styles.fillRule;
       counter += 1;
       paths.push({ path, styles, name: el.getAttribute("id") || `Path ${counter}` });
     }
-    for (const child of Array.from(el.children)) walk(child);
+    for (const child of Array.from(el.children)) walk(child, matrix);
   };
-  for (const child of Array.from(svg.children)) walk(child);
+  // Seed with the viewBox origin offset so shapes normalize to a 0-based box.
+  const base: Mat = [1, 0, 0, 1, -minX, -minY];
+  for (const child of Array.from(svg.children)) walk(child, base);
 
   if (paths.length === 0) return null;
   return { viewBox: { width: vbW, height: vbH }, paths };
