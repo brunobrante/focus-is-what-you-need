@@ -233,6 +233,15 @@ export function useCanvasPointerEvents({
     return () => window.removeEventListener("paste", onPaste);
   }, [dispatch, latestStateRef]);
 
+  // The free-space cursor is normally rewritten only on pointer move, so switching
+  // tools without moving the mouse would leave a stale cursor (e.g. the pen cursor
+  // lingering after switching to select). Sync it to the new tool on every change. B11.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || interactionRef.current) return;
+    viewport.style.cursor = state.tool === "pen" ? PEN_CURSOR : state.tool === "pencil" ? "crosshair" : "";
+  }, [state.tool, viewportRef]);
+
   // Drop a photo/image file onto the frame → a new Image element holding that
   // file (planned/canvas-image-drop.md). Async because we decode the file into a
   // data URL and read its natural size before placing the node.
