@@ -20,6 +20,8 @@ import {
   putRecord,
   removeRecords,
 } from "@/lib/storage/store";
+import { deleteComponentTree } from "@/lib/storage/repos/components.repo";
+import { setComponentOwner } from "@/application/graph/ownership";
 
 const KEY = TABLES.systemDesigns;
 const TOKENS_KEY = TABLES.tokens;
@@ -99,6 +101,21 @@ function tokenRowIdsForDesigns(designIds: Iterable<string>): string[] {
   return peekTable<TokenRow>(TOKENS_KEY)
     .filter((row) => ids.has(row.systemDesignId))
     .map((row) => row.id);
+}
+
+/**
+ * Backing component ids of the *owned* icon tokens of the given designs. Linked
+ * instances (`instanceOf`) are skipped — their backing belongs to the master's
+ * design, not here — so deleting a project design never removes a workspace
+ * icon's art.
+ */
+function iconBackingIdsForDesigns(designIds: Iterable<string>): string[] {
+  const ids = new Set(designIds);
+  return peekTable<TokenRow>(TOKENS_KEY)
+    .filter((row) => ids.has(row.systemDesignId) && row.category === "icons")
+    .map((row) => row.token as { backingComponentId?: string; instanceOf?: unknown })
+    .filter((token) => !token.instanceOf && Boolean(token.backingComponentId))
+    .map((token) => token.backingComponentId!);
 }
 
 /** Persist the design row itself, with `tokens` stripped (tokens are rows). */
@@ -242,9 +259,20 @@ export async function getSystemDesign(id: string): Promise<SystemDesignRow | nul
 }
 
 export function deleteSystemDesign(id: string): void {
+  // Cascade the icon backings first (each owned icon token owns a backing
+  // component holding its editable art) so the components/variants/scenes don't
+  // leak when their token rows disappear. Fire-and-forget: the async subtree
+  // removal can trail the synchronous row deletes.
+  const backingIds = iconBackingIdsForDesigns([id]);
   removeRecords(KEY, [id]);
   const tokenIds = tokenRowIdsForDesigns([id]);
   if (tokenIds.length > 0) removeRecords(TOKENS_KEY, tokenIds);
+  for (const backingId of backingIds) {
+    void (async () => {
+      await setComponentOwner(backingId, null);
+      await deleteComponentTree(backingId);
+    })();
+  }
 }
 
 type LinkableToken = {

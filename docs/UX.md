@@ -1205,11 +1205,13 @@ of truth. The icon form offers two ways to author it:
   capped at 64 KB) with an inline preview, saved directly to the token.
 - **Draw / Edit in canvas** — a button in the form (and the per-icon **Edit in
   canvas** tile action) opens the icon's art on the **normal canvas**. The art
-  lives in an ownerless **draft** component (a variant-owned scene, created
-  lazily), so the icon opens by variant just like a draft — there is **no
-  special editor mode or route**. Every scene save serializes the artboard back
-  into the token's cached `svg`, so the tab reflects edits automatically. These
-  icon-backing drafts are hidden from the `/drafts` list.
+  lives in a backing component (a variant-owned scene, created lazily) **owned by
+  the icon token** (`token owns component`), so the icon opens by variant just
+  like a draft — there is **no special editor mode or route** — while its origin
+  stays unambiguous and it never appears in the `/drafts` list. Every scene save
+  serializes the artboard back into the token's cached `svg`, so the tab reflects
+  edits automatically. Deleting the icon (or its whole system design) cascade-
+  deletes the backing.
 
 ---
 

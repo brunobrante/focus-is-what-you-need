@@ -1,7 +1,12 @@
 import type { NavigateFunction } from "react-router-dom";
 import type { IconToken } from "@/lib/storage/schema";
 import type { SystemDesignController } from "@/application/system-design/useSystemDesign";
-import { createComponent, getComponent } from "@/lib/storage/repos/components.repo";
+import {
+  createComponent,
+  deleteComponentTree,
+  getComponent,
+} from "@/lib/storage/repos/components.repo";
+import { setComponentOwner } from "@/application/graph/ownership";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
 import {
   createBlankHtmlCanvasDocument,
@@ -15,11 +20,6 @@ import { parseSvg } from "@/canvas/engine/vector/svgImport";
 import { insertSvgDocument } from "@/canvas/engine/mutations/vectorOps";
 import { sanitizeSvg } from "@/canvas/engine/vector/sanitizeSvg";
 import { getSystemDesign, saveSystemDesign } from "@/lib/storage/repos/systemDesigns.repo";
-
-// Reserved `ComponentRow.category` marking the ownerless draft components that
-// back icon tokens, so they can be filtered out of the Home "Drafts" list. See
-// `listDrafts` in components.repo.ts.
-export const ICON_BACKING_CATEGORY = "system-icon";
 
 const DEFAULT_ICON_SIZE = { width: 24, height: 24 };
 
@@ -71,12 +71,15 @@ async function seedBackingScene(
 }
 
 /**
- * Open an icon token's editable art on the canvas. The art lives in an ownerless
- * *draft* component (a real component + Default variant owning a real scene) —
- * the same pattern as `useNewDraft` — so the icon opens in the normal canvas by
- * variant, with no special editor mode. The backing component is created lazily
- * and linked back onto the token; the token's cached `svg` is refreshed by the
- * canvas save-back keyed on the `icon`/`systemDesign` query params.
+ * Open an icon token's editable art on the canvas. The art lives in a backing
+ * component (a real component + Default variant owning a real scene) **owned by
+ * the token** via a `token owns component` edge — so the icon's origin is
+ * unambiguous (Product.md law 11) and it never shows up as a loose draft. The
+ * icon opens in the normal canvas by variant, with no special editor mode. The
+ * backing is created lazily and linked back onto the token; the token's cached
+ * `svg` is refreshed by the canvas save-back keyed on the `icon`/`systemDesign`
+ * query params. Deleting the token (or its design) cascade-deletes the backing
+ * via `deleteIconBacking`.
  */
 export async function openIconInCanvas({
   token,
@@ -103,13 +106,11 @@ export async function openIconInCanvas({
   }
 
   const { component, defaultVariant } = await createComponent({
-    parent: { kind: "draft" },
-    // A unique, stable name avoids the draft sibling name-collision throw and is
-    // never user-visible (backings are hidden from the Drafts list).
+    // The token owns its editable art — an unambiguous origin, not a loose draft.
+    parent: { kind: "token", tokenId: token.id },
+    // A unique, stable name is never user-visible (the backing is reachable only
+    // through the token, never listed on its own).
     name: `icon:${token.id}`,
-    category: ICON_BACKING_CATEGORY,
-    draftKind: "component",
-    draftType: "desktop",
     width: size.width,
     height: size.height,
   });
@@ -172,6 +173,18 @@ export async function writeIconSvgBack(
 
   const nextIcons = icons.map((t, i) => (i === idx ? nextIcon : t));
   saveSystemDesign({ ...design, tokens: { ...design.tokens, icons: nextIcons } });
+}
+
+/**
+ * Cascade-delete an icon token's backing component. Removing the token (or its
+ * whole design) must not leak the backing component/variant/scene. Tombstones the
+ * `token owns component` edge first, then removes the component subtree. Safe to
+ * call with a stale id (a since-deleted backing is a no-op). Never call this for a
+ * *linked instance* of an icon — that would delete the master's art from a project.
+ */
+export async function deleteIconBacking(backingComponentId: string): Promise<void> {
+  await setComponentOwner(backingComponentId, null);
+  await deleteComponentTree(backingComponentId);
 }
 
 function iconCanvasUrl(variantId: string, tokenId: string, designId: string): string {

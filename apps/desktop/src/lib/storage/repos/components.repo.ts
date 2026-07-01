@@ -80,6 +80,8 @@ function parentOwnerRef(
     }
     case "variant":
       return { type: "variant", id: parent.variantId };
+    case "token":
+      return { type: "token", id: parent.tokenId };
     case "draft":
       return null;
   }
@@ -101,6 +103,9 @@ export type ComponentParent =
   | { kind: "project"; projectId: string }
   | { kind: "screen"; screenId: string }
   | { kind: "variant"; variantId: string }
+  // A System Design icon token owning its editable vector art (`token owns
+  // component`). The backing lives with the token, not as a loose draft.
+  | { kind: "token"; tokenId: string }
   // A loose, project-less draft: every scope owner is null. Born from Home.
   | { kind: "draft" };
 
@@ -114,11 +119,10 @@ export async function listDrafts(): Promise<ComponentRow[]> {
   const rows = await listComponents();
   return rows
     .filter((r) => {
-      // A draft has no owner edge and no home pointer (workspace/project).
+      // A draft has no owner edge and no home pointer (workspace/project). An
+      // icon's editable art is now owned by its token (`token owns component`),
+      // so it carries an owner edge and never reaches here — no sentinel needed.
       if (peekOwnerOf("component", r.id)) return false;
-      // Ownerless components that merely BACK an icon token are an implementation
-      // detail, not user-facing drafts — hide them (see ICON_BACKING_CATEGORY).
-      if (r.category === "system-icon") return false;
       return !r.workspaceId && !r.projectId;
     })
     .sort((a, b) => b.updatedAt - a.updatedAt);

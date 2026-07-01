@@ -3,16 +3,23 @@
 > **Status: implemented — with one deliberate deviation.** Phases 1–2 (vector
 > `IconToken`, seeds, `IconGlyph`, import) shipped as written. The canvas
 > authoring path (Phases 3–5) was **not** built as a bespoke ephemeral
-> `mode=icon` canvas. Instead, drawing/editing an icon reuses the existing
-> **draft** pattern: the art is an ownerless draft component (a variant-owned
-> scene) opened in the *normal* canvas by `/canvas?variant=…`, and the token
+> `mode=icon` canvas. Instead, drawing/editing an icon reuses the *normal* canvas
+> by `/canvas?variant=…`: the art is a real variant-owned scene, and the token
 > caches a serialized `<svg>` refreshed by a save-back keyed on
 > `icon=<tokenId>&systemDesign=<designId>` query params. This honors "variants
 > own scenes" without a special editor mode. The restricted toolbar / chrome
-> gating was dropped (it would fight the "same as drafts" pattern). See
+> gating was dropped (it would fight the "same as the canvas" pattern).
+>
+> **Ownership correction (post-first-cut).** The first implementation made the
+> backing component an *ownerless draft* (hidden from `/drafts` via a
+> `system-icon` category sentinel), linked to the token only by a one-way
+> `backingComponentId` pointer. That violated law 11 (origin must be
+> unambiguous) and leaked the component/variant/scene when the token or design
+> was deleted. The backing is now **owned by the token** (`token owns component`
+> edge, `ComponentParent.kind === "token"`); the sentinel is gone, and deleting a
+> token or a whole design cascade-deletes the backing (`deleteIconBacking`). See
 > `application/system-design/iconCanvas.ts` and `docs/UX.md` § 8. The
-> "Authoring path 2" section below is retained for history but is **superseded**
-> by the draft-backed design.
+> "Authoring path 2" section below is retained for history but is **superseded**.
 
 Replace the emoji-glyph icons in the system-design **Icons** tab with real,
 vector **SVG icons**. A user can either **import** an existing `.svg` file or
