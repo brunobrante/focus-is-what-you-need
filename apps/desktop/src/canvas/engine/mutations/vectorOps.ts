@@ -56,15 +56,20 @@ function pathNodeFromImported(
  * the paths are the top-level, individually-editable content, so the layers tree
  * shows them directly and the icon exports the whole artboard.
  */
-export function insertSvgPathsAsRoot(doc: CanvasDocument, imported: ImportedSvg): CanvasDocument {
+export function insertSvgPathsAsRoot(
+  doc: CanvasDocument,
+  imported: ImportedSvg,
+): { document: CanvasDocument; pathIds: string[] } {
   const next = cloneDocument(doc);
   const { width: vbW, height: vbH } = imported.viewBox;
+  const pathIds: string[] = [];
   for (const ip of imported.paths) {
     const node = pathNodeFromImported(ip, null, vbW, vbH);
     next.elements[node.id] = node;
     next.rootIds.push(node.id);
+    pathIds.push(node.id);
   }
-  return next;
+  return { document: next, pathIds };
 }
 
 /** Insert a parsed SVG as a sealed container node with child path nodes. */

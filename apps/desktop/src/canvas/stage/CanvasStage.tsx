@@ -50,6 +50,7 @@ export function CanvasStage({
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
   onBackToParentShortcut,
+  isIconSubject = false,
 }: {
   draftMode?: boolean;
   activeTool?: string;
@@ -59,6 +60,8 @@ export function CanvasStage({
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
   onBackToParentShortcut?: () => boolean | void;
+  // Icon-master canvas: SVG paste decomposes into root paths (see useCanvasPointerEvents).
+  isIconSubject?: boolean;
 }) {
   const { state, dispatch, clipboard } = useEditor();
   const hoverStore = useHoverStore();
@@ -333,6 +336,7 @@ export function CanvasStage({
     settings,
     fontTokens,
     navigableBounds,
+    isIconSubject,
   });
   cancelActiveInteractionRef.current = cancelActiveInteraction;
 

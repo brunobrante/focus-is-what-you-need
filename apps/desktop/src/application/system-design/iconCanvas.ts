@@ -36,7 +36,7 @@ export function buildIconSceneGraphJSON(
   if (!doc) return blankGraph;
   // The artboard IS the icon's SVG: the paths are its direct children (no sealed
   // container), so the tree shows the paths and the whole artboard is the icon.
-  const document = insertSvgPathsAsRoot(doc, imported);
+  const { document } = insertSvgPathsAsRoot(doc, imported);
   return htmlGraphJSONFromCanvasDocument(document, blankGraph, name);
 }
 

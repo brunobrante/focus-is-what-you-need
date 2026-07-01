@@ -90,6 +90,7 @@ export function CanvasRender({
   projectType = "desktop",
   parentTarget,
   isComponent = false,
+  isIconSubject = false,
   referencesContext = null,
   ancestorFrames = [],
   shellControls = DEFAULT_SHELL_CONTROLS_BY_WINDOW,
@@ -127,6 +128,8 @@ export function CanvasRender({
   projectType?: ProjectType;
   parentTarget?: CanvasParentTarget | null;
   isComponent?: boolean;
+  // The Current subject is an icon master (SVG paste lands as root paths there).
+  isIconSubject?: boolean;
   referencesContext?: CanvasReferencesContext | null;
   ancestorFrames?: AncestorFrame[];
   shellControls?: ShellControlsByWindow;
@@ -216,6 +219,7 @@ export function CanvasRender({
       projectType={projectType}
       parentTarget={parentTarget}
       isComponent={isComponent}
+      isIconSubject={isIconSubject}
       ancestorFrames={ancestorFrames}
       shellDeviceVisibility={deviceVisFor("current")}
       shellBackVisibility={shellControls.current.back}

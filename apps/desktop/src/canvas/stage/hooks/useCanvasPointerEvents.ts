@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { getCommonParentId, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/canvas/engine/hitTesting";
-import { insertSvgDocument } from "@/canvas/engine/actions";
+import { insertSvgDocument, insertSvgPathsAsRoot } from "@/canvas/engine/actions";
 import { parseSvg } from "@/canvas/engine/vector/svgImport";
 import type { ElementFontTokens, EditorState, Point, Rect } from "@/canvas/engine/types";
 import { isInsertTool, isSelectionTool } from "@/canvas/engine/types";
@@ -134,6 +134,9 @@ type Params = {
   // screen simulator is on, or null when off. Threaded to the pan handler so
   // space/middle-drag panning can reach the whole device, not just the component.
   navigableBounds?: Rect | null;
+  // The subject is an icon master: pasted SVG decomposes into root-level paths
+  // (the artboard IS the svg) instead of a sealed svg container.
+  isIconSubject?: boolean;
 };
 
 export type CanvasPointerEventsResult = {
@@ -176,6 +179,7 @@ export function useCanvasPointerEvents({
   settings = DEFAULT_GLOBAL_SETTINGS,
   fontTokens,
   navigableBounds,
+  isIconSubject = false,
 }: Params): CanvasPointerEventsResult {
   const dropTargetRef = useRef<CanvasDropTarget | null>(null);
   // Last free-space hover position (client coords), so we can re-evaluate the
@@ -214,6 +218,8 @@ export function useCanvasPointerEvents({
   });
 
   // System-clipboard SVG paste → decompose into a sealed svg node (Versioning §8).
+  // On an icon canvas the artboard IS the svg, so the paths land directly at the
+  // root instead (no sealed container — they show and edit like drawn paths).
   // Internal element paste (Cmd+V of copied elements) is handled separately in the
   // keyboard hook; this only fires when the clipboard holds raw SVG markup.
   useEffect(() => {
@@ -227,6 +233,11 @@ export function useCanvasPointerEvents({
       if (!parsed) return;
       event.preventDefault();
       const doc = latestStateRef.current.document;
+      if (isIconSubject) {
+        const { document: nextDocument, pathIds } = insertSvgPathsAsRoot(doc, parsed);
+        dispatch({ type: "commitDocument", document: nextDocument, selectedIds: pathIds });
+        return;
+      }
       const cx = doc.canvas.width / 2 - parsed.viewBox.width / 2;
       const cy = doc.canvas.height / 2 - parsed.viewBox.height / 2;
       const { document: nextDocument, svgId } = insertSvgDocument(doc, parsed, roundPixel(cx), roundPixel(cy));
@@ -234,7 +245,7 @@ export function useCanvasPointerEvents({
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [dispatch, latestStateRef]);
+  }, [dispatch, latestStateRef, isIconSubject]);
 
   // The free-space cursor is normally rewritten only on pointer move, so switching
   // tools without moving the mouse would leave a stale cursor (e.g. the pen cursor

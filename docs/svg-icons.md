@@ -145,8 +145,10 @@ Reuse the exact file-picker pattern already in `ImageForm`
 4. Preview the sanitized `<svg>` inline in the modal.
 5. Save writes `{ svg, viewBox, name }` to the token.
 
-Also wire the same accept path into canvas paste/drop for icons later, but that
-is out of scope here — the tab importer is the deliverable.
+Canvas paste is wired too: pasting raw SVG on an **icon master's canvas**
+decomposes it into root-level `path` elements via `insertSvgPathsAsRoot` (the
+artboard IS the svg — no sealed container), unlike the normal canvas where paste
+creates a sealed `svg` node. File drop of `.svg` still goes the image route.
 
 ## Authoring path 2 — Draw in the canvas (restricted "icon" mode)
 

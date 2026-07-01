@@ -890,6 +890,7 @@ function CanvasPageContent() {
         projectType={projectType}
         parentTarget={parentProjectNode}
         isComponent={!!component}
+        isIconSubject={!!iconMasterId}
         referencesContext={referencesContext}
         ancestorFrames={ancestorFrames}
         shellControls={shellControls}

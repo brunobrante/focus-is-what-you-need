@@ -265,6 +265,7 @@ export function CanvasSurface({
   settings = DEFAULT_GLOBAL_SETTINGS,
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
+  isIconSubject = false,
 }: {
   active: boolean;
   showActiveBorder: boolean;
@@ -290,6 +291,8 @@ export function CanvasSurface({
   settings?: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
   onOpenSelectedComponentShortcut?: () => boolean | void;
+  // Icon-master canvas: SVG paste decomposes into root paths (see useCanvasPointerEvents).
+  isIconSubject?: boolean;
 }) {
   const viewportSubjectKey = storageKey;
   const hasAncestors = ancestorFrames.length > 0;
@@ -338,6 +341,7 @@ export function CanvasSurface({
             onCanvasToolShortcut={onCanvasToolShortcut}
             onOpenSelectedComponentShortcut={openSelectedComponentShortcut}
             onBackToParentShortcut={backToParentShortcut}
+            isIconSubject={isIconSubject}
           />
           {!draftMode && parentTarget && shellBackVisibility !== "hidden" ? (
             <CanvasParentBackButton
