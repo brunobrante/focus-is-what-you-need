@@ -1280,6 +1280,11 @@ links the worked reference back into that owner (via the reference link engine �
 no copy, shares the library blob), and **Close** returns to the origin. (The
 in-project entry button that supplies these params is not built yet.)
 
+**Auto-save**: the stack commits to the database on its own — after any change
+(new cut, edit, radius, move, delete, variant) settles for ~1.2s, the reference
+stack is persisted durably without pressing **Save**. The Save button remains as
+an immediate, explicit commit; it just isn't required anymore.
+
 **Screens, images and groups**: one imported image is one **screen**. A single
 image can hold several screens (its roots) — "New screen" copies the original as
 a fresh root, and "Become root" turns a cut into the whole screen. Multiple

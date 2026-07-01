@@ -90,6 +90,24 @@ function rasterizeGray(
   return { gray, width: w, height: h };
 }
 
+// How long the stack must sit unchanged before it is auto-committed to the DB.
+const AUTOSAVE_DEBOUNCE_MS = 1200;
+
+// Cheap change-detector for the component stack: catches new/removed cuts,
+// box/radius edits, re-rasterized images (whose encoded length changes) and
+// variant changes, without hashing the full data URLs.
+function componentsSignature(components: SavedComponent[]): string {
+  let sig = String(components.length);
+  for (const c of components) {
+    const b = c.box;
+    sig +=
+      `|${c.id}:${c.parentId ?? ""}:` +
+      `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.w)},${Math.round(b.h)},${Math.round(b.r ?? 0)}:` +
+      `${c.dataUrl?.length ?? 0}:${c.variants?.length ?? 0}:${c.activeVariantId ?? ""}`;
+  }
+  return sig;
+}
+
 export type ToolsEditorProps = {
   item: ToolReference;
   referenceId: string | null;
@@ -969,6 +987,30 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
   // read fresh at fire time rather than retriggering this whole load effect.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id, referenceId]);
+
+  // Auto-save: commit the reference stack to the DB on a debounce so the user
+  // never has to press the Save button. The local working copy is already
+  // written on every change (schedulePersist); this mirrors the durable commit
+  // (`persistReferenceStack`) that used to be manual-only. Only for the
+  // reference being edited, only after the stack has loaded, and only on a real
+  // change — the first settle after a (re)load just records the baseline.
+  const autosaveBaselineRef = useRef<{ key: string; sig: string } | null>(null);
+  useEffect(() => {
+    if (initializedKey !== componentKey) return;
+    if (!referenceId || item.id !== referenceId) return;
+    const sig = componentsSignature(components);
+    const baseline = autosaveBaselineRef.current;
+    if (!baseline || baseline.key !== componentKey) {
+      autosaveBaselineRef.current = { key: componentKey, sig };
+      return;
+    }
+    if (baseline.sig === sig) return;
+    const timer = window.setTimeout(() => {
+      autosaveBaselineRef.current = { key: componentKey, sig };
+      void persistReferenceStack();
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [components, initializedKey, componentKey, referenceId, item.id, persistReferenceStack]);
 
   // Deselect when navigating away from a component that no longer exists.
   useEffect(() => {
