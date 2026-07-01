@@ -6,6 +6,7 @@ import {
   IconClose,
   IconFrame,
   IconDiamond,
+  IconStar,
 } from "@/components/icons";
 import { PROJECT_TYPE_DIMS, PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
@@ -146,10 +147,10 @@ function StepKind({
         What are you drafting?
       </h1>
       <p className="m-0 mb-8 text-[14px] leading-[1.5] text-[var(--text-muted)]">
-        A draft lives outside any project or workspace. Start a full screen or a
-        single component — you can always build more inside it.
+        A draft lives outside any project or workspace. Start a full screen, a
+        single component, or a vector icon — you can always build more inside it.
       </p>
-      <div className="grid grid-cols-2 gap-3.5" role="radiogroup">
+      <div className="grid grid-cols-3 gap-3.5" role="radiogroup">
         <KindCard
           selected={kind === "screen"}
           onSelect={() => onSelect("screen")}
@@ -163,6 +164,13 @@ function StepKind({
           icon={<IconDiamond size={24} strokeWidth={1.5} />}
           title="Component"
           description="A free-size frame you set yourself."
+        />
+        <KindCard
+          selected={kind === "icon"}
+          onSelect={() => onSelect("icon")}
+          icon={<IconStar size={24} strokeWidth={1.5} />}
+          title="Icon"
+          description="A small square artboard for vector art."
         />
       </div>
     </section>
@@ -375,7 +383,8 @@ function StepName({
   inputRef: React.RefObject<HTMLInputElement | null>;
   onEnter: () => void;
 }) {
-  const label = kind === "component" ? "Component" : "Screen";
+  const label =
+    kind === "component" ? "Component" : kind === "icon" ? "Icon" : "Screen";
   return (
     <section className="w-full max-w-[760px]">
       <div className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--text-muted)]">

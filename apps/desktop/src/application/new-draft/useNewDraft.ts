@@ -4,8 +4,11 @@ import type { ProjectType } from "@/lib/data/types";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import { createComponent } from "@/lib/storage/repos/components.repo";
 
-/** What the user is drafting: a top-level Screen or a free-size Component. */
-export type DraftKind = "screen" | "component";
+/** What the user is drafting: a top-level Screen, a free-size Component, or an Icon. */
+export type DraftKind = "screen" | "component" | "icon";
+
+/** Default frame size offered for a fresh icon draft — a small square artboard. */
+export const DEFAULT_ICON_SIZE = { width: 24, height: 24 };
 
 /** Pixel size of each device preset — used to seed a screen draft's scene. */
 export const DRAFT_DEVICE_SIZE: Record<ProjectType, { width: number; height: number }> = {
@@ -64,17 +67,26 @@ export function useNewDraft(): NewDraftState {
   // The middle step depends on the kind: a Screen picks a device, a Component
   // sizes its frame. Steps stay at three so the progress bar is stable.
   const steps = useMemo<NewDraftStepId[]>(() => {
-    const middle: NewDraftStepId = kind === "component" ? "size" : "device";
+    // A Screen picks a device; a Component or Icon sizes its frame.
+    const middle: NewDraftStepId = kind === "screen" ? "device" : "size";
     return ["kind", middle, "name"];
   }, [kind]);
   const stepIndex = Math.max(0, steps.indexOf(stepId)) + 1;
   const totalSteps = steps.length;
 
-  // Choosing a kind reroutes the middle step; keep stepId valid.
+  // Choosing a kind reroutes the middle step; keep stepId valid. Icon and
+  // Component both size a frame, so seed the size fields with the kind's default.
   const setKind = (next: DraftKind) => {
     setKindState(next);
+    if (next === "icon") {
+      setWidth(String(DEFAULT_ICON_SIZE.width));
+      setHeight(String(DEFAULT_ICON_SIZE.height));
+    } else if (next === "component") {
+      setWidth(String(DEFAULT_COMPONENT_SIZE.width));
+      setHeight(String(DEFAULT_COMPONENT_SIZE.height));
+    }
     if (stepId === "device" || stepId === "size") {
-      setStepId(next === "component" ? "size" : "device");
+      setStepId(next === "screen" ? "device" : "size");
     }
   };
 
@@ -158,8 +170,10 @@ export function useNewDraft(): NewDraftState {
       ? kind
         ? kind === "screen"
           ? "a top-level screen"
-          : "a free-size component"
-        : "screen or component?"
+          : kind === "icon"
+            ? "a vector icon"
+            : "a free-size component"
+        : "screen, component or icon?"
       : stepId === "device"
         ? device
           ? `device: ${PROJECT_TYPE_LABEL[device]}`

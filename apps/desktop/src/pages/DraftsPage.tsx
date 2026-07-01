@@ -3,7 +3,7 @@ import { Snapshot } from "@/components/Snapshot";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
-import { IconPlus, IconDocument, IconFrame, IconDiamond } from "@/components/icons";
+import { IconPlus, IconDocument, IconFrame, IconDiamond, IconStar } from "@/components/icons";
 import { useDeleteComponent } from "@/application/components/useDeleteComponent";
 import { useDrafts } from "@/lib/storage/hooks";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
@@ -25,7 +25,7 @@ export function DraftsPage() {
         <div>
           <h1 className="m-0 mb-0.5 text-2xl font-semibold tracking-[-0.3px]">Drafts</h1>
           <p className="m-0 text-[13.5px] text-[var(--text-muted)]">
-            Loose screens and components, outside any workspace or project ·{" "}
+            Loose screens, components and icons, outside any workspace or project ·{" "}
             {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
           </p>
         </div>
@@ -39,7 +39,7 @@ export function DraftsPage() {
         <EmptyMessage
           icon={<IconDocument size={17} strokeWidth={1.7} />}
           title="No drafts yet"
-          description="Drafts are project-less screens and components to sketch ideas freely."
+          description="Drafts are project-less screens, components and icons to sketch ideas freely."
         />
       ) : (
         <div
@@ -74,8 +74,13 @@ function DraftCard({
   const navigate = useNavigate();
   const type = draftType(draft);
   const isScreen = draft.draftKind === "screen";
+  const isIcon = draft.draftKind === "icon";
   const canvasHref = `/canvas?variant=${encodeURIComponent(draft.activeVariantId)}&type=${type}`;
-  const meta = isScreen ? `Screen · ${PROJECT_TYPE_LABEL[type]}` : "Component";
+  const meta = isScreen
+    ? `Screen · ${PROJECT_TYPE_LABEL[type]}`
+    : isIcon
+      ? "Icon"
+      : "Component";
 
   return (
     <Link
@@ -123,6 +128,8 @@ function DraftCard({
         <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-[var(--text-muted)]">
           {isScreen ? (
             <IconFrame size={11} strokeWidth={1.7} className="flex-shrink-0 opacity-90" />
+          ) : isIcon ? (
+            <IconStar size={11} strokeWidth={1.7} className="flex-shrink-0 opacity-90" />
           ) : (
             <IconDiamond size={11} strokeWidth={1.7} className="flex-shrink-0 opacity-90" />
           )}
@@ -142,7 +149,7 @@ function AddDraftCard() {
       <DashedAddTile label="New draft" className="w-full" />
       <div className="flex flex-col gap-[3px] px-0.5">
         <span className="truncate text-[13px] font-medium text-[var(--text-muted)]">New draft</span>
-        <div className="text-[11.5px] text-[var(--text-muted)]">screen or component</div>
+        <div className="text-[11.5px] text-[var(--text-muted)]">screen, component or icon</div>
       </div>
     </Link>
   );

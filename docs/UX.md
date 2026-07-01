@@ -17,9 +17,9 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/settings` | SettingsPage | Standalone Settings inside the Home shell; reuses the same body (`AppSettingsContent`) as the global Settings modal |
 | `/projects` | LandingPage | Project browser for the active workspace |
 | `/new` | NewProjectPage | Multi-step project creation wizard. Links the project to a workspace only when launched with `?workspace=<id>` (from the workspace project browser); from Home it creates a loose, workspace-less project and skips the token-sharing step |
-| `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component) creation wizard |
+| `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component/icon) creation wizard |
 | `/new-workspace` | NewWorkspacePage | Multi-step workspace creation wizard (name → optional description); on finish it makes the workspace active and opens its project browser |
-| `/drafts` | DraftsPage | Loose, project-less screens and components (renders inside the Home shell) |
+| `/drafts` | DraftsPage | Loose, project-less screens, components and icons (renders inside the Home shell) |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
@@ -200,18 +200,20 @@ step appears only when the target workspace has a design system with tokens.
 
 ### 2a. New Draft Page `/new-draft`
 
-Wizard for creating a **draft** — a loose screen or component that lives outside
-any workspace or project (see the Drafts page below). Mirrors the New Project
-wizard's layout (progress bar, centered step, Back/Next footer) with **3 steps**:
+Wizard for creating a **draft** — a loose screen, component, or icon that lives
+outside any workspace or project (see the Drafts page below). Mirrors the New
+Project wizard's layout (progress bar, centered step, Back/Next footer) with
+**3 steps**:
 
-**Step — Kind**: two cards, **Screen** (a top-level frame at a device size) vs
-**Component** (a free-size frame). The choice reroutes the middle step.
+**Step — Kind**: three cards, **Screen** (a top-level frame at a device size),
+**Component** (a free-size frame), and **Icon** (a small square artboard for
+vector art). The choice reroutes the middle step.
 
 **Step — Device** (Screen only): three device cards (Desktop / Tablet / Mobile),
 identical to the project type step; the chosen device fixes the screen's size.
 
-**Step — Size** (Component only): Width × Height number inputs (px) for the
-component's frame. Defaults to `720 × 360`.
+**Step — Size** (Component or Icon): Width × Height number inputs (px) for the
+frame. Defaults to `720 × 360` for a component, `24 × 24` for an icon.
 
 **Step — Name**: a badge showing the chosen kind, then a name input.
 
@@ -247,17 +249,20 @@ header + sidebar), so the page itself is only the content column.
 - Content header: "Drafts" title with a count ("N drafts") on the left and a
   **New draft** button (→ `/new-draft`) on the right.
 - A responsive card grid. Each `DraftCard` shows a `Snapshot` of the draft's
-  scene, its name, and a meta line — **Screen · {Device}** or **Component** with
-  a matching icon. Clicking the card (or its "Open in canvas" menu) opens the
-  global canvas; the card menu also offers **Delete draft** (instance-aware, via
-  the shared delete flow). A trailing `DashedAddTile` ("New draft") closes the grid.
+  scene, its name, and a meta line — **Screen · {Device}**, **Component**, or
+  **Icon** with a matching icon. Clicking the card (or its "Open in canvas" menu)
+  opens the global canvas; the card menu also offers **Delete draft** (instance-
+  aware, via the shared delete flow). A trailing `DashedAddTile` ("New draft")
+  closes the grid.
 - Empty state when there are no drafts.
 
 Drafts are stored as `ComponentRow`s with every scope owner null (no workspace,
 project, screen, or parent variant), tagged with `draftKind` ("screen" |
-"component") and a `draftType` device. They never appear in project or workspace
-component views. (Not to be confused with the canvas **Sketch** window — the free
-scratch surface inside the editor.)
+"component" | "icon") and a `draftType` device. They never appear in project or
+workspace component views. A draft icon is just a small-frame draft edited on the
+normal canvas; it is not (yet) a system-design token — pulling a draft icon into a
+System Design is a separate, later flow. (Not to be confused with the canvas
+**Sketch** window — the free scratch surface inside the editor.)
 
 ---
 

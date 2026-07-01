@@ -109,11 +109,12 @@ export type ComponentRow = {
   linkable?: boolean;
   // Draft marker. Set only on loose, project-less components created from Home
   // (every scope owner is null). `draftKind` records whether the user meant a
-  // top-level Screen (the "top component" per the product law) or a free-size
-  // Component; `draftType` is the device used for sizing and the canvas `type`
-  // param (screens pick a device; components default to "desktop"). Null/absent
+  // top-level Screen (the "top component" per the product law), a free-size
+  // Component, or a vector Icon (a small square frame for drawing an icon);
+  // `draftType` is the device used for sizing and the canvas `type` param
+  // (screens pick a device; components/icons default to "desktop"). Null/absent
   // on every non-draft component. Optional so existing rows/literals stay valid.
-  draftKind?: "screen" | "component" | null;
+  draftKind?: "screen" | "component" | "icon" | null;
   draftType?: ProjectType | null;
   activeVariantId: string;
   order: number;
