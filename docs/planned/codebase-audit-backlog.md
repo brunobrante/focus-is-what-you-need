@@ -234,6 +234,14 @@ Paths are relative to `apps/desktop/`.
   `useAutoDetect.ts:76`, `src/generate/engine/componentModel.ts:38`,
   `variants.ts:16`, `src/lib/references/groupTypes.ts:37-39`,
   `src/application/system-design/useSystemDesign.ts:34`.
+  **Revised (2026-07-02):** NOT a mechanical "→ `newId()`" swap. `newId()` is
+  specifically for persisted entity/edge/row ids; `ids.ts` states scene-local
+  node ids intentionally do NOT use it. Every other generator carries a
+  load-bearing prefix (`r-` refs, `el-` elements, `c-` cuts, `v-` variants,
+  `g-` groups, `tok-` tokens, `root-`, `d-`) that acts as a discriminator, so
+  stripping it risks silent breakage. Correct fix is a shared crypto-backed
+  `prefixedId(prefix)` helper that preserves each prefix — a design change, not
+  a find-and-replace. Deferred pending that decision.
 - [x] **D3 — `normalizeName` ×3 with real drift.** `src/canvas/canvasUtils.ts:213`
   = `src/domain/canvas/graphTransforms.ts:238`, but
   `src/domain/canvas/htmlScene/styleUtils.ts:120` lacks `.trim()` — the same
