@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { readFileAsDataUrl } from "@/lib/utils";
+import { randomSuffix } from "@/lib/storage/ids";
 
 import type {
   CropBox,
@@ -146,7 +147,7 @@ export function useBuilderCutOperations({
         return;
       }
 
-      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+      const nextId = `c-${randomSuffix()}`;
       const parentId =
         activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
       const rootId = activeSubject.rootId ?? activeScopeId;
@@ -213,7 +214,7 @@ export function useBuilderCutOperations({
       if (!subjectBox) continue;
       const sourceBox = toOriginalCoords(subjectBox);
       const dataUrl = await rasterizeCropBox(img, subjectBox, activeSubject.url);
-      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+      const nextId = `c-${randomSuffix()}`;
       created.push({
         id: nextId,
         name: detection.label || shortComponentName(nextId),
@@ -312,7 +313,7 @@ export function useBuilderCutOperations({
         dataUrl = activeSubject.url;
       }
 
-      const nextId = `c-${Math.random().toString(36).slice(2, 9)}`;
+      const nextId = `c-${randomSuffix()}`;
       const parentId =
         activeSubject.kind === "component" ? activeSubject.component.id : rootComponent.id;
       const rootId = activeSubject.rootId ?? activeScopeId;

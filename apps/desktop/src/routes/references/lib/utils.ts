@@ -1,3 +1,4 @@
+import { randomSuffix } from "@/lib/storage/ids";
 import type { FilterKind } from "../types";
 
 export { inferType } from "@/lib/references/mediaTypes";
@@ -25,7 +26,7 @@ export function cancelIdle(id: number): void {
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return `r-${crypto.randomUUID()}`;
-  return `r-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `r-${Date.now()}-${randomSuffix()}`;
 }
 
 export function typeOptionsForKind(kind: FilterKind): Array<{ value: string; label: string }> {

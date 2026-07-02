@@ -36,6 +36,33 @@ export function newId(): string {
   return out;
 }
 
+// Dash-free base36, matching the character space of the old
+// `Math.random().toString(36)` id suffixes so it is a drop-in even for prefixes
+// that are parsed by splitting on "-" (which the crypto `newId` alphabet, with
+// its "-"/"_", is not).
+const SUFFIX_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * A short, dash-free, crypto-backed random suffix. The single replacement for
+ * the scattered `Math.random().toString(36).slice(2, N)` id suffixes (D2) — same
+ * shape, but collision-resistant randomness. Callers keep their own load-bearing
+ * prefix / timestamp (e.g. `c-${randomSuffix()}`, `g-${Date.now()}-${randomSuffix()}`).
+ * Falls back to `Math.random` only where no crypto exists at all.
+ */
+export function randomSuffix(length = 7): string {
+  const cryptoObj =
+    typeof crypto !== "undefined" && "getRandomValues" in crypto ? crypto : null;
+  let out = "";
+  if (cryptoObj) {
+    const bytes = new Uint8Array(length);
+    cryptoObj.getRandomValues(bytes);
+    for (let i = 0; i < length; i++) out += SUFFIX_ALPHABET[bytes[i]! % 36];
+    return out;
+  }
+  for (let i = 0; i < length; i++) out += SUFFIX_ALPHABET[Math.floor(Math.random() * 36)];
+  return out;
+}
+
 export function now(): number {
   return Date.now();
 }

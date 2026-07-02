@@ -257,7 +257,7 @@ Paths are relative to `apps/desktop/`.
   `src/lib/models/useCraftCheck.ts`, `src/lib/models/useFontDetect.ts`,
   `src/lib/storage/repos/history.repo.ts`, `src/routes/References.tsx`.
   **Keep** `src/domain/canvas/layout.ts` (planned layout compiler).
-- [ ] **D2 — ID generation: 4 competing schemes.** Canonical is `newId()`
+- [x] **D2 — ID generation: 4 competing schemes.** Canonical is `newId()`
   (`src/lib/storage/ids.ts:21`). Consolidate:
   `src/routes/references/lib/utils.ts:26` (second `newId`),
   `src/canvas/engine/mutations/coreUtils.ts:5` (`createId`), inline
@@ -273,6 +273,15 @@ Paths are relative to `apps/desktop/`.
   stripping it risks silent breakage. Correct fix is a shared crypto-backed
   `prefixedId(prefix)` helper that preserves each prefix — a design change, not
   a find-and-replace. Deferred pending that decision.
+  **Done (2026-07-02):** the real defect was the weak, collision-prone
+  `Math.random().toString(36)` — replaced all 9 sites with a single shared
+  crypto-backed `randomSuffix()` in `ids.ts`, each keeping its load-bearing
+  prefix/timestamp verbatim. `randomSuffix` deliberately uses a **dash-free**
+  base36 alphabet (unlike `newId`'s `-`/`_` alphabet) so it stays a drop-in for
+  prefixes parsed via `split("-")`. Left as-is: `createId` (coreUtils) and the
+  `crypto.randomUUID()` primary paths of `utils.newId`/`groupTypes` — already
+  crypto-backed, not the defect, and `createId`'s dash-free uuid8 could be
+  split-parsed, so redirecting it carries needless risk.
 - [x] **D3 — `normalizeName` ×3 with real drift.** `src/canvas/canvasUtils.ts:213`
   = `src/domain/canvas/graphTransforms.ts:238`, but
   `src/domain/canvas/htmlScene/styleUtils.ts:120` lacks `.trim()` — the same

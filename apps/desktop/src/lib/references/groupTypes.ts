@@ -1,3 +1,5 @@
+import { randomSuffix } from "@/lib/storage/ids";
+
 export type ReferenceGroup = {
   id: string;
   name: string;
@@ -36,6 +38,6 @@ export function newReferenceGroupId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `g-${crypto.randomUUID()}`;
   }
-  return `g-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `g-${Date.now()}-${randomSuffix()}`;
 }
 

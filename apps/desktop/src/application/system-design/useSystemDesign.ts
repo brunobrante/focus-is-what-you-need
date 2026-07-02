@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
+import { randomSuffix } from "@/lib/storage/ids";
 import { useWorkspaces } from "@/lib/storage/hooks";
 import { useGlobalSettings } from "@/application/settings/useGlobalSettings";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
@@ -31,7 +32,7 @@ import { deleteIcon } from "@/lib/storage/repos/icons.repo";
 type AnyToken = { id: string };
 
 export const newTokenId = () =>
-  `tok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  `tok-${Date.now().toString(36)}-${randomSuffix(5)}`;
 
 function upsertById<T extends AnyToken>(list: T[], item: T): T[] {
   const idx = list.findIndex((x) => x.id === item.id);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorTool, PendingDetectionBox } from "../types";
 import { AUTO_DETECT_BOX_COLORS } from "../types";
 import { runAutoDetect, urlToBytes } from "@/lib/models/modelCommands";
+import { randomSuffix } from "@/lib/storage/ids";
 import { clamp } from "../engine/geometry";
 
 export function useAutoDetect({
@@ -73,7 +74,7 @@ export function useAutoDetect({
             );
           }
           return {
-            id: `d-${Math.random().toString(36).slice(2, 9)}`,
+            id: `d-${randomSuffix()}`,
             box: {
               x,
               y,

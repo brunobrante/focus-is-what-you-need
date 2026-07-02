@@ -4,6 +4,7 @@ import { intersectCropBoxes } from "./geometry";
 import { clamp } from "./geometry";
 import { blobToDataUrl, dataUrlToBlob, safeStackFileName } from "./image";
 import { cutVariants, resolveActiveVariantId, ORIGINAL_VARIANT_ID } from "./variants";
+import { randomSuffix } from "@/lib/storage/ids";
 import {
   extFromName,
   loadReferenceStackFile,
@@ -35,7 +36,7 @@ export function sourceRootComponentId(sourceId: string) {
 // Additional (non-default) roots get this prefix so they never collide with the
 // implicit full-image default root id (`root-${referenceId}`) or with cuts (`c-…`).
 export function newRootComponentId() {
-  return `root-r${Math.random().toString(36).slice(2, 9)}`;
+  return `root-r${randomSuffix()}`;
 }
 
 export function createRootComponent(item: ToolReference): SavedComponent {

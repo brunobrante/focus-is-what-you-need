@@ -1,3 +1,4 @@
+import { randomSuffix } from "@/lib/storage/ids";
 import type { CutVariant, CutVariantTool, SavedComponent } from "./types";
 
 // Human-readable labels for each non-crop edit tool, shown in the variants panel.
@@ -13,7 +14,7 @@ export const VARIANT_TOOL_LABELS: Record<CutVariantTool, string> = {
 export const ORIGINAL_VARIANT_ID = "v-original";
 
 export function newVariantId(): string {
-  return `v-${Math.random().toString(36).slice(2, 9)}`;
+  return `v-${randomSuffix()}`;
 }
 
 // Returns the cut's variants, synthesising a single "original" entry from the
