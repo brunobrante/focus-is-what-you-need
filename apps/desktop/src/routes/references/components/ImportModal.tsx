@@ -333,7 +333,7 @@ export const ImportModal = forwardRef<ImportModalHandle>(
                   </div>
                   <div className="flex gap-3 text-[11.5px] text-[var(--text-muted)]">
                     <span className="flex items-center gap-1.5">
-                      <ImageIcon size={12} className="opacity-60" /> Imagens
+                      <ImageIcon size={12} className="opacity-60" /> Images
                     </span>
                     <span className="opacity-40">·</span>
                     <span className="flex items-center gap-1.5">
@@ -491,9 +491,9 @@ function DuplicateFileAlert({
 
         <div className="flex shrink-0 flex-wrap items-center gap-5 border-t border-[var(--border)] px-5 py-4">
           <DuplicateChoice checked={decision === "existing"} label="Use existing file" onChange={() => onDecisionChange("existing")} />
-          <DuplicateChoice checked={decision === "both"} label="Manter os dois" onChange={() => onDecisionChange("both")} />
+          <DuplicateChoice checked={decision === "both"} label="Keep both" onChange={() => onDecisionChange("both")} />
           <SmallButton type="button" primary className="ml-auto min-w-[132px]" onClick={onConfirm}>
-            Importar
+            Import
           </SmallButton>
         </div>
       </div>

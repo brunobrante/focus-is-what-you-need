@@ -229,7 +229,7 @@ function WorkspaceComponentCard({
         <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-[var(--text-muted)]">
           <IconGlobe size={11} strokeWidth={1.7} className="flex-shrink-0 text-[var(--text)] opacity-90" />
           <span className="min-w-0 truncate">
-            {primary ? `em ${primary.name}` : "Global"}
+            {primary ? `in ${primary.name}` : "Global"}
           </span>
           {extra > 0 ? (
             <span className="flex-shrink-0 rounded border border-[var(--border)] px-1 py-px text-[9.5px] text-[var(--text-faint)]">

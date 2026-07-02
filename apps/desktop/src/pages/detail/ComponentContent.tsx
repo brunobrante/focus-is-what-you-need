@@ -131,7 +131,7 @@ export function ComponentContent({ componentId, workspaceId }: { componentId: st
         <>
           {component.kind ? <span>{component.kind}</span> : <span>Component</span>}
           <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
-          <span>{variantCount} {variantCount === 1 ? "variante" : "variantes"}</span>
+          <span>{variantCount} {variantCount === 1 ? "variant" : "variants"}</span>
           <span className="h-[3px] w-[3px] rounded-full bg-[var(--text-faint)]" />
           <span>{children.length} {children.length === 1 ? "child component" : "child components"}</span>
         </>
@@ -260,7 +260,7 @@ function ComponentInfoPanel({
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] text-[var(--text-faint)]">Tipo</span>
+          <span className="text-[11px] text-[var(--text-faint)]">Type</span>
           <select
             value={kind}
             onChange={(e) => { const next = e.target.value as ComponentKind | ""; setKind(next); onSave({ kind: next || undefined }); }}
@@ -275,7 +275,7 @@ function ComponentInfoPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] text-[var(--text-faint)]">Categoria</span>
+          <span className="text-[11px] text-[var(--text-faint)]">Category</span>
           <input
             value={category}
             onChange={(e) => setCategory(e.target.value)}

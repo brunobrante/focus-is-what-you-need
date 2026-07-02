@@ -68,7 +68,7 @@ export function SideKindFilter({ value, onChange }: { value: ScreenCmpKindFilter
         className="h-[30px] cursor-pointer rounded-md border border-[var(--border)] bg-[var(--bg)] py-0 pl-2.5 pr-[26px] text-[12px] text-[var(--text)] outline-none focus:border-[var(--text-muted)]"
         style={{ appearance: "none", WebkitAppearance: "none" as never }}
       >
-        <option value="all">Todos</option>
+        <option value="all">All</option>
         <option value="Layout">Layout</option>
         <option value="Atom">Atom</option>
         <option value="Section">Section</option>

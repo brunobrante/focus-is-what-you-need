@@ -453,7 +453,7 @@ function StepName({
         Formato:{" "}
         <b className="font-medium text-[var(--text)]">{PROJECT_TYPE_LABEL[type]}</b>
       </div>
-      <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">Como vai se chamar?</h1>
+      <h1 className="m-0 mb-1.5 text-2xl font-semibold tracking-[-0.3px]">What will it be called?</h1>
       <p className="m-0 mb-8 text-[14px] leading-[1.5] text-[var(--text-muted)]">
         Give a name to your project. You can rename it anytime.
       </p>
