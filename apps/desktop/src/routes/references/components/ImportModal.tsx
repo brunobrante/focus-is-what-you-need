@@ -17,6 +17,7 @@ import type {
   StagedItem,
 } from "../types";
 import { discardReferenceItem, fileToReference, findDuplicateReference } from "../lib/fileHelpers";
+import { useReferenceUrl } from "../hooks/useReferenceUrl";
 import { formatDuration, formatSize, MAX_VIDEO_BYTES } from "../lib/utils";
 import { SmallButton, TagEditor } from "./ui";
 
@@ -167,12 +168,18 @@ export const ImportModal = forwardRef<ImportModalHandle>(
       if (!pendingDuplicate || !config) return;
       const remaining = duplicateQueue.slice(1);
       if (duplicateDecision === "existing") {
+        // Apply THIS existing-item choice immediately. It previously fired only on
+        // the final duplicate and only when nothing was staged, so any "use
+        // existing" decision made alongside other staged files (or before another
+        // duplicate) was silently dropped (M7).
         discardReferenceItem(pendingDuplicate.imported);
+        config.onUseExisting(pendingDuplicate.existing);
         setDuplicateQueue(remaining);
         setDuplicateDecision("existing");
+        // Queue drained and nothing staged to review → close. Otherwise leave the
+        // modal open for the staged-items confirm step.
         if (remaining.length === 0 && staged.length === 0) {
           confirmedRef.current = true;
-          config.onUseExisting(pendingDuplicate.existing);
           setIsOpen(false);
         }
         return;
@@ -495,13 +502,18 @@ function DuplicateFileAlert({
 }
 
 function DuplicatePreview({ item, badge, muted }: { item: ReferenceItem; badge: string; muted: boolean }) {
+  // The existing (library) item carries no `url` — it hydrates to "" and rendered
+  // a blank preview. Resolve it through the shared URL cache, preferring the
+  // item's own url when present (the freshly-imported side's blob) (M7).
+  const { url: resolvedUrl } = useReferenceUrl(item, { eager: true });
+  const src = item.url || resolvedUrl;
   return (
     <div className={["flex min-w-0 flex-col gap-4", muted ? "opacity-55" : ""].join(" ")}>
       <div className="relative flex h-[min(34vw,360px)] min-h-[220px] items-center justify-center overflow-hidden rounded-[10px] border border-[var(--border-strong)] bg-[var(--bg)]">
         {item.mediaKind === "video" ? (
-          <video src={item.url} muted preload="metadata" className="max-h-full max-w-full" />
+          <video src={src} muted preload="metadata" className="max-h-full max-w-full" />
         ) : (
-          <img src={item.url} alt={item.name} draggable={false} className="block max-h-full max-w-full object-contain" />
+          <img src={src} alt={item.name} draggable={false} className="block max-h-full max-w-full object-contain" />
         )}
         <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[8px] bg-[rgba(20,20,20,0.88)] px-4 py-2 text-[18px] font-medium text-[var(--text)] shadow-[0_8px_26px_rgba(0,0,0,0.35)]">
           {badge}
