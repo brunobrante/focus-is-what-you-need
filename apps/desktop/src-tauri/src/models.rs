@@ -1139,6 +1139,15 @@ fn sam_segment_blocking(
         let enc_out = encoder
             .run(ort::inputs![enc_in.as_str() => pixel_tensor])
             .map_err(|e| e.to_string())?;
+        // The SAM encoder is expected to return [image_embeddings, positional];
+        // a model whose output layout differs would panic on the bare index, so
+        // check the count and return an error instead (L4).
+        if enc_out.len() < 2 {
+            return Err(format!(
+                "SAM encoder produced {} outputs, expected at least 2",
+                enc_out.len()
+            ));
+        }
         let emb = enc_out[0].try_extract_array::<f32>().map_err(|e| e.to_string())?.to_owned();
         let pos = enc_out[1].try_extract_array::<f32>().map_err(|e| e.to_string())?.to_owned();
         (emb, pos)
@@ -1965,7 +1974,10 @@ fn florence2_decode_step(
     if shape.len() != 3 {
         return Err(format!("unexpected decoder output rank: {}", shape.len()));
     }
-    let last = shape[1] - 1;
+    // Guard the subtraction: a zero-length sequence would underflow and panic (L4).
+    let last = shape[1]
+        .checked_sub(1)
+        .ok_or_else(|| "decoder produced a zero-length sequence".to_string())?;
     let vocab = shape[2];
     let mut best_id = 0i64;
     let mut best_value = f32::MIN;

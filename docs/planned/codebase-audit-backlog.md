@@ -189,11 +189,19 @@ Paths are relative to `apps/desktop/`.
 - [x] **L3 — `linkEdge` live-uniqueness race**:
   `src/lib/storage/repos/edges.repo.ts:44-63` check-then-write; interleaved
   calls create duplicate live edges.
-- [ ] **L4 — Deletion commands discard errors**: `src-tauri/src/lib.rs:337,344,426,699,803,844`
+- [x] **L4 — Deletion commands discard errors**: `src-tauri/src/lib.rs:337,344,426,699,803,844`
   (`let _ = remove_*`) return `Ok` on permission failures. Also
   `src-tauri/src/db.rs:79,92` `ensure_column` interpolates identifiers via
   `format!` — keep private to constants. Panicking index ops on model outputs:
   `models.rs:476,535,605,657,929,1119,1124,1918`.
+  **Done (2026-07-02):** hardened the two ops with a real edge-case crash — the
+  SAM encoder's `enc_out[1]` (now checks the output count) and the decoder's
+  `shape[1] - 1` (now `checked_sub`, guarding a zero-length sequence).
+  **Left as-is (rationale):** the ubiquitous `outputs[0]`/`inputs()[0]` indexes
+  can't panic — an ONNX graph always has ≥1 input/output by spec; the
+  `let _ = remove_*` calls are deliberate best-effort cleanup of maybe-absent
+  paths (erroring would break normal delete flows); `ensure_column`'s `format!`
+  is only ever called with the constants `("records","rev")`, not injectable.
 - [ ] **L5 — Canvas gesture modifiers hardcoded** outside the bindings registry:
   `src/canvas/stage/useCanvasPointerEvents.ts:475,481,264,548`,
   `canvasVectorInteraction.ts:266` (shift add-to-selection, alt remove-anchor).
