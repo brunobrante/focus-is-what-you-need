@@ -347,16 +347,18 @@ export function useReferenceLibrary() {
   );
 
   const removeItem = useCallback((id: string, opts?: { keepFile?: boolean }) => {
-    setLibrary((prev) => {
-      const item = prev.find((i) => i.id === id);
-      if (item) releaseReferenceItemUrls(item);
-      return prev.filter((i) => i.id !== id);
-    });
+    // Revoke the owned object URLs OUTSIDE the setState updaters, reading the
+    // mirrored refs. StrictMode double-invokes updaters, so revoking inside them
+    // freed the same blob URL twice (L12; same class already fixed in ImportModal).
+    const item = libraryRef.current.find((i) => i.id === id);
+    if (item) releaseReferenceItemUrls(item);
+    const stackUrl = stackThumbnailUrlsRef.current[id];
+    if (stackUrl) URL.revokeObjectURL(stackUrl);
+
+    setLibrary((prev) => prev.filter((i) => i.id !== id));
     setGroups((prev) => pruneEmptyGroups(removeReferenceFromGroups(prev, id)));
     setStackThumbnailUrls((current) => {
-      const url = current[id];
-      if (!url) return current;
-      URL.revokeObjectURL(url);
+      if (!current[id]) return current;
       const { [id]: _removed, ...next } = current;
       return next;
     });
