@@ -296,32 +296,43 @@ fn ensure_workspace_folders(app: tauri::AppHandle) -> Result<String, String> {
     Ok(app_root(&cfg).to_string_lossy().into_owned())
 }
 
+// Reference binary I/O runs on the blocking pool, not the main thread: these
+// commands base64-decode and read/write multi-MB assets (a video reference can
+// be hundreds of MB), and a sync #[tauri::command] would freeze the UI for the
+// whole transfer (H4).
 #[tauri::command]
-fn write_reference_file(
+async fn write_reference_file(
     app: tauri::AppHandle,
     id: String,
     ext: String,
     data_b64: String,
 ) -> Result<(), String> {
-    let data = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-    let id = safe_path_segment(&id, "reference id")?;
-    let ext = safe_extension(&ext);
-    let dir = reference_dir(&cfg, &id);
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    fs::write(dir.join(format!("original.{}", ext)), &data)
-        .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let data = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
+        let cfg = read_config(&app);
+        ensure_local_structure(&cfg)?;
+        let id = safe_path_segment(&id, "reference id")?;
+        let ext = safe_extension(&ext);
+        let dir = reference_dir(&cfg, &id);
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        fs::write(dir.join(format!("original.{}", ext)), &data).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn read_reference_file(
+async fn read_reference_file(
     app: tauri::AppHandle,
     id: String,
     ext: String,
 ) -> Result<tauri::ipc::Response, String> {
-    let cfg = read_config(&app);
-    let data = read_reference_blob(&cfg, &id, &ext)?;
+    let data = tauri::async_runtime::spawn_blocking(move || {
+        let cfg = read_config(&app);
+        read_reference_blob(&cfg, &id, &ext)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     // Raw bytes over IPC (ArrayBuffer on the JS side). Avoids base64 encode here
     // and a synchronous main-thread atob() decode in the renderer.
     Ok(tauri::ipc::Response::new(data))
@@ -350,40 +361,48 @@ fn delete_reference_file(app: tauri::AppHandle, id: String) -> Result<(), String
 }
 
 #[tauri::command]
-fn write_reference_stack_file(
+async fn write_reference_stack_file(
     app: tauri::AppHandle,
     id: String,
     file_name: String,
     data_b64: String,
 ) -> Result<(), String> {
-    let data = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-    let id = safe_path_segment(&id, "reference id")?;
-    let file_name = safe_path_segment(&file_name, "stack file name")?;
-    let stack_dir = reference_dir(&cfg, &id).join("stack");
-    fs::create_dir_all(&stack_dir).map_err(|e| e.to_string())?;
-    fs::write(stack_dir.join(file_name), &data).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let data = BASE64.decode(&data_b64).map_err(|e| e.to_string())?;
+        let cfg = read_config(&app);
+        ensure_local_structure(&cfg)?;
+        let id = safe_path_segment(&id, "reference id")?;
+        let file_name = safe_path_segment(&file_name, "stack file name")?;
+        let stack_dir = reference_dir(&cfg, &id).join("stack");
+        fs::create_dir_all(&stack_dir).map_err(|e| e.to_string())?;
+        fs::write(stack_dir.join(file_name), &data).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn read_reference_stack_file(
+async fn read_reference_stack_file(
     app: tauri::AppHandle,
     id: String,
     file_name: String,
 ) -> Result<tauri::ipc::Response, String> {
-    let cfg = read_config(&app);
-    let id = safe_path_segment(&id, "reference id")?;
-    let file_name = safe_path_segment(&file_name, "stack file name")?;
-    let candidates = [
-        reference_dir(&cfg, &id).join("stack").join(&file_name),
-        legacy_reference_dir(&cfg, &id).join("stack").join(&file_name),
-    ];
-    let path = candidates
-        .into_iter()
-        .find(|path| path.exists())
-        .ok_or_else(|| "reference stack file not found".to_string())?;
-    let data = fs::read(&path).map_err(|e| e.to_string())?;
+    let data = tauri::async_runtime::spawn_blocking(move || {
+        let cfg = read_config(&app);
+        let id = safe_path_segment(&id, "reference id")?;
+        let file_name = safe_path_segment(&file_name, "stack file name")?;
+        let candidates = [
+            reference_dir(&cfg, &id).join("stack").join(&file_name),
+            legacy_reference_dir(&cfg, &id).join("stack").join(&file_name),
+        ];
+        let path = candidates
+            .into_iter()
+            .find(|path| path.exists())
+            .ok_or_else(|| "reference stack file not found".to_string())?;
+        fs::read(&path).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     Ok(tauri::ipc::Response::new(data))
 }
 
@@ -441,63 +460,67 @@ pub struct StackFileInput {
 // in a temp dir and swapped in only after every file succeeds, so a mid-batch
 // failure (bad input, disk full) leaves the previous stack intact (BLD-2).
 #[tauri::command]
-fn write_reference_stack_batch(
+async fn write_reference_stack_batch(
     app: tauri::AppHandle,
     id: String,
     files: Vec<StackFileInput>,
     data_json: String,
 ) -> Result<(), String> {
-    let cfg = read_config(&app);
-    ensure_local_structure(&cfg)?;
-    let id = safe_path_segment(&id, "reference id")?;
-    let ref_dir = reference_dir(&cfg, &id);
-    let stack_dir = ref_dir.join("stack");
-    let tmp_dir = ref_dir.join("stack.tmp");
-    let backup_dir = ref_dir.join("stack.old");
+    tauri::async_runtime::spawn_blocking(move || {
+        let cfg = read_config(&app);
+        ensure_local_structure(&cfg)?;
+        let id = safe_path_segment(&id, "reference id")?;
+        let ref_dir = reference_dir(&cfg, &id);
+        let stack_dir = ref_dir.join("stack");
+        let tmp_dir = ref_dir.join("stack.tmp");
+        let backup_dir = ref_dir.join("stack.old");
 
-    // Validate names + decode every payload before touching the filesystem, so a
-    // bad file name or base64 string can't leave a half-written stack.
-    let mut decoded: Vec<(String, Vec<u8>)> = Vec::with_capacity(files.len());
-    for file in &files {
-        let file_name = safe_path_segment(&file.file_name, "stack file name")?;
-        let data = BASE64.decode(&file.data_b64).map_err(|e| e.to_string())?;
-        decoded.push((file_name, data));
-    }
-
-    // Stage the full stack in a fresh temp dir.
-    let _ = fs::remove_dir_all(&tmp_dir);
-    fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
-    for (file_name, data) in &decoded {
-        fs::write(tmp_dir.join(file_name), data).map_err(|e| e.to_string())?;
-    }
-    fs::write(tmp_dir.join("data.json"), &data_json).map_err(|e| e.to_string())?;
-
-    // Swap it in. Move the existing stack *aside* (not delete) first, so a failed
-    // rename can restore it — deleting the old stack before the rename, as this
-    // used to, meant a failed swap destroyed both the old and the new stack (H5).
-    let _ = fs::remove_dir_all(&backup_dir);
-    let had_existing = stack_dir.exists();
-    if had_existing {
-        fs::rename(&stack_dir, &backup_dir).map_err(|e| {
-            let _ = fs::remove_dir_all(&tmp_dir);
-            e.to_string()
-        })?;
-    }
-    match fs::rename(&tmp_dir, &stack_dir) {
-        Ok(()) => {
-            // New stack is live; the previous one is no longer needed.
-            let _ = fs::remove_dir_all(&backup_dir);
-            Ok(())
+        // Validate names + decode every payload before touching the filesystem, so a
+        // bad file name or base64 string can't leave a half-written stack.
+        let mut decoded: Vec<(String, Vec<u8>)> = Vec::with_capacity(files.len());
+        for file in &files {
+            let file_name = safe_path_segment(&file.file_name, "stack file name")?;
+            let data = BASE64.decode(&file.data_b64).map_err(|e| e.to_string())?;
+            decoded.push((file_name, data));
         }
-        Err(e) => {
-            // Roll back to the previous stack and leave nothing half-swapped.
-            let _ = fs::remove_dir_all(&tmp_dir);
-            if had_existing {
-                let _ = fs::rename(&backup_dir, &stack_dir);
+
+        // Stage the full stack in a fresh temp dir.
+        let _ = fs::remove_dir_all(&tmp_dir);
+        fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
+        for (file_name, data) in &decoded {
+            fs::write(tmp_dir.join(file_name), data).map_err(|e| e.to_string())?;
+        }
+        fs::write(tmp_dir.join("data.json"), &data_json).map_err(|e| e.to_string())?;
+
+        // Swap it in. Move the existing stack *aside* (not delete) first, so a failed
+        // rename can restore it — deleting the old stack before the rename, as this
+        // used to, meant a failed swap destroyed both the old and the new stack (H5).
+        let _ = fs::remove_dir_all(&backup_dir);
+        let had_existing = stack_dir.exists();
+        if had_existing {
+            fs::rename(&stack_dir, &backup_dir).map_err(|e| {
+                let _ = fs::remove_dir_all(&tmp_dir);
+                e.to_string()
+            })?;
+        }
+        match fs::rename(&tmp_dir, &stack_dir) {
+            Ok(()) => {
+                // New stack is live; the previous one is no longer needed.
+                let _ = fs::remove_dir_all(&backup_dir);
+                Ok(())
             }
-            Err(e.to_string())
+            Err(e) => {
+                // Roll back to the previous stack and leave nothing half-swapped.
+                let _ = fs::remove_dir_all(&tmp_dir);
+                if had_existing {
+                    let _ = fs::rename(&backup_dir, &stack_dir);
+                }
+                Err(e.to_string())
+            }
         }
-    }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /* ---------- Video frame extraction (ffmpeg sidecar) ---------- */
@@ -693,19 +716,23 @@ async fn extract_video_frame_full(
 }
 
 #[tauri::command]
-fn read_reference_frame(
+async fn read_reference_frame(
     app: tauri::AppHandle,
     id: String,
     file_name: String,
 ) -> Result<tauri::ipc::Response, String> {
-    let cfg = read_config(&app);
-    let id = safe_path_segment(&id, "reference id")?;
-    let file_name = safe_path_segment(&file_name, "frame file name")?;
-    let path = reference_dir(&cfg, &id).join("frames").join(&file_name);
-    if !path.exists() {
-        return Err("frame not found".to_string());
-    }
-    let data = fs::read(&path).map_err(|e| e.to_string())?;
+    let data = tauri::async_runtime::spawn_blocking(move || {
+        let cfg = read_config(&app);
+        let id = safe_path_segment(&id, "reference id")?;
+        let file_name = safe_path_segment(&file_name, "frame file name")?;
+        let path = reference_dir(&cfg, &id).join("frames").join(&file_name);
+        if !path.exists() {
+            return Err("frame not found".to_string());
+        }
+        fs::read(&path).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     Ok(tauri::ipc::Response::new(data))
 }
 
@@ -724,23 +751,30 @@ fn delete_reference_frames(app: tauri::AppHandle, id: String) -> Result<(), Stri
 // only the one archive (it does not touch the workspace meta), so exporting a
 // project never disturbs the others.
 #[tauri::command]
-fn export_figx_project(
+async fn export_figx_project(
     app: tauri::AppHandle,
     project: FigxProjectInput,
 ) -> Result<String, String> {
-    let cfg = read_config(&app);
-    // Create the workspace folder on demand — only an actual export materializes it.
-    let target_dir = workspace_dir(&cfg);
-    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    // Reads every reference binary into memory, builds the zip, and CRC32-hashes
+    // it — hundreds of MB for a project with video references. Run it off the main
+    // thread so the export doesn't freeze the UI for its whole duration (H4).
+    tauri::async_runtime::spawn_blocking(move || {
+        let cfg = read_config(&app);
+        // Create the workspace folder on demand — only an actual export materializes it.
+        let target_dir = workspace_dir(&cfg);
+        fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
 
-    let filename = figx_filename(&project.project_id, &project.project_name);
-    let path = target_dir.join(&filename);
-    remove_stale_project_files(&target_dir, &project.project_id, &filename);
+        let filename = figx_filename(&project.project_id, &project.project_name);
+        let path = target_dir.join(&filename);
+        remove_stale_project_files(&target_dir, &project.project_id, &filename);
 
-    let entries = project_archive_entries(&cfg, &project)?;
-    write_zip_file(&path, &entries)?;
+        let entries = project_archive_entries(&cfg, &project)?;
+        write_zip_file(&path, &entries)?;
 
-    Ok(path.to_string_lossy().into_owned())
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // Per-element export (Inspector → Export panel). Opens a native "Save As…"

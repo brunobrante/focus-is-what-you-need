@@ -407,31 +407,36 @@ async fn download_file(
 }
 
 #[tauri::command]
-pub fn model_uninstall(app: AppHandle, id: &str) -> Result<(), String> {
+pub async fn model_uninstall(app: AppHandle, id: String) -> Result<(), String> {
     // Drop any cached sessions first so they cannot outlive the deleted files (RUST-8).
-    app.state::<ModelSessions>().invalidate(id);
-    let dir = model_storage_dir(&app, id)?;
-    let specs = model_file_specs(id)?;
-    if specs.len() > 1 {
-        // Multi-file package (its own folder): drop the whole folder, which also
-        // cancels an in-flight download.
-        if dir.exists() {
-            fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+    app.state::<ModelSessions>().invalidate(&id);
+    // remove_dir_all of a model folder can be ~700 MB — off the main thread (H4).
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = model_storage_dir(&app, &id)?;
+        let specs = model_file_specs(&id)?;
+        if specs.len() > 1 {
+            // Multi-file package (its own folder): drop the whole folder, which also
+            // cancels an in-flight download.
+            if dir.exists() {
+                fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+            }
+            return Ok(());
         }
-        return Ok(());
-    }
-    for file in specs {
-        let final_path = dir.join(file.name);
-        if final_path.exists() {
-            fs::remove_file(&final_path).map_err(|e| e.to_string())?;
+        for file in specs {
+            let final_path = dir.join(file.name);
+            if final_path.exists() {
+                fs::remove_file(&final_path).map_err(|e| e.to_string())?;
+            }
+            // Also clears an in-flight download (acts as a cancel).
+            let part_path = dir.join(format!("{}.part", file.name));
+            if part_path.exists() {
+                let _ = fs::remove_file(&part_path);
+            }
         }
-        // Also clears an in-flight download (acts as a cancel).
-        let part_path = dir.join(format!("{}.part", file.name));
-        if part_path.exists() {
-            let _ = fs::remove_file(&part_path);
-        }
-    }
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // --- inference ------------------------------------------------------------
@@ -706,20 +711,26 @@ pub struct ColorEntry {
 /// levels per channel, ~4096 possible buckets). Returns entries sorted by
 /// pixel count descending so the dominant color is first.
 #[tauri::command]
-pub fn extract_colors(image_bytes: Vec<u8>) -> Result<Vec<ColorEntry>, String> {
-    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
-    let rgb = img.to_rgb8();
-    let mut counts: HashMap<(u8, u8, u8), u32> = HashMap::new();
-    for px in rgb.pixels() {
-        let key = (px[0] & 0xF0, px[1] & 0xF0, px[2] & 0xF0);
-        *counts.entry(key).or_insert(0) += 1;
-    }
-    let mut entries: Vec<ColorEntry> = counts
-        .into_iter()
-        .map(|((r, g, b), count)| ColorEntry { r, g, b, count })
-        .collect();
-    entries.sort_by(|a, b| b.count.cmp(&a.count));
-    Ok(entries)
+pub async fn extract_colors(image_bytes: Vec<u8>) -> Result<Vec<ColorEntry>, String> {
+    // Full image decode + a per-pixel histogram over an arbitrarily large
+    // screenshot — run it on the blocking pool, not the main thread (H4).
+    tauri::async_runtime::spawn_blocking(move || {
+        let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+        let rgb = img.to_rgb8();
+        let mut counts: HashMap<(u8, u8, u8), u32> = HashMap::new();
+        for px in rgb.pixels() {
+            let key = (px[0] & 0xF0, px[1] & 0xF0, px[2] & 0xF0);
+            *counts.entry(key).or_insert(0) += 1;
+        }
+        let mut entries: Vec<ColorEntry> = counts
+            .into_iter()
+            .map(|((r, g, b), count)| ColorEntry { r, g, b, count })
+            .collect();
+        entries.sort_by(|a, b| b.count.cmp(&a.count));
+        Ok(entries)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // --- LaMa inpainting (remove element) -------------------------------------

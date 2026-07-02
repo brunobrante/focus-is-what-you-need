@@ -55,7 +55,7 @@ Paths are relative to `apps/desktop/`.
   writeChain.then(() => runJob(key))` has no `.catch`; a single rejection stops
   every later job for the session. Also `flush()` (lines 62-80) runs jobs
   outside `writeChain`, bypassing the ordering the module documents.
-- [ ] **H4 — Sync Tauri commands freeze the UI.** Non-async commands run on the
+- [x] **H4 — Sync Tauri commands freeze the UI.** Non-async commands run on the
   main thread: `export_figx_project` (`src-tauri/src/lib.rs:708`) reads all
   reference binaries into RAM, zips in memory, table-less CRC32
   (`lib.rs:1068`); `write/read_reference_file`, `write/read_reference_stack_*`,
