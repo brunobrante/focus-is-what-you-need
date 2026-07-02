@@ -246,12 +246,12 @@ Paths are relative to `apps/desktop/`.
   = `src/domain/canvas/graphTransforms.ts:238`, but
   `src/domain/canvas/htmlScene/styleUtils.ts:120` lacks `.trim()` — the same
   name normalizes differently by caller. Consolidate to one.
-- [ ] **D4 — `cloneDocument` ×4 byte-identical** in
+- [x] **D4 — `cloneDocument` ×4 byte-identical** in
   `src/canvas/engine/mutations/` (`coreUtils.ts:12` exports it;
   `elementGeometry.ts:16`, `elementOrder.ts:3`, `elementContent.ts:5` shadow
   it). Also `clampNodeToParentBounds` duplicated
   (`elementGeometry.ts:21`/`elementHierarchy.ts:22`).
-- [ ] **D5 — Stack-helpers module duplicated.**
+- [x] **D5 — Stack-helpers module duplicated.**
   `src/routes/references/components/stackViewHelpers.ts` vs
   `src/routes/references/lib/stackHelpers.ts` — `buildStackTree` verbatim
   (44 lines) plus `loadStackPreview`/`releaseStackUrls`/`findStackNode`/
