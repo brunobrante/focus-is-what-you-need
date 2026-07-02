@@ -105,6 +105,7 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
     pendingConfirmation,
     savingStack,
     stackSaveStatus,
+    setStackSaveStatus,
     expandedComponentIds,
     sidebarTab,
     cropsOverlayColor,
@@ -881,7 +882,14 @@ export function ToolsEditorView({ item, referenceId, groupContext, onUploadedLoc
                       // Opened from inside a project: link the worked reference
                       // back to that owner on save (no copy — shares the blob).
                       if (linkTarget && referenceId) {
-                        await linkReferenceToOwner(referenceId, linkTarget);
+                        try {
+                          await linkReferenceToOwner(referenceId, linkTarget);
+                        } catch (error) {
+                          // The link write failed after the stack saved — don't
+                          // leave the button reading "saved" as if it all worked (M9).
+                          console.error("[tools] failed to link reference to owner", error);
+                          setStackSaveStatus("Saved, but linking to the project failed");
+                        }
                       }
                     })()
                   }
