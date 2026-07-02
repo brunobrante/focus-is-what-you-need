@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageFooter } from "@/components/layout/PageFooter";
-import { useActiveWorkspaceId } from "@/lib/storage/activeWorkspace";
 import { useReferences } from "@/lib/storage/hooks";
 import {
   createOrAttachReference,
@@ -28,12 +27,9 @@ import { IconImage, IconPlus } from "@/components/icons";
  * library and link here in one step.
  */
 export function WorkspaceReferencesPage() {
+  // The active workspace is already synced from :workspaceId by WorkspaceLayout,
+  // which this page renders under — no need to re-sync it here (D8).
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const [activeId, setActiveId] = useActiveWorkspaceId();
-
-  useEffect(() => {
-    if (workspaceId && workspaceId !== activeId) setActiveId(workspaceId);
-  }, [workspaceId, activeId, setActiveId]);
 
   const { data: references } = useReferences("workspace", workspaceId ?? null);
   const addRef = useRef<AddReferenceModalHandle>(null);

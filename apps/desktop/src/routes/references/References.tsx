@@ -14,12 +14,16 @@ import { ReferenceDetailModal, type ReferenceDetailSubject } from "./components/
 import { SmallButton, FilterSearchBar } from "./components/ui";
 
 /**
- * The reference library page body. The top chrome is supplied by the route
- * wrapper via `header` — the workspace route passes the workspace `TopBar` — so
- * the same grid/cards/modals serve `/references` and `/workspace/:id/references`
- * without duplication. When `embedded` (the Home `/references` route), the shell
- * comes from `HomeLayout` instead: this body fills the layout `<main>` and skips
- * its own full-height wrapper and footer.
+ * The shared reference-library body: one grid/cards/modals surface reused wherever
+ * the full library is shown (Home `/references`, the gallery References tab, and
+ * the reference picker modals). The top chrome is supplied by the caller via
+ * `header`. When `embedded` (the Home `/references` route), the shell comes from
+ * `HomeLayout`: this body fills the layout `<main>` and skips its own full-height
+ * wrapper and footer.
+ *
+ * Note: the workspace route `/workspace/:workspaceId/references` is a *separate*
+ * page (`WorkspaceReferencesPage`) showing only that workspace's linked
+ * references — it does not render this component.
  */
 export function References({
   header,
