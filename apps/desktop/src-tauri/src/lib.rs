@@ -453,6 +453,7 @@ fn write_reference_stack_batch(
     let ref_dir = reference_dir(&cfg, &id);
     let stack_dir = ref_dir.join("stack");
     let tmp_dir = ref_dir.join("stack.tmp");
+    let backup_dir = ref_dir.join("stack.old");
 
     // Validate names + decode every payload before touching the filesystem, so a
     // bad file name or base64 string can't leave a half-written stack.
@@ -471,14 +472,32 @@ fn write_reference_stack_batch(
     }
     fs::write(tmp_dir.join("data.json"), &data_json).map_err(|e| e.to_string())?;
 
-    // Swap it in: only now is the existing stack removed, then the staged dir is
-    // moved into place. On a failed rename, clean up the temp dir rather than
-    // leaving it behind.
-    let _ = fs::remove_dir_all(&stack_dir);
-    fs::rename(&tmp_dir, &stack_dir).map_err(|e| {
-        let _ = fs::remove_dir_all(&tmp_dir);
-        e.to_string()
-    })
+    // Swap it in. Move the existing stack *aside* (not delete) first, so a failed
+    // rename can restore it — deleting the old stack before the rename, as this
+    // used to, meant a failed swap destroyed both the old and the new stack (H5).
+    let _ = fs::remove_dir_all(&backup_dir);
+    let had_existing = stack_dir.exists();
+    if had_existing {
+        fs::rename(&stack_dir, &backup_dir).map_err(|e| {
+            let _ = fs::remove_dir_all(&tmp_dir);
+            e.to_string()
+        })?;
+    }
+    match fs::rename(&tmp_dir, &stack_dir) {
+        Ok(()) => {
+            // New stack is live; the previous one is no longer needed.
+            let _ = fs::remove_dir_all(&backup_dir);
+            Ok(())
+        }
+        Err(e) => {
+            // Roll back to the previous stack and leave nothing half-swapped.
+            let _ = fs::remove_dir_all(&tmp_dir);
+            if had_existing {
+                let _ = fs::rename(&backup_dir, &stack_dir);
+            }
+            Err(e.to_string())
+        }
+    }
 }
 
 /* ---------- Video frame extraction (ffmpeg sidecar) ---------- */

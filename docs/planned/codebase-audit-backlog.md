@@ -63,7 +63,7 @@ Paths are relative to `apps/desktop/`.
   (`src-tauri/src/models.rs:709`); `model_uninstall` (`models.rs:410`,
   ~700 MB `remove_dir_all`). Convert to `async` + `spawn_blocking` (pattern
   already used by `extract_video_frames`).
-- [ ] **H5 — Stack batch swap destroys old and new on failure.**
+- [x] **H5 — Stack batch swap destroys old and new on failure.**
   `src-tauri/src/lib.rs:477-481`: `write_reference_stack_batch` deletes the old
   stack dir *before* the rename, and the rename error path deletes the temp —
   a failed rename loses both. Rename the old dir aside instead.
