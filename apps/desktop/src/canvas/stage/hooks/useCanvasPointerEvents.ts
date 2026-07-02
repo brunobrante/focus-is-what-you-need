@@ -13,6 +13,7 @@ import { DRAFT_ELEMENT_SIZE_SCALE, viewportPointToCanvas } from "@/canvas/engine
 import type { Size } from "@/canvas/engine/viewport";
 import { createElementForTool, insertElement } from "@/canvas/engine/actions";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { isModifierCommandActive } from "@/domain/settings/resolve";
 import type { GlobalSettings } from "@/domain/settings/types";
 import type { CanvasToolingRef } from "../CanvasToolingLayer";
 import { findChildAtPoint, retargetForIsolatedParent } from "../canvasHitTesting";
@@ -272,7 +273,7 @@ export function useCanvasPointerEvents({
       viewport.style.cursor =
         hit.type === "radius"
           ? RADIUS_CURSOR
-          : hit.type === "path-anchor" && e.altKey
+          : hit.type === "path-anchor" && isModifierCommandActive(e, settings, "canvas.vector.removeAnchor")
             ? PEN_REMOVE_CURSOR
             : hit.cursor;
     };
@@ -483,13 +484,13 @@ export function useCanvasPointerEvents({
     }
 
     let effectiveTargetId = targetId;
-    if (!state.isolatedParentId && !event.shiftKey && state.selectedIds.length === 1 && state.selectedIds[0] === targetId && state.document.elements[targetId]?.children.length && !state.document.elements[targetId]?.instanceOf) {
+    if (!state.isolatedParentId && !isModifierCommandActive(event, settings, "canvas.selection.addToClick") && state.selectedIds.length === 1 && state.selectedIds[0] === targetId && state.document.elements[targetId]?.children.length && !state.document.elements[targetId]?.instanceOf) {
       const child = findChildAtPoint(state.document, targetId, point);
       if (child) effectiveTargetId = child;
     }
 
     const currentlySelected = state.selectedIds.includes(effectiveTargetId);
-    const selectedIds = event.shiftKey
+    const selectedIds = isModifierCommandActive(event, settings, "canvas.selection.addToClick")
       ? currentlySelected ? state.selectedIds.filter((id) => id !== effectiveTargetId) : [...state.selectedIds, effectiveTargetId]
       : currentlySelected ? state.selectedIds : [effectiveTargetId];
     dispatch({ type: "setSelected", selectedIds });
@@ -556,7 +557,7 @@ export function useCanvasPointerEvents({
           const cursor =
             hit.type === "radius"
               ? RADIUS_CURSOR
-              : hit.type === "path-anchor" && event.altKey
+              : hit.type === "path-anchor" && isModifierCommandActive(event, settings, "canvas.vector.removeAnchor")
                 ? PEN_REMOVE_CURSOR
                 : hit.cursor;
           viewport.style.cursor = cursor;

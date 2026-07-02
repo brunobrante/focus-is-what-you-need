@@ -62,6 +62,10 @@ const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
   "canvas.resize.fromCenter": "alt",
   "canvas.transform.constrainAspect": "shift",
   "canvas.rotate.snap": "shift",
+  // Defaults chosen to exactly match the previously hardcoded gestures, so
+  // routing these through the configurable layer changes no behavior (L5).
+  "canvas.selection.addToClick": "shift",
+  "canvas.vector.removeAnchor": "alt",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {

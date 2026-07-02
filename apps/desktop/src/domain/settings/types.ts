@@ -45,7 +45,9 @@ export type CanvasModifierCommandId =
   | "canvas.overlay.parentDistances"
   | "canvas.resize.fromCenter"
   | "canvas.transform.constrainAspect"
-  | "canvas.rotate.snap";
+  | "canvas.rotate.snap"
+  | "canvas.selection.addToClick"
+  | "canvas.vector.removeAnchor";
 
 export type CanvasCommandId = CanvasKeyCommandId | CanvasModifierCommandId;
 

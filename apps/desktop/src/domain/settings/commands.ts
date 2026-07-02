@@ -105,6 +105,8 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.resize.fromCenter", label: "Resize from center", group: "Modifiers", type: "modifier" },
       { id: "canvas.transform.constrainAspect", label: "Constrain aspect while drawing or resizing", group: "Modifiers", type: "modifier" },
       { id: "canvas.rotate.snap", label: "Snap rotation", group: "Modifiers", type: "modifier" },
+      { id: "canvas.selection.addToClick", label: "Add to selection on click", group: "Modifiers", type: "modifier" },
+      { id: "canvas.vector.removeAnchor", label: "Remove anchor point", group: "Modifiers", type: "modifier" },
     ],
   },
 ];

@@ -33,6 +33,7 @@ import type {
   VectorAnchor,
 } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
+import { isModifierCommandActive } from "@/domain/settings/resolve";
 import type { GlobalSettings } from "@/domain/settings/types";
 import type { ToolingHit } from "./canvasHitTesting";
 
@@ -256,14 +257,14 @@ export function anchorEditPointerDown(
   point: Point,
   hit: ToolingHit,
 ): boolean {
-  const { state, dispatch, interactionRef, setInteractionActive, viewport } = ctx;
+  const { state, dispatch, settings, interactionRef, setInteractionActive, viewport } = ctx;
   const id = state.pathEditId;
   if (!id || !state.document.elements[id]) return false;
   const doc = state.document;
 
   if (hit.type === "path-anchor") {
     // Alt-click removes the anchor.
-    if (event.altKey) {
+    if (isModifierCommandActive(event, settings, "canvas.vector.removeAnchor")) {
       let next = deleteAnchor(doc, id, hit.subpathIndex, hit.anchorIndex);
       const remaining = next.elements[id];
       const isEmpty =

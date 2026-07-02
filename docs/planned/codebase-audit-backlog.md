@@ -202,7 +202,7 @@ Paths are relative to `apps/desktop/`.
   `let _ = remove_*` calls are deliberate best-effort cleanup of maybe-absent
   paths (erroring would break normal delete flows); `ensure_column`'s `format!`
   is only ever called with the constants `("records","rev")`, not injectable.
-- [ ] **L5 — Canvas gesture modifiers hardcoded** outside the bindings registry:
+- [x] **L5 — Canvas gesture modifiers hardcoded** outside the bindings registry:
   `src/canvas/stage/useCanvasPointerEvents.ts:475,481,264,548`,
   `canvasVectorInteraction.ts:266` (shift add-to-selection, alt remove-anchor).
   Register `CanvasModifierCommandId`s when touched.
