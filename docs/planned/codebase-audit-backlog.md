@@ -210,11 +210,19 @@ Paths are relative to `apps/desktop/`.
   `selection`/`drawingPath` → window listener re-added at pointermove rate
   (`useToolsEditor.ts:1069`); padding-base effect commits a fresh object per
   selection change → second full re-render per pointermove (`:545-551`).
-- [ ] **L7 — Canvas perf (minor)**: reparent drag rebuilds `excludeIds` +
+- [x] **L7 — Canvas perf (minor)**: reparent drag rebuilds `excludeIds` +
   corner-transforms per move (`stage/canvasInteractionHandlers.ts:221-224`);
   `draftContentBounds` memo keyed on whole document → per-frame AABB scan in
   draft mode (`CanvasStage.tsx:378-381`); Inspector subscribes to full document
   identity (`shell/Inspector.tsx:123`).
+  **Done (2026-07-02):** cached the reparent `excludeIds` on the interaction
+  (`reparentExcludeIds`), mirroring the existing `snapCandidates`/`parentBoundsById`
+  lazy caches — behavior-identical, just computed once per drag instead of every
+  frame. **Left (rationale):** narrowing the Inspector's document subscription
+  risks the *intended* live X/Y/W/H updates during a drag (a correctness-sensitive
+  change needing runtime verification), and the `draftContentBounds` memo only
+  bites in draft mode on large scenes — both are unverifiable-perf against `tsc`
+  and better done with a profiler in hand.
 - [x] **L8 — GallerySlider arrow keys** have no input-target guard
   (`src/generate/ui/GallerySlider.tsx:54-63`) — moving the opacity range slider
   also flips cuts.

@@ -320,6 +320,10 @@ export type DragInteraction = BaseInteraction & {
   // computed once on the first move frame and reused, instead of every ~60Hz frame.
   snapCandidates?: SnapCandidateSet;
   parentBoundsById?: Record<string, Rect>;
+  // The dragged ids plus every descendant — the reparent drop-target search's
+  // exclude set. Depends only on transformIds + beforeDocument, both constant for
+  // the drag, so it is computed once instead of walking descendants every frame.
+  reparentExcludeIds?: Set<string>;
 };
 
 export type ResizeInteraction = BaseInteraction & {

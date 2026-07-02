@@ -218,10 +218,15 @@ export function handleDragMove(
     const canvasBounds: Rect = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
     move = computeDragMoveCommandFromScreenDelta(interaction, screenDelta, canvasBounds);
     const committed = commitDragMove(interaction, move.delta, { clampBounds: canvasBounds });
-    const excludeIds = new Set<string>(interaction.transformIds);
-    for (const id of interaction.transformIds) {
-      for (const desc of getDescendantIds(interaction.beforeDocument, id)) excludeIds.add(desc);
-    }
+    const excludeIds =
+      interaction.reparentExcludeIds ??
+      (interaction.reparentExcludeIds = (() => {
+        const ids = new Set<string>(interaction.transformIds);
+        for (const id of interaction.transformIds) {
+          for (const desc of getDescendantIds(interaction.beforeDocument, id)) ids.add(desc);
+        }
+        return ids;
+      })());
     const targetId = findDropTarget(committed, point, excludeIds);
     const detachParentId = targetId === null ? getSharedCurrentParentId(interaction) : null;
     updateDropTarget(
