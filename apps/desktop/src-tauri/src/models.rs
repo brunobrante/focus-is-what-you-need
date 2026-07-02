@@ -6,7 +6,7 @@
 //! exists once the user explicitly installs it from Settings.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
@@ -331,6 +331,14 @@ struct DownloadProgress {
 
 #[tauri::command]
 pub async fn model_install(app: AppHandle, window: Window, id: String) -> Result<(), String> {
+    // Reject a second concurrent install of the same id rather than let it
+    // interleave into the shared `.part` file and publish a corrupt model (M11).
+    // The guard releases the slot on drop, including on early-return or panic.
+    let sessions = app.state::<ModelSessions>();
+    let _install_guard = sessions
+        .begin_install(&id)
+        .ok_or_else(|| format!("model \"{id}\" is already installing"))?;
+
     let specs = model_file_specs(&id)?;
     let dir = model_storage_dir(&app, &id)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -1671,9 +1679,40 @@ pub struct ModelSessions {
     // cached at a time (the user switches between SlimSAM and SAM ViT-B); the
     // tagged id lets a run detect a model change and reload.
     sam: Mutex<Option<SamSessions>>,
+    // Model ids with an install currently in flight. Two concurrent installs of
+    // the same id would stream interleaved bytes into the shared `.part` file and
+    // the winning rename would publish a corrupt model, so installs of a given id
+    // are made mutually exclusive (M11).
+    installing: Mutex<HashSet<String>>,
+}
+
+/// RAII slot for an in-flight install: releasing the id on drop guarantees a
+/// failed or panicking install can't leave the id permanently marked busy.
+struct InstallGuard<'a> {
+    sessions: &'a ModelSessions,
+    id: String,
+}
+
+impl Drop for InstallGuard<'_> {
+    fn drop(&mut self) {
+        self.sessions
+            .installing
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&self.id);
+    }
 }
 
 impl ModelSessions {
+    /// Claim an exclusive install slot for `id`, or `None` if one is already held.
+    fn begin_install(&self, id: &str) -> Option<InstallGuard<'_>> {
+        let mut guard = self.installing.lock().unwrap_or_else(|e| e.into_inner());
+        if !guard.insert(id.to_string()) {
+            return None;
+        }
+        Some(InstallGuard { sessions: self, id: id.to_string() })
+    }
+
     /// Drop any cached sessions for `id` (after the model is uninstalled/replaced).
     fn invalidate(&self, id: &str) {
         if id == FLORENCE2_ID {

@@ -143,7 +143,7 @@ Paths are relative to `apps/desktop/`.
 - [x] **M10 — `.figx` export silently truncates.** `src-tauri/src/lib.rs:946,986`:
   unreadable reference binaries are skipped without error; a corrupt
   `meta.json` exports zero references; the command still returns success.
-- [ ] **M11 — `model_install` has no concurrency guard.**
+- [x] **M11 — `model_install` has no concurrency guard.**
   `src-tauri/src/models.rs:333`: two concurrent installs of the same id stream
   interleaved into the same `.part` file; no checksum catches the corrupt
   result.
