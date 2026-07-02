@@ -66,21 +66,24 @@ export function useTextEditingSession({
     selectionStart: number,
     selectionEnd: number,
   ) => {
-    setTextEdit((current) => {
-      if (!current) return current;
-      const start = Math.max(0, Math.min(selectionStart, value.length));
-      const end = Math.max(0, Math.min(selectionEnd, value.length));
-      const nextDocument = updateElementTextShallow(latestDocumentRef.current, current.nodeId, value);
-      latestDocumentRef.current = nextDocument;
-      dispatch({ type: "setDocumentTransient", document: nextDocument });
-      return {
-        ...current,
-        value,
-        selectionStart: Math.min(start, end),
-        selectionEnd: Math.max(start, end),
-        anchorIndex: end,
-      };
-    });
+    const current = latestTextEditRef.current;
+    if (!current) return;
+    const start = Math.max(0, Math.min(selectionStart, value.length));
+    const end = Math.max(0, Math.min(selectionEnd, value.length));
+    // Side effects run OUTSIDE the setState updater: StrictMode double-invokes
+    // updaters, which here mutated latestDocumentRef and fired the transient
+    // dispatch twice per keystroke (M14; same fix already applied to zoom and
+    // pen-move). The updater below is now pure.
+    const nextDocument = updateElementTextShallow(latestDocumentRef.current, current.nodeId, value);
+    latestDocumentRef.current = nextDocument;
+    dispatch({ type: "setDocumentTransient", document: nextDocument });
+    setTextEdit((prev) => (prev ? {
+      ...prev,
+      value,
+      selectionStart: Math.min(start, end),
+      selectionEnd: Math.max(start, end),
+      anchorIndex: end,
+    } : prev));
   }, [dispatch, latestDocumentRef]);
 
   const commitTextEditing = useCallback(() => {
