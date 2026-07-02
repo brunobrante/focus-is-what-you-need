@@ -111,6 +111,11 @@ Paths are relative to `apps/desktop/`.
   land after a re-create. Related: adapters diverge on rev-less upserts (SQLite
   drops via `excluded.rev > records.rev`, `db.rs:113,152`; IndexedDB/memory
   apply unconditionally).
+  **Deferred (2026-07-02):** the correct fix is rev-guarded/tombstoned deletes
+  applied consistently across all three adapters — a change to the persistence
+  protocol that risks silent data loss if wrong, and can only be validated
+  against the running app (crash/replay/re-create sequences), not `tsc`. Do it
+  as a focused, separately-verified task, not folded into this sweep.
 
 ## Medium — Builder / UI
 
@@ -151,9 +156,19 @@ Paths are relative to `apps/desktop/`.
   arrays (`Vec<u8>`, ~4x blowup — `lib.rs:38-41`, all model runners); assets
   round-trip as base64 (+33% — `db.rs:230-297`). Use `tauri::ipc::Request`/raw
   buffers (the reverse direction already uses `ipc::Response`).
+  **Deferred (2026-07-02):** performance-only, and it changes the IPC wire
+  format across every model runner + its TS caller in lockstep. `tsc`/`cargo
+  check` can't prove images still round-trip byte-for-byte — that needs the
+  running app. Do it as its own task with a real end-to-end image check.
 - [ ] **M13 — Florence2 decoder is O(n²).** `src-tauri/src/models.rs:1850-1908`:
   cache-less decode clones `encoder_hidden` (~MB) and full `decoder_embeds`
   every step, up to 512 steps. Inside `spawn_blocking`, so slowness only.
+  **Deferred (2026-07-02):** performance-only and *not* a UI freeze (runs on the
+  blocking pool). The real fix is a KV-cache restructure (drive the decoder's
+  `use_cache` branch), which changes inference behavior; even the smaller
+  "hoist the invariant encoder tensor out of the loop" win depends on `ort`
+  borrowed-tensor APIs whose correctness can't be confirmed without running
+  inference and diffing detections. Needs a runtime harness, not a blind edit.
 
 ## Medium — StrictMode
 
