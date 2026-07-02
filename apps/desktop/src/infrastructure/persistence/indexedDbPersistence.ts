@@ -183,6 +183,11 @@ function openDatabase(): Promise<IDBDatabase> {
       resolve(request.result);
     };
   });
+  // Drop a rejected open so the next call retries instead of caching the failure
+  // for the rest of the session (L1).
+  dbPromise.catch(() => {
+    if (!openDb) dbPromise = null;
+  });
   return dbPromise;
 }
 

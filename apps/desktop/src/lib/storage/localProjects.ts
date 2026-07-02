@@ -63,6 +63,11 @@ export async function deleteLocalFigxProjectFile(projectId: string): Promise<voi
 export async function ensureLocalProjectsLoaded(): Promise<void> {
   if (!readyPromise) {
     readyPromise = ensureSeededAndMigrated();
+    // Drop a rejected seed/migration so a later call can retry, instead of
+    // caching the failure for the whole session (L1).
+    readyPromise.catch(() => {
+      readyPromise = null;
+    });
   }
   return readyPromise;
 }

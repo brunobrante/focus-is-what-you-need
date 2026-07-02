@@ -154,6 +154,11 @@ async function ensureHydrated(table: string): Promise<void> {
     hydrated.add(table);
     dirtyBeforeHydration.delete(table);
   })();
+  // Evict a rejected hydration so the next read retries, instead of caching the
+  // failure and leaving the table unloadable for the whole session (L1).
+  promise.catch(() => {
+    if (!hydrated.has(table)) hydration.delete(table);
+  });
   hydration.set(table, promise);
   return promise;
 }

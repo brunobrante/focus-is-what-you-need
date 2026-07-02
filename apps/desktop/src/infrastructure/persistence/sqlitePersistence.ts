@@ -94,6 +94,11 @@ async function getInvoke(): Promise<Invoke> {
     invokePromise = import("@tauri-apps/api/core").then(
       (module) => module.invoke as Invoke,
     );
+    // Drop a rejected import so the next call retries rather than caching the
+    // failure for the whole session (L1).
+    invokePromise.catch(() => {
+      invokePromise = null;
+    });
   }
   return invokePromise;
 }
