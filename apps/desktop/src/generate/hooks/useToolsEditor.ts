@@ -1043,6 +1043,10 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      // These are all bare-key shortcuts — never hijack an OS/browser chord like
+      // Cmd+C (copy), Cmd+V (paste) or Cmd+F (find), which otherwise switched the
+      // tool / created a screen instead of doing the expected thing (M5).
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key === "v" || event.key === "V") {
         setTool("move");
