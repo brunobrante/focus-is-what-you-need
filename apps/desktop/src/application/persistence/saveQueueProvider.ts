@@ -1,4 +1,5 @@
 import { SaveQueue } from "./saveQueue";
+import { setSaveStatus } from "./saveStatusStore";
 import {
   getPersistencePort,
   resetPersistencePort,
@@ -20,7 +21,10 @@ export function getSaveQueue(): SaveQueue {
       detectPersistenceRuntime() === "memory"
         ? createMemoryOutbox()
         : createLocalStorageOutbox();
-    queueSingleton = new SaveQueue(getPersistencePort(), { outbox });
+    queueSingleton = new SaveQueue(getPersistencePort(), {
+      outbox,
+      onStatusChange: setSaveStatus,
+    });
     // Replay any batch a previous session left behind before accepting edits.
     void queueSingleton.replayOutbox().catch((error) => {
       console.warn("[persistence] outbox replay failed", error);

@@ -54,6 +54,9 @@ export class SaveQueue {
   private scheduled = false;
   private retries = 0;
   private status: SaveStatus = "idle";
+  /** Set after a give-up so the still-pending batch is retried later without
+   *  needing a fresh edit to kick the queue (M1). */
+  private errorRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(port: PersistencePort, options: SaveQueueOptions = {}) {
     this.port = port;
@@ -165,6 +168,10 @@ export class SaveQueue {
         await this.port.applyBatch(batch);
         this.retries = 0;
         this.inFlight = [];
+        if (this.errorRetryTimer) {
+          clearTimeout(this.errorRetryTimer);
+          this.errorRetryTimer = null;
+        }
         // Keep the outbox equal to the still-unflushed set. Clearing it outright
         // would drop edits enqueued during applyBatch in the crash window before
         // the next flush (SAVE-1); a crash between ack and this write only replays
@@ -180,8 +187,13 @@ export class SaveQueue {
         for (const mutation of batch) this.acceptIfFresh(mutation);
         this.retries += 1;
         if (this.retries > this.maxRetries) {
+          // Surface the failure, but don't abandon the batch: reset the retry
+          // budget and schedule a later attempt so it self-heals once the disk /
+          // connection recovers, instead of sitting stuck until the next edit (M1).
           this.setStatus("error");
-          console.error("[saveQueue] giving up after retries", error);
+          console.error("[saveQueue] giving up for now, will retry later", error);
+          this.retries = 0;
+          this.scheduleErrorRetry();
           return;
         }
         this.setStatus("retrying");
@@ -190,6 +202,16 @@ export class SaveQueue {
       }
     }
     this.setStatus("idle");
+  }
+
+  /** After a give-up, retry the still-pending batch after a long delay so the
+   *  queue recovers on its own. Coalesced — at most one timer in flight. */
+  private scheduleErrorRetry(): void {
+    if (this.errorRetryTimer) return;
+    this.errorRetryTimer = setTimeout(() => {
+      this.errorRetryTimer = null;
+      if (this.pending.size > 0) void this.flush();
+    }, ERROR_RETRY_MS);
   }
 
   private setStatus(status: SaveStatus): void {
@@ -207,6 +229,8 @@ function defaultSchedule(run: () => void): void {
     else setTimeout(run, 0);
   });
 }
+
+const ERROR_RETRY_MS = 30_000;
 
 function backoffMs(retries: number): number {
   return Math.min(30_000, 250 * 2 ** (retries - 1));

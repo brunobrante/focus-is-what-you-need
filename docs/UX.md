@@ -67,6 +67,14 @@ Builder, and New Project.
 palette, `Esc` or a backdrop click dismisses it. Each result shows an icon and a
 kind badge (Element, Screen, Component, Reference, Project, Command).
 
+## Save status indicator
+
+A quiet, app-wide indicator (`SaveStatusIndicator`, mounted once in `App`) that
+stays hidden while saves are healthy. If the save queue exhausts its retries it
+shows a small pill in the bottom-right — "Changes aren't saving — retrying…" —
+so the user isn't left editing in the belief their work is persisted. The queue
+keeps retrying in the background and the pill clears itself once a save succeeds.
+
 ---
 
 ## Pages

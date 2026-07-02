@@ -23,6 +23,7 @@ import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { WorkspaceEditPage } from "@/pages/WorkspaceEditPage";
 import { ensureLocalProjectsLoaded } from "@/lib/storage/localProjects";
 import { installQuitFlush } from "@/application/persistence/flushOnQuit";
+import { SaveStatusIndicator } from "@/components/persistence/SaveStatusIndicator";
 import { SearchProvider } from "@/application/search/SearchProvider";
 
 export default function App() {
@@ -81,6 +82,7 @@ export default function App() {
       <Route path="/generate" element={<Generate />} />
       <Route path="/tools" element={<Generate />} />
       </Routes>
+      <SaveStatusIndicator />
     </SearchProvider>
   );
 }
