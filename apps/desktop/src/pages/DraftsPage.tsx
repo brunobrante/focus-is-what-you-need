@@ -1,5 +1,10 @@
+import { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Snapshot } from "@/components/Snapshot";
+import {
+  ConfirmActionModal,
+  type ConfirmActionModalHandle,
+} from "@/components/modals/ConfirmActionModal";
 import { DashedAddTile } from "@/components/DashedAddTile";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
 import { CardMenu, CardMenuIcons } from "@/components/screen/CardMenu";
@@ -21,6 +26,9 @@ export function DraftsPage() {
   const { data: drafts } = useDrafts();
   const { data: iconDrafts } = useDraftIcons();
   const { requestDelete, modal: deleteModal } = useDeleteComponent();
+  // Icons aren't components, so they can't go through useDeleteComponent — but
+  // they still deserve a confirm before deletion, like the sibling DraftCard (L9).
+  const confirmRef = useRef<ConfirmActionModalHandle>(null);
 
   const total = drafts.length + iconDrafts.length;
 
@@ -55,13 +63,24 @@ export function DraftsPage() {
             <DraftCard key={d.id} draft={d} onRequestDelete={() => void requestDelete(d)} />
           ))}
           {iconDrafts.map((icon) => (
-            <IconDraftCard key={icon.id} icon={icon} />
+            <IconDraftCard
+              key={icon.id}
+              icon={icon}
+              onRequestDelete={() =>
+                confirmRef.current?.open({
+                  title: "Delete draft",
+                  message: `"${icon.name}" will be permanently deleted.`,
+                  onConfirm: () => void deleteIcon(icon.id),
+                })
+              }
+            />
           ))}
           <AddDraftCard />
         </div>
       )}
 
       {deleteModal}
+      <ConfirmActionModal ref={confirmRef} />
     </div>
   );
 }
@@ -141,7 +160,7 @@ function DraftCard({
   );
 }
 
-function IconDraftCard({ icon }: { icon: IconRow }) {
+function IconDraftCard({ icon, onRequestDelete }: { icon: IconRow; onRequestDelete: () => void }) {
   const navigate = useNavigate();
   // A draft icon opens by its art variant alone (no project), like every draft.
   const canvasHref = `/canvas?variant=${encodeURIComponent(icon.activeVariantId)}&type=desktop`;
@@ -178,7 +197,7 @@ function IconDraftCard({ icon }: { icon: IconRow }) {
                   label: "Delete draft",
                   icon: CardMenuIcons.Trash,
                   destructive: true,
-                  onClick: () => void deleteIcon(icon.id),
+                  onClick: onRequestDelete,
                 },
               ],
             },

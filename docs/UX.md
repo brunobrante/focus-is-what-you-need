@@ -260,8 +260,9 @@ header + sidebar), so the page itself is only the content column.
   drafts as `IconDraftCard`s — each shows a `Snapshot` of the draft's scene, its
   name, and a meta line (**Screen · {Device}**, **Component**, or **Icon**) with a
   matching glyph. Clicking a card (or its "Open in canvas" menu) opens the global
-  canvas; the card menu also offers **Delete draft**. A trailing `DashedAddTile`
-  ("New draft") closes the grid.
+  canvas; the card menu also offers **Delete draft**, which asks for confirmation
+  before removing the draft (screen/component and icon drafts alike). A trailing
+  `DashedAddTile` ("New draft") closes the grid.
 - Empty state when there are no drafts of any kind.
 
 Screen and component drafts are `ComponentRow`s with every scope owner null (no

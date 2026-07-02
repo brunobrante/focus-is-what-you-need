@@ -55,6 +55,13 @@ export function GallerySlider({
     // Functional updates so the listener doesn't re-bind on every index change —
     // it now depends only on cuts.length (BLD-12).
     const onKey = (e: KeyboardEvent) => {
+      // Don't hijack arrow keys aimed at a form control (e.g. the opacity range
+      // slider), which would flip the cut while the user adjusts it (L8).
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) {
+        return;
+      }
       if (e.key === "ArrowLeft") setIndex((i) => wrapIndex(i - 1, cuts.length));
       if (e.key === "ArrowRight") setIndex((i) => wrapIndex(i + 1, cuts.length));
     };
