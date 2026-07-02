@@ -1,9 +1,5 @@
 import type { CanvasDocument } from "../types";
-
-export function cloneDocument(document: CanvasDocument): CanvasDocument {
-  if (typeof structuredClone === "function") return structuredClone(document);
-  return JSON.parse(JSON.stringify(document)) as CanvasDocument;
-}
+import { cloneDocument } from "./coreUtils";
 
 export function reorderElement(
   document: CanvasDocument,

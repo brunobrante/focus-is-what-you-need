@@ -1,11 +1,6 @@
 import type { CanvasDocument } from "../types";
-import { mutateElementShallow, shallowCloneDocument } from "./coreUtils";
+import { cloneDocument, mutateElementShallow, shallowCloneDocument } from "./coreUtils";
 import { applyTextFitSizingInPlace } from "./elementGeometry";
-
-export function cloneDocument(document: CanvasDocument): CanvasDocument {
-  if (typeof structuredClone === "function") return structuredClone(document);
-  return JSON.parse(JSON.stringify(document)) as CanvasDocument;
-}
 
 export function updateElementText(document: CanvasDocument, id: string, content: string): CanvasDocument {
   const next = cloneDocument(document);

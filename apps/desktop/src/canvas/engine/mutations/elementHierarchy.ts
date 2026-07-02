@@ -1,13 +1,11 @@
 import type { CanvasDocument, ElementNode } from "../types";
 import {
-  clampRotatedRectToBounds,
   filterTopLevelIds,
   getAbsoluteCenter,
   getAbsoluteRect,
   getCommonParentId,
   getDescendantIds,
   getEffectiveRotation,
-  getParentBounds,
   getParentSize,
   getSelectionBox,
   MIN_ELEMENT_SIZE,
@@ -17,20 +15,8 @@ import {
   roundPixel,
 } from "../geometry";
 import { cloneDocument, createId } from "./coreUtils";
+import { clampNodeToParentBounds } from "./elementGeometry";
 import { DEFAULT_SHELL_BACKGROUND } from "./documentDefaults";
-
-function clampNodeToParentBounds(document: CanvasDocument, id: string): void {
-  const node = document.elements[id];
-  if (!node) return;
-  const parentBounds = getParentBounds(document, id);
-  const clamped = clampRotatedRectToBounds(
-    { x: parentBounds.x + node.x, y: parentBounds.y + node.y, width: node.width, height: node.height },
-    node.rotation,
-    parentBounds,
-  );
-  node.x = roundPixel(clamped.x - parentBounds.x);
-  node.y = roundPixel(clamped.y - parentBounds.y);
-}
 
 // Mutates `document.elements[id]` in place. The caller is responsible for owning
 // `document` (e.g. via a single top-level `cloneDocument`) so this never leaks into

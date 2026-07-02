@@ -1,5 +1,6 @@
 import { getElementDefinition } from "../elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, Rect } from "../types";
+import { cloneDocument } from "./coreUtils";
 import {
   clamp,
   clampBorderRadiusForSize,
@@ -13,12 +14,7 @@ import {
 } from "../geometry";
 import { fontForNode, measureTextWidth } from "./textMeasurement";
 
-export function cloneDocument(document: CanvasDocument): CanvasDocument {
-  if (typeof structuredClone === "function") return structuredClone(document);
-  return JSON.parse(JSON.stringify(document)) as CanvasDocument;
-}
-
-function clampNodeToParentBounds(document: CanvasDocument, id: string): void {
+export function clampNodeToParentBounds(document: CanvasDocument, id: string): void {
   const node = document.elements[id];
   if (!node) return;
   const parentBounds = getParentBounds(document, id);
