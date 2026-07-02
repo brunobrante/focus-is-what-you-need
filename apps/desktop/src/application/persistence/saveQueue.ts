@@ -72,7 +72,7 @@ export class SaveQueue {
     // While a flush is in flight the on-disk outbox predates this edit; persist
     // the full unflushed set so a crash during applyBatch cannot drop it (SAVE-1).
     if (this.flushing && this.outbox) {
-      void this.outbox.save(this.unflushedSnapshot()).catch(() => {});
+      void this.outbox.save(this.unflushedSnapshot()).catch(logOutboxWriteError);
     }
     if (this.autoFlush) this.scheduleFlush();
   }
@@ -162,7 +162,7 @@ export class SaveQueue {
       this.inFlight = batch;
 
       this.setStatus(this.retries > 0 ? "retrying" : "saving");
-      if (this.outbox) await this.outbox.save(this.unflushedSnapshot()).catch(() => {});
+      if (this.outbox) await this.outbox.save(this.unflushedSnapshot()).catch(logOutboxWriteError);
 
       try {
         await this.port.applyBatch(batch);
@@ -178,8 +178,8 @@ export class SaveQueue {
         // the just-applied (idempotent) batch.
         if (this.outbox) {
           const remaining = this.unflushedSnapshot();
-          if (remaining.length > 0) await this.outbox.save(remaining).catch(() => {});
-          else await this.outbox.clear().catch(() => {});
+          if (remaining.length > 0) await this.outbox.save(remaining).catch(logOutboxWriteError);
+          else await this.outbox.clear().catch(logOutboxWriteError);
         }
       } catch (error) {
         this.inFlight = [];
@@ -228,6 +228,12 @@ function defaultSchedule(run: () => void): void {
     if (idle) idle(run);
     else setTimeout(run, 0);
   });
+}
+
+/** The outbox is best-effort durability, so its write failures don't fail the
+ *  save — but they must not vanish silently either (L2). */
+function logOutboxWriteError(error: unknown): void {
+  console.warn("[saveQueue] outbox write failed (durability best-effort)", error);
 }
 
 const ERROR_RETRY_MS = 30_000;

@@ -47,5 +47,8 @@ async function runThumbnailJob(job: ThumbnailJob): Promise<void> {
   // A snapshot just changed — if it belongs to a screen's variant, refresh the
   // owning project's card thumbnail (off the critical path, gated by the
   // auto-generate setting; the helper ignores non-screen variants).
-  void refreshProjectThumbnailForVariantSnapshot(job.ownerId);
+  void refreshProjectThumbnailForVariantSnapshot(job.ownerId).catch((error) => {
+    // Off the critical path, but must not become an unhandled rejection (L2).
+    console.warn("[thumbnails] project thumbnail refresh failed", error);
+  });
 }
