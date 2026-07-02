@@ -12,11 +12,12 @@ export function Tabs({
   tabHrefs: Record<Tab, string>;
   screensCount: number;
   componentsCount: number;
+  referencesCount: number;
 }) {
   const tabs: Array<{ id: Tab; label: string; count?: number }> = [
     { id: "screens", label: "Screens", count: screensCount },
     { id: "components", label: "Components", count: componentsCount },
-    { id: "references", label: "References" },
+    { id: "references", label: "References", count: referencesCount },
     { id: "system", label: "System" },
   ];
   return (
