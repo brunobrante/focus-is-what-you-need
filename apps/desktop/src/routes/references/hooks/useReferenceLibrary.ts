@@ -114,6 +114,11 @@ export function useReferenceLibrary() {
       setLibrary(seeded.items);
       setGroups(nextGroups);
       setLoading(false);
+    }).catch((error) => {
+      // A read failure must still clear the spinner, or the library is stuck
+      // loading forever (M8). Leave the library empty and let the user retry.
+      console.error("[references] failed to load the library", error);
+      setLoading(false);
     });
     return () => {
       clearReferenceUrlCache();
