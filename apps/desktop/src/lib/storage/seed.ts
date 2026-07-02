@@ -186,6 +186,19 @@ async function firstBootSeedV5(): Promise<void> {
   // Icon masters (IconRow) are created lazily (drawn/imported), never seeded.
   // Clear so a reseed cannot leave a stale icon from a prior schema shape behind.
   await replaceTable<never>(TABLES.icons, [], silent);
+  // Derived / auxiliary tables are never seeded — they are only appended to by
+  // their reconcilers or rebuilt lazily. A schema-mismatch reseed must wipe them
+  // too, or stale rows from the prior shape survive (M2): reconcileAllGraphEdges
+  // only ADDS, so old graph edges to now-deleted nodes dangle; and a non-empty
+  // instance_usage suppresses the cold rebuild from the fresh scenes
+  // (primeInstanceUsage rebuilds only when empty). Clear graph_edges here, before
+  // emitSeedOwnerEdges below repopulates the seed's owner edges.
+  await replaceTable<never>(TABLES.graphEdges, [], silent);
+  await replaceTable<never>(TABLES.instanceUsage, [], silent);
+  await replaceTable<never>(TABLES.checklists, [], silent);
+  await replaceTable<never>(TABLES.galleryLayout, [], silent);
+  await replaceTable<never>(TABLES.referenceLibrary, [], silent);
+  await replaceTable<never>(TABLES.referenceLibraryGroups, [], silent);
 
   notify(TABLES.projects);
   notify(TABLES.screens);
@@ -199,6 +212,12 @@ async function firstBootSeedV5(): Promise<void> {
   notify(TABLES.systemDesigns);
   notify(TABLES.tokens);
   notify(TABLES.icons);
+  notify(TABLES.graphEdges);
+  notify(TABLES.instanceUsage);
+  notify(TABLES.checklists);
+  notify(TABLES.galleryLayout);
+  notify(TABLES.referenceLibrary);
+  notify(TABLES.referenceLibraryGroups);
 
   // Ownership is the edge now — emit the `variant owns component` edges the tree
   // collected (the rows carry no screenId/parentVariantId to derive from).
