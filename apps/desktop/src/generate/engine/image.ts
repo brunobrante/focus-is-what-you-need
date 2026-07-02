@@ -47,8 +47,23 @@ export function waitForImage(img: HTMLImageElement): Promise<void> {
 export function measureImage(src: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth || 0, h: img.naturalHeight || 0 });
-    img.onerror = () => reject(new Error("Could not measure image"));
+    // Release the element on settle so it doesn't hold a decode alive — the
+    // sibling copy in routes/references/lib/fileHelpers had this fix and this
+    // one didn't (D7 drift).
+    const release = () => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = "";
+    };
+    img.onload = () => {
+      const size = { w: img.naturalWidth || 0, h: img.naturalHeight || 0 };
+      release();
+      resolve(size);
+    };
+    img.onerror = () => {
+      release();
+      reject(new Error("Could not measure image"));
+    };
     img.src = src;
   });
 }

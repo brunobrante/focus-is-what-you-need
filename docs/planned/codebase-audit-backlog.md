@@ -295,6 +295,12 @@ Paths are relative to `apps/desktop/`.
   (`src/generate/engine/image.ts:47` vs
   `src/routes/references/lib/fileHelpers.ts:114`); test fixture seeds
   copy-pasted across 4 suites (~220 lines collapsible into a shared helper).
+  **Partly done (2026-07-02):** fixed the one item that was an actual bug — the
+  leaky `measureImage` in `generate/engine/image.ts` now releases the element on
+  settle, matching the fileHelpers copy. The remaining entries are cosmetic
+  component extractions (Toggle, DeviceCard, wizard chrome, popovers, CardMenu)
+  that change rendered UI and need preview verification — left as a visual-dedup
+  pass, not folded into this backend-heavy sweep.
 - [x] **D8 — Stale docstring.** `src/routes/references/References.tsx:17-21`
   claims it serves `/workspace/:id/references`; that route renders
   `WorkspaceReferencesPage`. Also `WorkspaceReferencesPage.tsx:34-36`
