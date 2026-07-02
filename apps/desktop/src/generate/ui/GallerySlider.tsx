@@ -62,7 +62,11 @@ export function GallerySlider({
     return () => window.removeEventListener("keydown", onKey);
   }, [cuts.length]);
 
-  const current = cuts[index];
+  // Clamp for this render: when a cut is deleted, `index` can point past the end
+  // until the `[cuts.length]` effect resets it (effects run after render), and
+  // `cuts[index]` would be undefined — `key={current.id}` / `current.dataUrl`
+  // then threw during render (M6).
+  const current = cuts.length > 0 ? cuts[Math.min(index, cuts.length - 1)] : undefined;
 
   useEffect(() => {
     onFocusChange?.(current?.id ?? null);
@@ -76,6 +80,10 @@ export function GallerySlider({
       const bytes = await urlToBytes(current.dataUrl);
       const result = await extractColors(bytes);
       setColorResult(result.slice(0, 12));
+    } catch (error) {
+      // Don't let the AI-tool failure surface as an unhandled rejection (M6);
+      // the finally still clears the spinner.
+      console.error("[GallerySlider] color extraction failed", error);
     } finally {
       setLoadingColor(false);
     }
@@ -89,6 +97,8 @@ export function GallerySlider({
       const bytes = await urlToBytes(current.dataUrl);
       const result = await runFlorence2TextCheck(bytes);
       setTextResult(result);
+    } catch (error) {
+      console.error("[GallerySlider] text check failed", error);
     } finally {
       setLoadingText(false);
     }
@@ -102,12 +112,14 @@ export function GallerySlider({
       const bytes = await urlToBytes(current.dataUrl);
       const result = await runFontDetect(bytes);
       setFontResult(result);
+    } catch (error) {
+      console.error("[GallerySlider] font detection failed", error);
     } finally {
       setLoadingFont(false);
     }
   }, [current]);
 
-  if (cuts.length === 0) {
+  if (!current) {
     return (
       <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 text-[var(--text-faint)]">
         <LayoutGrid size={24} strokeWidth={1.5} />
