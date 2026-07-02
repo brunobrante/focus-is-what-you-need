@@ -547,7 +547,17 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       paddingApplyRef.current = false;
       return;
     }
-    setPaddingBase(selection ? selectionToSubjectCoords(selection) : null);
+    const next = selection ? selectionToSubjectCoords(selection) : null;
+    // Bail when the subject box is unchanged so a selection reference that churned
+    // without actually moving the crop doesn't force a second editor re-render
+    // (L6). The updater is pure — it only ever returns `prev` or `next`.
+    setPaddingBase((prev) => {
+      if (!prev || !next) return next;
+      if (prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h) {
+        return prev;
+      }
+      return next;
+    });
   }, [selection, selectionToSubjectCoords]);
 
   const { segmenting, segmentError, segment, clearSegmentation } =
@@ -1038,6 +1048,31 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     expandComponentPath(selectedComponentId);
   }, [expandComponentPath, selectedComponentId]);
 
+  // The shortcut handler reads several values that change every pointermove
+  // (selection, drawingPath). Route them through a latest-ref so the window
+  // listener mounts once, instead of being torn down and re-added at pointermove
+  // rate during a crop drag / free-draw (L6).
+  const shortcutStateRef = useRef({
+    selection,
+    drawingPath,
+    selectionLocked,
+    editingComponentId,
+    setTool,
+    beginRootCreation,
+    cancelSelection,
+    saveSelection,
+  });
+  shortcutStateRef.current = {
+    selection,
+    drawingPath,
+    selectionLocked,
+    editingComponentId,
+    setTool,
+    beginRootCreation,
+    cancelSelection,
+    saveSelection,
+  };
+
   // Keyboard shortcuts.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1047,6 +1082,17 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
       // Cmd+C (copy), Cmd+V (paste) or Cmd+F (find), which otherwise switched the
       // tool / created a screen instead of doing the expected thing (M5).
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const {
+        selection,
+        drawingPath,
+        selectionLocked,
+        editingComponentId,
+        setTool,
+        beginRootCreation,
+        cancelSelection,
+        saveSelection,
+      } = shortcutStateRef.current;
 
       if (event.key === "v" || event.key === "V") {
         setTool("move");
@@ -1070,7 +1116,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [beginRootCreation, cancelSelection, drawingPath, editingComponentId, saveSelection, selection, selectionLocked, setTool]);
+  }, []);
 
   // --- Derived display values ----------------------------------------------
 

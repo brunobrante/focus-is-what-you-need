@@ -198,7 +198,7 @@ Paths are relative to `apps/desktop/`.
   `src/canvas/stage/useCanvasPointerEvents.ts:475,481,264,548`,
   `canvasVectorInteraction.ts:266` (shift add-to-selection, alt remove-anchor).
   Register `CanvasModifierCommandId`s when touched.
-- [ ] **L6 — Builder editor perf**: shortcut effect deps include
+- [x] **L6 — Builder editor perf**: shortcut effect deps include
   `selection`/`drawingPath` → window listener re-added at pointermove rate
   (`useToolsEditor.ts:1069`); padding-base effect commits a fresh object per
   selection change → second full re-render per pointermove (`:545-551`).
