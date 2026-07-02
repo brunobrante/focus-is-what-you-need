@@ -1,5 +1,6 @@
 import { canvasDocumentFromHtmlGraphJSON, getNodeAbsoluteBoundsInGraph } from "@/canvas/engine/htmlSceneAdapter";
 import { htmlCanvasDocumentFromJSON } from "@/domain/canvas/htmlScene/document";
+import { normalizeName } from "@/domain/canvas/normalizeName";
 import { subjectNodeForDocument } from "@/lib/canvas/htmlScene";
 import { createBlankDocument } from "@/canvas/engine/actions";
 import { getSceneByOwner, mainVariantIdForScreen } from "@/lib/storage/repos/scenes.repo";
@@ -208,14 +209,6 @@ export function addCurrentToSplit(
   const key = nextCurrentKey(normalized);
   if (!key) return { windows: normalized, key: null };
   return { windows: [...normalized, key], key };
-}
-
-export function normalizeName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
 }
 
 export function normalizeProjectType(value: string | null): ProjectType {

@@ -16,6 +16,7 @@ import {
   type MasterResolver,
 } from "@/lib/canvas/htmlScene";
 import { DEFAULT_SHELL_BACKGROUND } from "./actions";
+import { normalizeName } from "@/domain/canvas/normalizeName";
 import type {
   CanvasDocument,
   ElementNode,
@@ -746,12 +747,6 @@ function slugClass(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function normalizeName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-}
 
 /**
  * Returns the absolute position of a node within the scene graph, accounting

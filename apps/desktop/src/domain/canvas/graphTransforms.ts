@@ -3,6 +3,9 @@ import {
   serializeHtmlCanvasDocument,
 } from "@/domain/canvas/htmlScene/document";
 import type { HtmlCanvasNode } from "@/domain/canvas/htmlScene/types";
+import { normalizeName } from "./normalizeName";
+// Re-exported: existing callers (e.g. scenes.repo) import normalizeName from here.
+export { normalizeName };
 import {
   collectDescendantIds,
   collectDescendantIdsFrom,
@@ -235,10 +238,3 @@ export function mergeSubjectIntoTarget(
   };
 }
 
-export function normalizeName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}

@@ -1,5 +1,6 @@
 import type { CanvasInsertToolId } from "@/domain/canvas/types";
 import type { HtmlCanvasBounds, HtmlCanvasNode, HtmlCanvasNodeKind, HtmlCanvasTag } from "./types";
+import { normalizeName } from "../normalizeName";
 import {
   alignFromMock,
   clamp,
@@ -51,10 +52,6 @@ export function tagFromKind(kind: HtmlCanvasNodeKind, name: string): HtmlCanvasT
   if (kind === "component" && (normalized.includes("button") || normalized.includes("cta"))) return "button";
   if (kind === "frame") return "section";
   return "div";
-}
-
-function normalizeName(value: string): string {
-  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
 export function normalizeNode(node: HtmlCanvasNode, fallbackOrder: number): HtmlCanvasNode {

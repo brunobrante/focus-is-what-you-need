@@ -1,4 +1,5 @@
 import type { HtmlCanvasStyle } from "./types";
+import { normalizeName } from "../normalizeName";
 
 export function defaultStyle(): HtmlCanvasStyle {
   return {
@@ -115,13 +116,6 @@ export function slugId(value: string): string {
 
 export function slugClass(value: string): string {
   return normalizeName(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-export function normalizeName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
 }
 
 export function escapeAttr(value: string): string {
