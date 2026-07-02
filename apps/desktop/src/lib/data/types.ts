@@ -34,7 +34,12 @@ export type ComponentVariant =
   | "cfooter";
 
 export type ComponentKind = "Layout" | "Atom" | "Section" | "Pattern" | "Overlay" | "Custom";
-export type ComponentScope = "global" | "screen";
+// Scope of a mock-seed ProjectComponent. Distinct from the live
+// `ComponentScope` in lib/storage/defaults ("workspace"|"project"|"screen"|
+// "nested"): both once shared the name "ComponentScope" and both carry a
+// "screen" member, so a wrong import compiled silently (D6). Renamed to keep
+// the two from colliding.
+export type MockComponentScope = "global" | "screen";
 
 export type Project = {
   id: string;
@@ -55,7 +60,7 @@ export type ProjectComponent = {
   title: string;
   kind: ComponentKind;
   variant: ComponentVariant;
-  scope: ComponentScope;
+  scope: MockComponentScope;
   screens: string[];
 };
 

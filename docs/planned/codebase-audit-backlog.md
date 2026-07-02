@@ -271,14 +271,18 @@ Paths are relative to `apps/desktop/`.
   `src/routes/references/lib/stackHelpers.ts` — `buildStackTree` verbatim
   (44 lines) plus `loadStackPreview`/`releaseStackUrls`/`findStackNode`/
   `listStackRoots`; both live. Merge into `lib/stackHelpers.ts`.
-- [ ] **D6 — `ComponentScope` name collision with different shapes.**
+- [x] **D6 — `ComponentScope` name collision with different shapes.**
   `src/lib/storage/defaults.ts:74` (`workspace|project|screen|nested`) vs
   `src/lib/data/types.ts:37` (`global|screen`) — a wrong import compiles for
-  `"screen"`. Also `ComponentKind` collision (`lib/data/types.ts:36` vs
-  `src/generate/engine/types.ts:52`); `CmpKindFilter`/`SectionState`
-  triplicated (`useGallery.ts:32-33`, `useScreenDetail.ts:41`,
-  `routes/Gallery/types.ts:4-5`); `Point` ×3 / `Rect` ×2 across
-  canvas/generate.
+  `"screen"`. **Fixed:** renamed the mock-layer one to `MockComponentScope`, so
+  the dangerous same-name/same-`"screen"`-member collision is gone. **Left as-is
+  (no drift risk):** the `ComponentKind` collision (`lib/data/types.ts:36`
+  Layout/Atom/… vs `src/generate/engine/types.ts:52` root|cut) lives in two
+  separate subsystems that never cross-import; `CmpKindFilter`/`SectionState`
+  (`useGallery.ts:32-33`, `useScreenDetail.ts:41`, `routes/Gallery/types.ts:4-5`)
+  and `Point` ×3 / `Rect` ×2 are byte-identical 1-liners — consolidating them
+  rewires imports across ~6 files for no correctness gain, so deferred to D7-class
+  cleanup.
 - [ ] **D7 — Copy-pasted components.** Toggle switch verbatim
   (`src/canvas/CanvasTabs.tsx:298-329` = `src/canvas/shell/PreviewLauncher.tsx:201-232`);
   `DeviceCard` (`NewDraftPage.tsx:267-313` = `NewProjectPage.tsx:388-435`);
