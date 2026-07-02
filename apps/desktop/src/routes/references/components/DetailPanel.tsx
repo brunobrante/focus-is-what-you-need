@@ -6,7 +6,7 @@ import { formatDateTime, formatDuration, formatSize } from "../lib/utils";
 import { DetailList, Section, TagEditor } from "./ui";
 import { TabButton, Action, ActionLink } from "./ModalShell";
 import { StackTreeRows } from "./StackView";
-import { findStackNode, countTreeNodes } from "./stackViewHelpers";
+import { findStackNode, countStackTreeNodes } from "../lib/stackHelpers";
 
 export function DetailPanel({
   item, group, groupReferences, groups, looseReferences,
@@ -89,7 +89,7 @@ export function DetailPanel({
                     {awaitingScreenSelection
                       ? "Select a screen"
                       : stackTree.length > 0
-                      ? `${countTreeNodes(stackTree)} components`
+                      ? `${countStackTreeNodes(stackTree)} components`
                       : "No data"}
                   </p>
                 )}

@@ -4,7 +4,7 @@ import { ReferenceCard } from "@/components/references/ReferenceCard";
 import type { ReferenceStackData } from "@/lib/references/stackTypes";
 import { stackRootIds } from "@/lib/references/stackTypes";
 import type { StackTreeNode } from "../types";
-import type { StackRootEntry } from "./stackViewHelpers";
+import type { StackRootEntry } from "../lib/stackHelpers";
 
 export function StackCompositeView({
   data, urls, selectedId, onSelect, rootId = null,

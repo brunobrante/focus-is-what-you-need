@@ -8,7 +8,10 @@ import {
   type ReferenceStackData,
   type ReferenceStackItem,
 } from "@/lib/references/stackTypes";
-import type { StackPreviewState, StackTreeNode } from "../types";
+import { loadReferenceUrl } from "@/lib/references/referenceUrlCache";
+import type { ReferenceItem, StackPreviewState, StackTreeNode } from "../types";
+
+export type StackRootEntry = { id: string; name: string };
 
 export async function loadStackThumbnailBatch(
   referenceIds: string[],
@@ -174,4 +177,51 @@ export function defaultStackSelectionId(data: ReferenceStackData): string | null
   const rootIds = stackRootIds(data);
   const firstCut = data.components.find((c) => !rootIds.has(c.id));
   return firstCut?.id ?? data.roots?.[0]?.id ?? data.components[0]?.id ?? null;
+}
+
+/**
+ * Load a stack preview from a full ReferenceItem (the detail-view path). Distinct
+ * from loadStackPreviewById: the base image resolves through the reference URL
+ * cache (loadReferenceUrl) rather than re-reading the original file. Merged here
+ * from the former stackViewHelpers module (D5).
+ */
+export async function loadStackPreview(item: ReferenceItem): Promise<StackPreviewState | null> {
+  const data = await readReferenceStackData(item.id);
+  if (!data) return null;
+  const baseUrl = (await loadReferenceUrl(item)) ?? "";
+  const urls: Record<string, string> = {};
+  const ownedUrls: string[] = [];
+
+  if (data.roots && data.roots.length > 0) {
+    for (const root of data.roots) {
+      if (!root.file) { urls[root.id] = baseUrl; continue; }
+      const blob = await loadReferenceStackFile(item.id, root.file, "image/png");
+      if (!blob) { urls[root.id] = baseUrl; continue; }
+      const url = URL.createObjectURL(blob);
+      urls[root.id] = url;
+      ownedUrls.push(url);
+    }
+  }
+
+  for (const component of data.components) {
+    if (!component.file) { urls[component.id] = baseUrl; continue; }
+    const blob = await loadReferenceStackFile(item.id, component.file, "image/png");
+    if (!blob) continue;
+    const url = URL.createObjectURL(blob);
+    urls[component.id] = url;
+    ownedUrls.push(url);
+  }
+  return { data, urls, ownedUrls };
+}
+
+/** The stack's root entries (id + display name), for the root picker. */
+export function listStackRoots(data: ReferenceStackData): StackRootEntry[] {
+  if (data.roots && data.roots.length > 0) {
+    return data.roots.map((root) => ({ id: root.id, name: root.name }));
+  }
+  if (data.rootComponentId) {
+    const root = data.components.find((c) => c.id === data.rootComponentId);
+    return [{ id: data.rootComponentId, name: root?.name || data.original.name || "Stack" }];
+  }
+  return [];
 }

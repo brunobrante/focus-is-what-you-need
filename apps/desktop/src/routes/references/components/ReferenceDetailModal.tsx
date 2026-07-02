@@ -9,8 +9,8 @@ import { ModalShell } from "./ModalShell";
 import { DetailPanel } from "./DetailPanel";
 import { StackCompositeView, StackRootsGallery } from "./StackView";
 import {
-  loadStackPreview, releaseStackUrls, buildStackTree, listStackRoots,
-} from "./stackViewHelpers";
+  loadStackPreview, releaseStackPreview, buildStackTree, listStackRoots,
+} from "../lib/stackHelpers";
 import { writeReferenceStackData } from "@/lib/tauri/referenceStorage";
 
 // ─── public API ──────────────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ export function ReferenceDetailModal({
     let cancelled = false;
     setStackLoading(true);
     void loadStackPreview(currentItem).then((preview) => {
-      if (cancelled) { releaseStackUrls(preview); return; }
+      if (cancelled) { releaseStackPreview(preview); return; }
       setStackPreview(preview);
       const rootCount = preview?.data.roots?.length ?? (preview?.data.rootComponentId ? 1 : 0);
       setSelectedStackComponentId(rootCount > 1 ? null : preview?.data.primaryComponentId ?? null);
@@ -143,7 +143,7 @@ export function ReferenceDetailModal({
   // from under the renamed preview, blanking all its images (H8).
   useEffect(() => {
     const preview = stackPreview;
-    return () => { releaseStackUrls(preview); };
+    return () => { releaseStackPreview(preview); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stackPreview?.ownedUrls]);
 
