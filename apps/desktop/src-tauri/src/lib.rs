@@ -996,12 +996,16 @@ fn reference_archive_entries(
         let primary = references_dir(cfg).join(format!("{}.{}", safe_id, ext));
         let fallback = legacy_references_dir(cfg).join(format!("{}.{}", safe_id, ext));
         let path = if primary.exists() { primary } else { fallback };
-        if let Ok(data) = fs::read(path) {
-            entries.push(ZipEntry {
-                name: format!("references/{}.{}", safe_id, ext),
-                data,
-            });
-        }
+        // Fail the export instead of silently dropping an unreadable binary — a
+        // .figx missing referenced assets but returning success is worse than a
+        // loud error the user can act on (M10).
+        let data = fs::read(&path).map_err(|e| {
+            format!("reference \"{}\" binary is unreadable ({}): {}", safe_id, path.display(), e)
+        })?;
+        entries.push(ZipEntry {
+            name: format!("references/{}.{}", safe_id, ext),
+            data,
+        });
     }
 
     Ok(entries)
@@ -1019,7 +1023,11 @@ fn push_reference_dir_entries(
         let zip_name = format!("{}/{}", zip_prefix, name);
         if path.is_dir() {
             push_reference_dir_entries(&path, &zip_name, entries)?;
-        } else if let Ok(data) = fs::read(&path) {
+        } else {
+            // Propagate rather than skip: a silently omitted file yields an
+            // incomplete archive that still reports success (M10).
+            let data = fs::read(&path)
+                .map_err(|e| format!("reference file {} is unreadable: {}", path.display(), e))?;
             entries.push(ZipEntry { name: zip_name, data });
         }
     }
@@ -1036,7 +1044,10 @@ fn read_reference_meta_values(cfg: &WorkspaceConfig) -> Result<Vec<Value>, Strin
     } else {
         "[]".into()
     };
-    let parsed: Value = serde_json::from_str(&raw).unwrap_or(Value::Array(vec![]));
+    // A corrupt meta.json used to parse to an empty array, silently exporting
+    // zero references with a success result — fail loudly instead (M10).
+    let parsed: Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("references meta.json is corrupt: {}", e))?;
     Ok(parsed.as_array().cloned().unwrap_or_default())
 }
 

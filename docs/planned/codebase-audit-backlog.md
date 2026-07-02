@@ -140,7 +140,7 @@ Paths are relative to `apps/desktop/`.
 
 ## Medium — Rust
 
-- [ ] **M10 — `.figx` export silently truncates.** `src-tauri/src/lib.rs:946,986`:
+- [x] **M10 — `.figx` export silently truncates.** `src-tauri/src/lib.rs:946,986`:
   unreadable reference binaries are skipped without error; a corrupt
   `meta.json` exports zero references; the command still returns success.
 - [ ] **M11 — `model_install` has no concurrency guard.**
