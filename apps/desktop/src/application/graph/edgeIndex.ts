@@ -183,6 +183,23 @@ export function peekOwnerOf(type: string, id: string): EntityRef | null {
   return edge ? { type: edge.fromType, id: edge.fromId } : null;
 }
 
+/**
+ * Sync live edge for a triple (null until the index is hydrated). Lets `linkEdge`
+ * do an atomic check-then-write with no await between the two, closing the race
+ * where two concurrent links for the same triple both miss and create duplicate
+ * live edges (L3).
+ */
+export function peekLiveEdgeForTriple(
+  fromType: GraphEdgeRow["fromType"],
+  fromId: string,
+  relation: GraphRelation,
+  toType: GraphEdgeRow["toType"],
+  toId: string,
+): GraphEdgeRow | null {
+  if (!hydrated) return null;
+  return maps.byTriple.get(edgeTripleKey(fromType, fromId, relation, toType, toId)) ?? null;
+}
+
 /** Eagerly hydrate the index so subsequent sync peeks are authoritative. */
 export async function primeEdgeIndex(): Promise<void> {
   await ensureMaps();

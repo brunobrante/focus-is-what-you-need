@@ -4,7 +4,8 @@ import {
   applyEdgeToIndex,
   edgesFrom,
   edgesTo,
-  liveEdgeForTriple,
+  peekLiveEdgeForTriple,
+  primeEdgeIndex,
 } from "@/application/graph/edgeIndex";
 import type {
   EdgeFilter,
@@ -42,7 +43,11 @@ export type LinkEdgeInput = {
 
 /** Create the edge, or update an existing live edge for the same triple. */
 export async function linkEdge(input: LinkEdgeInput): Promise<GraphEdgeRow> {
-  const existing = await liveEdgeForTriple(
+  // Hydrate once, then look up + write with no await between them, so two
+  // concurrent links for the same triple can't both miss and each create a live
+  // edge (check-then-write race → duplicate live edges) (L3).
+  await primeEdgeIndex();
+  const existing = peekLiveEdgeForTriple(
     input.from.type,
     input.from.id,
     input.relation,
@@ -84,7 +89,8 @@ export async function unlinkEdge(
   relation: GraphRelation,
   to: EntityRef,
 ): Promise<void> {
-  const existing = await liveEdgeForTriple(
+  await primeEdgeIndex();
+  const existing = peekLiveEdgeForTriple(
     from.type,
     from.id,
     relation,
@@ -106,7 +112,8 @@ export async function relinkEdge(
   oldTo: EntityRef,
   newTo: EntityRef,
 ): Promise<GraphEdgeRow | null> {
-  const existing = await liveEdgeForTriple(
+  await primeEdgeIndex();
+  const existing = peekLiveEdgeForTriple(
     from.type,
     from.id,
     relation,
