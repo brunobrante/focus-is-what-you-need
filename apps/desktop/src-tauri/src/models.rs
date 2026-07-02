@@ -468,10 +468,13 @@ fn encode_png(img: DynamicImage) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
-pub async fn run_birefnet(app: AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, String> {
-    tauri::async_runtime::spawn_blocking(move || birefnet_blocking(&app, image_bytes))
+pub async fn run_birefnet(app: AppHandle, image_bytes: Vec<u8>) -> Result<tauri::ipc::Response, String> {
+    // Return the processed image as raw bytes (ArrayBuffer on the JS side) rather
+    // than a JSON number array, which ~4x'd a multi-MB result over IPC (M12).
+    let out = tauri::async_runtime::spawn_blocking(move || birefnet_blocking(&app, image_bytes))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(out))
 }
 
 fn birefnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, String> {
@@ -530,10 +533,13 @@ fn birefnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, S
 }
 
 #[tauri::command]
-pub async fn run_real_esrgan(app: AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, String> {
-    tauri::async_runtime::spawn_blocking(move || real_esrgan_blocking(&app, image_bytes))
+pub async fn run_real_esrgan(app: AppHandle, image_bytes: Vec<u8>) -> Result<tauri::ipc::Response, String> {
+    // Upscaled output is *larger* than the input; ship it as raw bytes, not a
+    // JSON number array (M12).
+    let out = tauri::async_runtime::spawn_blocking(move || real_esrgan_blocking(&app, image_bytes))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(out))
 }
 
 fn real_esrgan_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, String> {
@@ -748,10 +754,12 @@ pub async fn run_lama(
     app: AppHandle,
     image_bytes: Vec<u8>,
     mask_bytes: Vec<u8>,
-) -> Result<Vec<u8>, String> {
-    tauri::async_runtime::spawn_blocking(move || lama_blocking(&app, image_bytes, mask_bytes))
+) -> Result<tauri::ipc::Response, String> {
+    // Inpainted full-res image back as raw bytes, not a JSON number array (M12).
+    let out = tauri::async_runtime::spawn_blocking(move || lama_blocking(&app, image_bytes, mask_bytes))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(out))
 }
 
 /// Resolves which of LaMa's two inputs is the RGB image and which is the mask.

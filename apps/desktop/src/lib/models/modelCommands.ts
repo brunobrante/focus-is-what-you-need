@@ -43,12 +43,14 @@ export function modelUninstall(id: string): Promise<void> {
 }
 
 export async function runBirefnet(imageBytes: Uint8Array): Promise<Uint8Array> {
-  const out = await invoke<number[]>("run_birefnet", { imageBytes: Array.from(imageBytes) });
+  // The command returns a tauri ipc::Response, so invoke resolves to an
+  // ArrayBuffer (raw bytes) rather than a JSON number array (M12).
+  const out = await invoke<ArrayBuffer>("run_birefnet", { imageBytes: Array.from(imageBytes) });
   return new Uint8Array(out);
 }
 
 export async function runRealEsrgan(imageBytes: Uint8Array): Promise<Uint8Array> {
-  const out = await invoke<number[]>("run_real_esrgan", { imageBytes: Array.from(imageBytes) });
+  const out = await invoke<ArrayBuffer>("run_real_esrgan", { imageBytes: Array.from(imageBytes) });
   return new Uint8Array(out);
 }
 
@@ -120,7 +122,7 @@ export async function runLama(
   imageBytes: Uint8Array,
   maskBytes: Uint8Array,
 ): Promise<Uint8Array> {
-  const out = await invoke<number[]>("run_lama", {
+  const out = await invoke<ArrayBuffer>("run_lama", {
     imageBytes: Array.from(imageBytes),
     maskBytes: Array.from(maskBytes),
   });

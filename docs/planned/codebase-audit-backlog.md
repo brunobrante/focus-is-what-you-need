@@ -156,10 +156,19 @@ Paths are relative to `apps/desktop/`.
   arrays (`Vec<u8>`, ~4x blowup — `lib.rs:38-41`, all model runners); assets
   round-trip as base64 (+33% — `db.rs:230-297`). Use `tauri::ipc::Request`/raw
   buffers (the reverse direction already uses `ipc::Response`).
-  **Deferred (2026-07-02):** performance-only, and it changes the IPC wire
-  format across every model runner + its TS caller in lockstep. `tsc`/`cargo
-  check` can't prove images still round-trip byte-for-byte — that needs the
-  running app. Do it as its own task with a real end-to-end image check.
+  **Output direction done (2026-07-02):** the three image-*returning* commands
+  (`run_birefnet`, `run_real_esrgan`, `run_lama`) now return `tauri::ipc::Response`
+  (raw ArrayBuffer) instead of a JSON number array — the biggest blowup, since
+  these results are multi-MB (upscale output is larger than input). Wrapper
+  signatures (`Uint8Array` in/out) are unchanged, so no downstream caller moved.
+  **→ verify in-app:** background-remove / upscale / remove-element must still
+  produce a correct image.
+  **Remaining:** the *input* direction still passes `Array.from(imageBytes)`.
+  Raw `ipc::Request` has a single body, which doesn't fit the multi-arg commands
+  (`run_lama` = image+mask, `run_auto_detect`/`run_sam_segment` = image+params),
+  and passing a bare `Uint8Array` arg isn't a confirmed-efficient path — so the
+  input side is a real design change, left for a focused task. Same for `db.rs`
+  base64 assets (`asset_get_many` returns many blobs, no single-body fit).
 - [ ] **M13 — Florence2 decoder is O(n²).** `src-tauri/src/models.rs:1850-1908`:
   cache-less decode clones `encoder_hidden` (~MB) and full `decoder_embeds`
   every step, up to 512 steps. Inside `spawn_blocking`, so slowness only.
