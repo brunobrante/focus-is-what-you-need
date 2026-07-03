@@ -187,7 +187,7 @@ Paths are relative to `apps/desktop/`.
   it stays a JSON pair; `db.rs` base64 assets (`asset_get_many` returns *many*
   blobs) need a framed multi-blob binary protocol on the response side, a distinct
   change from this input-direction sweep.
-- [ ] **M13 — Florence2 decoder is O(n²).** `src-tauri/src/models.rs:1850-1908`:
+- [x] **M13 — Florence2 decoder is O(n²).** `src-tauri/src/models.rs:1850-1908`:
   cache-less decode clones `encoder_hidden` (~MB) and full `decoder_embeds`
   every step, up to 512 steps. Inside `spawn_blocking`, so slowness only.
   **Allocation blowup done (2026-07-02):** the audit's headline cost — re-cloning
@@ -208,14 +208,23 @@ Paths are relative to `apps/desktop/`.
   byte-identical (a gather, no float math), so detections are provably unchanged —
   an O(n²) → O(n) cut on the embed path with no execution-path change. `cargo
   check` passes.
-  **Remaining:** the *decoder's* own O(n²) — it re-processes the full sequence
-  each step on the no-cache branch. The only fix is driving the model's
-  `use_cache` branch (feed `present.*` KV outputs back as `past_key_values.*`,
-  feed only the new token per step). That changes the execution path, manages ~24
-  KV tensors/step with growing attention masks, and its failure mode is *silent
-  detection degradation* — so it needs a runtime before/after detection-diff to
-  confirm parity, which can't be done from `cargo check` alone. Held pending that
-  verification (perf-only: the whole decode is inside `spawn_blocking`).
+  **Decoder cache done (2026-07-03):** the greedy loop now drives the merged
+  decoder's KV-cache branch. Prefill (step 0) runs `use_cache_branch=false` over
+  the single start token — byte-identical to the old no-cache first step, so the
+  first token is provably unchanged — and emits `present.*`. Every later step runs
+  `use_cache_branch=true`, feeding the previous `present.*.decoder.*` back as
+  `past_key_values.*.decoder.*` plus only the one new token, with the
+  cross-attention (`.encoder.`) KV pinned from prefill and a full-length all-ones
+  attention mask. `present`↔`past_key_values` names and layer count are discovered
+  from `decoder.inputs()/outputs()` (no hardcoded layer count). This drops the
+  decoder from re-processing the whole sequence each step (O(n²)) to attending
+  over the cache (O(n)). `cargo check` passes. **→ MUST verify in-app (runtime,
+  can't be checked from `cargo check`):** run auto-detect / Adjust-crop on a few
+  screenshots and confirm the detected regions match what the old build produced —
+  a subtly-wrong KV/mask wiring degrades detections *silently* rather than
+  erroring. If regions drift, revert commit for this item (the embed-path commit
+  before it is safe to keep). Perf-only: the whole decode is inside
+  `spawn_blocking`.
 
 ## Medium — StrictMode
 

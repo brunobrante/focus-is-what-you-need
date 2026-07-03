@@ -1909,24 +1909,24 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     let decoder_inputs: Vec<String> =
         decoder.inputs().iter().map(|o| o.name().to_string()).collect();
 
-    // The decoder runs on its no-cache branch, re-feeding the full sequence every
-    // step. Only inputs_embeds / input_ids / attention_mask grow; the rest are
-    // constant for the whole decode. Build those once and hand the step a
-    // zero-copy `.view()`, instead of re-cloning encoder_hidden (~MB) and the
-    // dummy past into a fresh tensor on each of up to 512 steps — the O(n^2)
-    // cumulative copying the audit flagged (M13). This does not change the
-    // decode math (still the no-cache branch), only where the tensors are built.
+    // The merged decoder is driven on its KV-cache branch (M13). Prefill (step 0)
+    // runs `use_cache_branch=false` over the single start token and emits the
+    // `present.*` key/value tensors; every later step runs `use_cache_branch=true`,
+    // feeding the previous step's `present.*` back as `past_key_values.*` and only
+    // the one new token — so the decoder attends over the cache instead of
+    // re-processing the whole growing sequence each step (O(n^2) -> O(n)). The
+    // invariant cross-attention inputs are built once and viewed each step.
+    let decoder_outputs: Vec<String> =
+        decoder.outputs().iter().map(|o| o.name().to_string()).collect();
     let encoder_hidden_tensor =
         Tensor::from_array((vec![1, encoder_seq as i64, d_model as i64], encoder_hidden))
             .map_err(|e| e.to_string())?;
     let encoder_mask_tensor =
         Tensor::from_array((vec![1, encoder_seq as i64], vec![1i64; encoder_seq]))
             .map_err(|e| e.to_string())?;
-    let use_cache_tensor =
-        Tensor::from_array((vec![1i64], vec![false])).map_err(|e| e.to_string())?;
-    // One shared dummy for every `past_key_values.*` input — same shape the
-    // no-cache branch fed before; it reaches an unexecuted `If` branch, so a
-    // single zero tensor viewed N times is equivalent.
+    // The prefill branch ignores `past_key_values.*` (an unexecuted `If` branch),
+    // but ORT rejects a 0-length tensor, so a shared length-1 zero past is fed for
+    // every past input on step 0; cache steps feed the real captured KV instead.
     let dummy_past_len = FLORENCE2_NUM_HEADS * FLORENCE2_HEAD_DIM;
     let dummy_past_tensor = Tensor::from_array((
         vec![1, FLORENCE2_NUM_HEADS as i64, 1, FLORENCE2_HEAD_DIM as i64],
@@ -1934,35 +1934,56 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     ))
     .map_err(|e| e.to_string())?;
 
-    let mut input_ids: Vec<i64> = vec![FLORENCE2_DECODER_START];
-    // The merged decoder consumes pre-embedded tokens (`inputs_embeds`).
-    // `embed_tokens` is a pure per-token lookup, so a token's embedding is the
-    // same wherever it sits in the sequence — embed each token exactly once and
-    // grow this buffer instead of re-embedding the whole sequence every step. An
-    // O(n^2) -> O(n) cut on the embed path that leaves `inputs_embeds` (and thus
-    // the decoder output / detections) byte-identical (M13).
-    let mut decoder_embeds = florence2_embed(embed, &embed_input, &input_ids)?;
+    // The decoder consumes pre-embedded tokens; `embed_tokens` is a pure per-token
+    // lookup, so each token is embedded exactly once when it becomes the step's
+    // input. The KV cache carries all prior context, so each step feeds just the
+    // single new token, never the growing sequence.
+    let mut token_ids: Vec<i64> = vec![FLORENCE2_DECODER_START];
+    let mut token_embeds = florence2_embed(embed, &embed_input, &token_ids)?;
+    let mut past: Vec<(String, Tensor<f32>)> = Vec::new();
     let mut generated: Vec<i64> = Vec::new();
-    for _ in 0..FLORENCE2_MAX_NEW_TOKENS {
-        let next = florence2_decode_step(
+    // Decoder positions seen so far, including the current step's token — the
+    // length of the (all-ones, no padding) decoder attention mask.
+    let mut total_len: usize = 1;
+    for step in 0..FLORENCE2_MAX_NEW_TOKENS {
+        let (next, present) = florence2_decode_step(
             decoder,
             &decoder_inputs,
-            &input_ids,
-            &decoder_embeds,
+            &decoder_outputs,
+            &token_ids,
+            &token_embeds,
             d_model,
+            total_len,
+            step > 0, // prefill on step 0, KV-cache branch after
+            &past,
             &encoder_hidden_tensor,
             &encoder_mask_tensor,
-            &use_cache_tensor,
             &dummy_past_tensor,
         )?;
         if next == FLORENCE2_EOS {
             break;
         }
-        input_ids.push(next);
         generated.push(next);
-        // Append only the new token's embedding for the next step.
-        let next_embed = florence2_embed(embed, &embed_input, &[next])?;
-        decoder_embeds.extend_from_slice(&next_embed);
+        // Next step feeds only the new token; its context lives in the KV cache.
+        token_ids = vec![next];
+        token_embeds = florence2_embed(embed, &embed_input, &token_ids)?;
+        // Update the cache: prefill seeds everything (self- and cross-attention
+        // KV); later steps refresh only the self-attention (`.decoder.`) KV and
+        // keep the invariant cross-attention (`.encoder.`) KV pinned from prefill,
+        // so a passthrough/empty encoder `present` on the cache branch can't wipe
+        // it.
+        if step == 0 {
+            past = present;
+        } else {
+            for (name, tensor) in present {
+                if name.contains(".decoder.") {
+                    if let Some(slot) = past.iter_mut().find(|(n, _)| *n == name) {
+                        slot.1 = tensor;
+                    }
+                }
+            }
+        }
+        total_len += 1;
     }
 
     // Decode to text (keeping `<loc_*>` tokens) and return the raw string.
@@ -1985,33 +2006,40 @@ fn florence2_embed(
     Ok(array.iter().copied().collect())
 }
 
-/// Runs one decoder step and returns the argmax token id of the last position.
-/// The merged decoder is driven on its no-cache branch (`use_cache_branch=false`
-/// with dummy past tensors), re-feeding the full pre-embedded sequence each step.
+/// Runs one merged-decoder step and returns the next token (argmax of the last
+/// position) plus the `present.*` key/value tensors — keyed by the matching
+/// `past_key_values.*` input name — to feed back on the following step.
+/// `use_cache` selects the branch: `false` on prefill (past ignored, KV computed
+/// from scratch), `true` afterwards (attend over the fed-back cache and only the
+/// new token).
+#[allow(clippy::too_many_arguments)]
 fn florence2_decode_step(
     decoder: &mut Session,
     input_names: &[String],
-    input_ids: &[i64],
-    decoder_embeds: &[f32],
+    output_names: &[String],
+    token_ids: &[i64],
+    token_embeds: &[f32],
     d_model: usize,
-    // Invariant inputs, built once by the caller and passed as a zero-copy view
-    // each step (M13): encoder hidden states, its attention mask, the constant
-    // `use_cache_branch=false`, and the shared dummy past.
+    total_len: usize,
+    use_cache: bool,
+    past: &[(String, Tensor<f32>)],
+    // Invariant cross-attention inputs, built once and viewed each step (M13).
     encoder_hidden_tensor: &Tensor<f32>,
     encoder_mask_tensor: &Tensor<i64>,
-    use_cache_tensor: &Tensor<bool>,
     dummy_past_tensor: &Tensor<f32>,
-) -> Result<i64, String> {
-    let seq = input_ids.len();
+) -> Result<(i64, Vec<(String, Tensor<f32>)>), String> {
+    let cur = token_ids.len();
+    let use_cache_tensor =
+        Tensor::from_array((vec![1i64], vec![use_cache])).map_err(|e| e.to_string())?;
     let mut inputs: Vec<(Cow<str>, SessionInputValue)> = Vec::new();
 
     for name in input_names {
         let value: SessionInputValue = if name == "inputs_embeds" {
-            Tensor::from_array((vec![1, seq as i64, d_model as i64], decoder_embeds.to_vec()))
+            Tensor::from_array((vec![1, cur as i64, d_model as i64], token_embeds.to_vec()))
                 .map_err(|e| e.to_string())?
                 .into()
         } else if name == "input_ids" {
-            Tensor::from_array((vec![1, seq as i64], input_ids.to_vec()))
+            Tensor::from_array((vec![1, cur as i64], token_ids.to_vec()))
                 .map_err(|e| e.to_string())?
                 .into()
         } else if name == "encoder_hidden_states" {
@@ -2019,16 +2047,19 @@ fn florence2_decode_step(
         } else if name == "encoder_attention_mask" {
             encoder_mask_tensor.view().into()
         } else if name == "attention_mask" {
-            Tensor::from_array((vec![1, seq as i64], vec![1i64; seq]))
+            // Full decoder length so far (past + current); all ones, no padding.
+            Tensor::from_array((vec![1, total_len as i64], vec![1i64; total_len]))
                 .map_err(|e| e.to_string())?
                 .into()
         } else if name == "use_cache_branch" {
             use_cache_tensor.view().into()
         } else if name.starts_with("past_key_values") {
-            // Dummy past for the no-cache branch: it feeds an unexecuted `If`
-            // branch and is ignored (a 0-length tensor is rejected by ORT, so a
-            // length-1 zero tensor is used). Shared across every past input.
-            dummy_past_tensor.view().into()
+            // Cache steps feed the real captured KV by name; prefill feeds the
+            // shared dummy (the branch ignores it).
+            match past.iter().find(|(n, _)| n == name) {
+                Some((_, tensor)) => tensor.view().into(),
+                None => dummy_past_tensor.view().into(),
+            }
         } else {
             // Unknown / optional input: skip it. ORT errors out if it was required.
             continue;
@@ -2037,28 +2068,49 @@ fn florence2_decode_step(
     }
 
     let outputs = decoder.run(inputs).map_err(|e| e.to_string())?;
-    let logits = outputs[0]
-        .try_extract_array::<f32>()
-        .map_err(|e| e.to_string())?;
-    let shape = logits.shape();
-    if shape.len() != 3 {
-        return Err(format!("unexpected decoder output rank: {}", shape.len()));
-    }
-    // Guard the subtraction: a zero-length sequence would underflow and panic (L4).
-    let last = shape[1]
-        .checked_sub(1)
-        .ok_or_else(|| "decoder produced a zero-length sequence".to_string())?;
-    let vocab = shape[2];
-    let mut best_id = 0i64;
-    let mut best_value = f32::MIN;
-    for v in 0..vocab {
-        let value = logits[[0, last, v]];
-        if value > best_value {
-            best_value = value;
-            best_id = v as i64;
+
+    let best_id = {
+        let logits = outputs[0]
+            .try_extract_array::<f32>()
+            .map_err(|e| e.to_string())?;
+        let shape = logits.shape();
+        if shape.len() != 3 {
+            return Err(format!("unexpected decoder output rank: {}", shape.len()));
         }
+        // Guard the subtraction: a zero-length sequence would underflow and panic (L4).
+        let last = shape[1]
+            .checked_sub(1)
+            .ok_or_else(|| "decoder produced a zero-length sequence".to_string())?;
+        let vocab = shape[2];
+        let mut best_id = 0i64;
+        let mut best_value = f32::MIN;
+        for v in 0..vocab {
+            let value = logits[[0, last, v]];
+            if value > best_value {
+                best_value = value;
+                best_id = v as i64;
+            }
+        }
+        best_id
+    };
+
+    // Capture the `present.*` KV as owned tensors, keyed by the `past_key_values.*`
+    // input they feed on the next step. Output order matches `output_names`.
+    let mut present: Vec<(String, Tensor<f32>)> = Vec::new();
+    for (i, oname) in output_names.iter().enumerate() {
+        if !oname.starts_with("present") {
+            continue;
+        }
+        let arr = outputs[i]
+            .try_extract_array::<f32>()
+            .map_err(|e| e.to_string())?;
+        let dims: Vec<i64> = arr.shape().iter().map(|&d| d as i64).collect();
+        let data: Vec<f32> = arr.iter().copied().collect();
+        let tensor = Tensor::from_array((dims, data)).map_err(|e| e.to_string())?;
+        present.push((oname.replacen("present", "past_key_values", 1), tensor));
     }
-    Ok(best_id)
+
+    Ok((best_id, present))
 }
 
 /// Parses Florence-2's region string. Regions come as a label followed by four
