@@ -10,12 +10,14 @@ export function useAutoDetect({
   activeSubjectUrl,
   imgRef,
   setPendingDetections,
+  pushDetectionHistory,
   setCurrentTool,
 }: {
   canCrop: boolean;
   activeSubjectUrl: string;
   imgRef: React.RefObject<HTMLImageElement | null>;
   setPendingDetections: React.Dispatch<React.SetStateAction<PendingDetectionBox[]>>;
+  pushDetectionHistory: () => void;
   setCurrentTool: React.Dispatch<React.SetStateAction<EditorTool>>;
 }) {
   const [autoDetecting, setAutoDetecting] = useState(false);
@@ -85,6 +87,8 @@ export function useAutoDetect({
             color: colorByLabel.get(label) as string,
           };
         });
+        // Snapshot the prior review boxes so Cmd/Ctrl+Z can undo this run.
+        pushDetectionHistory();
         setPendingDetections(boxes);
         setCurrentTool("crop");
       } catch (error) {
@@ -94,7 +98,7 @@ export function useAutoDetect({
         setAutoDetecting(false);
       }
     },
-    [autoDetecting, canCrop, activeSubjectUrl, flashMessage, imgRef, setCurrentTool, setPendingDetections],
+    [autoDetecting, canCrop, activeSubjectUrl, flashMessage, imgRef, pushDetectionHistory, setCurrentTool, setPendingDetections],
   );
 
   return { autoDetecting, autoDetectMessage, autoDetect };

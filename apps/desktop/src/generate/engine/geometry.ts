@@ -105,16 +105,6 @@ export function radiusHandleCenter(
   return { x, y };
 }
 
-// Center of a pending-detection box's "×" discard control: a small handle
-// inset from the top-right corner, sized like the other handle hit areas.
-const DETECTION_CLOSE_INSET = 14;
-
-export function detectionCloseButtonCenter(box: CropBox, zoom: number): { x: number; y: number } {
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const inset = DETECTION_CLOSE_INSET / safeZoom;
-  return { x: box.x + box.w - inset, y: box.y + inset };
-}
-
 export function resizeCropBox(
   startBox: CropBox,
   handle: ResizeHandle,

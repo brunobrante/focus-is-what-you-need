@@ -478,6 +478,9 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     setCropsOverlayAlpha,
     isHoveringSelection,
     cancelSelection,
+    pushDetectionHistory,
+    deleteActiveDetection,
+    undoDetection,
     selectionToSubjectCoords,
     toOriginalCoords,
     selectionCrop,
@@ -521,6 +524,7 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     activeSubjectUrl: activeSubject.url,
     imgRef,
     setPendingDetections,
+    pushDetectionHistory,
     setCurrentTool,
   });
 
@@ -1057,20 +1061,26 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     drawingPath,
     selectionLocked,
     editingComponentId,
+    activeDetectionId,
     setTool,
     beginRootCreation,
     cancelSelection,
     saveSelection,
+    deleteActiveDetection,
+    undoDetection,
   });
   shortcutStateRef.current = {
     selection,
     drawingPath,
     selectionLocked,
     editingComponentId,
+    activeDetectionId,
     setTool,
     beginRootCreation,
     cancelSelection,
     saveSelection,
+    deleteActiveDetection,
+    undoDetection,
   };
 
   // Keyboard shortcuts.
@@ -1078,23 +1088,38 @@ export function useToolsEditor(props: ToolsEditorProps): ToolsEditorState {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
-      // These are all bare-key shortcuts — never hijack an OS/browser chord like
-      // Cmd+C (copy), Cmd+V (paste) or Cmd+F (find), which otherwise switched the
-      // tool / created a screen instead of doing the expected thing (M5).
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const {
         selection,
         drawingPath,
         selectionLocked,
         editingComponentId,
+        activeDetectionId,
         setTool,
         beginRootCreation,
         cancelSelection,
         saveSelection,
+        deleteActiveDetection,
+        undoDetection,
       } = shortcutStateRef.current;
 
-      if (event.key === "v" || event.key === "V") {
+      // Cmd/Ctrl+Z undoes the last auto-detect run or box deletion. Handled
+      // before the chord guard below (which drops every other modifier combo).
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && (event.key === "z" || event.key === "Z")) {
+        if (undoDetection()) event.preventDefault();
+        return;
+      }
+
+      // The remaining shortcuts are all bare keys — never hijack an OS/browser
+      // chord like Cmd+C (copy), Cmd+V (paste) or Cmd+F (find), which otherwise
+      // switched the tool / created a screen instead of doing the expected thing (M5).
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      if (event.key === "Backspace" || event.key === "Delete") {
+        // Remove the active auto-detect review box; ignore otherwise so the key
+        // stays free for normal navigation elsewhere.
+        if (activeDetectionId && deleteActiveDetection()) event.preventDefault();
+      } else if (event.key === "v" || event.key === "V") {
         setTool("move");
       } else if (event.key === "c" || event.key === "C") {
         setTool("crop");

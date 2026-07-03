@@ -38,7 +38,6 @@ import {
 } from "../engine/geometry";
 import {
   componentHitTest,
-  detectionCloseHitTest,
   selectionHitTest,
 } from "../engine/hitTesting";
 import { componentAreaAlreadyExists } from "../engine/componentModel";
@@ -105,6 +104,9 @@ export type BuilderInteractionState = {
   isHoveringSelection: boolean;
 
   cancelSelection: () => void;
+  pushDetectionHistory: () => void;
+  deleteActiveDetection: () => boolean;
+  undoDetection: () => boolean;
   selectionToSubjectCoords: (box: CropBox) => CropBox | null;
   toOriginalCoords: (subjectBox: CropBox) => CropBox;
 
@@ -253,6 +255,45 @@ export function useBuilderInteraction({
     );
   }, [selection, activeDetectionId]);
 
+  // --- Undo history for the auto-detect review boxes -----------------------
+  // A simple snapshot stack: each destructive action (running auto-detect,
+  // deleting a box) pushes the prior `pendingDetections` before mutating, so
+  // Cmd/Ctrl+Z can restore it. Mirrors live in refs so the keyboard handler and
+  // the auto-detect hook stay stable (they don't re-subscribe per state change).
+  const pendingDetectionsRef = useRef(pendingDetections);
+  pendingDetectionsRef.current = pendingDetections;
+  const activeDetectionIdRef = useRef(activeDetectionId);
+  activeDetectionIdRef.current = activeDetectionId;
+  const detectionHistoryRef = useRef<PendingDetectionBox[][]>([]);
+
+  const pushDetectionHistory = useCallback(() => {
+    // Cap the stack so a long review session can't grow it unbounded.
+    const stack = detectionHistoryRef.current;
+    stack.push(pendingDetectionsRef.current.slice());
+    if (stack.length > 50) stack.shift();
+  }, []);
+
+  const deleteActiveDetection = useCallback(() => {
+    const id = activeDetectionIdRef.current;
+    if (!id) return false;
+    pushDetectionHistory();
+    setPendingDetections((current) => current.filter((d) => d.id !== id));
+    setActiveDetectionId(null);
+    setSelection(null);
+    setSelectionLocked(false);
+    return true;
+  }, [pushDetectionHistory]);
+
+  const undoDetection = useCallback(() => {
+    const prev = detectionHistoryRef.current.pop();
+    if (prev === undefined) return false;
+    setPendingDetections(prev);
+    setActiveDetectionId(null);
+    setSelection(null);
+    setSelectionLocked(false);
+    return true;
+  }, []);
+
   const selectionToSubjectCoords = useCallback(
     (box: CropBox): CropBox | null => {
       const img = imgRef.current;
@@ -398,70 +439,65 @@ export function useBuilderInteraction({
     event.currentTarget.setPointerCapture(event.pointerId);
 
     if (currentTool === "crop" && pendingDetections.length > 0) {
-      // The × discard control takes priority over everything else, topmost box first.
-      for (let i = pendingDetections.length - 1; i >= 0; i -= 1) {
-        const detection = pendingDetections[i];
-        if (!detectionCloseHitTest(point, detection.box, toolZoom)) continue;
-        setPendingDetections((current) => current.filter((d) => d.id !== detection.id));
-        if (activeDetectionId === detection.id) {
-          setActiveDetectionId(null);
-          setSelection(null);
-          setSelectionLocked(false);
-        }
-        return;
-      }
-
-      // A hit on the already-active box falls through to the normal resize/move/
-      // radius handling below (it's already bound to `selection`).
+      // A resize/radius *handle* hit on the already-active box falls through to
+      // the normal handling below (it's already bound to `selection`). A plain
+      // body hit does NOT — otherwise, once a box is active, its body would
+      // swallow clicks meant for a smaller box nested inside it.
       const activeHit =
         selection && selectionLocked ? selectionHitTest(point, selection, true, toolZoom) : null;
-      if (!activeHit) {
-        let activated = false;
-        for (let i = pendingDetections.length - 1; i >= 0; i -= 1) {
-          const detection = pendingDetections[i];
-          if (detection.id === activeDetectionId) continue;
+      if (!activeHit || activeHit.kind === "move") {
+        // Pick the smallest box under the cursor so nested detections stay
+        // clickable: overlapping boxes resolve to the innermost (smallest-area)
+        // one instead of whichever happens to sit last in the array.
+        let target: PendingDetectionBox | null = null;
+        let targetHit: ReturnType<typeof selectionHitTest> = null;
+        let targetArea = Number.POSITIVE_INFINITY;
+        for (const detection of pendingDetections) {
           const hit = selectionHitTest(point, detection.box, true, toolZoom);
           if (!hit) continue;
-          setActiveDetectionId(detection.id);
-          setSelection(detection.box);
+          const area = detection.box.w * detection.box.h;
+          if (area < targetArea) {
+            target = detection;
+            targetHit = hit;
+            targetArea = area;
+          }
+        }
+        if (target && targetHit) {
+          setActiveDetectionId(target.id);
+          setSelection(target.box);
           setSelectionLocked(true);
-          if (hit.kind === "radius") {
+          if (targetHit.kind === "radius") {
             selectionInteractionRef.current = {
               type: "radius",
               pointerId: event.pointerId,
-              handle: hit.handle,
+              handle: targetHit.handle,
               startPoint: point,
-              startBox: detection.box,
+              startBox: target.box,
             };
             if (stageViewportRef.current) stageViewportRef.current.style.cursor = RADIUS_CURSOR;
-          } else if (hit.kind === "resize") {
+          } else if (targetHit.kind === "resize") {
             selectionInteractionRef.current = {
               type: "resize",
               pointerId: event.pointerId,
-              handle: hit.handle,
+              handle: targetHit.handle,
               startPoint: point,
-              startBox: detection.box,
+              startBox: target.box,
             };
           } else {
             selectionInteractionRef.current = {
               type: "move",
               pointerId: event.pointerId,
               startPoint: point,
-              startBox: detection.box,
+              startBox: target.box,
             };
           }
           setDrawing(true);
-          activated = true;
-          break;
-        }
-        if (!activated) {
+        } else if (activeDetectionId || selection) {
           // Missed every box — just deselect, don't start a new manual crop draw
           // while there are still auto-detected boxes to review.
-          if (activeDetectionId || selection) {
-            setActiveDetectionId(null);
-            setSelection(null);
-            setSelectionLocked(false);
-          }
+          setActiveDetectionId(null);
+          setSelection(null);
+          setSelectionLocked(false);
         }
         return;
       }
@@ -680,6 +716,9 @@ export function useBuilderInteraction({
     setCropsOverlayAlpha,
     isHoveringSelection,
     cancelSelection,
+    pushDetectionHistory,
+    deleteActiveDetection,
+    undoDetection,
     selectionToSubjectCoords,
     toOriginalCoords,
     selectionCrop,

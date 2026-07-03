@@ -7,7 +7,6 @@ import { MIN_TOOL_ZOOM } from "../types";
 import {
   resizeHandleCenter,
   radiusHandleCenter,
-  detectionCloseButtonCenter,
   maxCropRadius,
   componentBoxInSubject,
   imageClientFromSubjectBox,
@@ -319,29 +318,6 @@ export function drawSquareHandle(
   ctx.stroke();
 }
 
-/** The small "×" discard control at a pending-detection box's top-right corner. */
-function drawDetectionCloseButton(
-  ctx: CanvasRenderingContext2D,
-  box: { x: number; y: number; w: number; h: number },
-  color: string,
-  stroke: number,
-  zoom: number,
-) {
-  const safeZoom = Math.max(MIN_TOOL_ZOOM, zoom);
-  const center = detectionCloseButtonCenter(box, zoom);
-  const radius = (HANDLE_DOT_SIZE / 2 / safeZoom) * 1.1;
-  drawCircleHandle(ctx, center.x, center.y, radius, "#FFFFFF", color, stroke);
-  const half = radius * 0.45;
-  ctx.beginPath();
-  ctx.moveTo(center.x - half, center.y - half);
-  ctx.lineTo(center.x + half, center.y + half);
-  ctx.moveTo(center.x + half, center.y - half);
-  ctx.lineTo(center.x - half, center.y + half);
-  ctx.lineWidth = 1.4 * stroke;
-  ctx.strokeStyle = color;
-  ctx.stroke();
-}
-
 function prepareImageCanvas(
   canvas: HTMLCanvasElement,
   img: HTMLImageElement | null,
@@ -550,7 +526,6 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
     ctx.strokeStyle = detection.color;
     ctx.stroke();
     drawLabelBadge(ctx, detection.label, x, y - 4 * stroke, toolZoom);
-    drawDetectionCloseButton(ctx, detection.box, detection.color, stroke, toolZoom);
   }
 
   if (selection) {
@@ -608,9 +583,6 @@ export function paintOverlayCanvas(args: PaintOverlayArgs) {
           drawCircleHandle(ctx, center.x, center.y, radiusRadius, "#FFFFFF", selectionColor, stroke);
         }
       }
-    }
-    if (activeDetection) {
-      drawDetectionCloseButton(ctx, selection, activeDetection.color, stroke, toolZoom);
     }
   }
 
