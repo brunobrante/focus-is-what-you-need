@@ -2104,6 +2104,12 @@ fn florence2_decode_step(
         let arr = outputs[i]
             .try_extract_array::<f32>()
             .map_err(|e| e.to_string())?;
+        // On the cache branch the merged decoder emits the cross-attention
+        // (`.encoder.`) present as a 0-length passthrough; skip any empty tensor
+        // (ORT rejects a 0 dimension) — the encoder KV stays pinned from prefill.
+        if arr.shape().iter().any(|&d| d == 0) {
+            continue;
+        }
         let dims: Vec<i64> = arr.shape().iter().map(|&d| d as i64).collect();
         let data: Vec<f32> = arr.iter().copied().collect();
         let tensor = Tensor::from_array((dims, data)).map_err(|e| e.to_string())?;
