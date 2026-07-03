@@ -1935,11 +1935,15 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     .map_err(|e| e.to_string())?;
 
     let mut input_ids: Vec<i64> = vec![FLORENCE2_DECODER_START];
+    // The merged decoder consumes pre-embedded tokens (`inputs_embeds`).
+    // `embed_tokens` is a pure per-token lookup, so a token's embedding is the
+    // same wherever it sits in the sequence — embed each token exactly once and
+    // grow this buffer instead of re-embedding the whole sequence every step. An
+    // O(n^2) -> O(n) cut on the embed path that leaves `inputs_embeds` (and thus
+    // the decoder output / detections) byte-identical (M13).
+    let mut decoder_embeds = florence2_embed(embed, &embed_input, &input_ids)?;
     let mut generated: Vec<i64> = Vec::new();
     for _ in 0..FLORENCE2_MAX_NEW_TOKENS {
-        // The merged decoder consumes pre-embedded tokens (`inputs_embeds`), so
-        // the growing decoder sequence is run through embed_tokens each step.
-        let decoder_embeds = florence2_embed(embed, &embed_input, &input_ids)?;
         let next = florence2_decode_step(
             decoder,
             &decoder_inputs,
@@ -1956,6 +1960,9 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
         }
         input_ids.push(next);
         generated.push(next);
+        // Append only the new token's embedding for the next step.
+        let next_embed = florence2_embed(embed, &embed_input, &[next])?;
+        decoder_embeds.extend_from_slice(&next_embed);
     }
 
     // Decode to text (keeping `<loc_*>` tokens) and return the raw string.

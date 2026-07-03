@@ -200,12 +200,22 @@ Paths are relative to `apps/desktop/`.
   — same no-cache branch, byte-identical tensor values — so detections are
   unchanged (**→ sanity-check auto-detect returns the same regions**). Verified by
   `cargo check`.
-  **Remaining:** the deeper O(n²) is *compute*, not copying — the decoder still
-  re-processes the full sequence each step, and `florence2_embed` re-embeds the
-  whole growing sequence. Turning that into O(n) means driving the model's
-  `use_cache` branch (feed `present.*` KV outputs back as `past_key_values.*`),
-  which changes the execution path and needs a runtime detection-diff to confirm
-  parity. Left as a focused task.
+  **Embed path done (2026-07-03):** the second half of the flagged compute cost —
+  `florence2_embed` re-embedding the *whole* growing sequence every step — is gone.
+  `embed_tokens` is a pure per-token lookup, so a token's embedding is identical
+  wherever it sits; the loop now embeds each token exactly once and grows the
+  `inputs_embeds` buffer. This leaves the buffer handed to the decoder
+  byte-identical (a gather, no float math), so detections are provably unchanged —
+  an O(n²) → O(n) cut on the embed path with no execution-path change. `cargo
+  check` passes.
+  **Remaining:** the *decoder's* own O(n²) — it re-processes the full sequence
+  each step on the no-cache branch. The only fix is driving the model's
+  `use_cache` branch (feed `present.*` KV outputs back as `past_key_values.*`,
+  feed only the new token per step). That changes the execution path, manages ~24
+  KV tensors/step with growing attention masks, and its failure mode is *silent
+  detection degradation* — so it needs a runtime before/after detection-diff to
+  confirm parity, which can't be done from `cargo check` alone. Held pending that
+  verification (perf-only: the whole decode is inside `spawn_blocking`).
 
 ## Medium — StrictMode
 
