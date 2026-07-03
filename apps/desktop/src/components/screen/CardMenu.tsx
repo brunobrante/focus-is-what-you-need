@@ -1,8 +1,11 @@
 import { useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { IconCheck, IconDuplicate, IconEllipsis, IconFastEdit, IconGlobe, IconGrid, IconMoveTo, IconOpenCanvas, IconTrash, IconZoomIn } from "@/components/icons";
-import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
+import {
+  CardMenuDropdown,
+  cardMenuPosition,
+  type CardMenuItem as MoreMenuItem,
+} from "@/components/ui/CardMenuDropdown";
 
 export type CardMenuButton = {
   key: string;
@@ -50,15 +53,7 @@ export function CardMenu({ buttons }: { buttons: CardMenuButton[] }) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (btn.menuItems) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const width = 176;
-                  setMenuPosition({
-                    top: rect.bottom + 8,
-                    left: Math.min(
-                      window.innerWidth - width - 8,
-                      Math.max(8, rect.right - width),
-                    ),
-                  });
+                  setMenuPosition(cardMenuPosition(e.currentTarget.getBoundingClientRect()));
                   setOpenKey((current) => (current === btn.key ? null : btn.key));
                   return;
                 }
@@ -68,41 +63,19 @@ export function CardMenu({ buttons }: { buttons: CardMenuButton[] }) {
             >
               {btn.icon}
             </button>
-            {btn.menuItems && openKey === btn.key && menuPosition ? createPortal(
-              <div
-                ref={menuRef}
-                role="menu"
-                className="fixed z-[80] min-w-44 overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1 shadow-[var(--shadow-pop)] backdrop-blur-md"
-                style={{ top: menuPosition.top, left: menuPosition.left }}
-              >
-                {btn.menuItems.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    role="menuitem"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setOpenKey(null);
-                      setMenuPosition(null);
-                      item.onClick();
-                    }}
-                    className={[
-                      "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] transition-colors",
-                      item.destructive
-                        ? "text-[#ff7373] hover:bg-[rgba(255,80,80,0.12)]"
-                        : item.accent
-                          ? "hover:bg-[var(--surface-hover)]"
-                          : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-                    ].join(" ")}
-                    style={item.accent ? { color: LINKED_INSTANCE_COLOR } : undefined}
-                  >
-                    {item.icon ? <span className="grid h-4 w-4 place-items-center">{item.icon}</span> : null}
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </div>,
-              document.body,
+            {btn.menuItems && openKey === btn.key && menuPosition ? (
+              <CardMenuDropdown
+                menuRef={menuRef}
+                position={menuPosition}
+                items={btn.menuItems}
+                onSelect={(item, e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpenKey(null);
+                  setMenuPosition(null);
+                  item.onClick();
+                }}
+              />
             ) : null}
           </span>
         </span>
@@ -110,16 +83,6 @@ export function CardMenu({ buttons }: { buttons: CardMenuButton[] }) {
     </div>
   );
 }
-
-type MoreMenuItem = {
-  key: string;
-  label: string;
-  icon?: ReactNode;
-  destructive?: boolean;
-  /** Purple "linked" accent — used by the linkable toggle. */
-  accent?: boolean;
-  onClick: () => void;
-};
 
 export function CardMoreMenu({
   items,
@@ -160,54 +123,24 @@ export function CardMoreMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const width = 176;
-          setMenuPosition({
-            top: rect.bottom + 8,
-            left: Math.min(
-              window.innerWidth - width - 8,
-              Math.max(8, rect.right - width),
-            ),
-          });
+          setMenuPosition(cardMenuPosition(e.currentTarget.getBoundingClientRect()));
           setOpen((v) => !v);
         }}
         className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-[var(--border-strong)] bg-[rgba(20,20,20,0.92)] text-[var(--text-muted)] shadow-[var(--shadow-pop)] backdrop-blur-md transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
       >
         {CardMenuIcons.More}
       </button>
-      {open && menuPosition ? createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          className="fixed z-[80] min-w-44 overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1 shadow-[var(--shadow-pop)] backdrop-blur-md"
-          style={{ top: menuPosition.top, left: menuPosition.left }}
-        >
-          {items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                setMenuPosition(null);
-                item.onClick();
-              }}
-              className={[
-                "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] transition-colors",
-                item.destructive
-                  ? "text-[#ff7373] hover:bg-[rgba(255,80,80,0.12)]"
-                  : item.accent
-                    ? "hover:bg-[var(--surface-hover)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-              ].join(" ")}
-              style={item.accent ? { color: LINKED_INSTANCE_COLOR } : undefined}
-            >
-              {item.icon ? <span className="grid h-4 w-4 place-items-center">{item.icon}</span> : null}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body,
+      {open && menuPosition ? (
+        <CardMenuDropdown
+          menuRef={menuRef}
+          position={menuPosition}
+          items={items}
+          onSelect={(item) => {
+            setOpen(false);
+            setMenuPosition(null);
+            item.onClick();
+          }}
+        />
       ) : null}
     </div>
   );

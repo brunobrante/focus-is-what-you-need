@@ -1,12 +1,9 @@
 import {
-  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
-import { useDismissable } from "@/lib/hooks/useDismissable";
 import { screenPath } from "@/lib/navigation/projectUrl";
 import { Snapshot } from "@/components/Snapshot";
 import { PROJECT_TYPE_DIMS } from "@/lib/data/projects";
@@ -14,7 +11,6 @@ import type { ProjectType } from "@/lib/data/types";
 import type { ScreenRow } from "@/lib/storage/schema";
 import { CardMenuIcons as SharedCardMenuIcons } from "@/components/screen/CardMenu";
 import {
-  IconChevronDown,
   IconFastEdit,
   IconFolder,
   IconOpenCanvas,
@@ -25,6 +21,7 @@ import {
 } from "@/components/icons";
 import { FilterButton, FilterSection } from "@/components/ui/FilterButton";
 import { EmptyMessage } from "@/components/screen/EmptyMessage";
+import { NewItemPopover } from "./shared/NewItemPopover";
 import { CardMenu } from "./shared/CardMenu";
 import { SectionedGrid } from "./shared/SectionedGrid";
 import type { CmpChipOption, SectionState } from "./types";
@@ -132,41 +129,13 @@ function CreateScreenDropdown({
   onNewSection: () => void;
   type: ProjectType;
 }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const toggle = () => {
-    if (open) { setOpen(false); return; }
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setPos({ top: rect.bottom + 5, right: window.innerWidth - rect.right });
-    setOpen(true);
-  };
-
-  useDismissable(open, () => setOpen(false), [rootRef, menuRef]);
-
   return (
-    <div ref={rootRef} className="relative inline-flex">
-      <button
-        type="button"
-        onClick={toggle}
-        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-[var(--text)] px-3 text-[12.5px] font-medium text-[var(--bg)] transition-opacity hover:opacity-85"
-      >
-        <IconPlus size={13} strokeWidth={2.2} />
-        New
-        <IconChevronDown size={10} strokeWidth={2.4} className={["transition-transform duration-150", open ? "rotate-180" : ""].join(" ")} />
-      </button>
-      {open && pos ? createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: "fixed", top: pos.top, right: pos.right }}
-          className="z-[80] w-[190px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
-        >
+    <NewItemPopover>
+      {(close) => (
+        <>
           <button
             type="button"
-            onClick={() => { onNewScreen(); setOpen(false); }}
+            onClick={() => { onNewScreen(); close(); }}
             className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
           >
             {type === "mobile"
@@ -177,16 +146,15 @@ function CreateScreenDropdown({
           <div className="my-1 border-t border-[var(--border)]" />
           <button
             type="button"
-            onClick={() => { onNewSection(); setOpen(false); }}
+            onClick={() => { onNewSection(); close(); }}
             className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-[7px] text-left text-[13px] text-[var(--text)] transition-colors hover:bg-[var(--surface)]"
           >
             <IconFolder size={13} strokeWidth={1.6} className="shrink-0 text-[var(--text-muted)]" />
             New section
           </button>
-        </div>,
-        document.body,
-      ) : null}
-    </div>
+        </>
+      )}
+    </NewItemPopover>
   );
 }
 

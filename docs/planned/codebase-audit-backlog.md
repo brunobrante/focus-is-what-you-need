@@ -333,7 +333,7 @@ Paths are relative to `apps/desktop/`.
   and `Point` ×3 / `Rect` ×2 are byte-identical 1-liners — consolidating them
   rewires imports across ~6 files for no correctness gain, so deferred to D7-class
   cleanup.
-- [ ] **D7 — Copy-pasted components.** Toggle switch verbatim
+- [x] **D7 — Copy-pasted components.** Toggle switch verbatim
   (`src/canvas/CanvasTabs.tsx:298-329` = `src/canvas/shell/PreviewLauncher.tsx:201-232`);
   `DeviceCard` (`NewDraftPage.tsx:267-313` = `NewProjectPage.tsx:388-435`);
   wizard chrome (`NewDraftPage.tsx:91-123` = `NewWorkspacePage.tsx:64-96`);
@@ -345,12 +345,25 @@ Paths are relative to `apps/desktop/`.
   (`src/generate/engine/image.ts:47` vs
   `src/routes/references/lib/fileHelpers.ts:114`); test fixture seeds
   copy-pasted across 4 suites (~220 lines collapsible into a shared helper).
-  **Partly done (2026-07-02):** fixed the one item that was an actual bug — the
-  leaky `measureImage` in `generate/engine/image.ts` now releases the element on
-  settle, matching the fileHelpers copy. The remaining entries are cosmetic
-  component extractions (Toggle, DeviceCard, wizard chrome, popovers, CardMenu)
-  that change rendered UI and need preview verification — left as a visual-dedup
-  pass, not folded into this backend-heavy sweep.
+  **Done (2026-07-03):** the leaky `measureImage` (bug), then the shared
+  extractions across three commits: `DeviceTypeCard` and the `FeatureToggle`
+  switch, and now the remaining chrome — `WizardHeader`/`WizardFooter`
+  (`pages/shared/WizardChrome.tsx`, adopted by the new project / draft / workspace
+  wizards; also unifies the stray Portuguese "Etapa" footer to "Step"),
+  `EditPanelHeader` (`pages/shared/EditPanelHeader.tsx`, shared by the workspace +
+  project edit panels), `NewItemPopover` (`routes/Gallery/shared/`, the "New ▾"
+  split-button shell for the Screens + Components tabs), and `CardMenuDropdown`
+  (`components/ui/`, the byte-identical portal menu shared by the screen-card
+  `CardMenu`/`CardMoreMenu` and the gallery-card `CardMenu`). **Left as-is
+  (rationale):** the two card *toolbars* keep their own chrome — they carry
+  genuine visual drift (screen: `rounded-md`, translucent blur; gallery:
+  `rounded-[10px]`, solid `#161616` + shadow), so only the shared dropdown was
+  lifted, not the shells. The four test-fixture seed helpers have drifted into
+  different signatures/purposes per suite (`comp`/`seedVariant`/`seedScreen`/
+  `seedWithStar`), so collapsing them is a real refactor with test-break risk and
+  marginal gain — deferred. **→ sanity-check in-app:** the create wizards, the
+  edit panels, the "New" dropdowns, and every card's action menu still render and
+  behave the same.
 - [x] **D8 — Stale docstring.** `src/routes/references/References.tsx:17-21`
   claims it serves `/workspace/:id/references`; that route renders
   `WorkspaceReferencesPage`. Also `WorkspaceReferencesPage.tsx:34-36`

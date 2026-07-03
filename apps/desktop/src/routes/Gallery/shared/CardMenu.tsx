@@ -1,6 +1,10 @@
 import { useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { useDismissable } from "@/lib/hooks/useDismissable";
+import {
+  CardMenuDropdown,
+  cardMenuPosition,
+  type CardMenuItem,
+} from "@/components/ui/CardMenuDropdown";
 
 export function CardMenu({
   actions,
@@ -10,14 +14,7 @@ export function CardMenu({
     label: string;
     icon: ReactNode;
     onClick?: () => void;
-    menuItems?: Array<{
-      key: string;
-      label: string;
-      icon?: ReactNode;
-      destructive?: boolean;
-      accent?: boolean;
-      onClick: () => void;
-    }>;
+    menuItems?: CardMenuItem[];
   }>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -54,15 +51,7 @@ export function CardMenu({
               e.preventDefault();
               e.stopPropagation();
               if (a.menuItems) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const width = 176;
-                setMenuPosition({
-                  top: rect.bottom + 8,
-                  left: Math.min(
-                    window.innerWidth - width - 8,
-                    Math.max(8, rect.right - width),
-                  ),
-                });
+                setMenuPosition(cardMenuPosition(e.currentTarget.getBoundingClientRect()));
                 setOpenId((current) => (current === a.id ? null : a.id));
                 return;
               }
@@ -72,41 +61,19 @@ export function CardMenu({
           >
             {a.icon}
           </button>
-          {a.menuItems && openId === a.id && menuPosition ? createPortal(
-            <div
-              ref={menuRef}
-              role="menu"
-              className="fixed z-[80] min-w-44 overflow-hidden rounded-lg border border-[var(--border-strong)] bg-[rgba(20,20,20,0.98)] p-1 shadow-[var(--shadow-pop)] backdrop-blur-md"
-              style={{ top: menuPosition.top, left: menuPosition.left }}
-            >
-              {a.menuItems.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  role="menuitem"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setOpenId(null);
-                    setMenuPosition(null);
-                    item.onClick();
-                  }}
-                  className={[
-                    "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 text-left text-[12px] transition-colors",
-                    item.destructive
-                      ? "text-[#ff7373] hover:bg-[rgba(255,80,80,0.12)]"
-                      : item.accent
-                        ? "hover:bg-[var(--surface-hover)]"
-                        : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
-                  ].join(" ")}
-                  style={item.accent ? { color: "#8638E5" } : undefined}
-                >
-                  {item.icon ? <span className="grid h-4 w-4 place-items-center">{item.icon}</span> : null}
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>,
-            document.body,
+          {a.menuItems && openId === a.id && menuPosition ? (
+            <CardMenuDropdown
+              menuRef={menuRef}
+              position={menuPosition}
+              items={a.menuItems}
+              onSelect={(item, e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpenId(null);
+                setMenuPosition(null);
+                item.onClick();
+              }}
+            />
           ) : null}
         </span>
       ))}

@@ -1,15 +1,12 @@
-import { Link } from "react-router-dom";
 import {
   IconCheck,
-  IconChevronLeft,
-  IconChevronRight,
-  IconClose,
   IconFrame,
   IconDiamond,
   IconStar,
 } from "@/components/icons";
 import type { ProjectType } from "@/lib/data/types";
 import { DeviceTypeCard } from "@/pages/shared/DeviceTypeCard";
+import { WizardHeader, WizardFooter } from "@/pages/shared/WizardChrome";
 import { useNewDraft, type DraftKind } from "@/application/new-draft/useNewDraft";
 
 /**
@@ -44,30 +41,12 @@ export function NewDraftPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      <header className="px-6 pt-[18px]">
-        <div className="mb-3.5 flex items-center justify-between text-[12px] tracking-[0.3px] text-[var(--text-muted)]">
-          <div>
-            <span className="font-medium text-[var(--text)]">New draft</span>
-            <span>
-              {" "}
-              · step {stepIndex} of {totalSteps}
-            </span>
-          </div>
-          <Link
-            to="/drafts"
-            aria-label="Close"
-            className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-lg border border-[var(--border)] bg-transparent text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-          >
-            <IconClose size={14} strokeWidth={1.6} />
-          </Link>
-        </div>
-        <div className="h-[3px] overflow-hidden rounded-[2px] bg-[#1A1A1A]">
-          <div
-            className="h-full rounded-[2px] bg-[var(--text)] transition-[width] duration-[320ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)]"
-            style={{ width: `${(stepIndex / totalSteps) * 100}%` }}
-          />
-        </div>
-      </header>
+      <WizardHeader
+        title="New draft"
+        stepIndex={stepIndex}
+        totalSteps={totalSteps}
+        closeHref="/drafts"
+      />
 
       <main className="grid flex-1 place-items-center px-6 pb-12 pt-8">
         {stepId === "kind" && <StepKind kind={kind} onSelect={setKind} />}
@@ -92,39 +71,15 @@ export function NewDraftPage() {
         )}
       </main>
 
-      <footer className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-6 py-3.5">
-        <div className="text-[12px] tracking-[0.2px] text-[var(--text-faint)]">
-          {error ? (
-            <span className="text-[var(--danger,#e5484d)]">{error}</span>
-          ) : (
-            <>
-              <span>Step {stepIndex}</span> · <span>{footerHint}</span>
-            </>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={back}
-            disabled={stepIndex === 1}
-          >
-            <IconChevronLeft size={14} strokeWidth={1.8} />
-            Back
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void next()}
-            disabled={!canNext}
-          >
-            <span>
-              {creating ? "Creating…" : stepId === "name" ? "Create draft" : "Next"}
-            </span>
-            <IconChevronRight size={14} strokeWidth={1.8} />
-          </button>
-        </div>
-      </footer>
+      <WizardFooter
+        stepIndex={stepIndex}
+        footerHint={footerHint}
+        error={error}
+        onBack={back}
+        onNext={() => void next()}
+        nextDisabled={!canNext}
+        primaryLabel={creating ? "Creating…" : stepId === "name" ? "Create draft" : "Next"}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useProjectElementDefaults } from "@/application/settings/useScopedEleme
 import { ElementDefaultsEditor } from "@/canvas/settings/ElementDefaultsEditor";
 import { useAssetDataUrl, useWorkspaces } from "@/lib/storage/hooks";
 import { readFileAsDataUrl } from "@/lib/utils";
+import { EditPanelHeader } from "@/pages/shared/EditPanelHeader";
 import { projectLogoColor } from "./utils";
 
 type Tab = "details" | "canvas";
@@ -146,46 +147,16 @@ export function ProjectEditPanel({
       }}
     >
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--bg)]">
-        <div className="flex items-center justify-between px-7 py-3">
-          <span className="text-[13px] font-medium text-[var(--text)]">Edit project</span>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={!name.trim() || saving}
-              className="btn btn-primary"
-            >
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-          </div>
-        </div>
-        {/* Tabs */}
-        <div role="tablist" className="flex gap-0.5 px-5">
-          {TABS.map((t) => {
-            const isActive = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                role="tab"
-                type="button"
-                aria-selected={isActive}
-                onClick={() => setTab(t.id)}
-                className={[
-                  "relative cursor-pointer border-0 bg-transparent px-3 py-2.5 text-[12px] font-medium",
-                  isActive ? "text-[var(--text)]" : "text-[var(--text-muted)] hover:text-[var(--text)]",
-                ].join(" ")}
-              >
-                {t.label}
-                {isActive && (
-                  <span className="absolute -bottom-px left-3 right-3 h-0.5 rounded-[2px] bg-[var(--text)]" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <EditPanelHeader
+        title="Edit project"
+        onCancel={onClose}
+        onSave={() => void save()}
+        saveDisabled={!name.trim() || saving}
+        saving={saving}
+        tabs={TABS}
+        activeTab={tab}
+        onSelectTab={setTab}
+      />
 
       {/* Scrollable body */}
       <div className="min-h-0 flex-1 overflow-y-auto">

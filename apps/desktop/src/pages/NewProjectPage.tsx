@@ -1,8 +1,9 @@
-import { Link, useSearchParams } from "react-router-dom";
-import { IconChevronLeft, IconChevronRight, IconClose, IconUpload } from "@/components/icons";
+import { useSearchParams } from "react-router-dom";
+import { IconUpload } from "@/components/icons";
 import { PROJECT_TYPE_LABEL } from "@/lib/data/projects";
 import type { ProjectType } from "@/lib/data/types";
 import { DeviceTypeCard } from "@/pages/shared/DeviceTypeCard";
+import { WizardHeader, WizardFooter } from "@/pages/shared/WizardChrome";
 import { IconGlyph } from "@/components/system/IconGlyph";
 import { readFileAsDataUrl } from "@/lib/utils";
 import { useNewProject } from "@/application/new-project/useNewProject";
@@ -55,30 +56,12 @@ export function NewProjectPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      <header className="px-6 pt-[18px]">
-        <div className="mb-3.5 flex items-center justify-between text-[12px] tracking-[0.3px] text-[var(--text-muted)]">
-          <div>
-            <span className="font-medium text-[var(--text)]">New project</span>
-            <span>
-              {" "}
-              · step {stepIndex} of {totalSteps}
-            </span>
-          </div>
-          <Link
-            to={closeHref}
-            aria-label="Close"
-            className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-lg border border-[var(--border)] bg-transparent text-[var(--text-muted)] no-underline hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"
-          >
-            <IconClose size={14} strokeWidth={1.6} />
-          </Link>
-        </div>
-        <div className="h-[3px] overflow-hidden rounded-[2px] bg-[#1A1A1A]">
-          <div
-            className="h-full rounded-[2px] bg-[var(--text)] transition-[width] duration-[320ms] [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)]"
-            style={{ width: `${(stepIndex / totalSteps) * 100}%` }}
-          />
-        </div>
-      </header>
+      <WizardHeader
+        title="New project"
+        stepIndex={stepIndex}
+        totalSteps={totalSteps}
+        closeHref={closeHref}
+      />
 
       <main className="grid flex-1 place-items-center px-6 pb-12 pt-8">
         {stepId === "type" && <StepType type={type} onSelect={setType} />}
@@ -111,16 +94,15 @@ export function NewProjectPage() {
         )}
       </main>
 
-      <footer className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-6 py-3.5">
-        <div className="text-[12px] tracking-[0.2px] text-[var(--text-faint)]">
-          <span>Etapa {stepIndex}</span> · <span>{footerHint}</span>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className="btn btn-ghost" onClick={back} disabled={stepIndex === 1}>
-            <IconChevronLeft size={14} strokeWidth={1.8} />
-            Back
-          </button>
-          {stepId === "advanced" ? (
+      <WizardFooter
+        stepIndex={stepIndex}
+        footerHint={footerHint}
+        onBack={back}
+        onNext={() => void next()}
+        nextDisabled={!canNext || creating}
+        primaryLabel={creating ? "Creating…" : stepId === "advanced" ? "Create project" : "Next"}
+        extra={
+          stepId === "advanced" ? (
             <button
               type="button"
               className="btn btn-ghost"
@@ -129,13 +111,9 @@ export function NewProjectPage() {
             >
               Save and skip
             </button>
-          ) : null}
-          <button type="button" className="btn btn-primary" onClick={() => void next()} disabled={!canNext || creating}>
-            <span>{creating ? "Creating…" : stepId === "advanced" ? "Create project" : "Next"}</span>
-            <IconChevronRight size={14} strokeWidth={1.8} />
-          </button>
-        </div>
-      </footer>
+          ) : null
+        }
+      />
     </div>
   );
 }
