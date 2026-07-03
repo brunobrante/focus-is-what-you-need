@@ -1,0 +1,4 @@
+# Throwaway venvs and export scratch created by convert_models.py
+.venv-*/
+_uidetr_export/
+__pycache__/
