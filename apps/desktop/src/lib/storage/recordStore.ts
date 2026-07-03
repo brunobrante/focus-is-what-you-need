@@ -230,11 +230,15 @@ export function putRecord<T extends Row>(table: TableKey, row: T): void {
 export function removeRecords(table: TableKey, ids: string[]): void {
   if (ids.length === 0) return;
   const map = bucket(table);
+  // Stamp each delete with the row's *next* revision (M4), read before the row
+  // leaves the cache, so a stale replayed delete loses to a newer re-create of
+  // the same id the same way a stale upsert does — the adapter's rev guard.
+  const revs = ids.map((id) => nextRev(map.get(id)));
   for (const id of ids) {
     guardBeforeHydration(table, id);
     map.delete(id);
   }
-  getSaveQueue().enqueue({ op: "deleteRecords", table, ids });
+  getSaveQueue().enqueue({ op: "deleteRecords", table, ids, revs });
   notify(table);
 }
 

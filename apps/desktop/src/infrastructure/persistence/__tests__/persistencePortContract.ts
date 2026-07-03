@@ -110,6 +110,37 @@ export function runRecordPortContract(
       ]);
       expect(await port.getRecord("t", "a")).toBe("fresh");
     });
+
+    // --- rev-guarded delete (M4) ------------------------------------------
+
+    test("a delete that out-ranks the stored row removes it", async () => {
+      const port = makePort();
+      await port.applyBatch([
+        { op: "upsertRecord", table: "t", id: "a", json: "r5", rev: 5 },
+      ]);
+      await port.applyBatch([{ op: "deleteRecords", table: "t", ids: ["a"], revs: [6] }]);
+      expect(await port.getRecord("t", "a")).toBeNull();
+    });
+
+    test("a stale delete is rejected when the row was re-created newer", async () => {
+      const port = makePort();
+      // Row re-created at rev 6; a delete stamped rev 6 by the older session must
+      // NOT win — the strict rev guard keeps the re-created row (M4).
+      await port.applyBatch([
+        { op: "upsertRecord", table: "t", id: "a", json: "recreated", rev: 6 },
+      ]);
+      await port.applyBatch([{ op: "deleteRecords", table: "t", ids: ["a"], revs: [6] }]);
+      expect(await port.getRecord("t", "a")).toBe("recreated");
+    });
+
+    test("a lower-rev delete cannot wipe a higher-rev row", async () => {
+      const port = makePort();
+      await port.applyBatch([
+        { op: "upsertRecord", table: "t", id: "a", json: "r9", rev: 9 },
+      ]);
+      await port.applyBatch([{ op: "deleteRecords", table: "t", ids: ["a"], revs: [7] }]);
+      expect(await port.getRecord("t", "a")).toBe("r9");
+    });
   });
 }
 

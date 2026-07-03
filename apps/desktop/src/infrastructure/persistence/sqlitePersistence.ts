@@ -85,6 +85,8 @@ function toWire(mutation: Mutation): Record<string, unknown> {
         op: "delete_records",
         table: mutation.table,
         ids: mutation.ids,
+        // Per-id delete guard (M4); empty → unconditional (legacy / prune).
+        revs: mutation.revs ?? [],
       };
   }
 }

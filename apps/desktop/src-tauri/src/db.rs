@@ -116,6 +116,10 @@ pub enum Mutation {
     DeleteRecords {
         table: String,
         ids: Vec<String>,
+        /// Per-id optimistic-write guard, parallel to `ids` (M4). Absent/empty →
+        /// unconditional delete (legacy / whole-table prune / un-revisioned writer).
+        #[serde(default)]
+        revs: Vec<i64>,
     },
 }
 
@@ -146,14 +150,23 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
             // identical INSERT/DELETE for every row in the batch (RUST-2).
             let mut upsert = tx
                 .prepare_cached(
+                    // `excluded.rev = 0` is the un-revisioned/legacy sentinel — the
+                    // store always stamps rev >= 1 — and applies unconditionally, so
+                    // a rev-less writer keeps last-write-wins (matching the memory /
+                    // IndexedDB adapters, which SQLite used to silently diverge from
+                    // by dropping rev-less upserts against an existing row). (M4)
                     "INSERT INTO records (tbl, id, json, rev)
                      VALUES (?1, ?2, ?3, ?4)
                      ON CONFLICT(tbl, id) DO UPDATE SET json = excluded.json, rev = excluded.rev
-                     WHERE excluded.rev > records.rev",
+                     WHERE excluded.rev = 0 OR excluded.rev > records.rev",
                 )
                 .map_err(|e| e.to_string())?;
+            // Rev-guarded delete: `?3 = 0` (absent/legacy) deletes unconditionally,
+            // otherwise only when the delete's rev out-ranks the stored row (M4).
             let mut delete = tx
-                .prepare_cached("DELETE FROM records WHERE tbl = ?1 AND id = ?2")
+                .prepare_cached(
+                    "DELETE FROM records WHERE tbl = ?1 AND id = ?2 AND (?3 = 0 OR ?3 > rev)",
+                )
                 .map_err(|e| e.to_string())?;
 
             for mutation in &batch {
@@ -168,10 +181,12 @@ pub async fn db_apply(state: State<'_, Db>, batch: Vec<Mutation>) -> Result<Appl
                             .execute(params![table, id, json, rev])
                             .map_err(|e| e.to_string())?;
                     }
-                    Mutation::DeleteRecords { table, ids } => {
-                        for id in ids {
+                    Mutation::DeleteRecords { table, ids, revs } => {
+                        for (i, id) in ids.iter().enumerate() {
+                            // 0 = unconditional when no rev was supplied for this id.
+                            let rev = revs.get(i).copied().unwrap_or(0);
                             applied += delete
-                                .execute(params![table, id])
+                                .execute(params![table, id, rev])
                                 .map_err(|e| e.to_string())?;
                         }
                     }

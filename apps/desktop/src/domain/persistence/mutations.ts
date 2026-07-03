@@ -13,10 +13,17 @@
  * never clobber a newer row — the single mechanism the future sync layer rides
  * on. It is **optional** on the wire: a mutation without `rev` (legacy / tests)
  * is applied unconditionally, preserving the prior last-write-wins behaviour.
+ *
+ * `deleteRecords.revs` carries the same guard for deletes (M4): `revs[i]` is the
+ * next revision the store stamped for `ids[i]` when it removed that row. Adapters
+ * apply a delete only when `revs[i] > stored.rev`, so a stale replayed delete can
+ * no longer wipe a row that a newer session already re-created. The array is
+ * **optional** and, when present, parallel to `ids`; a delete without `revs`
+ * (legacy / a whole-table `replaceTable` prune / tests) deletes unconditionally.
  */
 export type Mutation =
   | { op: "upsertRecord"; table: string; id: string; json: string; rev?: number }
-  | { op: "deleteRecords"; table: string; ids: string[] };
+  | { op: "deleteRecords"; table: string; ids: string[]; revs?: number[] };
 
 export type ApplyAck = {
   applied: number;
@@ -60,8 +67,14 @@ export function oppositeMutationKey(mutation: Mutation): string {
  */
 export function* eachRecordMutation(mutation: Mutation): Iterable<Mutation> {
   if (mutation.op === "deleteRecords") {
-    for (const id of mutation.ids) {
-      yield { op: "deleteRecords", table: mutation.table, ids: [id] };
+    for (let i = 0; i < mutation.ids.length; i += 1) {
+      const rev = mutation.revs?.[i];
+      yield {
+        op: "deleteRecords",
+        table: mutation.table,
+        ids: [mutation.ids[i]!],
+        ...(rev === undefined ? {} : { revs: [rev] }),
+      };
     }
     return;
   }

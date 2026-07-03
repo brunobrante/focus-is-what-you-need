@@ -145,8 +145,24 @@ function applyMutation(recordsStore: IDBObjectStore, mutation: Mutation): void {
       return;
     }
     case "deleteRecords":
-      for (const id of mutation.ids) {
-        recordsStore.delete([mutation.table, id]);
+      for (let i = 0; i < mutation.ids.length; i += 1) {
+        const id = mutation.ids[i]!;
+        const rev = mutation.revs?.[i];
+        if (rev === undefined) {
+          // Legacy / whole-table prune: delete unconditionally.
+          recordsStore.delete([mutation.table, id]);
+          continue;
+        }
+        // Rev-guarded delete (M4): read the stored row, delete only if the
+        // delete out-ranks it — both requests on this readwrite transaction.
+        const getReq = recordsStore.get([mutation.table, id]);
+        getReq.onsuccess = () => {
+          const stored = getReq.result as RecordRow | undefined;
+          if (stored && stored.rev !== undefined && rev <= stored.rev) {
+            return; // stale delete — keep the newer row
+          }
+          recordsStore.delete([mutation.table, id]);
+        };
       }
       return;
   }

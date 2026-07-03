@@ -104,18 +104,24 @@ Paths are relative to `apps/desktop/`.
   table is overwritten/resurrected, and the enqueued upsert carries rev=1 which
   the adapters then drop (`db.rs:152`, `indexedDbPersistence.ts:140`) — lost on
   both sides.
-- [ ] **M4 — Deletes have no staleness guard; outbox replay races the session.**
+- [x] **M4 — Deletes have no staleness guard; outbox replay races the session.**
   `deleteRecords` is unconditional in all three adapters; `replayOutbox`
   (`saveQueueProvider.ts:25`, `saveQueue.ts:136-144`) doesn't block boot;
   `acceptIfFresh` only checks the pending map — a stale replayed delete can
   land after a re-create. Related: adapters diverge on rev-less upserts (SQLite
   drops via `excluded.rev > records.rev`, `db.rs:113,152`; IndexedDB/memory
   apply unconditionally).
-  **Deferred (2026-07-02):** the correct fix is rev-guarded/tombstoned deletes
-  applied consistently across all three adapters — a change to the persistence
-  protocol that risks silent data loss if wrong, and can only be validated
-  against the running app (crash/replay/re-create sequences), not `tsc`. Do it
-  as a focused, separately-verified task, not folded into this sweep.
+  **Done (2026-07-02):** `deleteRecords` now carries an optional per-id `revs[]`
+  parallel to `ids`; `removeRecords` stamps each with the row's next revision
+  (read before it leaves the cache). All three adapters apply a delete only when
+  `revs[i] > stored.rev` (absent/empty → unconditional, for legacy + whole-table
+  `replaceTable` prunes), so a stale replayed delete can no longer wipe a row a
+  newer session re-created. Also fixed the divergence: SQLite's upsert guard is
+  now `excluded.rev = 0 OR excluded.rev > records.rev`, so a rev-less upsert
+  applies unconditionally like memory/IndexedDB and the documented contract. New
+  shared-contract tests (stale delete rejected, out-ranking delete applied,
+  lower-rev delete can't wipe) pass on all three adapters. **→ sanity-check
+  in-app:** deleting a screen / component / reference still works normally.
 
 ## Medium — Builder / UI
 

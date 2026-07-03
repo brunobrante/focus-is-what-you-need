@@ -43,7 +43,17 @@ export function createMemoryPersistence(): GraphPersistencePort {
       }
       case "deleteRecords": {
         const bucket = table(mutation.table);
-        for (const id of mutation.ids) bucket.delete(id);
+        for (let i = 0; i < mutation.ids.length; i += 1) {
+          const id = mutation.ids[i]!;
+          const rev = mutation.revs?.[i];
+          // Rev-guarded delete (M4): drop the row only when the delete out-ranks
+          // it. Without a rev (legacy / whole-table prune) delete unconditionally.
+          if (rev !== undefined) {
+            const stored = bucket.get(id);
+            if (stored && stored.rev !== undefined && rev <= stored.rev) continue;
+          }
+          bucket.delete(id);
+        }
         return;
       }
     }
