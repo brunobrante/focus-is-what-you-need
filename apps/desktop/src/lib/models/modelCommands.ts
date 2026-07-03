@@ -34,6 +34,11 @@ export function modelIsInstalled(id: string): Promise<boolean> {
   return invoke<boolean>("model_is_installed", { id });
 }
 
+/** Absolute path where a manual model's ONNX file must be placed. */
+export function modelManualPath(id: string): Promise<string> {
+  return invoke<string>("model_manual_path", { id });
+}
+
 export function modelInstall(id: string): Promise<void> {
   return invoke("model_install", { id });
 }

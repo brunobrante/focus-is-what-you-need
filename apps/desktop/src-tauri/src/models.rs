@@ -36,6 +36,8 @@ const DBNET_RESNET50_ID: &str = "dbnet-resnet50";
 const DBNET_MOBILENET_ID: &str = "dbnet-mobilenet-v3-large";
 const LAMA_ID: &str = "lama";
 const OMNIPARSER_ID: &str = "omniparser-icon-detect";
+const OMNIPARSER_V2_ID: &str = "omniparser-icon-detect-v2";
+const UIDETR_ID: &str = "ui-detr";
 const FONT_CLASSIFY_ID: &str = "font-classify";
 const BIREFNET_SIZE: u32 = 1024;
 const PROGRESS_EVENT: &str = "model://progress";
@@ -75,6 +77,29 @@ const OMNIPARSER_IOU_THRESHOLD: f32 = 0.45;
 const OMNIPARSER_MAX_DETECTIONS: usize = 200;
 // Neutral gray pad used when letterboxing to a square (standard YOLO value).
 const OMNIPARSER_PAD: u8 = 114;
+
+// OmniParser v2 and UI-DETR ship no public ONNX — the user converts the model
+// locally and drops the file in the models folder (see `model_manual_path`).
+// v2 is the same YOLOv8 head as v1, so it reuses the OmniParser inference path;
+// only the weights file differs.
+//
+// UI-DETR (RF-DETR-Medium fine-tune, class-agnostic UI element detector). Unlike
+// YOLO it is a DETR: the image is resized to a fixed square (stretch, no
+// letterbox), ImageNet-normalized, and the head emits 300 queries. Outputs are
+// pred_boxes [1, 300, 4] (cx, cy, w, h normalized) + pred_logits [1, 300, C];
+// we sigmoid the logits, take the per-query best score over a floor, and map the
+// (already-normalized) boxes straight through.
+//
+// UIDETR_SIZE MUST match the exported ONNX's fixed input. UI-DETR-1 is built with
+// resolution=1600, so that is the default; if your export reports a different
+// input (rfdetr rounds to a multiple of 56 in some versions), set this to the
+// size ORT complains about and rebuild. Score floor is the Space's default (0.35).
+const UIDETR_SIZE: u32 = 1600;
+const UIDETR_SCORE_THRESHOLD: f32 = 0.35;
+// RF-DETR is NMS-free; this only collapses near-identical duplicate queries and
+// deliberately keeps nested boxes (a small box inside a large one has low IoU).
+const UIDETR_IOU_THRESHOLD: f32 = 0.7;
+const UIDETR_MAX_DETECTIONS: usize = 300;
 
 // LaMa inpainting: a single fp32 ONNX file (~208 MB). It removes a painted
 // selection from a cut by reconstructing the masked region from its surroundings.
@@ -258,6 +283,13 @@ fn model_file_specs(id: &str) -> Result<Vec<ModelFile>, String> {
             name: "omniparser-icon-detect.onnx",
             url: OMNIPARSER_URL,
         }]),
+        // Manual models: no download URL. `model_install` refuses to download an
+        // empty URL and points the user at `model_manual_path` instead.
+        OMNIPARSER_V2_ID => Ok(vec![ModelFile {
+            name: "omniparser-icon-detect-v2.onnx",
+            url: "",
+        }]),
+        UIDETR_ID => Ok(vec![ModelFile { name: "ui-detr.onnx", url: "" }]),
         SLIMSAM_ID => Ok(vec![
             ModelFile { name: SAM_ENCODER_FILE, url: SLIMSAM_ENCODER_URL },
             ModelFile { name: SAM_DECODER_FILE, url: SLIMSAM_DECODER_URL },
@@ -318,6 +350,16 @@ pub fn model_is_installed(app: AppHandle, id: &str) -> bool {
     specs.iter().all(|file| dir.join(file.name).exists())
 }
 
+/// Absolute path where a manual (no-download) model's ONNX file must be placed.
+/// The Settings UI shows this so the user knows where to drop a converted model.
+#[tauri::command]
+pub fn model_manual_path(app: AppHandle, id: &str) -> Result<String, String> {
+    let specs = model_file_specs(id)?;
+    let dir = model_storage_dir(&app, id)?;
+    let file = specs.first().ok_or_else(|| format!("no file spec for {id}"))?;
+    Ok(dir.join(file.name).to_string_lossy().into_owned())
+}
+
 #[derive(Clone, Serialize)]
 struct DownloadProgress {
     id: String,
@@ -342,6 +384,19 @@ pub async fn model_install(app: AppHandle, window: Window, id: String) -> Result
     let specs = model_file_specs(&id)?;
     let dir = model_storage_dir(&app, &id)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    // Manual models have no download URL — they must be placed by hand. The
+    // frontend routes these through `model_manual_path` instead of downloading,
+    // so this only guards a direct/defensive call.
+    if specs.iter().any(|f| f.url.is_empty()) {
+        let path = specs
+            .first()
+            .map(|f| dir.join(f.name).to_string_lossy().into_owned())
+            .unwrap_or_default();
+        return Err(format!(
+            "\"{id}\" has no download. Place the converted ONNX at: {path}"
+        ));
+    }
 
     let client = reqwest::Client::new();
     // Sequential, not parallel: one file at a time with its own progress stream.
@@ -942,7 +997,10 @@ pub async fn run_auto_detect(
     let model_id = request_header(&request, "x-model-id")?.to_string();
     let image_bytes = request_image_bytes(&request)?;
     tauri::async_runtime::spawn_blocking(move || match model_id.as_str() {
-        OMNIPARSER_ID => omniparser_blocking(&app, image_bytes),
+        // v1 and v2 share the YOLOv8 inference path; only the weights file differs.
+        OMNIPARSER_ID => omniparser_blocking(&app, image_bytes, OMNIPARSER_ID),
+        OMNIPARSER_V2_ID => omniparser_blocking(&app, image_bytes, OMNIPARSER_V2_ID),
+        UIDETR_ID => uidetr_blocking(&app, image_bytes),
         FLORENCE2_ID => florence2_blocking(&app, image_bytes),
         other => Err(format!("unknown auto-detect model: {other}")),
     })
@@ -963,7 +1021,11 @@ pub async fn run_florence2_text_check(
 
 // --- OmniParser icon detector (YOLOv8) ------------------------------------
 
-fn omniparser_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<DetectedRegion>, String> {
+fn omniparser_blocking(
+    app: &AppHandle,
+    image_bytes: Vec<u8>,
+    model_id: &str,
+) -> Result<Vec<DetectedRegion>, String> {
     let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
     let (orig_w, orig_h) = img.dimensions();
     if orig_w == 0 || orig_h == 0 {
@@ -987,7 +1049,7 @@ fn omniparser_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<Dete
     let mut input = Array4::<f32>::from_elem((1, 3, size as usize, size as usize), pad_value);
     fill_nchw_rgb(&mut input, &resized, pad_x, pad_y, NchwNorm::Div255);
 
-    let mut session = load_session(app, OMNIPARSER_ID)?;
+    let mut session = load_session(app, model_id)?;
     let input_name = session.inputs()[0].name().to_string();
     let tensor = Tensor::from_array(input).map_err(|e| e.to_string())?;
     let outputs = session
@@ -1051,6 +1113,108 @@ fn omniparser_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<Dete
     }
 
     Ok(nms(candidates, OMNIPARSER_IOU_THRESHOLD, OMNIPARSER_MAX_DETECTIONS))
+}
+
+// --- UI-DETR (RF-DETR) icon detector --------------------------------------
+
+/// UI-DETR / RF-DETR inference. The model is a DETR, not a YOLO: resize the
+/// image to a fixed square (stretch, no letterbox), ImageNet-normalize, and read
+/// two heads — box coordinates and per-query class logits. Boxes come out as
+/// (cx, cy, w, h) normalized to the input; because the resize is a plain stretch,
+/// those normalized coords map 1:1 onto the original image, so no un-letterbox
+/// math is needed. We sigmoid the logits (RF-DETR is trained with a sigmoid/focal
+/// head), keep the per-query best score over the score floor, then NMS as a light
+/// dedupe.
+///
+/// The two outputs are matched by shape (the [1, Q, 4] one is the boxes, the
+/// other is the logits), so this is robust to whichever order/names the ONNX
+/// export emits.
+fn uidetr_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<DetectedRegion>, String> {
+    let img = image::load_from_memory(&image_bytes).map_err(|e| e.to_string())?;
+    let (orig_w, orig_h) = img.dimensions();
+    if orig_w == 0 || orig_h == 0 {
+        return Ok(Vec::new());
+    }
+    let rgb = img.to_rgb8();
+
+    // Square stretch to SIZE x SIZE (RF-DETR preprocessing), ImageNet-normalized.
+    let size = UIDETR_SIZE;
+    let resized = image::imageops::resize(&rgb, size, size, image::imageops::FilterType::Triangle);
+    let mut input = Array4::<f32>::zeros((1, 3, size as usize, size as usize));
+    fill_nchw_rgb(&mut input, &resized, 0, 0, NchwNorm::ImageNet);
+
+    let mut session = load_session(app, UIDETR_ID)?;
+    let input_name = session.inputs()[0].name().to_string();
+    let output_count = session.outputs().len();
+    let tensor = Tensor::from_array(input).map_err(|e| e.to_string())?;
+    let outputs = session
+        .run(ort::inputs![input_name.as_str() => tensor])
+        .map_err(|e| e.to_string())?;
+
+    // Collect the 3-D outputs and split by last dim: 4 => boxes, else => logits.
+    let mut boxes: Option<(Vec<f32>, usize)> = None; // (data, num_queries)
+    let mut logits: Option<(Vec<f32>, usize, usize)> = None; // (data, num_queries, num_classes)
+    for i in 0..output_count {
+        let Ok(arr) = outputs[i].try_extract_array::<f32>() else {
+            continue;
+        };
+        let shape = arr.shape().to_vec();
+        if shape.len() != 3 || shape[0] != 1 {
+            continue;
+        }
+        let data: Vec<f32> = arr.iter().copied().collect();
+        if shape[2] == 4 {
+            boxes = Some((data, shape[1]));
+        } else {
+            logits = Some((data, shape[1], shape[2]));
+        }
+    }
+    let (box_data, num_queries) =
+        boxes.ok_or("UI-DETR: no [1, Q, 4] box output found (is this an RF-DETR ONNX?)")?;
+    let (logit_data, logit_queries, num_classes) =
+        logits.ok_or("UI-DETR: no class-logits output found")?;
+    let queries = num_queries.min(logit_queries);
+
+    let mut candidates: Vec<DetectedRegion> = Vec::new();
+    for q in 0..queries {
+        // Best class score for this query (class-agnostic models have C == 1).
+        let mut best = f32::NEG_INFINITY;
+        for c in 0..num_classes {
+            let v = logit_data[q * num_classes + c];
+            if v > best {
+                best = v;
+            }
+        }
+        let score = 1.0 / (1.0 + (-best).exp()); // sigmoid
+        if score <= UIDETR_SCORE_THRESHOLD {
+            continue;
+        }
+        let cx = box_data[q * 4];
+        let cy = box_data[q * 4 + 1];
+        let bw = box_data[q * 4 + 2];
+        let bh = box_data[q * 4 + 3];
+        // cxcywh normalized [0,1] -> xyxy normalized, clamped to the image.
+        let x0 = (cx - bw / 2.0).clamp(0.0, 1.0);
+        let y0 = (cy - bh / 2.0).clamp(0.0, 1.0);
+        let x1 = (cx + bw / 2.0).clamp(0.0, 1.0);
+        let y1 = (cy + bh / 2.0).clamp(0.0, 1.0);
+        let w = x1 - x0;
+        let h = y1 - y0;
+        // Drop degenerate boxes (< 1px on the original image).
+        if (w * orig_w as f32) < 1.0 || (h * orig_h as f32) < 1.0 {
+            continue;
+        }
+        candidates.push(DetectedRegion {
+            label: String::new(),
+            x: x0,
+            y: y0,
+            w,
+            h,
+            confidence: score,
+        });
+    }
+
+    Ok(nms(candidates, UIDETR_IOU_THRESHOLD, UIDETR_MAX_DETECTIONS))
 }
 
 /// Intersection-over-union of two normalized regions.

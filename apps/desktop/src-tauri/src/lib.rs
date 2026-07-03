@@ -1194,6 +1194,7 @@ pub fn run() {
             save_export_file,
             save_export_archive,
             models::model_is_installed,
+            models::model_manual_path,
             models::model_install,
             models::model_uninstall,
             models::run_birefnet,

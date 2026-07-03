@@ -22,6 +22,12 @@ export type ModelCatalogEntry = {
   files?: readonly string[];
   /** Built-in engine that runs in the app (no download, always available). */
   builtin?: boolean;
+  /**
+   * No public download exists — the user converts the model to ONNX and drops it
+   * in the models folder. The install action reveals the target path and only
+   * marks the model installed once the file is present.
+   */
+  manual?: boolean;
 };
 
 /** The built-in classic-CV "Adjust crop" engine (no model download). */
@@ -123,6 +129,24 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
     label: "OmniParser (icon detect)",
     size: "~58 MB",
     description: "Detects UI icons and elements as crop regions. Fast; built for screenshots.",
+  },
+  {
+    modelId: "omniparser-icon-detect-v2",
+    feature: "autoDetect",
+    label: "OmniParser v2 (icon detect)",
+    size: "Local file",
+    description:
+      "OmniParser v2 icon detector (YOLOv8) — better on small elements, faster. No public ONNX: convert the .pt locally and drop it in the models folder.",
+    manual: true,
+  },
+  {
+    modelId: "ui-detr",
+    feature: "autoDetect",
+    label: "UI-DETR (RF-DETR)",
+    size: "Local file",
+    description:
+      "RF-DETR UI element detector — detects many more / denser elements, MIT-licensed. No public ONNX: export the .pth locally and drop it in the models folder.",
+    manual: true,
   },
   {
     modelId: "florence2",

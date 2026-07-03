@@ -9,6 +9,7 @@ import {
   Check,
   ChevronRight,
   Download,
+  FolderInput,
   Eraser,
   Maximize2,
   Palette,
@@ -177,12 +178,13 @@ function ModelListRow({ model }: { model: ModelControls }) {
         <div className="flex items-center gap-0.5">
           <button
             type="button"
-            aria-label={`Download ${model.label}`}
+            aria-label={model.manual ? `Add ${model.label} file` : `Download ${model.label}`}
+            title={model.manual ? "Convert the model to ONNX and place it in the models folder" : undefined}
             disabled={model.installed}
             onClick={model.install}
             className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--text-muted)] cursor-pointer"
           >
-            <Download size={13} strokeWidth={1.9} />
+            {model.manual ? <FolderInput size={13} strokeWidth={1.9} /> : <Download size={13} strokeWidth={1.9} />}
           </button>
           <button
             type="button"

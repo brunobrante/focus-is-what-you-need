@@ -18,6 +18,8 @@ import {
 import {
   MODEL_PROGRESS_EVENT,
   modelInstall,
+  modelIsInstalled,
+  modelManualPath,
   modelUninstall,
   type ModelProgressEvent,
 } from "./modelCommands";
@@ -112,9 +114,37 @@ export function useProcessingFeatures(): ProcessingState {
   const [progress, setProgress] = useState<ModelMap<number>>(() => modelMap(0));
   const [currentFile, setCurrentFile] = useState<ModelMap<string>>(() => modelMap(""));
 
+  // Mark a feature's first installed model active so it's usable immediately.
+  const activateIfFirst = useCallback(
+    async (entry: ModelCatalogEntry) => {
+      const featureActive = settings.processing.features[entry.feature].activeModelId;
+      if (!featureActive) await setFeatureActiveModel(entry.feature, entry.modelId);
+    },
+    [settings],
+  );
+
   const install = useCallback(async (modelId: string) => {
     const entry = catalogEntry(modelId);
     if (!entry || entry.builtin) return; // built-in engines need no download
+
+    // Manual models have no download URL: the user drops a converted ONNX into
+    // the models folder. "Install" here just checks whether that file is present
+    // — if so, mark it installed; if not, reveal the exact target path.
+    if (entry.manual) {
+      const present = await modelIsInstalled(modelId).catch(() => false);
+      if (present) {
+        await setModelInstalled(modelId, true);
+        await activateIfFirst(entry);
+      } else {
+        const path = await modelManualPath(modelId).catch(() => "");
+        window.alert(
+          `${entry.label} has no public download.\n\n` +
+            `Convert the model to ONNX and place the file at:\n\n${path}\n\n` +
+            `Then click again to enable it.`,
+        );
+      }
+      return;
+    }
 
     setInstalling((prev) => ({ ...prev, [modelId]: true }));
     setProgress((prev) => ({ ...prev, [modelId]: 0 }));
