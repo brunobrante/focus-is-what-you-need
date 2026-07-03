@@ -1869,6 +1869,31 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
     let decoder_inputs: Vec<String> =
         decoder.inputs().iter().map(|o| o.name().to_string()).collect();
 
+    // The decoder runs on its no-cache branch, re-feeding the full sequence every
+    // step. Only inputs_embeds / input_ids / attention_mask grow; the rest are
+    // constant for the whole decode. Build those once and hand the step a
+    // zero-copy `.view()`, instead of re-cloning encoder_hidden (~MB) and the
+    // dummy past into a fresh tensor on each of up to 512 steps — the O(n^2)
+    // cumulative copying the audit flagged (M13). This does not change the
+    // decode math (still the no-cache branch), only where the tensors are built.
+    let encoder_hidden_tensor =
+        Tensor::from_array((vec![1, encoder_seq as i64, d_model as i64], encoder_hidden))
+            .map_err(|e| e.to_string())?;
+    let encoder_mask_tensor =
+        Tensor::from_array((vec![1, encoder_seq as i64], vec![1i64; encoder_seq]))
+            .map_err(|e| e.to_string())?;
+    let use_cache_tensor =
+        Tensor::from_array((vec![1i64], vec![false])).map_err(|e| e.to_string())?;
+    // One shared dummy for every `past_key_values.*` input — same shape the
+    // no-cache branch fed before; it reaches an unexecuted `If` branch, so a
+    // single zero tensor viewed N times is equivalent.
+    let dummy_past_len = FLORENCE2_NUM_HEADS * FLORENCE2_HEAD_DIM;
+    let dummy_past_tensor = Tensor::from_array((
+        vec![1, FLORENCE2_NUM_HEADS as i64, 1, FLORENCE2_HEAD_DIM as i64],
+        vec![0f32; dummy_past_len],
+    ))
+    .map_err(|e| e.to_string())?;
+
     let mut input_ids: Vec<i64> = vec![FLORENCE2_DECODER_START];
     let mut generated: Vec<i64> = Vec::new();
     for _ in 0..FLORENCE2_MAX_NEW_TOKENS {
@@ -1880,9 +1905,11 @@ fn florence2_decode_text(app: &AppHandle, image_bytes: Vec<u8>, task_text: &str)
             &decoder_inputs,
             &input_ids,
             &decoder_embeds,
-            &encoder_hidden,
-            encoder_seq,
             d_model,
+            &encoder_hidden_tensor,
+            &encoder_mask_tensor,
+            &use_cache_tensor,
+            &dummy_past_tensor,
         )?;
         if next == FLORENCE2_EOS {
             break;
@@ -1919,9 +1946,14 @@ fn florence2_decode_step(
     input_names: &[String],
     input_ids: &[i64],
     decoder_embeds: &[f32],
-    encoder_hidden: &[f32],
-    encoder_seq: usize,
     d_model: usize,
+    // Invariant inputs, built once by the caller and passed as a zero-copy view
+    // each step (M13): encoder hidden states, its attention mask, the constant
+    // `use_cache_branch=false`, and the shared dummy past.
+    encoder_hidden_tensor: &Tensor<f32>,
+    encoder_mask_tensor: &Tensor<i64>,
+    use_cache_tensor: &Tensor<bool>,
+    dummy_past_tensor: &Tensor<f32>,
 ) -> Result<i64, String> {
     let seq = input_ids.len();
     let mut inputs: Vec<(Cow<str>, SessionInputValue)> = Vec::new();
@@ -1936,37 +1968,20 @@ fn florence2_decode_step(
                 .map_err(|e| e.to_string())?
                 .into()
         } else if name == "encoder_hidden_states" {
-            Tensor::from_array((
-                vec![1, encoder_seq as i64, d_model as i64],
-                encoder_hidden.to_vec(),
-            ))
-            .map_err(|e| e.to_string())?
-            .into()
+            encoder_hidden_tensor.view().into()
         } else if name == "encoder_attention_mask" {
-            Tensor::from_array((vec![1, encoder_seq as i64], vec![1i64; encoder_seq]))
-                .map_err(|e| e.to_string())?
-                .into()
+            encoder_mask_tensor.view().into()
         } else if name == "attention_mask" {
             Tensor::from_array((vec![1, seq as i64], vec![1i64; seq]))
                 .map_err(|e| e.to_string())?
                 .into()
         } else if name == "use_cache_branch" {
-            Tensor::from_array((vec![1i64], vec![false]))
-                .map_err(|e| e.to_string())?
-                .into()
+            use_cache_tensor.view().into()
         } else if name.starts_with("past_key_values") {
-            // Dummy past for the no-cache branch. Semantically this should be a
-            // zero-length tensor, but ORT's native tensor constructor rejects a
-            // 0 dimension. On `use_cache_branch=false` the past feeds an
-            // unexecuted `If` branch and is ignored, so a length-1 zero tensor is
-            // accepted and has no effect on the result.
-            let len = FLORENCE2_NUM_HEADS * FLORENCE2_HEAD_DIM;
-            Tensor::from_array((
-                vec![1, FLORENCE2_NUM_HEADS as i64, 1, FLORENCE2_HEAD_DIM as i64],
-                vec![0f32; len],
-            ))
-            .map_err(|e| e.to_string())?
-            .into()
+            // Dummy past for the no-cache branch: it feeds an unexecuted `If`
+            // branch and is ignored (a 0-length tensor is rejected by ORT, so a
+            // length-1 zero tensor is used). Shared across every past input.
+            dummy_past_tensor.view().into()
         } else {
             // Unknown / optional input: skip it. ORT errors out if it was required.
             continue;

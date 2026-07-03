@@ -178,12 +178,22 @@ Paths are relative to `apps/desktop/`.
 - [ ] **M13 — Florence2 decoder is O(n²).** `src-tauri/src/models.rs:1850-1908`:
   cache-less decode clones `encoder_hidden` (~MB) and full `decoder_embeds`
   every step, up to 512 steps. Inside `spawn_blocking`, so slowness only.
-  **Deferred (2026-07-02):** performance-only and *not* a UI freeze (runs on the
-  blocking pool). The real fix is a KV-cache restructure (drive the decoder's
-  `use_cache` branch), which changes inference behavior; even the smaller
-  "hoist the invariant encoder tensor out of the loop" win depends on `ort`
-  borrowed-tensor APIs whose correctness can't be confirmed without running
-  inference and diffing detections. Needs a runtime harness, not a blind edit.
+  **Allocation blowup done (2026-07-02):** the audit's headline cost — re-cloning
+  the invariant `encoder_hidden` (~MB) and the dummy past into a fresh tensor on
+  every one of up to 512 steps ("O(n²) multi-GB cumulative copying") — is gone.
+  `ort` `Value` is `Arc`-backed and exposes `.view()` → a borrowed
+  `SessionInputValue`, so the invariant inputs (encoder hidden states, its mask,
+  `use_cache_branch=false`, the shared dummy past) are now built **once** before
+  the loop and viewed zero-copy each step. This does **not** touch the decode math
+  — same no-cache branch, byte-identical tensor values — so detections are
+  unchanged (**→ sanity-check auto-detect returns the same regions**). Verified by
+  `cargo check`.
+  **Remaining:** the deeper O(n²) is *compute*, not copying — the decoder still
+  re-processes the full sequence each step, and `florence2_embed` re-embeds the
+  whole growing sequence. Turning that into O(n) means driving the model's
+  `use_cache` branch (feed `present.*` KV outputs back as `past_key_values.*`),
+  which changes the execution path and needs a runtime detection-diff to confirm
+  parity. Left as a focused task.
 
 ## Medium — StrictMode
 
