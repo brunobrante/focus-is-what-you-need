@@ -158,7 +158,7 @@ Paths are relative to `apps/desktop/`.
   `src-tauri/src/models.rs:333`: two concurrent installs of the same id stream
   interleaved into the same `.part` file; no checksum catches the corrupt
   result.
-- [ ] **M12 — IPC payload overhead.** Image bytes cross IPC as JSON number
+- [x] **M12 — IPC payload overhead.** Image bytes cross IPC as JSON number
   arrays (`Vec<u8>`, ~4x blowup — `lib.rs:38-41`, all model runners); assets
   round-trip as base64 (+33% — `db.rs:230-297`). Use `tauri::ipc::Request`/raw
   buffers (the reverse direction already uses `ipc::Response`).
@@ -169,12 +169,24 @@ Paths are relative to `apps/desktop/`.
   signatures (`Uint8Array` in/out) are unchanged, so no downstream caller moved.
   **→ verify in-app:** background-remove / upscale / remove-element must still
   produce a correct image.
-  **Remaining:** the *input* direction still passes `Array.from(imageBytes)`.
-  Raw `ipc::Request` has a single body, which doesn't fit the multi-arg commands
-  (`run_lama` = image+mask, `run_auto_detect`/`run_sam_segment` = image+params),
-  and passing a bare `Uint8Array` arg isn't a confirmed-efficient path — so the
-  input side is a real design change, left for a focused task. Same for `db.rs`
-  base64 assets (`asset_get_many` returns many blobs, no single-body fit).
+  **Input direction done (2026-07-03):** `invoke`'s `InvokeArgs` union accepts a
+  bare `Uint8Array`, delivered to the command as its `ipc::Request` raw body — so
+  every image-*input* command now ships the image as an ArrayBuffer instead of
+  `Array.from(imageBytes)` (the ~4x blowup). The image-only commands
+  (`run_birefnet`, `run_real_esrgan`, `extract_colors`, `run_florence2_text_check`,
+  `run_font_detect`) take just the raw body; the image+small-param commands
+  (`run_auto_detect`, `run_text_check`, `run_sam_segment`) put the image in the
+  body and the small side-params (`x-model-id`, JSON-encoded `x-bbox`) in request
+  headers via `InvokeOptions.headers`. Two shared Rust helpers —
+  `request_image_bytes` / `request_header` — back all of them. `cargo check` +
+  `tsc` pass. **→ verify in-app:** background-remove / upscale / auto-detect /
+  Adjust-crop SAM / text + font + color checks must still produce correct results
+  (the header round-trip for model id / bbox is the part worth a real click-test).
+  **Left as-is (rationale):** `run_lama` has *two* large payloads (image + mask)
+  and a single raw body holds only one — a header can't carry a full-res mask, so
+  it stays a JSON pair; `db.rs` base64 assets (`asset_get_many` returns *many*
+  blobs) need a framed multi-blob binary protocol on the response side, a distinct
+  change from this input-direction sweep.
 - [ ] **M13 — Florence2 decoder is O(n²).** `src-tauri/src/models.rs:1850-1908`:
   cache-less decode clones `encoder_hidden` (~MB) and full `decoder_embeds`
   every step, up to 512 steps. Inside `spawn_blocking`, so slowness only.

@@ -42,15 +42,19 @@ export function modelUninstall(id: string): Promise<void> {
   return invoke("model_uninstall", { id });
 }
 
+// The image crosses IPC as a raw ArrayBuffer body (not a JSON number array,
+// which ~4x'd the payload — M12). `invoke` accepts a Uint8Array as the whole
+// args, delivered to the command as its `ipc::Request` body. Small side-params
+// (model id, bbox) ride as request headers.
 export async function runBirefnet(imageBytes: Uint8Array): Promise<Uint8Array> {
-  // The command returns a tauri ipc::Response, so invoke resolves to an
+  // The command also returns a tauri ipc::Response, so invoke resolves to an
   // ArrayBuffer (raw bytes) rather than a JSON number array (M12).
-  const out = await invoke<ArrayBuffer>("run_birefnet", { imageBytes: Array.from(imageBytes) });
+  const out = await invoke<ArrayBuffer>("run_birefnet", imageBytes);
   return new Uint8Array(out);
 }
 
 export async function runRealEsrgan(imageBytes: Uint8Array): Promise<Uint8Array> {
-  const out = await invoke<ArrayBuffer>("run_real_esrgan", { imageBytes: Array.from(imageBytes) });
+  const out = await invoke<ArrayBuffer>("run_real_esrgan", imageBytes);
   return new Uint8Array(out);
 }
 
@@ -60,9 +64,8 @@ export function runAutoDetect(
   modelId: string,
   imageBytes: Uint8Array,
 ): Promise<DetectedRegion[]> {
-  return invoke<DetectedRegion[]>("run_auto_detect", {
-    modelId,
-    imageBytes: Array.from(imageBytes),
+  return invoke<DetectedRegion[]>("run_auto_detect", imageBytes, {
+    headers: { "x-model-id": modelId },
   });
 }
 
@@ -78,10 +81,8 @@ export async function runSamSegment(
   imageBytes: Uint8Array,
   bbox: SamBox,
 ): Promise<Uint8Array> {
-  const out = await invoke<number[]>("run_sam_segment", {
-    modelId,
-    imageBytes: Array.from(imageBytes),
-    bbox,
+  const out = await invoke<number[]>("run_sam_segment", imageBytes, {
+    headers: { "x-model-id": modelId, "x-bbox": JSON.stringify(bbox) },
   });
   return new Uint8Array(out);
 }
@@ -92,16 +93,13 @@ export function runTextCheck(
   modelId: string,
   imageBytes: Uint8Array,
 ): Promise<boolean> {
-  return invoke<boolean>("run_text_check", {
-    modelId,
-    imageBytes: Array.from(imageBytes),
+  return invoke<boolean>("run_text_check", imageBytes, {
+    headers: { "x-model-id": modelId },
   });
 }
 
 export function runFlorence2TextCheck(imageBytes: Uint8Array): Promise<boolean> {
-  return invoke<boolean>("run_florence2_text_check", {
-    imageBytes: Array.from(imageBytes),
-  });
+  return invoke<boolean>("run_florence2_text_check", imageBytes);
 }
 
 // One predicted font family and its softmax probability (0–1).
@@ -110,9 +108,7 @@ export type FontPrediction = { name: string; confidence: number };
 // Runs the font detector (EfficientNet-B3) on a cut's image. Returns the top
 // font-family guesses, most confident first.
 export function runFontDetect(imageBytes: Uint8Array): Promise<FontPrediction[]> {
-  return invoke<FontPrediction[]>("run_font_detect", {
-    imageBytes: Array.from(imageBytes),
-  });
+  return invoke<FontPrediction[]>("run_font_detect", imageBytes);
 }
 
 // Runs LaMa inpainting on a cut. `maskBytes` is a PNG grayscale mask where
@@ -135,7 +131,7 @@ export type ColorEntry = { r: number; g: number; b: number; count: number };
 // Extracts all colors from an image, quantized to 4-bit per channel (16 levels
 // per channel). Returns entries sorted by count descending.
 export async function extractColors(imageBytes: Uint8Array): Promise<ColorEntry[]> {
-  return invoke<ColorEntry[]>("extract_colors", { imageBytes: Array.from(imageBytes) });
+  return invoke<ColorEntry[]>("extract_colors", imageBytes);
 }
 
 // --- image <-> bytes helpers ----------------------------------------------

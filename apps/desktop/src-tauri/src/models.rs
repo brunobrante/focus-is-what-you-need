@@ -467,10 +467,36 @@ fn encode_png(img: DynamicImage) -> Result<Vec<u8>, String> {
     Ok(buffer.into_inner())
 }
 
+/// Extracts the image bytes from a command whose whole IPC body *is* the image,
+/// sent as an ArrayBuffer. This avoids the ~4x blowup of shipping a `Vec<u8>` as
+/// a JSON number array (M12). Small side-params (model id, bbox) ride along as
+/// request headers — see `request_header`.
+fn request_image_bytes(request: &tauri::ipc::Request<'_>) -> Result<Vec<u8>, String> {
+    match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) => Ok(bytes.clone()),
+        tauri::ipc::InvokeBody::Json(_) => {
+            Err("expected the raw image bytes as the request body".to_string())
+        }
+    }
+}
+
+/// Reads a required string header off a raw-body image command.
+fn request_header<'a>(
+    request: &'a tauri::ipc::Request<'_>,
+    name: &str,
+) -> Result<&'a str, String> {
+    request
+        .headers()
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| format!("missing or invalid '{name}' header"))
+}
+
 #[tauri::command]
-pub async fn run_birefnet(app: AppHandle, image_bytes: Vec<u8>) -> Result<tauri::ipc::Response, String> {
-    // Return the processed image as raw bytes (ArrayBuffer on the JS side) rather
-    // than a JSON number array, which ~4x'd a multi-MB result over IPC (M12).
+pub async fn run_birefnet(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {
+    // Image arrives as a raw ArrayBuffer body and the result leaves as raw bytes,
+    // both avoiding the ~4x JSON-number-array blowup over IPC (M12).
+    let image_bytes = request_image_bytes(&request)?;
     let out = tauri::async_runtime::spawn_blocking(move || birefnet_blocking(&app, image_bytes))
         .await
         .map_err(|e| e.to_string())??;
@@ -533,9 +559,10 @@ fn birefnet_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>, S
 }
 
 #[tauri::command]
-pub async fn run_real_esrgan(app: AppHandle, image_bytes: Vec<u8>) -> Result<tauri::ipc::Response, String> {
-    // Upscaled output is *larger* than the input; ship it as raw bytes, not a
-    // JSON number array (M12).
+pub async fn run_real_esrgan(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {
+    // Raw ArrayBuffer in, raw bytes out — the upscaled output is *larger* than the
+    // input, so neither should cross IPC as a JSON number array (M12).
+    let image_bytes = request_image_bytes(&request)?;
     let out = tauri::async_runtime::spawn_blocking(move || real_esrgan_blocking(&app, image_bytes))
         .await
         .map_err(|e| e.to_string())??;
@@ -585,9 +612,11 @@ fn real_esrgan_blocking(app: &AppHandle, image_bytes: Vec<u8>) -> Result<Vec<u8>
 #[tauri::command]
 pub async fn run_text_check(
     app: AppHandle,
-    model_id: String,
-    image_bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<bool, String> {
+    // Cut image as a raw ArrayBuffer body, model id as a header (M12).
+    let model_id = request_header(&request, "x-model-id")?.to_string();
+    let image_bytes = request_image_bytes(&request)?;
     tauri::async_runtime::spawn_blocking(move || {
         if model_id == CRAFT_ID {
             craft_blocking(&app, image_bytes)
@@ -725,7 +754,9 @@ pub struct ColorEntry {
 /// levels per channel, ~4096 possible buckets). Returns entries sorted by
 /// pixel count descending so the dominant color is first.
 #[tauri::command]
-pub async fn extract_colors(image_bytes: Vec<u8>) -> Result<Vec<ColorEntry>, String> {
+pub async fn extract_colors(request: tauri::ipc::Request<'_>) -> Result<Vec<ColorEntry>, String> {
+    // Image arrives as a raw ArrayBuffer body, not a JSON number array (M12).
+    let image_bytes = request_image_bytes(&request)?;
     // Full image decode + a per-pixel histogram over an arbitrarily large
     // screenshot — run it on the blocking pool, not the main thread (H4).
     tauri::async_runtime::spawn_blocking(move || {
@@ -904,9 +935,12 @@ pub struct DetectedRegion {
 #[tauri::command]
 pub async fn run_auto_detect(
     app: AppHandle,
-    model_id: String,
-    image_bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<Vec<DetectedRegion>, String> {
+    // The (large) screenshot rides as a raw ArrayBuffer body; the small model id
+    // rides as a header (M12).
+    let model_id = request_header(&request, "x-model-id")?.to_string();
+    let image_bytes = request_image_bytes(&request)?;
     tauri::async_runtime::spawn_blocking(move || match model_id.as_str() {
         OMNIPARSER_ID => omniparser_blocking(&app, image_bytes),
         FLORENCE2_ID => florence2_blocking(&app, image_bytes),
@@ -919,8 +953,9 @@ pub async fn run_auto_detect(
 #[tauri::command]
 pub async fn run_florence2_text_check(
     app: AppHandle,
-    image_bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<bool, String> {
+    let image_bytes = request_image_bytes(&request)?;
     tauri::async_runtime::spawn_blocking(move || florence2_text_check_blocking(&app, image_bytes))
         .await
         .map_err(|e| e.to_string())?
@@ -1082,10 +1117,14 @@ pub struct SamBox {
 #[tauri::command]
 pub async fn run_sam_segment(
     app: AppHandle,
-    model_id: String,
-    image_bytes: Vec<u8>,
-    bbox: SamBox,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<Vec<u8>, String> {
+    // Image as a raw ArrayBuffer body; the small model id + box prompt ride as
+    // headers, the bbox JSON-encoded (M12).
+    let model_id = request_header(&request, "x-model-id")?.to_string();
+    let bbox: SamBox = serde_json::from_str(request_header(&request, "x-bbox")?)
+        .map_err(|e| format!("invalid 'x-bbox' header: {e}"))?;
+    let image_bytes = request_image_bytes(&request)?;
     tauri::async_runtime::spawn_blocking(move || sam_segment_blocking(&app, &model_id, image_bytes, bbox))
         .await
         .map_err(|e| e.to_string())?
@@ -1278,8 +1317,9 @@ pub struct FontPrediction {
 #[tauri::command]
 pub async fn run_font_detect(
     app: AppHandle,
-    image_bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<Vec<FontPrediction>, String> {
+    let image_bytes = request_image_bytes(&request)?;
     tauri::async_runtime::spawn_blocking(move || font_detect_blocking(&app, image_bytes))
         .await
         .map_err(|e| e.to_string())?
