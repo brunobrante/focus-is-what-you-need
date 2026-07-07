@@ -9,7 +9,10 @@ import {
   rectRight
 } from "./geometry";
 
-const SNAP_DISTANCE = 6;
+/** Snap magnetism radius, in *screen* pixels. Callers convert it to a world-space
+ *  tolerance by dividing by the display zoom so magnetism feels constant at any
+ *  zoom level (M3). */
+export const SNAP_DISTANCE = 6;
 
 type Candidate = SnapCandidate;
 
@@ -25,7 +28,8 @@ function buildIgnoreSet(document: CanvasDocument, ids: string[]): Set<string> {
 
 function findBestSnap(
   moving: Array<{ value: number; kind: "start" | "center" | "end" }>,
-  candidates: Candidate[]
+  candidates: Candidate[],
+  tolerance: number
 ): { delta: number; guide: Candidate } | null {
   let best: { distance: number; delta: number; guide: Candidate } | null = null;
 
@@ -33,7 +37,7 @@ function findBestSnap(
     for (const candidate of candidates) {
       const delta = candidate.value - point.value;
       const distance = Math.abs(delta);
-      if (distance <= SNAP_DISTANCE && (!best || distance < best.distance)) {
+      if (distance <= tolerance && (!best || distance < best.distance)) {
         best = {
           distance,
           delta,
@@ -112,19 +116,22 @@ export function snapRect(
   document: CanvasDocument,
   ignoreIds: string[],
   bounds: Rect,
-  parentId: string | null | undefined
+  parentId: string | null | undefined,
+  tolerance: number = SNAP_DISTANCE
 ): { rect: Rect; guides: SnapGuide[] } {
   return snapRectWithCandidates(
     rect,
     buildSnapCandidates(document, ignoreIds, bounds, parentId),
-    bounds
+    bounds,
+    tolerance
   );
 }
 
 export function snapRectWithCandidates(
   rect: Rect,
   candidates: SnapCandidateSet,
-  bounds: Rect
+  bounds: Rect,
+  tolerance: number = SNAP_DISTANCE
 ): { rect: Rect; guides: SnapGuide[] } {
   const verticalCandidates = candidates.vertical;
   const horizontalCandidates = candidates.horizontal;
@@ -135,7 +142,8 @@ export function snapRectWithCandidates(
       { value: rectCenterX(rect), kind: "center" },
       { value: rectRight(rect), kind: "end" }
     ],
-    verticalCandidates
+    verticalCandidates,
+    tolerance
   );
   const horizontalSnap = findBestSnap(
     [
@@ -143,7 +151,8 @@ export function snapRectWithCandidates(
       { value: rectCenterY(rect), kind: "center" },
       { value: rectBottom(rect), kind: "end" }
     ],
-    horizontalCandidates
+    horizontalCandidates,
+    tolerance
   );
 
   const snapped = {

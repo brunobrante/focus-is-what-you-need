@@ -24,7 +24,7 @@ import {
   roundPixel,
   snapAngle,
 } from "@/canvas/engine/geometry";
-import { buildSnapCandidates, snapRectWithCandidates } from "@/canvas/engine/snapping";
+import { buildSnapCandidates, SNAP_DISTANCE, snapRectWithCandidates } from "@/canvas/engine/snapping";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
 import type { CanvasDocument, ElementNode, Point, RadiusCorner, Rect, SnapGuide } from "@/canvas/engine/types";
@@ -73,7 +73,16 @@ export function computeDragMoveFromWorldDelta(
       interaction.parentBounds,
       interaction.commonParentId,
     ));
-  const snapped = snapRectWithCandidates(nextBox, candidates, interaction.parentBounds);
+  // Convert the screen-px snap radius to world space so magnetism feels constant
+  // at any zoom (M3). The world→screen matrix scale (a == d, no viewport rotation)
+  // is the display zoom.
+  const displayZoom = interaction.startWorldToScreenMatrix.a || 1;
+  const snapped = snapRectWithCandidates(
+    nextBox,
+    candidates,
+    interaction.parentBounds,
+    SNAP_DISTANCE / displayZoom,
+  );
   nextBox = clampRectToBounds(snapped.rect, interaction.parentBounds);
   return {
     delta: {
