@@ -162,6 +162,21 @@ export function LayoutSection({
   const alignX = styles.alignX ?? "start";
   const alignY = styles.alignY ?? "start";
 
+  // Min/max bound fields: empty clears to undefined, a valid number clamps to
+  // >= 0, and anything non-numeric reverts (returns false) instead of coercing
+  // to 0 like `Number(v) || 0` did (L5).
+  const commitBound =
+    (key: "minWidth" | "maxWidth" | "minHeight" | "maxHeight") => (v: string): boolean => {
+      if (v.trim() === "") {
+        onChange({ [key]: undefined });
+        return true;
+      }
+      const n = Number(v);
+      if (!Number.isFinite(n)) return false;
+      onChange({ [key]: clamp(n, 0, Infinity) });
+      return true;
+    };
+
   const perSidePadding =
     styles.paddingTop !== undefined ||
     styles.paddingRight !== undefined ||
@@ -388,16 +403,16 @@ export function LayoutSection({
             <InsInput value={String(styles.order ?? 0)} onChange={(v) => updateNumber(v, (order) => onChange({ order }))} />
           </InsRow>
           <InsRow label="Min W">
-            <InsInput value={styles.minWidth === undefined ? "" : String(styles.minWidth)} placeholder="—" onChange={(v) => onChange({ minWidth: v.trim() === "" ? undefined : clamp(Number(v) || 0, 0, Infinity) })} suffix="px" />
+            <InsInput value={styles.minWidth === undefined ? "" : String(styles.minWidth)} placeholder="—" onChange={commitBound("minWidth")} suffix="px" />
           </InsRow>
           <InsRow label="Max W">
-            <InsInput value={styles.maxWidth === undefined ? "" : String(styles.maxWidth)} placeholder="—" onChange={(v) => onChange({ maxWidth: v.trim() === "" ? undefined : clamp(Number(v) || 0, 0, Infinity) })} suffix="px" />
+            <InsInput value={styles.maxWidth === undefined ? "" : String(styles.maxWidth)} placeholder="—" onChange={commitBound("maxWidth")} suffix="px" />
           </InsRow>
           <InsRow label="Min H">
-            <InsInput value={styles.minHeight === undefined ? "" : String(styles.minHeight)} placeholder="—" onChange={(v) => onChange({ minHeight: v.trim() === "" ? undefined : clamp(Number(v) || 0, 0, Infinity) })} suffix="px" />
+            <InsInput value={styles.minHeight === undefined ? "" : String(styles.minHeight)} placeholder="—" onChange={commitBound("minHeight")} suffix="px" />
           </InsRow>
           <InsRow label="Max H">
-            <InsInput value={styles.maxHeight === undefined ? "" : String(styles.maxHeight)} placeholder="—" onChange={(v) => onChange({ maxHeight: v.trim() === "" ? undefined : clamp(Number(v) || 0, 0, Infinity) })} suffix="px" />
+            <InsInput value={styles.maxHeight === undefined ? "" : String(styles.maxHeight)} placeholder="—" onChange={commitBound("maxHeight")} suffix="px" />
           </InsRow>
         </>
       ) : null}
