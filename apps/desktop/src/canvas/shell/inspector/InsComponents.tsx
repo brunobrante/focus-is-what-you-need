@@ -333,7 +333,14 @@ export function InsColor({
       </label>
       <InsInput
         value={value.toUpperCase().replace("#", "")}
-        onChange={(v) => onChange("#" + v.replace("#", ""))}
+        onChange={(v) => {
+          const hex = "#" + v.replace(/#/g, "").trim();
+          // Reject non-hex input so the deferred-commit field reverts to the last
+          // valid value instead of storing junk like "#red" (L4).
+          if (!/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) return false;
+          onChange(hex);
+          return true;
+        }}
       />
       {canBind && (
         <button
