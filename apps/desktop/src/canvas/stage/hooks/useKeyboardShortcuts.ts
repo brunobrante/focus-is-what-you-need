@@ -239,11 +239,21 @@ export function useKeyboardShortcuts({
       viewportRef.current?.classList.remove("is-space-panning");
     };
 
+    // A keyup can be missed if the window loses focus while Space is held (e.g.
+    // Cmd+Tab), leaving space-pan stuck on so the next click pans instead of
+    // selecting (M5). Reset on blur, mirroring CanvasToolingLayer's modifier reset.
+    const onBlur = () => {
+      spacePressedRef.current = false;
+      viewportRef.current?.classList.remove("is-space-panning");
+    };
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
       spacePressedRef.current = false;
     };
   }, [
