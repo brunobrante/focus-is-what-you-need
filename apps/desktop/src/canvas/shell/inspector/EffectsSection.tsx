@@ -52,12 +52,16 @@ function newEffect(): Effect {
 
 // When the user switches an entry's type, fill in any params the new type needs
 // but the old one didn't carry — so the inspector value matches what renders
-// (the compiler treats a missing param as 0/identity). Color filters need none
-// (compileEffects + FilterParams both fall back to the identity amount).
+// (the compiler treats a missing param as 0/identity).
 function seedForType(type: EffectType, e: Effect): Partial<Effect> {
   if (SHADOW_TYPES.has(type)) return { y: e.y ?? 2, blur: e.blur ?? 4, color: e.color ?? DEFAULT_SHADOW_COLOR };
   if (BLUR_TYPES.has(type)) return { radius: e.radius ?? 4 };
-  return {};
+  // Color-adjust filters all store one `amount`, but its unit differs per type
+  // (hue-rotate = degrees, grayscale/invert/sepia = 0..1, brightness/contrast/
+  // saturate = multiplier). Reset it to the new type's identity so a stale value
+  // from another unit family doesn't carry over — e.g. Hue 90° → Grayscale
+  // showing "9000%" (M10).
+  return { amount: defaultFilterAmount(type) };
 }
 
 const iconButtonClass =
