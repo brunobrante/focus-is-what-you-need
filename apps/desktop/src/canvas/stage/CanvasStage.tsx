@@ -441,7 +441,14 @@ export function CanvasStage({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={finishInteraction}
-      onPointerCancel={finishInteraction}
+      onPointerCancel={(event) => {
+        // An OS gesture interruption mid-drag must revert, not commit a
+        // half-finished move (M7). cancelActiveInteraction handles the transform
+        // gestures (drag/resize/rotate/radius + canvas variants); it returns
+        // false for pan/marquee/draw/pen/pencil, which fall back to their normal
+        // finish so they still clean up.
+        if (!cancelActiveInteraction()) finishInteraction(event);
+      }}
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
       onDragOver={onDragOver}
