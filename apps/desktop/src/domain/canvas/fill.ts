@@ -216,6 +216,10 @@ export type FillSource = {
   fills?: Fill[];
   background?: string;
   backgroundRef?: string;
+  /** Text element glyph color — the simple representation for a text solid fill
+   *  (M12 / D2). */
+  color?: string;
+  colorRef?: string;
   src?: string;
   objectFit?: string;
 };
@@ -225,6 +229,8 @@ export type FillSource = {
 export function normalizeFills(source: FillSource): Fill[] {
   if (source.fills && source.fills.length > 0) return source.fills;
   if (source.type === "image") return [synthImageFill(source.src, source.objectFit)];
+  // A text solid lives on `color`/`colorRef` (glyph paint), not `background`.
+  if (source.type === "text") return [synthSolidFill(source.color, source.colorRef)];
   return [synthSolidFill(source.background, source.backgroundRef)];
 }
 
@@ -276,6 +282,10 @@ export type FillWritePatch = {
   fills?: Fill[];
   background?: string;
   backgroundRef?: string;
+  /** Text element only — a single solid maps to the glyph `color`, never the box
+   *  `background` (M12 / D2). undefined = leave as-is. */
+  color?: string;
+  colorRef?: string;
   /** Image element only — sync the node `src` (undefined = leave as-is). */
   src?: string;
   /** Image element only — sync `objectFit` (undefined = leave as-is). */
@@ -284,6 +294,22 @@ export type FillWritePatch = {
 
 export function fillsToWritePatch(fills: Fill[], elementType: string): FillWritePatch {
   const enabled = fills.filter(fillEnabled);
+
+  // Collapse: a text element's single plain solid → the glyph `color`, not the
+  // box `background` (which paints a rectangle behind the glyphs). A 2+-fill list
+  // already clips to the glyphs via background-clip:text, so routing the single
+  // solid to `color` keeps both cases painting the glyphs (M12 / D2). Clear
+  // `background` so a stale box fill doesn't linger.
+  if (elementType === "text" && fills.length === 1 && isPlainSolid(fills[0])) {
+    const solid = fills[0];
+    return {
+      fills: undefined,
+      background: undefined,
+      backgroundRef: undefined,
+      color: solid.color,
+      colorRef: solid.colorRef,
+    };
+  }
 
   // Collapse: a single plain solid → the classic background path.
   if (elementType !== "image" && fills.length === 1 && isPlainSolid(fills[0])) {

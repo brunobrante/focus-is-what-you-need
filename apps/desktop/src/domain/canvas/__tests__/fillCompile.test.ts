@@ -159,6 +159,20 @@ test("fillsToWritePatch: a single plain solid collapses back to background", () 
   expect(patch.backgroundRef).toBe("colors:c1");
 });
 
+test("fillsToWritePatch: a text single solid collapses to color, not background (M12)", () => {
+  const patch = fillsToWritePatch([solid({ color: "#ff0000", colorRef: "colors:c1" })], "text");
+  expect(patch.fills).toBeUndefined();
+  expect(patch.color).toBe("#ff0000");
+  expect(patch.colorRef).toBe("colors:c1");
+  expect(patch.background).toBeUndefined();
+  expect(patch.backgroundRef).toBeUndefined();
+});
+
+test("normalizeFills: a text solid reads back from color, not background (M12)", () => {
+  const fills = normalizeFills({ type: "text", color: "#00ff00", colorRef: "colors:c2" });
+  expect(fills).toEqual([synthSolidFill("#00ff00", "colors:c2")]);
+});
+
 test("fillsToWritePatch: a plain image collapses back to src + objectFit", () => {
   const patch = fillsToWritePatch([image({ src: "x.png", fit: "fit" })], "image");
   expect(patch.fills).toBeUndefined();

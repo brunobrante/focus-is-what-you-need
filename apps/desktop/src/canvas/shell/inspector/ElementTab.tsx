@@ -118,6 +118,11 @@ export function ElementTab({
       background: patch.background,
       backgroundRef: patch.backgroundRef,
     };
+    // A text solid maps to the glyph `color`, not the box `background` (M12).
+    if (patch.color !== undefined) {
+      stylePatch.color = patch.color;
+      stylePatch.colorRef = patch.colorRef;
+    }
     if (patch.objectFit !== undefined) stylePatch.objectFit = patch.objectFit as ElementStyles["objectFit"];
     // Style + image src commit together in one document (see Inspector.commitFill).
     onUpdateFill(stylePatch, patch.src);
@@ -239,6 +244,9 @@ export function ElementTab({
             fills: node.styles.fills,
             background: node.styles.background,
             backgroundRef: node.styles.backgroundRef,
+            // Text solids live on the glyph color, not background (M12).
+            color: node.styles.color,
+            colorRef: node.styles.colorRef,
             src: node.src,
             objectFit: node.styles.objectFit,
           })}
