@@ -345,6 +345,13 @@ export function useCanvasPointerEvents({
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (contextMenu) setContextMenu(null);
 
+    // A gesture is already in flight (e.g. a left-button element drag). Ignore any
+    // second pointerdown — a middle-button pan, a second mouse button, or a
+    // concurrent touch/pen point — so it can't overwrite interactionRef and orphan
+    // the original drag, leaving the moved element at its transient position with
+    // no commit and no undo entry (H2).
+    if (interactionRef.current) return;
+
     const viewport = viewportRef.current;
     // Pan when: middle mouse, space held (temporary pan), or the Hand tool is the
     // active tool and the user presses the left button.
