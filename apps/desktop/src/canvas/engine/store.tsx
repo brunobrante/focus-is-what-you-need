@@ -574,24 +574,38 @@ export function EditorProvider({
     if (state.transientChangedIds != null) return;
 
     let cancelled = false;
+    let written = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Session-draft cache → localStorage (synchronous, no IPC). The database
+    // scene is saved separately through the queue, on commit.
+    const writeDraft = () => {
+      written = true;
+      try {
+        getDraftCachePort().writeDraft(storageKey, JSON.stringify(state.document));
+      } catch {
+        /* quota — non-fatal */
+      }
+      getDraftCachePort().emitSaved(storageKey, state.document);
+    };
 
     if (persistStorage && hydratedRef.current) {
       timeout = setTimeout(() => {
         if (cancelled) return;
-        // Session-draft cache → localStorage (synchronous, no IPC). The
-        // database scene is saved separately through the queue, on commit.
-        try {
-          getDraftCachePort().writeDraft(storageKey, JSON.stringify(state.document));
-        } catch {
-          /* quota — non-fatal */
-        }
-        getDraftCachePort().emitSaved(storageKey, state.document);
+        writeDraft();
       }, 250);
     }
     onDocumentChange?.(state.document);
     return () => {
       cancelled = true;
+      // Flush a still-pending write instead of dropping it, so a commit
+      // immediately followed by a new gesture (which supersedes this effect
+      // before the 250ms elapses) still lands this document in the cache (L11).
+      if (timeout && !written) {
+        clearTimeout(timeout);
+        writeDraft();
+        return;
+      }
       if (timeout) clearTimeout(timeout);
     };
   }, [onDocumentChange, persistStorage, state.document, state.transientChangedIds, storageKey]);
