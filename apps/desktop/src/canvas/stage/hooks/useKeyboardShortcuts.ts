@@ -131,6 +131,16 @@ export function useKeyboardShortcuts({
           dispatch({ type: "setTool", tool: "select" });
           return;
         }
+        // Abort an in-flight pencil stroke (M4): release capture and revert so
+        // pencilMove stops appending; keep the Pencil tool active for another stroke.
+        if (interaction?.type === "pencil") {
+          const viewport = viewportRef.current;
+          if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
+          interactionRef.current = null;
+          setInteractionActive(false);
+          dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
+          return;
+        }
         // Abort an in-flight drag/resize/rotate/radius gesture (STAGE-4).
         if (cancelActiveInteractionRef?.current?.()) return;
         if (currentState.tool !== "select") { dispatch({ type: "setTool", tool: "select" }); return; }
