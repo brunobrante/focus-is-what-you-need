@@ -243,6 +243,21 @@ function SolidBody({
   );
 }
 
+// Stable React keys for gradient stops, which carry no persisted id. setStop and
+// removeStop preserve the surviving stops' object references, so keying by object
+// identity keeps each row's color-field draft attached to its own stop when a
+// middle stop is removed (L17) — plain index keys shift drafts onto wrong rows.
+const gradientStopKeys = new WeakMap<GradientFill["stops"][number], string>();
+let gradientStopKeySeq = 0;
+function gradientStopKey(stop: GradientFill["stops"][number]): string {
+  let key = gradientStopKeys.get(stop);
+  if (key === undefined) {
+    key = `gs-${gradientStopKeySeq++}`;
+    gradientStopKeys.set(stop, key);
+  }
+  return key;
+}
+
 function GradientBody({
   fill,
   gradientTokens,
@@ -294,7 +309,7 @@ function GradientBody({
       </InsRow>
       <div className="flex flex-col gap-1.5">
         {fill.stops.map((stop, index) => (
-          <div key={index} className="flex items-center gap-1.5">
+          <div key={gradientStopKey(stop)} className="flex items-center gap-1.5">
             <div className="min-w-0 flex-1">
               <FillColorField value={stop.color} onChange={(color) => setStop(index, { color })} />
             </div>
