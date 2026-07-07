@@ -76,7 +76,9 @@ export function useTextEditingSession({
     // pen-move). The updater below is now pure.
     const nextDocument = updateElementTextShallow(latestDocumentRef.current, current.nodeId, value);
     latestDocumentRef.current = nextDocument;
-    dispatch({ type: "setDocumentTransient", document: nextDocument });
+    // Scope the transient to the edited node (P3): without changedIds the store
+    // falls back to a full O(N) deep diff + draft write + saveScene per keystroke.
+    dispatch({ type: "setDocumentTransient", document: nextDocument, changedIds: [current.nodeId] });
     setTextEdit((prev) => (prev ? {
       ...prev,
       value,
