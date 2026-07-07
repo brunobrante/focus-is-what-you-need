@@ -266,7 +266,11 @@ export function ElementTab({
         onScrubEnd={onScrubEnd}
       />
 
+      {/* Key by element id so each section's defaultOpen (which depends on the
+          element — has-border, has-effects) is re-evaluated on selection change
+          instead of freezing at the first-mounted element's state (L18). */}
       <BorderSection
+        key={`border-${node.id}`}
         styles={node.styles}
         target={borderTargetForType(node.type)}
         tokens={colorTokens}
@@ -275,6 +279,7 @@ export function ElementTab({
       />
 
       <EffectsSection
+        key={`effects-${node.id}`}
         effects={node.styles.effects ?? []}
         target={effectTargetForType(node.type)}
         tokens={colorTokens}
