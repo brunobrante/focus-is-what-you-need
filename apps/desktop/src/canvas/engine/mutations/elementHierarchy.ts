@@ -60,8 +60,14 @@ export function insertElement(document: CanvasDocument, node: ElementNode): Canv
   const next = cloneDocument(document);
   const parentId = node.parentId;
   next.elements[node.id] = node;
-  if (parentId) next.elements[parentId].children.push(node.id);
-  else next.rootIds.push(node.id);
+  // Fall back to root if the parent id is stale, instead of throwing on
+  // next.elements[parentId].children (L9).
+  const parent = parentId ? next.elements[parentId] : undefined;
+  if (parent) parent.children.push(node.id);
+  else {
+    node.parentId = null;
+    next.rootIds.push(node.id);
+  }
   constrainElementInPlace(next, node.id);
   return next;
 }
@@ -237,8 +243,10 @@ export function duplicateElements(
   const topLevelIds = filterTopLevelIds(document, ids).filter((id) => !document.elements[id]?.locked);
   const selectedIds: string[] = [];
 
-  const cloneTree = (sourceId: string, parentId: string | null, isTopLevel: boolean): string => {
+  const cloneTree = (sourceId: string, parentId: string | null, isTopLevel: boolean): string | null => {
     const source = document.elements[sourceId];
+    // Skip a stale child/source id instead of throwing on source.type (L9).
+    if (!source) return null;
     const newId = createId(source.type);
     // `styles` is the only nested mutable object a node owns; `children` is
     // rebuilt by the recursion below. So this spread is a complete deep copy of a
@@ -254,16 +262,18 @@ export function duplicateElements(
     next.elements[newId] = clone;
     for (const childId of source.children) {
       const clonedChildId = cloneTree(childId, newId, false);
-      clone.children.push(clonedChildId);
+      if (clonedChildId) clone.children.push(clonedChildId);
     }
     return newId;
   };
 
   for (const sourceId of topLevelIds) {
     const source = document.elements[sourceId];
+    if (!source) continue;
     const newId = cloneTree(sourceId, source.parentId, true);
+    if (!newId) continue;
     selectedIds.push(newId);
-    const list = source.parentId ? next.elements[source.parentId].children : next.rootIds;
+    const list = source.parentId ? next.elements[source.parentId]?.children ?? next.rootIds : next.rootIds;
     const sourceIndex = list.indexOf(sourceId);
     list.splice(sourceIndex >= 0 ? sourceIndex + 1 : list.length, 0, newId);
   }
