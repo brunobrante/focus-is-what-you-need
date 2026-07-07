@@ -14,6 +14,28 @@ import type { CanvasKeyCommandId, GlobalSettings } from "@/domain/settings/types
 import { TOOLBAR_TOOL_MAP } from "../canvasShellStyle";
 import type { Interaction } from "../canvasInteractionTypes";
 
+// Gestures that build a transient document and commit on pointerup. While one is
+// in flight, a document-committing shortcut (undo/redo/paste/duplicate/delete)
+// would land on a transient frame and be clobbered by the next pointermove or by
+// the gesture's own commit — corrupting history (H1). Pan/marquee don't mutate
+// the document, so they don't need gating.
+const DOCUMENT_MUTATING_GESTURES = new Set<Interaction["type"]>([
+  "drag",
+  "resize",
+  "rotate",
+  "radius",
+  "draw",
+  "pen",
+  "pencil",
+  "anchor-edit",
+  "canvas-resize",
+  "canvas-rotate",
+]);
+
+function isDocumentMutatingGesture(interaction: Interaction | null): boolean {
+  return interaction !== null && DOCUMENT_MUTATING_GESTURES.has(interaction.type);
+}
+
 type Params = {
   dispatch: (action: Record<string, unknown> & { type: string }) => void;
   // This editor's clipboard (per-instance, not module-global) — ENG-3.
@@ -114,8 +136,12 @@ export function useKeyboardShortcuts({
         if (currentState.tool !== "select") { dispatch({ type: "setTool", tool: "select" }); return; }
       }
 
-      if (matchesKeyCommand(event, settings, "canvas.history.redo")) { event.preventDefault(); dispatch({ type: "redo" }); return; }
-      if (matchesKeyCommand(event, settings, "canvas.history.undo")) { event.preventDefault(); dispatch({ type: "undo" }); return; }
+      // Block document-committing shortcuts while a mutating gesture is in flight (H1):
+      // they would commit onto a transient frame that the next pointermove/commit clobbers.
+      const mutatingGesture = isDocumentMutatingGesture(interactionRef.current);
+
+      if (matchesKeyCommand(event, settings, "canvas.history.redo")) { event.preventDefault(); if (!mutatingGesture) dispatch({ type: "redo" }); return; }
+      if (matchesKeyCommand(event, settings, "canvas.history.undo")) { event.preventDefault(); if (!mutatingGesture) dispatch({ type: "undo" }); return; }
       if (matchesKeyCommand(event, settings, "canvas.viewport.zoomReset")) { event.preventDefault(); dispatch({ type: "setZoom", zoom: 1 }); return; }
       if (matchesKeyCommand(event, settings, "canvas.viewport.zoomIn")) {
         event.preventDefault();
@@ -138,13 +164,14 @@ export function useKeyboardShortcuts({
       if (matchesKeyCommand(event, settings, "canvas.clipboard.copy")) { event.preventDefault(); clipboard.copy(currentState.document, currentState.selectedIds); return; }
       if (matchesKeyCommand(event, settings, "canvas.clipboard.paste")) {
         event.preventDefault();
+        if (mutatingGesture) return;
         const result = clipboard.paste(currentState.document);
         if (result) dispatch({ type: "commitDocument", document: result.document, selectedIds: result.selectedIds });
         return;
       }
       if (matchesKeyCommand(event, settings, "canvas.selection.duplicate")) {
         event.preventDefault();
-        if (currentState.selectedIds.length > 0) {
+        if (!mutatingGesture && currentState.selectedIds.length > 0) {
           const dup = duplicateElements(currentState.document, currentState.selectedIds);
           dispatch({ type: "commitDocument", document: dup.document, selectedIds: dup.selectedIds });
         }
@@ -152,6 +179,7 @@ export function useKeyboardShortcuts({
       }
       if (matchesKeyCommand(event, settings, "canvas.selection.delete") && currentState.selectedIds.length > 0) {
         event.preventDefault();
+        if (mutatingGesture) return;
         dispatch({ type: "commitDocument", document: deleteElements(currentState.document, currentState.selectedIds), selectedIds: [] });
         return;
       }
