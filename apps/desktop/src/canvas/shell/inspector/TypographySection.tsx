@@ -26,6 +26,23 @@ const LABEL_TO_CASE = new Map(
   ),
 );
 
+// `fontWeight` is a string that may hold a CSS keyword ("bold", "normal") rather
+// than a number; resolve keywords before numeric display so the field doesn't
+// show "NaN" (L3).
+const WEIGHT_KEYWORDS: Record<string, number> = {
+  normal: 400,
+  bold: 700,
+  bolder: 700,
+  lighter: 300,
+};
+function resolveFontWeight(weight: string | undefined): number {
+  if (weight == null) return 400;
+  const keyword = WEIGHT_KEYWORDS[weight.trim().toLowerCase()];
+  if (keyword !== undefined) return keyword;
+  const numeric = Number(weight);
+  return Number.isFinite(numeric) ? numeric : 400;
+}
+
 /**
  * The Typography panel — shown only for text elements. Maps cleanly to CSS text
  * properties; the value is in the non-obvious conversions (letter-spacing %,
@@ -72,7 +89,7 @@ export function TypographySection({
       {/* Continuous weight (drives the `wght` axis on variable fonts). */}
       <InsRow label="Weight">
         <InsInput
-          value={String(Number(styles.fontWeight ?? 400))}
+          value={String(resolveFontWeight(styles.fontWeight))}
           onChange={(v) => updateNumber(v, (w) => onChange({ fontWeight: String(clamp(Math.round(w), 1, 1000)) }))}
         />
       </InsRow>
