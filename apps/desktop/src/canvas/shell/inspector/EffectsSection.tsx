@@ -266,7 +266,7 @@ export function EffectsSection({
     <InsSection title="Effects" defaultOpen={effects.length > 0} disabled={locked}>
       {effects.length === 0 ? (
         <p className="text-[11px] leading-5 text-[#6B6B6B]">
-          Sombras, blur e filtros. A ordem importa — filtros encadeiam e sombras empilham.
+          Shadows, blur, and filters. Order matters — filters chain and shadows stack.
         </p>
       ) : (
         effects.map((effect, index) => (

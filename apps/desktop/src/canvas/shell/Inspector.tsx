@@ -298,7 +298,7 @@ export function Inspector({
 
   return (
     <aside
-      aria-label="Inspetor"
+      aria-label="Inspector"
       className="pointer-events-auto relative flex h-full shrink-0 flex-col overflow-hidden rounded-xl border border-[#2C2C2C] bg-[#171717] text-[#F2F2F2]"
       style={{ width, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
     >
@@ -419,7 +419,7 @@ export function Inspector({
           />
         ) : selectedCount > 1 ? (
           <div className="flex flex-col">
-            <EmptyState title={`${selectedCount} elementos selecionados`} body="Use the canvas to move the group or select a layer to edit properties." />
+            <EmptyState title={`${selectedCount} elements selected`} body="Use the canvas to move the group or select a layer to edit properties." />
             <div className="flex flex-col gap-1.5 border-t border-[#2C2C2C] px-3.5 py-3">
               <span className="text-[11px] font-medium text-[#9A9A9A]">Boolean</span>
               <div className="grid grid-cols-2 gap-1.5">
