@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { IconChevronDown, IconLink, IconUnlink } from "@/components/icons";
 
 import { clamp } from "@/domain/canvas/geometry";
@@ -7,6 +16,33 @@ import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 
 /** A System Design color token offered for binding in InsColor. */
 export type InsColorToken = { id: string; name: string; value: string };
+
+/**
+ * Scrub lifecycle for continuous controls (sliders, the native color swatch). A
+ * consumer that wants a drag to coalesce into a single undo entry (H3) wraps the
+ * subtree in `ScrubProvider`; leaf controls call onScrubStart on gesture begin
+ * and onScrubEnd on release. Controls also accept explicit props that win over
+ * the context, so both wiring styles work.
+ */
+type ScrubHandlers = { onScrubStart?: () => void; onScrubEnd?: () => void };
+const ScrubContext = createContext<ScrubHandlers>({});
+
+export function ScrubProvider({
+  onScrubStart,
+  onScrubEnd,
+  children,
+}: ScrubHandlers & { children: ReactNode }) {
+  const value = useMemo(() => ({ onScrubStart, onScrubEnd }), [onScrubStart, onScrubEnd]);
+  return <ScrubContext.Provider value={value}>{children}</ScrubContext.Provider>;
+}
+
+export function useScrubHandlers(explicit?: ScrubHandlers): ScrubHandlers {
+  const ctx = useContext(ScrubContext);
+  return {
+    onScrubStart: explicit?.onScrubStart ?? ctx.onScrubStart,
+    onScrubEnd: explicit?.onScrubEnd ?? ctx.onScrubEnd,
+  };
+}
 
 export { clamp };
 
@@ -434,6 +470,8 @@ export function InsSlider({
   max,
   step,
   onChange,
+  onScrubStart,
+  onScrubEnd,
   format = String,
 }: {
   value: number;
@@ -441,8 +479,14 @@ export function InsSlider({
   max: number;
   step: number;
   onChange: (value: number) => void;
+  /** Called on pointerdown before the drag — lets the consumer route the
+   *  following onChange ticks through transient frames (commit on release, H3). */
+  onScrubStart?: () => void;
+  /** Called when the drag releases — commit the coalesced scrub as one entry. */
+  onScrubEnd?: () => void;
   format?: (value: number) => string;
 }) {
+  const scrub = useScrubHandlers({ onScrubStart, onScrubEnd });
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <input
@@ -452,6 +496,11 @@ export function InsSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerDown={scrub.onScrubStart}
+        onPointerUp={scrub.onScrubEnd}
+        onPointerCancel={scrub.onScrubEnd}
+        onLostPointerCapture={scrub.onScrubEnd}
+        onBlur={scrub.onScrubEnd}
         className="h-7 min-w-0 flex-1 cursor-pointer accent-[#0D99FF]"
       />
       <span className="w-9 shrink-0 text-right text-[10.5px] tabular-nums text-[#6B6B6B]">

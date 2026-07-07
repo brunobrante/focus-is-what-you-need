@@ -36,6 +36,7 @@ import {
   InsSection,
   InsSelect,
   InsSlider,
+  ScrubProvider,
   updateNumber,
 } from "./InsComponents";
 
@@ -485,6 +486,8 @@ export function FillSection({
   gradientTokens,
   locked,
   onChange,
+  onScrubStart,
+  onScrubEnd,
 }: {
   fills: Fill[];
   target: FillTarget;
@@ -492,6 +495,10 @@ export function FillSection({
   gradientTokens: GradientTokenOption[];
   locked: boolean;
   onChange: (fills: Fill[]) => void;
+  /** Slider / native-color scrub lifecycle — one commit per drag (H3). Provided
+   *  to the subtree via ScrubProvider so nested sliders/color fields pick it up. */
+  onScrubStart?: () => void;
+  onScrubEnd?: () => void;
 }) {
   const updateAt = (index: number, patch: Partial<Fill>) =>
     onChange(fills.map((f, i) => (i === index ? ({ ...f, ...patch } as Fill) : f)));
@@ -511,6 +518,7 @@ export function FillSection({
   const add = () => onChange([newSolidFill(), ...fills]); // new fill goes on top
 
   return (
+    <ScrubProvider onScrubStart={onScrubStart} onScrubEnd={onScrubEnd}>
     <InsSection title="Fill" defaultOpen disabled={locked}>
       {fills.map((fill, index) => (
         <FillEntry
@@ -536,5 +544,6 @@ export function FillSection({
         Add fill
       </button>
     </InsSection>
+    </ScrubProvider>
   );
 }

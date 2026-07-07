@@ -5,12 +5,12 @@
 // native eyedropper (the web `EyeDropper` API, or the macOS `NSColorSampler`
 // fallback in WKWebView) and the same System Design color-token binding.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconCrosshair, IconLink, IconUnlink } from "@/components/icons";
 import { parseTokenRef, tokenRef } from "@/domain/system-design/resolveTokenRef";
 import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 import { pickScreenColor } from "@/infrastructure/eyedropper";
-import { type InsColorToken, InsInput } from "./InsComponents";
+import { type InsColorToken, InsInput, useScrubHandlers } from "./InsComponents";
 
 const iconButtonClass =
   "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2]";
@@ -34,6 +34,31 @@ export function FillColorField({
   const canBind = Boolean(onBind && tokens && tokens.length > 0);
   // The native swatch only speaks 6-digit hex; show black for richer literals.
   const nativeHex = /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000";
+
+  // Dragging inside the OS color picker fires a stream of `input` events (each a
+  // transient scrub tick) and one `change` when the picker closes (the commit).
+  // Coalesce the whole drag into a single undo entry (H3).
+  const scrub = useScrubHandlers();
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const scrubbingRef = useRef(false);
+  useEffect(() => {
+    const el = colorInputRef.current;
+    if (!el) return;
+    const onNativeChange = () => {
+      if (!scrubbingRef.current) return;
+      scrubbingRef.current = false;
+      scrub.onScrubEnd?.();
+    };
+    el.addEventListener("change", onNativeChange);
+    return () => el.removeEventListener("change", onNativeChange);
+  }, [scrub]);
+  const onNativeInput = (next: string) => {
+    if (!scrubbingRef.current) {
+      scrubbingRef.current = true;
+      scrub.onScrubStart?.();
+    }
+    onChange(next);
+  };
 
   if (boundRef && onBind) {
     const boundId = parseTokenRef(boundRef)?.tokenId;
@@ -71,9 +96,10 @@ export function FillColorField({
         style={{ background: value }}
       >
         <input
+          ref={colorInputRef}
           type="color"
           value={nativeHex}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onNativeInput(e.target.value)}
           className="absolute inset-0 cursor-pointer opacity-0"
         />
       </label>

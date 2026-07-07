@@ -28,6 +28,9 @@ type AppearanceSectionProps = {
   hasChildren: boolean;
   locked: boolean;
   onChange: (patch: Partial<ElementStyles>) => void;
+  /** Slider scrub lifecycle — transient while dragging, one commit on release (H3). */
+  onScrubStart?: () => void;
+  onScrubEnd?: () => void;
 };
 
 const cornerButtonBase =
@@ -55,6 +58,8 @@ export function AppearanceSection({
   hasChildren,
   locked,
   onChange,
+  onScrubStart,
+  onScrubEnd,
 }: AppearanceSectionProps) {
   const opacityPct = Math.round((styles.opacity ?? 1) * 100);
   const uniformRadius = styles.borderRadius ?? 0;
@@ -97,6 +102,8 @@ export function AppearanceSection({
           max={100}
           step={1}
           onChange={(next) => onChange({ opacity: clamp(next, 0, 100) / 100 })}
+          onScrubStart={onScrubStart}
+          onScrubEnd={onScrubEnd}
           format={(v) => `${v}%`}
         />
       </InsRow>
@@ -145,6 +152,8 @@ export function AppearanceSection({
                 max={sliderMax}
                 step={1}
                 onChange={(r) => onChange({ borderRadius: r })}
+                onScrubStart={onScrubStart}
+                onScrubEnd={onScrubEnd}
                 format={(v) => `${v}%`}
               />
             </InsRow>
@@ -196,6 +205,8 @@ export function AppearanceSection({
                   max={sliderMax}
                   step={1}
                   onChange={(r) => onChange({ borderRadius: r })}
+                  onScrubStart={onScrubStart}
+                  onScrubEnd={onScrubEnd}
                   format={(v) => `${v}`}
                 />
               </InsRow>

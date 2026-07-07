@@ -43,6 +43,11 @@ type ElementTabProps = {
   /** Commit a Fill-panel change: a style patch plus an optional image `src`, in
    *  one document (so the two don't overwrite each other). */
   onUpdateFill: (style: Partial<ElementStyles>, src?: string) => void;
+  /** Begin a slider / native-color scrub — subsequent style/fill updates are
+   *  transient until onScrubEnd, coalescing into one undo entry (H3). */
+  onScrubStart?: () => void;
+  /** End a scrub — commit the last transient frame as a single history entry. */
+  onScrubEnd?: () => void;
   onUpdateSizing: (sizing: ElementSizing) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
@@ -67,6 +72,8 @@ export function ElementTab({
   onUpdateRotation,
   onUpdateStyle,
   onUpdateFill,
+  onScrubStart,
+  onScrubEnd,
   onUpdateSizing,
   onToggleLocked,
   onToggleVisible,
@@ -238,6 +245,8 @@ export function ElementTab({
           gradientTokens={gradientTokens}
           locked={locked}
           onChange={handleFillsChange}
+          onScrubStart={onScrubStart}
+          onScrubEnd={onScrubEnd}
         />
       ) : null}
 
@@ -251,6 +260,8 @@ export function ElementTab({
         hasChildren={node.children.length > 0}
         locked={locked}
         onChange={onUpdateStyle}
+        onScrubStart={onScrubStart}
+        onScrubEnd={onScrubEnd}
       />
 
       <BorderSection

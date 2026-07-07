@@ -112,6 +112,13 @@ export function Inspector({
   useEffect(() => {
     if (!layoutTabAvailable && activeTab === "layout") setActiveTab("element");
   }, [layoutTabAvailable, activeTab]);
+  // Slider / native-color scrubbing (H3): while dragging, style/fill edits dispatch
+  // transient frames and coalesce into a single commit on release, instead of one
+  // full-document clone + undo entry per input tick (which overflowed the 80-cap
+  // history and wiped all prior undo steps).
+  const scrubbingRef = useRef(false);
+  const scrubBeforeRef = useRef<CanvasDocument | null>(null);
+  const scrubLastRef = useRef<CanvasDocument | null>(null);
   const prevShellTabSignalRef = useRef(openShellTabSignal ?? 0);
   useEffect(() => {
     if (openShellTabSignal !== undefined && openShellTabSignal !== prevShellTabSignalRef.current) {
@@ -171,11 +178,48 @@ export function Inspector({
 
   const commitDocument = (nextDocument: CanvasDocument | null = document, selectedIds?: string[]) => {
     if (!nextDocument) return;
-    (editorProp ?? getEditorSnapshot())?.dispatch({
+    const editor = editorProp ?? getEditorSnapshot();
+    // While scrubbing a slider / native color input, route every tick through a
+    // transient frame (no history entry) and remember the latest frame so the
+    // release can commit it as one undo step (H3).
+    if (scrubbingRef.current) {
+      scrubLastRef.current = nextDocument;
+      editor?.dispatch({
+        type: "setDocumentTransient",
+        document: nextDocument,
+        ...(node ? { changedIds: [node.id] } : {}),
+      });
+      return;
+    }
+    editor?.dispatch({
       type: "commitDocument",
       document: nextDocument,
       ...(selectedIds !== undefined ? { selectedIds } : {}),
     });
+  };
+
+  // Begin a scrub: snapshot the committed document as the single undo baseline.
+  const onScrubStart = () => {
+    if (scrubbingRef.current) return;
+    scrubbingRef.current = true;
+    scrubBeforeRef.current = (editorProp ?? getEditorSnapshot())?.state.document ?? document ?? null;
+    scrubLastRef.current = null;
+  };
+  // End a scrub: commit the last transient frame as one entry, against the baseline.
+  const onScrubEnd = () => {
+    if (!scrubbingRef.current) return;
+    scrubbingRef.current = false;
+    const before = scrubBeforeRef.current;
+    const last = scrubLastRef.current;
+    scrubBeforeRef.current = null;
+    scrubLastRef.current = null;
+    if (before && last) {
+      (editorProp ?? getEditorSnapshot())?.dispatch({
+        type: "commitDocument",
+        document: last,
+        beforeDocument: before,
+      });
+    }
   };
 
   const dispatchAncestor = (action: EditorAction) => {
@@ -409,6 +453,8 @@ export function Inspector({
             onUpdateRotation={(rotation) => commitDocument(updateElementRotation(document, node.id, rotation))}
             onUpdateStyle={commitStyle}
             onUpdateFill={commitFill}
+            onScrubStart={onScrubStart}
+            onScrubEnd={onScrubEnd}
             onUpdateSizing={commitSizing}
             onEditPath={onEditPath}
             onFlattenToPath={onFlattenToPath}
