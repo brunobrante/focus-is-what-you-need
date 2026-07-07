@@ -510,6 +510,12 @@ export function EditorProvider({
   onDocumentChange?: (document: CanvasDocument) => void;
 }) {
   const hydratedRef = useRef(!persistStorage);
+  // The storage key we last hydrated a draft for. The hydrate effect also depends
+  // on fallbackDocument/viewportMode (used by normalizeDraftCanvas), whose identity
+  // changes on panel/window resize; re-reading the draft then would reset
+  // past/future/selection/zoom and silently discard recent edits (M14). Hydrate
+  // exactly once per key.
+  const lastHydratedKeyRef = useRef<string | null>(null);
   const [state, dispatch] = useReducer(
     reducer,
     undefined,
@@ -529,8 +535,17 @@ export function EditorProvider({
   const clipboard = clipboardRef.current;
 
   useEffect(() => {
-    hydratedRef.current = !persistStorage;
-    if (!persistStorage) return;
+    if (!persistStorage) {
+      hydratedRef.current = true;
+      return;
+    }
+
+    // Hydrate the draft exactly once per storage key. This effect re-fires when
+    // fallbackDocument/viewportMode identity changes (panel resize), but the draft
+    // must not be re-read then — that would clobber the live document and history
+    // (M14). Only (re)hydrate when the storage key actually changes.
+    if (lastHydratedKeyRef.current === storageKey) return;
+    lastHydratedKeyRef.current = storageKey;
 
     // The current-canvas draft is a UI-session cache, not database state: read
     // it synchronously from localStorage (no IPC), matching createInitialState.
