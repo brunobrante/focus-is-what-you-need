@@ -124,8 +124,10 @@ export function ElementTab({
   };
   const def = getElementDefinition(node.type).capabilities;
   const c = def.constraints;
-  const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? w);
-  const clampH = (h: number) => clamp(h, c.height.min, c.height.max ?? h);
+  // Fall back to Infinity (not the typed value) for a missing max, so an entry
+  // below min still clamps up to min instead of inverting lo/hi (L6).
+  const clampW = (w: number) => clamp(w, c.width.min, c.width.max ?? Infinity);
+  const clampH = (h: number) => clamp(h, c.height.min, c.height.max ?? Infinity);
   const widthFit = node.type === "text" && node.sizing?.width === "fit";
   const heightFit = node.type === "text" && node.sizing?.height === "fit";
 
