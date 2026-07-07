@@ -254,7 +254,9 @@ export function EffectsSection({
   };
 
   const remove = (index: number) => onChange(effects.filter((_, i) => i !== index));
-  const add = () => onChange([...effects, newEffect()]);
+  // Prepend so a new effect lands on top (first = on top), matching the Fill
+  // panel's add convention and Figma (L2).
+  const add = () => onChange([newEffect(), ...effects]);
 
   return (
     <InsSection title="Effects" defaultOpen={effects.length > 0} disabled={locked}>
