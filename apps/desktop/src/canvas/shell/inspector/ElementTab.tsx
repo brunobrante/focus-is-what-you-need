@@ -337,7 +337,9 @@ export function ElementTab({
         />
       ) : null}
 
-      <ExportSection node={node} document={document} locked={locked} />
+      {/* Key by element id so the local export entries/notice state resets on
+          selection change instead of leaking to the next element (L19). */}
+      <ExportSection key={node.id} node={node} document={document} locked={locked} />
     </>
   );
 }
