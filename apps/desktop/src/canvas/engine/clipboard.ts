@@ -78,7 +78,11 @@ export function createClipboard(): Clipboard {
       }
 
       const newParentId = source.parentId ? idMap.get(source.parentId) ?? null : null;
-      const newChildren = source.children.map((childId) => idMap.get(childId) ?? childId);
+      // Drop children that weren't in the copied set — keeping the old id would
+      // dangle a reference into the source document (L8).
+      const newChildren = source.children
+        .map((childId) => idMap.get(childId))
+        .filter((id): id is string => id !== undefined);
 
       next.elements[newId] = {
         ...source,

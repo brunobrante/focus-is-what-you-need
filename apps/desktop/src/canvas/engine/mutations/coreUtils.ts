@@ -3,8 +3,11 @@ import type { CanvasDocument, ElementNode } from "../types";
 let fallbackId = 0;
 
 export function createId(prefix = "el"): string {
-  const randomId = globalThis.crypto?.randomUUID?.().slice(0, 8);
-  if (randomId) return `${prefix}-${randomId}`;
+  // Full UUID (not an 8-hex-char slice): a 32-bit id collides in practice on
+  // large scenes / repeated duplication, and a collision silently overwrites a
+  // live element and corrupts children arrays (L8).
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return `${prefix}-${uuid}`;
   fallbackId += 1;
   return `${prefix}-${fallbackId}`;
 }
