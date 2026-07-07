@@ -41,9 +41,13 @@ const SHADOW_TYPES: ReadonlySet<EffectType> = new Set(["drop-shadow", "inner-sha
 const BLUR_TYPES: ReadonlySet<EffectType> = new Set(["layer-blur", "background-blur"]);
 const MULTIPLIER_FILTERS: ReadonlySet<EffectType> = new Set(["brightness", "contrast", "saturate"]);
 
+// 25% black — matches the compile-side DEFAULT_SHADOW_COLOR (rgba(0,0,0,0.25)),
+// so a freshly added shadow is soft, not harsh opaque black (L1).
+const DEFAULT_SHADOW_COLOR = "#00000040";
+
 /** A fresh drop-shadow with sensible defaults. */
 function newEffect(): Effect {
-  return { id: createId("fx"), type: "drop-shadow", x: 0, y: 2, blur: 4, spread: 0, color: "#000000" };
+  return { id: createId("fx"), type: "drop-shadow", x: 0, y: 2, blur: 4, spread: 0, color: DEFAULT_SHADOW_COLOR };
 }
 
 // When the user switches an entry's type, fill in any params the new type needs
@@ -51,7 +55,7 @@ function newEffect(): Effect {
 // (the compiler treats a missing param as 0/identity). Color filters need none
 // (compileEffects + FilterParams both fall back to the identity amount).
 function seedForType(type: EffectType, e: Effect): Partial<Effect> {
-  if (SHADOW_TYPES.has(type)) return { y: e.y ?? 2, blur: e.blur ?? 4, color: e.color ?? "#000000" };
+  if (SHADOW_TYPES.has(type)) return { y: e.y ?? 2, blur: e.blur ?? 4, color: e.color ?? DEFAULT_SHADOW_COLOR };
   if (BLUR_TYPES.has(type)) return { radius: e.radius ?? 4 };
   return {};
 }
