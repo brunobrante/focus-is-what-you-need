@@ -8,7 +8,15 @@ import { pathSpaceToCanvas } from "@/canvas/engine/vector/vectorGeometry";
 import { sampleSegment } from "@/canvas/engine/vector/pathData";
 import type { PathEditAnchorGeom, PathEditGeometry, PathEditSegmentGeom } from "./canvasHitTesting";
 
-const SEGMENT_SAMPLES = 12;
+// Adaptive segment tessellation: sample roughly one point per this many on-screen
+// px, so a long curve at high zoom stays smooth and a short one stays cheap (F5).
+const SEGMENT_PX_PER_SAMPLE = 8;
+const MIN_SEGMENT_SAMPLES = 6;
+const MAX_SEGMENT_SAMPLES = 96;
+
+function viewportDistance(a: Point, b: Point): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
 
 export function computePathEditGeometry(
   document: CanvasDocument,
@@ -54,9 +62,20 @@ export function computePathEditGeometry(
       const from = sub.anchors[i];
       const to = sub.anchors[(i + 1) % sub.anchors.length];
       if (!from || !to) continue;
+      // Estimate the on-screen length from the control polygon (an upper bound on
+      // the curve length) and scale the sample count to it.
+      const vp0 = toView(from.x, from.y);
+      const vc0 = toView(from.x + (from.outX ?? 0), from.y + (from.outY ?? 0));
+      const vc1 = toView(to.x + (to.inX ?? 0), to.y + (to.inY ?? 0));
+      const vp1 = toView(to.x, to.y);
+      const estLength = viewportDistance(vp0, vc0) + viewportDistance(vc0, vc1) + viewportDistance(vc1, vp1);
+      const sampleCount = Math.max(
+        MIN_SEGMENT_SAMPLES,
+        Math.min(MAX_SEGMENT_SAMPLES, Math.ceil(estLength / SEGMENT_PX_PER_SAMPLE)),
+      );
       const samples: Point[] = [];
-      for (let s = 0; s <= SEGMENT_SAMPLES; s++) {
-        const p = sampleSegment(from, to, s / SEGMENT_SAMPLES);
+      for (let s = 0; s <= sampleCount; s++) {
+        const p = sampleSegment(from, to, s / sampleCount);
         samples.push(toView(p.x, p.y));
       }
       segments.push({ subpathIndex, segIndex: i, samples });

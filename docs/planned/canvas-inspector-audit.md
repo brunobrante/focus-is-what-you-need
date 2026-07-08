@@ -748,7 +748,7 @@ documented shipped decision; `-webkit-backdrop-filter` twin
   (`canvasDocumentMutations.ts:600-603`) writes a single
   `styles.borderRadius`; per-corner exists in the compiler/inspector but has
   no per-corner canvas affordance (Figma: Alt-drag a single corner ball).
-- **F5 — Path-edit overlay faceting.** `pathEditGeometry.ts:11` — fixed
+- ✅ **DONE — F5 — Path-edit overlay faceting.** `pathEditGeometry.ts:11` — fixed
   `SEGMENT_SAMPLES = 12` per segment; long curves at high zoom show a
   visibly faceted blue skeleton (render + hit-test polyline). Sample
   adaptively by on-screen segment length.
