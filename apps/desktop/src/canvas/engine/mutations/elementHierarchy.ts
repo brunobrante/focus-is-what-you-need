@@ -47,12 +47,21 @@ export function constrainAll(document: CanvasDocument): CanvasDocument {
   // are handled by nuke-and-reseed on a SCHEMA_VERSION bump, not here. See the
   // "Data Lifecycle & Migrations" section in CLAUDE.md.
   if (!next.shellBackground) next.shellBackground = DEFAULT_SHELL_BACKGROUND;
-  // Clone once, then clamp every node in place. Parents are only clamped within
-  // their own parent (never resized), so clamping children after parents matches
-  // the previous per-call behavior.
-  for (const id of Object.keys(next.elements)) {
+  // Clamp parents before children: a child's size is clamped against its parent's
+  // current size, so processing a child before its oversized parent would clamp it
+  // against a stale (too-large) parent (L10). Walk roots-first, depth-first.
+  const visited = new Set<string>();
+  const clampSubtree = (id: string) => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    const node = next.elements[id];
+    if (!node) return;
     constrainElementInPlace(next, id);
-  }
+    for (const childId of node.children) clampSubtree(childId);
+  };
+  for (const rootId of next.rootIds) clampSubtree(rootId);
+  // Any element unreachable from a root (defensive) still gets clamped.
+  for (const id of Object.keys(next.elements)) clampSubtree(id);
   return next;
 }
 
