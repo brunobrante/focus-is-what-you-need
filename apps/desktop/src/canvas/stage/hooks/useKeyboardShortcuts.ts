@@ -49,8 +49,13 @@ function isDocumentMutatingGesture(interaction: Interaction | null): boolean {
 
 type Params = {
   dispatch: (action: Record<string, unknown> & { type: string }) => void;
-  // This editor's clipboard (per-instance, not module-global) — ENG-3.
+  // The shell-shared clipboard (one instance across panes, G6) or this editor's
+  // own isolated buffer when mounted standalone.
   clipboard: Clipboard;
+  // Only the ACTIVE pane may handle window-level shortcuts. Every mounted stage
+  // attaches to `window`, so without this gate a split view would undo/zoom/paste
+  // in every pane at once — with the shared clipboard that means a double paste.
+  enabled?: boolean;
   viewportRef: MutableRefObject<HTMLDivElement | null>;
   interactionRef: MutableRefObject<Interaction | null>;
   latestStateRef: MutableRefObject<EditorState>;
@@ -69,6 +74,7 @@ type Params = {
 export function useKeyboardShortcuts({
   dispatch,
   clipboard,
+  enabled = true,
   viewportRef,
   interactionRef,
   latestStateRef,
@@ -81,6 +87,17 @@ export function useKeyboardShortcuts({
   ancestorOverlayAvailable,
 }: Params): { spacePressedRef: MutableRefObject<boolean> } {
   const spacePressedRef = useRef(false);
+  // Read through a ref so an activity flip doesn't tear down/re-subscribe the
+  // listeners (which would flush a pending nudge burst mid-typing elsewhere).
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  // Deactivating while Space is held would strand space-pan on (same failure
+  // mode as M5's missed keyup on blur) — clear it when the pane goes inactive.
+  useEffect(() => {
+    if (enabled) return;
+    spacePressedRef.current = false;
+    viewportRef.current?.classList.remove("is-space-panning");
+  }, [enabled, viewportRef]);
   // Coalesced-nudge burst state (G2): the document before the burst (for one undo
   // entry) and the idle timer that commits it.
   const nudgeBeforeRef = useRef<CanvasDocument | null>(null);
@@ -109,6 +126,7 @@ export function useKeyboardShortcuts({
     >;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!enabledRef.current) return;
       const currentState = latestStateRef.current;
       if (isEditableTarget(event.target) || currentState.editingTextId) return;
 
@@ -293,6 +311,7 @@ export function useKeyboardShortcuts({
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
+      if (!enabledRef.current) return;
       if (!matchesKeyCommand(event, settings, "canvas.viewport.pan")) return;
       spacePressedRef.current = false;
       viewportRef.current?.classList.remove("is-space-panning");

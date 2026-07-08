@@ -51,6 +51,7 @@ export function CanvasStage({
   onOpenSelectedComponentShortcut,
   onBackToParentShortcut,
   isIconSubject = false,
+  shortcutsEnabled = true,
 }: {
   draftMode?: boolean;
   activeTool?: string;
@@ -62,6 +63,9 @@ export function CanvasStage({
   onBackToParentShortcut?: () => boolean | void;
   // Icon-master canvas: SVG paste decomposes into root paths (see useCanvasPointerEvents).
   isIconSubject?: boolean;
+  // False on inactive split panes: window-level shortcuts must run in exactly
+  // one editor (see useKeyboardShortcuts.enabled).
+  shortcutsEnabled?: boolean;
 }) {
   const { state, dispatch, clipboard } = useEditor();
   const hoverStore = useHoverStore();
@@ -166,6 +170,7 @@ export function CanvasStage({
   const { spacePressedRef } = useKeyboardShortcuts({
     dispatch,
     clipboard,
+    enabled: shortcutsEnabled,
     viewportRef,
     interactionRef,
     latestStateRef,

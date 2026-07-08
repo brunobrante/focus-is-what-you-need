@@ -15,16 +15,16 @@ Paths are relative to `apps/desktop/` unless noted.
 Items marked **✅ DONE** below were fixed one-per-commit (typechecked, and
 unit-tested where tests exist). Completed so far:
 
-- **High:** H1, H2, H3.
-- **Medium:** M3, M4, M5, M6, M7, M10, M12 (with D2), M14.
-- **Low:** L1–L6, L8–L15, L17–L21.
-- **Perf:** P3.
-
-Remaining bug-class items not yet done: L7 (blocked on D1), L16 (deferred —
-needs new rebindable commands); performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
-ride on M12/M13, and G15/M11 for the no-fill state); the rendering-fidelity
-F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
-on hold.
+- **High:** H1, H2, H3 — all done.
+- **Medium:** M1–M14 — all done.
+- **Low:** L1–L15, L17–L22 done; L16 deferred (needs new rebindable commands);
+  L23 reviewed, no change.
+- **Perf:** P3, P5, P7, P8, P10.
+- **Doc-divergence:** D1 (decided: store radius verbatim, clamp at render —
+  closed L7, unblocked F4), D2 (with M12), D8 (with M13).
+- **Fidelity:** F1, F2 (shadows half), F5, F6.
+- **Parity:** G1 (context menu; toolbar/inspector surfaces pending), G2, G6
+  (shared clipboard + active-pane shortcut gating), G7, G15 (with M11).
 
 Full-audit pass (2026-07-08, fix-order): resuming from step 6 leftovers.
 Completions this pass:
@@ -44,15 +44,15 @@ NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
 NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
-**Remaining after this pass — needs decisions or runtime work I can't do here:**
-- **Product decision:** D1 (radius clamping policy) — blocks L7 + F4.
+**Remaining (2026-07-08, after the tractable-items pass began):**
 - **Architecture perf (need runtime measurement):** P1 (zoom projection), P2 (rAF
   batching), P4 (inspector selector subscription), P6 (history snapshot sharing),
   P9 (spatial index — audit says not urgent).
 - **Blocked on the SVG render target:** F3, G13, D6-partial, F2-borders.
 - **Deferred (needs new rebindable commands):** L16.
-- **Parity features (need UX.md specs + runtime verification):** G1–G14 (minus the
-  already-closed G15), and the doc-divergence UI items D3/D4/D5/D7.
+- **Fidelity:** F4 (per-corner radius drag — unblocked by D1).
+- **Parity features:** G3, G4, G5, G8, G9, G10, G11, G12, G14; G1's
+  toolbar/inspector surfaces; and the doc-divergence UI items D3/D4/D5/D7.
 
 ## Scope and intentional exclusions
 
@@ -850,7 +850,21 @@ element-resize commit paths in `src/canvas/stage/canvasDocumentMutations.ts`.
 This is constraint *application* — distinct from the deliberately-deferred
 auto-layout wiring. Fix D4/D5 (authoring scope) in the same effort.
 
-## G6 — Cross-window clipboard: Sketch → Current (**violates Product.md [NOW]**)
+## ✅ DONE — G6 — Cross-window clipboard: Sketch → Current (**violates Product.md [NOW]**)
+
+`CanvasRender` now owns ONE shared `createClipboard()` instance passed to every
+pane's `EditorProvider` (Current, Sketch, Versions, extra Currents) via a new
+optional `clipboard` prop — copy in Sketch pastes in Current, and the buffer
+survives tab switches (in tab mode only one surface is mounted at a time, so a
+per-provider buffer died with the pane). Per-pane paste semantics kept: paste
+targets the pane's own document with full id remap (L8 already fixed the id
+weaknesses). Required companion fix: window-level keyboard shortcuts are now
+gated on the **active** pane (`CanvasStage.shortcutsEnabled` ←
+`CanvasSurface.active`) — every mounted stage listens on `window`, so in split
+view a shared clipboard would have double-pasted (and undo/zoom/tools already
+double-fired — a latent split-view bug this closes too). UX.md updated.
+
+Original note:
 
 `src/canvas/engine/clipboard.ts` is an in-memory buffer **per
 EditorProvider**, and each pane gets its own provider

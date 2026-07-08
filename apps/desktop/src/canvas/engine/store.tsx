@@ -57,8 +57,9 @@ type EditorContextValue = {
   dispatch: Dispatch<EditorAction>;
   hoverStore: HoverStore;
   noticeStore: NoticeStore;
-  // Per-editor copy buffer — never module-global, so split canvases don't share
-  // a clipboard (ENG-3).
+  // Copy buffer. The canvas shell passes one shared instance to every pane so
+  // copy-paste crosses Sketch/Current/Versions (Product.md [NOW], G6); an editor
+  // mounted without the prop gets an isolated buffer.
   clipboard: Clipboard;
 };
 
@@ -501,6 +502,7 @@ export function EditorProvider({
   persistStorage = true,
   viewportMode = "frame",
   onDocumentChange,
+  clipboard: sharedClipboard,
 }: {
   children: ReactNode;
   storageKey?: string;
@@ -508,6 +510,10 @@ export function EditorProvider({
   persistStorage?: boolean;
   viewportMode?: ViewportMode;
   onDocumentChange?: (document: CanvasDocument) => void;
+  // Shell-provided shared clipboard so copy/paste crosses panes (Sketch → Current
+  // is a Product.md [NOW] flow) and survives tab switches that unmount the editor.
+  // Omitted → an isolated per-editor buffer (tests, standalone mounts).
+  clipboard?: Clipboard;
 }) {
   const hydratedRef = useRef(!persistStorage);
   // The storage key we last hydrated a draft for. The hydrate effect also depends
@@ -531,8 +537,10 @@ export function EditorProvider({
   const noticeStore = noticeStoreRef.current;
 
   const clipboardRef = useRef<Clipboard | null>(null);
-  if (clipboardRef.current === null) clipboardRef.current = createClipboard();
-  const clipboard = clipboardRef.current;
+  if (sharedClipboard == null && clipboardRef.current === null) {
+    clipboardRef.current = createClipboard();
+  }
+  const clipboard = sharedClipboard ?? clipboardRef.current!;
 
   useEffect(() => {
     if (!persistStorage) {

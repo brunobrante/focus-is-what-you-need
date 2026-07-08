@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconExpand,
 } from "@/components/icons";
@@ -10,6 +10,7 @@ import {
 
 import { CURRENT_CANVAS_STORAGE_KEY, SKETCH_CANVAS_STORAGE_KEY, VERSIONS_CANVAS_STORAGE_KEY } from "@/canvas/engine/storageKeys";
 import { createDraftDocument } from "@/canvas/engine/actions";
+import { createClipboard, type Clipboard } from "@/canvas/engine/clipboard";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
 export type { ZoomSetter } from "./ZoomControl";
@@ -178,6 +179,14 @@ export function CanvasRender({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // One element clipboard for every pane in this shell, living above the
+  // editors so it survives tab switches (only one surface is mounted outside
+  // split) and crosses panes — copy in Sketch, paste in Current (G6, a
+  // Product.md [NOW] flow).
+  const sharedClipboardRef = useRef<Clipboard | null>(null);
+  if (sharedClipboardRef.current === null) sharedClipboardRef.current = createClipboard();
+  const sharedClipboard = sharedClipboardRef.current;
+
   const draftsFallbackDoc = useMemo(() => {
     // Approximate visible-canvas size with both panels open — derived from the
     // shell layout constants rather than hardcoded offsets. It's only a fallback
@@ -228,6 +237,7 @@ export function CanvasRender({
       settings={settings}
       onCanvasToolShortcut={onCanvasToolShortcut}
       onOpenSelectedComponentShortcut={onOpenSelectedComponentShortcut}
+      clipboard={sharedClipboard}
     />
   );
 
@@ -256,6 +266,7 @@ export function CanvasRender({
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
           onOpenSelectedComponentShortcut={undefined}
+          clipboard={sharedClipboard}
         />
       );
     }
@@ -279,6 +290,7 @@ export function CanvasRender({
           shellZoomVisibility={zoomVisFor("versions")}
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
+          clipboard={sharedClipboard}
         />
       );
     }
@@ -328,6 +340,7 @@ export function CanvasRender({
           shellZoomVisibility={zoomVisFor("current")}
           settings={settings}
           onCanvasToolShortcut={onCanvasToolShortcut}
+          clipboard={sharedClipboard}
         />
       );
     }

@@ -520,6 +520,14 @@ it, cascading on repeat) — matching Figma. Pasting into a different document/p
 (where the original parent is absent, e.g. Sketch → Current) falls back to the frame
 root.
 
+**Clipboard scope**: all canvas panes (Current, Sketch, Versions, extra Current
+windows) share **one** element clipboard — copy in Sketch, paste in Current works,
+whether the panes are split side-by-side or reached by switching tabs (the buffer
+survives tab switches). Ids are regenerated on paste, so cross-pane paste can never
+collide with the source pane's elements. Keyboard shortcuts (copy/paste, undo/redo,
+zoom, tools, delete…) are handled by the **active pane only** — clicking a pane makes
+it active (blue border); an inactive split pane ignores them.
+
 **Arrow-key nudge**: with elements selected, the arrow keys move the selection by 1px
 in the canvas axes; **Shift+arrow** moves by 10px. Amounts are settings-backed
 (`canvas.nudge.small` / `.large`) and the keys are rebindable

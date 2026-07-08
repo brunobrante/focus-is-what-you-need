@@ -7,6 +7,7 @@ import {
 
 import { EditorBridgePublisher } from "@/canvas/engine/bridge";
 import { EditorProvider, useEditor } from "@/canvas/engine/store";
+import type { Clipboard } from "@/canvas/engine/clipboard";
 import { LiveInstanceRefresh } from "./LiveInstanceRefresh";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ProjectType } from "@/lib/data/types";
@@ -95,6 +96,7 @@ export function VersionsWindowSurface({
   shellZoomVisibility,
   settings,
   onCanvasToolShortcut,
+  clipboard,
 }: {
   active: boolean;
   showActiveBorder: boolean;
@@ -110,6 +112,7 @@ export function VersionsWindowSurface({
   shellZoomVisibility: ShellControlVisibility;
   settings: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+  clipboard?: Clipboard;
 }) {
   const versionsMenu = useWindowContextMenu();
   // No version selected (the current subject has no versions yet) → empty state.
@@ -172,6 +175,7 @@ export function VersionsWindowSurface({
       settings={settings}
       onCanvasToolShortcut={onCanvasToolShortcut}
       onOpenSelectedComponentShortcut={undefined}
+      clipboard={clipboard}
     />
   );
 }
@@ -193,6 +197,7 @@ export function ExtraCurrentSurface({
   shellZoomVisibility,
   settings,
   onCanvasToolShortcut,
+  clipboard,
 }: {
   windowKey: CanvasWindowKey;
   subject: SubjectOwner | null;
@@ -206,6 +211,7 @@ export function ExtraCurrentSurface({
   shellZoomVisibility: ShellControlVisibility;
   settings: GlobalSettings;
   onCanvasToolShortcut?: (tool: CanvasToolId) => boolean | void;
+  clipboard?: Clipboard;
 }) {
   const { document, storageKey, ready, onDocumentChange } = useSubjectCanvasWindow({
     subjectOwner: subject,
@@ -236,6 +242,7 @@ export function ExtraCurrentSurface({
       settings={settings}
       onCanvasToolShortcut={onCanvasToolShortcut}
       onOpenSelectedComponentShortcut={undefined}
+      clipboard={clipboard}
     />
   );
 }
@@ -266,6 +273,7 @@ export function CanvasSurface({
   onCanvasToolShortcut,
   onOpenSelectedComponentShortcut,
   isIconSubject = false,
+  clipboard,
 }: {
   active: boolean;
   showActiveBorder: boolean;
@@ -293,6 +301,9 @@ export function CanvasSurface({
   onOpenSelectedComponentShortcut?: () => boolean | void;
   // Icon-master canvas: SVG paste decomposes into root paths (see useCanvasPointerEvents).
   isIconSubject?: boolean;
+  // Shell-shared element clipboard (see EditorProvider) — lets copy in one pane
+  // paste in another (Sketch → Current) and survive tab switches.
+  clipboard?: Clipboard;
 }) {
   const viewportSubjectKey = storageKey;
   const hasAncestors = ancestorFrames.length > 0;
@@ -329,6 +340,7 @@ export function CanvasSurface({
           persistStorage={persistStorage}
           viewportMode={draftMode ? "draft" : "frame"}
           onDocumentChange={onDocumentChange}
+          clipboard={clipboard}
         >
           <EditorBridgePublisher sourceId={sourceId} active={publishBridge} />
           <LiveInstanceRefresh />
@@ -342,6 +354,7 @@ export function CanvasSurface({
             onOpenSelectedComponentShortcut={openSelectedComponentShortcut}
             onBackToParentShortcut={backToParentShortcut}
             isIconSubject={isIconSubject}
+            shortcutsEnabled={active}
           />
           {!draftMode && parentTarget && shellBackVisibility !== "hidden" ? (
             <CanvasParentBackButton

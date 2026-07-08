@@ -16,10 +16,13 @@ export type Clipboard = {
 };
 
 /**
- * Creates an isolated clipboard. One instance is owned per `EditorProvider`, so
- * split canvases (multiple editors) never share a copy buffer — copying in one
- * pane cannot leak ids/positions into another, and pasting cannot clobber a
- * sibling's copied payload (ENG-3).
+ * Creates a clipboard buffer. The canvas shell owns ONE instance shared by all
+ * of its panes (Sketch/Current/Versions/extra Currents), so copying in one pane
+ * pastes in another — the Sketch → Current flow is a Product.md [NOW] behavior
+ * (G6). Paste remaps every id into the target document, and a copied root whose
+ * original parent is absent there falls back to the frame root, so cross-pane
+ * paste is structurally safe. Editors mounted without a shell-provided
+ * clipboard get their own isolated instance.
  */
 export function createClipboard(): Clipboard {
   let clipboard: ClipboardData | null = null;
