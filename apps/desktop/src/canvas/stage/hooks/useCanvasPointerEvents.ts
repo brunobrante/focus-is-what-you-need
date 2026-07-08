@@ -677,6 +677,16 @@ export function useCanvasPointerEvents({
 
     dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
     dispatch({ type: "setGuides", guides: [] });
+    // A canvas resize shifts the camera per frame for the W/N handles, so reverting
+    // only the document leaves the camera offset — restore the start viewport too (L12).
+    if (interaction.type === "canvas-resize") {
+      dispatch({
+        type: "setViewport",
+        zoom: interaction.zoom,
+        offsetX: interaction.startOffsetX,
+        offsetY: interaction.startOffsetY,
+      });
+    }
     return true;
   };
 
