@@ -103,7 +103,14 @@ test("compileFills: exact-gap tile becomes an SVG pattern overlay", () => {
   const out = compileFills([image({ fit: "tile", tileGap: 12, scale: 40 })], "box", undefined, "el1");
   expect(out.patternLayer).toBeTruthy();
   expect(out.patternLayer?.gap).toBe(12);
-  expect(out.patternLayer?.motif).toBe(40);
+  // `scale` is a percentage of natural size, carried through as-is; the overlay
+  // resolves the px motif from the measured image (M13).
+  expect(out.patternLayer?.scalePercent).toBe(40);
+});
+
+test("compileFills: tile with no scale defaults to 100% of natural size (M13)", () => {
+  const out = compileFills([image({ fit: "tile", tileGap: 4 })], "box", undefined, "el1");
+  expect(out.patternLayer?.scalePercent).toBe(100);
 });
 
 // ── image element render path ─────────────────────────────────────────────────

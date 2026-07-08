@@ -54,12 +54,15 @@ export type SvgFilterDef = {
 };
 
 /** An exact-gap tile, rendered as an SVG `<pattern>` overlay (CSS has no exact
- *  background tile gap). `cell = motif + gap` in userSpaceOnUse px. */
+ *  background tile gap). The motif is the image at its natural size scaled by
+ *  `scalePercent` (100 = natural); the overlay measures the loaded image to
+ *  resolve the px size, then `cell = motif + gap` in userSpaceOnUse px (M13). */
 export type SvgPatternLayer = {
   id: string;
   href: string;
-  motif: number; // px
-  gap: number; // px
+  /** Motif size as a percentage of the image's natural size (100 = natural). */
+  scalePercent: number;
+  gap: number; // px between tiles
   opacity: number; // 0..1
 };
 
@@ -277,7 +280,9 @@ function compileBoxLayers(
         patternLayer = {
           id: `${defIdBase}-pat-${index}`,
           href: src,
-          motif: fill.scale && fill.scale > 0 ? fill.scale : 64,
+          // `scale` is a percentage of natural size (100 = natural), not a px
+          // count — the overlay resolves px from the measured image (M13).
+          scalePercent: fill.scale && fill.scale > 0 ? fill.scale : 100,
           gap: fill.tileGap,
           opacity: op,
         };

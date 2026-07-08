@@ -5,6 +5,7 @@
 //
 // See domain/canvas/fillCompile.ts (SvgFilterDef / SvgPatternLayer).
 
+import { useEffect, useState } from "react";
 import type { SvgFilterDef, SvgPatternLayer } from "@/domain/canvas/fillCompile";
 
 // Scale factors mapping the inspector's -100..100 sliders to filter strength.
@@ -63,9 +64,30 @@ export function FillFilterDefs({ defs }: { defs: SvgFilterDef[] }) {
   );
 }
 
+/** Measure an image's natural size (once per src). Null until it loads. */
+function useNaturalSize(src: string): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    setSize(null);
+    if (!src) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+  return size;
+}
+
 /** Full-bleed SVG `<pattern>` overlay for an exact-gap tile fill. Sits behind
  *  content (the renderer places it as the first child); the element's own
- *  overflow/clip-path clips it. */
+ *  overflow/clip-path clips it. The motif is the image at its natural size ×
+ *  `scalePercent`, so a 100% scale tiles at the real pixel size regardless of
+ *  the element box, and the gap is the documented `cell − motif` px (M13). */
 export function FillPatternOverlay({
   layer,
   renderScale = 1,
@@ -73,8 +95,16 @@ export function FillPatternOverlay({
   layer: SvgPatternLayer;
   renderScale?: number;
 }) {
-  const motif = layer.motif * renderScale;
-  const cell = (layer.motif + layer.gap) * renderScale;
+  const natural = useNaturalSize(layer.href);
+  // Until the image is measured, render nothing rather than flash a wrong-sized
+  // motif; the overlay reappears at the correct size on load.
+  if (!natural) return null;
+  const s = layer.scalePercent / 100;
+  const motifW = natural.width * s * renderScale;
+  const motifH = natural.height * s * renderScale;
+  const gap = layer.gap * renderScale;
+  const cellW = motifW + gap;
+  const cellH = motifH + gap;
   return (
     <svg
       aria-hidden
@@ -83,11 +113,11 @@ export function FillPatternOverlay({
       style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
     >
       <defs>
-        <pattern id={layer.id} width={cell} height={cell} patternUnits="userSpaceOnUse">
+        <pattern id={layer.id} width={cellW} height={cellH} patternUnits="userSpaceOnUse">
           <image
             href={layer.href}
-            width={motif}
-            height={motif}
+            width={motifW}
+            height={motifH}
             preserveAspectRatio="xMidYMid slice"
           />
         </pattern>

@@ -20,7 +20,7 @@ unit-tested where tests exist). Completed so far:
 - **Low:** L1–L6, L8–L15, L17–L21.
 - **Perf:** P3.
 
-Remaining bug-class items not yet done: M1, M2, M8, M9, M13, L7, L16, L22,
+Remaining bug-class items not yet done: M1, M2, M8, M9, L7, L16, L22,
 L23; performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
 ride on M12/M13, and G15/M11 for the no-fill state); the rendering-fidelity
 F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
@@ -28,7 +28,7 @@ on hold.
 
 Full-audit pass (2026-07-08, fix-order): resuming from step 6 leftovers.
 Additional completions this pass: **M11** (explicit no-fill state; also closes
-G15).
+G15), **M13** (tile motif from natural size × scale%; also closes D8).
 
 ## Scope and intentional exclusions
 
@@ -376,7 +376,7 @@ glyphs. Also contradicts `docs/inspector-fill.md` (text solid → `color`), see
 D2. **Fix:** for `text`, collapse a single solid to `styles.color` (per the
 doc), never to `background`.
 
-## M13 — Tile pattern treats `scale` (a percentage) as pixels
+## ✅ DONE — M13 — Tile pattern treats `scale` (a percentage) as pixels
 
 `src/domain/canvas/fillCompile.ts:276` —
 `motif: fill.scale && fill.scale > 0 ? fill.scale : 64`, consumed as px in
@@ -687,10 +687,11 @@ transient frames. Memoize on the settled document or on `changedIds`.
 - **D7 — Export scale.** `docs/inspector-export.md` §Core panel: "Scale:
   0.5×/1×/2×/3× + arbitrary". `ExportSection.tsx:38` offers only the four
   presets.
-- **D8 — Tile-gap formula.** `docs/inspector-fill.md` §Pattern documents
+- ✅ **DONE — D8 — Tile-gap formula.** `docs/inspector-fill.md` §Pattern documents
   "gap = patternWidth − motifWidth" with the motif at its real pixel size;
-  the compiled motif is the `scale` number reinterpreted as px (M13), so the
-  documented semantics only hold accidentally. Fixed by M13.
+  the compiled motif was the `scale` number reinterpreted as px, so the
+  documented semantics only held accidentally. Fixed by M13 (the overlay now
+  measures the image and sizes the motif at natural × scale%).
 
 Checked and consistent (no action): Plus Darker omitted / Plus Lighter kept;
 isolation only on divs with children; radius slider max = min(w,h)/2; spread
