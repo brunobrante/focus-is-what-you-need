@@ -55,7 +55,7 @@ function ExportEntryRow({
 }) {
   const raster = isRasterFormat(entry.format);
   return (
-    <div className="flex flex-col gap-2 rounded-[10px] bg-[#1C1C1C] p-2.5">
+    <div className="flex flex-col gap-[7px] rounded-[9px] bg-[#1C1C1C] p-2">
       <InsRow label="Format">
         <InsSelect
           value={FORMAT_LABELS[entry.format]}

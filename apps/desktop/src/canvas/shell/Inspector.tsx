@@ -309,7 +309,7 @@ export function Inspector({
         max={maxWidth}
         onResize={onResize}
       />
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#2C2C2C] pl-3.5 pr-3">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#2C2C2C] pl-3 pr-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="grid shrink-0 place-items-center text-[#9A9A9A]" style={{ width: 16, height: 16 }}>
             {isReferencesActive ? (
@@ -335,7 +335,7 @@ export function Inspector({
         </button>
       </div>
 
-      <div className="flex shrink-0 border-b border-[#2C2C2C] px-2">
+      <div className="flex shrink-0 border-b border-[#2C2C2C] px-1.5">
         {((isReferencesActive
           ? [
               { id: "element", label: "Element" },
@@ -359,7 +359,7 @@ export function Inspector({
                   (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active: false });
                 }
               }}
-              className="relative cursor-pointer border-0 bg-transparent px-2.5 py-2.5 text-[12px] font-medium"
+              className="relative cursor-pointer border-0 bg-transparent px-2.5 py-2 text-[12px] font-medium"
               style={{ color: isActive ? "#F2F2F2" : "#9A9A9A" }}
             >
               {tab.label}
@@ -420,7 +420,7 @@ export function Inspector({
         ) : selectedCount > 1 ? (
           <div className="flex flex-col">
             <EmptyState title={`${selectedCount} elements selected`} body="Use the canvas to move the group or select a layer to edit properties." />
-            <div className="flex flex-col gap-1.5 border-t border-[#2C2C2C] px-3.5 py-3">
+            <div className="flex flex-col gap-2 border-t border-[#2C2C2C] px-3 py-3">
               <span className="text-[11px] font-medium text-[#9A9A9A]">Boolean</span>
               <div className="grid grid-cols-2 gap-1.5">
                 {([
@@ -474,7 +474,7 @@ export function Inspector({
       </div>
 
       <div
-        className="flex shrink-0 items-center justify-between border-t border-[#2C2C2C] px-3 py-2.5 text-[11px] text-[#6B6B6B]"
+        className="flex shrink-0 items-center justify-between border-t border-[#2C2C2C] px-3 py-2 text-[11px] text-[#6B6B6B]"
         style={{ letterSpacing: "0.2px" }}
       >
         <span>auto-save</span>

@@ -223,11 +223,11 @@ export function InsSection({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b" style={{ borderColor: INS.divider }}>
-      <div className="flex h-[38px] items-center gap-1 pl-3.5 pr-2">
+      <div className="flex h-[33px] items-center gap-1 pl-3 pr-2">
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="-ml-0.5 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent py-2 text-left"
+          className="-ml-0.5 flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent text-left"
         >
           <IconChevronDown
             size={10}
@@ -237,14 +237,14 @@ export function InsSection({
           <span className="truncate text-[12px] font-medium text-[#CFCFCF]">{title}</span>
         </button>
         {action ? (
-          <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          <div className="-mr-1 flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
             {action}
           </div>
         ) : null}
       </div>
       {open ? (
         <div
-          className={`flex flex-col gap-2 px-3.5 pb-3.5${disabled ? " pointer-events-none select-none opacity-50" : ""}`}
+          className={`flex flex-col gap-[7px] px-3 pb-3${disabled ? " pointer-events-none select-none opacity-50" : ""}`}
           inert={disabled || undefined}
         >
           {children}
@@ -271,10 +271,10 @@ export function InsRow({
   return (
     <div
       className="grid min-w-0 gap-2"
-      style={{ gridTemplateColumns: "68px minmax(0, 1fr)", alignItems: align === "start" ? "start" : "center" }}
+      style={{ gridTemplateColumns: "64px minmax(0, 1fr)", alignItems: align === "start" ? "start" : "center" }}
     >
       <span
-        className={`truncate text-[11px] text-[#8A8A8A]${align === "start" ? " pt-2" : ""}`}
+        className={`truncate text-[11px] text-[#8A8A8A]${align === "start" ? " pt-[7px]" : ""}`}
         style={{ letterSpacing: "0.1px" }}
       >
         {label}

@@ -60,7 +60,7 @@ function MoreDisclosure({ children }: { children: ReactNode }) {
         <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>›</span>
         {open ? "Less" : "More"}
       </button>
-      {open ? <div className="flex flex-col gap-2">{children}</div> : null}
+      {open ? <div className="flex flex-col gap-[7px]">{children}</div> : null}
     </>
   );
 }
@@ -193,7 +193,7 @@ export function ElementTab({
   return (
     <>
       {locked ? (
-        <div className="flex items-start gap-2 border-b border-[#2C2C2C] bg-[#1A1A1A] px-3.5 py-2.5 text-[11px] text-[#8638E5]">
+        <div className="flex items-start gap-2 border-b border-[#2C2C2C] bg-[#1A1A1A] px-3 py-2.5 text-[11px] text-[#8638E5]">
           <span className="mt-px shrink-0">
             <IconLink size={12} strokeWidth={1.8} />
           </span>

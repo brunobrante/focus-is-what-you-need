@@ -93,7 +93,7 @@ function EffectEntry({
   ).map((t) => EFFECT_LABELS[t]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-[10px] bg-[#1C1C1C] p-2.5">
+    <div className="flex flex-col gap-[7px] rounded-[9px] bg-[#1C1C1C] p-2">
       <div className="flex items-center gap-1.5">
         <button
           type="button"
