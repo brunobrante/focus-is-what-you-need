@@ -497,3 +497,13 @@ test("fit text height follows wrapping after fit width is constrained", () => {
   expect(fitted.elements.node.width).toBe(120);
   expect(fitted.elements.node.height).toBeGreaterThan(22);
 });
+
+test("corner radius is stored verbatim, not clamped to min(w,h)/2 at write (D1)", () => {
+  const document = createDocument(); // 50×40 rect
+  const pill = updateElementStyles(document, "node", { borderRadius: 9999 });
+  // Kept as-is (a pill), NOT corrected to 20; CSS caps at render.
+  expect(pill.elements.node.styles.borderRadius).toBe(9999);
+  // Still floored at zero.
+  const negative = updateElementStyles(document, "node", { borderRadius: -5 });
+  expect(negative.elements.node.styles.borderRadius).toBe(0);
+});

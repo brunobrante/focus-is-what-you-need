@@ -276,9 +276,8 @@ function resizeSingleElement(
         const heightFit = source.type === "text" && source.sizing?.height === "fit";
         node.width = widthFit ? source.width : width;
         node.height = heightFit ? source.height : height;
-        if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
-          node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
-        }
+        // Corner radius is stored verbatim and clamped only at render (D1) — a pill
+        // (e.g. 9999) stays a pill across a resize instead of being re-corrected.
         node.x = widthFit ? source.x : roundPixel(localCenter.x - node.width / 2);
         node.y = heightFit ? source.y : roundPixel(localCenter.y - node.height / 2);
         bakePathResize(node, source);
@@ -344,9 +343,7 @@ function resizeSingleElement(
       const heightFit = source.type === "text" && source.sizing?.height === "fit";
       node.width = widthFit ? source.width : width;
       node.height = heightFit ? source.height : height;
-      if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
-        node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
-      }
+      // Corner radius kept verbatim, clamped only at render (D1) — pill survives resize.
       node.x = widthFit ? source.x : roundPixel(absX - parentBounds.x);
       node.y = heightFit ? source.y : roundPixel(absY - parentBounds.y);
       bakePathResize(node, source);
@@ -519,9 +516,7 @@ export function resizeDocument(
     node.height = heightFit
       ? sourceNode.height
       : roundPixel(clamp(absoluteRect.height, nc.height.min, Math.min(parentSize.height, nc.height.max ?? parentSize.height)));
-    if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
-      node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
-    }
+    // Corner radius kept verbatim, clamped only at render (D1).
     const clampedRect = clampRotatedRectToBounds(
       { x: absoluteRect.x, y: absoluteRect.y, width: node.width, height: node.height },
       node.rotation,

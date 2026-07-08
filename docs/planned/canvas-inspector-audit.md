@@ -466,11 +466,9 @@ the fallback doc independently of panel widths.
   `updateElementGeometry` re-clamps
   (`src/canvas/engine/mutations/elementGeometry.ts:42-43`), but the helper is
   logically wrong. Use a real max fallback (`Infinity`).
-- **L7 — Per-corner radii are not clamped at write** (uniform radius is):
-  `elementGeometry.ts:70-77` clamps `styles.borderRadius` via
-  `clampBorderRadiusForSize`; `AppearanceSection.tsx:64-69` `setCorner` only
-  does `Math.max(0, value)`. Note the tension with D1 — resolve D1's policy
-  first, then make uniform and per-corner consistent with it.
+- ✅ **DONE — L7 — Per-corner radii are not clamped at write** (uniform radius is):
+  resolved with D1 — uniform radius no longer clamps at write either, so both
+  uniform and per-corner now store `Math.max(0, value)` and clamp only at render.
 - ✅ **DONE — L8 — Clipboard/duplicate id generation is 32 bits and unchecked.**
   `src/canvas/engine/mutations/coreUtils.ts:5-10` slices the UUID to 8 hex
   chars; `src/canvas/engine/clipboard.ts:83` and `duplicateElements` never
@@ -686,7 +684,12 @@ transient frames. Memoize on the settled document or on `changedIds`.
 
 # 5. Doc-vs-code divergences (`docs/inspector-*.md`)
 
-- **D1 — Radius clamping / "Full" contradict the doc.**
+- ✅ **DONE — D1 — Radius clamping / "Full" contradict the doc.** Implemented the
+  doc/Figma behavior: corner radius is stored verbatim (no write/resize/scale
+  clamp), "Full" writes 9999, and the value is clamped only at render (CSS caps
+  border-radius at 50%). A pill now stays a pill across resizes. Resolves L7 too
+  (uniform + per-corner are now consistent: both store `max(0, value)` and clamp at
+  render). Unblocks F4.
   `docs/inspector-appearance.md` §Corner radius: "Keep the stored value
   (e.g. 9999 for a pill) … don't 'correct' the user's number"; "Full →
   border-radius: 9999px". Code: typed radius is clamped to min(w,h)/2 at

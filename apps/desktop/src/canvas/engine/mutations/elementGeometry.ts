@@ -3,7 +3,6 @@ import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, Rect } 
 import { cloneDocument } from "./coreUtils";
 import {
   clamp,
-  clampBorderRadiusForSize,
   clampRotatedRectToBounds,
   getParentBounds,
   getParentSize,
@@ -69,7 +68,10 @@ export function updateElementStyles(
   const def = getElementDefinition(node.type).capabilities;
   if (styles.borderRadius !== undefined) {
     if (def.radiusRole === "corner") {
-      node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(styles.borderRadius, node.width, node.height));
+      // Store the user's value verbatim (e.g. 9999 for a pill); the radius is
+      // clamped only at render (CSS caps border-radius at 50% automatically), so a
+      // pill stays a pill across resizes (D1). Just keep it non-negative.
+      node.styles.borderRadius = roundPixel(Math.max(0, styles.borderRadius));
     } else if (def.radiusRole === "ratio" && def.constraints.radius) {
       const { min, max } = def.constraints.radius;
       node.styles.borderRadius = roundPixel(clamp(styles.borderRadius, min, max ?? styles.borderRadius));

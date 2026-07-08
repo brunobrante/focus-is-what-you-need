@@ -48,6 +48,10 @@ function CornersIcon() {
 
 const CORNER_LABELS = ["Top L", "Top R", "Bot R", "Bot L"] as const;
 
+// "Full" stores a large sentinel rather than the current min(w,h)/2, so the pill
+// survives a resize — the radius is clamped only at render (CSS caps at 50%). D1.
+const PILL_RADIUS = 9999;
+
 export function AppearanceSection({
   styles,
   radius,
@@ -169,7 +173,7 @@ export function AppearanceSection({
               <button
                 type="button"
                 title="Pill — round the corners fully"
-                onClick={() => onChange({ borderRadius: cornerMax, cornerRadii: undefined })}
+                onClick={() => onChange({ borderRadius: PILL_RADIUS, cornerRadii: undefined })}
                 className="grid h-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent px-2 text-[11px] text-[#9A9A9A] transition-colors hover:bg-[#2C2C2C] hover:text-[#E2E2E2]"
               >
                 Full
