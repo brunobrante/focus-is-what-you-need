@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { useEditor } from "@/canvas/engine/store";
 import { buildMasterResolver, reresolveInstances } from "@/canvas/engine/htmlSceneAdapter";
@@ -27,26 +27,45 @@ export function LiveInstanceRefresh({ fallbackName = "Canvas" }: { fallbackName?
   const stateRef = useRef(state);
   stateRef.current = state;
   const signatureRef = useRef<string | null>(null);
+  // Set when a refresh was deferred because the editor was busy (mid-gesture or
+  // editing text); the settle effect retries it (L13).
+  const pendingRef = useRef(false);
+
+  const attemptRefresh = useCallback(() => {
+    const editor = stateRef.current;
+    // Never interrupt text editing, and never refresh while a document-mutating
+    // gesture is producing transient frames: refreshInstances would swap the
+    // document and the next transient frame (rebuilt from interaction.before-
+    // Document) would clobber it, while signatureRef had already advanced —
+    // leaving stale instance content until the master changes again (L13). Mark
+    // pending and retry once the editor settles.
+    if (editor.editingTextId || editor.transientChangedIds != null) {
+      pendingRef.current = true;
+      return;
+    }
+    pendingRef.current = false;
+    const scenes = getScenesSnapshot();
+    const signature = masterSignature(editor.document, scenes);
+    if (signature === signatureRef.current) return; // no referenced master changed
+    signatureRef.current = signature;
+    if (!signature) return; // document has no linked instances
+    const next = reresolveInstances(editor.document, buildMasterResolver(scenes), fallbackName);
+    dispatch({ type: "refreshInstances", document: next });
+  }, [dispatch, fallbackName]);
 
   useEffect(() => {
     // Seed the baseline so an unrelated first scene change is a no-op.
     signatureRef.current = masterSignature(stateRef.current.document, getScenesSnapshot());
-    return subscribe(TABLES.scenes, () => {
-      const editor = stateRef.current;
-      if (editor.editingTextId) return; // never interrupt text editing
-      const scenes = getScenesSnapshot();
-      const signature = masterSignature(editor.document, scenes);
-      if (signature === signatureRef.current) return; // no referenced master changed
-      signatureRef.current = signature;
-      if (!signature) return; // document has no linked instances
-      const next = reresolveInstances(
-        editor.document,
-        buildMasterResolver(scenes),
-        fallbackName,
-      );
-      dispatch({ type: "refreshInstances", document: next });
-    });
-  }, [dispatch, fallbackName]);
+    return subscribe(TABLES.scenes, attemptRefresh);
+  }, [attemptRefresh]);
+
+  // Retry a deferred refresh once the editor is idle again (gesture committed or
+  // text editing ended).
+  useEffect(() => {
+    if (pendingRef.current && !state.editingTextId && state.transientChangedIds == null) {
+      attemptRefresh();
+    }
+  }, [state.editingTextId, state.transientChangedIds, attemptRefresh]);
 
   return null;
 }
