@@ -7,6 +7,8 @@ export type TextLayout = {
   lineHeight: number;
   contentX: number;
   contentY: number;
+  /** Y of the first line's top, including the vertical-align offset (M8). */
+  top: number;
   contentWidth: number;
   lines: TextLayoutLine[];
 };
@@ -31,11 +33,40 @@ function getMeasureContext(): CanvasRenderingContext2D | null {
 
 function fontForNode(node: ElementNode): string {
   const style = node.styles;
+  // CSS `font` shorthand order: font-style font-weight font-size family. Include
+  // font-style so italic text measures with the italic metrics the DOM renders (M8).
+  const fontStyle = style.fontStyle ? `${style.fontStyle} ` : "";
   const weight = style.fontWeight ?? "400";
   const size = style.fontSize ?? 16;
   const family = style.fontFamily || "Inter, system-ui, sans-serif";
-  return `${weight} ${size}px ${family}`;
+  return `${fontStyle}${weight} ${size}px ${family}`;
 }
+
+// Mirrors CSS `text-transform`; the DOM renders the transformed glyphs, so the
+// caret/selection measurement must too (M8). Upper/lower/capitalize are 1:1 char
+// maps for the common case; on the rare length-changing map (e.g. ß→SS) we fall
+// back so caret indices stay aligned to the original string.
+function applyTextTransform(text: string, transform: string | undefined): string {
+  let out: string;
+  switch (transform) {
+    case "uppercase":
+      out = text.toUpperCase();
+      break;
+    case "lowercase":
+      out = text.toLowerCase();
+      break;
+    case "capitalize":
+      out = text.replace(/(^|\s)(\S)/g, (_, sep, ch) => sep + ch.toUpperCase());
+      break;
+    default:
+      return text;
+  }
+  return out.length === text.length ? out : text;
+}
+
+// The DOM's default (unset) line-height is the `.text-element` CSS class's 1.12,
+// not `normal`; a set `styles.lineHeight` is a unitless ratio that overrides it.
+const DEFAULT_LINE_HEIGHT_RATIO = 1.12;
 
 function textStartForNode(node: ElementNode, contentWidth: number, textWidth: number): number {
   if (node.styles.textAlign === "center") {
@@ -52,22 +83,42 @@ function isWrapOpportunity(char: string): boolean {
 }
 
 function computeTextLayout(node: ElementNode): TextLayout {
+  const styles = node.styles;
   const text = node.content ?? "";
-  const fontSize = node.styles.fontSize ?? 16;
-  const lineHeight = fontSize * 1.12;
+  const fontSize = styles.fontSize ?? 16;
+  const lineHeightRatio =
+    typeof styles.lineHeight === "number" && Number.isFinite(styles.lineHeight)
+      ? styles.lineHeight
+      : DEFAULT_LINE_HEIGHT_RATIO;
+  const lineHeight = fontSize * lineHeightRatio;
   const font = fontForNode(node);
   const ctx = getMeasureContext();
-  const padding = node.styles.padding ?? 0;
-  const borderWidth = node.styles.borderWidth ?? 0;
+  const padding = styles.padding ?? 0;
+  const borderWidth = styles.borderWidth ?? 0;
   const contentInset = padding + borderWidth;
   const contentX = contentInset;
   const contentY = contentInset;
   const contentWidth = Math.max(1, node.width - contentInset * 2);
 
-  if (ctx) ctx.font = font;
-  const measure = (value: string) =>
-    ctx ? ctx.measureText(value).width : value.length * fontSize * 0.55;
-  const measureRange = (start: number, end: number) => measure(text.slice(start, end));
+  // letter-spacing: `%` → em → px, added between glyphs (M8). Prefer the native
+  // ctx.letterSpacing so measureText includes it; fall back to per-char addition.
+  const letterSpacingPx =
+    typeof styles.letterSpacing === "number" && styles.letterSpacing !== 0
+      ? (styles.letterSpacing / 100) * fontSize
+      : 0;
+  const ctxSpacing = ctx != null && "letterSpacing" in ctx;
+  if (ctx) {
+    ctx.font = font;
+    if (ctxSpacing) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${letterSpacingPx}px`;
+  }
+
+  // The DOM renders the case-transformed glyphs; measure them (indices stay 1:1).
+  const measuredText = applyTextTransform(text, styles.textTransform);
+  const measure = (value: string) => {
+    const base = ctx ? ctx.measureText(value).width : value.length * fontSize * 0.55;
+    return ctxSpacing || letterSpacingPx === 0 ? base : base + letterSpacingPx * value.length;
+  };
+  const measureRange = (start: number, end: number) => measure(measuredText.slice(start, end));
 
   const ranges: Array<{ start: number; end: number }> = [];
   let lineStart = 0;
@@ -107,6 +158,15 @@ function computeTextLayout(node: ElementNode): TextLayout {
 
   ranges.push({ start: lineStart, end: text.length });
 
+  // vertical-align (compiled as a flex column in the DOM): shift the whole text
+  // block down within the content box when it is taller than the text (M8).
+  const contentHeight = Math.max(0, node.height - contentInset * 2);
+  const totalTextHeight = ranges.length * lineHeight;
+  const vFactor =
+    styles.verticalAlign === "middle" ? 0.5 : styles.verticalAlign === "bottom" ? 1 : 0;
+  const vOffset = Math.max(0, (contentHeight - totalTextHeight) * vFactor);
+  const top = contentY + vOffset;
+
   const lines = ranges.map((range, lineIndex) => {
     const width = measureRange(range.start, range.end);
     const charX: number[] = [];
@@ -117,7 +177,7 @@ function computeTextLayout(node: ElementNode): TextLayout {
       start: range.start,
       end: range.end,
       x: contentX + textStartForNode(node, contentWidth, width),
-      y: contentY + lineIndex * lineHeight,
+      y: top + lineIndex * lineHeight,
       width,
       charX,
     };
@@ -130,6 +190,7 @@ function computeTextLayout(node: ElementNode): TextLayout {
     lineHeight,
     contentX,
     contentY,
+    top,
     contentWidth,
     lines,
   };
@@ -142,10 +203,15 @@ function layoutKey(node: ElementNode): string {
   return [
     node.content ?? "",
     node.width,
-    `${s.fontWeight ?? "400"} ${s.fontSize ?? 16} ${s.fontFamily ?? ""}`,
+    node.height, // verticalAlign offset depends on box height
+    `${s.fontStyle ?? ""} ${s.fontWeight ?? "400"} ${s.fontSize ?? 16} ${s.fontFamily ?? ""}`,
     s.textAlign ?? "left",
     s.padding ?? 0,
     s.borderWidth ?? 0,
+    s.lineHeight ?? "",
+    s.letterSpacing ?? 0,
+    s.textTransform ?? "none",
+    s.verticalAlign ?? "top",
   ].join("|");
 }
 
@@ -205,7 +271,7 @@ export function getIndexFromPoint(
     0,
     Math.min(
       layout.lines.length - 1,
-      Math.floor((localY - layout.contentY) / layout.lineHeight),
+      Math.floor((localY - layout.top) / layout.lineHeight),
     ),
   );
   const line = layout.lines[lineIndex];

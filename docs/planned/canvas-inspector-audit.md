@@ -297,7 +297,7 @@ wire `onPointerCancel` to the cancel path.
 
 ## Text editing
 
-## M8 — Caret/selection/hit-testing desync for every typography style beyond weight/size/family
+## ✅ DONE — M8 — Caret/selection/hit-testing desync for every typography style beyond weight/size/family
 
 `src/canvas/stage/textEditingLayout.ts:32-38` (`fontForNode` omits
 `fontStyle`), `:56-57` (`lineHeight = fontSize * 1.12` hardcoded), `:140-150`
