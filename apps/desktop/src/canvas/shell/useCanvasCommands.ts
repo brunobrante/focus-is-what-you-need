@@ -1,13 +1,17 @@
 import { useMemo } from "react";
 
 import {
+  alignElements,
   bringToFront,
   deleteElements,
+  distributeElements,
   duplicateElements,
   reorderElement,
   sendToBack,
   setElementLocked,
   setElementVisible,
+  type AlignEdge,
+  type DistributeAxis,
 } from "@/canvas/engine/actions";
 import type { EditorBridgeValue } from "@/canvas/engine/bridge";
 
@@ -60,6 +64,14 @@ export function useCanvasCommands(
       },
       sendToBack: () => {
         if (singleId) commit(sendToBack(state.document, singleId));
+      },
+      // Align a single element within its parent frame, or a multi-selection within
+      // its shared bounds (G1). Distribute needs 3+ elements.
+      align: (edge: AlignEdge) => {
+        if (selectedIds.length >= 1) commit(alignElements(state.document, selectedIds, edge));
+      },
+      distribute: (axis: DistributeAxis) => {
+        if (selectedIds.length >= 3) commit(distributeElements(state.document, selectedIds, axis));
       },
       setLocked: (locked: boolean) => {
         if (singleId) commit(setElementLocked(state.document, singleId, locked));

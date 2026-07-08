@@ -877,6 +877,22 @@ function TreeContextMenuContent({
     { type: "action", label: "Send Backward", disabled: !singleNode, action: commands.sendBackward },
     { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: commands.sendToBack },
     { type: "separator" },
+    // Align / distribute (G1) — shown for a multi-selection (align uses the shared
+    // bounds; distribute needs 3+). Single-element align-within-parent is exposed
+    // through other surfaces, not this menu, to keep it uncluttered.
+    ...(selectedIds.length >= 2 ? [
+      { type: "action" as const, label: "Align left", action: () => commands.align("left") },
+      { type: "action" as const, label: "Align horizontal centers", action: () => commands.align("hcenter") },
+      { type: "action" as const, label: "Align right", action: () => commands.align("right") },
+      { type: "action" as const, label: "Align top", action: () => commands.align("top") },
+      { type: "action" as const, label: "Align vertical centers", action: () => commands.align("vcenter") },
+      { type: "action" as const, label: "Align bottom", action: () => commands.align("bottom") },
+      ...(selectedIds.length >= 3 ? [
+        { type: "action" as const, label: "Distribute horizontally", action: () => commands.distribute("horizontal") },
+        { type: "action" as const, label: "Distribute vertically", action: () => commands.distribute("vertical") },
+      ] : []),
+      { type: "separator" as const },
+    ] : []),
     ...(singleNode ? [
       { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commands.setLocked(!singleNode.locked) },
       { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commands.setVisible(singleNode.visible === false) },

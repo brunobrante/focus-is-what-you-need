@@ -5,6 +5,7 @@ export { insertElement, constrainElement, constrainAll, reparentElements, moveEl
 export { fitTextElementToContent, setTextElementSizing, updateElementGeometry, updateElementRotation, updateElementStyles } from "./mutations/elementGeometry";
 export { updateElementText, updateElementTextShallow, updateElementImageSource, renameElement, setElementLocked, setElementVisible, detachInstance } from "./mutations/elementContent";
 export { reorderElement, moveElementBefore, bringToFront, sendToBack } from "./mutations/elementOrder";
+export { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./mutations/elementAlign";
 export {
   makePathNode,
   appendAnchor,
