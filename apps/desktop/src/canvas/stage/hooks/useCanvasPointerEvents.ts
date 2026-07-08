@@ -283,7 +283,7 @@ export function useCanvasPointerEvents({
       window.removeEventListener("keydown", onAltChange);
       window.removeEventListener("keyup", onAltChange);
     };
-  }, [state.pathEditId, state.editingTextId, viewportRef, toolingRef, interactionRef, getCurrentViewportRect]);
+  }, [state.pathEditId, state.editingTextId, viewportRef, toolingRef, interactionRef, getCurrentViewportRect, settings]);
 
   // Drop a photo/image file onto the frame → a new Image element holding that
   // file (planned/canvas-image-drop.md). Async because we decode the file into a
