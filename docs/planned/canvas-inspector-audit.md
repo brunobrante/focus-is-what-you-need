@@ -27,16 +27,32 @@ F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
 on hold.
 
 Full-audit pass (2026-07-08, fix-order): resuming from step 6 leftovers.
-Additional completions this pass: **M11** (explicit no-fill state; also closes
-G15), **M13** (tile motif from natural size × scale%; also closes D8), **M1**
-(resize/radius honor ancestor rotation) and **M2** (path-edit + vector coordinate
-math through the full element transform), **M8** (text-editing layout honors full
-typography) and **M9** (rotated text-editing overlay + inverse-rotated pointer
-mapping). New shared geometry helpers in `bounds.ts`:
-`canvasPointToParentContentSpace`, `elementLocalToCanvas`, `canvasToElementLocal`.
-NB: the canvas geometry/overlay changes are typechecked + unit-tested but not
-runtime-verified in this env (no `bun`); verify nested/rotated resize, radius,
-path-edit and rotated text editing in-app.
+Completions this pass:
+- **Bugs:** M11 (no-fill state; closes G15), M13 (tile motif from natural size ×
+  scale%; closes D8), M1 (resize/radius honor ancestor rotation), M2 (path-edit +
+  vector coords through the full element transform), M8 (text-editing layout honors
+  full typography), M9 (rotated text-editing overlay + pointer mapping), L22 (paste
+  into source parent).
+- **Perf:** P5 (grid buffer), P10 (draft scrollbar rescan), P7 (per-word text-fit
+  wrapping), P8 (shared commit listener).
+- **Fidelity:** F6 (toolbar vertical clamp), F5 (adaptive path tessellation), F1
+  (resize flip/mirror), F2-shadows (drop-shadow on clip-path shapes).
+- New shared geometry helpers in `bounds.ts`: `canvasPointToParentContentSpace`,
+  `elementLocalToCanvas`, `canvasToElementLocal`.
+
+NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
+NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
+path-edit, rotated text editing, and resize-flip in-app.
+
+**Remaining after this pass — needs decisions or runtime work I can't do here:**
+- **Product decision:** D1 (radius clamping policy) — blocks L7 + F4.
+- **Architecture perf (need runtime measurement):** P1 (zoom projection), P2 (rAF
+  batching), P4 (inspector selector subscription), P6 (history snapshot sharing),
+  P9 (spatial index — audit says not urgent).
+- **Blocked on the SVG render target:** F3, G13, D6-partial, F2-borders.
+- **Deferred (needs new rebindable commands):** L16.
+- **Parity features (need UX.md specs + runtime verification):** G1–G14 (minus the
+  already-closed G15), and the doc-divergence UI items D3/D4/D5/D7.
 
 ## Scope and intentional exclusions
 
