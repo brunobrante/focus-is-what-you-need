@@ -244,7 +244,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       const pathEditNode = props.pathEditId ? doc.elements[props.pathEditId] : null;
       const pathEditGeometry =
         pathEditNode && pathEditNode.type === "path"
-          ? computePathEditGeometry(pathEditNode, t, props.penToolActive)
+          ? computePathEditGeometry(doc, pathEditNode, t, props.penToolActive)
           : null;
       const pathEditActive = pathEditGeometry !== null;
       // In path edit mode the box + resize/rotate/radius handles are hidden; only

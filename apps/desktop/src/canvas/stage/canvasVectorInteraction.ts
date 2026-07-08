@@ -88,7 +88,7 @@ export function penPointerDown(
     }
 
     // Otherwise append a new corner anchor to the active subpath.
-    const pt = canvasToPathSpace(node, point.x, point.y);
+    const pt = canvasToPathSpace(doc, node, point.x, point.y);
     const anchorIndex = sub ? sub.anchors.length : 0;
     const withAnchor = appendAnchor(doc, editingId, activeSubpath, { x: pt.x, y: pt.y, handleType: "corner" });
     interactionRef.current = {
@@ -153,7 +153,7 @@ export function penPointerMove(
   interaction.moved = true;
   const node = interaction.lastDocument.elements[interaction.elementId];
   if (!node) return;
-  const rel = canvasDeltaToPathSpace(node, dx, dy);
+  const rel = canvasDeltaToPathSpace(interaction.lastDocument, node, dx, dy);
   // Symmetric (mirrored) handles while dragging out of a freshly-placed anchor.
   const next = updateAnchor(interaction.lastDocument, interaction.elementId, interaction.subpathIndex, interaction.draggingHandleOfAnchor, {
     outX: rel.x,
@@ -215,7 +215,7 @@ export function pencilMove(
   const node = interaction.lastDocument.elements[interaction.elementId];
   if (!node) return;
   const anchors = interaction.points.map((p) => {
-    const sp = canvasToPathSpace(node, p.x, p.y);
+    const sp = canvasToPathSpace(interaction.lastDocument, node, p.x, p.y);
     return { x: sp.x, y: sp.y, handleType: "corner" as const };
   });
   const next = updateSubpathAnchors(interaction.lastDocument, interaction.elementId, anchors);
@@ -227,7 +227,7 @@ export function pencilMove(
 export function finishPencil(interaction: PencilInteraction, dispatch: Dispatch): void {
   const node = interaction.lastDocument.elements[interaction.elementId];
   if (!node) return;
-  const ptsPath = interaction.points.map((p) => canvasToPathSpace(node, p.x, p.y));
+  const ptsPath = interaction.points.map((p) => canvasToPathSpace(interaction.lastDocument, node, p.x, p.y));
   const anchors = simplifyToAnchors(ptsPath, 2);
   let next = updateSubpathAnchors(interaction.lastDocument, interaction.elementId, anchors);
   next = recomputePathBounds(next, interaction.elementId);
@@ -355,14 +355,14 @@ export function anchorEditMove(
 
   let next: CanvasDocument;
   if (interaction.target === "anchor") {
-    const rel = canvasDeltaToPathSpace(node0, dx, dy);
+    const rel = canvasDeltaToPathSpace(interaction.beforeDocument, node0, dx, dy);
     next = updateAnchor(interaction.beforeDocument, interaction.elementId, interaction.subpathIndex, interaction.anchorIndex, {
       x: anchor0.x + rel.x,
       y: anchor0.y + rel.y,
     });
   } else {
-    const anchorCanvas = pathSpaceToCanvas(node0, anchor0.x, anchor0.y);
-    const rel = canvasDeltaToPathSpace(node0, point.x - anchorCanvas.px, point.y - anchorCanvas.py);
+    const anchorCanvas = pathSpaceToCanvas(interaction.beforeDocument, node0, anchor0.x, anchor0.y);
+    const rel = canvasDeltaToPathSpace(interaction.beforeDocument, node0, point.x - anchorCanvas.px, point.y - anchorCanvas.py);
     next = updateHandle(interaction.beforeDocument, interaction.elementId, interaction.subpathIndex, interaction.anchorIndex, interaction.target, rel.x, rel.y);
   }
   interaction.lastDocument = next;

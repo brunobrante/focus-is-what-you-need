@@ -1,7 +1,7 @@
 // Builds the viewport-space anchor/handle/segment geometry for a path in edit
 // mode — consumed by both the overlay renderer and the hit-tester. Pure.
 
-import type { ElementNode, Point } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, Point } from "@/canvas/engine/types";
 import type { ViewportTransform } from "@/canvas/engine/viewport";
 import { canvasToViewport } from "./canvasToolingRenderer";
 import { pathSpaceToCanvas } from "@/canvas/engine/vector/vectorGeometry";
@@ -10,29 +10,19 @@ import type { PathEditAnchorGeom, PathEditGeometry, PathEditSegmentGeom } from "
 
 const SEGMENT_SAMPLES = 12;
 
-function rotate(px: number, py: number, cx: number, cy: number, deg: number): { x: number; y: number } {
-  if (!deg) return { x: px, y: py };
-  const rad = (deg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const dx = px - cx;
-  const dy = py - cy;
-  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
-}
-
 export function computePathEditGeometry(
+  document: CanvasDocument,
   node: ElementNode,
   t: ViewportTransform,
   penToolActive: boolean,
 ): PathEditGeometry | null {
   if (node.type !== "path" || !node.path) return null;
-  const cx = node.x + node.width / 2;
-  const cy = node.y + node.height / 2;
-  // Path space → canvas (with element rotation) → viewport.
+  // Path space → canvas → viewport. pathSpaceToCanvas already applies the element's
+  // full transform (ancestor offset/rotation + own rotation), so no extra rotate
+  // here — that would double-count and misplace anchors on nested paths (M1/M2).
   const toView = (x: number, y: number): Point => {
-    const c = pathSpaceToCanvas(node, x, y);
-    const r = rotate(c.px, c.py, cx, cy, node.rotation);
-    return canvasToViewport(r.x, r.y, t);
+    const c = pathSpaceToCanvas(document, node, x, y);
+    return canvasToViewport(c.px, c.py, t);
   };
 
   const anchors: PathEditAnchorGeom[] = [];

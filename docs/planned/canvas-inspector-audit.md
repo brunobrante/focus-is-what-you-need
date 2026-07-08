@@ -20,7 +20,7 @@ unit-tested where tests exist). Completed so far:
 - **Low:** L1–L6, L8–L15, L17–L21.
 - **Perf:** P3.
 
-Remaining bug-class items not yet done: M1, M2, M8, M9, L7, L16, L22,
+Remaining bug-class items not yet done: M8, M9, L7, L16, L22,
 L23; performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
 ride on M12/M13, and G15/M11 for the no-fill state); the rendering-fidelity
 F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
@@ -28,7 +28,13 @@ on hold.
 
 Full-audit pass (2026-07-08, fix-order): resuming from step 6 leftovers.
 Additional completions this pass: **M11** (explicit no-fill state; also closes
-G15), **M13** (tile motif from natural size × scale%; also closes D8).
+G15), **M13** (tile motif from natural size × scale%; also closes D8), **M1**
+(resize/radius honor ancestor rotation) and **M2** (path-edit + vector coordinate
+math through the full element transform). New shared geometry helpers in
+`bounds.ts`: `canvasPointToParentContentSpace`, `elementLocalToCanvas`,
+`canvasToElementLocal`. NB: the canvas geometry changes are typechecked +
+unit-tested but not runtime-verified in this env (no `bun`); verify nested/rotated
+resize, radius and path-edit in-app.
 
 ## Scope and intentional exclusions
 
@@ -186,7 +192,7 @@ already fine (`InsInput` defers to blur/Enter).
 
 ## Geometry / interaction
 
-## M1 — Resize/radius/rotate math ignores ancestor rotation while handles are drawn with it
+## ✅ DONE — M1 — Resize/radius/rotate math ignores ancestor rotation while handles are drawn with it
 
 Handles/hit geometry use `getElementTransformedCorners` (full ancestor
 rotation chain, `src/canvas/engine/geometry/bounds.ts:194-212`), but:
@@ -211,7 +217,7 @@ Drag/move is **correct** (`computeDragMoveFromWorldDelta` uses
 resize/radius/rotate/path-edit. **Fix:** use the effective (ancestor-chain)
 rotation and the transformed frame in all four paths, same as move does.
 
-## M2 — Path-edit coordinate math ignores ancestors and (for drags) the element's own rotation
+## ✅ DONE — M2 — Path-edit coordinate math ignores ancestors and (for drags) the element's own rotation
 
 - `src/canvas/engine/vector/vectorGeometry.ts:16-25` —
   `canvasToPathSpace`/`pathSpaceToCanvas` treat `node.x/y` as

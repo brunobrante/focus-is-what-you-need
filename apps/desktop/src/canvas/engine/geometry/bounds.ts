@@ -274,6 +274,50 @@ export function canvasPointToParentContentSpace(
   return p;
 }
 
+/**
+ * Exact element-local → canvas transform (accumulated ancestor border offset,
+ * rotation and translation plus the element's own rotation), with no layout-unit
+ * snapping — so it matches where the element (and its inner SVG) actually renders.
+ * Element-local space has the element's box at (0,0)–(width,height). Used for path
+ * anchor/handle mapping (M2). Null on a broken ancestor chain.
+ */
+export function elementLocalToCanvas(
+  document: CanvasDocument,
+  id: string,
+  point: Point,
+): Point | null {
+  let currentId: string | null = id;
+  let p = { x: point.x, y: point.y };
+  while (currentId) {
+    const node: ElementNode | undefined = document.elements[currentId];
+    if (!node) return null;
+    p = rotatePoint(p, { x: node.width / 2, y: node.height / 2 }, node.rotation);
+    p = { x: p.x + node.x, y: p.y + node.y };
+    currentId = node.parentId;
+    if (currentId) {
+      const parent = document.elements[currentId];
+      if (!parent) return null;
+      const bw = parent.styles.borderWidth ?? 0;
+      p = { x: p.x + bw, y: p.y + bw };
+    }
+  }
+  return p;
+}
+
+/** Exact inverse of {@link elementLocalToCanvas}: canvas → element-local space. */
+export function canvasToElementLocal(
+  document: CanvasDocument,
+  id: string,
+  point: Point,
+): Point | null {
+  const node = document.elements[id];
+  if (!node) return null;
+  const pc = canvasPointToParentContentSpace(document, id, point);
+  if (!pc) return null;
+  const q = { x: pc.x - node.x, y: pc.y - node.y };
+  return rotatePoint(q, { x: node.width / 2, y: node.height / 2 }, -node.rotation);
+}
+
 export function getParentBounds(document: CanvasDocument, id: string): Rect {
   const node = document.elements[id];
   if (!node?.parentId) {
