@@ -83,5 +83,5 @@ export function computePathEditGeometry(
     }
   }
 
-  return { anchors, segments, closeTarget };
+  return { anchors, segments, closeTarget, penActive: penToolActive };
 }

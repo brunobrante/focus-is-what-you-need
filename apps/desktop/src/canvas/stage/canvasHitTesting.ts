@@ -110,6 +110,8 @@ export type PathEditGeometry = {
   segments: PathEditSegmentGeom[];
   // The first anchor of the active subpath, when the pen tool can close it.
   closeTarget: Point | null;
+  // Whether the Pen tool is active — drives the empty-space cursor (L20).
+  penActive: boolean;
 };
 
 export type ToolingGeometry = {
@@ -464,7 +466,10 @@ export function hitTestTooling(vx: number, vy: number, geometry: ToolingGeometry
   if (geometry.pathEdit) {
     const hit = hitTestPathEdit(vx, vy, geometry.pathEdit);
     if (hit) return hit;
-    return { type: "path-empty", cursor: PEN_CURSOR };
+    // Empty space: only show the pen cursor when the Pen tool is active (clicking
+    // will place an anchor). With Select active, an empty click exits edit mode,
+    // so keep the default cursor (L20).
+    return { type: "path-empty", cursor: geometry.pathEdit.penActive ? PEN_CURSOR : "default" };
   }
 
   if (geometry.hasRadiusHandles && geometry.radiusHandlePositions) {
