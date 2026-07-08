@@ -661,7 +661,7 @@ Snap-candidate build, marquee, drop-target search, `findChildAtPoint` are
 linear scans with per-node ancestor walks. Fine at hundreds of nodes,
 quadratic-ish at Figma-scale scenes. Not urgent; revisit when scenes grow.
 
-## P10 — LOW — Draft-mode scrollbars recompute `getSelectionAABB` over all roots on every document change
+## ✅ DONE — P10 — Draft-mode scrollbars recompute `getSelectionAABB` over all roots on every document change
 
 `CanvasStage.tsx:382-385` depends on `state.document`, including 60 Hz
 transient frames. Memoize on the settled document or on `changedIds`.

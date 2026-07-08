@@ -379,10 +379,18 @@ export function CanvasStage({
   // it (Figma/Penpot-style): thumb length = viewport / content, so it is
   // proportional to the window (a 600px window over 1000px of content → a 60%
   // thumb) and shrinks as you zoom in. Hidden whenever the content fits the window.
-  const draftContentBounds = useMemo(
-    () => (draftMode ? getSelectionAABB(state.document, state.document.rootIds) : null),
-    [draftMode, state.document],
-  );
+  // The scrollbar extent rescans every root's AABB — O(roots). During an active
+  // gesture the document churns at 60Hz, so reuse the last settled bounds and
+  // recompute only when the gesture ends; the scroll extent lagging to gesture-end
+  // is invisible (P10). The ref write is idempotent (deterministic from the doc).
+  const draftBoundsRef = useRef<Rect | null>(null);
+  const draftContentBounds = useMemo(() => {
+    if (!draftMode) return null;
+    if (interactionActive && draftBoundsRef.current) return draftBoundsRef.current;
+    const bounds = getSelectionAABB(state.document, state.document.rootIds);
+    draftBoundsRef.current = bounds;
+    return bounds;
+  }, [draftMode, state.document, interactionActive]);
   const draftScroll = useMemo(() => {
     if (!draftContentBounds || viewportSize.width <= 0 || viewportSize.height <= 0) return HIDDEN_SCROLL;
     const startX = draftContentBounds.x * displayZoom + viewportTransform.offsetX;
