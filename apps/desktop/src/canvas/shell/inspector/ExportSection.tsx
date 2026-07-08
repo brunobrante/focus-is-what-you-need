@@ -12,6 +12,7 @@ import {
   isRasterFormat,
 } from "@/lib/canvas/export/types";
 import {
+  iconButtonClass,
   InsColor,
   InsInput,
   InsRow,
@@ -37,9 +38,6 @@ const LABEL_TO_FORMAT = new Map(FORMAT_VALUES.map((f) => [FORMAT_LABELS[f], f] a
 
 const SCALE_OPTIONS = ["0.5", "1", "2", "3"];
 
-const iconButtonClass =
-  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2] disabled:cursor-not-allowed disabled:opacity-30";
-
 function newEntry(): ExportEntry {
   return { id: createId("exp"), scale: 1, format: "png", suffix: "" };
 }
@@ -57,7 +55,7 @@ function ExportEntryRow({
 }) {
   const raster = isRasterFormat(entry.format);
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-[#2C2C2C] bg-[#181818] p-2">
+    <div className="flex flex-col gap-2 rounded-[10px] bg-[#1C1C1C] p-2.5">
       <InsRow label="Format">
         <InsSelect
           value={FORMAT_LABELS[entry.format]}
@@ -135,7 +133,16 @@ export function ExportSection({
   };
 
   return (
-    <InsSection title="Export" defaultOpen={false} disabled={locked}>
+    <InsSection
+      title="Export"
+      defaultOpen={false}
+      disabled={locked}
+      action={
+        <button type="button" title="Add export" onClick={add} className={iconButtonClass}>
+          <IconPlus size={13} />
+        </button>
+      }
+    >
       {entries.map((entry, index) => (
         <ExportEntryRow
           key={entry.id}
@@ -185,18 +192,9 @@ export function ExportSection({
 
       <button
         type="button"
-        onClick={add}
-        className="mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A]"
-      >
-        <IconPlus size={12} />
-        Add export
-      </button>
-
-      <button
-        type="button"
         onClick={onExport}
         disabled={busy || entries.length === 0}
-        className="flex w-full cursor-pointer items-center justify-center rounded-md border-0 bg-[#8638E5] px-2 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#7A2FD8] disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-0.5 flex h-[32px] w-full cursor-pointer items-center justify-center rounded-[8px] border-0 bg-[#0D99FF] px-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#2AA5FF] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Exporting…" : "Export"}
       </button>

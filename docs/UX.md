@@ -722,6 +722,15 @@ into a local copy — see System Design) updates every bound element automatical
 literal colour from the picker also unbinds. (Live updates while a canvas stays open rely on
 the same scenes-table reactivity as linked instances.)
 
+**Inspector → Transform** (shown for every element, the **first** element section — merges the
+former **Position** + **Tamanho** blocks): a compact transform grid in the Framer style —
+**X │ Y** on one row, **W │ H** on the next with a trailing **aspect-ratio lock** (session-only;
+when on, editing one dimension scales the other by the node's current ratio), then **Rotation**.
+Fields carry an in-field glyph (X / Y / W / H / ⟲) instead of an outside label. Secondary metadata
+— **Abs X / Abs Y** and the type's **Min/Max W/H** limits — lives behind an inline **More**
+disclosure, collapsed by default. **Text** elements also get **Fixed / Fit** width and height
+mode toggles (a Fit axis shows a read-only size instead of an input).
+
 **Inspector → Fill** (shown for every fillable element — hidden for **line / arrow** which have
 no interior, and for **path / svg** which fill through the Vector section): a stacked **Fill**
 list (Figma's model) above Appearance. Each fill is a card with an **eye** enable toggle, a
@@ -823,7 +832,7 @@ Right / Left-Right / Center / Scale). **Text** gets a **Resize** enum (Auto W / 
 distinct from the container sizing modes. **Authoring-only for now:** these controls write real
 CSS-bound fields compiled by `domain/canvas/layout.ts`, but they have **no on-canvas effect yet** —
 absolute positioning stays the default and the renderer adopts the engine in a later pass.
-(X/Y/W/H and rotation remain live in the separate **Position** / **Tamanho** sections.)
+(X/Y/W/H and rotation remain live in the separate **Transform** section — see above.)
 
 **Inspector → Typography** (shown only for **text** elements, replacing the old "Tipografia"
 section): **Font** (family, free text, placeholder "System Sans-Serif"), **Size** (px),
@@ -849,7 +858,7 @@ formats also get a **Scale** (0.5× / 1× / 2× / 3×) and an optional filename 
 appears (**None** = transparent / **Color** / **Flatten**, with a color swatch for the latter
 two; JPEG is always flattened since it has no alpha). When any HTML entry is present an **HTML**
 toggle appears (**Single file** = one self-contained `.html` with embedded styles, or
-**Bundle** = `index.html` + `styles.css`). The **Export** button (purple, full-width) runs every
+**Bundle** = `index.html` + `styles.css`). The **Export** button (accent-blue, full-width) runs every
 entry, then opens a native **"Save As…"** dialog — one file when a single plain file is produced,
 or a `.zip` when several entries (or an HTML bundle) are. A status line below reports the result
 (`Exported N files.` / `Export cancelled.` / failure). **How it's produced (webview-complete):**
@@ -864,7 +873,7 @@ gradients) via `takeSnapshot`, vector **PDF** via `createPDF`, **AVIF**, and the
 
 **Read-only linked instances (Versions window)**: when the Versions window is focused and
 the selected element is a **linked instance** (a node referencing a master component), the
-Inspector's Element tab still shows every section (Position, Tamanho, Layout, Appearance, …)
+Inspector's Element tab still shows every section (Transform, Layout, Appearance, …)
 but they are **locked** — fields are dimmed and non-interactive. A purple link banner at the
 top reads "Instância linkada — somente leitura. Faça detach para editar." followed by an
 inline **"Ou clique aqui"** link that opens the **master component** the instance points to

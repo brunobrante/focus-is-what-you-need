@@ -329,7 +329,7 @@ export function Inspector({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="grid h-6 w-6 cursor-pointer place-items-center rounded-md border border-[#2C2C2C] bg-transparent text-[#9A9A9A] hover:bg-[#2A2A2A] hover:text-[var(--text)]"
+          className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-[7px] border border-transparent bg-transparent text-[#9A9A9A] transition-colors hover:bg-[#2C2C2C] hover:text-[#EDEDED]"
         >
           <IconClose size={11} strokeWidth={1.8} />
         </button>
@@ -433,7 +433,7 @@ export function Inspector({
                     key={op}
                     type="button"
                     onClick={() => onBooleanOp(op)}
-                    className="cursor-pointer rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A]"
+                    className="flex h-[30px] cursor-pointer items-center justify-center rounded-[8px] bg-[#242424] px-2 text-[12px] font-medium text-[#EDEDED] transition-colors hover:bg-[#2E2E2E]"
                   >
                     {label}
                   </button>

@@ -9,12 +9,14 @@ import {
 import { IconChevronDown, IconChevronUp, IconEye, IconEyeOff, IconPlus, IconTrash } from "@/components/icons";
 import {
   clamp,
+  iconButtonClass,
   InsColor,
   type InsColorToken,
   InsInput,
   InsRow,
   InsSection,
   InsSelect,
+  insButtonClass,
   updateNumber,
 } from "./InsComponents";
 
@@ -64,9 +66,6 @@ function seedForType(type: EffectType, e: Effect): Partial<Effect> {
   return { amount: defaultFilterAmount(type) };
 }
 
-const iconButtonClass =
-  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2] disabled:cursor-not-allowed disabled:opacity-30";
-
 function EffectEntry({
   effect,
   index,
@@ -94,7 +93,7 @@ function EffectEntry({
   ).map((t) => EFFECT_LABELS[t]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-[#2C2C2C] bg-[#181818] p-2">
+    <div className="flex flex-col gap-2 rounded-[10px] bg-[#1C1C1C] p-2.5">
       <div className="flex items-center gap-1.5">
         <button
           type="button"
@@ -263,11 +262,20 @@ export function EffectsSection({
   const add = () => onChange([newEffect(), ...effects]);
 
   return (
-    <InsSection title="Effects" defaultOpen={effects.length > 0} disabled={locked}>
+    <InsSection
+      title="Effects"
+      defaultOpen={effects.length > 0}
+      disabled={locked}
+      action={
+        <button type="button" title="Add effect" onClick={add} className={iconButtonClass}>
+          <IconPlus size={13} />
+        </button>
+      }
+    >
       {effects.length === 0 ? (
-        <p className="text-[11px] leading-5 text-[#6B6B6B]">
-          Shadows, blur, and filters. Order matters — filters chain and shadows stack.
-        </p>
+        <button type="button" onClick={add} className={insButtonClass}>
+          <IconPlus size={12} /> Add effect
+        </button>
       ) : (
         effects.map((effect, index) => (
           <EffectEntry
@@ -283,14 +291,6 @@ export function EffectsSection({
           />
         ))
       )}
-      <button
-        type="button"
-        onClick={add}
-        className="mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A]"
-      >
-        <IconPlus size={12} />
-        Add effect
-      </button>
     </InsSection>
   );
 }

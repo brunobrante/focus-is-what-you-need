@@ -34,7 +34,7 @@ type AppearanceSectionProps = {
 };
 
 const cornerButtonBase =
-  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border transition-colors";
+  "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent transition-colors";
 
 /** A small icon hinting "individual corners" — two L-brackets at opposite corners. */
 function CornersIcon() {
@@ -170,7 +170,7 @@ export function AppearanceSection({
                 type="button"
                 title="Pill — round the corners fully"
                 onClick={() => onChange({ borderRadius: cornerMax, cornerRadii: undefined })}
-                className="h-[22px] shrink-0 rounded-[5px] border border-[#2C2C2C] px-2 text-[11px] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2]"
+                className="grid h-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent px-2 text-[11px] text-[#9A9A9A] transition-colors hover:bg-[#2C2C2C] hover:text-[#E2E2E2]"
               >
                 Full
               </button>
@@ -180,8 +180,8 @@ export function AppearanceSection({
                 onClick={togglePerCorner}
                 className={`${cornerButtonBase} ${
                   perCorner
-                    ? "border-[#3A3A3A] text-[#E2E2E2]"
-                    : "border-[#2C2C2C] text-[#A6A6A6] hover:border-[#3A3A3A] hover:text-[#E2E2E2]"
+                    ? "bg-[#2C2C2C] text-[#E2E2E2]"
+                    : "text-[#9A9A9A] hover:bg-[#2C2C2C] hover:text-[#E2E2E2]"
                 }`}
               >
                 <CornersIcon />

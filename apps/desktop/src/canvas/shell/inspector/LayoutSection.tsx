@@ -50,7 +50,7 @@ function AlignmentPad({
   onPick: (x: PadAlign, y: PadAlign) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-0.5 rounded-md border border-[#2C2C2C] bg-[#1E1E1E] p-1">
+    <div className="grid grid-cols-3 gap-0.5 rounded-[8px] bg-[#1C1C1C] p-1">
       {PADS.map((y) =>
         PADS.map((x) => {
           const active = alignX === x && alignY === y;
@@ -105,7 +105,7 @@ function TrackEditor({
             type="button"
             title="Add track"
             onClick={() => onChange([...tracks, { kind: "fill", value: 1 }])}
-            className="h-[20px] w-[20px] rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] hover:border-[#3A3A3A] hover:text-[#E2E2E2]"
+            className="grid h-[22px] w-[22px] place-items-center rounded-[6px] bg-[#242424] text-[#A6A6A6] transition-colors hover:bg-[#2E2E2E] hover:text-[#E2E2E2] disabled:opacity-40"
           >
             +
           </button>
@@ -125,7 +125,7 @@ function TrackEditor({
           <select
             value={t.kind}
             onChange={(e) => set(i, { kind: e.target.value as GridTrack["kind"] })}
-            className="h-7 flex-1 rounded-md border border-[#2C2C2C] bg-[#1E1E1E] px-2 text-[12px] text-[#F2F2F2] outline-none"
+            className="h-[30px] flex-1 rounded-[8px] border border-transparent bg-[#242424] px-2.5 text-[12px] text-[#EDEDED] capitalize outline-none transition-colors hover:bg-[#2C2C2C] focus:border-[#0D99FF]/70"
           >
             {TRACK_KINDS.map((k) => (
               <option key={k} value={k}>{k}</option>
@@ -315,11 +315,8 @@ export function LayoutSection({
                   type="button"
                   title="Set each side individually"
                   onClick={togglePerSidePadding}
-                  className="h-[22px] shrink-0 rounded-[5px] border px-2 text-[11px] transition-colors"
-                  style={{
-                    borderColor: perSidePadding ? "#3A3A3A" : "#2C2C2C",
-                    color: perSidePadding ? "#E2E2E2" : "#A6A6A6",
-                  }}
+                  className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent text-[11px] transition-colors hover:bg-[#2C2C2C]"
+                  style={{ color: perSidePadding ? "#0D99FF" : "#8A8A8A", background: perSidePadding ? "#2C2C2C" : "transparent" }}
                 >
                   4
                 </button>

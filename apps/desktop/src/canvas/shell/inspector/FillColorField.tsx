@@ -10,10 +10,7 @@ import { IconCrosshair, IconLink, IconUnlink } from "@/components/icons";
 import { parseTokenRef, tokenRef } from "@/domain/system-design/resolveTokenRef";
 import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 import { pickScreenColor } from "@/infrastructure/eyedropper";
-import { type InsColorToken, InsInput, useScrubHandlers } from "./InsComponents";
-
-const iconButtonClass =
-  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2]";
+import { iconButtonClass, type InsColorToken, InsInput, useScrubHandlers } from "./InsComponents";
 
 export function FillColorField({
   value,
@@ -66,7 +63,7 @@ export function FillColorField({
     return (
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <span
-          className="h-[22px] w-[22px] shrink-0 rounded-[5px] border border-[#2C2C2C]"
+          className="h-[26px] w-[26px] shrink-0 rounded-[7px] ring-1 ring-black/20"
           style={{ background: token?.value ?? value }}
         />
         <span
@@ -92,7 +89,7 @@ export function FillColorField({
   return (
     <div className="relative flex min-w-0 flex-1 items-center gap-1.5">
       <label
-        className="relative h-[22px] w-[22px] shrink-0 cursor-pointer overflow-hidden rounded-[5px] border border-[#2C2C2C]"
+        className="relative h-[26px] w-[26px] shrink-0 cursor-pointer overflow-hidden rounded-[7px] ring-1 ring-black/20"
         style={{ background: value }}
       >
         <input
@@ -126,7 +123,7 @@ export function FillColorField({
         </button>
       )}
       {open && canBind && (
-        <div className="absolute right-0 top-[26px] z-50 max-h-48 w-44 overflow-y-auto rounded-md border border-[#2C2C2C] bg-[#1E1E1E] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.45)]">
+        <div className="absolute right-0 top-[32px] z-50 max-h-48 w-44 overflow-y-auto rounded-[10px] border border-[#2C2C2C] bg-[#1E1E1E] p-1 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
           {tokens!.map((t) => (
             <button
               key={t.id}
@@ -135,7 +132,7 @@ export function FillColorField({
                 onBind?.(tokenRef("colors", t.id));
                 setOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[12px] text-[#E2E2E2] transition-colors hover:bg-[#2A2A2A]"
+              className="flex w-full items-center gap-2 rounded-[6px] px-1.5 py-1 text-left text-[12px] text-[#E2E2E2] transition-colors hover:bg-[#2A2A2A]"
             >
               <span
                 className="h-3 w-3 shrink-0 rounded-[3px] border border-white/10"

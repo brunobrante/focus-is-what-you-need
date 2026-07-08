@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
@@ -20,6 +20,7 @@ import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignCont
 import type { ColorToken, GradientToken } from "@/domain/system-design/types";
 import {
   clamp,
+  FieldGroup,
   InsColor,
   type InsColorToken,
   InsInput,
@@ -28,9 +29,41 @@ import {
   InsSelect,
   InsTextarea,
   InsToggle,
+  insButtonClass,
   Readout,
   updateNumber,
 } from "./InsComponents";
+
+/** A small rotation glyph for the field icon slot. */
+const RotateGlyph = (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+    <path
+      d="M8 3.5A4.5 4.5 0 1 0 12.5 8M8 3.5V1.5M8 3.5H6"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/** An inline reveal for secondary metadata (absolute position, size limits). */
+function MoreDisclosure({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="mt-0.5 flex cursor-pointer items-center gap-1 self-start border-0 bg-transparent p-0 text-[11px] text-[#7C7C7C] transition-colors hover:text-[#B0B0B0]"
+      >
+        <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>›</span>
+        {open ? "Less" : "More"}
+      </button>
+      {open ? <div className="flex flex-col gap-2">{children}</div> : null}
+    </>
+  );
+}
 
 type ElementTabProps = {
   node: ElementNode;
@@ -136,6 +169,27 @@ export function ElementTab({
   const widthFit = node.type === "text" && node.sizing?.width === "fit";
   const heightFit = node.type === "text" && node.sizing?.height === "fit";
 
+  // Aspect-ratio lock (session-local UI state, not persisted). When on, editing
+  // one dimension scales the other by the node's current W:H so the shape keeps
+  // its proportions. The ratio is read at commit time from the live node.
+  const [aspectLocked, setAspectLocked] = useState(false);
+  const commitWidth = (w: number) => {
+    const width = clampW(w);
+    if (aspectLocked && node.width > 0 && node.height > 0) {
+      onUpdateGeometry({ width, height: clampH(Math.round((width * node.height) / node.width)) });
+    } else {
+      onUpdateGeometry({ width });
+    }
+  };
+  const commitHeight = (h: number) => {
+    const height = clampH(h);
+    if (aspectLocked && node.width > 0 && node.height > 0) {
+      onUpdateGeometry({ width: clampW(Math.round((height * node.width) / node.height)), height });
+    } else {
+      onUpdateGeometry({ height });
+    }
+  };
+
   return (
     <>
       {locked ? (
@@ -168,63 +222,94 @@ export function ElementTab({
         </InsSection>
       ) : null}
 
-      <InsSection title="Position" disabled={locked}>
-        <Readout label="Abs X" value={String(Math.round(rect?.x ?? 0))} />
-        <Readout label="Abs Y" value={String(Math.round(rect?.y ?? 0))} />
-        <InsRow label="X">
-          <InsInput value={String(node.x)} onChange={(value) => updateNumber(value, (x) => onUpdateGeometry({ x }))} suffix="px" />
+      <InsSection title="Transform" disabled={locked}>
+        {/* Position: X │ Y */}
+        <InsRow>
+          <FieldGroup>
+            <InsInput value={String(node.x)} onChange={(value) => updateNumber(value, (x) => onUpdateGeometry({ x }))} icon="X" />
+            <InsInput value={String(node.y)} onChange={(value) => updateNumber(value, (y) => onUpdateGeometry({ y }))} icon="Y" />
+          </FieldGroup>
         </InsRow>
-        <InsRow label="Y">
-          <InsInput value={String(node.y)} onChange={(value) => updateNumber(value, (y) => onUpdateGeometry({ y }))} suffix="px" />
-        </InsRow>
-        <InsRow label="Rotation">
-          <InsInput value={String(Math.round(node.rotation))} onChange={(value) => updateNumber(value, onUpdateRotation)} suffix="°" />
-        </InsRow>
-      </InsSection>
 
-      <InsSection title="Size" disabled={locked}>
+        {/* Text sizing modes (Fixed / Fit per axis). */}
         {node.type === "text" ? (
-          <>
-            <InsRow label="W mode">
+          <InsRow>
+            <FieldGroup>
               <InsToggle
                 value={widthFit ? "fit" : "fixed"}
                 onChange={(width) => onUpdateSizing({ width: width as ElementSizing["width"] })}
                 options={[
-                  { value: "fixed", label: "Fixed" },
-                  { value: "fit", label: "Fit" },
+                  { value: "fixed", label: "Fixed W" },
+                  { value: "fit", label: "Fit W" },
                 ]}
               />
-            </InsRow>
-            <InsRow label="H mode">
               <InsToggle
                 value={heightFit ? "fit" : "fixed"}
                 onChange={(height) => onUpdateSizing({ height: height as ElementSizing["height"] })}
                 options={[
-                  { value: "fixed", label: "Fixed" },
-                  { value: "fit", label: "Fit" },
+                  { value: "fixed", label: "Fixed H" },
+                  { value: "fit", label: "Fit H" },
                 ]}
               />
-            </InsRow>
-          </>
+            </FieldGroup>
+          </InsRow>
         ) : null}
-        {widthFit ? (
-          <Readout label="W" value={`${node.width} px fit`} />
-        ) : (
-          <InsRow label="W">
-            <InsInput value={String(node.width)} onChange={(value) => updateNumber(value, (w) => onUpdateGeometry({ width: clampW(w) }))} suffix="px" />
-          </InsRow>
-        )}
-        {heightFit ? (
-          <Readout label="H" value={`${node.height} px fit`} />
-        ) : (
-          <InsRow label="H">
-            <InsInput value={String(node.height)} onChange={(value) => updateNumber(value, (h) => onUpdateGeometry({ height: clampH(h) }))} suffix="px" />
-          </InsRow>
-        )}
-        <Readout label="Min W" value={String(c.width.min)} />
-        {c.width.max !== undefined && <Readout label="Max W" value={String(c.width.max)} />}
-        <Readout label="Min H" value={String(c.height.min)} />
-        {c.height.max !== undefined && <Readout label="Max H" value={String(c.height.max)} />}
+
+        {/* Size: W │ H (+ aspect-ratio lock). Fit axes show a readout instead. */}
+        <InsRow>
+          <FieldGroup>
+            {widthFit ? (
+              <div className="flex h-[30px] min-w-0 flex-1 items-center gap-1.5 rounded-[8px] bg-[#242424] px-2.5 text-[12px] text-[#9A9A9A]">
+                <span className="w-3.5 text-[10.5px] font-medium text-[#7C7C7C]">W</span>
+                <span className="truncate">{node.width} fit</span>
+              </div>
+            ) : (
+              <InsInput value={String(node.width)} onChange={(value) => updateNumber(value, commitWidth)} icon="W" />
+            )}
+            {heightFit ? (
+              <div className="flex h-[30px] min-w-0 flex-1 items-center gap-1.5 rounded-[8px] bg-[#242424] px-2.5 text-[12px] text-[#9A9A9A]">
+                <span className="w-3.5 text-[10.5px] font-medium text-[#7C7C7C]">H</span>
+                <span className="truncate">{node.height} fit</span>
+              </div>
+            ) : (
+              <InsInput value={String(node.height)} onChange={(value) => updateNumber(value, commitHeight)} icon="H" />
+            )}
+            <button
+              type="button"
+              title={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+              aria-pressed={aspectLocked}
+              onClick={() => setAspectLocked((v) => !v)}
+              className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent transition-colors hover:bg-[#2C2C2C]"
+              style={{ color: aspectLocked ? "#0D99FF" : "#8A8A8A" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                {aspectLocked ? (
+                  <path d="M5 7.5V5.5a3 3 0 0 1 6 0v2M4.5 7.5h7a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-3.5a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                ) : (
+                  <path d="M5 7.5V5.5a3 3 0 0 1 5.9-.7M4.5 7.5h7a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-3.5a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+              </svg>
+            </button>
+          </FieldGroup>
+        </InsRow>
+
+        {/* Rotation. */}
+        <InsRow>
+          <FieldGroup>
+            <InsInput value={String(Math.round(node.rotation))} onChange={(value) => updateNumber(value, onUpdateRotation)} icon={RotateGlyph} suffix="°" />
+            <span className="min-w-0 flex-1" />
+          </FieldGroup>
+        </InsRow>
+
+        {/* Secondary metadata: absolute position + size limits, hidden by default. */}
+        <MoreDisclosure>
+          <Readout label="Abs X" value={String(Math.round(rect?.x ?? 0))} />
+          <Readout label="Abs Y" value={String(Math.round(rect?.y ?? 0))} />
+          <Readout label="Min W" value={String(c.width.min)} />
+          {c.width.max !== undefined && <Readout label="Max W" value={String(c.width.max)} />}
+          <Readout label="Min H" value={String(c.height.min)} />
+          {c.height.max !== undefined && <Readout label="Max H" value={String(c.height.max)} />}
+        </MoreDisclosure>
       </InsSection>
 
       <LayoutSection
@@ -319,7 +404,7 @@ export function ElementTab({
               type="button"
               onClick={onEditPath}
               disabled={locked}
-              className="mt-1 w-full cursor-pointer rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A] disabled:cursor-not-allowed disabled:opacity-50"
+              className={`mt-1 ${insButtonClass}`}
             >
               Edit path
             </button>
@@ -333,7 +418,7 @@ export function ElementTab({
             type="button"
             onClick={onFlattenToPath}
             disabled={locked}
-            className="w-full cursor-pointer rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A] disabled:cursor-not-allowed disabled:opacity-50"
+            className={insButtonClass}
           >
             Flatten to path
           </button>

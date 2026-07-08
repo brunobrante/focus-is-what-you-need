@@ -281,3 +281,55 @@ const activeCount = (typeFilter !== "all" ? 1 : 0) + (screenFilter !== "all" ? 1
 | Screens | `ScreenSearchBar` | `routes/Gallery.tsx` |
 | References (Gallery) | `RefSearchBar` | `routes/Gallery.tsx` |
 | References (route) | `FilterSearchBar` | `routes/references/components/ui.tsx` |
+
+---
+
+## Canvas Inspector Controls
+
+The canvas inspector (`canvas/shell/inspector/`) has its **own** control language,
+modelled on Framer's property panel — soft filled fields, large corner radii, glyph
+labels inside the field, and segmented controls with a sliding indicator. It does **not**
+use the page-level tokens above; its palette is centralised in the `INS` object and the
+exported class constants at the top of `inspector/InsComponents.tsx`. Read that file before
+adding or restyling any inspector control — never hard-code hex values in a section file.
+
+### Tokens (`INS` in `InsComponents.tsx`)
+
+| Token | Value | Role |
+|---|---|---|
+| `INS.fill` / `fillHover` | `#242424` / `#2C2C2C` | Field & control fill, rest / hover |
+| `INS.track` | `#1C1C1C` | Recessed track behind segmented controls & sliders |
+| `INS.active` | `#363636` | Sliding indicator / active segment |
+| `INS.divider` | `#282828` | Hairline between sections |
+| `INS.text` / `label` / `faint` | `#EDEDED` / `#8A8A8A` / `#5F5F5F` | Value / label / placeholder text |
+| `INS.accent` | `#0D99FF` | Focus ring, slider fill, switch on, primary CTA |
+
+### Height scale
+
+Every text-like control (input, select, readout, segmented control, slider) is **30px**
+tall. Icon buttons and swatches are **26px**. Corner radius is **8px** for fields and
+tracks, **7px** for icon buttons. This replaces the old 28px/22px + `rounded-md`/`rounded-[5px]`
+scale — do not mix the two.
+
+### Primitives (all exported from `InsComponents.tsx`)
+
+- **`InsSection`** — collapsible section. Header is a chevron + title on the left and an
+  optional right-side **`action`** slot (used for the `+` add button on Fill / Effects /
+  Export, following Figma/Framer). Pass `disabled` to lock the body read-only (linked
+  instances).
+- **`InsRow`** — label (68px column) + control. Omit `label` to let the control span full
+  width; pass `align="start"` when the control is taller than one field (e.g. an align pad).
+- **`FieldGroup`** — packs 2–4 fields into one horizontal row (`X │ Y`, `W │ H`), each
+  flexing equally. This is the signature of the redesigned Transform block.
+- **`InsInput`** — filled field. `icon` renders a muted glyph inside the field (X, Y, W, H,
+  a rotation SVG); `suffix` renders a trailing unit (px, °, ×, %). Deferred commit (Enter
+  commits, Escape reverts, commit on outside click).
+- **`InsToggle` / `InsMultiSelect`** — segmented control with a sliding indicator (width /
+  left computed from the active index). Replaces the old rounded-full pills.
+- **`InsSelect`** — filled field with a custom chevron; **`InsSlider`** — track + accent
+  progress fill + native thumb (thumb styled via `.ins-slider` in `index.css`) + numeric
+  readout; **`InsColor` / `FillColorField`** — swatch inside the field + hex/value + token
+  link (and eyedropper on `FillColorField`); **`InsSwitch`** — 30×18 accent toggle.
+- **`iconButtonClass`** (26px, ghost→hover fill), **`insButtonClass`** (30px filled
+  full-width action), **`fieldClass`** (the shared field chrome) — reuse these instead of
+  re-deriving the class strings per file.

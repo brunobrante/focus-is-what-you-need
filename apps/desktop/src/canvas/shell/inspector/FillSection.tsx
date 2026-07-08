@@ -30,12 +30,14 @@ import {
 import { FillColorField } from "./FillColorField";
 import {
   clamp,
+  iconButtonClass,
   type InsColorToken,
   InsInput,
   InsRow,
   InsSection,
   InsSelect,
   InsSlider,
+  insButtonClass,
   ScrubProvider,
   updateNumber,
 } from "./InsComponents";
@@ -92,9 +94,6 @@ const FIT_LABEL_TO_VALUE = new Map(
     (k) => [IMAGE_FIT_LABELS[k], k] as const,
   ),
 );
-
-const iconButtonClass =
-  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[5px] border border-[#2C2C2C] text-[#A6A6A6] transition-colors hover:border-[#3A3A3A] hover:text-[#E2E2E2] disabled:cursor-not-allowed disabled:opacity-30";
 
 function fillTypesForTarget(target: FillTarget): FillType[] {
   if (target === "image") return ["solid", "gradient", "image", "video"];
@@ -272,7 +271,7 @@ function GradientBody({
     const token = gradientTokens.find((t) => t.id === boundId);
     return (
       <div className="flex items-center gap-1.5">
-        <span className="h-[22px] w-[22px] shrink-0 rounded-[5px] border border-[#2C2C2C]" style={{ background: token?.css }} />
+        <span className="h-[26px] w-[26px] shrink-0 rounded-[6px] ring-1 ring-black/20" style={{ background: token?.css }} />
         <span className="min-w-0 flex-1 truncate text-[12px] text-[#8638E5]">{token?.name ?? "Gradient token"}</span>
         <button type="button" title="Unbind" onClick={() => onUpdate({ gradientRef: undefined })} className={iconButtonClass}>
           <IconTrash size={11} />
@@ -334,7 +333,7 @@ function GradientBody({
         <button
           type="button"
           onClick={addStop}
-          className="flex w-full cursor-pointer items-center justify-center gap-1 rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1 text-[11px] text-[#C8C8C8] hover:bg-[#2A2A2A]"
+          className="flex h-[28px] w-full cursor-pointer items-center justify-center gap-1 rounded-[7px] bg-[#242424] px-2 text-[11px] text-[#C8C8C8] transition-colors hover:bg-[#2E2E2E]"
         >
           <IconPlus size={11} /> Add stop
         </button>
@@ -467,7 +466,7 @@ function FillEntry({
 }) {
   const enabled = fill.enabled !== false;
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-[#2C2C2C] bg-[#181818] p-2">
+    <div className="flex flex-col gap-2 rounded-[10px] bg-[#1C1C1C] p-2.5">
       <FillHeader
         fill={fill}
         index={index}
@@ -534,30 +533,37 @@ export function FillSection({
 
   return (
     <ScrubProvider onScrubStart={onScrubStart} onScrubEnd={onScrubEnd}>
-    <InsSection title="Fill" defaultOpen disabled={locked}>
-      {fills.map((fill, index) => (
-        <FillEntry
-          key={fill.id}
-          fill={fill}
-          index={index}
-          count={fills.length}
-          target={target}
-          tokens={tokens}
-          gradientTokens={gradientTokens}
-          onUpdate={(patch) => updateAt(index, patch)}
-          onChangeType={(type) => changeTypeAt(index, type)}
-          onMove={(direction) => move(index, direction)}
-          onRemove={() => remove(index)}
-        />
-      ))}
-      <button
-        type="button"
-        onClick={add}
-        className="mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#2C2C2C] bg-transparent px-2 py-1.5 text-[12px] font-medium text-[#F2F2F2] hover:bg-[#2A2A2A]"
-      >
-        <IconPlus size={12} />
-        Add fill
-      </button>
+    <InsSection
+      title="Fill"
+      defaultOpen
+      disabled={locked}
+      action={
+        <button type="button" title="Add fill" onClick={add} className={iconButtonClass}>
+          <IconPlus size={13} />
+        </button>
+      }
+    >
+      {fills.length === 0 ? (
+        <button type="button" onClick={add} className={insButtonClass}>
+          <IconPlus size={12} /> Add fill
+        </button>
+      ) : (
+        fills.map((fill, index) => (
+          <FillEntry
+            key={fill.id}
+            fill={fill}
+            index={index}
+            count={fills.length}
+            target={target}
+            tokens={tokens}
+            gradientTokens={gradientTokens}
+            onUpdate={(patch) => updateAt(index, patch)}
+            onChangeType={(type) => changeTypeAt(index, type)}
+            onMove={(direction) => move(index, direction)}
+            onRemove={() => remove(index)}
+          />
+        ))
+      )}
     </InsSection>
     </ScrubProvider>
   );

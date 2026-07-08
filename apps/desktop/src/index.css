@@ -604,3 +604,35 @@
   margin: 4px 8px;
   background: #2c2c2c;
 }
+
+/* ── Inspector slider (InsSlider) ──────────────────────────────────────────
+   The range input is transparent and appearance-none so the filled track and
+   progress behind it show through; we draw only the thumb here. */
+.ins-slider {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ins-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+.ins-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+.ins-slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid rgba(13, 153, 255, 0.6);
+  outline-offset: 1px;
+}
