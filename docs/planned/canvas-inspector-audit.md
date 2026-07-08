@@ -728,7 +728,7 @@ documented shipped decision; `-webkit-backdrop-filter` twin
   clamps at `minSize`; dragging the E handle past the W edge pins at min
   size instead of flipping (Figma mirrors and swaps the handle). Draw-tool
   rubber-banding is fine (`Math.abs`); only resize sticks.
-- **F2 — Shadows on clip-path shapes are clipped away.**
+- ✅ **DONE (shadows) — F2 — Shadows on clip-path shapes are clipped away.**
   `ElementRenderer.tsx:127-171` — `polygon`/`star`/`arrow` get `clipPath`,
   and `effectTargetForType` returns `"box"` for them
   (`src/domain/canvas/effects.ts:155-160`), so effects compile to

@@ -156,5 +156,9 @@ export function effectTargetForType(type: string): EffectTarget {
   if (type === EFFECT_TARGET_BY_TEXT) return "text";
   if (type === "image") return "image";
   if (type === "path" || type === "svg") return "vector";
+  // clip-path shapes render as a clipped div, so a box-shadow would be clipped
+  // away — route them to the vector target's `filter: drop-shadow`, which follows
+  // the clipped silhouette (F2). Spread/inset are meaningless here and are hidden.
+  if (type === "polygon" || type === "star" || type === "arrow") return "vector";
   return "box";
 }
