@@ -709,6 +709,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           transformIdsLength={renderData.transformIds.length}
           sizeLabelViewportRect={renderData.sizeLabelViewportRect}
           overlayWidth={overlaySize.width}
+          overlayHeight={overlaySize.height}
           editingTextId={props.editingTextId}
           contextToolbarModifierDown={contextToolbarModifierDown}
           onCommitDocument={props.onCommitDocument}

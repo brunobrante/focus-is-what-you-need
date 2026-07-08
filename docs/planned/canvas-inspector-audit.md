@@ -752,7 +752,7 @@ documented shipped decision; `-webkit-backdrop-filter` twin
   `SEGMENT_SAMPLES = 12` per segment; long curves at high zoom show a
   visibly faceted blue skeleton (render + hit-test polyline). Sample
   adaptively by on-screen segment length.
-- **F6 — Context toolbar can be unreachable at extreme zoom.**
+- ✅ **DONE — F6 — Context toolbar can be unreachable at extreme zoom.**
   `src/canvas/stage/ContextToolbar.tsx:357-390` — `top` derives from the
   selection's viewport box; zoomed far into an element larger than the
   screen (rect.y ≪ 0, bottom ≫ viewport height), both "above" and the

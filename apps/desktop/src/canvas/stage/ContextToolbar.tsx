@@ -95,6 +95,7 @@ export type ContextToolbarProps = {
   transformIdsLength: number;
   sizeLabelViewportRect: Rect | null;
   overlayWidth: number;
+  overlayHeight: number;
   editingTextId: string | null;
   // The held modifier that summons the toolbar, tracked by the parent.
   contextToolbarModifierDown: boolean;
@@ -367,19 +368,29 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
     }
     const labelRect = props.sizeLabelViewportRect;
     const above = labelRect.y - CONTEXT_TOOLBAR_HEIGHT - CONTEXT_TOOLBAR_GAP;
+    const preferred =
+      above >= CONTEXT_TOOLBAR_MIN_TOP
+        ? above
+        : labelRect.y + labelRect.height + CONTEXT_TOOLBAR_GAP;
+    // When zoomed far into an element larger than the screen, both the above and
+    // below placements can fall off-screen (rect.y ≪ 0, bottom ≫ viewport). Clamp
+    // the toolbar into the viewport so it stays reachable (F6), mirroring the
+    // size-label clamp. Guard against a viewport too short to hold it.
+    const maxTop = props.overlayHeight - CONTEXT_TOOLBAR_HEIGHT - TOOLBAR_VIEWPORT_PAD;
+    const top = maxTop <= CONTEXT_TOOLBAR_MIN_TOP
+      ? CONTEXT_TOOLBAR_MIN_TOP
+      : Math.min(Math.max(preferred, CONTEXT_TOOLBAR_MIN_TOP), maxTop);
     return {
       left: clampToolbarCenter(
         labelRect.x + labelRect.width / 2,
         props.overlayWidth,
         isRenamingSelection ? CONTEXT_TOOLBAR_HALF_WIDTH_RENAME : CONTEXT_TOOLBAR_HALF_WIDTH,
       ),
-      top:
-        above >= CONTEXT_TOOLBAR_MIN_TOP
-          ? above
-          : labelRect.y + labelRect.height + CONTEXT_TOOLBAR_GAP,
+      top,
     };
   }, [
     props.overlayWidth,
+    props.overlayHeight,
     isRenamingSelection,
     toolbarActive,
     props.canvasStageActive,
