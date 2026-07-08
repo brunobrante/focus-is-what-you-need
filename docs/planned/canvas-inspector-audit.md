@@ -641,7 +641,7 @@ Interaction-path commits at least share untouched nodes via
 also routing inspector commits through the shallow-clone path so snapshots
 share unchanged nodes.
 
-## P7 — LOW/MED — Text-fit wrapping is O(len²) per line per keystroke
+## ✅ DONE — P7 — Text-fit wrapping is O(len²) per line per keystroke
 
 `elementGeometry.ts:86-117` (`wrapLineCount`) re-measures a growing prefix
 per character via canvas `measureText`; runs on every keystroke for

@@ -83,37 +83,61 @@ function isTextFit(node: ElementNode, axis: keyof ElementSizing): boolean {
   return node.type === "text" && node.sizing?.[axis] === "fit";
 }
 
-function wrapLineCount(line: string, contentWidth: number, measure: (value: string) => number): number {
-  if (line.length === 0) return 1;
-  let count = 0;
-  let lineStart = 0;
-  let index = 0;
-  let lastWrapAfter: number | null = null;
+// Tokenize a line into maximal whitespace / non-whitespace runs. Wrapping only
+// ever happens at run boundaries (or, for an over-long word, inside it), so
+// measuring per run instead of per character makes this O(words) instead of
+// O(len²) in `measure` calls (P7) while producing the identical break positions
+// as the previous char-by-char scan (matches `overflow-wrap: break-word`).
+function tokenizeLine(line: string): Array<{ end: number; isWs: boolean }> {
+  const tokens: Array<{ end: number; isWs: boolean }> = [];
+  let i = 0;
+  const isWsChar = (c: string) => c === " " || c === "\t";
+  while (i < line.length) {
+    const ws = isWsChar(line[i]);
+    let end = i + 1;
+    while (end < line.length && isWsChar(line[end]) === ws) end += 1;
+    tokens.push({ end, isWs: ws });
+    i = end;
+  }
+  return tokens;
+}
 
-  while (index < line.length) {
-    const char = line[index];
-    const candidateEnd = index + 1;
-    const candidateWidth = measure(line.slice(lineStart, candidateEnd));
-    if (candidateWidth <= contentWidth || candidateEnd === lineStart + 1) {
-      if (char === " " || char === "\t") lastWrapAfter = candidateEnd;
-      index = candidateEnd;
+/** Exported for the P7 equivalence test; not part of the public geometry API. */
+export function wrapLineCount(line: string, contentWidth: number, measure: (value: string) => number): number {
+  if (line.length === 0) return 1;
+  const tokens = tokenizeLine(line);
+  let wraps = 0;
+  let lineStart = 0;
+  let lastWrapAfter: number | null = null;
+  let i = 0;
+
+  while (i < tokens.length) {
+    const tokenEnd = tokens[i].end;
+    // The whole run from lineStart through this token fits → accept it.
+    if (measure(line.slice(lineStart, tokenEnd)) <= contentWidth) {
+      if (tokens[i].isWs) lastWrapAfter = tokenEnd;
+      i += 1;
       continue;
     }
-
+    // Overflow with a wrap opportunity behind us → wrap at the last space run and
+    // re-examine this token on the new line.
     if (lastWrapAfter !== null && lastWrapAfter > lineStart) {
-      count += 1;
+      wraps += 1;
       lineStart = lastWrapAfter;
-      index = lineStart;
       lastWrapAfter = null;
       continue;
     }
-
-    count += 1;
-    lineStart = index;
+    // No wrap opportunity: the current word alone overflows the line — break it
+    // character-by-character (break-word). Only the over-long word pays O(len²).
+    let c = lineStart + 1;
+    while (c < tokenEnd && measure(line.slice(lineStart, c + 1)) <= contentWidth) c += 1;
+    wraps += 1;
+    lineStart = c;
     lastWrapAfter = null;
+    if (c >= tokenEnd) i += 1;
   }
 
-  return count + 1;
+  return wraps + 1;
 }
 
 type TextFitMetrics = {
