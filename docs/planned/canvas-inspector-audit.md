@@ -624,7 +624,7 @@ fresh `styles` identities each commit — a selector-based subscription (the
 bridge already supports selectors) on the selected element(s) + value
 equality is the fix shape.
 
-## P5 — LOW — Grid overlay reallocs a viewport-sized canvas buffer on every CanvasStage render — even when the grid is disabled
+## ✅ DONE — P5 — Grid overlay reallocs a viewport-sized canvas buffer on every CanvasStage render — even when the grid is disabled
 
 `CanvasStage.tsx:506-511` passes `canvasRect={{…}}` as a fresh object
 literal each render; `CanvasGridOverlay.tsx:130-140`'s effect lists it as a

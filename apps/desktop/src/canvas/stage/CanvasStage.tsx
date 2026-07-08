@@ -398,6 +398,17 @@ export function CanvasStage({
   const stageHeight = canvasSize.height;
   const projectedStageWidth = stageWidth * renderScale;
   const projectedStageHeight = stageHeight * renderScale;
+  // Stable identity so the grid overlay's effect doesn't re-run (and re-alloc its
+  // buffer) on every render from a fresh object literal (P5).
+  const gridCanvasRect = useMemo(
+    () => ({
+      x: viewportTransform.offsetX,
+      y: viewportTransform.offsetY,
+      width: projectedStageWidth,
+      height: projectedStageHeight,
+    }),
+    [viewportTransform.offsetX, viewportTransform.offsetY, projectedStageWidth, projectedStageHeight],
+  );
   const stageSpaceStyle = useMemo<CSSProperties>(
     () =>
       scaledDomProjection
@@ -510,12 +521,7 @@ export function CanvasStage({
           type={state.document.shellGrid?.type ?? "dots"}
           shellBackground={state.document.shellBackground ?? "#000000"}
           canvasBackground={state.document.canvas.background || "#ffffff"}
-          canvasRect={{
-            x: viewportTransform.offsetX,
-            y: viewportTransform.offsetY,
-            width: projectedStageWidth,
-            height: projectedStageHeight,
-          }}
+          canvasRect={gridCanvasRect}
           displayZoom={displayZoom}
           offsetX={viewportTransform.offsetX}
           offsetY={viewportTransform.offsetY}
