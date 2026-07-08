@@ -1,14 +1,53 @@
 import {
   filterTopLevelIds,
   getAbsoluteRect,
-  getElementAABB,
+  getElementTransformedCorners,
   getParentBounds,
   getSelectionAABB,
   getSelectionBox,
   isInsideInstance,
 } from "@/canvas/engine/geometry";
-import { boxesIntersect } from "@/domain/canvas/geometry";
-import type { CanvasDocument, ElementNode, Rect, ViewportMode } from "@/canvas/engine/types";
+import type { CanvasDocument, ElementNode, Point, Rect, ViewportMode } from "@/canvas/engine/types";
+
+// Convex-polygon vs axis-aligned-rect overlap via the Separating Axis Theorem:
+// the shapes intersect iff no candidate axis (the rect's two axes + the polygon's
+// edge normals) separates their projections. Used so the marquee tests an
+// element's *oriented* box, not its rotation-inflated AABB (M6).
+function projectionsOverlap(a: Point[], b: Point[], axisX: number, axisY: number): boolean {
+  let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
+  for (const p of a) {
+    const d = p.x * axisX + p.y * axisY;
+    if (d < minA) minA = d;
+    if (d > maxA) maxA = d;
+  }
+  for (const p of b) {
+    const d = p.x * axisX + p.y * axisY;
+    if (d < minB) minB = d;
+    if (d > maxB) maxB = d;
+  }
+  return maxA >= minB && maxB >= minA;
+}
+
+function orientedBoxIntersectsRect(corners: Point[], rect: Rect): boolean {
+  const rectCorners: Point[] = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y + rect.height },
+    { x: rect.x, y: rect.y + rect.height },
+  ];
+  // Rect axes.
+  if (!projectionsOverlap(corners, rectCorners, 1, 0)) return false;
+  if (!projectionsOverlap(corners, rectCorners, 0, 1)) return false;
+  // Polygon edge normals.
+  for (let i = 0; i < corners.length; i += 1) {
+    const p1 = corners[i];
+    const p2 = corners[(i + 1) % corners.length];
+    const axisX = -(p2.y - p1.y);
+    const axisY = p2.x - p1.x;
+    if (!projectionsOverlap(corners, rectCorners, axisX, axisY)) return false;
+  }
+  return true;
+}
 
 export function getTransformIds(document: CanvasDocument, selectedIds: string[]): string[] {
   return filterTopLevelIds(document, selectedIds).filter((id) => {
@@ -109,8 +148,10 @@ export function findElementsInMarquee(document: CanvasDocument, marquee: Rect): 
     for (const id of ids) {
       const node = document.elements[id];
       if (!node || node.visible === false) continue;
-      const aabb = getElementAABB(document, id);
-      if (aabb && boxesIntersect(marquee, aabb)) {
+      // Locked nodes aren't marquee-selectable (matching the click paths), but
+      // their unlocked descendants still are — so skip the match, keep recursing.
+      const corners = node.locked ? null : getElementTransformedCorners(document, id);
+      if (corners && orientedBoxIntersectsRect(corners, marquee)) {
         // Selecting a node implies its whole subtree moves with it, so we stop
         // here: never return a parent together with its descendants, and skip
         // descending into matched subtrees. A child that overflows a parent that
