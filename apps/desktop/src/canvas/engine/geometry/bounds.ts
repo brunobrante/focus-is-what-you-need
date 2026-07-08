@@ -232,6 +232,48 @@ export function getEffectiveRotation(document: CanvasDocument, id: string): numb
   return rotation;
 }
 
+/**
+ * Inverse of {@link getAbsoluteCenter}: maps a canvas-space point into the
+ * element's own parent-content-local space — the coordinate system in which
+ * `node.x`/`node.y` are expressed — by undoing every ancestor's border offset,
+ * rotation and translation from the root down. For a root element (no parent)
+ * this is the identity, since its `x`/`y` are already canvas coordinates.
+ *
+ * Use this to convert a resized/edited element's new visual center back into a
+ * storable `node.x`/`node.y` when any ancestor is rotated (M1/M2).
+ */
+export function canvasPointToParentContentSpace(
+  document: CanvasDocument,
+  id: string,
+  point: Point,
+): Point | null {
+  const node = document.elements[id];
+  if (!node) return null;
+
+  // Ancestor chain, immediate parent → root.
+  const chain: ElementNode[] = [];
+  let parentId = node.parentId;
+  while (parentId) {
+    const parent = document.elements[parentId];
+    if (!parent) return null;
+    chain.push(parent);
+    parentId = parent.parentId;
+  }
+
+  // Undo each ancestor step in reverse order (root → immediate parent), mirroring
+  // the forward chain in getAbsoluteCenter: translate by −(x,y), rotate by −θ about
+  // the ancestor's border-box center, then subtract the ancestor's border offset.
+  let p = { x: point.x, y: point.y };
+  for (let i = chain.length - 1; i >= 0; i -= 1) {
+    const a = chain[i];
+    p = { x: p.x - a.x, y: p.y - a.y };
+    p = rotatePoint(p, { x: a.width / 2, y: a.height / 2 }, -a.rotation);
+    const bw = a.styles.borderWidth ?? 0;
+    p = { x: p.x - bw, y: p.y - bw };
+  }
+  return p;
+}
+
 export function getParentBounds(document: CanvasDocument, id: string): Rect {
   const node = document.elements[id];
   if (!node?.parentId) {

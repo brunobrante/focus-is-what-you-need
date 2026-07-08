@@ -3,10 +3,12 @@ import { mutateElementShallow, mutateElementWithStyles, scaledPath, shallowClone
 import {
   angleBetweenPoints,
   angleDelta,
+  canvasPointToParentContentSpace,
   clamp,
   clampBorderRadiusForSize,
   clampRectToBounds,
   clampRotatedRectToBounds,
+  getAbsoluteCenter,
   getAbsoluteRect,
   getDescendantIds,
   getEffectiveRotation,
@@ -236,6 +238,56 @@ function resizeSingleElement(
   const maxW = Math.min(parentSize.width, def.constraints.width.max ?? parentSize.width);
   const minH = def.constraints.height.min;
   const maxH = Math.min(parentSize.height, def.constraints.height.max ?? parentSize.height);
+
+  // Nested under a rotated ancestor: the handles are drawn with the full effective
+  // rotation, so the resize must run in that same rotated visual frame (M1). The
+  // common no-ancestor-rotation path below is left untouched. This branch skips the
+  // parent-bounds clamp (rotation-blind bounds don't align with a rotated frame);
+  // the size still respects the element's own min/max.
+  const ancestorRotation = getEffectiveRotation(interaction.beforeDocument, id) - source.rotation;
+  if (ancestorRotation !== 0) {
+    const effectiveRotation = getEffectiveRotation(interaction.beforeDocument, id);
+    const absCenter = getAbsoluteCenter(interaction.beforeDocument, id);
+    if (absCenter) {
+      const visualRect: Rect = {
+        x: absCenter.x - startRect.width / 2,
+        y: absCenter.y - startRect.height / 2,
+        width: startRect.width,
+        height: startRect.height,
+      };
+      const resized = resizeRotatedRectFromHandle(visualRect, handle, currentPoint, effectiveRotation, {
+        altKey: fromCenter,
+        shiftKey: constrainAspect,
+      });
+      const width = roundPixel(clamp(resized.width, minW, maxW));
+      const height = roundPixel(clamp(resized.height, minH, maxH));
+      const newCanvasCenter = {
+        x: resized.x + resized.width / 2,
+        y: resized.y + resized.height / 2,
+      };
+      const localCenter = canvasPointToParentContentSpace(interaction.beforeDocument, id, newCanvasCenter);
+      const next = shallowCloneDocument(interaction.beforeDocument);
+      const node =
+        source.styles.borderRadius !== undefined
+          ? mutateElementWithStyles(next, id)
+          : mutateElementShallow(next, id);
+      if (node && localCenter) {
+        const widthFit = source.type === "text" && source.sizing?.width === "fit";
+        const heightFit = source.type === "text" && source.sizing?.height === "fit";
+        node.width = widthFit ? source.width : width;
+        node.height = heightFit ? source.height : height;
+        if (node.styles.borderRadius !== undefined && getElementDefinition(node.type).capabilities.radiusRole === "corner") {
+          node.styles.borderRadius = roundPixel(clampBorderRadiusForSize(node.styles.borderRadius, node.width, node.height));
+        }
+        node.x = widthFit ? source.x : roundPixel(localCenter.x - node.width / 2);
+        node.y = heightFit ? source.y : roundPixel(localCenter.y - node.height / 2);
+        bakePathResize(node, source);
+        applyTextFitSizingInPlace(next, id);
+      }
+      return { document: next, guides: [] };
+    }
+  }
+
   let nextRect: Rect;
   if (source.rotation !== 0) {
     nextRect = resizeRotatedRectFromHandle(startRect, handle, currentPoint, source.rotation, {
@@ -558,13 +610,23 @@ export function radiusDocument(
 ): { document: CanvasDocument; guides: SnapGuide[] } {
   const element = interaction.beforeDocument.elements[interaction.elementId];
   if (!element) return { document: interaction.beforeDocument, guides: [] };
-  const rect = getAbsoluteRect(interaction.beforeDocument, interaction.elementId);
-  if (!rect) return { document: interaction.beforeDocument, guides: [] };
-  const cx = rect.x + rect.width / 2;
-  const cy = rect.y + rect.height / 2;
-  const center = { x: cx, y: cy };
-  const local = element.rotation
-    ? rotatePoint(currentPoint, center, -element.rotation)
+  const absRect = getAbsoluteRect(interaction.beforeDocument, interaction.elementId);
+  const absCenter = getAbsoluteCenter(interaction.beforeDocument, interaction.elementId);
+  if (!absRect || !absCenter) return { document: interaction.beforeDocument, guides: [] };
+  // Center on the element's true visual center (which accounts for ancestor
+  // rotation) and un-rotate the cursor by the full effective rotation, so a rect
+  // nested under a rotated parent tracks the radius ball correctly (M1). With no
+  // ancestor rotation this reduces exactly to the element's own center + rotation.
+  const rect: Rect = {
+    x: absCenter.x - absRect.width / 2,
+    y: absCenter.y - absRect.height / 2,
+    width: absRect.width,
+    height: absRect.height,
+  };
+  const center = { x: absCenter.x, y: absCenter.y };
+  const effectiveRotation = getEffectiveRotation(interaction.beforeDocument, interaction.elementId);
+  const local = effectiveRotation
+    ? rotatePoint(currentPoint, center, -effectiveRotation)
     : { x: currentPoint.x, y: currentPoint.y };
 
   // When the grab starts at the maximum radius, the handles that share the short edge
@@ -582,8 +644,8 @@ export function radiusDocument(
       // Unstacked grab: the reported corner is unambiguous, lock to it immediately.
       interaction.committedCorner = interaction.corner;
     } else {
-      const startLocal = element.rotation
-        ? rotatePoint(interaction.startPoint, center, -element.rotation)
+      const startLocal = effectiveRotation
+        ? rotatePoint(interaction.startPoint, center, -effectiveRotation)
         : interaction.startPoint;
       // Pulling the ball toward a corner drives that corner's offset down fastest, so
       // the candidate whose offset has dropped the most since the grab is the one the
