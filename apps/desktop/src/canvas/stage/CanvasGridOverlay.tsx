@@ -133,11 +133,19 @@ export function CanvasGridOverlay({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = width;
-    canvas.height = height;
-    ctx.clearRect(0, 0, width, height);
+    // Size the backing buffer at device resolution and scale the context, so
+    // grid lines are crisp on Retina instead of being a CSS-px buffer stretched
+    // up (blurry) — matching the Skia adapter's getResolution() (L15). All
+    // drawing below stays in CSS px.
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (!enabled || displayZoom < FADE_START_ZOOM || width === 0 || height === 0) return;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
 
     const fadeOpacity = Math.min(
       1,
@@ -162,6 +170,8 @@ export function CanvasGridOverlay({
       drawGrid(ctx, type, gridColors(canvasBackground, fadeOpacity), cellSize, phaseX, phaseY, width, height);
       ctx.restore();
     }
+
+    ctx.restore();
   }, [enabled, type, shellBackground, canvasBackground, canvasRect, displayZoom, offsetX, offsetY, width, height]);
 
   return (
