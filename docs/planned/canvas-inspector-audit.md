@@ -1,14 +1,30 @@
 # Canvas & Inspector Audit — July 2026
 
-Status: **confirmed findings, ready to fix** — produced by a four-agent deep
-audit (inspector vs docs, engine core, stage/interaction, Figma/paper.design
-gap analysis) on 2026-07-05. Every finding was verified against the actual
-code before being listed; file:line references were correct at audit time.
+Status: **in progress** — produced by a four-agent deep audit (inspector vs
+docs, engine core, stage/interaction, Figma/paper.design gap analysis) on
+2026-07-05. Every finding was verified against the actual code before being
+listed; file:line references were correct at audit time.
 
 Work one item at a time: fix, verify, commit, next. Do not batch unrelated
 items into one commit.
 
 Paths are relative to `apps/desktop/` unless noted.
+
+## Progress (2026-07-08)
+
+Items marked **✅ DONE** below were fixed one-per-commit (typechecked, and
+unit-tested where tests exist). Completed so far:
+
+- **High:** H1, H2, H3.
+- **Medium:** M3, M4, M5, M6, M7, M10, M12 (with D2), M14.
+- **Low:** L1–L6, L8–L15, L17–L21.
+- **Perf:** P3.
+
+Remaining bug-class items not yet done: M1, M2, M8, M9, M11, M13, L7, L16, L22,
+L23; performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
+ride on M12/M13); the rendering-fidelity F-items; and all parity G-items. The
+suggested fix order (§8) resumes at step 7 (M1+M2). D1 (radius policy) is
+undecided, so L7/F4 are on hold.
 
 ## Scope and intentional exclusions
 
@@ -81,7 +97,7 @@ The audit explicitly confirmed these are correct; leave them alone:
 
 # 1. High-severity bugs (state/history corruption)
 
-## H1 — Global document shortcuts are not gated on an in-flight pointer gesture
+## ✅ DONE — H1 — Global document shortcuts are not gated on an in-flight pointer gesture
 
 `src/canvas/stage/hooks/useKeyboardShortcuts.ts:117-156`.
 
@@ -107,7 +123,7 @@ commits a document) when `interactionRef.current` is a document-mutating
 gesture (drag/resize/rotate/radius/pen/pencil/anchor). Pan/marquee may stay
 allowed or be included for simplicity.
 
-## H2 — Second pointerdown during an active gesture orphans the drag; move is applied without commit or undo entry
+## ✅ DONE — H2 — Second pointerdown during an active gesture orphans the drag; move is applied without commit or undo entry
 
 `src/canvas/stage/hooks/useCanvasPointerEvents.ts:345-363` (pan branch),
 `:518-539` (drag move), `:599-603` (pointerId guard in `finishInteraction`).
@@ -132,7 +148,7 @@ first (finish = commit, matching pointerup semantics). Also consider keying
 move/up handlers strictly by the originating pointerId (partially present at
 `:599-603`).
 
-## H3 — Every slider tick / native color-input tick is a full undoable commit; one drag can wipe the entire undo history
+## ✅ DONE — H3 — Every slider tick / native color-input tick is a full undoable commit; one drag can wipe the entire undo history
 
 - `src/canvas/shell/inspector/InsComponents.tsx:448-456` — `InsSlider` is a
   native range input calling `onChange` on every `input` event.
@@ -213,7 +229,7 @@ translation + rotation, incl. the element's own rotation) and use it in both
 directions in `vectorGeometry.ts`, `pathEditGeometry.ts`, and the anchor drag
 delta mapping. Overlaps M1's path-edit bullet — fix together.
 
-## M3 — Snap tolerance is world-space, so snapping strength varies with zoom
+## ✅ DONE — M3 — Snap tolerance is world-space, so snapping strength varies with zoom
 
 `src/canvas/engine/snapping.ts:12` (`SNAP_DISTANCE = 6`) is compared against
 world-space deltas (`src/canvas/stage/canvasDocumentMutations.ts:76`, deltas
@@ -223,7 +239,7 @@ tooling-layer hit tests correctly use viewport px, making the inconsistency
 visible. **Fix:** divide the tolerance by `displayZoom` at the call site
 (constant screen-px tolerance, Figma behavior).
 
-## M4 — Escape does not cancel a pencil stroke
+## ✅ DONE — M4 — Escape does not cancel a pencil stroke
 
 `src/canvas/stage/hooks/useKeyboardShortcuts.ts:84-115` handles `pen`,
 `anchor-edit`, `draw`; `cancelActiveInteraction`
@@ -237,7 +253,7 @@ active, and pointerup commits the stroke via `finishPencil`. The stroke
 cannot be aborted. **Fix:** include `pencil` in the cancellable set (revert
 to `beforeDocument`, release capture, clear interaction).
 
-## M5 — Space-pan state sticks after window blur
+## ✅ DONE — M5 — Space-pan state sticks after window blur
 
 `src/canvas/stage/hooks/useKeyboardShortcuts.ts:192-201` — space-down sets
 `spacePressedRef` and the `is-space-panning` class; the only reset is the
@@ -247,7 +263,7 @@ on blur). **Scenario:** hold Space, Cmd+Tab away, release Space, come back →
 next left-click starts a pan instead of a selection until Space is tapped
 again. **Fix:** reset on `window` `blur` like the tooling layer does.
 
-## M6 — Marquee selects locked elements and uses rotation-inflated AABBs
+## ✅ DONE — M6 — Marquee selects locked elements and uses rotation-inflated AABBs
 
 `src/canvas/stage/canvasToolingUtils.ts:106-127` — `findElementsInMarquee`
 skips `visible === false` but never checks `node.locked` (click paths do:
@@ -260,7 +276,7 @@ by a marquee touching only the empty corner of its AABB (Figma tests the
 oriented box). **Fix:** skip `locked` nodes; test the oriented box (corner
 polygon vs marquee rect) instead of the AABB.
 
-## M7 — pointercancel commits partial gestures instead of reverting
+## ✅ DONE — M7 — pointercancel commits partial gestures instead of reverting
 
 `src/canvas/stage/CanvasStage.tsx:444` wires
 `onPointerCancel={finishInteraction}`, which runs `finishMovedInteraction`
@@ -308,7 +324,7 @@ in `localPointForTextNode`; derive scale from the unrotated element size.
 
 ## Inspector / domain
 
-## M10 — Switching an effect's type keeps a stale `amount` across unit families
+## ✅ DONE — M10 — Switching an effect's type keeps a stale `amount` across unit families
 
 `src/canvas/shell/inspector/EffectsSection.tsx:53-57` — `seedForType` resets
 params only for shadow/blur types; `amount` survives a switch between color
@@ -341,7 +357,7 @@ fills list): make `normalizeFills` treat `fills: []` as an explicit empty
 list (panel shows empty state + Add button), and make the renderer paint
 nothing. Ties into G-list item "no zero-fill state".
 
-## M12 — Text fill semantics flip between one fill and two
+## ✅ DONE — M12 — Text fill semantics flip between one fill and two
 
 `src/domain/canvas/fill.ts:289-292` — the plain-solid collapse
 (`elementType !== "image"`) also applies to `text`, writing
@@ -371,7 +387,7 @@ motif becomes a fixed 100 px square regardless of natural size. **Fix:**
 resolve the motif from the image's natural size × scale% (needs natural
 dimensions available at compile or in `FillDefs`). Also fixes D8.
 
-## M14 — Sketch canvas: panel/window resize can revert recent edits and wipe undo history
+## ✅ DONE — M14 — Sketch canvas: panel/window resize can revert recent edits and wipe undo history
 
 `src/canvas/engine/store.tsx:531-552` — the hydrate effect depends on
 `fallbackDocument` identity. The sketch surface passes `draftsFallbackDoc`,
@@ -391,32 +407,32 @@ the fallback doc independently of panel widths.
 
 # 3. Low-severity bugs
 
-- **L1 — New drop-shadow default color mismatch.**
+- ✅ **DONE — L1 — New drop-shadow default color mismatch.**
   `EffectsSection.tsx:46` seeds `color: "#000000"` (opaque black); the
   compile-side fallback is `rgba(0,0,0,0.25)`
   (`src/domain/canvas/effects.ts:27`). Every added shadow is harsh solid
   black. Seed with the 25% black (needs alpha support in the seed / picker,
   see G9).
-- **L2 — Add conventions disagree:** new fill is prepended
+- ✅ **DONE — L2 — Add conventions disagree:** new fill is prepended
   (`FillSection.tsx:511`, lands on top) but new effect is appended
   (`EffectsSection.tsx:253`, lands at the bottom = *under* existing shadows,
   since first = on top). Make effects prepend like fills (Figma behavior).
-- **L3 — Typography weight shows "NaN" for keyword weights.**
+- ✅ **DONE — L3 — Typography weight shows "NaN" for keyword weights.**
   `TypographySection.tsx:75` — `String(Number(styles.fontWeight ?? 400))`;
   `fontWeight` is typed `string` (`src/domain/canvas/types.ts:148`), so
   `"bold"` renders "NaN". Map keywords (`bold`→700, `normal`→400) before
   numeric conversion.
-- **L4 — `InsColor` hex field accepts junk with no validation/revert.**
+- ✅ **DONE — L4 — `InsColor` hex field accepts junk with no validation/revert.**
   `InsComponents.tsx:298-301` — `onChange("#" + v.replace("#",""))` returns
   void (never `false`), so the deferred-commit revert contract
   (`InsComponents.tsx:47-50`) never fires. Typing "red" stores `"#red"`; the
   border/underline/shadow silently disappears while the field shows "RED".
   Validate 3/6/8-digit hex and return `false` otherwise.
-- **L5 — Layout min/max inputs coerce invalid input to 0.**
+- ✅ **DONE — L5 — Layout min/max inputs coerce invalid input to 0.**
   `LayoutSection.tsx:391-400` — `clamp(Number(v) || 0, 0, Infinity)` and the
   handler returns void, so "abc" commits `minWidth: 0` instead of reverting.
   Use the same `updateNumber` pattern as every other numeric field.
-- **L6 — `clampW`/`clampH` invert lo/hi when the typed value is below min.**
+- ✅ **DONE — L6 — `clampW`/`clampH` invert lo/hi when the typed value is below min.**
   `ElementTab.tsx:120-121` — `clamp(w, c.width.min, c.width.max ?? w)`; for
   `w < min`, hi (=w) < lo. Harmless today only because
   `updateElementGeometry` re-clamps
@@ -427,7 +443,7 @@ the fallback doc independently of panel widths.
   `clampBorderRadiusForSize`; `AppearanceSection.tsx:64-69` `setCorner` only
   does `Math.max(0, value)`. Note the tension with D1 — resolve D1's policy
   first, then make uniform and per-corner consistent with it.
-- **L8 — Clipboard/duplicate id generation is 32 bits and unchecked.**
+- ✅ **DONE — L8 — Clipboard/duplicate id generation is 32 bits and unchecked.**
   `src/canvas/engine/mutations/coreUtils.ts:5-10` slices the UUID to 8 hex
   chars; `src/canvas/engine/clipboard.ts:83` and `duplicateElements` never
   check for an existing key — a collision silently overwrites a live element
@@ -435,41 +451,41 @@ the fallback doc independently of panel widths.
   `idMap.get(childId) ?? childId` keeps a stale foreign id when a copied
   child was missing at copy time. Use full UUIDs or regenerate on collision;
   drop unmapped children.
-- **L9 — Missing-parent crashes.**
+- ✅ **DONE — L9 — Missing-parent crashes.**
   `src/canvas/engine/mutations/elementHierarchy.ts:63`
   (`next.elements[parentId].children.push(...)` unchecked) and
   `duplicateElements`'s `cloneTree` (`elementHierarchy.ts:241-242`,
   `document.elements[sourceId]` unchecked) throw on a stale id instead of
   no-oping.
-- **L10 — `constrainAll` is order-dependent.**
+- ✅ **DONE — L10 — `constrainAll` is order-dependent.**
   `elementHierarchy.ts:43-57` clamps in `Object.keys` order; lines 29-30
   clamp child size against the parent's **pre-clamp** size when the child is
   processed before its oversized parent. Process parents before children
   (topological order).
-- **L11 — Draft-cache write starvation (sketch).** The persistence effect's
+- ✅ **DONE — L11 — Draft-cache write starvation (sketch).** The persistence effect's
   cleanup (`store.tsx:578-581`) cancels the pending 250 ms draft write when a
   new gesture starts inside the window; a commit followed quickly by a new
   gesture never lands in the draft cache until a later commit settles. Flush
   instead of cancel on cleanup.
-- **L12 — Escape-cancel of a canvas resize restores the document but not the
+- ✅ **DONE — L12 — Escape-cancel of a canvas resize restores the document but not the
   viewport.** `handleCanvasResizeMove` shifts the origin per frame for w/n
   handles (`canvasInteractionHandlers.ts:267-281`), but
   `cancelActiveInteraction` (`useCanvasPointerEvents.ts:646-674`) only
   restores `beforeDocument` — after Escape the camera stays shifted. Snapshot
   and restore the viewport too.
-- **L13 — `LiveInstanceRefresh` mid-gesture refresh is silently lost.**
+- ✅ **DONE — L13 — `LiveInstanceRefresh` mid-gesture refresh is silently lost.**
   `src/canvas/shell/surfaces/LiveInstanceRefresh.tsx:34-48` guards only
   `editingTextId`. If a referenced master changes during a drag,
   `refreshInstances` swaps the document, the next transient frame (built from
   `interaction.beforeDocument`) clobbers it, and `signatureRef` was already
   advanced — stale instance content persists until the master changes again.
   Defer the refresh while an interaction is active (retry on idle).
-- **L14 — Mixed UI language.** `EffectsSection.tsx:258-260` empty-state copy
+- ✅ **DONE — L14 — Mixed UI language.** `EffectsSection.tsx:258-260` empty-state copy
   is Portuguese ("Sombras, blur e filtros…"), `Inspector.tsx:257`
   `aria-label="Inspetor"`, `Inspector.tsx:378` "elementos selecionados".
   Decide the product interface language and make it consistent (all other
   inspector copy is English).
-- **L15 — Grid overlay is not devicePixelRatio-aware.**
+- ✅ **DONE — L15 — Grid overlay is not devicePixelRatio-aware.**
   `src/canvas/stage/CanvasGridOverlay.tsx:136-137` sets
   `canvas.width = width` in CSS px (no DPR scaling, unlike the Skia
   adapter's `getResolution()`), so pixel-grid lines render blurry on Retina
@@ -484,26 +500,26 @@ the fallback doc independently of panel widths.
   `shiftKey`/`metaKey` for editing keys — arguably text-editing scope, but it
   is interaction code per the project rule). Route through
   `matchesKeyCommand`/`isModifierCommandActive`.
-- **L17 — Gradient stops keyed by index.** `FillSection.tsx:296` — removing a
+- ✅ **DONE — L17 — Gradient stops keyed by index.** `FillSection.tsx:296` — removing a
   middle stop shifts the color-field drafts of all following stops into the
   wrong rows. Key by a stable stop id.
-- **L18 — Section open/collapse state doesn't react to selection.**
+- ✅ **DONE — L18 — Section open/collapse state doesn't react to selection.**
   `defaultOpen={width > 0}` etc. (`BorderSection.tsx:40`,
   `EffectsSection.tsx:256`) only applies on first mount at that tree
   position: selecting a bordered element after a borderless one keeps Border
   collapsed. Key the section (or lift open state) by selected element id, or
   derive open state from the current selection.
-- **L19 — `ExportSection` state leaks across selections.**
+- ✅ **DONE — L19 — `ExportSection` state leaks across selections.**
   `ExportSection.tsx:100-102` — local entries state silently carries one
   element's export entries over to the next selected element. Reset on
   selection change (or persist per element, see the doc's deferred list).
-- **L20 — Free-space cursor in path-edit mode is the pen cursor even with the
+- ✅ **DONE — L20 — Free-space cursor in path-edit mode is the pen cursor even with the
   Select tool.** `src/canvas/stage/canvasHitTesting.ts:463-468` returns
   `{type:"path-empty", cursor: PEN_CURSOR}` for every miss whenever
   `pathEdit` geometry exists; `useCanvasPointerEvents.ts:552-567` applies it.
   With Select active, clicking empty space *exits* edit mode rather than
   placing an anchor — show the default cursor unless the pen tool is active.
-- **L21 — Stale `settings` closure in the Alt-cursor effect.**
+- ✅ **DONE — L21 — Stale `settings` closure in the Alt-cursor effect.**
   `useCanvasPointerEvents.ts:263-286` — the effect reads `settings`
   (`isModifierCommandActive`) but omits it from the dependency array; a
   settings change during a path-edit session keeps the old binding.
@@ -561,7 +577,7 @@ frame; optionally fold `getCoalescedEvents`). Make the reparent preview
 incremental (shallow clone + touched-subtree copy) or defer the actual
 reparent to pointerup, previewing only the drop-target highlight per frame.
 
-## P3 — LOW effort / MEDIUM win — Text-editing keystrokes violate the transient contract (one-line fix)
+## ✅ DONE — P3 — LOW effort / MEDIUM win — Text-editing keystrokes violate the transient contract (one-line fix)
 
 `src/canvas/stage/hooks/useTextEditingSession.ts:77-79` dispatches
 `setDocumentTransient` **without** `changedIds`, so `transientChangedIds` is
@@ -640,9 +656,10 @@ transient frames. Memoize on the settled document or on `changedIds`.
   100×40 rect (stores 20), resize to 100×80 → corners stay r=20, no longer a
   pill. Decide: either implement the doc (store user value, clamp only at
   compile) — recommended, it is the Figma behavior — or update the doc.
-- **D2 — Text solid fill target.** `docs/inspector-fill.md` §Solid +
-  cheat-sheet: text solid → `color`. Code writes `background`
-  (`fill.ts:289-292`) — same defect as M12; fix there.
+- ✅ **DONE — D2 — Text solid fill target.** `docs/inspector-fill.md` §Solid +
+  cheat-sheet: text solid → `color`. Code wrote `background`
+  (`fill.ts:289-292`) — same defect as M12; fixed there (text single solid now
+  routes to `styles.color`/`colorRef`).
 - **D3 — Border color opacity control missing.**
   `docs/inspector-border-stroke.md` §Boxes: "Color + opacity % →
   border-color as #RRGGBBAA". `BorderSection.tsx:48-56` offers color only
