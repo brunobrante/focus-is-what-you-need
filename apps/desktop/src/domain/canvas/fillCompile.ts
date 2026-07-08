@@ -95,6 +95,10 @@ export type CompiledFill = {
   /** True when at least one enabled fill drives the paint (renderer then bypasses
    *  the legacy `background` path). */
   hasFills: boolean;
+  /** True when the element carries a *defined but empty* fills list — the explicit
+   *  "no fill" state. The renderer must paint nothing (no legacy `background`/`src`
+   *  fallback) rather than resurrecting a phantom fill (M11). */
+  cleared?: boolean;
 };
 
 const EMPTY: CompiledFill = { style: {}, filterDefs: [], hasFills: false };
@@ -330,7 +334,10 @@ export function compileFills(
   resolveRef?: FillRefResolver,
   defIdBase = "fill",
 ): CompiledFill {
-  if (!fills || fills.length === 0) return EMPTY;
+  if (!fills) return EMPTY;
+  // A defined-but-empty list is an explicit "no fill" — paint nothing, do not fall
+  // back to the legacy `background`/`src` path (M11).
+  if (fills.length === 0) return { ...EMPTY, cleared: true };
   const active = fills.filter(fillEnabled);
   if (active.length === 0) return { ...EMPTY, hasFills: false };
 

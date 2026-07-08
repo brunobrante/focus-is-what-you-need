@@ -227,7 +227,11 @@ export type FillSource = {
 /** The fills list the inspector should display/edit. Returns the stored `fills`
  *  when present, else a single fill synthesized from the simple representation. */
 export function normalizeFills(source: FillSource): Fill[] {
-  if (source.fills && source.fills.length > 0) return source.fills;
+  // A *defined* `fills` array is authoritative — including an empty one, which is
+  // the explicit "no fill" state (the panel shows an empty state + Add button).
+  // Only an absent `fills` falls back to the simple `background`/`color`/`src`
+  // representation (M11).
+  if (source.fills) return source.fills;
   if (source.type === "image") return [synthImageFill(source.src, source.objectFit)];
   // A text solid lives on `color`/`colorRef` (glyph paint), not `background`.
   if (source.type === "text") return [synthSolidFill(source.color, source.colorRef)];

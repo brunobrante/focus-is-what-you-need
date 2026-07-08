@@ -114,6 +114,8 @@ function borderStyleFor(
 // When an element carries a typed `fills` stack the compiled background longhands
 // replace the legacy `background` shorthand (clearing it so the two don't fight).
 function withFill(base: CSSProperties, compiled: CompiledFill | null): CSSProperties {
+  // An explicit empty fills list paints nothing — drop the legacy background (M11).
+  if (compiled?.cleared) return { ...base, background: undefined };
   if (!compiled || !compiled.hasFills) return base;
   return { ...base, background: undefined, ...compiled.style };
 }
@@ -466,6 +468,9 @@ function ElementRendererImpl({
       );
     }
 
+    // An explicit empty fills list paints nothing — skip the legacy `node.src`
+    // fallback and show the empty placeholder (M11).
+    const cleared = compiledFill?.cleared ?? false;
     // No typed fill — legacy single-image path, unchanged.
     return (
       <div
@@ -474,7 +479,7 @@ function ElementRendererImpl({
         className={elementClassName(node, "element image-element", false, isolatedParentId, canvasDocument.elements)}
         style={base}
       >
-        {node.src ? (
+        {node.src && !cleared ? (
           <img src={node.src} alt={node.name} draggable={false} style={{ objectFit: node.styles.objectFit }} />
         ) : (
           <div className="image-placeholder"><span>IMG</span></div>

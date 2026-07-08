@@ -152,6 +152,20 @@ test("normalizeFills: synthesizes an image fill for the image element", () => {
   expect((fills[0] as ImageFill).fit).toBe("fit");
 });
 
+test("normalizeFills: a defined empty list is the explicit no-fill state, not a phantom (M11)", () => {
+  // An element that once had a background but now carries `fills: []` must read
+  // back as empty — the panel shows an Add button, not a resurrected white solid.
+  expect(normalizeFills({ type: "rect", fills: [], background: "#abcdef" })).toEqual([]);
+  expect(normalizeFills({ type: "image", fills: [], src: "p.png" })).toEqual([]);
+  expect(normalizeFills({ type: "text", fills: [], color: "#00ff00" })).toEqual([]);
+});
+
+test("compileFills: an explicit empty list is cleared (paints nothing), absent is legacy (M11)", () => {
+  expect(compileFills([], "box").cleared).toBe(true);
+  expect(compileFills([], "box").hasFills).toBe(false);
+  expect(compileFills(undefined, "box").cleared).toBeUndefined();
+});
+
 test("fillsToWritePatch: a single plain solid collapses back to background", () => {
   const patch = fillsToWritePatch([solid({ color: "#ff0000", colorRef: "colors:c1" })], "rect");
   expect(patch.fills).toBeUndefined();

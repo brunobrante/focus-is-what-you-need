@@ -155,6 +155,12 @@ export function ElementTab({
     if (patch.color !== undefined) {
       stylePatch.color = patch.color;
       stylePatch.colorRef = patch.colorRef;
+    } else if (node.type === "text" && patch.fills !== undefined) {
+      // An explicit fills list drives the glyphs (multi-fill clips to text; an empty
+      // list paints nothing) — clear the stale single-solid glyph color so it can't
+      // linger behind an empty panel (M11).
+      stylePatch.color = undefined;
+      stylePatch.colorRef = undefined;
     }
     if (patch.objectFit !== undefined) stylePatch.objectFit = patch.objectFit as ElementStyles["objectFit"];
     // Style + image src commit together in one document (see Inspector.commitFill).

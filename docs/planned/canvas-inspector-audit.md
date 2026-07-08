@@ -20,11 +20,15 @@ unit-tested where tests exist). Completed so far:
 - **Low:** L1–L6, L8–L15, L17–L21.
 - **Perf:** P3.
 
-Remaining bug-class items not yet done: M1, M2, M8, M9, M11, M13, L7, L16, L22,
+Remaining bug-class items not yet done: M1, M2, M8, M9, M13, L7, L16, L22,
 L23; performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
-ride on M12/M13); the rendering-fidelity F-items; and all parity G-items. The
-suggested fix order (§8) resumes at step 7 (M1+M2). D1 (radius policy) is
-undecided, so L7/F4 are on hold.
+ride on M12/M13, and G15/M11 for the no-fill state); the rendering-fidelity
+F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
+on hold.
+
+Full-audit pass (2026-07-08, fix-order): resuming from step 6 leftovers.
+Additional completions this pass: **M11** (explicit no-fill state; also closes
+G15).
 
 ## Scope and intentional exclusions
 
@@ -339,7 +343,7 @@ emits `grayscale(90)`. Reverse: Brightness 150% (`amount: 1.5`) → Hue rotate
 shows "2°". **Fix:** reset `amount` to the target type's default on every
 type switch (extend `seedForType` to all types).
 
-## M11 — Removing the last fill stores `fills: []`; the panel resurrects a phantom white fill that doesn't match the render
+## ✅ DONE — M11 — Removing the last fill stores `fills: []`; the panel resurrects a phantom white fill that doesn't match the render
 
 `src/canvas/shell/inspector/FillSection.tsx:510` (`remove` can yield `[]`) →
 `src/domain/canvas/fill.ts:285-321` `fillsToWritePatch([], …)` hits neither
