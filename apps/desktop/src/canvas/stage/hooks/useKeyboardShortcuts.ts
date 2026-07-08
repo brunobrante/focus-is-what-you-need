@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 import type { Clipboard } from "@/canvas/engine/clipboard";
-import { deleteElements, duplicateElements, nudgeElements } from "@/canvas/engine/actions";
+import { deleteElements, duplicateElements, nudgeElements, unwrapElement } from "@/canvas/engine/actions";
 import { isEditableTarget } from "@/canvas/engine/hitTesting";
 import { clamp } from "@/canvas/engine/geometry";
 import type { CanvasDocument, EditorState } from "@/canvas/engine/types";
@@ -223,6 +223,18 @@ export function useKeyboardShortcuts({
         event.preventDefault();
         if (mutatingGesture) return;
         dispatch({ type: "commitDocument", document: deleteElements(currentState.document, currentState.selectedIds), selectedIds: [] });
+        return;
+      }
+      if (matchesKeyCommand(event, settings, "canvas.selection.ungroup")) {
+        event.preventDefault();
+        if (mutatingGesture) return;
+        if (currentState.selectedIds.length === 1) {
+          const target = currentState.document.elements[currentState.selectedIds[0]];
+          if (target && target.children.length > 0) {
+            const result = unwrapElement(currentState.document, currentState.selectedIds[0]);
+            dispatch({ type: "commitDocument", document: result.document, selectedIds: result.selectedIds });
+          }
+        }
         return;
       }
       for (const { id, ux, uy } of NUDGE_COMMANDS) {

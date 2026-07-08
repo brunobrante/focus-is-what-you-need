@@ -492,7 +492,10 @@ Front/Forward, Send Backward/Back) · **Align / Distribute** (shown only for a
 multi-selection: Align left / horizontal centers / right / top / vertical centers /
 bottom, aligning the selected elements to their shared bounding box; Distribute
 horizontally / vertically appears with 3+ elements and equalizes the gaps between
-them, keeping the two extremes fixed) · Lock/Hide · Delete · **Hide this window** (only
+them, keeping the two extremes fixed) · **Ungroup** (shown for a single container
+with children — reparents its children to the grandparent, preserving each child's
+absolute position/rotation, and removes the container; `⌘⇧G`) · Lock/Hide · Delete ·
+**Hide this window** (only
 while split, on **any** pane including the primary Current — drops that pane from the
 split; with two or more panes left the split keeps going, otherwise it collapses to a
 single window) · **Open / Close panels**

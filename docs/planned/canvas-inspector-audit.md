@@ -862,7 +862,16 @@ buffer to a canvas-shell-level service shared by all EditorProviders
 with a custom MIME type (also unlocks cross-project paste). Fix L8's id
 weaknesses while in there.
 
-## G7 — Ungroup/unwrap (MISSING; wrap exists)
+## ✅ DONE — G7 — Ungroup/unwrap (MISSING; wrap exists)
+
+`unwrapElement` (inverse of `wrapElements`): reparents children to the grandparent
+via `reparentElements` (absolute position + rotation preserved), re-inserts them at
+the container's sibling slot, removes the empty container, selects the children.
+Wired to `useCanvasCommands.unwrap`, the layers/canvas context menu (shown for a
+single container with children), and a rebindable `canvas.selection.ungroup` command
+(default ⌘⇧G). UX.md updated; round-trip unit-tested.
+
+Original note:
 
 `wrapElements` exists (`elementHierarchy.ts`); its inverse doesn't —
 restructuring is one-way. Add `unwrapElement`: reparent children to the

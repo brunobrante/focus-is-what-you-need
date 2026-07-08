@@ -10,6 +10,7 @@ import {
   sendToBack,
   setElementLocked,
   setElementVisible,
+  unwrapElement,
   type AlignEdge,
   type DistributeAxis,
 } from "@/canvas/engine/actions";
@@ -72,6 +73,13 @@ export function useCanvasCommands(
       },
       distribute: (axis: DistributeAxis) => {
         if (selectedIds.length >= 3) commit(distributeElements(state.document, selectedIds, axis));
+      },
+      // Ungroup a single container: reparent its children to the grandparent and
+      // remove it, selecting the freed children (G7).
+      unwrap: () => {
+        if (!singleId) return;
+        const result = unwrapElement(state.document, singleId);
+        commit(result.document, result.selectedIds);
       },
       setLocked: (locked: boolean) => {
         if (singleId) commit(setElementLocked(state.document, singleId, locked));

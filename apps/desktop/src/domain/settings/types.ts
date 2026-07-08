@@ -15,6 +15,7 @@ export type CanvasKeyCommandId =
   | "canvas.selection.duplicate"
   | "canvas.selection.delete"
   | "canvas.selection.cancel"
+  | "canvas.selection.ungroup"
   | "canvas.nudge.up"
   | "canvas.nudge.down"
   | "canvas.nudge.left"

@@ -320,3 +320,49 @@ export function wrapElements(
   next = reparentElements(next, ids, wrapperId);
   return { document: next, wrapperId };
 }
+
+/**
+ * Ungroup / unwrap (G7) — the inverse of {@link wrapElements}. Reparents the
+ * container's children to its parent (grandparent), preserving each child's
+ * absolute position and rotation via `reparentElements`, re-inserts them at the
+ * container's slot in the sibling order, then removes the now-empty container.
+ * Returns the freed children as the new selection.
+ */
+export function unwrapElement(
+  document: CanvasDocument,
+  id: string,
+): { document: CanvasDocument; selectedIds: string[] } {
+  const wrapper = document.elements[id];
+  if (!wrapper) return { document, selectedIds: [] };
+  const childIds = [...wrapper.children];
+  const grandparentId = wrapper.parentId ?? null;
+
+  if (childIds.length === 0) {
+    return { document: deleteElements(document, [id]), selectedIds: [] };
+  }
+
+  const siblingList = grandparentId
+    ? document.elements[grandparentId]?.children ?? []
+    : document.rootIds;
+  const wrapperIndex = siblingList.indexOf(id);
+
+  let next = reparentElements(document, childIds, grandparentId);
+  next = deleteElements(next, [id]); // the container is childless now
+
+  // Place the freed children at the container's old slot, keeping their order.
+  const list = grandparentId ? next.elements[grandparentId]?.children : next.rootIds;
+  if (list) {
+    const childSet = new Set(childIds);
+    const filtered = list.filter((cid) => !childSet.has(cid));
+    const insertAt = Math.min(Math.max(wrapperIndex, 0), filtered.length);
+    filtered.splice(insertAt, 0, ...childIds);
+    if (grandparentId) {
+      const gp = next.elements[grandparentId];
+      if (gp) gp.children = filtered;
+    } else {
+      next.rootIds = filtered;
+    }
+  }
+
+  return { document: next, selectedIds: childIds };
+}

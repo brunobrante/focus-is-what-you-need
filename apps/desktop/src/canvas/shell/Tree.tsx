@@ -893,6 +893,10 @@ function TreeContextMenuContent({
       ] : []),
       { type: "separator" as const },
     ] : []),
+    ...(singleNode && singleNode.children.length > 0 ? [
+      { type: "action" as const, label: "Ungroup", shortcut: `${modLabel}⇧G`, action: commands.unwrap },
+      { type: "separator" as const },
+    ] : []),
     ...(singleNode ? [
       { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commands.setLocked(!singleNode.locked) },
       { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commands.setVisible(singleNode.visible === false) },

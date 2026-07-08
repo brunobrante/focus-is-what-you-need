@@ -22,6 +22,7 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
     { key: "Backspace" },
   ],
   "canvas.selection.cancel": [{ key: "Escape" }],
+  "canvas.selection.ungroup": [{ mod: true, shift: true, key: "g" }],
   // Two bindings each so the plain arrow (nudge ±1) and Shift+arrow (nudge ±10)
   // both match the same command; the amount is chosen from shiftKey at handle time.
   "canvas.nudge.up": [{ key: "ArrowUp" }, { key: "ArrowUp", shift: true }],

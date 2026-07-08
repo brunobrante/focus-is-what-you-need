@@ -61,6 +61,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.selection.duplicate", label: "Duplicate", group: "Canvas", type: "key" },
       { id: "canvas.selection.delete", label: "Delete selection", group: "Canvas", type: "key" },
       { id: "canvas.selection.cancel", label: "Cancel or select tool", group: "Canvas", type: "key" },
+      { id: "canvas.selection.ungroup", label: "Ungroup", group: "Canvas", type: "key" },
       { id: "canvas.nudge.up", label: "Nudge up (Shift = ×10)", group: "Canvas", type: "key" },
       { id: "canvas.nudge.down", label: "Nudge down (Shift = ×10)", group: "Canvas", type: "key" },
       { id: "canvas.nudge.left", label: "Nudge left (Shift = ×10)", group: "Canvas", type: "key" },
