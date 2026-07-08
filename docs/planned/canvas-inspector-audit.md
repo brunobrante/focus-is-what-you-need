@@ -20,8 +20,8 @@ unit-tested where tests exist). Completed so far:
 - **Low:** L1–L6, L8–L15, L17–L21.
 - **Perf:** P3.
 
-Remaining bug-class items not yet done: L7, L16, L22,
-L23; performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
+Remaining bug-class items not yet done: L7 (blocked on D1), L16 (deferred —
+needs new rebindable commands); performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
 ride on M12/M13, and G15/M11 for the no-fill state); the rendering-fidelity
 F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
 on hold.
@@ -502,7 +502,15 @@ the fallback doc independently of panel widths.
   `canvas.width = width` in CSS px (no DPR scaling, unlike the Skia
   adapter's `getResolution()`), so pixel-grid lines render blurry on Retina
   and the `Math.round(x)+0.5` crispness trick operates on the wrong grid.
-- **L16 — Raw modifier checks bypass the settings command layer.**
+- **L16 — DEFERRED (needs new rebindable commands) — Raw modifier checks bypass the
+  settings command layer.** Routing these through the registry requires *new*
+  command ids that don't exist yet: a wheel-zoom modifier command (only the
+  `metaKey` half is a policy choice — `ctrlKey` on wheel is WebKit's pinch
+  encoding and must stay raw), a path-commit key command for Enter, and
+  selection/caret key commands for the textarea editing keys — each with settings
+  type + defaults + rebinding-UI plumbing. That is a disproportionate, unverifiable
+  (no runtime here) expansion for a low-severity hygiene item, so it is deferred
+  rather than done badly. Original references:
   `src/canvas/stage/hooks/useViewportControls.ts:237`
   (`event.ctrlKey || event.metaKey` for wheel-zoom vs pan — caveat: `ctrlKey`
   on wheel is also WebKit's pinch encoding, so only the `metaKey` half is a
@@ -535,14 +543,17 @@ the fallback doc independently of panel widths.
   `useCanvasPointerEvents.ts:263-286` — the effect reads `settings`
   (`isModifierCommandActive`) but omits it from the dependency array; a
   settings change during a path-edit session keeps the old binding.
-- **L22 — Paste always lands at root with a +24 cascade.**
-  `clipboard.ts:104-110` — never into the source parent or at the cursor.
-  (Figma pastes into the same parent / at the pointer.) Borderline
-  gap-vs-bug; listed here because the current behavior surprises users.
-- **L23 — Render-phase ref writes (benign, watch only).**
-  `InsComponents.tsx:29-30` (`useDeferredCommitField`) and
-  `CanvasStage.tsx:341` write refs during render — idempotent and safe under
-  StrictMode double-render today; do not add non-idempotent writes there.
+- ✅ **DONE — L22 — Paste always lands at root with a +24 cascade.**
+  `clipboard.ts` now pastes each top-level clone back into its **original parent**
+  when that parent still exists in the target document (offset +24px, clamped by
+  `constrainAll`, cascading on repeat), matching Figma; cross-document/split-pane
+  paste (original parent absent) falls back to the frame root. Cursor-anchored
+  paste is intentionally not added (would need pointer coords threaded into
+  `paste()`); the same-parent behavior removes the surprise. UX.md updated.
+- ✅ **REVIEWED (no change) — L23 — Render-phase ref writes (benign, watch only).**
+  `InsComponents.tsx` (`useDeferredCommitField`) and `CanvasStage.tsx` write refs
+  during render — idempotent and safe under StrictMode double-render; confirmed
+  still idempotent. No code change; flagged to not add non-idempotent writes there.
 
 ---
 

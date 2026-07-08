@@ -507,6 +507,12 @@ Versions** state — still get a right-click menu (even with no content), but on
 window/UI group: **Hide this window** (when split) · **Open / Close panels** · **Hide
 UI**. The editing actions (Copy/Paste/ordering/Delete) are omitted there.
 
+**Paste target**: pasted elements land back into their **original parent container**
+when that container still exists in the target document (offset +24px, clamped inside
+it, cascading on repeat) — matching Figma. Pasting into a different document/pane
+(where the original parent is absent, e.g. Sketch → Current) falls back to the frame
+root.
+
 **Top-left**:
 - A compact chip: back button · the current subject's name (component / screen /
   project, truncated) · the project-type badge · search toggle (opens the

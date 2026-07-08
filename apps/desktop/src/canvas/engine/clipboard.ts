@@ -93,7 +93,11 @@ export function createClipboard(): Clipboard {
       };
     }
 
-    // Insert top-level clones into the document (offset by 24px)
+    // Insert top-level clones (offset by 24px). Prefer the element's ORIGINAL
+    // parent when it still exists in the target document — pasting back into the
+    // same container is what users expect (Figma), instead of everything jumping
+    // to the frame root (L22). Cross-document/split-pane paste, or a since-deleted
+    // parent, falls back to the root.
     for (const oldRootId of clipboard.rootIds) {
       const newId = idMap.get(oldRootId);
       if (!newId) {
@@ -105,11 +109,21 @@ export function createClipboard(): Clipboard {
         continue;
       }
 
-      // Top-level pasted elements go to the root
-      node.parentId = null;
+      const originalParentId = clipboard.elements[oldRootId]?.parentId ?? null;
+      const targetParent =
+        originalParentId && !idMap.has(originalParentId)
+          ? next.elements[originalParentId]
+          : undefined;
+
       node.x += 24;
       node.y += 24;
-      next.rootIds.push(newId);
+      if (targetParent) {
+        node.parentId = originalParentId;
+        targetParent.children.push(newId);
+      } else {
+        node.parentId = null;
+        next.rootIds.push(newId);
+      }
       newSelectedIds.push(newId);
     }
 
