@@ -20,7 +20,7 @@ unit-tested where tests exist). Completed so far:
 - **Low:** L1–L6, L8–L15, L17–L21.
 - **Perf:** P3.
 
-Remaining bug-class items not yet done: M8, M9, L7, L16, L22,
+Remaining bug-class items not yet done: L7, L16, L22,
 L23; performance P1, P2, P4–P10; the doc-divergence D-items (except D2/D8 which
 ride on M12/M13, and G15/M11 for the no-fill state); the rendering-fidelity
 F-items; and all parity G-items. D1 (radius policy) is undecided, so L7/F4 are
@@ -30,11 +30,13 @@ Full-audit pass (2026-07-08, fix-order): resuming from step 6 leftovers.
 Additional completions this pass: **M11** (explicit no-fill state; also closes
 G15), **M13** (tile motif from natural size × scale%; also closes D8), **M1**
 (resize/radius honor ancestor rotation) and **M2** (path-edit + vector coordinate
-math through the full element transform). New shared geometry helpers in
-`bounds.ts`: `canvasPointToParentContentSpace`, `elementLocalToCanvas`,
-`canvasToElementLocal`. NB: the canvas geometry changes are typechecked +
-unit-tested but not runtime-verified in this env (no `bun`); verify nested/rotated
-resize, radius and path-edit in-app.
+math through the full element transform), **M8** (text-editing layout honors full
+typography) and **M9** (rotated text-editing overlay + inverse-rotated pointer
+mapping). New shared geometry helpers in `bounds.ts`:
+`canvasPointToParentContentSpace`, `elementLocalToCanvas`, `canvasToElementLocal`.
+NB: the canvas geometry/overlay changes are typechecked + unit-tested but not
+runtime-verified in this env (no `bun`); verify nested/rotated resize, radius,
+path-edit and rotated text editing in-app.
 
 ## Scope and intentional exclusions
 
@@ -317,7 +319,7 @@ renders centered.
 letter-spacing, transform, vertical offset) through `fontForNode` /
 layout measurement, and include those inputs in `layoutKey`.
 
-## M9 — Editing a rotated text element draws the overlay unrotated over the AABB
+## ✅ DONE — M9 — Editing a rotated text element draws the overlay unrotated over the AABB
 
 `src/canvas/stage/TextEditingOverlay.tsx:20-55` and
 `src/canvas/stage/canvasStageHelpers.ts:124-144` (`localPointForTextNode`)

@@ -1,6 +1,7 @@
 import { elementNodesEqual } from "@/canvas/engine/history";
+import { canvasToElementLocal } from "@/canvas/engine/geometry";
 import type { CanvasDocument, Point, Rect } from "@/canvas/engine/types";
-import type { ViewportTransform } from "@/canvas/engine/viewport";
+import { viewportPointToCanvas, type ViewportTransform } from "@/canvas/engine/viewport";
 import { elementToPaintViewportRect } from "./canvasToolingRenderer";
 import { getCaretRect, getIndexFromPoint, getTextLayout } from "./textEditingLayout";
 import type { TextEditState, ViewportClientRect } from "./canvasStageTypes";
@@ -132,15 +133,16 @@ export function localPointForTextNode(input: {
 }): Point | null {
   const node = input.document.elements[input.nodeId];
   if (!node) return null;
-  const rect = elementToPaintViewportRect(input.document, input.nodeId, input.viewportTransform);
-  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  // Map the pointer through the inverse of the full transform so a rotated (or
+  // nested) text box still yields correct element-local content coords (M9):
+  // client → viewport → canvas → element-local (0..width, 0..height). Reduces
+  // exactly to the plain AABB math when nothing along the chain is rotated.
   const viewportRect = input.viewportRect ?? input.viewport.getBoundingClientRect();
-  const x = input.clientX - viewportRect.left - rect.x;
-  const y = input.clientY - viewportRect.top - rect.y;
-  return {
-    x: x / (rect.width / Math.max(node.width, 1)),
-    y: y / (rect.height / Math.max(node.height, 1)),
-  };
+  const canvasPoint = viewportPointToCanvas(
+    { x: input.clientX - viewportRect.left, y: input.clientY - viewportRect.top },
+    input.viewportTransform,
+  );
+  return canvasToElementLocal(input.document, input.nodeId, canvasPoint);
 }
 
 export function textIndexFromClientPoint(input: {
