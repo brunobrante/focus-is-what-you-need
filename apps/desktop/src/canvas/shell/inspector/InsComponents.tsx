@@ -148,27 +148,58 @@ export function useDeferredCommitField(value: string, onChange: (v: string) => C
   return { draftValue, setDraftValue, commitDraft, resetDraft };
 }
 
+// A text element's tab mounts ~30 deferred-commit fields; giving each its own
+// capture-phase document.pointerdown + window.blur listener meant ~30 handlers ran
+// on every pointerdown anywhere in the app. Instead all fields share ONE pair of
+// listeners driven by a registry (P8). Committing a field whose element doesn't
+// contain the pointer target is a no-op when that field has no pending draft, so
+// the shared handler is behaviourally identical to the old per-field ones.
+type CommitSubscriber = { ref: { current: HTMLElement | null }; commit: () => void };
+const commitSubscribers = new Set<CommitSubscriber>();
+let commitListenersInstalled = false;
+
+function handleSharedCommitPointerDown(event: PointerEvent) {
+  const target = event.target;
+  // Copy first: a commit can unmount/re-subscribe fields mid-iteration.
+  for (const sub of [...commitSubscribers]) {
+    const element = sub.ref.current;
+    if (element && target instanceof Node && element.contains(target)) continue;
+    sub.commit();
+  }
+}
+
+function handleSharedCommitBlur() {
+  for (const sub of [...commitSubscribers]) sub.commit();
+}
+
+function ensureCommitListeners() {
+  const ownerDocument = globalThis.document;
+  if (commitListenersInstalled || !ownerDocument) return;
+  ownerDocument.addEventListener("pointerdown", handleSharedCommitPointerDown, true);
+  globalThis.addEventListener("blur", handleSharedCommitBlur);
+  commitListenersInstalled = true;
+}
+
+function releaseCommitListenersIfIdle() {
+  const ownerDocument = globalThis.document;
+  if (!commitListenersInstalled || commitSubscribers.size > 0 || !ownerDocument) return;
+  ownerDocument.removeEventListener("pointerdown", handleSharedCommitPointerDown, true);
+  globalThis.removeEventListener("blur", handleSharedCommitBlur);
+  commitListenersInstalled = false;
+}
+
 export function useCommitOnOutsideInteraction<T extends HTMLElement>(
   ref: { current: T | null },
   commitDraft: () => void,
 ) {
   useEffect(() => {
-    const ownerDocument = globalThis.document;
-    if (!ownerDocument) return undefined;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const element = ref.current;
-      const target = event.target;
-      if (element && target instanceof Node && element.contains(target)) return;
-      commitDraft();
-    };
-    const handleWindowBlur = () => commitDraft();
-
-    ownerDocument.addEventListener("pointerdown", handlePointerDown, true);
-    globalThis.addEventListener("blur", handleWindowBlur);
+    if (!globalThis.document) return undefined;
+    const subscriber: CommitSubscriber = { ref, commit: commitDraft };
+    commitSubscribers.add(subscriber);
+    ensureCommitListeners();
     return () => {
-      ownerDocument.removeEventListener("pointerdown", handlePointerDown, true);
-      globalThis.removeEventListener("blur", handleWindowBlur);
+      commitSubscribers.delete(subscriber);
+      releaseCommitListenersIfIdle();
       commitDraft();
     };
   }, [commitDraft, ref]);

@@ -647,7 +647,7 @@ share unchanged nodes.
 per character via canvas `measureText`; runs on every keystroke for
 fit-sized text. Use per-word measurement with cumulative widths.
 
-## P8 — LOW — Global capture listener per input
+## ✅ DONE — P8 — Global capture listener per input
 
 Every `InsInput`/`InsTextarea` registers a capture-phase
 `document.pointerdown` + `window.blur` listener
