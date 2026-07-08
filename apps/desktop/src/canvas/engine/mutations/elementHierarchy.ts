@@ -21,7 +21,7 @@ import { DEFAULT_SHELL_BACKGROUND } from "./documentDefaults";
 // Mutates `document.elements[id]` in place. The caller is responsible for owning
 // `document` (e.g. via a single top-level `cloneDocument`) so this never leaks into
 // a shared document.
-function constrainElementInPlace(document: CanvasDocument, id: string): void {
+export function constrainElementInPlace(document: CanvasDocument, id: string): void {
   const node = document.elements[id];
   if (!node) return;
   const parentSize = getParentSize(document, id);

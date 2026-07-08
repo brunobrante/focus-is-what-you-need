@@ -805,7 +805,15 @@ engine mutation module beside `src/canvas/engine/mutations/elementOrder.ts`
 single-selected), surfaced in the Inspector Element tab, ContextToolbar, and
 context menu.
 
-## G2 — Arrow-key nudge (MISSING)
+## ✅ DONE — G2 — Arrow-key nudge (MISSING)
+
+Added rebindable `canvas.nudge.up/down/left/right` key commands (default arrows,
+Shift = ×10), settings-backed amounts (`canvas.nudge.small`/`.large`), moving
+`selectedIds` via `nudgeElements` (canvas-delta → parent-local, `constrainElementInPlace`
+clamp, locked skipped). A burst coalesces into one undo entry (transient frames +
+400ms settle commit; flushed on unmount). UX.md updated; engine unit-tested.
+
+Original note:
 
 Arrow keys currently move nothing; precision layout is impossible. Add to
 `useKeyboardShortcuts.ts` via the rebindable command registry

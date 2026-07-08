@@ -22,6 +22,12 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
     { key: "Backspace" },
   ],
   "canvas.selection.cancel": [{ key: "Escape" }],
+  // Two bindings each so the plain arrow (nudge ±1) and Shift+arrow (nudge ±10)
+  // both match the same command; the amount is chosen from shiftKey at handle time.
+  "canvas.nudge.up": [{ key: "ArrowUp" }, { key: "ArrowUp", shift: true }],
+  "canvas.nudge.down": [{ key: "ArrowDown" }, { key: "ArrowDown", shift: true }],
+  "canvas.nudge.left": [{ key: "ArrowLeft" }, { key: "ArrowLeft", shift: true }],
+  "canvas.nudge.right": [{ key: "ArrowRight" }, { key: "ArrowRight", shift: true }],
   "canvas.component.openSelection": [{ key: "1" }],
   "canvas.component.backToParent": [{ key: "2" }],
   "canvas.overlay.toggleScreen": [{ key: "3" }],
@@ -215,6 +221,10 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
     viewport: {
       zoomStep: 0.25,
       wheelZoomSensitivity: 0.002,
+    },
+    nudge: {
+      small: 1,
+      large: 10,
     },
     shell: {
       background: "#171717",

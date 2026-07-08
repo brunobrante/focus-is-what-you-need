@@ -14,6 +14,7 @@ import {
   unionRects,
 } from "../geometry";
 import { cloneDocument } from "./coreUtils";
+import { constrainElementInPlace } from "./elementHierarchy";
 
 export type AlignEdge = "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom";
 export type DistributeAxis = "horizontal" | "vertical";
@@ -114,6 +115,27 @@ export function alignElements(
         break;
     }
     moveByAbsoluteDelta(next, id, dx, dy);
+  }
+  return next;
+}
+
+/**
+ * Nudge the selection by a canvas-space delta (arrow-key nudge, G2). The delta is
+ * translated into each element's parent-local space and each moved element is
+ * re-clamped inside its parent. Locked elements are left in place.
+ */
+export function nudgeElements(
+  document: CanvasDocument,
+  ids: string[],
+  dxAbs: number,
+  dyAbs: number,
+): CanvasDocument {
+  const movable = movableIds(document, ids);
+  if (movable.length === 0 || (dxAbs === 0 && dyAbs === 0)) return document;
+  const next = cloneDocument(document);
+  for (const id of movable) {
+    moveByAbsoluteDelta(next, id, dxAbs, dyAbs);
+    constrainElementInPlace(next, id);
   }
   return next;
 }

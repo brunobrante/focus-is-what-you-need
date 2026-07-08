@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { alignElements, distributeElements } from "../elementAlign";
+import { alignElements, distributeElements, nudgeElements } from "../elementAlign";
 import type { CanvasDocument, ElementNode } from "../../types";
 
 function rect(id: string, x: number, y: number, width: number, height: number, extra: Partial<ElementNode> = {}): ElementNode {
@@ -74,4 +74,24 @@ test("align skips locked elements but uses them as a reference anchor (G1)", () 
   const out = alignElements(doc, ["a", "b"], "left");
   expect(out.elements.b.x).toBe(10); // locked: untouched, but its edge is the anchor
   expect(out.elements.a.x).toBe(10); // moved to the union-left (the locked element's edge)
+});
+
+test("nudge moves selected elements by a canvas delta (G2)", () => {
+  const doc = docOf([rect("a", 10, 10, 40, 40), rect("b", 100, 100, 40, 40)]);
+  const out = nudgeElements(doc, ["a", "b"], 10, -5);
+  expect(out.elements.a).toMatchObject({ x: 20, y: 5 });
+  expect(out.elements.b).toMatchObject({ x: 110, y: 95 });
+});
+
+test("nudge clamps to the parent/canvas bounds and skips locked (G2)", () => {
+  const doc = docOf([rect("a", 0, 0, 40, 40), rect("b", 100, 100, 40, 40, { locked: true })]);
+  const out = nudgeElements(doc, ["a", "b"], -10, -10); // a already at the top-left edge
+  expect(out.elements.a).toMatchObject({ x: 0, y: 0 }); // clamped, no negative
+  expect(out.elements.b).toMatchObject({ x: 100, y: 100 }); // locked, untouched
+});
+
+test("nudge with no delta or no selection is a no-op (G2)", () => {
+  const doc = docOf([rect("a", 10, 10, 40, 40)]);
+  expect(nudgeElements(doc, ["a"], 0, 0)).toBe(doc);
+  expect(nudgeElements(doc, [], 5, 5)).toBe(doc);
 });

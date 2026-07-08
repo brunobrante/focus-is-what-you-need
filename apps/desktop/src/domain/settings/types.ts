@@ -15,6 +15,10 @@ export type CanvasKeyCommandId =
   | "canvas.selection.duplicate"
   | "canvas.selection.delete"
   | "canvas.selection.cancel"
+  | "canvas.nudge.up"
+  | "canvas.nudge.down"
+  | "canvas.nudge.left"
+  | "canvas.nudge.right"
   | "canvas.component.openSelection"
   | "canvas.component.backToParent"
   | "canvas.overlay.toggleScreen"
@@ -166,12 +170,20 @@ export type CanvasShellSettings = {
   resizeImageToFrame: boolean;
 };
 
+/** Arrow-key nudge distances in canvas px (G2). `small` = plain arrow, `large` =
+ *  Shift+arrow. */
+export type CanvasNudgeSettings = {
+  small: number;
+  large: number;
+};
+
 export type CanvasSettings = {
   tools: CanvasToolsSettings;
   toolDefaults: CanvasToolDefaultsSettings;
   elementDefaults: CanvasElementDefaultsSettings;
   inputBindings: CanvasInputBindings;
   viewport: CanvasViewportSettings;
+  nudge: CanvasNudgeSettings;
   shell: CanvasShellSettings;
 };
 

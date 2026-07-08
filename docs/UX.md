@@ -517,6 +517,12 @@ it, cascading on repeat) — matching Figma. Pasting into a different document/p
 (where the original parent is absent, e.g. Sketch → Current) falls back to the frame
 root.
 
+**Arrow-key nudge**: with elements selected, the arrow keys move the selection by 1px
+in the canvas axes; **Shift+arrow** moves by 10px. Amounts are settings-backed
+(`canvas.nudge.small` / `.large`) and the keys are rebindable
+(`canvas.nudge.up/down/left/right`). A rapid burst of nudges coalesces into a single
+undo step, and the moved elements stay clamped inside their frame.
+
 **Top-left**:
 - A compact chip: back button · the current subject's name (component / screen /
   project, truncated) · the project-type badge · search toggle (opens the

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 import type { Clipboard } from "@/canvas/engine/clipboard";
-import { deleteElements, duplicateElements } from "@/canvas/engine/actions";
+import { deleteElements, duplicateElements, nudgeElements } from "@/canvas/engine/actions";
 import { isEditableTarget } from "@/canvas/engine/hitTesting";
 import { clamp } from "@/canvas/engine/geometry";
-import type { EditorState } from "@/canvas/engine/types";
+import type { CanvasDocument, EditorState } from "@/canvas/engine/types";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import type { CanvasToolId } from "@/canvas/tools";
 import { TOOL_BY_CANVAS_COMMAND } from "@/domain/settings/commands";
@@ -31,6 +31,17 @@ const DOCUMENT_MUTATING_GESTURES = new Set<Interaction["type"]>([
   "canvas-resize",
   "canvas-rotate",
 ]);
+
+// Arrow-key nudge (G2): unit direction per command; the distance comes from
+// settings (small = plain, large = Shift). A burst of nudges coalesces into one
+// undo entry, committed once the burst settles.
+const NUDGE_COMMANDS: Array<{ id: CanvasKeyCommandId; ux: number; uy: number }> = [
+  { id: "canvas.nudge.up", ux: 0, uy: -1 },
+  { id: "canvas.nudge.down", ux: 0, uy: 1 },
+  { id: "canvas.nudge.left", ux: -1, uy: 0 },
+  { id: "canvas.nudge.right", ux: 1, uy: 0 },
+];
+const NUDGE_COMMIT_DELAY = 400;
 
 function isDocumentMutatingGesture(interaction: Interaction | null): boolean {
   return interaction !== null && DOCUMENT_MUTATING_GESTURES.has(interaction.type);
@@ -70,8 +81,29 @@ export function useKeyboardShortcuts({
   ancestorOverlayAvailable,
 }: Params): { spacePressedRef: MutableRefObject<boolean> } {
   const spacePressedRef = useRef(false);
+  // Coalesced-nudge burst state (G2): the document before the burst (for one undo
+  // entry) and the idle timer that commits it.
+  const nudgeBeforeRef = useRef<CanvasDocument | null>(null);
+  const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const commitNudge = () => {
+      if (nudgeTimerRef.current) {
+        clearTimeout(nudgeTimerRef.current);
+        nudgeTimerRef.current = null;
+      }
+      const before = nudgeBeforeRef.current;
+      nudgeBeforeRef.current = null;
+      if (!before) return;
+      const latest = latestStateRef.current;
+      dispatch({
+        type: "commitDocument",
+        beforeDocument: before,
+        document: latest.document,
+        selectedIds: latest.selectedIds,
+      });
+    };
+
     const toolCommands = Object.entries(TOOL_BY_CANVAS_COMMAND) as Array<
       [CanvasKeyCommandId, CanvasToolId]
     >;
@@ -193,6 +225,21 @@ export function useKeyboardShortcuts({
         dispatch({ type: "commitDocument", document: deleteElements(currentState.document, currentState.selectedIds), selectedIds: [] });
         return;
       }
+      for (const { id, ux, uy } of NUDGE_COMMANDS) {
+        if (!matchesKeyCommand(event, settings, id)) continue;
+        event.preventDefault();
+        if (mutatingGesture || currentState.selectedIds.length === 0) return;
+        const amount = event.shiftKey ? settings.canvas.nudge.large : settings.canvas.nudge.small;
+        const moved = nudgeElements(currentState.document, currentState.selectedIds, ux * amount, uy * amount);
+        if (moved === currentState.document) return; // nothing movable / no change
+        // Capture the pre-burst document once so the whole burst is a single undo
+        // entry; push transient frames and commit after the burst settles (G2/H3).
+        if (!nudgeBeforeRef.current) nudgeBeforeRef.current = currentState.document;
+        dispatch({ type: "setDocumentTransient", document: moved, changedIds: currentState.selectedIds });
+        if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+        nudgeTimerRef.current = setTimeout(commitNudge, NUDGE_COMMIT_DELAY);
+        return;
+      }
       if (matchesKeyCommand(event, settings, "canvas.component.openSelection")) {
         const handled =
           currentState.selectedIds.length === 1 &&
@@ -255,6 +302,8 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
       spacePressedRef.current = false;
+      // Flush any pending nudge burst so it isn't lost across a re-subscribe.
+      commitNudge();
     };
   }, [
     dispatch,
