@@ -233,11 +233,17 @@ export function resizeBoxFromHandle(
   const aspect = startBox.width / Math.max(startBox.height, 1);
   const minSize = options.minSize ?? MIN_ELEMENT_SIZE;
 
-  let width = dirX === 0 ? startBox.width : startBox.width + dx * dirX * (options.altKey ? 2 : 1);
-  let height = dirY === 0 ? startBox.height : startBox.height + dy * dirY * (options.altKey ? 2 : 1);
+  const altMul = options.altKey ? 2 : 1;
+  // Signed extents. A negative extent means the grabbed edge crossed its anchor,
+  // so the box mirrors to the other side (F1) instead of pinning at min size; we
+  // track the flip and size from the magnitude.
+  const signedWidth = dirX === 0 ? startBox.width : startBox.width + dx * dirX * altMul;
+  const signedHeight = dirY === 0 ? startBox.height : startBox.height + dy * dirY * altMul;
+  const flippedX = dirX !== 0 && signedWidth < 0;
+  const flippedY = dirY !== 0 && signedHeight < 0;
 
-  width = Math.max(width, minSize);
-  height = Math.max(height, minSize);
+  let width = Math.max(Math.abs(signedWidth), minSize);
+  let height = Math.max(Math.abs(signedHeight), minSize);
 
   if (options.shiftKey) {
     if (dirX !== 0 && dirY !== 0) {
@@ -262,15 +268,21 @@ export function resizeBoxFromHandle(
     x = centerX - width / 2;
     y = centerY - height / 2;
   } else {
-    if (dirX < 0) {
-      x = rectRight(startBox) - width;
-    } else if (dirX === 0 && options.shiftKey && dirY !== 0) {
+    if (dirX !== 0) {
+      // Anchor = the edge opposite the grabbed handle; the box grows away from it,
+      // or toward it (past it) when flipped.
+      const anchorX = dirX > 0 ? startBox.x : rectRight(startBox);
+      const growsRight = (flippedX ? -dirX : dirX) > 0;
+      x = growsRight ? anchorX : anchorX - width;
+    } else if (options.shiftKey && dirY !== 0) {
       x = centerX - width / 2;
     }
 
-    if (dirY < 0) {
-      y = rectBottom(startBox) - height;
-    } else if (dirY === 0 && options.shiftKey && dirX !== 0) {
+    if (dirY !== 0) {
+      const anchorY = dirY > 0 ? startBox.y : rectBottom(startBox);
+      const growsDown = (flippedY ? -dirY : dirY) > 0;
+      y = growsDown ? anchorY : anchorY - height;
+    } else if (options.shiftKey && dirX !== 0) {
       y = centerY - height / 2;
     }
   }

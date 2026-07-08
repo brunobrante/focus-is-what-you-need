@@ -312,12 +312,23 @@ function resizeSingleElement(
   } else {
     const dirX = handle.includes("e") ? 1 : handle.includes("w") ? -1 : 0;
     const dirY = handle.includes("s") ? 1 : handle.includes("n") ? -1 : 0;
-    if (dirX > 0) absX = startRect.x;
-    else if (dirX < 0) absX = startRect.x + startRect.width - width;
-    else absX = startRect.x;
-    if (dirY > 0) absY = startRect.y;
-    else if (dirY < 0) absY = startRect.y + startRect.height - height;
-    else absY = startRect.y;
+    const dx = currentPoint.x - interaction.startPoint.x;
+    const dy = currentPoint.y - interaction.startPoint.y;
+    // Anchor the edge opposite the (post-flip) growth direction, so a resize
+    // dragged past its anchor mirrors like resizeBoxFromHandle does (F1) rather
+    // than pinning. Identical to the plain min/max anchoring when not flipped.
+    const growsRight = (dirX !== 0 && startRect.width + dx * dirX < 0 ? -dirX : dirX) > 0;
+    const growsDown = (dirY !== 0 && startRect.height + dy * dirY < 0 ? -dirY : dirY) > 0;
+    if (dirX === 0) absX = startRect.x;
+    else {
+      const anchorX = dirX > 0 ? startRect.x : startRect.x + startRect.width;
+      absX = growsRight ? anchorX : anchorX - width;
+    }
+    if (dirY === 0) absY = startRect.y;
+    else {
+      const anchorY = dirY > 0 ? startRect.y : startRect.y + startRect.height;
+      absY = growsDown ? anchorY : anchorY - height;
+    }
     absX = clamp(absX, parentBounds.x, parentBounds.x + parentBounds.width - width);
     absY = clamp(absY, parentBounds.y, parentBounds.y + parentBounds.height - height);
   }

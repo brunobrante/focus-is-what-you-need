@@ -723,7 +723,7 @@ documented shipped decision; `-webkit-backdrop-filter` twin
 
 # 6. Rendering fidelity gaps (renderer/tooling, not new features)
 
-- **F1 — No flip/mirror when a resize crosses its anchor.**
+- ✅ **DONE — F1 — No flip/mirror when a resize crosses its anchor.**
   `src/canvas/engine/geometry/transforms.ts:236-240` — `resizeBoxFromHandle`
   clamps at `minSize`; dragging the E handle past the W edge pins at min
   size instead of flipping (Figma mirrors and swaps the handle). Draw-tool
