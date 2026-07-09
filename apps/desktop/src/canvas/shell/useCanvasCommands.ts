@@ -2,12 +2,12 @@ import { useMemo } from "react";
 
 import {
   alignElements,
-  bringToFront,
+  bringElementsToFront,
   deleteElements,
   distributeElements,
   duplicateElements,
-  reorderElement,
-  sendToBack,
+  reorderElements,
+  sendElementsToBack,
   setElementLocked,
   setElementVisible,
   unwrapElement,
@@ -56,17 +56,19 @@ export function useCanvasCommands(
         const result = duplicateElements(state.document, selectedIds);
         commit(result.document, result.selectedIds);
       },
+      // Z-order works on the whole selection, preserving its relative order;
+      // ids reorder within their own sibling list (G12).
       bringToFront: () => {
-        if (singleId) commit(bringToFront(state.document, singleId));
+        if (selectedIds.length > 0) commit(bringElementsToFront(state.document, selectedIds));
       },
       bringForward: () => {
-        if (singleId) commit(reorderElement(state.document, singleId, "forward"));
+        if (selectedIds.length > 0) commit(reorderElements(state.document, selectedIds, "forward"));
       },
       sendBackward: () => {
-        if (singleId) commit(reorderElement(state.document, singleId, "backward"));
+        if (selectedIds.length > 0) commit(reorderElements(state.document, selectedIds, "backward"));
       },
       sendToBack: () => {
-        if (singleId) commit(sendToBack(state.document, singleId));
+        if (selectedIds.length > 0) commit(sendElementsToBack(state.document, selectedIds));
       },
       // Align a single element within its parent frame, or a multi-selection within
       // its shared bounds (G1). Distribute needs 3+ elements.

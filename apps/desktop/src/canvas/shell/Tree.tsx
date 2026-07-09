@@ -872,10 +872,10 @@ function TreeContextMenuContent({
     { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !editor.clipboard.has(), action: commands.paste },
     { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: commands.duplicate },
     { type: "separator" },
-    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: commands.bringToFront },
-    { type: "action", label: "Bring Forward", disabled: !singleNode, action: commands.bringForward },
-    { type: "action", label: "Send Backward", disabled: !singleNode, action: commands.sendBackward },
-    { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: commands.sendToBack },
+    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !hasSelection, action: commands.bringToFront },
+    { type: "action", label: "Bring Forward", disabled: !hasSelection, action: commands.bringForward },
+    { type: "action", label: "Send Backward", disabled: !hasSelection, action: commands.sendBackward },
+    { type: "action", label: "Send to Back", shortcut: "[", disabled: !hasSelection, action: commands.sendToBack },
     { type: "separator" },
     // Align / distribute (G1) — shown for a multi-selection (align uses the shared
     // bounds; distribute needs 3+). Single-element align-within-parent is exposed

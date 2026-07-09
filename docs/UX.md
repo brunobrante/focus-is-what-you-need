@@ -488,7 +488,9 @@ and the header/preview chrome floats over it; once the nav is shown (a feature w
 enabled) it descends below that top row so the nav never covers a pane's top.
 
 **Right-click (canvas context menu)**: Copy / Paste / Duplicate · ordering (Bring to
-Front/Forward, Send Backward/Back) · **Align / Distribute** (shown only for a
+Front/Forward, Send Backward/Back — works on a **multi-selection** too: the selected
+elements keep their relative order and reorder within their own sibling lists) ·
+**Align / Distribute** (shown only for a
 multi-selection: Align left / horizontal centers / right / top / vertical centers /
 bottom, aligning the selected elements to their shared bounding box; Distribute
 horizontally / vertically appears with 3+ elements and equalizes the gaps between

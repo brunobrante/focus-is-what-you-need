@@ -4,7 +4,7 @@ export { createElementForTool, elementTypeLabel } from "./mutations/elementCreat
 export { insertElement, constrainElement, constrainAll, reparentElements, moveElementToParent, deleteElements, duplicateElements, wrapElements, unwrapElement } from "./mutations/elementHierarchy";
 export { fitTextElementToContent, setTextElementSizing, updateElementGeometry, updateElementRotation, updateElementStyles } from "./mutations/elementGeometry";
 export { updateElementText, updateElementTextShallow, updateElementImageSource, renameElement, setElementLocked, setElementVisible, detachInstance } from "./mutations/elementContent";
-export { reorderElement, moveElementBefore, bringToFront, sendToBack } from "./mutations/elementOrder";
+export { reorderElement, reorderElements, moveElementBefore, bringToFront, bringElementsToFront, sendToBack, sendElementsToBack } from "./mutations/elementOrder";
 export { alignElements, distributeElements, nudgeElements, type AlignEdge, type DistributeAxis } from "./mutations/elementAlign";
 export {
   makePathNode,
