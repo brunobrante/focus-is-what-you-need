@@ -866,15 +866,18 @@ The CSS conversions are handled in `compileAppearance`.
 controls follow the selected element — paper.design's CSS-honest, per-type naming, with one
 real CSS property behind each name:
 - **Box** (rect / wrapper / image / a div with children) → a **Border** section: **Width**,
-  **Color** (binds to a System Design color token like Fill), **Style** (**solid / dashed /
-  dotted / double**), and **Align** (**Inside** = CSS `border`; **Outside** = CSS `outline`
-  hugging the edge — keeps dashes and follows the corner radius). *Center alignment, per-side
-  widths, and a separate Outline-offset control are deferred (they need an SVG render target).*
+  **Color** (binds to a System Design color token like Fill), **Opacity %** (composes into the
+  color as an `#RRGGBBAA` alpha; shown while the color is a plain hex literal and no token is
+  bound — D3), **Style** (**solid / dashed / dotted / double**), and **Align** (**Inside** =
+  CSS `border`; **Outside** = CSS `outline` hugging the edge — keeps dashes and follows the
+  corner radius). *Center alignment, per-side widths, and a separate Outline-offset control
+  are deferred (they need an SVG render target).*
 - **Text** → an **Underline** section (on/off switch, then **Style** solid/double/dotted/
   dashed/wavy, **Color**, **Thickness**, **Offset** → the `text-decoration-*` family) and a
-  **Text stroke** section (**Width**, **Color**, and a **Fill** toggle **Above / Below** =
-  `paint-order`, mapping to `-webkit-text-stroke`; visible width is ~half the set value on
-  WebKit). Underline and text-stroke colors bind to tokens.
+  **Text stroke** section (**Width**, **Color** + **Opacity %** (same `#RRGGBBAA` composition
+  as the box border), and a **Fill** toggle **Above / Below** = `paint-order`, mapping to
+  `-webkit-text-stroke`; visible width is ~half the set value on WebKit). Underline and
+  text-stroke colors bind to tokens.
 - **Vector** (path / svg) → a **Stroke** section: **Color** (token-bindable), **Width**,
   **Opacity**, **Cap** (butt/round/square), **Join** (miter/round/bevel), and **Dash** (e.g.
   `4 2`), painted directly on the `<path>`. *clip-path shapes (polygon / star / arrow) can't

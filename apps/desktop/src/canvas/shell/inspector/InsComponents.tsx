@@ -109,6 +109,36 @@ export function updateNumber(value: string, commit: (value: number) => void): bo
   return true;
 }
 
+// ── Hex alpha helpers ────────────────────────────────────────────────────────
+// Color + opacity % pairs store a single `#RRGGBBAA` string (the doc's model
+// for border/stroke colors). #RGB and #RRGGBB parse as fully opaque; anything
+// that isn't a plain hex literal is left alone (returns null).
+
+/** The alpha of a hex color as 0–100, or null when not a hex literal. */
+export function hexAlphaPercent(color: string): number | null {
+  const raw = color.trim();
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) return null;
+  if (raw.length !== 9) return 100;
+  return Math.round((parseInt(raw.slice(7, 9), 16) / 255) * 100);
+}
+
+/** The same hex color with its alpha channel replaced (percent 0–100), or null
+ *  when the input isn't a hex literal. 100% collapses back to #RRGGBB. */
+export function hexWithAlphaPercent(color: string, percent: number): string | null {
+  const raw = color.trim();
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) return null;
+  const rgb =
+    raw.length === 4
+      ? `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`
+      : raw.slice(0, 7);
+  const clamped = clamp(Math.round(percent), 0, 100);
+  if (clamped >= 100) return rgb.toUpperCase();
+  const alpha = Math.round((clamped / 100) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `${rgb}${alpha}`.toUpperCase();
+}
+
 export function useDeferredCommitField(value: string, onChange: (v: string) => CommitResult) {
   const [draftValue, setDraftValueState] = useState(value);
   const draftValueRef = useRef(value);

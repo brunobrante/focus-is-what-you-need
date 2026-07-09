@@ -2,6 +2,8 @@ import type { ElementStyles } from "@/canvas/engine/types";
 import type { BorderTarget } from "@/domain/canvas/border";
 import {
   clamp,
+  hexAlphaPercent,
+  hexWithAlphaPercent,
   InsColor,
   type InsColorToken,
   InsInput,
@@ -12,6 +14,34 @@ import {
   InsToggle,
   updateNumber,
 } from "./InsComponents";
+
+// Color + opacity % → one #RRGGBBAA string (docs/inspector-border-stroke.md,
+// D3). Shown only while the stored color is a plain hex literal — a bound
+// token or an exotic CSS literal has no place to carry the alpha.
+function ColorOpacityRow({
+  color,
+  onCommit,
+}: {
+  color: string;
+  onCommit: (nextColor: string) => void;
+}) {
+  const alpha = hexAlphaPercent(color);
+  if (alpha === null) return null;
+  return (
+    <InsRow label="Opacity">
+      <InsInput
+        value={String(alpha)}
+        onChange={(v) =>
+          updateNumber(v, (n) => {
+            const next = hexWithAlphaPercent(color, clamp(n, 0, 100));
+            if (next) onCommit(next);
+          })
+        }
+        suffix="%"
+      />
+    </InsRow>
+  );
+}
 
 /**
  * The type-aware Border / Stroke panel. The header and controls follow the
@@ -54,6 +84,12 @@ export function BorderSection({
             onBind={(borderColorRef) => onChange({ borderColorRef })}
           />
         </InsRow>
+        {!styles.borderColorRef ? (
+          <ColorOpacityRow
+            color={styles.borderColor ?? "#CBD5E1"}
+            onCommit={(borderColor) => onChange({ borderColor, borderColorRef: undefined })}
+          />
+        ) : null}
         <InsRow label="Style">
           <InsSelect
             value={styles.borderStyle ?? "solid"}
@@ -137,6 +173,12 @@ export function BorderSection({
               onBind={(textStrokeColorRef) => onChange({ textStrokeColorRef })}
             />
           </InsRow>
+          {!styles.textStrokeColorRef ? (
+            <ColorOpacityRow
+              color={styles.textStrokeColor ?? "#000000"}
+              onCommit={(textStrokeColor) => onChange({ textStrokeColor, textStrokeColorRef: undefined })}
+            />
+          ) : null}
           <InsRow label="Fill">
             <InsToggle
               value={styles.textStrokePaintOrder ?? "under"}
