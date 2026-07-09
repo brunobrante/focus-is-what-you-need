@@ -50,9 +50,9 @@ path-edit, rotated text editing, and resize-flip in-app.
   P9 (spatial index — audit says not urgent).
 - **Blocked on the SVG render target:** F3, G13, D6-partial, F2-borders.
 - **Deferred (needs new rebindable commands):** L16.
-- **Parity features:** G3, G8, G9, G10, G11, G14; G1's toolbar/inspector
-  surfaces; and the doc-divergence UI items D3/D4/D5/D7.
-  (2026-07-09 pass: G4, G5, G6, G12, F4 done — see the item entries.)
+- **Parity features:** G3, G8, G9, G10, G11, G14; and G1's toolbar/inspector
+  surfaces. (2026-07-09 pass: G4, G5, G6, G12, F4, D3–D7 done — see the item
+  entries.)
 
 ## Scope and intentional exclusions
 
@@ -702,29 +702,23 @@ transient frames. Memoize on the settled document or on `changedIds`.
   cheat-sheet: text solid → `color`. Code wrote `background`
   (`fill.ts:289-292`) — same defect as M12; fixed there (text single solid now
   routes to `styles.color`/`colorRef`).
-- **D3 — Border color opacity control missing.**
-  `docs/inspector-border-stroke.md` §Boxes: "Color + opacity % →
-  border-color as #RRGGBBAA". `BorderSection.tsx:48-56` offers color only
-  (reachable only by hand-typing 8-digit hex). Vector strokes do get an
-  Opacity row (`BorderSection.tsx:175-181`); boxes/text-stroke don't.
-- **D4 — Min/max gating.** `docs/inspector-layout.md` §Min/max: "apply per
-  axis, independently … e.g. min-height on a Hug container".
-  `LayoutSection.tsx:356-401` shows Min/Max W/H only when the **parent** is
-  flex/grid; an absolute child or a container itself can't author them.
-- **D5 — Constraint anchors scope.** `docs/inspector-layout.md` §Constraint
-  anchors: "Absolute/free children only". `LayoutSection.tsx:426-443` shows
-  Pin X / Pin Y for every non-root element, including in-flow flex/grid
-  children.
-- **D6 — Engine fields with no authoring UI.** `styles.baseline`
-  (`src/domain/canvas/layout.ts:118-120`), `rowGap`/`columnGap`,
-  `gridColumnSpan`/`gridRowSpan`, `justifySelf`, `alignContent`
-  (`layout.ts:84-92, 237-241`) are implemented in the compiler but no
-  LayoutSection control sets them. Similarly the `TextResize` enum is defined
-  but unused (see G4). Add controls (respecting the auto-layout UX gate) or
-  mark deferred in the doc.
-- **D7 — Export scale.** `docs/inspector-export.md` §Core panel: "Scale:
-  0.5×/1×/2×/3× + arbitrary". `ExportSection.tsx:38` offers only the four
-  presets.
+- ✅ **DONE — D3 — Border color opacity control missing.** Opacity % rows under
+  the box Border and Text stroke colors compose into the stored hex's alpha
+  (`#RRGGBBAA`), shown while the color is a plain hex literal with no token
+  bound; shared `hexAlphaPercent`/`hexWithAlphaPercent` helpers in
+  InsComponents.
+- ✅ **DONE — D4 — Min/max gating.** Min/Max W/H moved out of the
+  flex/grid-child block — authorable on every element, per axis.
+- ✅ **DONE — D5 — Constraint anchors scope.** Pin X / Pin Y now gate on
+  `!isRoot && !parentIsFlow` (absolute/free children only), matching the G5
+  resize reflow which skips flex/grid children.
+- ✅ **DONE — D6 — Engine fields with no authoring UI.** Added Row/Col gap
+  per-axis overrides, Rows align (`align-content`, wrap only), Baseline (row
+  flow), and grid-cell Justify self + Col/Row span. TextResize was removed by
+  G4 rather than authored.
+- ✅ **DONE — D7 — Export scale.** Free 0.1×–10× numeric field beside the
+  0.5/1/2/3 preset select (which lists an arbitrary current value so it never
+  shows blank).
 - ✅ **DONE — D8 — Tile-gap formula.** `docs/inspector-fill.md` §Pattern documents
   "gap = patternWidth − motifWidth" with the motif at its real pixel size;
   the compiled motif was the `scale` number reinterpreted as px, so the
