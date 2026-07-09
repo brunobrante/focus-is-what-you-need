@@ -44,15 +44,20 @@ NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
 NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
-**Remaining (2026-07-08, after the tractable-items pass began):**
-- **Architecture perf (need runtime measurement):** P1 (zoom projection), P2 (rAF
-  batching), P4 (inspector selector subscription), P6 (history snapshot sharing),
-  P9 (spatial index — audit says not urgent).
-- **Blocked on the SVG render target:** F3, G13, D6-partial, F2-borders.
+**Remaining (2026-07-09, after the tractable-items pass):**
+- **Architecture perf (need runtime measurement):** P1 (zoom projection), P4's
+  selector-subscription refactor (partially done — see the item), P9 (spatial
+  index — audit says not urgent).
+- **Blocked on the SVG render target:** F3, G13, F2-borders.
 - **Deferred (needs new rebindable commands):** L16.
-- **Parity features:** G3, G8, G9, G10, G11, G14; and G1's toolbar/inspector
-  surfaces. (2026-07-09 pass: G4, G5, G6, G12, F4, D3–D7 done — see the item
-  entries.)
+- **Parity features:** G3 (font management — needs queryLocalFonts/Rust
+  verification), G9 (full color picker), G10 (rich text — its own multi-phase
+  effort).
+- Done in the 2026-07-09 pass: G1 (fully), G4, G5, G6, G8, G11, G12, G14, F4,
+  D3–D7, P2, P6, P4-partial — see the item entries. All typechecked and
+  unit-tested where tests exist, but NOT runtime-verified here; verify
+  cross-pane paste, constraints-on-resize, alt-drag duplicate, endpoint
+  editing, the gradient overlay, and token binding in-app.
 
 ## Scope and intentional exclusions
 
@@ -598,7 +603,16 @@ wheel events so at most one re-projection runs per frame; (c) raise the
 scaled-projection threshold. (a)+(b) together match what Figma-class editors
 do (blurry-during-zoom, crisp-on-settle).
 
-## P2 — MEDIUM — No rAF batching / coalescing for pointermove-driven document mutation
+## ✅ DONE — P2 — MEDIUM — No rAF batching / coalescing for pointermove-driven document mutation
+
+The gesture branch of `onPointerMove` now stores only the newest event and
+processes it once per animation frame (deltas are absolute from gesture
+start, so dropped intermediates are lossless); pointerup flushes the pending
+move first, Escape-cancel drops it. The reparent preview's per-frame
+`structuredClone` cost is now paid at most once per display frame; making it
+incremental remains a possible follow-up if profiling still shows it hot.
+
+Original note:
 
 `useCanvasPointerEvents.ts:542-597` dispatches `setDocumentTransient`
 synchronously per pointermove; a 120 Hz+ mouse produces more document clones
@@ -625,7 +639,19 @@ null and every keystroke triggers: full O(N) deep diff
 (`store.tsx:554-582`). Every other hot path passes `changedIds`. **Fix:**
 pass `changedIds: [current.nodeId]`.
 
-## P4 — MEDIUM — Whole-inspector re-render on every document change, including 60 Hz transient drags
+## ⏳ PARTIAL — P4 — Whole-inspector re-render on every document change, including 60 Hz transient drags
+
+Done so far: `normalizeFills` is memoized on its fill inputs (transient drag
+frames share the node's styles object, so the Fill subtree's array identity
+now survives a whole drag), and P2's rAF coalescing caps the re-render rate
+at the display refresh. Remaining: the selector-based subscription refactor —
+the Inspector's commit callbacks close over the subscribed `document`, so
+narrowing the subscription without moving every callback to event-time
+snapshot reads risks committing from a stale document. Do it with React
+profiler measurements at hand (it's also less urgent now that P6 removed the
+per-commit deep clones).
+
+Original note:
 
 `src/canvas/shell/Inspector.tsx:123` subscribes to the entire `document`;
 `setDocumentTransient` (`store.tsx:390-410`) publishes a new document per
@@ -646,7 +672,15 @@ dep and executes `canvas.width = width` (buffer realloc + clear) **before**
 the `enabled`/zoom early-return. **Fix:** early-return before touching the
 canvas; memoize `canvasRect`.
 
-## P6 — MEDIUM (memory) — History is 80 full document snapshots
+## ✅ DONE — P6 — MEDIUM (memory) — History is 80 full document snapshots
+
+Every single-node mutation (geometry, rotation, styles, text sizing/content,
+image src, rename, lock/visible) now shallow-clones the document and copies
+only the touched node, so history snapshots share untouched nodes with each
+other — matching what the interaction paths already did. `detachInstance`
+keeps its deep clone (it mutates a whole subtree).
+
+Original note:
 
 `history.ts:63` caps length, but each Inspector-path entry is an independent
 `structuredClone` of the whole scene (H3 path); ceiling is 80 × scene size.

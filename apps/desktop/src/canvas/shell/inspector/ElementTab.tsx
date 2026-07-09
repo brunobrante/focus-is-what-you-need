@@ -152,6 +152,34 @@ export function ElementTab({
     [resolvedDesign],
   );
   const fillTarget = fillTargetForType(node.type);
+  // Keep the normalized fills array reference-stable across renders whose fill
+  // inputs didn't change (P4): transient drag frames share the node's styles
+  // object, so this bails for the whole drag instead of fabricating a fresh
+  // array (and re-rendering the Fill subtree) per frame.
+  const normalizedFills = useMemo(
+    () =>
+      normalizeFills({
+        type: node.type,
+        fills: node.styles.fills,
+        background: node.styles.background,
+        backgroundRef: node.styles.backgroundRef,
+        // Text solids live on the glyph color, not background (M12).
+        color: node.styles.color,
+        colorRef: node.styles.colorRef,
+        src: node.src,
+        objectFit: node.styles.objectFit,
+      }),
+    [
+      node.type,
+      node.styles.fills,
+      node.styles.background,
+      node.styles.backgroundRef,
+      node.styles.color,
+      node.styles.colorRef,
+      node.src,
+      node.styles.objectFit,
+    ],
+  );
   // The Fill panel edits a normalized Fill[]; we translate it back to the stored
   // shape (collapsing the trivial solid/image cases to `background` / `src`).
   const handleFillsChange = (next: Fill[]) => {
@@ -345,17 +373,7 @@ export function ElementTab({
 
       {fillTarget ? (
         <FillSection
-          fills={normalizeFills({
-            type: node.type,
-            fills: node.styles.fills,
-            background: node.styles.background,
-            backgroundRef: node.styles.backgroundRef,
-            // Text solids live on the glyph color, not background (M12).
-            color: node.styles.color,
-            colorRef: node.styles.colorRef,
-            src: node.src,
-            objectFit: node.styles.objectFit,
-          })}
+          fills={normalizedFills}
           target={fillTarget}
           tokens={colorTokens}
           gradientTokens={gradientTokens}
