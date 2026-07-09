@@ -546,6 +546,56 @@ export function useCanvasPointerEvents({
     viewport.setPointerCapture(event.pointerId);
   };
 
+  // The gesture branch of a pointermove, run at most once per animation frame
+  // (P2): a 120Hz+ mouse otherwise produces more document clones + React
+  // commits than display frames — worst on the Cmd-reparent drag, which walks
+  // the tree and structuredClones per event.
+  const processInteractionMove = (event: ReactPointerEvent<HTMLDivElement>, interaction: Interaction) => {
+    if (interaction.type === "pan") { handlePanMove(interaction, event, state.document, getCurrentViewportSize, dispatch, navigableBounds); return; }
+
+    const point = getCanvasPoint(event);
+    if (!point) return;
+
+    if (interaction.type === "draw") { handleDrawMove(interaction, event, point, dispatch, latestDocumentRef, settings); return; }
+    if (interaction.type === "pen") { penPointerMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "pencil") { pencilMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "anchor-edit") { anchorEditMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
+    if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
+
+    // canvas-resize, canvas-rotate, resize, rotate, radius: shared distance threshold
+    interaction.moved = interaction.moved || Math.hypot(point.x - interaction.startPoint.x, point.y - interaction.startPoint.y) > 0.5;
+
+    if (interaction.type === "canvas-resize") { handleCanvasResizeMove(interaction, event, dispatch, latestDocumentRef, settings); return; }
+    if (interaction.type === "canvas-rotate") { handleCanvasRotateMove(interaction, point, event, dispatch, latestDocumentRef, settings); return; }
+    handleTransformMove(interaction, point, event, dispatch, latestDocumentRef, settings);
+  };
+
+  // Latest unprocessed move (only the newest matters — deltas are absolute from
+  // the gesture start, so intermediate events are safely dropped) and its rAF.
+  const pendingMoveRef = useRef<{ event: ReactPointerEvent<HTMLDivElement>; interaction: Interaction } | null>(null);
+  const moveRafRef = useRef<number | null>(null);
+
+  const clearPendingMove = () => {
+    if (moveRafRef.current !== null) {
+      cancelAnimationFrame(moveRafRef.current);
+      moveRafRef.current = null;
+    }
+    pendingMoveRef.current = null;
+  };
+
+  // Process a still-pending move NOW — pointerup must see the final cursor
+  // position, not the last painted frame's.
+  const flushPendingMove = () => {
+    const pending = pendingMoveRef.current;
+    clearPendingMove();
+    if (pending && interactionRef.current === pending.interaction) {
+      processInteractionMove(pending.event, pending.interaction);
+    }
+  };
+
+  useEffect(() => clearPendingMove, []);
+
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (textInteraction.handleTextDragMove(event)) return;
 
@@ -583,28 +633,28 @@ export function useCanvasPointerEvents({
     }
 
     if (interaction.pointerId !== event.pointerId) return;
-    if (interaction.type === "pan") { handlePanMove(interaction, event, state.document, getCurrentViewportSize, dispatch, navigableBounds); return; }
 
-    const point = getCanvasPoint(event);
-    if (!point) return;
-
-    if (interaction.type === "draw") { handleDrawMove(interaction, event, point, dispatch, latestDocumentRef, settings); return; }
-    if (interaction.type === "pen") { penPointerMove(interaction, point, dispatch, latestDocumentRef); return; }
-    if (interaction.type === "pencil") { pencilMove(interaction, point, dispatch, latestDocumentRef); return; }
-    if (interaction.type === "anchor-edit") { anchorEditMove(interaction, point, dispatch, latestDocumentRef); return; }
-    if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
-    if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
-
-    // canvas-resize, canvas-rotate, resize, rotate, radius: shared distance threshold
-    interaction.moved = interaction.moved || Math.hypot(point.x - interaction.startPoint.x, point.y - interaction.startPoint.y) > 0.5;
-
-    if (interaction.type === "canvas-resize") { handleCanvasResizeMove(interaction, event, dispatch, latestDocumentRef, settings); return; }
-    if (interaction.type === "canvas-rotate") { handleCanvasRotateMove(interaction, point, event, dispatch, latestDocumentRef, settings); return; }
-    handleTransformMove(interaction, point, event, dispatch, latestDocumentRef, settings);
+    // rAF-coalesce the gesture path (P2): keep only the newest event and process
+    // once per frame. The stale-interaction guard drops a frame queued for a
+    // gesture that ended/was cancelled before the rAF fired.
+    pendingMoveRef.current = { event, interaction };
+    if (moveRafRef.current === null) {
+      moveRafRef.current = requestAnimationFrame(() => {
+        moveRafRef.current = null;
+        const pending = pendingMoveRef.current;
+        pendingMoveRef.current = null;
+        if (!pending || interactionRef.current !== pending.interaction) return;
+        processInteractionMove(pending.event, pending.interaction);
+      });
+    }
   };
 
   const finishInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (textInteraction.releaseTextDrag(event, viewportRef.current)) return;
+
+    // Apply the last coalesced move before finishing, so the commit reflects
+    // the final pointer position (P2).
+    flushPendingMove();
 
     const interaction = interactionRef.current;
     if (!interaction || interaction.pointerId !== event.pointerId) return;
@@ -675,6 +725,9 @@ export function useCanvasPointerEvents({
     ) {
       return false;
     }
+
+    // Drop (don't process) a coalesced move — we're reverting anyway (P2).
+    clearPendingMove();
 
     const viewport = viewportRef.current;
     if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
