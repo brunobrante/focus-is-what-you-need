@@ -809,6 +809,16 @@ Fit H), matching Figma. Either behavior can be changed per axis with the
 Fixed/Fit toggles above; a Fit axis shows a read-only size and ignores
 resize-handle drags until switched back to Fixed.
 
+**Inspector → multi-selection (G8):** selecting **2+ elements** shows a compact batch panel
+instead of the single-element tabs: **X / Y / W / H** fields (showing the common value, or an
+empty field with a **Mixed** placeholder when the elements differ; committing applies to every
+editable selected element), an **Opacity %** field (same Mixed convention), and — when any
+selected element takes a fill — a **Fill** color swatch that batch-applies a **solid** fill to
+all of them (per-type: glyph color on text, background on boxes; the row label reads
+"Fill · Mixed" while colors differ). Linked instances (and their descendants) and locked
+elements are skipped by batch writes. The **Boolean** ops block (Union / Subtract / Intersect /
+Exclude) stays below the batch panel.
+
 **Inspector → Fill** (shown for every fillable element — hidden for **line / arrow** which have
 no interior, and for **path / svg** which fill through the Vector section): a stacked **Fill**
 list (Figma's model) above Appearance. Each fill is a card with an **eye** enable toggle, a

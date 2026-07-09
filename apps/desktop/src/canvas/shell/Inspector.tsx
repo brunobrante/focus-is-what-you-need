@@ -29,6 +29,7 @@ import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument, CanvasP
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
 import { getInstanceRootId } from "@/canvas/engine/geometry";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
+import { MultiSelectTab } from "./inspector/MultiSelectTab";
 import { CanvasTab } from "./inspector/CanvasTab";
 import { LayoutTab } from "./inspector/LayoutTab";
 import { ShellTab, type ShellControlVisibility } from "./inspector/ShellTab";
@@ -419,7 +420,13 @@ export function Inspector({
           />
         ) : selectedCount > 1 ? (
           <div className="flex flex-col">
-            <EmptyState title={`${selectedCount} elements selected`} body="Use the canvas to move the group or select a layer to edit properties." />
+            <MultiSelectTab
+              nodes={((editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [])
+                .map((id) => document.elements[id])
+                .filter((n): n is NonNullable<typeof n> => Boolean(n))}
+              document={document}
+              commitDocument={(next) => commitDocument(next)}
+            />
             <div className="flex flex-col gap-2 border-t border-[#2C2C2C] px-3 py-3">
               <span className="text-[11px] font-medium text-[#9A9A9A]">Boolean</span>
               <div className="grid grid-cols-2 gap-1.5">

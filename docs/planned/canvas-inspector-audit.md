@@ -914,7 +914,17 @@ grandparent preserving absolute positions (account for parent rotation),
 remove the empty wrapper, select the children. Menu + shortcut via the
 command registry.
 
-## G8 — Multi-selection editing in the inspector (MISSING)
+## ✅ DONE (minimum viable) — G8 — Multi-selection editing in the inspector (MISSING)
+
+New `MultiSelectTab`: shared X/Y/W/H and Opacity % fields (common value or a
+"Mixed" placeholder; commits fold `updateElementGeometry`/`updateElementStyles`
+over every editable selected element) plus a solid-fill batch apply using the
+same write-patch translation as ElementTab (text → glyph color). Linked
+instances/descendants and locked nodes are skipped. Boolean ops stay below.
+Full per-section mixed editing (typography, borders, effects…) remains a
+follow-up. UX.md updated.
+
+Original note:
 
 `Inspector.tsx:376-399`: >1 selected shows an empty state + Boolean ops
 only. No mixed-value display ("Mixed" placeholder), no batch apply. Minimum
