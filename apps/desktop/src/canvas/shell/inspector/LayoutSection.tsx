@@ -8,7 +8,7 @@
 // default). The panel is the authoring surface; the renderer adopts the engine
 // in a later pass. See docs/inspector-layout.md.
 
-import type { ElementStyles, ElementType, GridTrack, PadAlign } from "@/canvas/engine/types";
+import type { ElementStyles, GridTrack, PadAlign } from "@/canvas/engine/types";
 import {
   clamp,
   InsInput,
@@ -21,7 +21,6 @@ import {
 
 type LayoutSectionProps = {
   styles: ElementStyles;
-  type: ElementType;
   /** True when the element lays out children (a "frame" — any div with kids). */
   hasChildren: boolean;
   /** The parent element's styles, or null at the root. Gates the child controls
@@ -150,7 +149,6 @@ function TrackEditor({
 
 export function LayoutSection({
   styles,
-  type,
   hasChildren,
   parentStyles,
   isRoot,
@@ -198,20 +196,8 @@ export function LayoutSection({
 
   return (
     <InsSection title="Layout" disabled={locked}>
-      {/* ── Text resize (its own enum) ── */}
-      {type === "text" ? (
-        <InsRow label="Resize">
-          <InsToggle
-            value={styles.textResize ?? "auto-height"}
-            onChange={(v) => onChange({ textResize: v as ElementStyles["textResize"] })}
-            options={[
-              { value: "auto-width", label: "Auto W" },
-              { value: "auto-height", label: "Auto H" },
-              { value: "fixed", label: "Fixed" },
-            ]}
-          />
-        </InsRow>
-      ) : null}
+      {/* Text auto-resize lives in Transform as the per-axis Fixed/Fit toggles
+          (node.sizing, G4); the old authoring-only textResize enum is gone. */}
 
       {/* ── Container layout (any element with children) ── */}
       {hasChildren ? (

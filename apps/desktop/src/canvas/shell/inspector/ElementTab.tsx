@@ -320,7 +320,6 @@ export function ElementTab({
 
       <LayoutSection
         styles={node.styles}
-        type={node.type}
         hasChildren={node.children.length > 0}
         parentStyles={node.parentId ? document.elements[node.parentId]?.styles ?? null : null}
         isRoot={!node.parentId}
