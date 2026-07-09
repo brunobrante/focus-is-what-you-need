@@ -32,7 +32,6 @@ import type {
   GridTrack,
   PadAlign,
   SizingMode,
-  TextResize,
 } from "./types";
 
 // ─── Small helpers ──────────────────────────────────────────────────────────
@@ -295,29 +294,6 @@ export function compileFlip(styles: ElementStyles): string | undefined {
   if (styles.flipH) parts.push("scaleX(-1)");
   if (styles.flipV) parts.push("scaleY(-1)");
   return parts.length ? parts.join(" ") : undefined;
-}
-
-// ─── Text auto-resize (its own enum) ────────────────────────────────────────
-
-/**
- * Compile the text-resize enum (trap #10). Distinct from the Fixed/Hug/Fill
- * container modes:
- *  • auto-width  → `width: max-content` (grows horizontally; honors explicit
- *    breaks, so no soft-wrap).
- *  • auto-height → fixed width, `height: auto` (wraps and grows downward).
- *  • fixed       → fixed W+H, clipped (caller supplies W/H; we add the clip).
- */
-export function compileTextResize(mode: TextResize | undefined): CSSProperties {
-  switch (mode) {
-    case "auto-width":
-      return { width: "max-content", whiteSpace: "pre" };
-    case "auto-height":
-      return { height: "auto", whiteSpace: "normal" };
-    case "fixed":
-      return { overflow: "hidden" };
-    default:
-      return {};
-  }
 }
 
 // ─── Canvas stacking (paint order) ──────────────────────────────────────────

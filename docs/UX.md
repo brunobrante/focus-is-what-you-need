@@ -758,6 +758,14 @@ Fields carry an in-field glyph (X / Y / W / H / ⟲) instead of an outside label
 disclosure, collapsed by default. **Text** elements also get **Fixed / Fit** width and height
 mode toggles (a Fit axis shows a read-only size instead of an input).
 
+**Text auto-resize defaults (G4):** a **click-created** text element starts in
+**auto-width** — Fit on both axes, hugging its content and growing while you type
+(the box re-fits on every content, font, or typography change). A **drag-drawn**
+text box keeps the **width you drew** and hugs its content vertically (Fixed W +
+Fit H), matching Figma. Either behavior can be changed per axis with the
+Fixed/Fit toggles above; a Fit axis shows a read-only size and ignores
+resize-handle drags until switched back to Fixed.
+
 **Inspector → Fill** (shown for every fillable element — hidden for **line / arrow** which have
 no interior, and for **path / svg** which fill through the Vector section): a stacked **Fill**
 list (Figma's model) above Appearance. Each fill is a card with an **eye** enable toggle, a

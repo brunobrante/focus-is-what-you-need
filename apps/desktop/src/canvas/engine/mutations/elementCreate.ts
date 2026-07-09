@@ -1,4 +1,4 @@
-import type { ElementNode, ElementType, InsertTool } from "../types";
+import type { ElementNode, ElementSizing, ElementType, InsertTool } from "../types";
 import { clamp, roundPixel } from "../geometry";
 import { createId } from "./coreUtils";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -141,6 +141,12 @@ export function createElementForTool(
     height: sized(configured.height, ranges.height[0], ranges.height[1], sizeMode),
     styles,
     ...(configured.content !== undefined ? { content: configured.content } : {}),
+    // New text defaults to auto-width (Figma): the box hugs its content on both
+    // axes and grows while typing. A drag-drawn text box overrides this to
+    // fixed-width + auto-height at commit (G4).
+    ...(TOOL_TYPES[tool] === "text"
+      ? { sizing: { width: "fit", height: "fit" } as ElementSizing }
+      : {}),
   } as ElementNode;
   node.x = roundPixel(x - node.width / 2);
   node.y = roundPixel(y - node.height / 2);

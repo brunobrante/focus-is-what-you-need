@@ -834,7 +834,20 @@ per-family weight lists feeding `fontFamily`/`fontWeight`; ensure the
 renderer loads chosen faces before measuring (text-fit and M8 both depend on
 correct metrics).
 
-## G4 — Wire text auto-resize (PARTIAL: modeled, dead)
+## ✅ DONE — G4 — Wire text auto-resize (PARTIAL: modeled, dead)
+
+Since the audit, the per-axis `node.sizing` model ("fit"/"fixed") had already
+superseded the dead `TextResize` enum: `applyTextFitSizingInPlace` runs on every
+content/style/typography change (including per-keystroke via
+`updateElementTextShallow`), and the Inspector Transform section exposes
+Fixed/Fit toggles per axis. This pass closed the remaining gaps: **new
+click-created text defaults to auto-width** (fit × fit, sized to content and
+centered on the click), **drag-drawn text commits as drawn-width + fit-height**
+(Figma), and the never-wired `TextResize` enum / `styles.textResize` /
+`compileTextResize` were deleted (also closes D6's TextResize bullet). UX.md
+updated; unit-tested.
+
+Original note:
 
 `TextResize` enum exists in the domain but is unused by renderer/engine;
 text boxes don't grow while typing — only the manual "Fit width and height"

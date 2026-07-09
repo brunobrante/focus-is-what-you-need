@@ -2,6 +2,8 @@ import type React from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { getToolElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { createElementForTool, reparentElements, shallowCloneDocument } from "@/canvas/engine/actions";
+import { mutateElementShallow } from "@/canvas/engine/mutations/coreUtils";
+import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
 import { clamp, getDescendantIds, roundPixel } from "@/canvas/engine/geometry";
 import type { CanvasDocument, EditorState, ElementFontTokens, Point, Rect } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
@@ -351,10 +353,23 @@ export function finishDrawInteraction(
   noticeStore?: NoticeStore,
 ): void {
   if (interaction.moved) {
+    let finalDocument = interaction.lastDocument;
+    // A drag-drawn text box keeps the width the user drew but hugs its content
+    // vertically (Figma: fixed width + auto height). Click-created text stays on
+    // the creation default (auto-width, see createElementForTool) (G4).
+    if (finalDocument.elements[interaction.elementId]?.type === "text") {
+      const next = shallowCloneDocument(finalDocument);
+      const node = mutateElementShallow(next, interaction.elementId);
+      if (node) {
+        node.sizing = { width: "fixed", height: "fit" };
+        applyTextFitSizingInPlace(next, interaction.elementId);
+        finalDocument = next;
+      }
+    }
     dispatch({
       type: "commitDocument",
       beforeDocument: interaction.beforeDocument,
-      document: interaction.lastDocument,
+      document: finalDocument,
       selectedIds: [interaction.elementId],
     });
   } else {
@@ -370,6 +385,15 @@ export function finishDrawInteraction(
     node.id = interaction.elementId;
     next.elements[node.id] = node;
     if (!next.rootIds.includes(node.id)) next.rootIds.push(node.id);
+    if (node.type === "text") {
+      // Size the new auto-width box to its placeholder content right away and
+      // keep it centered on the click point (the default centering used the
+      // pre-fit size), clamped inside the frame.
+      applyTextFitSizingInPlace(next, node.id);
+      const canvas = next.canvas;
+      node.x = roundPixel(clamp(interaction.startPoint.x - node.width / 2, 0, Math.max(0, canvas.width - node.width)));
+      node.y = roundPixel(clamp(interaction.startPoint.y - node.height / 2, 0, Math.max(0, canvas.height - node.height)));
+    }
     dispatch({
       type: "commitDocument",
       beforeDocument: interaction.beforeDocument,

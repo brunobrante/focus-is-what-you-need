@@ -6,7 +6,6 @@ import {
   compileConstraints,
   compileContainerLayout,
   compileFlip,
-  compileTextResize,
 } from "../layout";
 
 // ── display gate ──────────────────────────────────────────────────────────────
@@ -154,15 +153,6 @@ test("scale expresses position and size as percentages", () => {
   expect(out.left).toBe(`${(10 / 400) * 100}%`);
   expect(out.width).toBe(`${(100 / 400) * 100}%`);
   expect(out.height).toBe(`${(50 / 300) * 100}%`);
-});
-
-// ── trap #10: text resize is its own enum ─────────────────────────────────────
-
-test("text resize maps to the three distinct CSS shapes", () => {
-  expect(compileTextResize("auto-width")).toEqual({ width: "max-content", whiteSpace: "pre" });
-  expect(compileTextResize("auto-height")).toEqual({ height: "auto", whiteSpace: "normal" });
-  expect(compileTextResize("fixed")).toEqual({ overflow: "hidden" });
-  expect(compileTextResize(undefined)).toEqual({});
 });
 
 // ── grid ──────────────────────────────────────────────────────────────────────

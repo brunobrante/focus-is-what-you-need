@@ -63,10 +63,6 @@ export type ConstraintH = "left" | "right" | "left-right" | "center" | "scale";
 /** Absolute-child vertical constraint when its frame resizes (trap #9). */
 export type ConstraintV = "top" | "bottom" | "top-bottom" | "center" | "scale";
 
-/** Text auto-resize — its OWN enum, not the Fixed/Hug/Fill container modes
- *  (trap #10). auto-width → `max-content`; auto-height → fixed width + `auto`
- *  height (wraps); fixed → fixed W+H (clips). */
-export type TextResize = "auto-width" | "auto-height" | "fixed";
 
 // ── Effects (Inspector → Effects panel) ─────────────────────────────────────
 // One unified list (Figma's model) where each entry has a type. The CSS the
@@ -243,8 +239,6 @@ export type ElementStyles = {
   // rotation sign is inverted vs CSS; we keep the CSS convention here):
   flipH?: boolean;
   flipV?: boolean;
-  // Text auto-resize — its own enum, separate from widthMode/heightMode (#10):
-  textResize?: TextResize;
   objectFit?: "fill" | "contain" | "cover" | "none" | "scale-down";
   // ── Text stroke & underline (Inspector → Border/Stroke panel; text only) ──
   // Text stroke is `-webkit-text-stroke` (fixed-center; ~half the set width is

@@ -15,7 +15,6 @@ import type {
   Distribute,
   ConstraintH,
   ConstraintV,
-  TextResize,
 } from "@/domain/canvas/types";
 export type {
   Tool,
@@ -31,7 +30,6 @@ export type {
   Distribute,
   ConstraintH,
   ConstraintV,
-  TextResize,
 };
 import type {
   Fill,
