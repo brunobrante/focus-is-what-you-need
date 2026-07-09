@@ -50,8 +50,9 @@ path-edit, rotated text editing, and resize-flip in-app.
   P9 (spatial index — audit says not urgent).
 - **Blocked on the SVG render target:** F3, G13, D6-partial, F2-borders.
 - **Deferred (needs new rebindable commands):** L16.
-- **Parity features:** G3, G4, G5, G8, G9, G10, G11, G12, G14; G1's
-  toolbar/inspector surfaces; and the doc-divergence UI items D3/D4/D5/D7.
+- **Parity features:** G3, G8, G9, G10, G11, G14; G1's toolbar/inspector
+  surfaces; and the doc-divergence UI items D3/D4/D5/D7.
+  (2026-07-09 pass: G4, G5, G6, G12, F4 done — see the item entries.)
 
 ## Scope and intentional exclusions
 
@@ -952,30 +953,33 @@ Stops/angle are numeric-panel-only (`FillSection`). Draw the gradient axis +
 stop handles in `CanvasToolingLayer` when a gradient fill row is active in
 `FillSection`; drag stops on canvas, double-click axis to add a stop.
 
-## G12 — Workflow small-unlocks bundle
+## ✅ DONE — G12 — Workflow small-unlocks bundle
 
-Each is small; together they close most of the remaining "feel" gap:
+All six landed, one commit each (plus a stage/tree context-menu unification
+that closed a G1/G7 doc-code divergence found on the way):
 
-- **Alt-drag duplicate** — branch in `canvasInteractionBegin.ts` to clone via
-  existing `duplicateElements` before moving (note: Alt is currently
-  resize-from-center on handles; the conflict only matters on body drags —
-  and must go through `isModifierCommandActive`).
-- **Click on a multi-selection without dragging should collapse the
-  selection to the clicked element on mouseup** (Figma behavior).
-- **Multi-select z-order** — `bringToFront/reorderElement/sendToBack` exist
-  but are gated on `singleId` in
-  `src/canvas/shell/useCanvasCommands.ts`; lift to multi-selection
-  (preserve relative order).
-- **Free two-point lines/arrows** — lines draw horizontally only
-  (`drawMode: "horizontal"`, resize handles `["e","w"]`, height capped 20);
-  diagonals only via rotation, no endpoint handles. Add two-point draw +
-  endpoint editing; consider arrowhead markers (F3/vector work is adjacent).
-- **Select-all / cut / zoom-to-selection** commands (registry has
-  undo/redo/copy/paste/duplicate/delete/zoom/tools/esc only).
-- **Alt-hover measurement** — currently distances-to-parent only, single
-  selection (`getParentDistanceMeasurements`,
-  `CanvasToolingLayer.tsx:423`); generalize to selection↔hovered-element
-  distances.
+- **Alt-drag duplicate** — new `canvas.drag.duplicate` modifier (default Alt);
+  the first moved frame clones in place via `duplicateElements({offset: 0})`
+  and drags the clones; `historyBeforeDocument` keeps commit/undo/Escape
+  clone-free. Body drags only — Alt on handles stays resize-from-center.
+- **Click-collapse** — a no-drag click on an element of a multi-selection
+  collapses the selection to it on mouseup.
+- **Multi-select z-order** — `bringElementsToFront` / `sendElementsToBack` /
+  `reorderElements` preserve relative order per sibling list; both context
+  menus gate on any selection; single-id functions are wrappers.
+- **Free two-point lines/arrows** — end handles now edit the ENDPOINT (pin the
+  opposite end, re-derive length + angle; Shift snaps 15°); draw already
+  followed the drag angle. Arrowheads deferred to the SVG target (F3/G13).
+- **Select-all / cut / zoom-to-selection** — `canvas.selection.selectAll`
+  (mod+A, isolation-aware, skips locked/hidden), `canvas.clipboard.cut`
+  (mod+X), `canvas.viewport.zoomToSelection` (Shift+2 by physical code; frames
+  the selection union via a one-shot `requestSelectionFocus`).
+- **Hover measurement** — with the parent-distances modifier held, hovering a
+  non-selected element measures selection↔hovered (`getRectDistanceSegments`:
+  per-axis gap lines when disjoint, four insets on containment; union bounds
+  for multi-selections); no eligible hover falls back to parent distances.
+
+UX.md updated per item; engine changes unit-tested.
 
 ## G13 — Per-side borders + stroke center (blocked on SVG render target)
 
