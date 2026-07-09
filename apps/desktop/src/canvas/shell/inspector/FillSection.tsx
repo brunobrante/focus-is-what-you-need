@@ -448,6 +448,8 @@ function FillEntry({
   target,
   tokens,
   gradientTokens,
+  canvasEditActive,
+  onToggleCanvasEdit,
   onUpdate,
   onChangeType,
   onMove,
@@ -459,6 +461,9 @@ function FillEntry({
   target: FillTarget;
   tokens: InsColorToken[];
   gradientTokens: GradientTokenOption[];
+  /** True when the on-canvas gradient overlay is editing THIS fill (G11). */
+  canvasEditActive?: boolean;
+  onToggleCanvasEdit?: () => void;
   onUpdate: (patch: Partial<Fill>) => void;
   onChangeType: (type: FillType) => void;
   onMove: (direction: -1 | 1) => void;
@@ -481,7 +486,22 @@ function FillEntry({
         {fill.type === "solid" ? (
           <SolidBody fill={fill} tokens={tokens} onUpdate={onUpdate as (p: Partial<SolidFill>) => void} />
         ) : fill.type === "gradient" ? (
-          <GradientBody fill={fill} gradientTokens={gradientTokens} onUpdate={onUpdate as (p: Partial<GradientFill>) => void} />
+          <>
+            {onToggleCanvasEdit ? (
+              <button
+                type="button"
+                onClick={onToggleCanvasEdit}
+                className="flex h-[28px] w-full cursor-pointer items-center justify-center gap-1 rounded-[7px] px-2 text-[11px] transition-colors"
+                style={{
+                  background: canvasEditActive ? "#0D99FF22" : "#242424",
+                  color: canvasEditActive ? "#5DB9FF" : "#C8C8C8",
+                }}
+              >
+                {canvasEditActive ? "Editing on canvas — click to stop" : "Edit on canvas"}
+              </button>
+            ) : null}
+            <GradientBody fill={fill} gradientTokens={gradientTokens} onUpdate={onUpdate as (p: Partial<GradientFill>) => void} />
+          </>
         ) : fill.type === "image" ? (
           <ImageBody fill={fill} onUpdate={onUpdate as (p: Partial<ImageFill>) => void} />
         ) : (
@@ -500,6 +520,8 @@ export function FillSection({
   gradientTokens,
   locked,
   onChange,
+  canvasEditFillIndex = null,
+  onToggleCanvasEdit,
   onScrubStart,
   onScrubEnd,
 }: {
@@ -509,6 +531,9 @@ export function FillSection({
   gradientTokens: GradientTokenOption[];
   locked: boolean;
   onChange: (fills: Fill[]) => void;
+  /** Index of the fill the on-canvas gradient overlay is editing, or null (G11). */
+  canvasEditFillIndex?: number | null;
+  onToggleCanvasEdit?: (fillIndex: number | null) => void;
   /** Slider / native-color scrub lifecycle — one commit per drag (H3). Provided
    *  to the subtree via ScrubProvider so nested sliders/color fields pick it up. */
   onScrubStart?: () => void;
@@ -557,6 +582,12 @@ export function FillSection({
             target={target}
             tokens={tokens}
             gradientTokens={gradientTokens}
+            canvasEditActive={canvasEditFillIndex === index}
+            onToggleCanvasEdit={
+              onToggleCanvasEdit
+                ? () => onToggleCanvasEdit(canvasEditFillIndex === index ? null : index)
+                : undefined
+            }
             onUpdate={(patch) => updateAt(index, patch)}
             onChangeType={(type) => changeTypeAt(index, type)}
             onMove={(direction) => move(index, direction)}

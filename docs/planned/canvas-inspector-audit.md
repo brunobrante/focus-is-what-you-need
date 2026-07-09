@@ -955,7 +955,18 @@ per-run, and export. Floor requirement for real product copy; schedule as
 its own multi-phase effort. `SCHEMA_VERSION` bump + reseed is acceptable
 (local-only, no migrations).
 
-## G11 — On-canvas gradient editing (panel-only today)
+## ✅ DONE — G11 — On-canvas gradient editing (panel-only today)
+
+New `GradientEditOverlay` (a DOM overlay like TextEditingOverlay, not a Skia
+tooling command): toggled per gradient card via "Edit on canvas" (editor state
+`activeGradientEdit`, cleared on selection change). Draws the rotation-aware
+gradient axis + a ball per stop + endpoint handles; drag a stop to move it,
+drag an endpoint to re-angle (Shift snaps 15°), double-click the axis to
+insert a stop seeded with the nearest stop's color. Drags are transient
+frames committed once on release. Radial shows its stops along a radius
+(no angle handles). UX.md updated.
+
+Original note:
 
 Stops/angle are numeric-panel-only (`FillSection`). Draw the gradient axis +
 stop handles in `CanvasToolingLayer` when a gradient fill row is active in

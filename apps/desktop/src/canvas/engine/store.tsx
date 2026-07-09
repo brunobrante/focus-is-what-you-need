@@ -37,6 +37,7 @@ export type EditorAction =
   | { type: "setCanvasStageActive"; active: boolean }
   | { type: "requestNodeFocus"; nodeId: string | null }
   | { type: "requestSelectionFocus"; active: boolean }
+  | { type: "setActiveGradientEdit"; target: { elementId: string; fillIndex: number } | null }
   | { type: "setGuides"; guides: SnapGuide[] }
   | { type: "setExportOpen"; exportOpen: boolean }
   | { type: "hydrateDocument"; document: CanvasDocument }
@@ -202,6 +203,7 @@ function stateForDocument(document: CanvasDocument, viewportMode: ViewportMode):
     transientChangedIds: null,
     focusNodeId: null,
     focusSelection: false,
+    activeGradientEdit: null,
     viewportSize: { width: 0, height: 0 },
     navigableBounds: null,
     ancestorOverlay: { enabled: false, items: {} },
@@ -291,6 +293,10 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     if ((state.focusSelection ?? false) === action.active) return state;
     return { ...state, focusSelection: action.active };
   },
+  setActiveGradientEdit(state, action) {
+    if ((state.activeGradientEdit ?? null) === action.target) return state;
+    return { ...state, activeGradientEdit: action.target };
+  },
   setSelected(state, action) {
     const selectedIds = sanitizeSelection(state.document, action.selectedIds);
     const isolatedParentId = sanitizeIsolatedParent(state.document, state.isolatedParentId, selectedIds);
@@ -310,6 +316,12 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
       canvasStageActive,
       editingTextId: selectedIds.includes(state.editingTextId ?? "") ? state.editingTextId : null,
       pathEditId: selectedIds.includes(state.pathEditId ?? "") ? state.pathEditId : null,
+      // The gradient overlay follows a single selected element; drop it when the
+      // selection moves elsewhere (G11).
+      activeGradientEdit:
+        state.activeGradientEdit && selectedIds.includes(state.activeGradientEdit.elementId)
+          ? state.activeGradientEdit
+          : null,
     };
   },
   setIsolatedParent(state, action) {

@@ -832,6 +832,14 @@ list (Figma's model) above Appearance. Each fill is a card with an **eye** enabl
 per element kind — the same fill compiles to a `background-image` layer on a box, a
 `background-clip: text` paint on text, and an `<img>` / `<video>` / repeating background on the
 Image element:
+- **Gradient fills can be edited on canvas (G11):** the gradient card has an **"Edit on
+  canvas"** toggle. While on (and the element is the single selection), the canvas draws the
+  **gradient axis** across the element — rotation-aware — with a **round handle per stop** and
+  **endpoint handles**: drag a stop ball to move that stop (the panel's % field follows), drag
+  an endpoint to re-angle the gradient (**Shift** snaps to 15°; linear/conic only — radial shows
+  its stops along a radius), and **double-click the axis** to insert a stop there (seeded with
+  the nearest stop's color). Each drag is one undo step. The overlay turns off with the toggle,
+  or automatically when the selection changes.
 - **Solid** — a colour via the Fill color field, which accepts any CSS literal (`#RRGGBBAA`,
   `rgb()`, **Display P3** `color(display-p3 …)`, **OKLCH** `oklch(…)`), carries a **native
   eyedropper** (web `EyeDropper`, falling back to the macOS `NSColorSampler` in the WKWebView),

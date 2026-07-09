@@ -245,6 +245,10 @@ export type EditorState = {
   // One-shot camera focus request on the current selection's union bounds
   // (zoom-to-selection, G12). Same consume-and-clear contract as focusNodeId.
   focusSelection?: boolean;
+  // On-canvas gradient editing (G11): the fill the overlay is editing —
+  // toggled from the Fill panel's gradient card. Transient — never persisted;
+  // cleared whenever the selection changes.
+  activeGradientEdit?: { elementId: string; fillIndex: number } | null;
   // Current viewport geometry, mirrored from the stage so the reducer can anchor
   // zoom changes (buttons / keyboard / toolbar) on the viewport center the same
   // way the wheel anchors on the cursor. `viewportSize` is the container size in

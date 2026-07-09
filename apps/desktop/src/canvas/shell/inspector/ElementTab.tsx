@@ -86,6 +86,9 @@ type ElementTabProps = {
   onUpdateSizing: (sizing: ElementSizing) => void;
   /** Align this element within its parent's content box (G1). */
   onAlign?: (edge: AlignEdge) => void;
+  /** On-canvas gradient editing (G11): which fill the overlay edits, or null. */
+  canvasEditFillIndex?: number | null;
+  onToggleCanvasEdit?: (fillIndex: number | null) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
   /** Enter path edit mode (path elements only). */
@@ -113,6 +116,8 @@ export function ElementTab({
   onScrubEnd,
   onUpdateSizing,
   onAlign,
+  canvasEditFillIndex = null,
+  onToggleCanvasEdit,
   onToggleLocked,
   onToggleVisible,
   onEditPath,
@@ -355,6 +360,8 @@ export function ElementTab({
           tokens={colorTokens}
           gradientTokens={gradientTokens}
           locked={locked}
+          canvasEditFillIndex={canvasEditFillIndex}
+          onToggleCanvasEdit={onToggleCanvasEdit}
           onChange={handleFillsChange}
           onScrubStart={onScrubStart}
           onScrubEnd={onScrubEnd}

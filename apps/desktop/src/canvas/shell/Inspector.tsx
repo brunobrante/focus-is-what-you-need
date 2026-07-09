@@ -133,6 +133,7 @@ export function Inspector({
   const bridgeSelectedId = useEditorBridge((v) => v?.state.selectedIds[0] ?? null);
   const bridgeSelectedCount = useEditorBridge((v) => v?.state.selectedIds.length ?? 0);
   const bridgeCanvasStageActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
+  const bridgeActiveGradientEdit = useEditorBridge((v) => v?.state.activeGradientEdit ?? null);
   const bridgeSourceId = useEditorBridge((v) => v?.sourceId ?? null);
   const bridgeAncestorOverlay = useEditorBridge((v) => v?.state.ancestorOverlay ?? null);
   const getEditorSnapshot = useEditorBridgeReader();
@@ -153,6 +154,8 @@ export function Inspector({
   const selectedId = editorProp !== undefined ? (editorProp?.state.selectedIds[0] ?? null) : bridgeSelectedId;
   const selectedCount = editorProp !== undefined ? (editorProp?.state.selectedIds.length ?? 0) : bridgeSelectedCount;
   const canvasStageActive = editorProp !== undefined ? (editorProp?.state.canvasStageActive ?? false) : bridgeCanvasStageActive;
+  const activeGradientEdit =
+    editorProp !== undefined ? (editorProp?.state.activeGradientEdit ?? null) : bridgeActiveGradientEdit;
   const sourceId = editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId;
   const sourceLabel = windowKeyLabel(sourceId ?? "current");
   const node = document && selectedId ? document.elements[selectedId] ?? null : null;
@@ -465,6 +468,15 @@ export function Inspector({
             onScrubEnd={onScrubEnd}
             onUpdateSizing={commitSizing}
             onAlign={(edge) => commitDocument(alignElements(document, [node.id], edge))}
+            canvasEditFillIndex={
+              activeGradientEdit?.elementId === node.id ? activeGradientEdit.fillIndex : null
+            }
+            onToggleCanvasEdit={(fillIndex) =>
+              (editorProp ?? getEditorSnapshot())?.dispatch({
+                type: "setActiveGradientEdit",
+                target: fillIndex === null ? null : { elementId: node.id, fillIndex },
+              })
+            }
             onEditPath={onEditPath}
             onFlattenToPath={onFlattenToPath}
             onToggleLocked={(locked) => commitDocument(setElementLocked(document, node.id, locked))}

@@ -27,6 +27,7 @@ import { getCanvasSize } from "./canvasCoordinates";
 import type { CanvasAlignmentLogInput } from "./canvasAlignmentLog";
 import { RenderedScene } from "./RenderedScene";
 import { TextEditingOverlay } from "./TextEditingOverlay";
+import { GradientEditOverlay } from "./GradientEditOverlay";
 import { TextEditingTextarea } from "./TextEditingTextarea";
 import { useViewportMetrics } from "./hooks/useViewportMetrics";
 import { useTextEditingSession } from "./hooks/useTextEditingSession";
@@ -609,6 +610,12 @@ export function CanvasStage({
         textEdit={textEdit}
         document={state.document}
         viewportTransform={viewportTransform}
+      />
+
+      <GradientEditOverlay
+        state={state}
+        viewportTransform={viewportTransform}
+        dispatch={dispatch}
       />
 
       {contextMenu && <CanvasContextMenu menu={contextMenu} onClose={closeContextMenu} />}
