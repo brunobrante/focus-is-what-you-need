@@ -28,6 +28,7 @@ import {
 } from "@/canvas/engine/geometry";
 import { buildSnapCandidates, SNAP_DISTANCE, snapRectWithCandidates } from "@/canvas/engine/snapping";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
+import { applyChildConstraintsInPlace } from "@/canvas/engine/mutations/elementConstraints";
 import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
 import type { CanvasDocument, ElementNode, Point, RadiusCorner, Rect, SnapGuide } from "@/canvas/engine/types";
 import { screenDeltaToWorldDelta, type ViewportState } from "@/canvas/engine/viewport";
@@ -282,6 +283,13 @@ function resizeSingleElement(
         node.y = heightFit ? source.y : roundPixel(localCenter.y - node.height / 2);
         bakePathResize(node, source);
         applyTextFitSizingInPlace(next, id);
+        // Reflow pinned children when the container's size changed (G5).
+        applyChildConstraintsInPlace(
+          next,
+          id,
+          { width: source.width, height: source.height },
+          { width: node.width, height: node.height },
+        );
       }
       return { document: next, guides: [] };
     }
@@ -348,6 +356,13 @@ function resizeSingleElement(
       node.y = heightFit ? source.y : roundPixel(absY - parentBounds.y);
       bakePathResize(node, source);
       applyTextFitSizingInPlace(next, id);
+      // Reflow pinned children when the container's size changed (G5).
+      applyChildConstraintsInPlace(
+        next,
+        id,
+        { width: source.width, height: source.height },
+        { width: node.width, height: node.height },
+      );
     }
   }
   return { document: next, guides: [] };
@@ -765,6 +780,13 @@ export function resizeCanvasDocument(
   const height = Math.round(Math.max(50, newHeight));
   next.canvas.width = width;
   next.canvas.height = height;
+  // Reflow pinned root elements against the frame's new size (G5).
+  applyChildConstraintsInPlace(
+    next,
+    null,
+    { width: interaction.startWidth, height: interaction.startHeight },
+    { width, height },
+  );
   const originShift = canvasDeltaToScreenDelta(
     handle.includes("w") ? interaction.startWidth - width : 0,
     handle.includes("n") ? interaction.startHeight - height : 0,

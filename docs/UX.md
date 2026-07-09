@@ -863,10 +863,18 @@ Grid (Fill `fr` / Auto / Min / Fixed `px`), and the advanced **Strokes** (Exclud
 and **Stacking** (Last / First on top). An element **inside a flex/grid parent** also gets **W/H
 mode** (Fixed / Hug / Fill), **Align self**, **Order**, and **Min/Max W/H**. Every element gets
 **Flip H / Flip V** and, when it has a parent, **Pin X / Pin Y** constraint dropdowns (Left /
-Right / Left-Right / Center / Scale). **Text** gets a **Resize** enum (Auto W / Auto H / Fixed),
-distinct from the container sizing modes. **Authoring-only for now:** these controls write real
-CSS-bound fields compiled by `domain/canvas/layout.ts`, but they have **no on-canvas effect yet** —
-absolute positioning stays the default and the renderer adopts the engine in a later pass.
+Right / Left-Right / Center / Scale). (Text auto-resize lives in the **Transform** section as
+per-axis Fixed/Fit toggles — see above.) **Mostly authoring-only for now:** these controls write
+real CSS-bound fields compiled by `domain/canvas/layout.ts`, but the flex/grid engine has **no
+on-canvas effect yet** — absolute positioning stays the default and the renderer adopts the
+engine in a later pass. **Exception — Pin X / Pin Y are live (G5):** when a container, or the
+frame itself, is **resized** (canvas handles, element resize handles, or the Inspector W/H
+fields), its absolute children reflow by their pins — Left/Top keeps the near inset (default),
+Right/Bottom keeps the far inset, Left-Right/Top-Bottom stretches the child, Center keeps the
+child's relative center, and Scale scales position and size proportionally. Stretched or scaled
+children cascade the reflow into their own pinned children; children of flex/grid containers are
+excluded (the layout engine owns them). The Scale **tool** is unchanged (it always scales
+everything proportionally).
 (X/Y/W/H and rotation remain live in the separate **Transform** section — see above.)
 
 **Inspector → Typography** (shown only for **text** elements, replacing the old "Tipografia"

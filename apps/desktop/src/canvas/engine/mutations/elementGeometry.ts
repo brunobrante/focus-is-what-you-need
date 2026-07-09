@@ -1,5 +1,6 @@
 import { getElementDefinition } from "../elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, Rect } from "../types";
+import { applyChildConstraintsInPlace } from "./elementConstraints";
 import { cloneDocument } from "./coreUtils";
 import {
   clamp,
@@ -30,6 +31,7 @@ export function updateElementGeometry(document: CanvasDocument, id: string, patc
   const next = cloneDocument(document);
   const node = next.elements[id];
   if (!node) return document;
+  const oldSize = { width: node.width, height: node.height };
   const parentSize = getParentSize(next, id);
   const c = getElementDefinition(node.type).capabilities.constraints;
   const minW = c.width.min;
@@ -44,6 +46,8 @@ export function updateElementGeometry(document: CanvasDocument, id: string, patc
   node.y = roundPixel(clamp(patch.y ?? node.y, 0, parentSize.height - node.height));
   applyTextFitSizingInPlace(next, id);
   clampNodeToParentBounds(next, id);
+  // Reflow pinned children when the container's size changed (G5).
+  applyChildConstraintsInPlace(next, id, oldSize, { width: node.width, height: node.height });
   return next;
 }
 

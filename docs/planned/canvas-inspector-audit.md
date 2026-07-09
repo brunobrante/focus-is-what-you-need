@@ -856,7 +856,18 @@ button (`fitTextElementToContent`). Apply auto-width/auto-height in
 `fitTextElementToContent`), defaulting new text elements to auto-width.
 Expose the three modes in TypographySection.
 
-## G5 — Apply constraints on frame/container resize (PARTIAL: compiled, zero callers)
+## ✅ DONE — G5 — Apply constraints on frame/container resize (PARTIAL: compiled, zero callers)
+
+New `engine/mutations/elementConstraints.ts#applyChildConstraintsInPlace` — the
+geometry twin of `compileConstraints` (same per-axis semantics, baked into px
+geometry): right/bottom keep the far inset, left-right/top-bottom stretch,
+center keeps the relative center, scale scales position+size; resized children
+cascade into their own pinned children; flex/grid children excluded. Wired into
+canvas resize, element resize (plain + rotated-ancestor branches), and Inspector
+W/H commits; the Scale tool keeps its scale-everything behavior. D4/D5
+(authoring scope) remain separate items. UX.md updated; unit-tested.
+
+Original note:
 
 `compileConstraints` (`src/domain/canvas/layout.ts`) is implemented and
 tested but has **no callers outside tests**; resizing the canvas or a
