@@ -3,8 +3,10 @@ import { cloneDocument, mutateElementShallow, shallowCloneDocument } from "./cor
 import { applyTextFitSizingInPlace } from "./elementGeometry";
 
 export function updateElementText(document: CanvasDocument, id: string, content: string): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  // Shallow like every other single-node commit (P6) — history snapshots share
+  // untouched nodes instead of deep-copying the whole scene per commit.
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node) return document;
   node.content = content;
   applyTextFitSizingInPlace(next, id);
@@ -13,10 +15,8 @@ export function updateElementText(document: CanvasDocument, id: string, content:
 
 /**
  * Hot-path variant of {@link updateElementText} for per-keystroke text edits.
- * `content` is a scalar on the node, so a shallow document clone plus a shallow
- * clone of just the edited node is sufficient — O(1) per keystroke instead of a
- * full `structuredClone` of the whole scene. Commit still uses the deep
- * `updateElementText` (see useTextEditingSession.commitTextEditing).
+ * Kept as a separate entry point for the text-editing session even though both
+ * are shallow now (P6); commit goes through updateElementText.
  */
 export function updateElementTextShallow(
   document: CanvasDocument,
@@ -32,30 +32,34 @@ export function updateElementTextShallow(
 }
 
 export function updateElementImageSource(document: CanvasDocument, id: string, src: string): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node || node.type !== "image") return document;
   node.src = src.trim() || undefined;
   return next;
 }
 
 export function renameElement(document: CanvasDocument, id: string, name: string): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node) return document;
   node.name = name.trim() || node.name;
   return next;
 }
 
 export function setElementLocked(document: CanvasDocument, id: string, locked: boolean): CanvasDocument {
-  const next = cloneDocument(document);
-  if (next.elements[id]) next.elements[id].locked = locked;
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
+  if (!node) return document;
+  node.locked = locked;
   return next;
 }
 
 export function setElementVisible(document: CanvasDocument, id: string, visible: boolean): CanvasDocument {
-  const next = cloneDocument(document);
-  if (next.elements[id]) next.elements[id].visible = visible;
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
+  if (!node) return document;
+  node.visible = visible;
   return next;
 }
 

@@ -1,7 +1,7 @@
 import { getElementDefinition } from "../elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, Rect } from "../types";
 import { applyChildConstraintsInPlace } from "./elementConstraints";
-import { cloneDocument } from "./coreUtils";
+import { mutateElementShallow, shallowCloneDocument } from "./coreUtils";
 import {
   clamp,
   clampRotatedRectToBounds,
@@ -28,8 +28,11 @@ export function clampNodeToParentBounds(document: CanvasDocument, id: string): v
 }
 
 export function updateElementGeometry(document: CanvasDocument, id: string, patch: Partial<Rect>): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  // Shallow clone + per-node copy (P6): inspector commits snapshot into history,
+  // and a deep structuredClone per commit made every snapshot a full independent
+  // copy of the scene. Untouched nodes now share structurally across history.
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node) return document;
   const oldSize = { width: node.width, height: node.height };
   const parentSize = getParentSize(next, id);
@@ -52,8 +55,8 @@ export function updateElementGeometry(document: CanvasDocument, id: string, patc
 }
 
 export function updateElementRotation(document: CanvasDocument, id: string, rotation: number): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node) return document;
   node.rotation = roundAngle(normalizeAngle(rotation));
   clampNodeToParentBounds(next, id);
@@ -65,8 +68,8 @@ export function updateElementStyles(
   id: string,
   styles: Partial<ElementStyles>,
 ): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node) return document;
   node.styles = { ...node.styles, ...styles };
   const def = getElementDefinition(node.type).capabilities;
@@ -213,8 +216,8 @@ export function setTextElementSizing(
   id: string,
   sizing: ElementSizing,
 ): CanvasDocument {
-  const next = cloneDocument(document);
-  const node = next.elements[id];
+  const next = shallowCloneDocument(document);
+  const node = mutateElementShallow(next, id);
   if (!node || node.type !== "text") return document;
   node.sizing = {
     ...node.sizing,
