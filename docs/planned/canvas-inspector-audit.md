@@ -784,14 +784,18 @@ Inventory verdicts (EXISTS/PARTIAL/MISSING) were checked against the scene
 model and code, not file names. Ordered by how much each blocks designing a
 realistic app screen. Items that add UI **must update `docs/UX.md` first**.
 
-## ✅ DONE (context menu) — G1 — Align & distribute (MISSING entirely)
+## ✅ DONE — G1 — Align & distribute (MISSING entirely)
 
 Engine module `mutations/elementAlign.ts` (`alignElements` 6 ways + `distributeElements`
 H/V), aligning by each element's AABB with the delta translated into parent-local
 space (rotated-parent safe), locked elements act as anchors but don't move. Surfaced
-via `useCanvasCommands.align/distribute` in the right-click context menu (multi-select;
-distribute needs 3+). ContextToolbar + Inspector Element-tab surfaces and single-element
-align-in-parent UI are the remaining follow-ups. UX.md updated; unit-tested.
+via `useCanvasCommands.align/distribute` in BOTH right-click context menus (stage +
+layers tree; multi-select, distribute needs 3+) and in the Inspector via the shared
+`AlignRow` (lucide icons): the multi-selection panel aligns to the selection's shared
+bounds, and the single-element Transform section aligns within the parent's content
+box. A ContextToolbar surface was deliberately skipped — the toolbar is single-node,
+transient chrome, and the menu + inspector cover both entry points. UX.md updated;
+unit-tested.
 
 Original note:
 

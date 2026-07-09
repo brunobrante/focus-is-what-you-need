@@ -8,6 +8,7 @@ import {
 import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
 import type { EditorAction } from "@/canvas/engine/store";
 import {
+  alignElements,
   renameElement,
   setTextElementSizing,
   setElementLocked,
@@ -463,6 +464,7 @@ export function Inspector({
             onScrubStart={onScrubStart}
             onScrubEnd={onScrubEnd}
             onUpdateSizing={commitSizing}
+            onAlign={(edge) => commitDocument(alignElements(document, [node.id], edge))}
             onEditPath={onEditPath}
             onFlattenToPath={onFlattenToPath}
             onToggleLocked={(locked) => commitDocument(setElementLocked(document, node.id, locked))}

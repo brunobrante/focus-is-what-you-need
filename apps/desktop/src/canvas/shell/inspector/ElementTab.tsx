@@ -7,6 +7,8 @@ import { effectTargetForType } from "@/domain/canvas/effects";
 import { borderTargetForType } from "@/domain/canvas/border";
 import { fillTargetForType } from "@/domain/canvas/fillCompile";
 import { normalizeFills, fillsToWritePatch } from "@/domain/canvas/fill";
+import type { AlignEdge } from "@/canvas/engine/actions";
+import { AlignRow } from "./AlignRow";
 import { AppearanceSection } from "./AppearanceSection";
 import { LayoutSection } from "./LayoutSection";
 import { BorderSection } from "./BorderSection";
@@ -82,6 +84,8 @@ type ElementTabProps = {
   /** End a scrub — commit the last transient frame as a single history entry. */
   onScrubEnd?: () => void;
   onUpdateSizing: (sizing: ElementSizing) => void;
+  /** Align this element within its parent's content box (G1). */
+  onAlign?: (edge: AlignEdge) => void;
   onToggleLocked: (locked: boolean) => void;
   onToggleVisible: (visible: boolean) => void;
   /** Enter path edit mode (path elements only). */
@@ -108,6 +112,7 @@ export function ElementTab({
   onScrubStart,
   onScrubEnd,
   onUpdateSizing,
+  onAlign,
   onToggleLocked,
   onToggleVisible,
   onEditPath,
@@ -229,6 +234,12 @@ export function ElementTab({
       ) : null}
 
       <InsSection title="Transform" disabled={locked}>
+        {/* Align within the parent's content box (frame for a root) — G1. */}
+        {onAlign ? (
+          <InsRow>
+            <AlignRow onAlign={onAlign} />
+          </InsRow>
+        ) : null}
         {/* Position: X │ Y */}
         <InsRow>
           <FieldGroup>

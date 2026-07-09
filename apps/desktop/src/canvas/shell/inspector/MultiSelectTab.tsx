@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { CanvasDocument, ElementNode, ElementStyles } from "@/canvas/engine/types";
-import { updateElementGeometry, updateElementStyles } from "@/canvas/engine/actions";
+import { alignElements, distributeElements, updateElementGeometry, updateElementStyles } from "@/canvas/engine/actions";
+import { AlignRow } from "./AlignRow";
 import { getInstanceRootId } from "@/canvas/engine/geometry";
 import { elementTakesFill, fillsFallbackColor, fillsToWritePatch, normalizeFills, synthSolidFill } from "@/domain/canvas/fill";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -104,9 +105,22 @@ export function MultiSelectTab({
     />
   );
 
+  const ids = nodes.map((node) => node.id);
+
   return (
     <>
       <InsSection title="Transform">
+        {/* Align to the selection's shared bounds; distribute needs 3+ (G1). */}
+        <InsRow>
+          <AlignRow
+            onAlign={(edge) => commitDocument(alignElements(document, ids, edge))}
+            onDistribute={
+              ids.length >= 3
+                ? (axis) => commitDocument(distributeElements(document, ids, axis))
+                : undefined
+            }
+          />
+        </InsRow>
         <InsRow>
           <FieldGroup>
             {numberField("X", sharedX, (x) => batchGeometry({ x }))}

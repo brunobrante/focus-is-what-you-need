@@ -793,7 +793,9 @@ literal colour from the picker also unbinds. (Live updates while a canvas stays 
 the same scenes-table reactivity as linked instances.)
 
 **Inspector → Transform** (shown for every element, the **first** element section — merges the
-former **Position** + **Tamanho** blocks): a compact transform grid in the Framer style —
+former **Position** + **Tamanho** blocks): an **Align row** at the top (the six align buttons —
+for a single element they align it **within its parent's content box**, or the frame for a root
+element; G1), then a compact transform grid in the Framer style —
 **X │ Y** on one row, **W │ H** on the next with a trailing **aspect-ratio lock** (session-only;
 when on, editing one dimension scales the other by the node's current ratio), then **Rotation**.
 Fields carry an in-field glyph (X / Y / W / H / ⟲) instead of an outside label. Secondary metadata
@@ -810,7 +812,9 @@ Fixed/Fit toggles above; a Fit axis shows a read-only size and ignores
 resize-handle drags until switched back to Fixed.
 
 **Inspector → multi-selection (G8):** selecting **2+ elements** shows a compact batch panel
-instead of the single-element tabs: **X / Y / W / H** fields (showing the common value, or an
+instead of the single-element tabs: an **Align row** (the six align buttons, aligning to the
+selection's shared bounds; the two distribute buttons appear with 3+ elements — G1),
+**X / Y / W / H** fields (showing the common value, or an
 empty field with a **Mixed** placeholder when the elements differ; committing applies to every
 editable selected element), an **Opacity %** field (same Mixed convention), and — when any
 selected element takes a fill — a **Fill** color swatch that batch-applies a **solid** fill to
