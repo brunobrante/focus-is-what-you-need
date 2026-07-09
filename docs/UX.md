@@ -1043,8 +1043,17 @@ the instance in place (same effect as the layers-tree unlink button).
 **Corner radius handle:**
 - When a single radius-capable element is hovered (or while its handle is being dragged), a small circle appears inset from each corner; hovering it shows a custom "bend" cursor.
 - Dragging a handle sets a uniform corner radius for all four corners, clamped to half the shorter side. At the maximum the two handles on the short edge meet and the drag locks there.
-- On a merged (maxed) handle the first drag direction commits the corner: the drag can be pulled back to the lock but cannot cross it into the opposite corner.
-- While dragging, a value tag showing the current radius is rendered just beside the dragged handle.
+- **Alt-drag rounds only the grabbed corner** (Figma behavior; rebindable as the
+  `canvas.radius.perCorner` modifier). The other corners keep their values (seeded
+  from the uniform radius the first time), and each ball then sits at its own
+  corner's offset. The modifier is read live, so pressing/releasing Alt mid-drag
+  switches between single-corner and all-corners. If a per-corner drag brings all
+  four corners back to the same value, the element collapses back to a uniform
+  radius (matching the Inspector's per-corner toggle convention). A plain
+  (no-modifier) drag on an element with mixed corners resets all four to the
+  dragged value.
+- On a merged (maxed) handle the first drag direction commits the corner: the drag can be pulled back to the lock but cannot cross it into the opposite corner. (With per-corner radii the handles no longer stack, so the grabbed ball is always unambiguous.)
+- While dragging, a value tag showing the dragged corner's current radius is rendered just beside the dragged handle.
 
 **Escape cancels an in-progress transform:**
 - Pressing **Esc** while actively dragging, resizing, rotating, or dragging a corner-radius handle **aborts** the gesture: the element snaps back to where it was when the gesture began (no commit, nothing added to undo history), and any reparent drop-target highlight or alignment guide is cleared. This matches the existing Esc-to-cancel behavior of the pen/draw tools.

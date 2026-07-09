@@ -407,6 +407,15 @@ function applyScaledNode(
     const value = node.styles[key];
     if (typeof value === "number") node.styles[key] = roundPixel(value * scale);
   }
+  // Per-corner radii scale with geometry the same way the uniform radius does.
+  if (node.styles.cornerRadii) {
+    node.styles.cornerRadii = node.styles.cornerRadii.map((r) => roundPixel(r * scale)) as [
+      number,
+      number,
+      number,
+      number,
+    ];
+  }
 }
 
 /**
@@ -597,6 +606,20 @@ function radiusEdgeCorners(
 
 const ALL_RADIUS_CORNERS: RadiusCorner[] = ["nw", "ne", "se", "sw"];
 
+// styles.cornerRadii is [top-left, top-right, bottom-right, bottom-left].
+const RADIUS_CORNER_TO_INDEX: Record<RadiusCorner, 0 | 1 | 2 | 3> = {
+  nw: 0,
+  ne: 1,
+  se: 2,
+  sw: 3,
+};
+
+// The corner's current radius as the user sees it: its per-corner entry when
+// per-corner radii exist, else the uniform radius.
+function effectiveCornerRadius(styles: ElementNode["styles"], corner: RadiusCorner): number {
+  return styles.cornerRadii?.[RADIUS_CORNER_TO_INDEX[corner]] ?? styles.borderRadius ?? 0;
+}
+
 // The set of corners whose handles stack at the maximum radius and therefore compete
 // for the grab. A rectangle only stacks the two handles on the short edge. A perfect
 // square collapses ALL FOUR handles onto the center, so any corner is a valid target —
@@ -613,6 +636,9 @@ function radiusStackedCorners(
 export function radiusDocument(
   interaction: RadiusInteraction,
   currentPoint: Point,
+  // Round only the grabbed corner (Alt by default, `canvas.radius.perCorner`),
+  // writing styles.cornerRadii instead of the uniform borderRadius (F4).
+  perCorner = false,
 ): { document: CanvasDocument; guides: SnapGuide[] } {
   const element = interaction.beforeDocument.elements[interaction.elementId];
   if (!element) return { document: interaction.beforeDocument, guides: [] };
@@ -643,10 +669,15 @@ export function radiusDocument(
   // maximum) but cannot cross it into another corner.
   const candidates = radiusStackedCorners(interaction.corner, rect.width, rect.height);
   const maxRadius = maxBorderRadiusForSize(rect.width, rect.height);
-  const grabbedAtMax = (element.styles.borderRadius ?? 0) >= maxRadius - RADIUS_COMMIT_EPSILON;
+  const grabbedAtMax =
+    effectiveCornerRadius(element.styles, interaction.corner) >= maxRadius - RADIUS_COMMIT_EPSILON;
 
   if (!interaction.committedCorner) {
-    if (!grabbedAtMax) {
+    if (perCorner || element.styles.cornerRadii) {
+      // Per-corner mode targets exactly the grabbed ball; and with mixed radii
+      // the handles no longer stack pairwise, so the ambiguity dance is moot.
+      interaction.committedCorner = interaction.corner;
+    } else if (!grabbedAtMax) {
       // Unstacked grab: the reported corner is unambiguous, lock to it immediately.
       interaction.committedCorner = interaction.corner;
     } else {
@@ -677,7 +708,31 @@ export function radiusDocument(
   const newRadius = roundPixel(clampBorderRadiusForSize(offset, rect.width, rect.height));
   const next = shallowCloneDocument(interaction.beforeDocument);
   const node = mutateElementWithStyles(next, interaction.elementId);
-  if (node) node.styles.borderRadius = newRadius;
+  if (node) {
+    if (perCorner) {
+      const uniform = node.styles.borderRadius ?? 0;
+      const radii = (node.styles.cornerRadii ?? [uniform, uniform, uniform, uniform]).slice() as [
+        number,
+        number,
+        number,
+        number,
+      ];
+      radii[RADIUS_CORNER_TO_INDEX[interaction.committedCorner ?? interaction.corner]] = newRadius;
+      if (radii.every((r) => r === radii[0])) {
+        // All corners converged back to one value — collapse to the uniform field,
+        // mirroring the inspector's convention (per-corner off ⇒ cornerRadii unset).
+        node.styles.borderRadius = radii[0];
+        node.styles.cornerRadii = undefined;
+      } else {
+        node.styles.cornerRadii = radii;
+      }
+    } else {
+      // Uniform drag rounds every corner; clear a per-corner override so it
+      // doesn't keep masking the uniform value at render.
+      node.styles.borderRadius = newRadius;
+      node.styles.cornerRadii = undefined;
+    }
+  }
   return { document: next, guides: [] };
 }
 

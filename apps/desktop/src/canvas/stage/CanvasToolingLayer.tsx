@@ -334,16 +334,19 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
           elemRect.height >= RADIUS_MIN_ELEMENT_SCREEN
         ) {
           hasRadiusHandles = true;
+          // Per-corner radii place each ball at its own corner's offset (F4).
+          const handleRadii =
+            radiusElement.styles.cornerRadii ?? radiusElement.styles.borderRadius ?? 0;
           radiusHandlePositions = elemBox
             ? getOrientedRadiusHandlePositions(
                 elemBox,
-                radiusElement.styles.borderRadius ?? 0,
+                handleRadii,
                 t.displayZoom,
                 isRadiusDragging ? 0 : undefined,
               )
             : getRadiusHandlePositions(
                 elemRect,
-                radiusElement.styles.borderRadius ?? 0,
+                handleRadii,
                 t.displayZoom,
                 isRadiusDragging ? 0 : undefined,
               );
@@ -359,12 +362,17 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         props.radiusDragCorner &&
         radiusElement
       ) {
-        const ball = radiusHandlePositions[RADIUS_CORNER_INDEX[props.radiusDragCorner]];
+        const cornerIndex = RADIUS_CORNER_INDEX[props.radiusDragCorner];
+        const ball = radiusHandlePositions[cornerIndex];
         if (ball) {
           const onLeftEdge =
             props.radiusDragCorner === "nw" || props.radiusDragCorner === "sw";
           radiusLabel = {
-            text: formatSizeValue(radiusElement.styles.borderRadius ?? 0),
+            text: formatSizeValue(
+              radiusElement.styles.cornerRadii?.[cornerIndex] ??
+                radiusElement.styles.borderRadius ??
+                0,
+            ),
             x: onLeftEdge ? ball.x - RADIUS_LABEL_GAP : ball.x + RADIUS_LABEL_GAP,
             centerY: ball.y,
             align: onLeftEdge ? "end" : "start",

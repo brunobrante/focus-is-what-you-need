@@ -319,7 +319,11 @@ export function handleTransformMove(
     interaction.type === "resize"
       ? resizeDocument(interaction, point, event, settings)
       : interaction.type === "radius"
-        ? radiusDocument(interaction, point)
+        ? radiusDocument(
+            interaction,
+            point,
+            isModifierCommandActive(event, settings, "canvas.radius.perCorner"),
+          )
         : rotateDocument(interaction, point, event, settings);
   interaction.lastDocument = result.document;
   if ("lastGuides" in interaction) interaction.lastGuides = result.guides;

@@ -73,6 +73,7 @@ const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
   // routing these through the configurable layer changes no behavior (L5).
   "canvas.selection.addToClick": "shift",
   "canvas.vector.removeAnchor": "alt",
+  "canvas.radius.perCorner": "alt",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {

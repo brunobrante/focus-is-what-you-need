@@ -50,7 +50,6 @@ path-edit, rotated text editing, and resize-flip in-app.
   P9 (spatial index — audit says not urgent).
 - **Blocked on the SVG render target:** F3, G13, D6-partial, F2-borders.
 - **Deferred (needs new rebindable commands):** L16.
-- **Fidelity:** F4 (per-corner radius drag — unblocked by D1).
 - **Parity features:** G3, G4, G5, G8, G9, G10, G11, G12, G14; G1's
   toolbar/inspector surfaces; and the doc-divergence UI items D3/D4/D5/D7.
 
@@ -763,10 +762,13 @@ documented shipped decision; `-webkit-backdrop-filter` twin
   (`ElementRenderer.tsx:520-531`) are always SVG-centered with no
   inside/outside emulation. Depends on the HTML→SVG render-target promotion
   (`docs/inspector-border-stroke.md`).
-- **F4 — Radius drag is uniform-only.** `radiusDocument`
-  (`canvasDocumentMutations.ts:600-603`) writes a single
-  `styles.borderRadius`; per-corner exists in the compiler/inspector but has
-  no per-corner canvas affordance (Figma: Alt-drag a single corner ball).
+- ✅ **DONE — F4 — Radius drag is uniform-only.** Alt-drag (new rebindable
+  modifier `canvas.radius.perCorner`) rounds only the grabbed ball, writing
+  `styles.cornerRadii` seeded from the uniform radius; balls render at their own
+  corner offsets and the drag label shows the dragged corner's value. A plain
+  drag stays uniform and clears a per-corner override; per-corner values that
+  re-equalize collapse back to `borderRadius`. Scale-resize now scales
+  `cornerRadii` alongside the other scalable styles. UX.md updated; unit-tested.
 - ✅ **DONE — F5 — Path-edit overlay faceting.** `pathEditGeometry.ts:11` — fixed
   `SEGMENT_SAMPLES = 12` per segment; long curves at high zoom show a
   visibly faceted blue skeleton (render + hit-test polyline). Sample

@@ -166,26 +166,46 @@ export function getToolingBoxRotation(box: ToolingBox): number {
   return (Math.atan2(ne.y - nw.y, ne.x - nw.x) * 180) / Math.PI;
 }
 
+// Radius input is either the uniform value or per-corner [nw, ne, se, sw]
+// (= styles.cornerRadii order [tl, tr, br, bl]); each ball sits at its own
+// corner's offset so mixed radii read correctly on canvas (F4).
+export type RadiusHandleRadii = number | readonly [number, number, number, number];
+
+function cornerOffset(
+  radii: RadiusHandleRadii,
+  index: 0 | 1 | 2 | 3,
+  zoom: number,
+  minOffset: number,
+  maxOffset: number,
+): number {
+  const radius = typeof radii === "number" ? radii : radii[index];
+  const radiusPx = radius * Math.max(zoom, 0.0001);
+  return Math.min(Math.max(radiusPx, minOffset), maxOffset);
+}
+
 export function getRadiusHandlePositions(
   rect: Rect,
-  radius: number,
+  radii: RadiusHandleRadii,
   zoom: number,
   minOffset = RADIUS_MIN_OFFSET,
 ): Point[] {
-  const radiusPx = radius * Math.max(zoom, 0.0001);
   const maxOffset = maxBorderRadiusForSize(rect.width, rect.height);
-  const offset = Math.min(Math.max(radiusPx, minOffset), maxOffset);
+  const at = (index: 0 | 1 | 2 | 3) => cornerOffset(radii, index, zoom, minOffset, maxOffset);
+  const o0 = at(0);
+  const o1 = at(1);
+  const o2 = at(2);
+  const o3 = at(3);
   return [
-    { x: rect.x + offset, y: rect.y + offset },
-    { x: rect.x + rect.width - offset, y: rect.y + offset },
-    { x: rect.x + rect.width - offset, y: rect.y + rect.height - offset },
-    { x: rect.x + offset, y: rect.y + rect.height - offset },
+    { x: rect.x + o0, y: rect.y + o0 },
+    { x: rect.x + rect.width - o1, y: rect.y + o1 },
+    { x: rect.x + rect.width - o2, y: rect.y + rect.height - o2 },
+    { x: rect.x + o3, y: rect.y + rect.height - o3 },
   ];
 }
 
 export function getOrientedRadiusHandlePositions(
   box: ToolingBox,
-  radius: number,
+  radii: RadiusHandleRadii,
   zoom: number,
   minOffset = RADIUS_MIN_OFFSET,
 ): Point[] {
@@ -194,26 +214,29 @@ export function getOrientedRadiusHandlePositions(
   const uy = normalizedVector(nw, sw);
   const width = Math.hypot(ne.x - nw.x, ne.y - nw.y);
   const height = Math.hypot(sw.x - nw.x, sw.y - nw.y);
-  const radiusPx = radius * Math.max(zoom, 0.0001);
   const maxOffset = maxBorderRadiusForSize(width, height);
-  const offset = Math.min(Math.max(radiusPx, minOffset), maxOffset);
+  const at = (index: 0 | 1 | 2 | 3) => cornerOffset(radii, index, zoom, minOffset, maxOffset);
+  const o0 = at(0);
+  const o1 = at(1);
+  const o2 = at(2);
+  const o3 = at(3);
 
   return [
     {
-      x: nw.x + ux.x * offset + uy.x * offset,
-      y: nw.y + ux.y * offset + uy.y * offset,
+      x: nw.x + ux.x * o0 + uy.x * o0,
+      y: nw.y + ux.y * o0 + uy.y * o0,
     },
     {
-      x: ne.x - ux.x * offset + uy.x * offset,
-      y: ne.y - ux.y * offset + uy.y * offset,
+      x: ne.x - ux.x * o1 + uy.x * o1,
+      y: ne.y - ux.y * o1 + uy.y * o1,
     },
     {
-      x: se.x - ux.x * offset - uy.x * offset,
-      y: se.y - ux.y * offset - uy.y * offset,
+      x: se.x - ux.x * o2 - uy.x * o2,
+      y: se.y - ux.y * o2 - uy.y * o2,
     },
     {
-      x: sw.x + ux.x * offset - uy.x * offset,
-      y: sw.y + ux.y * offset - uy.y * offset,
+      x: sw.x + ux.x * o3 - uy.x * o3,
+      y: sw.y + ux.y * o3 - uy.y * o3,
     },
   ];
 }

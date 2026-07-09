@@ -52,7 +52,8 @@ export type CanvasModifierCommandId =
   | "canvas.transform.constrainAspect"
   | "canvas.rotate.snap"
   | "canvas.selection.addToClick"
-  | "canvas.vector.removeAnchor";
+  | "canvas.vector.removeAnchor"
+  | "canvas.radius.perCorner";
 
 export type CanvasCommandId = CanvasKeyCommandId | CanvasModifierCommandId;
 

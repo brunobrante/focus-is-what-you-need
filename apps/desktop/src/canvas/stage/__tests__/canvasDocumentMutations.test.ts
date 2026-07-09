@@ -241,6 +241,51 @@ test("square stacked radius grab commits toward the down-left (sw) corner", () =
   expect(back.document.elements.node.styles.borderRadius).toBe(20);
 });
 
+// === Per-corner radius drag (F4) ===
+
+test("per-corner radius drag writes only the grabbed corner", () => {
+  const document = createDocument();
+  const interaction = createRadiusInteraction(document, "nw");
+
+  // Offset ((110-100) + (90-80)) / 2 = 10 on the nw rail only.
+  const result = radiusDocument(interaction, { x: 110, y: 90 }, true);
+
+  expect(result.document.elements.node.styles.cornerRadii).toEqual([10, 0, 0, 0]);
+  expect(result.document.elements.node.styles.borderRadius ?? 0).toBe(0);
+});
+
+test("per-corner radius drag seeds the other corners from the uniform radius", () => {
+  const document = createDocument();
+  document.elements.node.styles.borderRadius = 4;
+  const interaction = createRadiusInteraction(document, "se", { x: 150, y: 120 });
+
+  const result = radiusDocument(interaction, { x: 140, y: 110 }, true);
+
+  expect(result.document.elements.node.styles.cornerRadii).toEqual([4, 4, 10, 4]);
+});
+
+test("uniform radius drag clears a per-corner override", () => {
+  const document = createDocument();
+  document.elements.node.styles.cornerRadii = [10, 0, 0, 0];
+  const interaction = createRadiusInteraction(document, "nw");
+
+  const result = radiusDocument(interaction, { x: 105, y: 85 });
+
+  expect(result.document.elements.node.styles.borderRadius).toBe(5);
+  expect(result.document.elements.node.styles.cornerRadii).toBeUndefined();
+});
+
+test("per-corner drag that equalizes all corners collapses back to the uniform field", () => {
+  const document = createDocument();
+  document.elements.node.styles.cornerRadii = [10, 5, 5, 5];
+  const interaction = createRadiusInteraction(document, "nw");
+
+  const result = radiusDocument(interaction, { x: 105, y: 85 }, true);
+
+  expect(result.document.elements.node.styles.borderRadius).toBe(5);
+  expect(result.document.elements.node.styles.cornerRadii).toBeUndefined();
+});
+
 test("resizes a 180 degree element from the visual handle direction", () => {
   const document = createDocument();
   document.elements.node.rotation = 180;
