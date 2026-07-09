@@ -23,6 +23,72 @@ export type ParentDistanceMeasurements = {
   };
 };
 
+// A single measured segment in canvas space (drawn as a line + px label).
+export type MeasureSegment = {
+  from: Point;
+  to: Point;
+  value: number;
+  orientation: "horizontal" | "vertical";
+};
+
+/**
+ * Distance measurements between two arbitrary rects (selection ↔ hovered
+ * element, G12). Disjoint on an axis → one gap segment through the middle of
+ * the shared band (or the source's center when the bands don't overlap);
+ * containment → the four inset distances, like the parent measurements.
+ */
+export function getRectDistanceSegments(a: Rect, b: Rect): MeasureSegment[] {
+  const aRight = rectRight(a);
+  const aBottom = rectBottom(a);
+  const bRight = rectRight(b);
+  const bBottom = rectBottom(b);
+
+  const contains = (outer: Rect, inner: Rect) =>
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    rectRight(inner) <= rectRight(outer) &&
+    rectBottom(inner) <= rectBottom(outer);
+
+  const insetSegments = (outer: Rect, inner: Rect): MeasureSegment[] => {
+    const cx = rectCenterX(inner);
+    const cy = rectCenterY(inner);
+    return [
+      { from: { x: cx, y: inner.y }, to: { x: cx, y: outer.y }, value: inner.y - outer.y, orientation: "vertical" },
+      { from: { x: rectRight(inner), y: cy }, to: { x: rectRight(outer), y: cy }, value: rectRight(outer) - rectRight(inner), orientation: "horizontal" },
+      { from: { x: cx, y: rectBottom(inner) }, to: { x: cx, y: rectBottom(outer) }, value: rectBottom(outer) - rectBottom(inner), orientation: "vertical" },
+      { from: { x: inner.x, y: cy }, to: { x: outer.x, y: cy }, value: inner.x - outer.x, orientation: "horizontal" },
+    ];
+  };
+
+  if (contains(b, a)) return insetSegments(b, a);
+  if (contains(a, b)) return insetSegments(a, b);
+
+  const segments: MeasureSegment[] = [];
+
+  // Horizontal gap — measured through the middle of the vertical overlap band,
+  // falling back to a's vertical center when the bands don't overlap.
+  const bandY0 = Math.max(a.y, b.y);
+  const bandY1 = Math.min(aBottom, bBottom);
+  const y = bandY0 < bandY1 ? (bandY0 + bandY1) / 2 : rectCenterY(a);
+  if (bRight <= a.x) {
+    segments.push({ from: { x: a.x, y }, to: { x: bRight, y }, value: a.x - bRight, orientation: "horizontal" });
+  } else if (b.x >= aRight) {
+    segments.push({ from: { x: aRight, y }, to: { x: b.x, y }, value: b.x - aRight, orientation: "horizontal" });
+  }
+
+  // Vertical gap — symmetric.
+  const bandX0 = Math.max(a.x, b.x);
+  const bandX1 = Math.min(aRight, bRight);
+  const x = bandX0 < bandX1 ? (bandX0 + bandX1) / 2 : rectCenterX(a);
+  if (bBottom <= a.y) {
+    segments.push({ from: { x, y: a.y }, to: { x, y: bBottom }, value: a.y - bBottom, orientation: "vertical" });
+  } else if (b.y >= aBottom) {
+    segments.push({ from: { x, y: aBottom }, to: { x, y: b.y }, value: b.y - aBottom, orientation: "vertical" });
+  }
+
+  return segments;
+}
+
 export function getAbsoluteRect(document: CanvasDocument, id: string): Rect | null {
   const node = document.elements[id];
   if (!node) return null;

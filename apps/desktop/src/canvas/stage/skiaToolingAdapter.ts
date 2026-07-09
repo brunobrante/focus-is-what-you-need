@@ -15,6 +15,7 @@ import {
   drawGhost,
   drawGuide,
   drawOutline,
+  drawMeasureSegments,
   drawParentDistances,
   drawPathEdit,
   drawRadiusHandles,
@@ -60,6 +61,7 @@ function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
     a.marqueeRect === b.marqueeRect &&
     a.dropTarget === b.dropTarget &&
     a.parentDistances === b.parentDistances &&
+    a.measureSegments === b.measureSegments &&
     a.sizeLabel === b.sizeLabel &&
     a.radiusLabel === b.radiusLabel &&
     a.pathEdit === b.pathEdit
@@ -206,6 +208,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
       if (frame.parentDistances) {
         drawParentDistances(ck, canvas, pool, frame.parentDistances, frame, this.getParentDistanceFont(ck));
+      }
+
+      if (frame.measureSegments) {
+        drawMeasureSegments(ck, canvas, pool, frame.measureSegments, frame, this.getParentDistanceFont(ck));
       }
 
       if (frame.marqueeRect) {

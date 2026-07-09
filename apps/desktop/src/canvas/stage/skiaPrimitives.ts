@@ -389,6 +389,35 @@ export function drawParentDistances(
   });
 }
 
+/** Selection ↔ hovered element measurements (G12): the same line+label segment
+ *  primitive as the parent distances, over an arbitrary segment list. */
+export function drawMeasureSegments(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  segments: ToolingRenderFrame["measureSegments"],
+  frame: ToolingRenderFrame,
+  font: Font,
+): void {
+  if (!segments || segments.length === 0) return;
+  const stroke = pool.getStroke(PARENT_DISTANCE_COLOR, 1);
+  const fill = pool.getFill(PARENT_DISTANCE_COLOR);
+  const textPaint = pool.getFill(PARENT_DISTANCE_TEXT_COLOR);
+  for (const segment of segments) {
+    drawParentDistanceSegment(ck, canvas, {
+      from: segment.from,
+      to: segment.to,
+      value: segment.value,
+      orientation: segment.orientation,
+      frame,
+      stroke,
+      fill,
+      textPaint,
+      font,
+    });
+  }
+}
+
 function drawParentDistanceSegment(
   ck: CanvasKit,
   canvas: Canvas,

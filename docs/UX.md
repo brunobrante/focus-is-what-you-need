@@ -549,6 +549,15 @@ element that is already part of a multi-selection collapses the selection to tha
 element on mouseup — dragging still moves the whole selection, and a
 modifier-click (add/remove from selection) is unaffected. Matches Figma.
 
+**Hold-to-measure distances** (`canvas.overlay.parentDistances`, Ctrl by default):
+with the modifier held, a **single selection** shows its four labelled distances to
+its parent's content box. **Hovering another (non-selected) element while holding
+the modifier measures selection ↔ hovered instead (G12)**: disjoint elements get a
+labelled gap line per separated axis (drawn through the middle of their shared
+band), and when one contains the other the four inset distances are shown — so any
+element can be measured against any other, not just its parent. Works with a
+multi-selection (measured from the selection's union bounds).
+
 **Select all / Cut / Zoom to selection** (rebindable, G12):
 - **⌘A** (`canvas.selection.selectAll`) selects every sibling at the current level —
   the frame roots, or the isolated container's children when isolation is active —

@@ -1,6 +1,6 @@
 import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { filterTopLevelIds, getCommonParentId, getInstanceRootId, getParentDistanceMeasurements, getSelectionBox, isInsideInstance, unionRects } from "@/canvas/engine/geometry";
+import { filterTopLevelIds, getCommonParentId, getInstanceRootId, getParentDistanceMeasurements, getRectDistanceSegments, getSelectionAABB, getSelectionBox, isInsideInstance, unionRects } from "@/canvas/engine/geometry";
 import { useHoveredId } from "@/canvas/engine/store";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import type { CanvasDocument, ElementNode, Point, Rect, ResizeHandle, SnapGuide } from "@/canvas/engine/types";
@@ -35,6 +35,7 @@ import type {
   ToolingDropTargetCommand,
   ToolingGhostCommand,
   ToolingOutlineCommand,
+  ToolingMeasureSegmentCommand,
   ToolingParentDistanceCommand,
   ToolingPathEditCommand,
   ToolingRadiusLabelCommand,
@@ -167,6 +168,7 @@ type ToolingRenderData = {
   radiusLabel: ToolingRadiusLabelCommand | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
+  measureSegments: ToolingMeasureSegmentCommand[] | null;
   pathEdit: ToolingPathEditCommand | null;
   isInstanceSelection: boolean;
   isDragging: boolean;
@@ -423,10 +425,29 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
               intent: props.dropTarget.intent,
             }
           : null;
+      // Modifier + hover over a NON-selected element measures selection ↔ hovered
+      // distances (G12); with no eligible hover it falls back to the classic
+      // single-selection distances-to-parent.
+      const measureSegments =
+        !props.canvasStageActive &&
+        !isEditingText &&
+        parentDistanceModifierDown &&
+        hoveredId &&
+        transformIds.length > 0 &&
+        !transformIds.includes(hoveredId)
+          ? (() => {
+              const selectionRect = getSelectionAABB(doc, transformIds);
+              const hoveredRect = getSelectionAABB(doc, [hoveredId]);
+              if (!selectionRect || !hoveredRect) return null;
+              const segments = getRectDistanceSegments(selectionRect, hoveredRect);
+              return segments.length > 0 ? segments : null;
+            })()
+          : null;
       const parentDistances =
         !props.canvasStageActive &&
         !isEditingText &&
         parentDistanceModifierDown &&
+        !measureSegments &&
         transformIds.length === 1
           ? getParentDistanceMeasurements(doc, transformIds[0])
           : null;
@@ -518,6 +539,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         radiusLabel,
         dropTarget,
         parentDistances,
+        measureSegments,
         pathEdit: pathEditGeometry
           ? {
               anchors: pathEditGeometry.anchors.map((a) => ({
@@ -674,6 +696,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         marqueeRect: props.marqueeRect,
         dropTarget: renderData.dropTarget,
         parentDistances: renderData.parentDistances,
+        measureSegments: renderData.measureSegments,
         sizeLabel,
         radiusLabel: renderData.radiusLabel,
         pathEdit: renderData.pathEdit,

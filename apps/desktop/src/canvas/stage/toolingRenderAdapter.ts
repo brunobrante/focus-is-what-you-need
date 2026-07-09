@@ -52,6 +52,15 @@ export type ToolingParentDistanceCommand = {
   };
 };
 
+/** Free-form measured segments (selection ↔ hovered element, G12). Points are
+ *  in CANVAS space — the renderer projects them like the parent distances. */
+export type ToolingMeasureSegmentCommand = {
+  from: Point;
+  to: Point;
+  value: number;
+  orientation: "horizontal" | "vertical";
+};
+
 /**
  * The "width × height" tag drawn beside a selection. Coordinates are in overlay
  * space (0,0 = tooling host top-left). `centerX` is the horizontal anchor — the
@@ -112,6 +121,7 @@ export type ToolingRenderFrame = {
   marqueeRect: Rect | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
+  measureSegments: ToolingMeasureSegmentCommand[] | null;
   sizeLabel: ToolingSizeLabelCommand | null;
   radiusLabel: ToolingRadiusLabelCommand | null;
   pathEdit: ToolingPathEditCommand | null;
