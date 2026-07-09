@@ -229,6 +229,39 @@ export function useKeyboardShortcuts({
         if (result) dispatch({ type: "commitDocument", document: result.document, selectedIds: result.selectedIds });
         return;
       }
+      if (matchesKeyCommand(event, settings, "canvas.clipboard.cut")) {
+        event.preventDefault();
+        if (mutatingGesture || currentState.selectedIds.length === 0) return;
+        clipboard.copy(currentState.document, currentState.selectedIds);
+        dispatch({
+          type: "commitDocument",
+          document: deleteElements(currentState.document, currentState.selectedIds),
+          selectedIds: [],
+        });
+        return;
+      }
+      if (matchesKeyCommand(event, settings, "canvas.selection.selectAll")) {
+        event.preventDefault();
+        // Select the current level's siblings (isolation-aware), skipping locked
+        // and hidden nodes — the same exclusions the marquee applies (M6).
+        const parentId = currentState.isolatedParentId;
+        const pool = parentId
+          ? currentState.document.elements[parentId]?.children ?? []
+          : currentState.document.rootIds;
+        const ids = pool.filter((id) => {
+          const node = currentState.document.elements[id];
+          return node && !node.locked && node.visible !== false;
+        });
+        if (ids.length > 0) dispatch({ type: "setSelected", selectedIds: ids });
+        return;
+      }
+      if (matchesKeyCommand(event, settings, "canvas.viewport.zoomToSelection")) {
+        event.preventDefault();
+        if (currentState.selectedIds.length > 0) {
+          dispatch({ type: "requestSelectionFocus", active: true });
+        }
+        return;
+      }
       if (matchesKeyCommand(event, settings, "canvas.selection.duplicate")) {
         event.preventDefault();
         if (!mutatingGesture && currentState.selectedIds.length > 0) {

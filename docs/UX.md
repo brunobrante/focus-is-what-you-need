@@ -536,6 +536,17 @@ in the canvas axes; **Shift+arrow** moves by 10px. Amounts are settings-backed
 (`canvas.nudge.up/down/left/right`). A rapid burst of nudges coalesces into a single
 undo step, and the moved elements stay clamped inside their frame.
 
+**Select all / Cut / Zoom to selection** (rebindable, G12):
+- **⌘A** (`canvas.selection.selectAll`) selects every sibling at the current level —
+  the frame roots, or the isolated container's children when isolation is active —
+  skipping locked and hidden elements (the same exclusions as the marquee).
+- **⌘X** (`canvas.clipboard.cut`) copies the selection to the shared clipboard and
+  deletes it, as one undo step.
+- **⇧2** (`canvas.viewport.zoomToSelection`, matched by physical key so it works on
+  any layout) frames the selection: the camera zooms and centers on the union bounds
+  of the selected elements, using the same proportional-zoom rule as the layers-tree
+  focus button. No-op with nothing selected.
+
 **Top-left**:
 - A compact chip: back button · the current subject's name (component / screen /
   project, truncated) · the project-type badge · search toggle (opens the

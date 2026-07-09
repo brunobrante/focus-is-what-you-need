@@ -229,6 +229,32 @@ export function CanvasStage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.focusNodeId]);
 
+  // Zoom-to-selection (G12): same consume-and-clear contract as the node focus
+  // above, but framing the union bounds of the whole selection.
+  useEffect(() => {
+    if (!state.focusSelection) return;
+    const size = getCurrentViewportSize();
+    let union: Rect | null = null;
+    for (const id of state.selectedIds) {
+      const rect = getAbsoluteRect(state.document, id);
+      if (!rect) continue;
+      union = union ? unionRect(union, rect) : rect;
+    }
+    if (union && size.width > 0 && size.height > 0) {
+      const zoom = getInitialZoomForSubjectSize(
+        { width: union.width, height: union.height },
+        state.viewportMode,
+      );
+      const focus = { x: union.x + union.width / 2, y: union.y + union.height / 2 };
+      const next = centerViewportOnPoint(zoom, size, canvasSize, focus, state.viewportMode);
+      if (viewportChanged(next, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
+        dispatch({ type: "setViewport", zoom: next.zoom, offsetX: next.offsetX, offsetY: next.offsetY });
+      }
+    }
+    dispatch({ type: "requestSelectionFocus", active: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.focusSelection]);
+
   const commitContextToolbarDocument = useCallback((document: CanvasDocument, selectedIds?: string[]) => {
     dispatch({ type: "commitDocument", document, selectedIds });
   }, [dispatch]);

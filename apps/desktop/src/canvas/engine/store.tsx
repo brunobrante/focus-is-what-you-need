@@ -36,6 +36,7 @@ export type EditorAction =
   | { type: "exitPathEdit" }
   | { type: "setCanvasStageActive"; active: boolean }
   | { type: "requestNodeFocus"; nodeId: string | null }
+  | { type: "requestSelectionFocus"; active: boolean }
   | { type: "setGuides"; guides: SnapGuide[] }
   | { type: "setExportOpen"; exportOpen: boolean }
   | { type: "hydrateDocument"; document: CanvasDocument }
@@ -200,6 +201,7 @@ function stateForDocument(document: CanvasDocument, viewportMode: ViewportMode):
     future: [],
     transientChangedIds: null,
     focusNodeId: null,
+    focusSelection: false,
     viewportSize: { width: 0, height: 0 },
     navigableBounds: null,
     ancestorOverlay: { enabled: false, items: {} },
@@ -284,6 +286,10 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
   requestNodeFocus(state, action) {
     if (state.focusNodeId === action.nodeId) return state;
     return { ...state, focusNodeId: action.nodeId };
+  },
+  requestSelectionFocus(state, action) {
+    if ((state.focusSelection ?? false) === action.active) return state;
+    return { ...state, focusSelection: action.active };
   },
   setSelected(state, action) {
     const selectedIds = sanitizeSelection(state.document, action.selectedIds);

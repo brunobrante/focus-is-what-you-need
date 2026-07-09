@@ -16,7 +16,9 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
   ],
   "canvas.clipboard.copy": [{ mod: true, key: "c" }],
   "canvas.clipboard.paste": [{ mod: true, key: "v" }],
+  "canvas.clipboard.cut": [{ mod: true, key: "x" }],
   "canvas.selection.duplicate": [{ mod: true, key: "d" }],
+  "canvas.selection.selectAll": [{ mod: true, key: "a" }],
   "canvas.selection.delete": [
     { key: "Delete" },
     { key: "Backspace" },
@@ -41,6 +43,9 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
   ],
   "canvas.viewport.zoomOut": [{ mod: true, key: "-" }],
   "canvas.viewport.zoomReset": [{ mod: true, key: "0" }],
+  // Shift+2 (Figma). Matched by physical code — Shift turns the "2" keycap into
+  // "@"/other glyphs depending on layout, so a key match would never fire.
+  "canvas.viewport.zoomToSelection": [{ code: "Digit2", shift: true }],
   "canvas.viewport.pan": [{ code: "Space" }],
   "canvas.tool.cursor": [{ key: "v" }],
   "canvas.tool.hand": [{ key: "h" }],

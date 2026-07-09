@@ -242,6 +242,9 @@ export type EditorState = {
   // sits centered, without moving the node. The stage consumes it and clears it
   // back to null. Transient — never persisted.
   focusNodeId?: string | null;
+  // One-shot camera focus request on the current selection's union bounds
+  // (zoom-to-selection, G12). Same consume-and-clear contract as focusNodeId.
+  focusSelection?: boolean;
   // Current viewport geometry, mirrored from the stage so the reducer can anchor
   // zoom changes (buttons / keyboard / toolbar) on the viewport center the same
   // way the wheel anchors on the cursor. `viewportSize` is the container size in
