@@ -385,20 +385,23 @@ export function LayoutSection({
           <InsRow label="Order">
             <InsInput value={String(styles.order ?? 0)} onChange={(v) => updateNumber(v, (order) => onChange({ order }))} />
           </InsRow>
-          <InsRow label="Min W">
-            <InsInput value={styles.minWidth === undefined ? "" : String(styles.minWidth)} placeholder="—" onChange={commitBound("minWidth")} suffix="px" />
-          </InsRow>
-          <InsRow label="Max W">
-            <InsInput value={styles.maxWidth === undefined ? "" : String(styles.maxWidth)} placeholder="—" onChange={commitBound("maxWidth")} suffix="px" />
-          </InsRow>
-          <InsRow label="Min H">
-            <InsInput value={styles.minHeight === undefined ? "" : String(styles.minHeight)} placeholder="—" onChange={commitBound("minHeight")} suffix="px" />
-          </InsRow>
-          <InsRow label="Max H">
-            <InsInput value={styles.maxHeight === undefined ? "" : String(styles.maxHeight)} placeholder="—" onChange={commitBound("maxHeight")} suffix="px" />
-          </InsRow>
         </>
       ) : null}
+
+      {/* ── Min/max size bounds — per axis, on ANY element (docs/inspector-layout.md,
+          D4): e.g. a min-height on a Hug container, not just flex/grid children. ── */}
+      <InsRow label="Min W">
+        <InsInput value={styles.minWidth === undefined ? "" : String(styles.minWidth)} placeholder="—" onChange={commitBound("minWidth")} suffix="px" />
+      </InsRow>
+      <InsRow label="Max W">
+        <InsInput value={styles.maxWidth === undefined ? "" : String(styles.maxWidth)} placeholder="—" onChange={commitBound("maxWidth")} suffix="px" />
+      </InsRow>
+      <InsRow label="Min H">
+        <InsInput value={styles.minHeight === undefined ? "" : String(styles.minHeight)} placeholder="—" onChange={commitBound("minHeight")} suffix="px" />
+      </InsRow>
+      <InsRow label="Max H">
+        <InsInput value={styles.maxHeight === undefined ? "" : String(styles.maxHeight)} placeholder="—" onChange={commitBound("maxHeight")} suffix="px" />
+      </InsRow>
 
       {/* ── Self transform: flips (compose with the Position rotation) ── */}
       <InsRow label="Flip">

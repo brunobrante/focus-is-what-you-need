@@ -907,7 +907,9 @@ Between is the "auto gap"), **Stretch**, **Gap**, **Wrap**, individual **Padding
 splits the uniform value into Top/Right/Bottom/Left), a minimal **Columns/Rows** track editor for
 Grid (Fill `fr` / Auto / Min / Fixed `px`), and the advanced **Strokes** (Excluded / Included)
 and **Stacking** (Last / First on top). An element **inside a flex/grid parent** also gets **W/H
-mode** (Fixed / Hug / Fill), **Align self**, **Order**, and **Min/Max W/H**. Every element gets
+mode** (Fixed / Hug / Fill), **Align self**, and **Order**. **Min/Max W/H** are
+authorable on **every element, per axis independently** (e.g. a min-height on a Hug
+container) — not just flex/grid children (D4). Every element gets
 **Flip H / Flip V** and, when it has a parent, **Pin X / Pin Y** constraint dropdowns (Left /
 Right / Left-Right / Center / Scale). (Text auto-resize lives in the **Transform** section as
 per-axis Fixed/Fit toggles — see above.) **Mostly authoring-only for now:** these controls write
