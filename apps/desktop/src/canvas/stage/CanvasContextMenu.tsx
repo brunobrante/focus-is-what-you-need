@@ -1,18 +1,9 @@
 import { useEffect, useRef } from "react";
-import {
-  bringToFront,
-  deleteElements,
-  duplicateElements,
-  reorderElement,
-  sendToBack,
-  setElementLocked,
-  setElementVisible
-} from "@/canvas/engine/actions";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import { useEditor } from "@/canvas/engine/store";
+import { useCanvasCommands } from "@/canvas/shell/useCanvasCommands";
 import { useCanvasUiVisibility } from "@/canvas/CanvasUiVisibilityContext";
 import { useCanvasWindow } from "@/canvas/CanvasWindowContext";
-import type { CanvasDocument } from "@/canvas/engine/types";
 
 export type ContextMenuState = {
   x: number;
@@ -28,7 +19,11 @@ const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform
 const modLabel = isMac ? "⌘" : "Ctrl+";
 
 export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<ContextMenuState>; onClose: () => void }) {
-  const { state, dispatch, clipboard } = useEditor();
+  const editor = useEditor();
+  const { state, clipboard } = editor;
+  // Same engine-command layer as the layers tree's menu, so both menus offer
+  // the identical action set (copy/paste, ordering, align/distribute, ungroup).
+  const commands = useCanvasCommands(editor, onClose);
   const { uiHidden, toggleUiHidden, panelsOpen, togglePanels } = useCanvasUiVisibility();
   const windowInfo = useCanvasWindow();
   const canHideWindow = !!windowInfo && windowInfo.splitActive;
@@ -57,27 +52,40 @@ export function CanvasContextMenu({ menu, onClose }: { menu: NonNullable<Context
   const singleId = selectedIds.length === 1 ? selectedIds[0] : null;
   const singleNode = singleId ? state.document.elements[singleId] : null;
 
-  const commit = (doc: CanvasDocument, ids?: string[]) => {
-    dispatch({ type: "commitDocument", document: doc, selectedIds: ids ?? state.selectedIds });
-    onClose();
-  };
-
   const items: MenuItem[] = [
-    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: () => { clipboard.copy(state.document, selectedIds); onClose(); } },
-    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !clipboard.has(), action: () => { const r = clipboard.paste(state.document); if (r) commit(r.document, r.selectedIds); else onClose(); } },
-    { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: () => { const r = duplicateElements(state.document, selectedIds); commit(r.document, r.selectedIds); } },
+    { type: "action", label: "Copy", shortcut: `${modLabel}C`, disabled: !hasSelection, action: commands.copy },
+    { type: "action", label: "Paste", shortcut: `${modLabel}V`, disabled: !clipboard.has(), action: commands.paste },
+    { type: "action", label: "Duplicate", shortcut: `${modLabel}D`, disabled: !hasSelection, action: commands.duplicate },
     { type: "separator" },
-    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: () => { if (singleId) commit(bringToFront(state.document, singleId)); } },
-    { type: "action", label: "Bring Forward", disabled: !singleNode, action: () => { if (singleId) commit(reorderElement(state.document, singleId, "forward")); } },
-    { type: "action", label: "Send Backward", disabled: !singleNode, action: () => { if (singleId) commit(reorderElement(state.document, singleId, "backward")); } },
-    { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: () => { if (singleId) commit(sendToBack(state.document, singleId)); } },
+    { type: "action", label: "Bring to Front", shortcut: "]", disabled: !singleNode, action: commands.bringToFront },
+    { type: "action", label: "Bring Forward", disabled: !singleNode, action: commands.bringForward },
+    { type: "action", label: "Send Backward", disabled: !singleNode, action: commands.sendBackward },
+    { type: "action", label: "Send to Back", shortcut: "[", disabled: !singleNode, action: commands.sendToBack },
     { type: "separator" },
-    ...(singleNode ? [
-      { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commit(setElementLocked(state.document, singleId!, !singleNode.locked)) },
-      { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commit(setElementVisible(state.document, singleId!, singleNode.visible === false)) },
+    // Align / distribute (G1) — same gating as the layers tree's menu.
+    ...(selectedIds.length >= 2 ? [
+      { type: "action" as const, label: "Align left", action: () => commands.align("left") },
+      { type: "action" as const, label: "Align horizontal centers", action: () => commands.align("hcenter") },
+      { type: "action" as const, label: "Align right", action: () => commands.align("right") },
+      { type: "action" as const, label: "Align top", action: () => commands.align("top") },
+      { type: "action" as const, label: "Align vertical centers", action: () => commands.align("vcenter") },
+      { type: "action" as const, label: "Align bottom", action: () => commands.align("bottom") },
+      ...(selectedIds.length >= 3 ? [
+        { type: "action" as const, label: "Distribute horizontally", action: () => commands.distribute("horizontal") },
+        { type: "action" as const, label: "Distribute vertically", action: () => commands.distribute("vertical") },
+      ] : []),
       { type: "separator" as const },
     ] : []),
-    { type: "action", label: "Delete", shortcut: "Del", disabled: !hasSelection, action: () => commit(deleteElements(state.document, selectedIds), []) },
+    ...(singleNode && singleNode.children.length > 0 ? [
+      { type: "action" as const, label: "Ungroup", shortcut: `${modLabel}⇧G`, action: commands.unwrap },
+      { type: "separator" as const },
+    ] : []),
+    ...(singleNode ? [
+      { type: "action" as const, label: singleNode.locked ? "Unlock" : "Lock", action: () => commands.setLocked(!singleNode.locked) },
+      { type: "action" as const, label: singleNode.visible === false ? "Show" : "Hide", action: () => commands.setVisible(singleNode.visible === false) },
+      { type: "separator" as const },
+    ] : []),
+    { type: "action", label: "Delete", shortcut: "Del", disabled: !hasSelection, action: commands.remove },
     { type: "separator" },
     ...(canHideWindow
       ? [{ type: "action" as const, label: "Hide this window", action: () => { windowInfo!.onHideWindow(windowInfo!.windowKey); onClose(); } }]

@@ -17,16 +17,18 @@ import {
 import type { EditorBridgeValue } from "@/canvas/engine/bridge";
 
 /**
- * Application hook that owns the engine-mutation + commit command logic the
- * layers tree's context menu used to inline. Each callback applies the same
- * engine action and dispatches the same `commitDocument` as before — behavior
- * is identical, only the call site moves out of the Tree component.
+ * Application hook that owns the engine-mutation + commit command logic shared
+ * by the layers tree's and the canvas stage's context menus. Each callback
+ * applies the engine action and dispatches `commitDocument`.
  *
  * `onCommit` is invoked after every command (whether or not it produced a
  * mutation) so callers can close the menu exactly as the old inline code did.
+ *
+ * Accepts anything carrying the editor triplet — the shell passes the active
+ * bridge value, the stage menu passes its own `useEditor()` context.
  */
 export function useCanvasCommands(
-  editor: EditorBridgeValue,
+  editor: Pick<EditorBridgeValue, "state" | "dispatch" | "clipboard">,
   onCommit: () => void,
 ) {
   const { state, dispatch, clipboard } = editor;
