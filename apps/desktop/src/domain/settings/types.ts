@@ -56,7 +56,8 @@ export type CanvasModifierCommandId =
   | "canvas.rotate.snap"
   | "canvas.selection.addToClick"
   | "canvas.vector.removeAnchor"
-  | "canvas.radius.perCorner";
+  | "canvas.radius.perCorner"
+  | "canvas.drag.duplicate";
 
 export type CanvasCommandId = CanvasKeyCommandId | CanvasModifierCommandId;
 

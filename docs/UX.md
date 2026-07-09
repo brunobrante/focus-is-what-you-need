@@ -536,6 +536,14 @@ in the canvas axes; **Shift+arrow** moves by 10px. Amounts are settings-backed
 (`canvas.nudge.up/down/left/right`). A rapid burst of nudges coalesces into a single
 undo step, and the moved elements stay clamped inside their frame.
 
+**Alt-drag duplicates (G12):** holding the duplicate modifier (Alt by default;
+rebindable as `canvas.drag.duplicate`) when a body drag starts moving clones the
+selection in place — the originals stay put and the clones follow the cursor,
+named "… copy" and selected. The whole gesture is **one undo step** (undo removes
+the clones), and **Esc** mid-drag cancels the duplicate entirely. On resize/rotate
+handles Alt keeps its transform meaning (resize-from-center); the duplicate
+modifier only applies to body drags.
+
 **Click on a multi-selection collapses it (G12):** clicking (without dragging) an
 element that is already part of a multi-selection collapses the selection to that
 element on mouseup — dragging still moves the whole selection, and a

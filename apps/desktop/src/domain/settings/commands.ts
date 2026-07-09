@@ -116,6 +116,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.selection.addToClick", label: "Add to selection on click", group: "Modifiers", type: "modifier" },
       { id: "canvas.vector.removeAnchor", label: "Remove anchor point", group: "Modifiers", type: "modifier" },
       { id: "canvas.radius.perCorner", label: "Round a single corner", group: "Modifiers", type: "modifier" },
+      { id: "canvas.drag.duplicate", label: "Duplicate while dragging", group: "Modifiers", type: "modifier" },
     ],
   },
 ];

@@ -325,6 +325,12 @@ export type DragInteraction = BaseInteraction & {
   // exclude set. Depends only on transformIds + beforeDocument, both constant for
   // the drag, so it is computed once instead of walking descendants every frame.
   reparentExcludeIds?: Set<string>;
+  // Alt-drag duplicate (G12): set once the first moved frame cloned the dragged
+  // elements. `beforeDocument` then INCLUDES the clones (the per-frame rebuild
+  // base), while `historyBeforeDocument` keeps the pre-clone document so
+  // commit/undo and Escape-cancel remove the clones entirely.
+  duplicated?: boolean;
+  historyBeforeDocument?: CanvasDocument;
 };
 
 export type ResizeInteraction = BaseInteraction & {

@@ -79,6 +79,7 @@ const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
   "canvas.selection.addToClick": "shift",
   "canvas.vector.removeAnchor": "alt",
   "canvas.radius.perCorner": "alt",
+  "canvas.drag.duplicate": "alt",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {

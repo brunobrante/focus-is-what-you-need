@@ -1,7 +1,7 @@
 import type React from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { getToolElementDefinition } from "@/canvas/engine/elementDefinitions";
-import { createElementForTool, reparentElements, shallowCloneDocument } from "@/canvas/engine/actions";
+import { createElementForTool, duplicateElements, reparentElements, shallowCloneDocument } from "@/canvas/engine/actions";
 import { mutateElementShallow } from "@/canvas/engine/mutations/coreUtils";
 import { applyTextFitSizingInPlace } from "@/canvas/engine/mutations/elementGeometry";
 import { clamp, getDescendantIds, roundPixel } from "@/canvas/engine/geometry";
@@ -211,6 +211,33 @@ export function handleDragMove(
     y: event.clientY - interaction.startScreenPoint.y,
   };
   interaction.moved = interaction.moved || Math.hypot(screenDelta.x, screenDelta.y) > 0.5;
+
+  // Alt-drag duplicate (G12): the first frame that actually moves with the
+  // modifier held swaps the drag over to in-place clones — the originals stay
+  // put and the clones follow the cursor. `historyBeforeDocument` keeps the
+  // pre-clone document so commit lands as ONE undoable step (undo removes the
+  // clones) and Escape-cancel reverts to a clone-free document.
+  if (
+    !interaction.duplicated &&
+    interaction.moved &&
+    isModifierCommandActive(event, settings, "canvas.drag.duplicate")
+  ) {
+    const dup = duplicateElements(interaction.beforeDocument, interaction.transformIds, { offset: 0 });
+    if (dup.selectedIds.length > 0) {
+      interaction.duplicated = true;
+      interaction.historyBeforeDocument = interaction.beforeDocument;
+      interaction.beforeDocument = dup.document;
+      interaction.lastDocument = dup.document;
+      interaction.transformIds = dup.selectedIds;
+      interaction.selectedIds = dup.selectedIds;
+      interaction.clickedId = dup.selectedIds[0] ?? null;
+      // Drop the per-drag caches — they were derived from the pre-clone document.
+      interaction.snapCandidates = undefined;
+      interaction.parentBoundsById = undefined;
+      interaction.reparentExcludeIds = undefined;
+      dispatch({ type: "setSelected", selectedIds: dup.selectedIds });
+    }
+  }
 
   let move;
   let nextDocument: CanvasDocument;
@@ -437,7 +464,13 @@ export function finishMovedInteraction(
   }
   dispatch({
     type: "commitDocument",
-    beforeDocument: interaction.beforeDocument,
+    // An Alt-drag duplicate rebased beforeDocument onto the cloned document;
+    // history must instead capture the pre-clone state so one undo removes the
+    // clones (G12).
+    beforeDocument:
+      interaction.type === "drag"
+        ? interaction.historyBeforeDocument ?? interaction.beforeDocument
+        : interaction.beforeDocument,
     document: finalDoc,
     selectedIds: interaction.selectedIds,
   });

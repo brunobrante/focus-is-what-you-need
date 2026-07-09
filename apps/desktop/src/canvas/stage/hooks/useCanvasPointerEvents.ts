@@ -687,7 +687,17 @@ export function useCanvasPointerEvents({
     commandModeRef.current = false;
     updateDropTarget(null);
 
-    dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
+    // An Alt-drag duplicate rebased beforeDocument onto the cloned document;
+    // cancel must revert to the pre-clone state so the clones vanish (G12).
+    const revertDocument =
+      interaction.type === "drag"
+        ? interaction.historyBeforeDocument ?? interaction.beforeDocument
+        : interaction.beforeDocument;
+    dispatch({ type: "setDocumentTransient", document: revertDocument });
+    if (interaction.type === "drag" && interaction.historyBeforeDocument) {
+      // The mid-drag selection points at clones that no longer exist.
+      dispatch({ type: "setSelected", selectedIds: [] });
+    }
     dispatch({ type: "setGuides", guides: [] });
     // A canvas resize shifts the camera per frame for the W/N handles, so reverting
     // only the document leaves the camera offset — restore the start viewport too (L12).

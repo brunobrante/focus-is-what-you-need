@@ -247,7 +247,11 @@ export function deleteElements(document: CanvasDocument, ids: string[]): CanvasD
 export function duplicateElements(
   document: CanvasDocument,
   ids: string[],
+  // offset 0 = clones in place (Alt-drag duplicate, where the drag itself
+  // provides the displacement); the default +24 is the menu/shortcut cascade.
+  options: { offset?: number } = {},
 ): { document: CanvasDocument; selectedIds: string[] } {
+  const offset = options.offset ?? 24;
   const next = cloneDocument(document);
   const topLevelIds = filterTopLevelIds(document, ids).filter((id) => !document.elements[id]?.locked);
   const selectedIds: string[] = [];
@@ -265,8 +269,8 @@ export function duplicateElements(
       styles: { ...source.styles },
       id: newId, parentId, children: [],
       name: isTopLevel ? `${source.name} copy` : source.name,
-      x: source.x + (isTopLevel ? 24 : 0),
-      y: source.y + (isTopLevel ? 24 : 0),
+      x: source.x + (isTopLevel ? offset : 0),
+      y: source.y + (isTopLevel ? offset : 0),
     };
     next.elements[newId] = clone;
     for (const childId of source.children) {
