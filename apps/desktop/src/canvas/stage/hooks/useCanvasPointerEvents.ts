@@ -641,6 +641,18 @@ export function useCanvasPointerEvents({
     if (interaction.moved) {
       finishMovedInteraction(interaction, wasCommandMode, capturedDropTarget, dispatch, scheduleCanvasAlignmentLog, state);
     } else {
+      // Click (no drag) on an element of a multi-selection collapses the
+      // selection to that element on mouseup (Figma, G12). Only for a plain
+      // click on an already-selected element — a modifier-click add/remove
+      // never reaches here with wasAlreadySelected set.
+      if (
+        interaction.type === "drag" &&
+        interaction.wasAlreadySelected &&
+        interaction.clickedId &&
+        interaction.selectedIds.length > 1
+      ) {
+        dispatch({ type: "setSelected", selectedIds: [interaction.clickedId] });
+      }
       dispatch({ type: "setGuides", guides: [] });
     }
   };

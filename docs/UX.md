@@ -536,6 +536,11 @@ in the canvas axes; **Shift+arrow** moves by 10px. Amounts are settings-backed
 (`canvas.nudge.up/down/left/right`). A rapid burst of nudges coalesces into a single
 undo step, and the moved elements stay clamped inside their frame.
 
+**Click on a multi-selection collapses it (G12):** clicking (without dragging) an
+element that is already part of a multi-selection collapses the selection to that
+element on mouseup — dragging still moves the whole selection, and a
+modifier-click (add/remove from selection) is unaffected. Matches Figma.
+
 **Select all / Cut / Zoom to selection** (rebindable, G12):
 - **⌘A** (`canvas.selection.selectAll`) selects every sibling at the current level —
   the frame roots, or the isolated container's children when isolation is active —
