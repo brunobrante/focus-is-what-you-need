@@ -322,6 +322,79 @@ test("resizes a 180 degree element from the visual handle direction", () => {
   });
 });
 
+// === Line/arrow endpoint editing (G12) ===
+
+function createLineResizeInteraction(document: CanvasDocument, handle: "e" | "w"): ResizeInteraction {
+  return {
+    type: "resize",
+    pointerId: 1,
+    handle,
+    startPoint: { x: 0, y: 0 },
+    beforeDocument: document,
+    selectedIds: ["node"],
+    transformIds: ["node"],
+    startBox: { x: 100, y: 100, width: 100, height: 2 },
+    startRects: { node: { x: 100, y: 100, width: 100, height: 2 } },
+    commonParentId: null,
+    parentBounds: { x: 0, y: 0, width: 500, height: 500 },
+    moved: false,
+    lastDocument: document,
+    lastGuides: [],
+  };
+}
+
+test("dragging a line's east endpoint re-angles it around the pinned west end", () => {
+  const document = createDocument();
+  document.elements.node.type = "line";
+  document.elements.node.x = 100;
+  document.elements.node.y = 100;
+  document.elements.node.width = 100;
+  document.elements.node.height = 2;
+  const interaction = createLineResizeInteraction(document, "e");
+
+  // West endpoint is pinned at (100, 101); drag the east end straight down to
+  // (100, 201) → vertical line, length 100, rotation 90°.
+  const result = resizeDocument(
+    interaction,
+    { x: 100, y: 201 },
+    { altKey: false, shiftKey: false } as ReactPointerEvent,
+  );
+
+  expect(result.document.elements.node).toMatchObject({
+    width: 100,
+    rotation: 90,
+    x: 50,
+    y: 150,
+  });
+  expect(result.document.elements.node.height).toBe(2);
+});
+
+test("dragging the west endpoint keeps the east end pinned", () => {
+  const document = createDocument();
+  document.elements.node.type = "line";
+  document.elements.node.x = 100;
+  document.elements.node.y = 100;
+  document.elements.node.width = 100;
+  document.elements.node.height = 2;
+  const interaction = createLineResizeInteraction(document, "w");
+
+  // East endpoint pinned at (200, 101); drag the west end to (200, 301) →
+  // vertical line of length 200 whose axis points cursor→anchor (rotation 270).
+  const result = resizeDocument(
+    interaction,
+    { x: 200, y: 301 },
+    { altKey: false, shiftKey: false } as ReactPointerEvent,
+  );
+
+  // Center lands at (200, 201) → x = 200 - 200/2 = 100, y = 201 - 1 = 200.
+  expect(result.document.elements.node).toMatchObject({
+    width: 200,
+    rotation: 270,
+    x: 100,
+    y: 200,
+  });
+});
+
 test("scale tool resizes an element and its children proportionally", () => {
   const document = createDocument();
   document.rootIds = ["parent"];

@@ -558,6 +558,14 @@ band), and when one contains the other the four inset distances are shown — so
 element can be measured against any other, not just its parent. Works with a
 multi-selection (measured from the selection's union bounds).
 
+**Lines & arrows are two-point elements (G12):** drawing a line/arrow follows the
+cursor at any angle (the element is a thin box whose rotation is baked from the
+drag). Once placed, its two **end handles edit the endpoints**: dragging one end
+pins the opposite endpoint and re-derives the length *and* angle from the cursor
+(not an axis-locked resize), with **Shift snapping the angle to 15° steps**. The
+thickness (height) is untouched by endpoint drags. Arrowhead markers remain
+deferred to the SVG render-target work (F3/G13).
+
 **Select all / Cut / Zoom to selection** (rebindable, G12):
 - **⌘A** (`canvas.selection.selectAll`) selects every sibling at the current level —
   the frame roots, or the isolated container's children when isolation is active —

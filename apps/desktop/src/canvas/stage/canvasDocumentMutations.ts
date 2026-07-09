@@ -240,6 +240,52 @@ function resizeSingleElement(
   const minH = def.constraints.height.min;
   const maxH = Math.min(parentSize.height, def.constraints.height.max ?? parentSize.height);
 
+  // Line/arrow endpoint editing (G12): dragging an end handle moves that
+  // ENDPOINT freely — the opposite endpoint stays pinned and the element's
+  // length AND angle follow the cursor (Figma's two-point line), instead of a
+  // rotation-preserving axis resize. Height (line thickness) is untouched.
+  if ((source.type === "line" || source.type === "arrow") && (handle === "e" || handle === "w")) {
+    const effectiveRotation = getEffectiveRotation(interaction.beforeDocument, id);
+    const absCenter = getAbsoluteCenter(interaction.beforeDocument, id);
+    if (absCenter) {
+      const theta = (effectiveRotation * Math.PI) / 180;
+      const dir = { x: Math.cos(theta), y: Math.sin(theta) };
+      const half = startRect.width / 2;
+      const anchor =
+        handle === "e"
+          ? { x: absCenter.x - dir.x * half, y: absCenter.y - dir.y * half }
+          : { x: absCenter.x + dir.x * half, y: absCenter.y + dir.y * half };
+      const dx = currentPoint.x - anchor.x;
+      const dy = currentPoint.y - anchor.y;
+      const rawLength = Math.hypot(dx, dy);
+      const length = roundPixel(clamp(rawLength, minW, maxW));
+      // Shift-constrain snaps the angle to 15° steps (same modifier as
+      // constrain-aspect elsewhere). A zero-length drag keeps the old angle.
+      let angleDeg =
+        rawLength < 0.0001
+          ? effectiveRotation + (handle === "w" ? 180 : 0)
+          : (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (constrainAspect) angleDeg = Math.round(angleDeg / 15) * 15;
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const unit = { x: Math.cos(angleRad), y: Math.sin(angleRad) };
+      const movingEnd = { x: anchor.x + unit.x * length, y: anchor.y + unit.y * length };
+      const newCanvasCenter = { x: (anchor.x + movingEnd.x) / 2, y: (anchor.y + movingEnd.y) / 2 };
+      // The dragged handle is the EAST end when handle === "e", so the element's
+      // axis points anchor→cursor; for "w" the axis points cursor→anchor.
+      const elementAngle = handle === "e" ? angleDeg : angleDeg + 180;
+      const localCenter = canvasPointToParentContentSpace(interaction.beforeDocument, id, newCanvasCenter);
+      const next = shallowCloneDocument(interaction.beforeDocument);
+      const node = mutateElementShallow(next, id);
+      if (node && localCenter) {
+        node.width = length;
+        node.x = roundPixel(localCenter.x - length / 2);
+        node.y = roundPixel(localCenter.y - node.height / 2);
+        node.rotation = roundAngle(normalizeAngle(elementAngle - (effectiveRotation - source.rotation)));
+      }
+      return { document: next, guides: [] };
+    }
+  }
+
   // Nested under a rotated ancestor: the handles are drawn with the full effective
   // rotation, so the resize must run in that same rotated visual frame (M1). The
   // common no-ancestor-rotation path below is left untouched. This branch skips the
