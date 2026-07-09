@@ -910,8 +910,9 @@ and **Stacking** (Last / First on top). An element **inside a flex/grid parent**
 mode** (Fixed / Hug / Fill), **Align self**, and **Order**. **Min/Max W/H** are
 authorable on **every element, per axis independently** (e.g. a min-height on a Hug
 container) — not just flex/grid children (D4). Every element gets
-**Flip H / Flip V** and, when it has a parent, **Pin X / Pin Y** constraint dropdowns (Left /
-Right / Left-Right / Center / Scale). (Text auto-resize lives in the **Transform** section as
+**Flip H / Flip V**; **absolute/free children only** (an element with a parent that is NOT a
+flex/grid container — D5) get the **Pin X / Pin Y** constraint dropdowns (Left / Right /
+Left-Right / Center / Scale). (Text auto-resize lives in the **Transform** section as
 per-axis Fixed/Fit toggles — see above.) **Mostly authoring-only for now:** these controls write
 real CSS-bound fields compiled by `domain/canvas/layout.ts`, but the flex/grid engine has **no
 on-canvas effect yet** — absolute positioning stays the default and the renderer adopts the

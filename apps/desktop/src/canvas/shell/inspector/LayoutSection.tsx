@@ -423,8 +423,11 @@ export function LayoutSection({
         />
       </InsRow>
 
-      {/* ── Absolute constraints (how a free child reflows on frame resize) ── */}
-      {!isRoot ? (
+      {/* ── Absolute constraints (how a free child reflows on frame resize).
+          Absolute/free children only (docs/inspector-layout.md, D5): an in-flow
+          flex/grid child is positioned by the layout engine, and the resize
+          reflow (G5) skips those children for the same reason. ── */}
+      {!isRoot && !parentIsFlow ? (
         <>
           <InsRow label="Pin X">
             <InsSelect
