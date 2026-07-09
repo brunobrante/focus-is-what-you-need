@@ -903,10 +903,15 @@ one and authors the **layout engine** fields. It is **type-adaptive**: a **div w
 (a "frame") gets the container controls — **Display** (Block / Flex / Grid), **Direction** (Row /
 Column), a **9-point alignment pad** (a visual 3×3 — the engine maps it to `justify-content` /
 `align-items` and flips the mapping for a column), **Distribute** (Packed / Between / Around —
-Between is the "auto gap"), **Stretch**, **Gap**, **Wrap**, individual **Padding** (a `4` toggle
+Between is the "auto gap"), **Stretch**, **Gap** plus optional per-axis **Row gap / Col gap**
+overrides (empty = the uniform gap; D6), **Wrap** (when wrapped, a **Rows align**
+`align-content` select: start / center / end / stretch / space-between), a **Baseline** switch
+(row flow only — `align-items: baseline`), individual **Padding** (a `4` toggle
 splits the uniform value into Top/Right/Bottom/Left), a minimal **Columns/Rows** track editor for
 Grid (Fill `fr` / Auto / Min / Fixed `px`), and the advanced **Strokes** (Excluded / Included)
-and **Stacking** (Last / First on top). An element **inside a flex/grid parent** also gets **W/H
+and **Stacking** (Last / First on top). A child **inside a grid parent** additionally gets
+**Justify self** (auto / start / center / end / stretch) and **Col span / Row span** track spans
+(empty = 1 cell; D6). An element **inside a flex/grid parent** also gets **W/H
 mode** (Fixed / Hug / Fill), **Align self**, and **Order**. **Min/Max W/H** are
 authorable on **every element, per axis independently** (e.g. a min-height on a Hug
 container) — not just flex/grid children (D4). Every element gets

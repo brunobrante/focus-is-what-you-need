@@ -15,6 +15,7 @@ import {
   InsRow,
   InsSection,
   InsSelect,
+  InsSwitch,
   InsToggle,
   updateNumber,
 } from "./InsComponents";
@@ -145,6 +146,48 @@ function TrackEditor({
   );
 }
 
+// Optional per-axis gap overrides (D6). Empty = the uniform Gap applies to
+// that axis; a number writes rowGap/columnGap, which win in the compiler.
+function GapSplitRows({
+  styles,
+  onChange,
+}: {
+  styles: ElementStyles;
+  onChange: (patch: Partial<ElementStyles>) => void;
+}) {
+  const commitAxis =
+    (key: "rowGap" | "columnGap") => (v: string): boolean => {
+      if (v.trim() === "") {
+        onChange({ [key]: undefined });
+        return true;
+      }
+      const n = Number(v);
+      if (!Number.isFinite(n)) return false;
+      onChange({ [key]: Math.max(0, n) });
+      return true;
+    };
+  return (
+    <>
+      <InsRow label="Row gap">
+        <InsInput
+          value={styles.rowGap === undefined ? "" : String(styles.rowGap)}
+          placeholder="—"
+          onChange={commitAxis("rowGap")}
+          suffix="px"
+        />
+      </InsRow>
+      <InsRow label="Col gap">
+        <InsInput
+          value={styles.columnGap === undefined ? "" : String(styles.columnGap)}
+          placeholder="—"
+          onChange={commitAxis("columnGap")}
+          suffix="px"
+        />
+      </InsRow>
+    </>
+  );
+}
+
 // ─── Section ────────────────────────────────────────────────────────────────
 
 export function LayoutSection({
@@ -256,13 +299,16 @@ export function LayoutSection({
 
               {/* Gap — uniform; "Auto" is space-between distribution, never gap:auto. */}
               {styles.distribute ? null : (
-                <InsRow label="Gap">
-                  <InsInput
-                    value={String(styles.gap ?? 0)}
-                    onChange={(v) => updateNumber(v, (gap) => onChange({ gap }))}
-                    suffix="px"
-                  />
-                </InsRow>
+                <>
+                  <InsRow label="Gap">
+                    <InsInput
+                      value={String(styles.gap ?? 0)}
+                      onChange={(v) => updateNumber(v, (gap) => onChange({ gap }))}
+                      suffix="px"
+                    />
+                  </InsRow>
+                  <GapSplitRows styles={styles} onChange={onChange} />
+                </>
               )}
 
               <InsRow label="Wrap">
@@ -275,6 +321,27 @@ export function LayoutSection({
                   ]}
                 />
               </InsRow>
+
+              {/* Wrapped rows pack via align-content (trap #5, D6). */}
+              {styles.flexWrap === "wrap" ? (
+                <InsRow label="Rows align">
+                  <InsSelect
+                    value={styles.alignContent ?? "start"}
+                    onChange={(v) => onChange({ alignContent: v === "start" ? undefined : (v as ElementStyles["alignContent"]) })}
+                    options={["start", "center", "end", "stretch", "space-between"]}
+                  />
+                </InsRow>
+              ) : null}
+
+              {/* Baseline alignment is a row-flow cross-axis modifier (D6). */}
+              {direction === "row" ? (
+                <InsRow label="Baseline">
+                  <InsSwitch
+                    checked={styles.baseline === true}
+                    onChange={(baseline) => onChange({ baseline: baseline || undefined })}
+                  />
+                </InsRow>
+              ) : null}
             </>
           ) : null}
 
@@ -285,6 +352,7 @@ export function LayoutSection({
               <InsRow label="Gap">
                 <InsInput value={String(styles.gap ?? 0)} onChange={(v) => updateNumber(v, (gap) => onChange({ gap }))} suffix="px" />
               </InsRow>
+              <GapSplitRows styles={styles} onChange={onChange} />
             </>
           ) : null}
 
@@ -385,6 +453,45 @@ export function LayoutSection({
           <InsRow label="Order">
             <InsInput value={String(styles.order ?? 0)} onChange={(v) => updateNumber(v, (order) => onChange({ order }))} />
           </InsRow>
+
+          {/* Grid-cell placement (D6): main-axis self-alignment and track spans. */}
+          {parentDisplay === "grid" ? (
+            <>
+              <InsRow label="Justify self">
+                <InsSelect
+                  value={styles.justifySelf ?? "auto"}
+                  onChange={(v) => onChange({ justifySelf: v === "auto" ? undefined : (v as ElementStyles["justifySelf"]) })}
+                  options={["auto", "start", "center", "end", "stretch"]}
+                />
+              </InsRow>
+              <InsRow label="Col span">
+                <InsInput
+                  value={styles.gridColumnSpan === undefined ? "" : String(styles.gridColumnSpan)}
+                  placeholder="—"
+                  onChange={(v) => {
+                    if (v.trim() === "") { onChange({ gridColumnSpan: undefined }); return true; }
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return false;
+                    onChange({ gridColumnSpan: Math.max(1, Math.round(n)) });
+                    return true;
+                  }}
+                />
+              </InsRow>
+              <InsRow label="Row span">
+                <InsInput
+                  value={styles.gridRowSpan === undefined ? "" : String(styles.gridRowSpan)}
+                  placeholder="—"
+                  onChange={(v) => {
+                    if (v.trim() === "") { onChange({ gridRowSpan: undefined }); return true; }
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return false;
+                    onChange({ gridRowSpan: Math.max(1, Math.round(n)) });
+                    return true;
+                  }}
+                />
+              </InsRow>
+            </>
+          ) : null}
         </>
       ) : null}
 
