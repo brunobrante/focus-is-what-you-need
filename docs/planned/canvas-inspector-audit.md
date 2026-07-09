@@ -997,7 +997,22 @@ render-target promotion (`docs/inspector-border-stroke.md`); F2/F3 land with
 the same work. Sequence after the higher items unless the SVG target is
 pulled forward.
 
-## G14 — Bind typography/spacing/radius tokens (colors only today)
+## ✅ DONE — G14 — Bind typography/spacing/radius tokens (colors only today)
+
+New `ElementStyles` refs: `radiusRef` (→ borderRadius), `gapRef`/`paddingRef`
+(→ spacing), `typeStyleRef` (→ font family/weight/size). Binding writes the
+ref plus the token's concrete value(s) as fallbacks; the renderer overlays the
+LIVE token values (`withTokenBoundStyles` in ElementRenderer, using the
+existing resolveTokenRef + new `resolveTypeStyleTokenRef`), so master changes
+re-render bound elements immediately — same contract as colorRef. Any manual
+edit of the concrete field (inspector inputs/sliders, the canvas radius-ball
+drag) clears the ref. Bind UI: `InsTokenBind` selects in Typography ("Style
+token"), Appearance ("Token" under Radius), Layout ("Gap token" / "Pad
+token"). Known limit (documented in types.ts): text-fit measurement reads the
+fallbacks, so a live typography-token change re-renders but does not
+re-measure fit boxes until the element is next edited. UX.md updated.
+
+Original note:
 
 `TypeStyleToken`, `SpacingToken`, `RadiusToken` exist in System Design
 (`src/domain/system-design/types.ts`) but are not bindable from the canvas —

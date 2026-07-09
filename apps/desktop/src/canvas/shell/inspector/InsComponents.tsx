@@ -109,6 +109,42 @@ export function updateNumber(value: string, commit: (value: number) => void): bo
   return true;
 }
 
+// ── Token binding (non-color, G14) ──────────────────────────────────────────
+
+export type InsTokenOption = { ref: string; name: string };
+
+/** Compact "bind to token" select: "None" + the category's token names. The
+ *  caller writes the ref AND the concrete fallback value on bind, and clears
+ *  the ref on "None" (or on any manual edit of the concrete field). */
+export function InsTokenBind({
+  boundRef,
+  options,
+  onBind,
+  onUnbind,
+}: {
+  boundRef?: string;
+  options: InsTokenOption[];
+  onBind: (option: InsTokenOption) => void;
+  onUnbind: () => void;
+}) {
+  if (options.length === 0) return null;
+  const bound = boundRef ? options.find((option) => option.ref === boundRef) : undefined;
+  return (
+    <InsSelect
+      value={bound?.name ?? "None"}
+      onChange={(name) => {
+        if (name === "None") {
+          onUnbind();
+          return;
+        }
+        const option = options.find((o) => o.name === name);
+        if (option) onBind(option);
+      }}
+      options={["None", ...options.map((o) => o.name)]}
+    />
+  );
+}
+
 // ── Hex alpha helpers ────────────────────────────────────────────────────────
 // Color + opacity % pairs store a single `#RRGGBBAA` string (the doc's model
 // for border/stroke colors). #RGB and #RRGGBB parse as fully opaque; anything

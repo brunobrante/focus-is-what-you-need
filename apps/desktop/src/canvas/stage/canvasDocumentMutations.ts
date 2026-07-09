@@ -770,6 +770,9 @@ export function radiusDocument(
   const next = shallowCloneDocument(interaction.beforeDocument);
   const node = mutateElementWithStyles(next, interaction.elementId);
   if (node) {
+    // A manual radius drag takes over from a bound radius token (G14) — same
+    // rule as the inspector fields: editing the concrete value clears the ref.
+    node.styles.radiusRef = undefined;
     if (perCorner) {
       const uniform = node.styles.borderRadius ?? 0;
       const radii = (node.styles.cornerRadii ?? [uniform, uniform, uniform, uniform]).slice() as [

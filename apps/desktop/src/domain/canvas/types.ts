@@ -172,6 +172,16 @@ export type ElementStyles = {
   backgroundRef?: string;
   colorRef?: string;
   borderColorRef?: string;
+  // Non-color token bindings (G14), same $$ref model. The matching concrete
+  // fields (borderRadius / gap / padding / fontFamily+fontSize+fontWeight) are
+  // written as fallbacks at bind time; the renderer resolves the LIVE token
+  // value on top of them. Note: text-fit measurement reads the fallbacks, so a
+  // master typography change re-renders live but does not re-measure fit boxes
+  // until the element is next edited.
+  radiusRef?: string; // "radius:<tokenId>" → borderRadius
+  gapRef?: string; // "spacing:<tokenId>" → gap
+  paddingRef?: string; // "spacing:<tokenId>" → padding
+  typeStyleRef?: string; // "typography:<tokenId>" → font family/size/weight
   opacity?: number;
   // ── Appearance (Inspector → Appearance panel) ─────────────────────────────
   // Type-aware over the unified HTML/SVG render (see docs/inspector-appearance.md).

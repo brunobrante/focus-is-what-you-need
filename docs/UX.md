@@ -869,7 +869,9 @@ CSS-honesty with Figma's per-type behavior). Controls:
 - **Radius** — type-aware. On a **box** (rect / image / div) it is CSS `border-radius`: a
   **slider + numeric input**, a **Full** button (pill — sets the radius to half the shorter
   side), and a **per-corner** toggle (the corner icon) that reveals **Top L / Top R / Bot R /
-  Bot L** inputs (`border-*-radius` longhands). On a **star** it is the inner-radius **%**
+  Bot L** inputs (`border-*-radius` longhands), plus a **Token** select binding the radius to a
+  System Design **radius token** (G14 — live like color refs; any manual radius edit, including
+  the canvas radius-ball drag, unbinds). On a **star** it is the inner-radius **%**
   (slider + input). Ellipses are always round; clip-path shapes (polygon / star / arrow) carry
   the radius as path geometry, not CSS. *Corner smoothing (squircle) and vector vertex-rounding
   are deferred — both need the renderer's HTML↔SVG target switch (see inspector-appearance.md).*
@@ -918,7 +920,9 @@ one and authors the **layout engine** fields. It is **type-adaptive**: a **div w
 Column), a **9-point alignment pad** (a visual 3×3 — the engine maps it to `justify-content` /
 `align-items` and flips the mapping for a column), **Distribute** (Packed / Between / Around —
 Between is the "auto gap"), **Stretch**, **Gap** plus optional per-axis **Row gap / Col gap**
-overrides (empty = the uniform gap; D6), **Wrap** (when wrapped, a **Rows align**
+overrides (empty = the uniform gap; D6) and a **Gap token** select (binds to a System Design
+**spacing token**, G14; Padding gets a matching **Pad token** select while uniform — manual
+edits unbind), **Wrap** (when wrapped, a **Rows align**
 `align-content` select: start / center / end / stretch / space-between), a **Baseline** switch
 (row flow only — `align-items: baseline`), individual **Padding** (a `4` toggle
 splits the uniform value into Top/Right/Bottom/Left), a minimal **Columns/Rows** track editor for
@@ -946,7 +950,11 @@ everything proportionally).
 (X/Y/W/H and rotation remain live in the separate **Transform** section — see above.)
 
 **Inspector → Typography** (shown only for **text** elements, replacing the old "Tipografia"
-section): **Font** (family, free text, placeholder "System Sans-Serif"), **Size** (px),
+section): a **Style token** select at the top (binds the element to a System Design
+**typography token** — G14: binding writes the token's family/weight/size as concrete
+fallbacks plus a live `typeStyleRef`; the render follows the master token, and any manual
+Font/Size/Weight edit unbinds), then **Font** (family, free text, placeholder
+"System Sans-Serif"), **Size** (px),
 **Weight** (a continuous 1–1000 number that drives a variable font's `wght` axis), **Style**
 (Normal / Italic), **Color** (an `InsColor` that can bind to a System Design color token like
 Fill), **Line** (Auto / Custom — Auto is `line-height: normal`, Custom reveals a unitless

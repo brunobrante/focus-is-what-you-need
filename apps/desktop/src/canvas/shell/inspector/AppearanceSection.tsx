@@ -1,5 +1,9 @@
+import { useMemo } from "react";
 import { BLEND_MODES, blendLabel, blendValueFromLabel } from "@/domain/canvas/appearance";
 import type { ElementStyles } from "@/canvas/engine/types";
+import { tokenRef } from "@/domain/system-design/resolveTokenRef";
+import type { RadiusToken } from "@/domain/system-design/types";
+import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 import {
   clamp,
   InsInput,
@@ -7,6 +11,7 @@ import {
   InsSection,
   InsSelect,
   InsSlider,
+  InsTokenBind,
   InsToggle,
   updateNumber,
 } from "./InsComponents";
@@ -68,20 +73,31 @@ export function AppearanceSection({
   const opacityPct = Math.round((styles.opacity ?? 1) * 100);
   const uniformRadius = styles.borderRadius ?? 0;
   const perCorner = Array.isArray(styles.cornerRadii);
+  // Radius token binding (G14): bind writes the ref + the token value as the
+  // concrete fallback; any manual radius edit clears the ref.
+  const resolvedDesign = useResolvedSystemDesign();
+  const radiusTokens = useMemo(
+    () =>
+      (resolvedDesign?.radius.tokens ?? []).map((sourced) => {
+        const token = sourced.token as RadiusToken;
+        return { ref: tokenRef("radius", token.id), name: token.name, value: token.value };
+      }),
+    [resolvedDesign],
+  );
   const cornerMax = Math.floor(Math.min(width, height) / 2);
 
   const setCorner = (index: number, value: number) => {
     const base = styles.cornerRadii ?? ([uniformRadius, uniformRadius, uniformRadius, uniformRadius] as [number, number, number, number]);
     const next = [...base] as [number, number, number, number];
     next[index] = Math.max(0, value);
-    onChange({ cornerRadii: next });
+    onChange({ cornerRadii: next, radiusRef: undefined });
   };
 
   const togglePerCorner = () => {
     if (perCorner) {
       onChange({ cornerRadii: undefined });
     } else {
-      onChange({ cornerRadii: [uniformRadius, uniformRadius, uniformRadius, uniformRadius] });
+      onChange({ cornerRadii: [uniformRadius, uniformRadius, uniformRadius, uniformRadius], radiusRef: undefined });
     }
   };
 
@@ -167,13 +183,13 @@ export function AppearanceSection({
             <InsRow label="Radius">
               <InsInput
                 value={perCorner ? "Mixed" : String(uniformRadius)}
-                onChange={(value) => updateNumber(value, (r) => onChange({ borderRadius: Math.max(0, r), cornerRadii: undefined }))}
+                onChange={(value) => updateNumber(value, (r) => onChange({ borderRadius: Math.max(0, r), cornerRadii: undefined, radiusRef: undefined }))}
                 suffix={radiusSuffix}
               />
               <button
                 type="button"
                 title="Pill — round the corners fully"
-                onClick={() => onChange({ borderRadius: PILL_RADIUS, cornerRadii: undefined })}
+                onClick={() => onChange({ borderRadius: PILL_RADIUS, cornerRadii: undefined, radiusRef: undefined })}
                 className="grid h-[26px] shrink-0 place-items-center rounded-[7px] border border-transparent px-2 text-[11px] text-[#9A9A9A] transition-colors hover:bg-[#2C2C2C] hover:text-[#E2E2E2]"
               >
                 Full
@@ -208,13 +224,30 @@ export function AppearanceSection({
                   min={0}
                   max={sliderMax}
                   step={1}
-                  onChange={(r) => onChange({ borderRadius: r })}
+                  onChange={(r) => onChange({ borderRadius: r, radiusRef: undefined })}
                   onScrubStart={onScrubStart}
                   onScrubEnd={onScrubEnd}
                   format={(v) => `${v}`}
                 />
               </InsRow>
             )}
+            {radiusTokens.length > 0 ? (
+              <InsRow label="Token">
+                <InsTokenBind
+                  boundRef={styles.radiusRef}
+                  options={radiusTokens}
+                  onBind={(option) => {
+                    const token = radiusTokens.find((t) => t.ref === option.ref);
+                    onChange({
+                      radiusRef: option.ref,
+                      borderRadius: token?.value ?? uniformRadius,
+                      cornerRadii: undefined,
+                    });
+                  }}
+                  onUnbind={() => onChange({ radiusRef: undefined })}
+                />
+              </InsRow>
+            ) : null}
           </>
         )
       ) : null}

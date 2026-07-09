@@ -9,6 +9,10 @@
 // in a later pass. See docs/inspector-layout.md.
 
 import type { ElementStyles, GridTrack, PadAlign } from "@/canvas/engine/types";
+import { useMemo } from "react";
+import { tokenRef } from "@/domain/system-design/resolveTokenRef";
+import type { SpacingToken } from "@/domain/system-design/types";
+import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 import {
   clamp,
   InsInput,
@@ -16,6 +20,7 @@ import {
   InsSection,
   InsSelect,
   InsSwitch,
+  InsTokenBind,
   InsToggle,
   updateNumber,
 } from "./InsComponents";
@@ -228,6 +233,38 @@ export function LayoutSection({
   const parentDisplay = parentStyles?.display ?? "block";
   const parentIsFlow = parentDisplay === "flex" || parentDisplay === "grid";
 
+  // Spacing token bindings for Gap / Padding (G14): bind writes the ref + the
+  // token value as the concrete fallback; manual edits clear the ref.
+  const resolvedDesign = useResolvedSystemDesign();
+  const spacingTokens = useMemo(
+    () =>
+      (resolvedDesign?.spacing.tokens ?? []).map((sourced) => {
+        const token = sourced.token as SpacingToken;
+        return { ref: tokenRef("spacing", token.id), name: token.name, value: token.value };
+      }),
+    [resolvedDesign],
+  );
+  const spacingBindRow = (
+    label: string,
+    boundRef: string | undefined,
+    apply: (patch: Partial<ElementStyles>) => void,
+    refKey: "gapRef" | "paddingRef",
+    valueKey: "gap" | "padding",
+  ) =>
+    spacingTokens.length > 0 ? (
+      <InsRow label={label}>
+        <InsTokenBind
+          boundRef={boundRef}
+          options={spacingTokens}
+          onBind={(option) => {
+            const token = spacingTokens.find((t) => t.ref === option.ref);
+            apply({ [refKey]: option.ref, ...(token ? { [valueKey]: token.value } : {}) });
+          }}
+          onUnbind={() => apply({ [refKey]: undefined })}
+        />
+      </InsRow>
+    ) : null;
+
   const togglePerSidePadding = () => {
     if (perSidePadding) {
       onChange({ paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined });
@@ -303,10 +340,11 @@ export function LayoutSection({
                   <InsRow label="Gap">
                     <InsInput
                       value={String(styles.gap ?? 0)}
-                      onChange={(v) => updateNumber(v, (gap) => onChange({ gap }))}
+                      onChange={(v) => updateNumber(v, (gap) => onChange({ gap, gapRef: undefined }))}
                       suffix="px"
                     />
                   </InsRow>
+                  {spacingBindRow("Gap token", styles.gapRef, onChange, "gapRef", "gap")}
                   <GapSplitRows styles={styles} onChange={onChange} />
                 </>
               )}
@@ -350,8 +388,9 @@ export function LayoutSection({
               <TrackEditor label="Columns" tracks={styles.gridColumns ?? []} onChange={(gridColumns) => onChange({ gridColumns })} />
               <TrackEditor label="Rows" tracks={styles.gridRows ?? []} onChange={(gridRows) => onChange({ gridRows })} />
               <InsRow label="Gap">
-                <InsInput value={String(styles.gap ?? 0)} onChange={(v) => updateNumber(v, (gap) => onChange({ gap }))} suffix="px" />
+                <InsInput value={String(styles.gap ?? 0)} onChange={(v) => updateNumber(v, (gap) => onChange({ gap, gapRef: undefined }))} suffix="px" />
               </InsRow>
+              {spacingBindRow("Gap token", styles.gapRef, onChange, "gapRef", "gap")}
               <GapSplitRows styles={styles} onChange={onChange} />
             </>
           ) : null}
@@ -362,7 +401,7 @@ export function LayoutSection({
               <InsRow label="Padding">
                 <InsInput
                   value={perSidePadding ? "Mixed" : String(styles.padding ?? 0)}
-                  onChange={(v) => updateNumber(v, (padding) => onChange({ padding, paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined }))}
+                  onChange={(v) => updateNumber(v, (padding) => onChange({ padding, paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined, paddingRef: undefined }))}
                   suffix="px"
                 />
                 <button
@@ -375,6 +414,9 @@ export function LayoutSection({
                   4
                 </button>
               </InsRow>
+              {!perSidePadding
+                ? spacingBindRow("Pad token", styles.paddingRef, onChange, "paddingRef", "padding")
+                : null}
               {perSidePadding
                 ? ([
                     ["paddingTop", "Top"],

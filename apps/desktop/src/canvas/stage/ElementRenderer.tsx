@@ -9,12 +9,53 @@ import { compileAppearance } from "@/domain/canvas/appearance";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
 import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
-import { resolveTokenRef } from "@/domain/system-design/resolveTokenRef";
+import { resolveTokenRef, resolveTypeStyleTokenRef } from "@/domain/system-design/resolveTokenRef";
+import type { ResolvedSystemDesign } from "@/domain/system-design/resolve";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 
 // Resolves a token `$$ref` (e.g. "colors:c-primary") to a live CSS value, or
 // undefined when unbound/unresolved so the literal style fallback is used.
 type RefResolver = (ref: string | undefined) => string | undefined;
+
+// Non-color token bindings (G14): overlay the LIVE radius/spacing/typography
+// token values onto the node's styles before compiling, so a master change
+// re-renders bound elements immediately — same contract as colorRef. Returns
+// the node untouched (same reference) when nothing is bound.
+function withTokenBoundStyles(node: ElementNode, resolved: ResolvedSystemDesign | null): ElementNode {
+  const s = node.styles;
+  if (!resolved || (!s.radiusRef && !s.gapRef && !s.paddingRef && !s.typeStyleRef)) return node;
+  const styles = { ...s };
+  const px = (ref: string): number | undefined => {
+    const value = resolveTokenRef(ref, resolved);
+    const n = value ? Number.parseFloat(value) : Number.NaN;
+    return Number.isFinite(n) ? n : undefined;
+  };
+  if (s.radiusRef) {
+    const radius = px(s.radiusRef);
+    if (radius !== undefined) {
+      styles.borderRadius = radius;
+      styles.cornerRadii = undefined;
+    }
+  }
+  if (s.gapRef) {
+    const gap = px(s.gapRef);
+    if (gap !== undefined) styles.gap = gap;
+  }
+  if (s.paddingRef) {
+    const padding = px(s.paddingRef);
+    if (padding !== undefined) styles.padding = padding;
+  }
+  if (s.typeStyleRef) {
+    const token = resolveTypeStyleTokenRef(s.typeStyleRef, resolved);
+    if (token) {
+      styles.fontFamily = token.family;
+      styles.fontWeight = token.weight;
+      const size = Number.parseFloat(token.size);
+      if (Number.isFinite(size)) styles.fontSize = size;
+    }
+  }
+  return { ...node, styles };
+}
 
 // ─── Clip-path helpers ────────────────────────────────────────────────────────
 
@@ -366,7 +407,10 @@ function ElementRendererImpl({
       ref && resolvedDesign ? resolveTokenRef(ref, resolvedDesign) ?? undefined : undefined,
     [resolvedDesign],
   );
-  const node = canvasDocument.elements[id];
+  const storedNode = canvasDocument.elements[id];
+  // Overlay live non-color token values (radius/spacing/typography, G14) so a
+  // bound element follows its master token without a document write.
+  const node = storedNode ? withTokenBoundStyles(storedNode, resolvedDesign) : storedNode;
   const isolatedParentId = preview ? null : isolatedParentIdProp;
   const isEditing = !preview && editingTextId === id;
   const isIsolatedParent = !preview && isolatedParentIdProp === id;

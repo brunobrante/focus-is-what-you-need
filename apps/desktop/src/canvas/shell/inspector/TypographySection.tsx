@@ -1,4 +1,8 @@
+import { useMemo } from "react";
 import type { ElementStyles } from "@/canvas/engine/types";
+import { tokenRef } from "@/domain/system-design/resolveTokenRef";
+import type { TypeStyleToken } from "@/domain/system-design/types";
+import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 import {
   clamp,
   InsColor,
@@ -8,6 +12,7 @@ import {
   InsSection,
   InsSelect,
   InsSwitch,
+  InsTokenBind,
   InsToggle,
   updateNumber,
 } from "./InsComponents";
@@ -67,13 +72,45 @@ export function TypographySection({
 }) {
   const lineHeightAuto = styles.lineHeight === undefined;
   const caseValue = styles.textTransform ?? "none";
+  // Type-style token binding (G14): bind writes typeStyleRef + the token's
+  // family/weight/size as concrete fallbacks; any manual font edit clears it.
+  const resolvedDesign = useResolvedSystemDesign();
+  const typeStyleTokens = useMemo(
+    () =>
+      (resolvedDesign?.typography.tokens ?? []).map((sourced) => {
+        const token = sourced.token as TypeStyleToken;
+        return { ref: tokenRef("typography", token.id), name: token.name, token };
+      }),
+    [resolvedDesign],
+  );
 
   return (
     <InsSection title="Typography" disabled={locked}>
+      {typeStyleTokens.length > 0 ? (
+        <InsRow label="Style token">
+          <InsTokenBind
+            boundRef={styles.typeStyleRef}
+            options={typeStyleTokens}
+            onBind={(option) => {
+              const token = typeStyleTokens.find((t) => t.ref === option.ref)?.token;
+              if (!token) return;
+              const size = Number.parseFloat(token.size);
+              onChange({
+                typeStyleRef: option.ref,
+                fontFamily: token.family,
+                fontWeight: token.weight,
+                ...(Number.isFinite(size) ? { fontSize: size } : {}),
+              });
+            }}
+            onUnbind={() => onChange({ typeStyleRef: undefined })}
+          />
+        </InsRow>
+      ) : null}
+
       <InsRow label="Font">
         <InsInput
           value={styles.fontFamily ?? ""}
-          onChange={(fontFamily) => onChange({ fontFamily: fontFamily.trim() || undefined })}
+          onChange={(fontFamily) => onChange({ fontFamily: fontFamily.trim() || undefined, typeStyleRef: undefined })}
           placeholder="System Sans-Serif"
         />
       </InsRow>
@@ -81,7 +118,7 @@ export function TypographySection({
       <InsRow label="Size">
         <InsInput
           value={String(styles.fontSize ?? 14)}
-          onChange={(v) => updateNumber(v, (fontSize) => onChange({ fontSize: clamp(fontSize, 1, 300) }))}
+          onChange={(v) => updateNumber(v, (fontSize) => onChange({ fontSize: clamp(fontSize, 1, 300), typeStyleRef: undefined }))}
           suffix="px"
         />
       </InsRow>
@@ -90,7 +127,7 @@ export function TypographySection({
       <InsRow label="Weight">
         <InsInput
           value={String(resolveFontWeight(styles.fontWeight))}
-          onChange={(v) => updateNumber(v, (w) => onChange({ fontWeight: String(clamp(Math.round(w), 1, 1000)) }))}
+          onChange={(v) => updateNumber(v, (w) => onChange({ fontWeight: String(clamp(Math.round(w), 1, 1000)), typeStyleRef: undefined }))}
         />
       </InsRow>
 

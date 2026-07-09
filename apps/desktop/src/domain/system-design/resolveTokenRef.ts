@@ -5,6 +5,7 @@ import type {
   RadiusToken,
   SpacingToken,
   SystemDesignCategory,
+  TypeStyleToken,
 } from "@/domain/system-design/types";
 
 // A style value bound to a System Design token. The ref string is
@@ -72,4 +73,20 @@ export function resolveTokenRef(
       // typography / icons / images have no single CSS string value here.
       return null;
   }
+}
+
+/**
+ * Resolve a typography ref to its live TypeStyleToken (family/weight/size) —
+ * the multi-value counterpart of resolveTokenRef for `typeStyleRef` (G14).
+ */
+export function resolveTypeStyleTokenRef(
+  ref: string,
+  resolved: ResolvedSystemDesign,
+): TypeStyleToken | null {
+  const parsed = parseTokenRef(ref);
+  if (!parsed || parsed.category !== "typography") return null;
+  const entry = resolved.typography.tokens.find(
+    (sourced) => sourced.token.id === parsed.tokenId,
+  );
+  return entry ? (entry.token as TypeStyleToken) : null;
 }
