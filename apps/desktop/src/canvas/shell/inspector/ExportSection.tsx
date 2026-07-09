@@ -68,10 +68,26 @@ function ExportEntryRow({
       </InsRow>
       {raster ? (
         <InsRow label="Scale">
+          {/* Free value (0.1–10) + quick presets (docs/inspector-export.md, D7).
+              The select lists the current arbitrary value so it never shows blank. */}
+          <InsInput
+            value={String(entry.scale)}
+            onChange={(value) => {
+              const n = Number(value);
+              if (!Number.isFinite(n) || n <= 0) return false;
+              onUpdate({ scale: Math.min(10, Math.max(0.1, n)) });
+              return true;
+            }}
+            suffix="×"
+          />
           <InsSelect
             value={String(entry.scale)}
             onChange={(value) => onUpdate({ scale: Number(value) || 1 })}
-            options={SCALE_OPTIONS}
+            options={
+              SCALE_OPTIONS.includes(String(entry.scale))
+                ? SCALE_OPTIONS
+                : [...SCALE_OPTIONS, String(entry.scale)].sort((a, b) => Number(a) - Number(b))
+            }
           />
         </InsRow>
       ) : null}

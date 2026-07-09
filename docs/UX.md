@@ -950,7 +950,8 @@ element section): per-element export of the selected node to image / vector / co
 from the project-level `.figx` file (which is export-only and lives in the Landing page menu).
 A list of **export entries** (add via **Add export**, remove via the trash icon — at least one
 always remains); each entry picks a **Format** (PNG / JPEG / WebP / SVG / HTML), and raster
-formats also get a **Scale** (0.5× / 1× / 2× / 3×) and an optional filename **Suffix**
+formats also get a **Scale** — a free numeric field (0.1×–10×) plus the quick presets
+0.5× / 1× / 2× / 3× (D7) — and an optional filename **Suffix**
 (defaults to `@Nx` for non-1× scales). When any raster entry is present a **Background** toggle
 appears (**None** = transparent / **Color** / **Flatten**, with a color swatch for the latter
 two; JPEG is always flattened since it has no alpha). When any HTML entry is present an **HTML**
