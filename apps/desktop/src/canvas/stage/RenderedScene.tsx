@@ -18,6 +18,7 @@ export type RenderedSceneProps = {
   isolatedParentId: string | null;
   editingTextId: string | null;
   affectedElementIds: ReadonlySet<string>;
+  transientTransformIds: ReadonlySet<string> | null;
   renderScale: number;
 };
 
@@ -28,6 +29,7 @@ function RenderedSceneImpl({
   isolatedParentId,
   editingTextId,
   affectedElementIds,
+  transientTransformIds,
   renderScale,
 }: RenderedSceneProps) {
   if (draftMode) {
@@ -41,6 +43,7 @@ function RenderedSceneImpl({
             isolatedParentId={isolatedParentId}
             editingTextId={editingTextId}
             affectedElementIds={affectedElementIds}
+            transientTransformIds={transientTransformIds}
             renderScale={renderScale}
           />
         ))}
@@ -58,6 +61,7 @@ function RenderedSceneImpl({
           isolatedParentId={isolatedParentId}
           editingTextId={editingTextId}
           affectedElementIds={affectedElementIds}
+          transientTransformIds={transientTransformIds}
           renderScale={renderScale}
         />
       ))}
@@ -66,6 +70,7 @@ function RenderedSceneImpl({
         isolatedParentId={isolatedParentId}
         editingTextId={editingTextId}
         affectedElementIds={affectedElementIds}
+        transientTransformIds={transientTransformIds}
         renderScale={renderScale}
       />
     </div>
@@ -78,7 +83,10 @@ export const RenderedScene = memo(RenderedSceneImpl, (previous, next) => {
     previous.canvasStageActive !== next.canvasStageActive ||
     previous.isolatedParentId !== next.isolatedParentId ||
     previous.editingTextId !== next.editingTextId ||
-    previous.renderScale !== next.renderScale
+    previous.renderScale !== next.renderScale ||
+    // Identity-stable during a gesture (memoized off the id list in CanvasStage);
+    // changes exactly at gesture start/commit, when promotion flips.
+    previous.transientTransformIds !== next.transientTransformIds
   ) {
     return false;
   }

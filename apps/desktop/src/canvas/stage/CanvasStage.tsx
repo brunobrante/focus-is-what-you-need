@@ -383,6 +383,18 @@ export function CanvasStage({
     [state.document, state.transientChangedIds],
   );
 
+  // Ids being live-transformed right now (no ancestors — only the nodes whose
+  // left/top actually sweep). ElementRenderer promotes these to their own
+  // compositing layer so WKWebView moves the layer instead of repainting the
+  // stage tile, which leaves 1px trails behind (WebKit dirty-rect rounding).
+  // Keyed off the id list so the Set identity is stable across the ~60Hz
+  // transient frames and flips exactly at gesture start/commit.
+  const transientTransformKey = state.transientChangedIds?.join("\u0000") ?? null;
+  const transientTransformIds = useMemo(
+    () => (transientTransformKey === null ? null : new Set(transientTransformKey.split("\u0000"))),
+    [transientTransformKey],
+  );
+
   const isDrawTool = isInsertTool(state.tool);
   const isHandTool = state.tool === "hand";
   const shellClassName = `canvas-shell${isDrawTool ? " is-draw-tool" : ""}${isHandTool ? " is-hand-tool" : ""}`;
@@ -535,6 +547,7 @@ export function CanvasStage({
             isolatedParentId={state.isolatedParentId}
             editingTextId={state.editingTextId}
             affectedElementIds={affectedElementIds}
+            transientTransformIds={transientTransformIds}
             renderScale={renderScale}
           />
         ) : (
@@ -561,6 +574,7 @@ export function CanvasStage({
               isolatedParentId={state.isolatedParentId}
               editingTextId={state.editingTextId}
               affectedElementIds={affectedElementIds}
+              transientTransformIds={transientTransformIds}
               renderScale={renderScale}
             />
           </div>

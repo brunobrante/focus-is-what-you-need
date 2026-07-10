@@ -470,6 +470,7 @@ type ElementRendererProps = {
   isolatedParentId?: string | null;
   editingTextId?: string | null;
   affectedElementIds?: ReadonlySet<string>;
+  transientTransformIds?: ReadonlySet<string> | null;
   preview?: boolean;
   renderScale?: number;
 };
@@ -479,14 +480,31 @@ type DetachedIsolatedChildrenProps = {
   isolatedParentId: string | null;
   editingTextId?: string | null;
   affectedElementIds?: ReadonlySet<string>;
+  transientTransformIds?: ReadonlySet<string> | null;
   renderScale?: number;
 };
+
+// While a node is being live-transformed (drag/resize, ids in
+// `transientTransformIds`) it gets its own compositing layer, so WebKit moves
+// the layer instead of repainting the stage tile under it. Without this,
+// WKWebView's dirty-rect rounding misses sub-pixel slivers of the fractional
+// `left`/`top` sweep and the element leaves 1px trails behind (WebKit-only —
+// Chromium snaps invalidation rects outward). Dropped on commit, which also
+// forces the full repaint that clears any residue.
+function promoteToOwnLayer(style: CSSProperties): CSSProperties {
+  return {
+    ...style,
+    transform: style.transform ? `${style.transform} translateZ(0)` : "translateZ(0)",
+    willChange: "transform",
+  };
+}
 
 function DetachedIsolatedChildrenImpl({
   document,
   isolatedParentId,
   editingTextId = null,
   affectedElementIds,
+  transientTransformIds = null,
   renderScale = 1,
 }: DetachedIsolatedChildrenProps) {
   const isolatedParent = isolatedParentId ? document.elements[isolatedParentId] : null;
@@ -504,6 +522,7 @@ function DetachedIsolatedChildrenImpl({
           isolatedParentId={isolatedParentId}
           editingTextId={editingTextId}
           affectedElementIds={affectedElementIds}
+          transientTransformIds={transientTransformIds}
           renderScale={renderScale}
         />
       ))}
@@ -520,6 +539,7 @@ function ElementRendererImpl({
   isolatedParentId: isolatedParentIdProp = null,
   editingTextId = null,
   affectedElementIds,
+  transientTransformIds = null,
   preview = false,
   renderScale = 1,
 }: ElementRendererProps) {
@@ -540,6 +560,9 @@ function ElementRendererImpl({
 
   if (!node || node.visible === false) return null;
 
+  const maybePromote: (style: CSSProperties) => CSSProperties =
+    !preview && transientTransformIds?.has(id) ? promoteToOwnLayer : (style) => style;
+
   // The typed Fill stack (solid/gradient/image/video), compiled type-aware. Null
   // for types that take no fill (line/arrow/path/svg). When `hasFills` is false
   // the legacy `background` path below is used unchanged.
@@ -558,7 +581,7 @@ function ElementRendererImpl({
     ) : null;
 
   if (node.type === "text") {
-    const base = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, isEditing, renderScale, resolveRef);
+    const base = maybePromote(detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, isEditing, renderScale, resolveRef));
     return (
       <div
         data-element-id={node.id}
@@ -573,7 +596,7 @@ function ElementRendererImpl({
   }
 
   if (node.type === "image") {
-    const base = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
+    const base = maybePromote(detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef));
     const render = compiledFill?.imageRender;
     const wrapperBase: CSSProperties = { ...base, background: undefined };
 
@@ -656,9 +679,11 @@ function ElementRendererImpl({
   }
 
   if (node.type === "path") {
-    const base = detached
-      ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
-      : nodeStyle(node, false, renderScale, resolveRef);
+    const base = maybePromote(
+      detached
+        ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
+        : nodeStyle(node, false, renderScale, resolveRef),
+    );
     // The positioning box paints nothing — fill/stroke live on the <path>.
     const boxStyle: CSSProperties = {
       ...base,
@@ -746,9 +771,11 @@ function ElementRendererImpl({
   if (node.type === "svg") {
     // Container node: a transparent positioning box that holds child `path` nodes
     // (rendered through the normal hierarchy). No raw markup is injected.
-    const base = detached
-      ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
-      : nodeStyle(node, false, renderScale, resolveRef);
+    const base = maybePromote(
+      detached
+        ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef)
+        : nodeStyle(node, false, renderScale, resolveRef),
+    );
     const boxStyle: CSSProperties = { ...base, background: undefined, overflow: "visible" };
     return (
       <div
@@ -769,6 +796,7 @@ function ElementRendererImpl({
               isolatedParentId={isolatedParentIdProp}
               editingTextId={editingTextId}
               affectedElementIds={affectedElementIds}
+              transientTransformIds={transientTransformIds}
               preview={preview}
               renderScale={renderScale}
             />
@@ -779,7 +807,7 @@ function ElementRendererImpl({
   }
 
   if (node.type === "icon") {
-    const base = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
+    const base = maybePromote(detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef));
     return (
       <div
         data-element-id={node.id}
@@ -795,7 +823,7 @@ function ElementRendererImpl({
     );
   }
 
-  const genericBase = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
+  const genericBase = maybePromote(detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef));
 
   const shapeClip = computeClipPath(node.type, node.styles.borderRadius);
   if (shapeClip) {
@@ -818,6 +846,7 @@ function ElementRendererImpl({
               isolatedParentId={isolatedParentIdProp}
               editingTextId={editingTextId}
               affectedElementIds={affectedElementIds}
+              transientTransformIds={transientTransformIds}
               preview={preview}
               renderScale={renderScale}
             />
@@ -844,6 +873,7 @@ function ElementRendererImpl({
           isolatedParentId={isolatedParentIdProp}
           editingTextId={editingTextId}
           affectedElementIds={affectedElementIds}
+          transientTransformIds={transientTransformIds}
           preview={preview}
           renderScale={renderScale}
         />
@@ -861,6 +891,15 @@ function areElementRendererPropsEqual(
     previous.detached !== next.detached ||
     previous.preview !== next.preview ||
     previous.renderScale !== next.renderScale
+  ) {
+    return false;
+  }
+
+  // Layer promotion must be applied/dropped even when the document reference is
+  // unchanged (a transient commit reuses the last transient document object).
+  if (
+    (previous.transientTransformIds?.has(next.id) ?? false) !==
+    (next.transientTransformIds?.has(next.id) ?? false)
   ) {
     return false;
   }
