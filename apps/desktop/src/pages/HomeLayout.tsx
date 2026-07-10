@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useMatch, useNavigate } from "react-router-dom";
 import { Home } from "lucide-react";
 
+import { SidebarPromoCard } from "@/components/home/SidebarPromoCard";
 import { PageFooter } from "@/components/layout/PageFooter";
 import { AppSettingsModal } from "@/components/modals/AppSettingsModal";
 import {
@@ -16,6 +17,7 @@ import {
   IconSparkles,
   IconWand,
 } from "@/components/icons";
+import { DevWrapper } from "@/components/ui/DevWrapper";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 
 /**
@@ -197,7 +199,7 @@ function MenuItem({
 
 function HomeSidebar() {
   return (
-    <aside className="hidden w-[224px] shrink-0 border-r border-[var(--border)] px-3 py-6 md:block">
+    <aside className="hidden w-[224px] shrink-0 flex-col overflow-y-auto border-r border-[var(--border)] px-3 py-6 md:flex">
       <nav className="flex flex-col gap-0.5">
         {/* All rows but Learn reach real routes inside this layout; Learn is a
             placeholder until its feature lands. */}
@@ -229,6 +231,11 @@ function HomeSidebar() {
       <SidebarLink to="/settings" icon={<IconSettings size={15} strokeWidth={1.7} />}>
         Settings
       </SidebarLink>
+
+      {/* The card sells the desktop build, so it is dead weight inside it. */}
+      <DevWrapper platform="web" className="mt-auto">
+        <SidebarPromoCard />
+      </DevWrapper>
     </aside>
   );
 }

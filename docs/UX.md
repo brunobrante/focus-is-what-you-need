@@ -108,9 +108,27 @@ browser (that is the Landing Page at `/workspace/:workspaceId/projects`).
 that highlight the active route — **Dashboard** (→ `/`), **Workspaces** (→
 `/workspaces`), **Projects** (→ `/my-projects`), **Drafts** (→ `/drafts`),
 **Local References** (→ `/references`), **Learn** (placeholder), and, below a
-divider, **Settings** (→ `/settings`). Learn is an inert placeholder ("Coming
-soon") until its feature exists; the others reach real destinations. Each row is
-a 36px icon+label row that highlights on hover and when active.
+divider, **Builder** (→ `/generate`) and **Settings** (→ `/settings`). Learn is
+an inert placeholder ("Coming soon") until its feature exists; the others reach
+real destinations. Each row is a 36px icon+label row that highlights on hover and
+when active. The sidebar is a scrolling column: when the viewport is too short
+for the nav plus the promo card below, it scrolls rather than compressing them.
+
+**Sidebar promo card** (`SidebarPromoCard`, `components/home/`): pinned to the
+bottom of the sidebar, below the nav. A bordered card with a decorative header —
+concentric dashed orbits behind a row of app tiles, the Focus mark centred and
+its neighbours fading off both edges — over the title "Focus desktop app", a
+one-line description, and two CTAs: **Download** (primary) and **Docs** (ghost,
+with a chevron). Both targets are inert placeholders until a public site exists.
+A **—** button in the card's top-right dismisses it **for the session only**;
+nothing is persisted, so it returns on the next launch. Beneath the card sit two
+low-weight links, **What's new** (→ `/news`) and **Feedback** (→ `/feedback`).
+
+The card is **web-only**: it advertises the desktop build, so it would be dead
+weight inside it. `HomeLayout` gates it behind `<DevWrapper platform="web">`,
+which also owns the `mt-auto` that pins the slot to the bottom (so the slot holds
+its position once the card is dismissed). On desktop it renders with the dev
+outline in development and disappears entirely in production.
 
 **Dashboard content** (`DashboardPage`, the `/` index): heading "Dashboard" plus
 the three sections below. The **Workspaces** and **Projects** pages reuse the
