@@ -19,6 +19,7 @@ import {
   makePathNode,
   recomputePathBounds,
   setHandleType,
+  shapeBuildSubpaths,
   translateAnchors,
   updateAnchor,
   updateHandle,
@@ -37,6 +38,7 @@ import type {
   VectorAnchorsMoveInteraction,
   VectorBendInteraction,
   VectorLassoInteraction,
+  VectorShapeBuildInteraction,
 } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
@@ -680,6 +682,82 @@ export function finishAnchorsMove(interaction: VectorAnchorsMoveInteraction, dis
   if (!interaction.moved) return;
   const next = recomputePathBounds(interaction.lastDocument, interaction.elementId);
   dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [interaction.elementId] });
+  dispatch({ type: "enterPathEdit", pathEditId: interaction.elementId });
+}
+
+// ─── Shape builder ─────────────────────────────────────────────────────────────
+
+/** Flatten a subpath's anchors to a corner polygon (path space) for hit detection. */
+function subpathCornerPolygon(anchors: VectorAnchor[]): Point[] {
+  return anchors.map((a) => ({ x: a.x, y: a.y }));
+}
+
+/** Pointer down for Shape builder: starts a stroke across the edited path's subpaths. */
+export function shapeBuildPointerDown(
+  ctx: VectorPointerCtx,
+  event: ReactPointerEvent,
+  point: Point,
+  setLasso: SetLasso,
+): boolean {
+  const { state, interactionRef, setInteractionActive, viewport } = ctx;
+  const id = state.pathEditId;
+  const node = id ? state.document.elements[id] : null;
+  // Needs at least two subpaths to combine.
+  if (!id || !node?.path || node.path.subpaths.length < 2) return false;
+  const interaction: VectorShapeBuildInteraction = {
+    type: "vector-shape-build",
+    pointerId: event.pointerId,
+    elementId: id,
+    startPoint: point,
+    points: [point],
+    subtract: event.altKey,
+    moved: false,
+  };
+  interactionRef.current = interaction;
+  setInteractionActive(true);
+  setLasso([point]);
+  viewport.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  return true;
+}
+
+export function shapeBuildMove(
+  interaction: VectorShapeBuildInteraction,
+  point: Point,
+  setLasso: SetLasso,
+): void {
+  const last = interaction.points[interaction.points.length - 1];
+  if (last && Math.hypot(point.x - last.x, point.y - last.y) < 1) return;
+  interaction.moved = true;
+  interaction.points.push(point);
+  setLasso([...interaction.points]);
+}
+
+export function finishShapeBuild(
+  interaction: VectorShapeBuildInteraction,
+  ctx: VectorPointerCtx,
+  setLasso: SetLasso,
+): void {
+  setLasso(null);
+  const { dispatch } = ctx;
+  const doc = ctx.state.document;
+  const node = doc.elements[interaction.elementId];
+  if (!interaction.moved || !node?.path) return;
+
+  // Which subpaths did the stroke pass through? A subpath is touched when any drag
+  // sample (in path space) falls inside its corner polygon.
+  const samplesPath = interaction.points.map((p) => canvasToPathSpace(doc, node, p.x, p.y));
+  const touched: number[] = [];
+  node.path.subpaths.forEach((sub, i) => {
+    if (sub.anchors.length < 3) return;
+    const poly = subpathCornerPolygon(sub.anchors);
+    if (samplesPath.some((sp) => pointInPolygon(sp.x, sp.y, poly))) touched.push(i);
+  });
+  if (touched.length < 2) return;
+
+  const next = shapeBuildSubpaths(doc, interaction.elementId, touched, interaction.subtract ? "subtract" : "union");
+  if (next === doc) return;
+  dispatch({ type: "commitDocument", beforeDocument: doc, document: next, selectedIds: [interaction.elementId] });
   dispatch({ type: "enterPathEdit", pathEditId: interaction.elementId });
 }
 

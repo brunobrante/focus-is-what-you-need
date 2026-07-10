@@ -494,6 +494,18 @@ export type VectorAnchorsMoveInteraction = {
   moved: boolean;
 };
 
+// Vector edit / Shape builder: dragging a stroke across the edited path's
+// subpaths to union (or Alt = subtract) the ones it touches. Canvas-space points.
+export type VectorShapeBuildInteraction = {
+  type: "vector-shape-build";
+  pointerId: number;
+  elementId: string;
+  startPoint: Point;
+  points: Point[];
+  subtract: boolean;
+  moved: boolean;
+};
+
 export type MarqueeInteraction = {
   type: "marquee";
   pointerId: number;
@@ -554,6 +566,7 @@ export type Interaction =
   | VectorBendInteraction
   | VectorLassoInteraction
   | VectorAnchorsMoveInteraction
+  | VectorShapeBuildInteraction
   | MarqueeInteraction
   | PanInteraction
   | CanvasResizeInteraction

@@ -28,12 +28,15 @@ import {
   finishAnchorEdit,
   finishPen,
   finishPencil,
+  finishShapeBuild,
   finishVectorSelect,
   pathDoubleClick,
   pencilMove,
   pencilPointerDown,
   penPointerDown,
   penPointerMove,
+  shapeBuildMove,
+  shapeBuildPointerDown,
   vectorEditPointerDown,
   vectorSelectMove,
   vectorSelectPointerDown,
@@ -409,6 +412,11 @@ export function useCanvasPointerEvents({
         const p = getCanvasPoint(event) ?? { x: 0, y: 0 };
         if (vectorSelectPointerDown(vectorCtx(viewport), event, p, state.vectorTool, setLassoPoints)) return;
       }
+      // Shape builder: drag a stroke across the edited path's subpaths.
+      if (state.pathEditId && state.tool !== "pen" && state.vectorTool === "shape-builder") {
+        const p = getCanvasPoint(event) ?? { x: 0, y: 0 };
+        if (shapeBuildPointerDown(vectorCtx(viewport), event, p, setLassoPoints)) return;
+      }
       // Path edit mode (select tool): anchor/handle/segment interactions take priority.
       if (state.pathEditId && state.tool !== "pen") {
         if (
@@ -581,6 +589,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "anchor-edit") { anchorEditMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "vector-bend") { bendMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "vector-lasso") { vectorSelectMove(interaction, point, vectorCtx(viewportRef.current!), setLassoPoints); return; }
+    if (interaction.type === "vector-shape-build") { shapeBuildMove(interaction, point, setLassoPoints); return; }
     if (interaction.type === "vector-anchors-move") { anchorsMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
     if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
@@ -706,6 +715,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "anchor-edit") { finishAnchorEdit(interaction, dispatch); return; }
     if (interaction.type === "vector-bend") { finishBend(interaction, dispatch); return; }
     if (interaction.type === "vector-lasso") { finishVectorSelect(interaction, vectorCtx(viewport ?? viewportRef.current!), setLassoPoints); return; }
+    if (interaction.type === "vector-shape-build") { finishShapeBuild(interaction, vectorCtx(viewport ?? viewportRef.current!), setLassoPoints); return; }
     if (interaction.type === "vector-anchors-move") { finishAnchorsMove(interaction, dispatch); return; }
 
     const wasCommandMode = commandModeRef.current;
@@ -739,8 +749,8 @@ export function useCanvasPointerEvents({
   // their own dedicated cancel paths in useKeyboardShortcuts and are left alone.
   const cancelActiveInteraction = (): boolean => {
     const interaction = interactionRef.current;
-    // Lasso/Paint carry no document to revert — just drop the gesture + overlay.
-    if (interaction?.type === "vector-lasso") {
+    // Lasso/Paint/Shape-build carry no document to revert — drop gesture + overlay.
+    if (interaction?.type === "vector-lasso" || interaction?.type === "vector-shape-build") {
       clearPendingMove();
       const viewport = viewportRef.current;
       if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);

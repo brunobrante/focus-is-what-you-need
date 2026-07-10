@@ -22,4 +22,4 @@ export {
   recomputePathBounds,
   scaledPath,
 } from "./mutations/vectorPath";
-export { insertSvgDocument, insertSvgPathsAsRoot, flattenElementToPath, applyBooleanToSelection } from "./mutations/vectorOps";
+export { insertSvgDocument, insertSvgPathsAsRoot, flattenElementToPath, applyBooleanToSelection, shapeBuildSubpaths } from "./mutations/vectorOps";

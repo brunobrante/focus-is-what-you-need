@@ -191,6 +191,42 @@ function toCanvasPath(node: ElementNode): VectorPath | null {
 }
 
 /**
+ * Shape builder: combine a set of subpaths of ONE path into a single region.
+ * `op` is "union" (merge the touched subpaths) or "subtract" (remove the later
+ * ones from the first). Touched subpaths are replaced by the boolean result; the
+ * remaining subpaths are kept. No-op when fewer than two valid subpaths are
+ * touched. Boolean geometry flattens curves to polygons — same limitation as the
+ * Inspector's boolean ops, and the reason this maps onto a single path's subpaths
+ * (combining separate elements is the Inspector's multi-select boolean).
+ */
+export function shapeBuildSubpaths(
+  doc: CanvasDocument,
+  id: string,
+  indices: number[],
+  op: "union" | "subtract",
+): CanvasDocument {
+  const node = doc.elements[id];
+  if (!node || node.type !== "path" || !node.path) return doc;
+  const uniq = [...new Set(indices)].sort((a, b) => a - b);
+  const subs = uniq.map((i) => node.path!.subpaths[i]).filter(Boolean);
+  if (subs.length < 2) return doc;
+
+  let result: VectorPath = { subpaths: [subs[0]], fillRule: node.path.fillRule };
+  for (let i = 1; i < subs.length; i++) {
+    result = booleanPaths(result, { subpaths: [subs[i]] }, op);
+    if (result.subpaths.length === 0) break;
+  }
+  if (result.subpaths.length === 0) return doc;
+
+  const next = cloneDocument(doc);
+  const path = next.elements[id].path!;
+  const removeSet = new Set(uniq);
+  const kept = path.subpaths.filter((_, i) => !removeSet.has(i));
+  path.subpaths = [...kept, ...result.subpaths];
+  return recomputePathBounds(next, id);
+}
+
+/**
  * Apply a boolean op to ALL convertible selected elements, folding them in z-order
  * (bottom → top). Replaces them with a single result path that keeps the operands'
  * parent and stacking position. Returns { document, selectedId } or null when fewer
