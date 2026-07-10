@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Dispatch, ReactNode } from "react";
-import type { AncestorOverlayItem, CanvasDocument, EditorState, Rect, Size, SnapGuide, Tool, ViewportMode } from "./types";
+import type { AncestorOverlayItem, CanvasDocument, EditorState, Rect, Size, SnapGuide, Tool, VectorEditTool, ViewportMode } from "./types";
 import { DEFAULT_ANCESTOR_OVERLAY_ITEM } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
@@ -35,6 +35,8 @@ export type EditorAction =
   | { type: "setEditingText"; editingTextId: string | null }
   | { type: "enterPathEdit"; pathEditId: string }
   | { type: "exitPathEdit" }
+  | { type: "setVectorTool"; vectorTool: VectorEditTool }
+  | { type: "setSelectedAnchors"; selectedAnchors: string[] }
   | { type: "setCanvasStageActive"; active: boolean }
   | { type: "requestNodeFocus"; nodeId: string | null }
   | { type: "requestSelectionFocus"; active: boolean }
@@ -194,6 +196,8 @@ function stateForDocument(document: CanvasDocument, viewportMode: ViewportMode):
     isolatedParentId: null,
     editingTextId: null,
     pathEditId: null,
+    vectorTool: "move",
+    selectedAnchors: [],
     canvasStageActive: false,
     tool: "select",
     zoom: getInitialZoomForSubjectSize(document.canvas, viewportMode),
@@ -229,7 +233,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     ) {
       return state;
     }
-    return { ...state, tool: action.tool, isolatedParentId, editingTextId: null, pathEditId: null };
+    return { ...state, tool: action.tool, isolatedParentId, editingTextId: null, pathEditId: null, vectorTool: "move", selectedAnchors: [] };
   },
   setPanning(state, action) {
     if (state.panning === action.panning) return state;
@@ -313,13 +317,16 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     ) {
       return state;
     }
+    const nextPathEditId = selectedIds.includes(state.pathEditId ?? "") ? state.pathEditId : null;
     return {
       ...state,
       selectedIds,
       isolatedParentId,
       canvasStageActive,
       editingTextId: selectedIds.includes(state.editingTextId ?? "") ? state.editingTextId : null,
-      pathEditId: selectedIds.includes(state.pathEditId ?? "") ? state.pathEditId : null,
+      pathEditId: nextPathEditId,
+      vectorTool: nextPathEditId ? state.vectorTool : "move",
+      selectedAnchors: nextPathEditId ? state.selectedAnchors : [],
       // The gradient overlay follows a single selected element; drop it when the
       // selection moves elsewhere (G11).
       activeGradientEdit:
@@ -352,12 +359,27 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const node = state.document.elements[action.pathEditId];
     if (!node || node.type !== "path") return state;
     if (state.pathEditId === action.pathEditId) return state;
-    // Editing a path is its own modal mode — leave text editing.
-    return { ...state, pathEditId: action.pathEditId, editingTextId: null };
+    // Editing a path is its own modal mode — leave text editing. The vector
+    // sub-tool always resets to "move" and no anchors start selected.
+    return {
+      ...state,
+      pathEditId: action.pathEditId,
+      editingTextId: null,
+      vectorTool: "move",
+      selectedAnchors: [],
+    };
   },
   exitPathEdit(state) {
     if (state.pathEditId === null) return state;
-    return { ...state, pathEditId: null };
+    return { ...state, pathEditId: null, vectorTool: "move", selectedAnchors: [] };
+  },
+  setVectorTool(state, action) {
+    if (state.vectorTool === action.vectorTool) return state;
+    return { ...state, vectorTool: action.vectorTool };
+  },
+  setSelectedAnchors(state, action) {
+    if (idsEqual(state.selectedAnchors, action.selectedAnchors)) return state;
+    return { ...state, selectedAnchors: action.selectedAnchors };
   },
   setCanvasStageActive(state, action) {
     const selectedIds = action.active ? [] : state.selectedIds;
@@ -370,7 +392,7 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     ) {
       return state;
     }
-    return { ...state, canvasStageActive: action.active, selectedIds, isolatedParentId, editingTextId: null, pathEditId: null };
+    return { ...state, canvasStageActive: action.active, selectedIds, isolatedParentId, editingTextId: null, pathEditId: null, vectorTool: "move", selectedAnchors: [] };
   },
   setGuides(state, action) {
     if (guidesEqual(state.guides, action.guides)) return state;

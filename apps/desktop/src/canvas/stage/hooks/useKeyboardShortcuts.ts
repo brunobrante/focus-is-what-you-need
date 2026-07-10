@@ -7,6 +7,7 @@ import { clamp } from "@/canvas/engine/geometry";
 import type { CanvasDocument, EditorState } from "@/canvas/engine/types";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import type { CanvasToolId } from "@/canvas/tools";
+import type { VectorEditTool } from "@/domain/canvas/types";
 import { TOOL_BY_CANVAS_COMMAND } from "@/domain/settings/commands";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import { matchesKeyCommand } from "@/domain/settings/resolve";
@@ -150,6 +151,27 @@ export function useKeyboardShortcuts({
             dispatch({ type: "enterPathEdit", pathEditId: node.id });
             return;
           }
+        }
+      }
+
+      // Vector edit sub-tool shortcuts (Figma parity): active only while a path is
+      // in anchor-edit mode. Modal + edit-only, so they live here rather than in the
+      // global tool-command registry. No plain-letter clash: normal tool switches are
+      // suppressed below whenever pathEditId is set.
+      if (currentState.pathEditId && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const vectorKey: VectorEditTool | null =
+          event.shiftKey && event.key.toLowerCase() === "w" ? "variable-width"
+          : event.shiftKey ? null
+          : event.key.toLowerCase() === "v" ? "move"
+          : event.key.toLowerCase() === "q" ? "lasso"
+          : event.key.toLowerCase() === "b" ? "bend"
+          : event.key.toLowerCase() === "c" ? "cut"
+          : event.key.toLowerCase() === "m" ? "shape-builder"
+          : null;
+        if (vectorKey) {
+          event.preventDefault();
+          dispatch({ type: "setVectorTool", vectorTool: vectorKey });
+          return;
         }
       }
 

@@ -308,3 +308,17 @@ export type CanvasToolId =
 // Lives here (not in the canvas app layer) so the pure htmlScene graph helpers can
 // reference it without a domain → lib/app import (DOM-1).
 export type CanvasInsertToolId = Exclude<CanvasToolId, "cursor" | "hand" | "scale">;
+
+// Sub-tools available only while a path is in anchor-edit mode (Figma's vector
+// edit toolbar). These are NOT CanvasToolIds — they live in a separate editor
+// state slot (EditorState.vectorTool) and only affect how pointer gestures are
+// interpreted against the edited path. "move" is the default: select/drag anchors
+// and handles (the classic anchor-edit behaviour).
+export type VectorEditTool =
+  | "move"
+  | "lasso"
+  | "paint"
+  | "bend"
+  | "cut"
+  | "shape-builder"
+  | "variable-width";

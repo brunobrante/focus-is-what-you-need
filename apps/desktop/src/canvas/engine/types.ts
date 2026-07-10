@@ -15,6 +15,7 @@ import type {
   Distribute,
   ConstraintH,
   ConstraintV,
+  VectorEditTool,
 } from "@/domain/canvas/types";
 export type {
   Tool,
@@ -30,6 +31,7 @@ export type {
   Distribute,
   ConstraintH,
   ConstraintV,
+  VectorEditTool,
 };
 import type { TextRun, TextRunStyles } from "@/domain/canvas/textRuns";
 export type { TextRun, TextRunStyles };
@@ -229,6 +231,13 @@ export type EditorState = {
   // editingTextId: enter on double-click / Enter, exit on Esc / empty-canvas click /
   // tool switch (see store enterPathEdit / exitPathEdit).
   pathEditId: string | null;
+  // Active sub-tool within vector edit mode (Figma's vector toolbar). Only meaningful
+  // while pathEditId != null; reset to "move" on every enter/exit. Never persisted.
+  vectorTool: VectorEditTool;
+  // Anchors selected in vector edit mode, as "<subpathIndex>:<anchorIndex>" keys.
+  // Drives multi-anchor move (lasso / paint) and the overlay's filled-anchor state.
+  // Cleared on enter/exit and when the edited path changes.
+  selectedAnchors: string[];
   canvasStageActive: boolean;
   tool: Tool;
   zoom: number;

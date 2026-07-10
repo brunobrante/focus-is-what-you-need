@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Toolbar } from "@/canvas/shell/Toolbar";
+import { VectorToolbar } from "@/canvas/shell/VectorToolbar";
 import { CanvasToolbarNotice } from "@/canvas/shell/CanvasToolbarNotice";
 import { Inspector } from "@/canvas/shell/Inspector";
 import { Tree, TreeToggle, type ProjectTreeNode } from "@/canvas/shell/Tree";
@@ -203,6 +204,8 @@ function CanvasPageContent() {
     return v.state.selectedIds;
   }, stringArraysEqual);
   const editorCanvasActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
+  const pathEditActive = useEditorBridge((v) => Boolean(v?.state.pathEditId));
+  const vectorTool = useEditorBridge((v) => v?.state.vectorTool ?? "move");
   const getEditor = useEditorBridgeReader();
 
   const { data: allVariants } = useAllVariants();
@@ -1105,6 +1108,13 @@ function CanvasPageContent() {
       {!uiHidden && (
       <div className="fixed bottom-6 left-1/2 z-[10] -translate-x-1/2 flex items-end gap-2">
         <CanvasToolbarNotice />
+        {pathEditActive ? (
+          <VectorToolbar
+            active={vectorTool}
+            onSelect={(tool) => getEditor()?.dispatch({ type: "setVectorTool", vectorTool: tool })}
+            onDone={() => getEditor()?.dispatch({ type: "exitPathEdit" })}
+          />
+        ) : (
         <Toolbar
           activeTool={toolbarActiveTool}
           onToolChange={handleToolChange}
@@ -1145,6 +1155,7 @@ function CanvasPageContent() {
             setShellTabSignal((s) => s + 1);
           }}
         />
+        )}
       </div>
       )}
 
