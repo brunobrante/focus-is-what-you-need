@@ -11,6 +11,7 @@ import {
   bendSegment,
   closeSubpath,
   createId,
+  cutSubpathAt,
   deleteAnchor,
   deleteElements,
   insertAnchorOnSegment,
@@ -269,10 +270,35 @@ export function vectorEditPointerDown(
     case "bend":
       if (bendPointerDown(ctx, event, point, hit)) return true;
       return anchorEditPointerDown(ctx, event, point, hit);
+    case "cut":
+      if (cutPointerDown(ctx, event, hit)) return true;
+      return anchorEditPointerDown(ctx, event, point, hit);
     case "move":
     default:
       return anchorEditPointerDown(ctx, event, point, hit);
   }
+}
+
+// ─── Cut sub-tool ─────────────────────────────────────────────────────────────
+
+/**
+ * Pointer down for the Cut (knife) tool: clicking a segment severs the path at the
+ * click point. It's a one-shot click (no drag), committed immediately; edit mode is
+ * preserved. Returns true when it consumed the event.
+ */
+function cutPointerDown(ctx: VectorPointerCtx, event: ReactPointerEvent, hit: ToolingHit): boolean {
+  const { state, dispatch } = ctx;
+  const id = state.pathEditId;
+  if (!id || !state.document.elements[id]) return false;
+  if (hit.type !== "path-segment") return false;
+  const doc = state.document;
+  let next = cutSubpathAt(doc, id, hit.subpathIndex, hit.segIndex, hit.t);
+  if (next === doc) return false;
+  next = recomputePathBounds(next, id);
+  dispatch({ type: "commitDocument", beforeDocument: doc, document: next, selectedIds: [id] });
+  dispatch({ type: "enterPathEdit", pathEditId: id });
+  event.preventDefault();
+  return true;
 }
 
 /** Pointer down while a path is in edit mode (select tool). Returns true if consumed. */

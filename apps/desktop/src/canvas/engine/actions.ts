@@ -13,6 +13,7 @@ export {
   updateHandle,
   bendSegment,
   insertAnchorOnSegment,
+  cutSubpathAt,
   deleteAnchor,
   closeSubpath,
   setHandleType,

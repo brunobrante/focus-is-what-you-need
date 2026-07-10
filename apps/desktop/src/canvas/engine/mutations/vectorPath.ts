@@ -263,6 +263,63 @@ export function bendSegment(
   return next;
 }
 
+/**
+ * Cut (knife) a subpath at parameter `t` of the segment `segIndex → segIndex+1`.
+ * The split point is first inserted on the curve (De Casteljau, shape-preserving),
+ * then the path is severed there:
+ *  - a CLOSED subpath is OPENED — unrolled into a single open subpath that starts
+ *    and ends at the cut point (two coincident endpoints, like Figma opening a
+ *    shape);
+ *  - an OPEN subpath is SPLIT into two independent open subpaths sharing the cut
+ *    point.
+ * The split point is duplicated so each side keeps only its facing tangent.
+ */
+export function cutSubpathAt(
+  doc: CanvasDocument,
+  id: string,
+  subpathIndex: number,
+  segIndex: number,
+  t: number,
+): CanvasDocument {
+  const node0 = getPathNode(doc, id);
+  const sub0 = node0?.path?.subpaths[subpathIndex];
+  if (!sub0 || sub0.anchors.length < 2) return doc;
+
+  const inserted = insertAnchorOnSegment(doc, id, subpathIndex, segIndex, t);
+  if (inserted === doc) return doc;
+  const next = cloneDocument(inserted);
+  const path = next.elements[id].path;
+  const sub = path?.subpaths[subpathIndex];
+  if (!path || !sub) return doc;
+  const k = segIndex + 1; // index of the freshly-inserted split anchor
+  const cut = sub.anchors[k];
+  if (!cut) return doc;
+
+  const startCopy: VectorAnchor = { ...cut, handleType: "asymmetric" };
+  delete startCopy.inX; delete startCopy.inY; // opening endpoint: outgoing tangent only
+  const endCopy: VectorAnchor = { ...cut, handleType: "asymmetric" };
+  delete endCopy.outX; delete endCopy.outY; // closing endpoint: incoming tangent only
+
+  if (sub.closed) {
+    const after = sub.anchors.slice(k + 1);
+    const before = sub.anchors.slice(0, k);
+    path.subpaths[subpathIndex] = {
+      anchors: [startCopy, ...after, ...before, endCopy],
+      closed: false,
+    };
+  } else {
+    const firstAnchors = [...sub.anchors.slice(0, k), endCopy];
+    const secondAnchors = [startCopy, ...sub.anchors.slice(k + 1)];
+    path.subpaths.splice(
+      subpathIndex,
+      1,
+      { anchors: firstAnchors, closed: false },
+      { anchors: secondAnchors, closed: false },
+    );
+  }
+  return next;
+}
+
 /** Remove an anchor; drops the subpath if it falls below 1 anchor. */
 export function deleteAnchor(
   doc: CanvasDocument,
