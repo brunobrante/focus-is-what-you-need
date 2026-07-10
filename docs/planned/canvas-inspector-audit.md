@@ -45,7 +45,7 @@ NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
 **Remaining (2026-07-10, after the P1/P4/P9 + F2/F3/G13 pass):**
-- **Parity features:** G3 (font management), G9 (full color picker), G10 (rich text).
+- **Parity features:** G3 (font management), G10 (rich text).
 - **Deferred (needs new rebindable commands):** L16.
 - Everything else is closed. The "blocked on the SVG render target" group (F2-borders,
   F3, G13) turned out not to need it: see each item. Nothing in the audit is blocked
@@ -57,10 +57,12 @@ path-edit, rotated text editing, and resize-flip in-app.
   unit-tested where tests exist, but NOT runtime-verified here; verify
   cross-pane paste, constraints-on-resize, alt-drag duplicate, endpoint
   editing, the gradient overlay, and token binding in-app.
-- Done in the 2026-07-10 pass: P1, P4, P9, F2 (fully), F3, G13. Unit-tested, NOT
+- Done in the 2026-07-10 pass: P1, P4, P9, F2 (fully), F3, G13, G9. Unit-tested, NOT
   runtime-verified: check zoom smoothness/re-sharpening, that dragging an unselected
-  element no longer re-renders the inspector, and that a stroked star/polygon draws
-  its border correctly at each alignment (including a bottom-only divider on a rect).
+  element no longer re-renders the inspector, that a stroked star/polygon draws
+  its border correctly at each alignment (including a bottom-only divider on a rect),
+  and that the color picker popover drags/positions correctly and a 50%-alpha border
+  now paints translucent on canvas.
 
 ## Scope and intentional exclusions
 
@@ -1070,15 +1072,20 @@ only. No mixed-value display ("Mixed" placeholder), no batch apply. Minimum
 viable: shared X/Y/W/H + opacity + fill batch-apply with mixed indicators;
 sections read from the first element and write to all selected.
 
-## G9 — Real color picker with alpha (native input only today)
+## ✅ DONE — G9 — Real color picker with alpha
 
-No popover picker (saturation square, hue + alpha sliders, recent colors,
-eyedropper); only the OS `<input type=color>` (sRGB 6-hex) + a hex text
-field. No alpha control on any `InsColor` consumer (border, underline, text
-stroke, shadow, typography color) — which is why L1 seeds opaque black.
-Eyedropper exists only on `FillColorField`, not on `InsColor` consumers.
-Build one shared picker popover used by both `FillColorField` and
-`InsColor`, with 8-digit-hex/alpha support end-to-end.
+New `src/canvas/shell/inspector/ColorPicker.tsx`: a `ColorSwatch` trigger + a
+portalled popover (saturation/value square, hue + alpha sliders, hex + alpha %
+fields, eyedropper, session-shared recent colors). Both `FillColorField` and
+`InsColor` — which moved into that file — now open it, so every color control has
+alpha and an eyedropper; the OS `<input type=color>` is gone. Conversions live in
+`src/domain/canvas/color.ts` (pure, unit-tested); the picker keeps HSV in local
+state so hue survives a trip through black/grey.
+
+8-digit hex is now honored end-to-end: `parseColor` in `src/canvas/stage/skiaColor.ts`
+used to shift `#RRGGBBAA` into the wrong channels *and* force `alpha: 1`, so the
+translucent border colors `BorderSection` already wrote (via `hexWithAlphaPercent`)
+painted opaque on canvas. It delegates to `parseCssColor` now.
 
 ## G10 — Rich text spans (MISSING; largest structural item)
 

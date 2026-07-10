@@ -24,7 +24,6 @@ import type { ColorToken, GradientToken } from "@/domain/system-design/types";
 import {
   clamp,
   FieldGroup,
-  InsColor,
   type InsColorToken,
   InsInput,
   InsRow,
@@ -36,6 +35,7 @@ import {
   Readout,
   updateNumber,
 } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 /** A small rotation glyph for the field icon slot. */
 const RotateGlyph = (

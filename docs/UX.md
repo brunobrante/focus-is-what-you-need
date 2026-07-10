@@ -861,10 +861,10 @@ Image element:
   its stops along a radius), and **double-click the axis** to insert a stop there (seeded with
   the nearest stop's color). Each drag is one undo step. The overlay turns off with the toggle,
   or automatically when the selection changes.
-- **Solid** — a colour via the Fill color field, which accepts any CSS literal (`#RRGGBBAA`,
-  `rgb()`, **Display P3** `color(display-p3 …)`, **OKLCH** `oklch(…)`), carries a **native
-  eyedropper** (web `EyeDropper`, falling back to the macOS `NSColorSampler` in the WKWebView),
-  and can **bind to a System Design color token** (link/unlink) like before.
+- **Solid** — a colour via the Fill color field, whose text input accepts any CSS literal
+  (`#RRGGBBAA`, `rgb()`, **Display P3** `color(display-p3 …)`, **OKLCH** `oklch(…)`), whose
+  swatch opens the [shared color picker](#color-picker), and which can **bind to a System Design
+  color token** (link/unlink) like before.
 - **Gradient** — **linear / radial / conic**, angle, an editable **stop list** (colour +
   position, add/remove), and an **interpolation** space (**sRGB (Average)** default, **OKLAB**,
   **OKLCH**, **Nearest hue**). A gradient can **bind to a System Design gradient token**.
@@ -1827,6 +1827,30 @@ Floating action layer that appears on card hover.
 **MoreMenu**: secondary submenu for additional options
 **Destructive actions**: visually distinct (e.g. Delete)
 **Behavior**: portal-based positioning, closes on outside click or Escape
+
+---
+
+### Color picker
+
+Every color control in the canvas inspector — the Fill color field and the `InsColor` fields
+(border, underline, text stroke, shadow, typography color, canvas background, export background)
+— shows a **swatch** that opens the same picker popover. Translucent colors are drawn over a
+checkerboard, in the swatch and in the picker.
+
+**Popover** (anchored under the swatch, flipped above near the bottom edge; closes on outside
+click or Escape):
+- a **saturation / value square** with a draggable ring;
+- a **hue slider** and an **alpha slider**;
+- a **hex field** (3/4/6/8 digits) and an **alpha %** field, both reverting on invalid input;
+- an **eyedropper** — the web `EyeDropper` API, falling back to the macOS `NSColorSampler` in the
+  WKWebView. Picking a color does not close the popover.
+- a **Recent** row of the last 8 colors committed in this session, shared by every picker.
+
+The picker writes hex: `#RRGGBB` when opaque, `#RRGGBBAA` otherwise — so **alpha is available on
+every color control**, not just Fill. Dragging a control inside the Fill picker coalesces into a
+single undo entry. The Fill field's text input still accepts wide-gamut literals
+(`color(display-p3 …)`, `oklch(…)`), which the swatch renders but the picker cannot represent; it
+seeds from black and only overwrites the literal once a control is actually moved.
 
 ---
 

@@ -13,13 +13,13 @@ import {
 } from "@/lib/canvas/export/types";
 import {
   iconButtonClass,
-  InsColor,
   InsInput,
   InsRow,
   InsSection,
   InsSelect,
   InsToggle,
 } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 // Per-element Export panel (Inspector → Export). Exports the selected element to
 // PNG / JPEG / WebP / SVG / HTML — see docs/inspector-export.md. Entry state is

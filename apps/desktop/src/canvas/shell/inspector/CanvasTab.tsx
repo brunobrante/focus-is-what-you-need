@@ -1,5 +1,6 @@
 import type { CanvasProperties } from "@/canvas/engine/types";
-import { clamp, InsColor, InsInput, InsRow, InsSection, updateNumber } from "./InsComponents";
+import { clamp, InsInput, InsRow, InsSection, updateNumber } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 type CanvasTabProps = {
   canvas: CanvasProperties;

@@ -5,7 +5,6 @@ import type { TypeStyleToken } from "@/domain/system-design/types";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 import {
   clamp,
-  InsColor,
   type InsColorToken,
   InsInput,
   InsRow,
@@ -16,6 +15,7 @@ import {
   InsToggle,
   updateNumber,
 } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 // Friendly labels for `text-transform`, kept off the stored slug.
 const CASE_LABELS: Record<NonNullable<ElementStyles["textTransform"]>, string> = {

@@ -8,11 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { IconChevronDown, IconLink, IconUnlink } from "@/components/icons";
+import { IconChevronDown } from "@/components/icons";
 
 import { clamp } from "@/domain/canvas/geometry";
-import { parseTokenRef, tokenRef } from "@/domain/system-design/resolveTokenRef";
-import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 
 /**
  * Shared visual tokens for the inspector. The look is modelled on Framer's
@@ -449,142 +447,6 @@ export function InsTextarea({
       rows={3}
       className="min-h-[72px] w-full resize-none rounded-[8px] border border-transparent bg-[#242424] px-2.5 py-2 text-[12px] leading-5 text-[#EDEDED] outline-none transition-colors hover:bg-[#2C2C2C] focus:border-[#0D99FF]/70 focus:bg-[#2C2C2C]"
     />
-  );
-}
-
-export function InsColor({
-  value,
-  onChange,
-  disabled = false,
-  tokens,
-  boundRef,
-  onBind,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  /** System Design color tokens this control can bind to. */
-  tokens?: InsColorToken[];
-  /** The current token binding ("colors:<id>"), if the value is bound. */
-  boundRef?: string;
-  /** Bind to a token ref, or pass undefined to revert to a literal value. */
-  onBind?: (ref: string | undefined) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const colorInputValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000";
-  const canBind = Boolean(onBind && tokens && tokens.length > 0);
-
-  // Bound to a token: show it read-only with a purple link badge + unbind.
-  if (boundRef && onBind) {
-    const boundId = parseTokenRef(boundRef)?.tokenId;
-    const token = boundId ? tokens?.find((t) => t.id === boundId) : undefined;
-    return (
-      <div
-        className={[
-          "flex min-w-0 flex-1 items-center gap-1.5",
-          disabled ? "pointer-events-none opacity-40" : "",
-        ].join(" ")}
-      >
-        <div className={`${fieldClass} flex-1 hover:bg-[#242424]`}>
-          <span
-            className="h-[18px] w-[18px] shrink-0 rounded-[5px] ring-1 ring-black/20"
-            style={{ background: token?.value ?? value }}
-          />
-          <span
-            className="flex min-w-0 flex-1 items-center gap-1 truncate text-[12px]"
-            style={{ color: LINKED_INSTANCE_COLOR }}
-            title="Bound to a System Design token"
-          >
-            <IconLink size={11} />
-            <span className="truncate">{token?.name ?? "Token"}</span>
-          </span>
-        </div>
-        <button type="button" title="Unbind — revert to a literal color" onClick={() => onBind(undefined)} className={iconButtonClass}>
-          <IconUnlink size={12} />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={[
-        "relative flex min-w-0 flex-1 items-center gap-1.5",
-        disabled ? "pointer-events-none opacity-40" : "",
-      ].join(" ")}
-    >
-      <div className={`${fieldClass} flex-1`}>
-        <label
-          className="relative h-[18px] w-[18px] shrink-0 cursor-pointer overflow-hidden rounded-[5px] ring-1 ring-black/20"
-          style={{ background: value }}
-        >
-          <input
-            type="color"
-            value={colorInputValue}
-            onChange={(e) => onChange(e.target.value)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-            disabled={disabled}
-          />
-        </label>
-        <BareHexInput value={value} onChange={onChange} />
-      </div>
-      {canBind && (
-        <button type="button" title="Bind to a System Design token" onClick={() => setOpen((o) => !o)} className={iconButtonClass}>
-          <IconLink size={12} />
-        </button>
-      )}
-      {open && canBind && (
-        <div className="absolute right-0 top-[32px] z-50 max-h-48 w-44 overflow-y-auto rounded-[10px] border border-[#2C2C2C] bg-[#1E1E1E] p-1 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-          {tokens!.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                onBind?.(tokenRef("colors", t.id));
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 rounded-[6px] px-1.5 py-1 text-left text-[12px] text-[#E2E2E2] transition-colors hover:bg-[#2A2A2A]"
-            >
-              <span className="h-3 w-3 shrink-0 rounded-[3px] border border-white/10" style={{ background: t.value }} />
-              <span className="truncate">{t.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The hex text field used inside InsColor's field chrome (no border of its own). */
-function BareHexInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const { draftValue, setDraftValue, commitDraft, resetDraft } = useDeferredCommitField(
-    value.toUpperCase().replace("#", ""),
-    (v) => {
-      const hex = "#" + v.replace(/#/g, "").trim();
-      // Reject non-hex input so the deferred-commit field reverts to the last
-      // valid value instead of storing junk like "#red" (L4).
-      if (!/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)) return false;
-      onChange(hex);
-      return true;
-    },
-  );
-  useCommitOnOutsideInteraction(wrapperRef, commitDraft);
-  return (
-    <div ref={wrapperRef} className="min-w-0 flex-1">
-      <input
-        type="text"
-        value={draftValue}
-        onChange={(e) => setDraftValue(e.target.value)}
-        onBlur={commitDraft}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); commitDraft(); }
-          else if (e.key === "Escape") { e.preventDefault(); resetDraft(); }
-        }}
-        className="w-full min-w-0 border-0 bg-transparent text-[12px] uppercase text-[#EDEDED] outline-none"
-        style={{ fontFeatureSettings: '"tnum"' }}
-      />
-    </div>
   );
 }
 

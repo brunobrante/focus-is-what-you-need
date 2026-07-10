@@ -4,7 +4,6 @@ import {
   clamp,
   hexAlphaPercent,
   hexWithAlphaPercent,
-  InsColor,
   type InsColorToken,
   InsInput,
   InsRow,
@@ -14,6 +13,7 @@ import {
   InsToggle,
   updateNumber,
 } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 const SIDE_LABELS = ["Top", "Right", "Bottom", "Left"] as const;
 

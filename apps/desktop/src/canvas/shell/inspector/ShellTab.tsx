@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { AncestorOverlayItem, AncestorOverlayState, ShellGridType } from "@/canvas/engine/types";
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
 import { IconChevronDown, IconGrid, IconScreen } from "@/components/icons";
-import { InsColor, InsRow, InsSection, InsSlider, InsSwitch, InsToggle } from "./InsComponents";
+import { InsRow, InsSection, InsSlider, InsSwitch, InsToggle } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 function AncestorCard({
   frame,

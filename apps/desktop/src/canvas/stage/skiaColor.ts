@@ -1,5 +1,7 @@
 import type { CanvasKit, Paint } from "canvaskit-wasm";
 
+import { parseCssColor } from "@/domain/canvas/color";
+
 export type ParsedColor = {
   r: number;
   g: number;
@@ -77,39 +79,8 @@ export function setPaintColor(
 }
 
 export function parseColor(input: string): ParsedColor {
-  if (input.startsWith("#")) {
-    const hex = input.slice(1);
-    const value = Number.parseInt(hex.length === 3 ? expandShortHex(hex) : hex, 16);
-    return {
-      r: (value >> 16) & 255,
-      g: (value >> 8) & 255,
-      b: value & 255,
-      alpha: 1,
-    };
-  }
-
-  const rgba = input.match(/rgba?\(([^)]+)\)/);
-  if (rgba) {
-    const [r, g, b, a = "1"] = rgba[1].split(",").map((value) => value.trim());
-    return {
-      r: clampColor(Number(r)),
-      g: clampColor(Number(g)),
-      b: clampColor(Number(b)),
-      alpha: Math.max(0, Math.min(1, Number(a))),
-    };
-  }
-
-  return { r: 0, g: 0, b: 0, alpha: 1 };
-}
-
-export function expandShortHex(hex: string): string {
-  return hex
-    .split("")
-    .map((value) => value + value)
-    .join("");
-}
-
-export function clampColor(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(255, Math.round(value)));
+  // `#RRGGBBAA` (what the color picker writes for a translucent color) must keep
+  // its alpha channel here, or a 50%-opaque border paints fully opaque on canvas.
+  const parsed = parseCssColor(input);
+  return parsed ? { r: parsed.r, g: parsed.g, b: parsed.b, alpha: parsed.a } : { r: 0, g: 0, b: 0, alpha: 1 };
 }

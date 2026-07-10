@@ -10,7 +10,6 @@ import { IconChevronDown, IconChevronUp, IconEye, IconEyeOff, IconPlus, IconTras
 import {
   clamp,
   iconButtonClass,
-  InsColor,
   type InsColorToken,
   InsInput,
   InsRow,
@@ -19,6 +18,7 @@ import {
   insButtonClass,
   updateNumber,
 } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 // Label ⇄ slug mapping for the per-entry type dropdown. InsSelect speaks plain
 // strings, so we offer labels and translate back to the stored EffectType.

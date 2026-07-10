@@ -9,13 +9,13 @@ import type { ColorToken } from "@/domain/system-design/types";
 import {
   clamp,
   FieldGroup,
-  InsColor,
   type InsColorToken,
   InsInput,
   InsRow,
   InsSection,
   updateNumber,
 } from "./InsComponents";
+import { InsColor } from "./ColorPicker";
 
 /**
  * Multi-selection editing (G8): shared X/Y/W/H, opacity, and a solid-fill
