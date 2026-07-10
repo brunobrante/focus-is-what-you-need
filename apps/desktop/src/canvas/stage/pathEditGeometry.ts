@@ -23,6 +23,7 @@ export function computePathEditGeometry(
   node: ElementNode,
   t: ViewportTransform,
   penToolActive: boolean,
+  selectedAnchors?: ReadonlySet<string>,
 ): PathEditGeometry | null {
   if (node.type !== "path" || !node.path) return null;
   // Path space → canvas → viewport. pathSpaceToCanvas already applies the element's
@@ -53,7 +54,9 @@ export function computePathEditGeometry(
         point: toView(a.x, a.y),
         inHandle: a.inX !== undefined || a.inY !== undefined ? toView(a.x + (a.inX ?? 0), a.y + (a.inY ?? 0)) : null,
         outHandle: a.outX !== undefined || a.outY !== undefined ? toView(a.x + (a.outX ?? 0), a.y + (a.outY ?? 0)) : null,
-        selected: subpathIndex === activeSubpathIndex && anchorIndex === activeAnchorIndex,
+        selected:
+          (subpathIndex === activeSubpathIndex && anchorIndex === activeAnchorIndex) ||
+          (selectedAnchors?.has(`${subpathIndex}:${anchorIndex}`) ?? false),
       });
     });
 

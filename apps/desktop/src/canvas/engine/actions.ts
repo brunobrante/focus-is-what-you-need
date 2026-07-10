@@ -12,6 +12,7 @@ export {
   updateAnchor,
   updateHandle,
   bendSegment,
+  translateAnchors,
   insertAnchorOnSegment,
   cutSubpathAt,
   deleteAnchor,

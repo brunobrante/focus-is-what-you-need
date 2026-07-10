@@ -7,13 +7,14 @@ import CanvasKitInit, {
 } from "canvaskit-wasm";
 import geistLatinFontUrl from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url";
 import canvasKitWasmUrl from "canvaskit-wasm/bin/canvaskit.wasm?url";
-import { SELECTION_COLOR, canvasRectToViewport } from "./canvasToolingRenderer";
+import { SELECTION_COLOR, canvasRectToViewport, canvasToViewport } from "./canvasToolingRenderer";
 import { PaintPool, createFillPaint } from "./skiaColor";
 import {
   drawDropTarget,
   drawFilledRect,
   drawGhost,
   drawGuide,
+  drawLassoPath,
   drawOutline,
   drawMeasureSegments,
   drawParentDistances,
@@ -59,6 +60,7 @@ function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
     a.guides === b.guides &&
     a.viewportTransform === b.viewportTransform &&
     a.marqueeRect === b.marqueeRect &&
+    a.lasso === b.lasso &&
     a.dropTarget === b.dropTarget &&
     a.parentDistances === b.parentDistances &&
     a.measureSegments === b.measureSegments &&
@@ -218,6 +220,11 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
         const rect = canvasRectToViewport(frame.marqueeRect, frame.viewportTransform);
         drawFilledRect(ck, canvas, pool, rect, MARQUEE_FILL);
         drawOutline(ck, canvas, pool, { rect, color: SELECTION_COLOR });
+      }
+
+      if (frame.lasso) {
+        const pts = frame.lasso.map((p) => canvasToViewport(p.x, p.y, frame.viewportTransform));
+        drawLassoPath(ck, canvas, pool, pts);
       }
 
       if (frame.dropTarget) {

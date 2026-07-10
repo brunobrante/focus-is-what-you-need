@@ -21,17 +21,22 @@ import type { ToolingHit } from "../canvasHitTesting";
 import { PEN_CURSOR, PEN_REMOVE_CURSOR } from "../penCursors";
 import {
   anchorEditMove,
+  anchorsMove,
   bendMove,
+  finishAnchorsMove,
   finishBend,
   finishAnchorEdit,
   finishPen,
   finishPencil,
+  finishVectorSelect,
   pathDoubleClick,
   pencilMove,
   pencilPointerDown,
   penPointerDown,
   penPointerMove,
   vectorEditPointerDown,
+  vectorSelectMove,
+  vectorSelectPointerDown,
   type VectorPointerCtx,
 } from "../canvasVectorInteraction";
 import { clearNativeTextSelection } from "../canvasStageHelpers";
@@ -144,6 +149,7 @@ type Params = {
 
 export type CanvasPointerEventsResult = {
   marqueeRect: Rect | null;
+  lassoPoints: Point[] | null;
   contextMenu: ContextMenuState;
   dropTarget: CanvasDropTarget | null;
   closeContextMenu: () => void;
@@ -189,6 +195,7 @@ export function useCanvasPointerEvents({
   // cursor when a modifier changes without the pointer moving. B19.
   const lastHoverClientRef = useRef<{ x: number; y: number } | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Rect | null>(null);
+  const [lassoPoints, setLassoPoints] = useState<Point[] | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [dropTarget, setDropTarget] = useState<CanvasDropTarget | null>(null);
 
@@ -392,6 +399,16 @@ export function useCanvasPointerEvents({
       const vpRect = getCurrentViewportRect();
       const hit = toolingRef.current.hitTest(event.clientX - vpRect.left, event.clientY - vpRect.top);
       toolingHit = hit;
+      // Lasso / Paint vector sub-tools start a region-select from anywhere in edit
+      // mode (even over empty canvas), so they take priority over hit routing.
+      if (
+        state.pathEditId &&
+        state.tool !== "pen" &&
+        (state.vectorTool === "lasso" || state.vectorTool === "paint")
+      ) {
+        const p = getCanvasPoint(event) ?? { x: 0, y: 0 };
+        if (vectorSelectPointerDown(vectorCtx(viewport), event, p, state.vectorTool, setLassoPoints)) return;
+      }
       // Path edit mode (select tool): anchor/handle/segment interactions take priority.
       if (state.pathEditId && state.tool !== "pen") {
         if (
@@ -563,6 +580,8 @@ export function useCanvasPointerEvents({
     if (interaction.type === "pencil") { pencilMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "anchor-edit") { anchorEditMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "vector-bend") { bendMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "vector-lasso") { vectorSelectMove(interaction, point, vectorCtx(viewportRef.current!), setLassoPoints); return; }
+    if (interaction.type === "vector-anchors-move") { anchorsMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
     if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
 
@@ -686,6 +705,8 @@ export function useCanvasPointerEvents({
     if (interaction.type === "pencil") { finishPencil(interaction, dispatch); return; }
     if (interaction.type === "anchor-edit") { finishAnchorEdit(interaction, dispatch); return; }
     if (interaction.type === "vector-bend") { finishBend(interaction, dispatch); return; }
+    if (interaction.type === "vector-lasso") { finishVectorSelect(interaction, vectorCtx(viewport ?? viewportRef.current!), setLassoPoints); return; }
+    if (interaction.type === "vector-anchors-move") { finishAnchorsMove(interaction, dispatch); return; }
 
     const wasCommandMode = commandModeRef.current;
     const capturedDropTarget = dropTargetRef.current;
@@ -718,6 +739,16 @@ export function useCanvasPointerEvents({
   // their own dedicated cancel paths in useKeyboardShortcuts and are left alone.
   const cancelActiveInteraction = (): boolean => {
     const interaction = interactionRef.current;
+    // Lasso/Paint carry no document to revert — just drop the gesture + overlay.
+    if (interaction?.type === "vector-lasso") {
+      clearPendingMove();
+      const viewport = viewportRef.current;
+      if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
+      interactionRef.current = null;
+      setInteractionActive(false);
+      setLassoPoints(null);
+      return true;
+    }
     if (
       !interaction ||
       interaction.type === "pan" ||
@@ -789,6 +820,7 @@ export function useCanvasPointerEvents({
 
   return {
     marqueeRect,
+    lassoPoints,
     contextMenu,
     dropTarget,
     closeContextMenu,

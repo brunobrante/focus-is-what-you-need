@@ -19,6 +19,7 @@ import {
   makePathNode,
   recomputePathBounds,
   setHandleType,
+  translateAnchors,
   updateAnchor,
   updateHandle,
 } from "@/canvas/engine/actions";
@@ -33,7 +34,9 @@ import type {
   PenInteraction,
   Point,
   VectorAnchor,
+  VectorAnchorsMoveInteraction,
   VectorBendInteraction,
+  VectorLassoInteraction,
 } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
@@ -279,6 +282,8 @@ export function vectorEditPointerDown(
   }
 }
 
+const anchorKey = (subpathIndex: number, anchorIndex: number): string => `${subpathIndex}:${anchorIndex}`;
+
 // ─── Cut sub-tool ─────────────────────────────────────────────────────────────
 
 /**
@@ -333,6 +338,18 @@ export function anchorEditPointerDown(
       dispatch({ type: "commitDocument", beforeDocument: doc, document: next, selectedIds: [id] });
       event.preventDefault();
       return true;
+    }
+    // Multi-anchor selection (from lasso/paint): grabbing an already-selected
+    // anchor drags the whole selection together. Grabbing an unselected anchor
+    // collapses the selection to just it, then edits it.
+    const key = anchorKey(hit.subpathIndex, hit.anchorIndex);
+    const selected = state.selectedAnchors;
+    if (selected.length > 1 && selected.includes(key)) {
+      startAnchorsMove(ctx, event, point, id, selected);
+      return true;
+    }
+    if (selected.length > 0 && !(selected.length === 1 && selected[0] === key)) {
+      dispatch({ type: "setSelectedAnchors", selectedAnchors: [key] });
     }
     startAnchorEdit(ctx, event, point, id, hit.subpathIndex, hit.anchorIndex, "anchor");
     return true;
@@ -487,6 +504,179 @@ export function bendMove(
 }
 
 export function finishBend(interaction: VectorBendInteraction, dispatch: Dispatch): void {
+  if (!interaction.moved) return;
+  const next = recomputePathBounds(interaction.lastDocument, interaction.elementId);
+  dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [interaction.elementId] });
+  dispatch({ type: "enterPathEdit", pathEditId: interaction.elementId });
+}
+
+// ─── Lasso / Paint selection ──────────────────────────────────────────────────
+
+type SetLasso = (points: Point[] | null) => void;
+
+/** Even-odd ray-cast point-in-polygon test (canvas space). */
+function pointInPolygon(px: number, py: number, poly: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/** Every "<sub>:<anchor>" key whose anchor (canvas space) falls inside the polygon. */
+function anchorsInPolygon(doc: CanvasDocument, id: string, poly: Point[]): string[] {
+  const node = doc.elements[id];
+  if (!node?.path || poly.length < 3) return [];
+  const keys: string[] = [];
+  node.path.subpaths.forEach((sub, si) => {
+    sub.anchors.forEach((a, ai) => {
+      const c = pathSpaceToCanvas(doc, node, a.x, a.y);
+      if (pointInPolygon(c.px, c.py, poly)) keys.push(anchorKey(si, ai));
+    });
+  });
+  return keys;
+}
+
+/** Pointer down for the Lasso / Paint tools. Returns true if consumed. */
+export function vectorSelectPointerDown(
+  ctx: VectorPointerCtx,
+  event: ReactPointerEvent,
+  point: Point,
+  mode: "lasso" | "paint",
+  setLasso: SetLasso,
+): boolean {
+  const { state, dispatch, interactionRef, setInteractionActive, viewport } = ctx;
+  const id = state.pathEditId;
+  if (!id || !state.document.elements[id]) return false;
+  const additive = event.shiftKey;
+  const interaction: VectorLassoInteraction = {
+    type: "vector-lasso",
+    pointerId: event.pointerId,
+    elementId: id,
+    startPoint: point,
+    points: [point],
+    mode,
+    additive,
+    baseSelection: additive ? state.selectedAnchors : [],
+    moved: false,
+  };
+  interactionRef.current = interaction;
+  setInteractionActive(true);
+  if (mode === "lasso") setLasso([point]);
+  else if (!additive) dispatch({ type: "setSelectedAnchors", selectedAnchors: [] });
+  viewport.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  return true;
+}
+
+export function vectorSelectMove(
+  interaction: VectorLassoInteraction,
+  point: Point,
+  ctx: VectorPointerCtx,
+  setLasso: SetLasso,
+): void {
+  const last = interaction.points[interaction.points.length - 1];
+  if (last && Math.hypot(point.x - last.x, point.y - last.y) < 1) return;
+  interaction.moved = true;
+  interaction.points.push(point);
+
+  if (interaction.mode === "lasso") {
+    setLasso([...interaction.points]);
+    return;
+  }
+  // Paint: live-add anchors near the cursor as it sweeps (brush select).
+  const doc = ctx.state.document;
+  const node = doc.elements[interaction.elementId];
+  if (!node?.path) return;
+  const brush = PAINT_BRUSH_RADIUS;
+  const acc = new Set(interaction.baseSelection);
+  // Re-scan the whole stroke so a fast drag doesn't skip anchors between samples.
+  for (const p of interaction.points) {
+    node.path.subpaths.forEach((sub, si) => {
+      sub.anchors.forEach((a, ai) => {
+        const c = pathSpaceToCanvas(doc, node, a.x, a.y);
+        if (Math.hypot(c.px - p.x, c.py - p.y) <= brush) acc.add(anchorKey(si, ai));
+      });
+    });
+  }
+  ctx.dispatch({ type: "setSelectedAnchors", selectedAnchors: [...acc] });
+}
+
+export function finishVectorSelect(
+  interaction: VectorLassoInteraction,
+  ctx: VectorPointerCtx,
+  setLasso: SetLasso,
+): void {
+  setLasso(null);
+  if (interaction.mode === "paint") return; // selection already applied live
+  const doc = ctx.state.document;
+  if (!interaction.moved || interaction.points.length < 3) {
+    // A bare click with the lasso clears the selection (unless additive).
+    if (!interaction.additive) ctx.dispatch({ type: "setSelectedAnchors", selectedAnchors: [] });
+    return;
+  }
+  const picked = anchorsInPolygon(doc, interaction.elementId, interaction.points);
+  const merged = interaction.additive
+    ? [...new Set([...interaction.baseSelection, ...picked])]
+    : picked;
+  ctx.dispatch({ type: "setSelectedAnchors", selectedAnchors: merged });
+}
+
+// Paint brush radius in canvas units (≈ px at 100% zoom). Kept simple; a
+// zoom-aware screen-constant radius can come later if needed.
+const PAINT_BRUSH_RADIUS = 12;
+
+// ─── Multi-anchor move ─────────────────────────────────────────────────────────
+
+function startAnchorsMove(
+  ctx: VectorPointerCtx,
+  event: ReactPointerEvent,
+  point: Point,
+  elementId: string,
+  selectedKeys: string[],
+): void {
+  const { state, interactionRef, setInteractionActive, viewport } = ctx;
+  const anchors = selectedKeys.map((k) => {
+    const [s, a] = k.split(":");
+    return { subpathIndex: Number(s), anchorIndex: Number(a) };
+  });
+  const interaction: VectorAnchorsMoveInteraction = {
+    type: "vector-anchors-move",
+    pointerId: event.pointerId,
+    startPoint: point,
+    elementId,
+    anchors,
+    beforeDocument: state.document,
+    lastDocument: state.document,
+    moved: false,
+  };
+  interactionRef.current = interaction;
+  setInteractionActive(true);
+  viewport.setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+
+export function anchorsMove(
+  interaction: VectorAnchorsMoveInteraction,
+  point: Point,
+  dispatch: Dispatch,
+  latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+): void {
+  const node0 = interaction.beforeDocument.elements[interaction.elementId];
+  if (!node0) return;
+  const dx = point.x - interaction.startPoint.x;
+  const dy = point.y - interaction.startPoint.y;
+  if (Math.hypot(dx, dy) > MOVE_THRESHOLD) interaction.moved = true;
+  const rel = canvasDeltaToPathSpace(interaction.beforeDocument, node0, dx, dy);
+  const next = translateAnchors(interaction.beforeDocument, interaction.elementId, interaction.anchors, rel.x, rel.y);
+  interaction.lastDocument = next;
+  latestDocumentRef.current = next;
+  dispatch({ type: "setDocumentTransient", document: next, changedIds: [interaction.elementId] });
+}
+
+export function finishAnchorsMove(interaction: VectorAnchorsMoveInteraction, dispatch: Dispatch): void {
   if (!interaction.moved) return;
   const next = recomputePathBounds(interaction.lastDocument, interaction.elementId);
   dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [interaction.elementId] });

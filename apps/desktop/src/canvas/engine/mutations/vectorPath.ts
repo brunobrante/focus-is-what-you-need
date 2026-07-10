@@ -263,6 +263,27 @@ export function bendSegment(
   return next;
 }
 
+/** Translate a set of anchors by (dx, dy) in path space (multi-anchor move). */
+export function translateAnchors(
+  doc: CanvasDocument,
+  id: string,
+  anchors: readonly { subpathIndex: number; anchorIndex: number }[],
+  dx: number,
+  dy: number,
+): CanvasDocument {
+  if (!getPathNode(doc, id) || anchors.length === 0) return doc;
+  const next = cloneDocument(doc);
+  const path = next.elements[id].path;
+  if (!path) return doc;
+  for (const { subpathIndex, anchorIndex } of anchors) {
+    const a = path.subpaths[subpathIndex]?.anchors[anchorIndex];
+    if (!a) continue;
+    a.x += dx;
+    a.y += dy;
+  }
+  return next;
+}
+
 /**
  * Cut (knife) a subpath at parameter `t` of the segment `segIndex → segIndex+1`.
  * The split point is first inserted on the curve (De Casteljau, shape-preserving),

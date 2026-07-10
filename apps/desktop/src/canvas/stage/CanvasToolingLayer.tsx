@@ -56,6 +56,10 @@ export type CanvasToolingLayerProps = {
   editingTextId: string | null;
   pathEditId: string | null;
   penToolActive: boolean;
+  // Vector-edit selected anchors ("<sub>:<anchor>" keys) + the live lasso region
+  // (canvas space). Both only meaningful while pathEditId is set.
+  selectedAnchors: string[];
+  lasso: Point[] | null;
   scaleToolActive: boolean;
   canvasStageActive: boolean;
   guides: SnapGuide[];
@@ -226,6 +230,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
     }, [settings]);
 
     const selectedIdsKey = props.selectedIds.join("|");
+    const selectedAnchorsKey = props.selectedAnchors.join("|");
 
     useEffect(() => {
       if (!props.editingTextId) return;
@@ -246,7 +251,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       const pathEditNode = props.pathEditId ? doc.elements[props.pathEditId] : null;
       const pathEditGeometry =
         pathEditNode && pathEditNode.type === "path"
-          ? computePathEditGeometry(doc, pathEditNode, t, props.penToolActive)
+          ? computePathEditGeometry(doc, pathEditNode, t, props.penToolActive, new Set(props.selectedAnchors))
           : null;
       const pathEditActive = pathEditGeometry !== null;
       // In path edit mode the box + resize/rotate/radius handles are hidden; only
@@ -572,6 +577,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.interactionType,
       props.radiusDragCorner,
       selectedIdsKey,
+      selectedAnchorsKey,
       props.suppressHover,
       parentDistanceModifierDown,
       settings.canvas.shell.invisibleDragGhost,
@@ -694,6 +700,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         guides: props.guides,
         viewportTransform: t,
         marqueeRect: props.marqueeRect,
+        lasso: props.lasso,
         dropTarget: renderData.dropTarget,
         parentDistances: renderData.parentDistances,
         measureSegments: renderData.measureSegments,
@@ -708,6 +715,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       overlaySize.width,
       props.guides,
       props.marqueeRect,
+      props.lasso,
       renderData,
       sizeLabel,
       t,

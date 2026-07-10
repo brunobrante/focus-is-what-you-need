@@ -467,6 +467,33 @@ export type VectorBendInteraction = {
   moved: boolean;
 };
 
+// Vector edit / Lasso (and Paint) sub-tool: dragging a region to select multiple
+// anchors. Points are canvas-space; the selection is resolved on pointer-up
+// (lasso) or live per-move (paint). `additive` unions with the prior selection.
+export type VectorLassoInteraction = {
+  type: "vector-lasso";
+  pointerId: number;
+  elementId: string;
+  startPoint: Point;
+  points: Point[];
+  mode: "lasso" | "paint";
+  additive: boolean;
+  baseSelection: string[];
+  moved: boolean;
+};
+
+// Vector edit / Move: dragging a set of selected anchors together.
+export type VectorAnchorsMoveInteraction = {
+  type: "vector-anchors-move";
+  pointerId: number;
+  startPoint: Point;
+  elementId: string;
+  anchors: { subpathIndex: number; anchorIndex: number }[];
+  beforeDocument: CanvasDocument;
+  lastDocument: CanvasDocument;
+  moved: boolean;
+};
+
 export type MarqueeInteraction = {
   type: "marquee";
   pointerId: number;
@@ -525,6 +552,8 @@ export type Interaction =
   | PencilInteraction
   | AnchorEditInteraction
   | VectorBendInteraction
+  | VectorLassoInteraction
+  | VectorAnchorsMoveInteraction
   | MarqueeInteraction
   | PanInteraction
   | CanvasResizeInteraction

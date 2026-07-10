@@ -177,13 +177,17 @@ export function useKeyboardShortcuts({
 
       if (matchesKeyCommand(event, settings, "canvas.selection.cancel")) {
         const interaction = interactionRef.current;
-        // Cancel an in-flight vector sub-tool gesture (bend) → revert, stay in edit mode.
-        if (interaction?.type === "vector-bend") {
-          const viewport = viewportRef.current;
-          if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
-          interactionRef.current = null;
-          setInteractionActive(false);
-          dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
+        // Cancel an in-flight vector sub-tool gesture (bend / lasso / group-move):
+        // the pointer hook's cancel reverts the document + clears the lasso overlay;
+        // stay in edit mode. Must run BEFORE the pathEditId branch below so Esc
+        // doesn't leave edit mode with a stuck gesture.
+        if (
+          interaction?.type === "vector-bend" ||
+          interaction?.type === "vector-lasso" ||
+          interaction?.type === "vector-anchors-move"
+        ) {
+          event.preventDefault();
+          cancelActiveInteractionRef?.current?.();
           return;
         }
         // Cancel an in-flight pen anchor-drag → revert to before the anchor placement.

@@ -21,6 +21,7 @@ import type {
 } from "./toolingRenderAdapter";
 
 const HANDLE_FILL = "#ffffff";
+const LASSO_FILL = "rgba(13, 153, 255, 0.08)";
 // Drag ghost for invisible elements: a soft blue drop shadow under a faint
 // surface, framed with a dashed selection-blue outline.
 const GHOST_FILL = "rgba(13, 153, 255, 0.10)";
@@ -109,6 +110,26 @@ export function drawPolygonOutline(
     const from = corners[index];
     const to = corners[(index + 1) % corners.length];
     canvas.drawLine(from.x, from.y, to.x, to.y, paint);
+  }
+}
+
+/** Draw the live lasso selection region (viewport-space polygon): soft fill + outline. */
+export function drawLassoPath(
+  ck: CanvasKit,
+  canvas: Canvas,
+  pool: PaintPool,
+  points: Point[],
+): void {
+  if (points.length < 2) return;
+  const path = new ck.Path();
+  try {
+    path.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) path.lineTo(points[i].x, points[i].y);
+    path.close();
+    canvas.drawPath(path, pool.getFill(LASSO_FILL));
+    canvas.drawPath(path, pool.getStroke(SELECTION_COLOR, 1));
+  } finally {
+    path.delete();
   }
 }
 

@@ -335,6 +335,7 @@ export function CanvasStage({
 
   const {
     marqueeRect,
+    lassoPoints,
     contextMenu,
     dropTarget,
     closeContextMenu,
@@ -588,6 +589,8 @@ export function CanvasStage({
         editingTextId={state.editingTextId}
         pathEditId={state.pathEditId}
         penToolActive={state.tool === "pen"}
+        selectedAnchors={state.selectedAnchors}
+        lasso={lassoPoints}
         scaleToolActive={state.tool === "scale"}
         canvasStageActive={state.canvasStageActive}
         guides={state.guides}

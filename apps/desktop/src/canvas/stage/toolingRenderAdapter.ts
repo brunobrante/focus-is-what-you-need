@@ -119,6 +119,8 @@ export type ToolingRenderFrame = {
   guides: SnapGuide[];
   viewportTransform: ViewportTransform;
   marqueeRect: Rect | null;
+  // Live vector-edit lasso region, in CANVAS space (converted at draw time).
+  lasso: Point[] | null;
   dropTarget: ToolingDropTargetCommand | null;
   parentDistances: ToolingParentDistanceCommand | null;
   measureSegments: ToolingMeasureSegmentCommand[] | null;
