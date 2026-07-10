@@ -12,6 +12,7 @@ import { NewDraftPage } from "@/pages/NewDraftPage";
 import { DraftsPage } from "@/pages/DraftsPage";
 import { NewsPage } from "@/pages/NewsPage";
 import { FeedbackPage } from "@/pages/FeedbackPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 import { GalleryPage } from "@/pages/GalleryPage";
 import { DetailPage } from "@/pages/DetailPage";
 import { CanvasPage } from "@/canvas/Canvas";
@@ -52,7 +53,7 @@ export default function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/news" element={<NewsPage />} />
         <Route path="/feedback" element={<FeedbackPage />} />
-        <Route path="*" element={<DashboardPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="/workspace/:workspaceId" element={<WorkspaceLayout />}>
         <Route path="projects" element={<LandingPage />} />
