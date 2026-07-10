@@ -613,6 +613,7 @@ export function CanvasStage({
         onInputValue={updateTextNodeFromTextareaInput}
         onCommit={commitTextEditing}
         onCancel={cancelTextEditing}
+        settings={settings}
       />
 
       <TextEditingOverlay

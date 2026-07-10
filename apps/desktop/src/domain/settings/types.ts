@@ -45,7 +45,9 @@ export type CanvasKeyCommandId =
   | "canvas.tool.text"
   | "canvas.tool.image"
   | "canvas.tool.svg"
-  | "canvas.tool.actions";
+  | "canvas.tool.actions"
+  | "canvas.path.commit"
+  | "canvas.text.commit";
 
 export type CanvasModifierCommandId =
   | "canvas.drag.reparent"
@@ -57,7 +59,9 @@ export type CanvasModifierCommandId =
   | "canvas.selection.addToClick"
   | "canvas.vector.removeAnchor"
   | "canvas.radius.perCorner"
-  | "canvas.drag.duplicate";
+  | "canvas.drag.duplicate"
+  | "canvas.viewport.wheelZoom"
+  | "canvas.text.extendSelection";
 
 export type CanvasCommandId = CanvasKeyCommandId | CanvasModifierCommandId;
 

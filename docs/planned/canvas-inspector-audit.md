@@ -17,8 +17,7 @@ unit-tested where tests exist). Completed so far:
 
 - **High:** H1, H2, H3 — all done.
 - **Medium:** M1–M14 — all done.
-- **Low:** L1–L15, L17–L22 done; L16 deferred (needs new rebindable commands);
-  L23 reviewed, no change.
+- **Low:** L1–L22 done; L23 reviewed, no change.
 - **Perf:** P3, P5, P7, P8, P10.
 - **Doc-divergence:** D1 (decided: store radius verbatim, clamp at render —
   closed L7, unblocked F4), D2 (with M12), D8 (with M13).
@@ -46,7 +45,6 @@ path-edit, rotated text editing, and resize-flip in-app.
 
 **Remaining (2026-07-10, after the P1/P4/P9 + F2/F3/G13 pass):**
 - **Parity features:** G3 (font management), G10 (rich text).
-- **Deferred (needs new rebindable commands):** L16.
 - Everything else is closed. The "blocked on the SVG render target" group (F2-borders,
   F3, G13) turned out not to need it: see each item. Nothing in the audit is blocked
   on a render-target promotion any more.
@@ -57,7 +55,7 @@ path-edit, rotated text editing, and resize-flip in-app.
   unit-tested where tests exist, but NOT runtime-verified here; verify
   cross-pane paste, constraints-on-resize, alt-drag duplicate, endpoint
   editing, the gradient overlay, and token binding in-app.
-- Done in the 2026-07-10 pass: P1, P4, P9, F2 (fully), F3, G13, G9. Unit-tested, NOT
+- Done in the 2026-07-10 pass: P1, P4, P9, F2 (fully), F3, G13, G9, L16. Unit-tested, NOT
   runtime-verified: check zoom smoothness/re-sharpening, that dragging an unselected
   element no longer re-renders the inspector, that a stroked star/polygon draws
   its border correctly at each alignment (including a bottom-only divider on a rect),
@@ -93,8 +91,9 @@ path-edit, rotated text editing, and resize-flip in-app.
   should read `Design.md` first for control conventions.
 - Keyboard/modifier behavior must go through `matchesKeyCommand` /
   `isModifierCommandActive` from `src/domain/settings/resolve.ts` — never raw
-  `event.metaKey/altKey/shiftKey`. Several existing violations are listed in
-  L16; do not add new ones.
+  `event.metaKey/altKey/shiftKey`. The last violations were closed by L16 (the
+  sole exception, documented there, is the raw `ctrlKey` on wheel = WebKit's
+  pinch encoding); do not add new ones.
 - React 19 **StrictMode** is on: setState updaters are double-invoked and must
   stay pure (no ref mutation, no nested setState, no side effects inside
   updaters). The audit found the codebase currently clean — keep it that way.
@@ -526,24 +525,20 @@ the fallback doc independently of panel widths.
   `canvas.width = width` in CSS px (no DPR scaling, unlike the Skia
   adapter's `getResolution()`), so pixel-grid lines render blurry on Retina
   and the `Math.round(x)+0.5` crispness trick operates on the wrong grid.
-- **L16 — DEFERRED (needs new rebindable commands) — Raw modifier checks bypass the
-  settings command layer.** Routing these through the registry requires *new*
-  command ids that don't exist yet: a wheel-zoom modifier command (only the
-  `metaKey` half is a policy choice — `ctrlKey` on wheel is WebKit's pinch
-  encoding and must stay raw), a path-commit key command for Enter, and
-  selection/caret key commands for the textarea editing keys — each with settings
-  type + defaults + rebinding-UI plumbing. That is a disproportionate, unverifiable
-  (no runtime here) expansion for a low-severity hygiene item, so it is deferred
-  rather than done badly. Original references:
-  `src/canvas/stage/hooks/useViewportControls.ts:237`
-  (`event.ctrlKey || event.metaKey` for wheel-zoom vs pan — caveat: `ctrlKey`
-  on wheel is also WebKit's pinch encoding, so only the `metaKey` half is a
-  policy choice); `useKeyboardShortcuts.ts:62` (raw
-  `!event.metaKey && !event.ctrlKey` on Enter for pen commit);
-  `src/canvas/stage/TextEditingTextarea.tsx:203-246` (raw
-  `shiftKey`/`metaKey` for editing keys — arguably text-editing scope, but it
-  is interaction code per the project rule). Route through
-  `matchesKeyCommand`/`isModifierCommandActive`.
+- ✅ **DONE — L16 — Raw modifier checks bypass the settings command layer.**
+  Four new rebindable commands close this: modifier `canvas.viewport.wheelZoom`
+  (default `mod`) and `canvas.text.extendSelection` (default `shift`), key
+  `canvas.path.commit` and `canvas.text.commit` (both default `Enter`). The
+  wheel handler (`useViewportControls.ts`) still reads `event.ctrlKey` raw
+  *in addition* to the binding, because WebKit encodes a trackpad pinch as a
+  ctrl-wheel — that is a platform fact, not a policy choice. Pen commit
+  (`useKeyboardShortcuts.ts`) and the textarea's Escape / Enter / select-all /
+  shift-arrow keys (`TextEditingTextarea.tsx`, now given `settings`) route
+  through `matchesKeyCommand` / `isModifierCommandActive`; select-all and cancel
+  reuse the existing `canvas.selection.selectAll` / `canvas.selection.cancel`.
+  All four appear in the Shortcuts settings tab (new "Text editing" group).
+  Side effect of using the binding matcher: a modified Enter (⌘/⇧) no longer
+  commits a path or a text edit. Unit-tested in `settings/__tests__/resolve.test.ts`.
 - ✅ **DONE — L17 — Gradient stops keyed by index.** `FillSection.tsx:296` — removing a
   middle stop shifts the color-field drafts of all following stops into the
   wrong rows. Key by a stable stop id.

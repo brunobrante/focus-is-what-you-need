@@ -130,8 +130,8 @@ export function useKeyboardShortcuts({
       const currentState = latestStateRef.current;
       if (isEditableTarget(event.target) || currentState.editingTextId) return;
 
-      // Enter: commit the pen path / toggle into path edit mode.
-      if (event.key === "Enter" && !event.metaKey && !event.ctrlKey) {
+      // Commit the pen path / toggle into path edit mode (Enter by default).
+      if (matchesKeyCommand(event, settings, "canvas.path.commit")) {
         if (currentState.pathEditId && currentState.tool === "pen") {
           event.preventDefault();
           dispatch({ type: "setTool", tool: "select" });

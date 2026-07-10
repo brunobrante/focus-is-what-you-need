@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MutableRefObject, WheelEvent as ReactWheelEvent } from "react";
 import type { EditorState, Point, Rect } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { isModifierCommandActive } from "@/domain/settings/resolve";
 import type { GlobalSettings } from "@/domain/settings/types";
 import { clamp } from "@/canvas/engine/geometry";
 import {
@@ -260,7 +261,9 @@ export function useViewportControls({
     const canvasSize = getCanvasSize(state.document);
     let nextViewport;
 
-    if (event.ctrlKey || event.metaKey) {
+    // `ctrlKey` on a wheel event is WebKit's trackpad-pinch encoding, not a key the
+    // user chose to hold, so it stays raw; only the deliberate modifier is bound.
+    if (event.ctrlKey || isModifierCommandActive(event, settings, "canvas.viewport.wheelZoom")) {
       markZoomGesture();
       const zoomLimits = getViewportZoomLimits(state.viewportMode);
       const nextZoom = clamp(

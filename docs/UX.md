@@ -1148,7 +1148,7 @@ the instance in place (same effect as the layers-tree unlink button).
 - It currently fires when a **wrapper** is added — both ways of creating one: choosing the Wrapper tool with a selection (which wraps the selection) and drawing a wrapper on an empty area. Because a wrapper has no fill or border, the message ("Wrapper added") is the user's confirmation that the tool worked.
 
 **Canvas zoom & pan model:**
-- Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform sketch canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Ctrl`/`Cmd`+wheel. The wheel zooms toward the **cursor**; the toolbar/percentage/keyboard zoom (which have no cursor to pivot on) anchor on the **viewport center**, so the view grows from the middle instead of the canvas top-left corner.
+- Minimum zoom is `1x` (100%); maximum is `256x` for screens/components (`2560x` in the freeform sketch canvas). Zoom in/out via the toolbar `±`, `Cmd`+`=` / `Cmd`+`-`, `Cmd`+`0` to reset, or `Cmd`+wheel (rebindable as `canvas.viewport.wheelZoom`). A trackpad pinch always zooms — WebKit reports it as a `Ctrl`+wheel, so that path stays hardwired regardless of the binding. The wheel zooms toward the **cursor**; the toolbar/percentage/keyboard zoom (which have no cursor to pivot on) anchor on the **viewport center**, so the view grows from the middle instead of the canvas top-left corner.
 - Panning and zooming clamp to the **navigable region**: by default the edited subject, but when the screen simulator is on it grows to include the whole device frame (see below).
 - **At 100% (minimum zoom) the region is always centered — there is no scroll slack**, whether it fits or overflows. Zooming back out to 100% therefore always re-centers the subject/device. The freeform sketch canvas is the exception: it has no meaningful center, so it is **not** force-centered at minimum zoom (doing so would push the user's content, which sits in a tiny corner of the huge canvas, off-screen); its offset stays anchored to wherever you panned/zoomed.
 - **Once zoomed in past 100%** (the region overflowing) panning gains over-scroll: the camera can travel until **any edge of the region reaches the viewport center** (≈ half the scaled region in each direction). Panning stops there — the region can never be pushed entirely past center into one half. Pan via space-drag or two-finger/wheel scroll.
@@ -1709,7 +1709,10 @@ drift:
 - **Canvas**: shell and layers-tree toggles (inherit parent background, drag ghost for invisible elements, resize dropped images to frame, reveal selected layers), plus the **Toolbar config** section — the **Global** element defaults (see below)
 - **Project thumbnails**: auto-generate project card thumbnails (see below)
 - **Processing Features**: optional on-device AI models (see below)
-- **Keyboard shortcuts**: rebindable canvas commands
+- **Keyboard shortcuts**: rebindable canvas commands, grouped as Canvas / Zoom / Tools /
+  Modifiers / Text editing. Beyond the tool and selection keys this covers the wheel-zoom
+  modifier, the Enter that commits a pen path, and the text-editing commit + selection-extend
+  keys.
 - **Save location**: workspace base folder and storage details, plus a **Danger
   zone** with a **Reset to default data** button — wipes every project/scene/edit
   and reseeds the factory mock workspace (same action as the TopBar user menu →

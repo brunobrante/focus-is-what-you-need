@@ -71,6 +71,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.component.openSelection", label: "Open selected component", group: "Canvas", type: "key" },
       { id: "canvas.component.backToParent", label: "Back to parent component", group: "Canvas", type: "key" },
       { id: "canvas.overlay.toggleScreen", label: "Toggle screen overlay", group: "Canvas", type: "key" },
+      { id: "canvas.path.commit", label: "Commit path / enter path edit", group: "Canvas", type: "key" },
     ],
   },
   {
@@ -81,6 +82,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.viewport.zoomReset", label: "Zoom 100%", group: "Zoom", type: "key" },
       { id: "canvas.viewport.zoomToSelection", label: "Zoom to selection", group: "Zoom", type: "key" },
       { id: "canvas.viewport.pan", label: "Temporary pan", group: "Zoom", type: "key" },
+      { id: "canvas.viewport.wheelZoom", label: "Wheel zooms instead of pans", group: "Zoom", type: "modifier" },
     ],
   },
   {
@@ -117,6 +119,13 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.vector.removeAnchor", label: "Remove anchor point", group: "Modifiers", type: "modifier" },
       { id: "canvas.radius.perCorner", label: "Round a single corner", group: "Modifiers", type: "modifier" },
       { id: "canvas.drag.duplicate", label: "Duplicate while dragging", group: "Modifiers", type: "modifier" },
+    ],
+  },
+  {
+    label: "Text editing",
+    commands: [
+      { id: "canvas.text.commit", label: "Commit text edit", group: "Text editing", type: "key" },
+      { id: "canvas.text.extendSelection", label: "Extend text selection", group: "Text editing", type: "modifier" },
     ],
   },
 ];

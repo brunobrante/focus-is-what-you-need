@@ -1,6 +1,9 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ViewportTransform } from "@/canvas/engine/viewport";
+import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
+import { isModifierCommandActive, matchesKeyCommand } from "@/domain/settings/resolve";
+import type { GlobalSettings } from "@/domain/settings/types";
 import { getCaretRect } from "./textEditingLayout";
 import {
   clampTextIndex,
@@ -20,6 +23,7 @@ type TextEditingTextareaProps = {
   onInputValue: (value: string, selectionStart: number, selectionEnd: number) => void;
   onCommit: () => void;
   onCancel: () => void;
+  settings?: GlobalSettings;
 };
 
 export function TextEditingTextarea({
@@ -31,6 +35,7 @@ export function TextEditingTextarea({
   onInputValue,
   onCommit,
   onCancel,
+  settings = DEFAULT_GLOBAL_SETTINGS,
 }: TextEditingTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const latestTextEditRef = useRef<TextEditState | null>(textEdit);
@@ -199,11 +204,11 @@ export function TextEditingTextarea({
         if (!current) return;
         event.stopPropagation();
 
-        if (event.key === "Escape") { event.preventDefault(); onCancel(); return; }
-        if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onCommit(); return; }
+        if (matchesKeyCommand(event, settings, "canvas.selection.cancel")) { event.preventDefault(); onCancel(); return; }
+        if (matchesKeyCommand(event, settings, "canvas.text.commit")) { event.preventDefault(); onCommit(); return; }
         if (composingRef.current) return;
 
-        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+        if (matchesKeyCommand(event, settings, "canvas.selection.selectAll")) {
           event.preventDefault();
           applySelection(event.currentTarget, 0, current.value.length, 0);
           return;
@@ -227,7 +232,7 @@ export function TextEditingTextarea({
         if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
           event.preventDefault();
           const direction = event.key === "ArrowLeft" ? -1 : 1;
-          if (event.shiftKey) {
+          if (isModifierCommandActive(event, settings, "canvas.text.extendSelection")) {
             const anchor = current.anchorIndex;
             const focus = current.selectionStart === current.selectionEnd
               ? current.selectionEnd

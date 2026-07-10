@@ -65,6 +65,8 @@ const keyCommands: Record<CanvasKeyCommandId, KeyBinding[]> = {
   "canvas.tool.image": [{ key: "i" }],
   "canvas.tool.svg": [{ key: "g" }],
   "canvas.tool.actions": [{ key: "k" }],
+  "canvas.path.commit": [{ key: "Enter" }],
+  "canvas.text.commit": [{ key: "Enter" }],
 };
 
 const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
@@ -80,6 +82,11 @@ const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
   "canvas.vector.removeAnchor": "alt",
   "canvas.radius.perCorner": "alt",
   "canvas.drag.duplicate": "alt",
+  // Held while wheeling to zoom instead of pan. WebKit also encodes a trackpad
+  // pinch as a ctrl-wheel, which is read raw at the call site and is not a
+  // policy choice — this binding only covers the deliberate modifier.
+  "canvas.viewport.wheelZoom": "mod",
+  "canvas.text.extendSelection": "shift",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
