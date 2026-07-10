@@ -44,20 +44,23 @@ NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
 NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
-**Remaining (2026-07-10, after the P1 pass):**
-- **Architecture perf (need runtime measurement):** P4's selector-subscription
-  refactor (partially done — see the item), P9 (spatial index — audit says not
-  urgent). P1 landed 2026-07-10 (gesture-scoped projection).
-- **Blocked on the SVG render target:** F3, G13, F2-borders.
+**Remaining (2026-07-10, after the P1/P4/P9 + F2/F3/G13 pass):**
+- **Parity features:** G3 (font management), G9 (full color picker), G10 (rich text).
 - **Deferred (needs new rebindable commands):** L16.
-- **Parity features:** G3 (font management — needs queryLocalFonts/Rust
-  verification), G9 (full color picker), G10 (rich text — its own multi-phase
-  effort).
+- Everything else is closed. The "blocked on the SVG render target" group (F2-borders,
+  F3, G13) turned out not to need it: see each item. Nothing in the audit is blocked
+  on a render-target promotion any more.
+- G3 needs `queryLocalFonts`/Rust verification; G10 (rich text) is its own multi-phase
+  effort.
 - Done in the 2026-07-09 pass: G1 (fully), G4, G5, G6, G8, G11, G12, G14, F4,
-  D3–D7, P2, P6, P4-partial — see the item entries. All typechecked and
+  D3–D7, P2, P6 — see the item entries. All typechecked and
   unit-tested where tests exist, but NOT runtime-verified here; verify
   cross-pane paste, constraints-on-resize, alt-drag duplicate, endpoint
   editing, the gradient overlay, and token binding in-app.
+- Done in the 2026-07-10 pass: P1, P4, P9, F2 (fully), F3, G13. Unit-tested, NOT
+  runtime-verified: check zoom smoothness/re-sharpening, that dragging an unselected
+  element no longer re-renders the inspector, and that a stroked star/polygon draws
+  its border correctly at each alignment (including a bottom-only divider on a rect).
 
 ## Scope and intentional exclusions
 
@@ -1132,13 +1135,28 @@ that closed a G1/G7 doc-code divergence found on the way):
 
 UX.md updated per item; engine changes unit-tested.
 
-## G13 — Per-side borders + stroke center (blocked on SVG render target)
+## ✅ DONE — G13 — Per-side borders + stroke center
 
-Real UIs are full of bottom-only dividers and tab underlines; currently only
-uniform border or a hacked line element. Requires the documented HTML↔SVG
-render-target promotion (`docs/inspector-border-stroke.md`); F2/F3 land with
-the same work. Sequence after the higher items unless the SVG target is
-pulled forward.
+Neither half needed the SVG render-target promotion the item assumed. Stroke center
+landed with F3 (an inset `outline`). **Per-side widths are plain CSS longhands**:
+`borderWidths: [top, right, bottom, left]` on `ElementStyles`, mirroring
+`cornerRadii` — an unset side falls back to the uniform `borderWidth`, so a
+bottom-only divider is `[0, 0, 1, 0]`.
+
+Because only the CSS `border` family has per-side longhands, a per-side border is
+**always drawn Inside**, and the Align control is hidden while per-side is on rather
+than offered and silently ignored. Per-side *colors/styles* are deliberately not
+modeled (Figma's individual strokes are widths only). Clip-path shapes don't offer
+per-side: one outline has no sides.
+
+The one case genuinely left to SVG is pixel-exact corner hand-off when mixed side
+widths meet a corner radius — the browser's choice, documented rather than fixed.
+
+Persistence was the real trap and is covered by tests: `borderWidths` had to be
+added to the `HtmlCanvasStyle` round trip, `borderAlign` widened to include
+`"center"`, and the adapter's `borderWidth > 0 ? style : "none"` rule fixed — a
+bottom-only divider has a *zero* uniform width, so it was dropping its border style
+on reload. UX.md updated.
 
 ## ✅ DONE — G14 — Bind typography/spacing/radius tokens (colors only today)
 
@@ -1165,7 +1183,7 @@ Original note:
 `colorRef`, bind UI in Typography/Layout sections. Without it, "design
 system" only covers colors/gradients on canvas.
 
-## G15 — Explicit "no fill" state
+## ✅ DONE — G15 — Explicit "no fill" state
 
 Figma allows an empty fills list; this app resurrects a phantom fill (M11).
 Covered by M11's fix; listed here because it is also a parity item.

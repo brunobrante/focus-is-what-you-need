@@ -16,6 +16,7 @@ import {
   type MasterResolver,
 } from "@/lib/canvas/htmlScene";
 import { DEFAULT_SHELL_BACKGROUND } from "./actions";
+import { hasPerSideWidths } from "@/domain/canvas/border";
 import { normalizeName } from "@/domain/canvas/normalizeName";
 import type {
   CanvasDocument,
@@ -496,6 +497,7 @@ function stylesFromHtmlNode(node: HtmlCanvasNode): ElementStyles {
     borderColor: style.borderColor,
     borderStyle: style.borderStyle === "none" ? undefined : style.borderStyle,
     borderAlign: style.borderAlign,
+    borderWidths: style.borderWidths,
     textStrokeWidth: style.textStrokeWidth,
     textStrokeColor: style.textStrokeColor,
     textStrokeColorRef: style.textStrokeColorRef,
@@ -562,10 +564,14 @@ function styleFromElement(
     opacity: styles.opacity ?? previousStyle?.opacity ?? 1,
     borderColor: styles.borderColor ?? previousStyle?.borderColor ?? "transparent",
     borderWidth,
-    borderStyle: borderWidth > 0 ? styles.borderStyle ?? "solid" : "none",
+    // A per-side border can have a zero uniform width (a bottom-only divider) and
+    // still paint, so the style must survive the round trip (G13).
+    borderStyle:
+      borderWidth > 0 || hasPerSideWidths(styles) ? styles.borderStyle ?? "solid" : "none",
     // Border/Stroke fields read straight from engine state (no previousStyle
     // fallback) so clearing one persists instead of resurrecting the old value.
     borderAlign: styles.borderAlign,
+    borderWidths: styles.borderWidths,
     textStrokeWidth: styles.textStrokeWidth,
     textStrokeColor: styles.textStrokeColor,
     textStrokeColorRef: styles.textStrokeColorRef,

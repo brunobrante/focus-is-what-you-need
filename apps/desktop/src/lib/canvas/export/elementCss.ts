@@ -41,6 +41,10 @@ function borderStyleFor(node: ElementNode, clipPath: string | undefined, resolve
   const b = compileBorder(node.styles, target, 1, resolveRef);
   return {
     borderWidth: b.borderWidth,
+    borderTopWidth: b.borderTopWidth,
+    borderRightWidth: b.borderRightWidth,
+    borderBottomWidth: b.borderBottomWidth,
+    borderLeftWidth: b.borderLeftWidth,
     borderStyle: b.borderStyle as CSSProperties["borderStyle"],
     borderColor: b.borderColor,
     outlineWidth: b.outlineWidth,

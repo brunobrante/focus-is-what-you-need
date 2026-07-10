@@ -916,8 +916,11 @@ real CSS property behind each name:
   bound — D3), **Style** (**solid / dashed / dotted / double**), and **Align** (**Inside** =
   CSS `border`; **Center** = the same outline pulled inward by half its width, so the stroke
   straddles the edge with no layout shift; **Outside** = CSS `outline` hugging the edge — both
-  keep dashes and follow the corner radius). *Per-side widths and a separate Outline-offset
-  control are deferred.*
+  keep dashes and follow the corner radius). A **sides button** beside Width switches to
+  **per-side widths** (Top / Right / Bottom / Left) — the bottom-only divider, the tab
+  underline. Turning it off restores the uniform width. While per-side is on the **Align**
+  control is hidden: only the CSS `border` family has per-side widths, so a per-side border
+  is always drawn Inside. *A separate Outline-offset control is still deferred.*
 - **Text** → an **Underline** section (on/off switch, then **Style** solid/double/dotted/
   dashed/wavy, **Color**, **Thickness**, **Offset** → the `text-decoration-*` family) and a
   **Text stroke** section (**Width**, **Color** + **Opacity %** (same `#RRGGBBAA` composition
@@ -932,7 +935,8 @@ real CSS property behind each name:
 - **Clip-path shapes** (polygon / star / arrow) use the **Box** Border section above, but the
   border is painted as an SVG stroke tracing the shape's real outline rather than as a CSS
   border (which a clip-path would cut away). All three alignments work; **Style** maps to a
-  dash pattern, and **double** falls back to solid (a single stroke can't draw it).
+  dash pattern, and **double** falls back to solid (a single stroke can't draw it). Per-side
+  widths are not offered: one outline has no sides.
 
 **Inspector → Effects** (shown for every element type): a single unified **Effects** list
 (Figma's model) below Appearance. It starts empty with a one-line hint and an **Add effect**

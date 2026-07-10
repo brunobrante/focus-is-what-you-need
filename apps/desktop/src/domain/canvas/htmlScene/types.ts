@@ -55,8 +55,10 @@ export type HtmlCanvasStyle = {
   blendMode?: BlendMode;
   isolation?: "isolate";
   cornerRadii?: [number, number, number, number];
-  /** Inspector → Border/Stroke panel. Optional + additive; absent on legacy scenes. */
-  borderAlign?: "inside" | "outside";
+  /** Inspector → Border/Stroke panel. Optional + additive; absent on legacy scenes.
+   *  `borderWidths` = per-side widths [top, right, bottom, left]; absent = uniform. */
+  borderAlign?: "inside" | "center" | "outside";
+  borderWidths?: [number, number, number, number];
   // Text stroke + underline (text nodes only). Optional + additive.
   textStrokeWidth?: number;
   textStrokeColor?: string;

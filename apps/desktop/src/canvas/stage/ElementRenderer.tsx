@@ -115,6 +115,10 @@ function borderStyleFor(
   const b = compileBorder(node.styles, target, renderScale, resolveRef);
   return {
     borderWidth: b.borderWidth,
+    borderTopWidth: b.borderTopWidth,
+    borderRightWidth: b.borderRightWidth,
+    borderBottomWidth: b.borderBottomWidth,
+    borderLeftWidth: b.borderLeftWidth,
     borderStyle: b.borderStyle as CSSProperties["borderStyle"],
     borderColor: b.borderColor,
     outlineWidth: b.outlineWidth,

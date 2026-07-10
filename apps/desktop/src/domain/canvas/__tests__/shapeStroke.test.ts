@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { compileBorder, compileShapeStroke } from "@/domain/canvas/border";
+import { compileBorder, compileShapeStroke, hasPerSideWidths } from "@/domain/canvas/border";
 import { shapeClipPath, shapeOutline, shapeOutlinePathData } from "@/domain/canvas/shapeGeometry";
 import { pathIsClosed } from "@/domain/canvas/vector";
 
@@ -128,6 +128,56 @@ test("Center's inset scales with the render scale, like every other px length", 
   const compiled = compileBorder({ borderWidth: 6, borderAlign: "center" }, "box", 2);
   expect(compiled.outlineWidth).toBe(12);
   expect(compiled.outlineOffset).toBe(-6);
+});
+
+// ─── Per-side borders (G13) ──────────────────────────────────────────────────
+
+test("per-side widths compile to border-*-width longhands", () => {
+  const compiled = compileBorder(
+    { borderWidths: [1, 2, 3, 4], borderColor: "#abcdef", borderStyle: "dashed" },
+    "box",
+  );
+  expect(compiled.borderTopWidth).toBe(1);
+  expect(compiled.borderRightWidth).toBe(2);
+  expect(compiled.borderBottomWidth).toBe(3);
+  expect(compiled.borderLeftWidth).toBe(4);
+  expect(compiled.borderColor).toBe("#abcdef");
+  expect(compiled.borderStyle).toBe("dashed");
+  // Never the uniform shorthand — it would override the longhands.
+  expect(compiled.borderWidth).toBeUndefined();
+});
+
+test("a bottom-only divider is a per-side border with a zero uniform width", () => {
+  const compiled = compileBorder({ borderWidth: 0, borderWidths: [0, 0, 1, 0] }, "box");
+  expect(compiled.borderBottomWidth).toBe(1);
+  expect(compiled.borderTopWidth).toBe(0);
+  expect(compiled.borderStyle).toBe("solid");
+});
+
+test("per-side always draws Inside — alignment is ignored, never emitted as an outline", () => {
+  const compiled = compileBorder(
+    { borderWidth: 2, borderWidths: [2, 0, 0, 0], borderAlign: "outside" },
+    "box",
+  );
+  expect(compiled.borderTopWidth).toBe(2);
+  expect(compiled.outlineWidth).toBeUndefined();
+});
+
+test("per-side widths scale with the render scale", () => {
+  const compiled = compileBorder({ borderWidths: [1, 2, 3, 4] }, "box", 3);
+  expect(compiled.borderTopWidth).toBe(3);
+  expect(compiled.borderLeftWidth).toBe(12);
+});
+
+test("hasPerSideWidths distinguishes an all-zero list from no list at all", () => {
+  expect(hasPerSideWidths({ borderWidths: [0, 0, 0, 0] })).toBe(true);
+  expect(hasPerSideWidths({ borderWidth: 4 })).toBe(false);
+  expect(hasPerSideWidths({})).toBe(false);
+});
+
+test("clip-path shapes ignore per-side widths — one outline has no sides", () => {
+  const stroke = compileShapeStroke({ borderWidth: 2, borderWidths: [9, 9, 9, 9] });
+  expect(stroke?.strokeWidth).toBe(4); // 2 × the uniform width, doubled for Inside
 });
 
 // ─── pathIsClosed: which vector paths can carry a stroke alignment (F3) ───────

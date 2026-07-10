@@ -18,6 +18,11 @@ export type CompiledBorder = {
   borderWidth?: number;
   borderStyle?: string;
   borderColor?: string;
+  // ── Box, per-side widths → `border-*-width` longhands (always Inside) ──
+  borderTopWidth?: number;
+  borderRightWidth?: number;
+  borderBottomWidth?: number;
+  borderLeftWidth?: number;
   // ── Box, Outside alignment → `outline` (grows outward, follows radius on
   //    modern WebKit, and — unlike a box-shadow ring — honors dashed/dotted/
   //    double, so it never collides with the Effects box-shadow list). ──
@@ -41,6 +46,16 @@ const DEFAULT_TEXT_STROKE_COLOR = "#000000";
 
 function num(value: number | undefined, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * True when the element authors its border side by side rather than uniformly.
+ *
+ * A side left unset (not a number) inherits the uniform `borderWidth`, so a list of
+ * all-zeros still counts as per-side — that is how you draw a bottom-only divider.
+ */
+export function hasPerSideWidths(styles: ElementStyles): boolean {
+  return Array.isArray(styles.borderWidths) && styles.borderWidths.some((w) => typeof w === "number");
 }
 
 /** The render target for an element type (mirrors ElementRenderer's branches). */
@@ -69,6 +84,25 @@ export function compileBorder(
 
   if (target === "box") {
     const width = num(styles.borderWidth);
+
+    // Per-side widths (G13) — the bottom-only divider, the tab underline. Only the
+    // CSS `border` shorthand family has per-side longhands, so this is always the
+    // Inside mechanism and `borderAlign` does not apply. An unset side falls back to
+    // the uniform width, exactly as an unset corner falls back in `cornerRadii`.
+    if (hasPerSideWidths(styles)) {
+      const sides = styles.borderWidths!;
+      const sideWidth = (index: number) =>
+        px(typeof sides[index] === "number" ? Math.max(0, sides[index]) : width);
+      out.borderTopWidth = sideWidth(0);
+      out.borderRightWidth = sideWidth(1);
+      out.borderBottomWidth = sideWidth(2);
+      out.borderLeftWidth = sideWidth(3);
+      out.borderStyle = styles.borderStyle ?? "solid";
+      out.borderColor =
+        resolveRef?.(styles.borderColorRef) ?? styles.borderColor ?? DEFAULT_BORDER_COLOR;
+      return out;
+    }
+
     if (width > 0) {
       const color = resolveRef?.(styles.borderColorRef) ?? styles.borderColor ?? DEFAULT_BORDER_COLOR;
       const style = styles.borderStyle ?? "solid";

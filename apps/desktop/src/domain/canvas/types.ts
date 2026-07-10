@@ -166,6 +166,12 @@ export type ElementStyles = {
   // stroke instead — see docs/inspector-border-stroke.md.
   borderStyle?: "solid" | "dashed" | "dotted" | "double";
   borderAlign?: "inside" | "center" | "outside";
+  // borderWidths → per-side `border-*-width` longhands [top, right, bottom, left];
+  // absent = the uniform `borderWidth` above applies to every side. Any single side
+  // left unset falls back to the uniform value, mirroring `cornerRadii`. Only the
+  // CSS `border` mechanism has per-side longhands, so a per-side border is always
+  // drawn Inside — `borderAlign` is ignored while it is set (G13).
+  borderWidths?: [number, number, number, number];
   // System Design token bindings ($$ref, e.g. "colors:c-primary"). When set, the
   // renderer resolves the LIVE token value (reflecting the workspace master, or a
   // detached local copy); the matching string field above is the fallback. Kept

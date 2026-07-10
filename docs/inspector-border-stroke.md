@@ -1,12 +1,19 @@
 # Inspector — Border / Stroke (Outline, Underline, text Stroke, shape Stroke)
 
-Status: **v2 shipped** — **Center** alignment on boxes, and clip-path shapes
-(polygon/star/arrow) now carry a real border with all three alignments. Still
-planned/deferred: **per-side** widths/colors, a separate **Outline (offset)** control, exact
-**SVG dashes on rounded corners** / **mixed corners**, **stroke alignment on `path`/`svg`
-vector nodes**, and **endpoint markers** for lines/arrows.
+Status: **v2 shipped** — **Center** alignment on boxes, **per-side widths**, stroke alignment
+on vector paths, and clip-path shapes (polygon/star/arrow) now carry a real border with all
+three alignments. Still planned/deferred: **per-side colors/styles**, a separate **Outline
+(offset)** control, exact **SVG dashes on rounded corners** / **mixed corners**, and
+**endpoint markers** for lines/arrows.
 
 **What shipped (v2):**
+- **Per-side widths** (`borderWidths: [top, right, bottom, left]`, mirroring `cornerRadii`):
+  an unset side falls back to the uniform `borderWidth`. Only the CSS `border` family has
+  per-side longhands, so a per-side border is **always drawn Inside** and the Align control is
+  hidden while it is on — rather than offered and quietly ignored. Per-side **colors/styles**
+  are not modeled (Figma's individual strokes are widths only). Clip-path shapes don't offer
+  per-side at all: one outline has no sides. Rounded corners with mixed side widths still hand
+  off the way the browser chooses; that's the remaining SVG-only case.
 - **Center on a box needs no SVG after all.** The plan below assumed a box-shadow ring, which
   breaks on rounded corners — but an `outline` is painted *outward from the offset edge*, so a
   width-`w` outline at `outline-offset: -w/2` spans −w/2..+w/2 around the box edge: exactly a

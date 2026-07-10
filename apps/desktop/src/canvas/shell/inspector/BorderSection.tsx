@@ -15,6 +15,18 @@ import {
   updateNumber,
 } from "./InsComponents";
 
+const SIDE_LABELS = ["Top", "Right", "Bottom", "Left"] as const;
+
+/** A small icon hinting "individual sides" — a box with one heavy edge. */
+function SidesIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2.5 13h11" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Color + opacity % → one #RRGGBBAA string (docs/inspector-border-stroke.md,
 // D3). Shown only while the stored color is a plain hex literal — a bound
 // token or an exotic CSS literal has no place to carry the alpha.
@@ -57,6 +69,7 @@ export function BorderSection({
   tokens,
   locked,
   strokeAlignAvailable = false,
+  perSideAvailable = false,
   onChange,
 }: {
   styles: ElementStyles;
@@ -65,19 +78,67 @@ export function BorderSection({
   locked: boolean;
   /** Vector only: alignment needs an interior, so it is hidden on open paths (F3). */
   strokeAlignAvailable?: boolean;
+  /** Box only: a clip-path shape strokes one outline, which has no "sides" (G13). */
+  perSideAvailable?: boolean;
   onChange: (patch: Partial<ElementStyles>) => void;
 }) {
   if (target === "box") {
     const width = styles.borderWidth ?? 0;
+    const perSide = Array.isArray(styles.borderWidths);
+    const sideWidth = (index: number) => styles.borderWidths?.[index] ?? width;
+    const setSide = (index: number, value: number) => {
+      const base: [number, number, number, number] = styles.borderWidths ?? [width, width, width, width];
+      const next = [...base] as [number, number, number, number];
+      next[index] = Math.max(0, value);
+      onChange({ borderWidths: next });
+    };
+    const togglePerSide = () =>
+      onChange(
+        perSide
+          ? { borderWidths: undefined }
+          : { borderWidths: [width, width, width, width] },
+      );
+
     return (
-      <InsSection title="Border" defaultOpen={width > 0} disabled={locked}>
+      <InsSection
+        title="Border"
+        defaultOpen={width > 0 || (perSide && (styles.borderWidths ?? []).some((w) => w > 0))}
+        disabled={locked}
+      >
         <InsRow label="Width">
-          <InsInput
-            value={String(width)}
-            onChange={(v) => updateNumber(v, (borderWidth) => onChange({ borderWidth: Math.max(0, borderWidth) }))}
-            suffix="px"
-          />
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <InsInput
+              value={String(width)}
+              onChange={(v) => updateNumber(v, (borderWidth) => onChange({ borderWidth: Math.max(0, borderWidth) }))}
+              suffix="px"
+            />
+            {perSideAvailable ? (
+              <button
+                type="button"
+                title="Set each side individually"
+                onClick={togglePerSide}
+                className={`grid h-[26px] w-[26px] shrink-0 cursor-pointer place-items-center rounded-[7px] border border-transparent bg-transparent transition-colors ${
+                  perSide
+                    ? "bg-[#2C2C2C] text-[#E2E2E2]"
+                    : "text-[#9A9A9A] hover:bg-[#2C2C2C] hover:text-[#E2E2E2]"
+                }`}
+              >
+                <SidesIcon />
+              </button>
+            ) : null}
+          </div>
         </InsRow>
+        {perSide
+          ? SIDE_LABELS.map((label, index) => (
+              <InsRow key={label} label={label}>
+                <InsInput
+                  value={String(sideWidth(index))}
+                  onChange={(v) => updateNumber(v, (w) => setSide(index, w))}
+                  suffix="px"
+                />
+              </InsRow>
+            ))
+          : null}
         <InsRow label="Color">
           <InsColor
             value={styles.borderColor ?? "#CBD5E1"}
@@ -100,17 +161,21 @@ export function BorderSection({
             options={["solid", "dashed", "dotted", "double"]}
           />
         </InsRow>
-        <InsRow label="Align">
-          <InsToggle
-            value={styles.borderAlign ?? "inside"}
-            onChange={(value) => onChange({ borderAlign: value as ElementStyles["borderAlign"] })}
-            options={[
-              { value: "inside", label: "Inside" },
-              { value: "center", label: "Center" },
-              { value: "outside", label: "Outside" },
-            ]}
-          />
-        </InsRow>
+        {/* Only the CSS `border` family has per-side longhands, so a per-side border
+            is always drawn Inside — offering Align there would be a lie (G13). */}
+        {perSide ? null : (
+          <InsRow label="Align">
+            <InsToggle
+              value={styles.borderAlign ?? "inside"}
+              onChange={(value) => onChange({ borderAlign: value as ElementStyles["borderAlign"] })}
+              options={[
+                { value: "inside", label: "Inside" },
+                { value: "center", label: "Center" },
+                { value: "outside", label: "Outside" },
+              ]}
+            />
+          </InsRow>
+        )}
       </InsSection>
     );
   }
