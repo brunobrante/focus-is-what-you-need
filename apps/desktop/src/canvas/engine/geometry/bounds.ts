@@ -257,10 +257,12 @@ function transformElementPointToCanvas(
   return transformed;
 }
 
-export function getElementTransformedCorners(
+export type ElementCorners = readonly [Point, Point, Point, Point];
+
+function computeElementTransformedCorners(
   document: CanvasDocument,
   id: string,
-): [Point, Point, Point, Point] | null {
+): ElementCorners | null {
   const node = document.elements[id];
   if (!node) return null;
 
@@ -274,7 +276,41 @@ export function getElementTransformedCorners(
   ].map((corner) => transformElementPointToCanvas(document, id, corner));
 
   if (corners.some((corner) => !corner)) return null;
-  return corners as [Point, Point, Point, Point];
+  return corners as unknown as ElementCorners;
+}
+
+// A node's corners are a pure function of (document, id) — computing them walks the
+// full ancestor chain, rotating once per level, so one node costs 4 × depth point
+// rotations. A published document is immutable (every mutation shallow- or
+// deep-clones before touching a node), so the result can be memoized for exactly as
+// long as that document is alive, and the WeakMap releases it with the document.
+//
+// This is P9's real fix. The audit called for a spatial index, but the scans it
+// named (marquee, drop-target, hit-test) are already *pruned* tree walks — they
+// never descend into a subtree that can't match — over scenes of ~100 nodes. What
+// actually burned per frame was recomputing those ancestor chains from scratch.
+// A marquee drag never mutates the document, so after the first frame every
+// candidate's corners are a map lookup; the same holds for tooling redraws and
+// hover hit-tests between commits. Revisit an actual index only if scenes reach
+// thousands of nodes.
+const transformedCornersCache = new WeakMap<CanvasDocument, Map<string, ElementCorners | null>>();
+
+/** The element's four canvas-space corners, in local order. Treat as read-only: the
+ *  array is shared between callers for the lifetime of `document`. */
+export function getElementTransformedCorners(
+  document: CanvasDocument,
+  id: string,
+): ElementCorners | null {
+  let perDocument = transformedCornersCache.get(document);
+  if (!perDocument) {
+    perDocument = new Map();
+    transformedCornersCache.set(document, perDocument);
+  }
+  const cached = perDocument.get(id);
+  if (cached !== undefined) return cached;
+  const corners = computeElementTransformedCorners(document, id);
+  perDocument.set(id, corners);
+  return corners;
 }
 
 /**

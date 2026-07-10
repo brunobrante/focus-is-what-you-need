@@ -13,7 +13,7 @@ import type { CanvasDocument, ElementNode, Point, Rect, ViewportMode } from "@/c
 // the shapes intersect iff no candidate axis (the rect's two axes + the polygon's
 // edge normals) separates their projections. Used so the marquee tests an
 // element's *oriented* box, not its rotation-inflated AABB (M6).
-function projectionsOverlap(a: Point[], b: Point[], axisX: number, axisY: number): boolean {
+function projectionsOverlap(a: readonly Point[], b: readonly Point[], axisX: number, axisY: number): boolean {
   let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
   for (const p of a) {
     const d = p.x * axisX + p.y * axisY;
@@ -28,7 +28,7 @@ function projectionsOverlap(a: Point[], b: Point[], axisX: number, axisY: number
   return maxA >= minB && maxB >= minA;
 }
 
-function orientedBoxIntersectsRect(corners: Point[], rect: Rect): boolean {
+function orientedBoxIntersectsRect(corners: readonly Point[], rect: Rect): boolean {
   const rectCorners: Point[] = [
     { x: rect.x, y: rect.y },
     { x: rect.x + rect.width, y: rect.y },

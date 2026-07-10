@@ -751,11 +751,38 @@ Every `InsInput`/`InsTextarea` registers a capture-phase
 capture listeners run on every pointerdown anywhere in the app. Use one
 shared listener with a registry.
 
-## P9 — LOW — No spatial index anywhere
+## ✅ DONE (as a bounds cache, not an index) — P9 — No spatial index anywhere
 
-Snap-candidate build, marquee, drop-target search, `findChildAtPoint` are
-linear scans with per-node ancestor walks. Fine at hundreds of nodes,
-quadratic-ish at Figma-scale scenes. Not urgent; revisit when scenes grow.
+Investigated before building: the four scans the audit names are **already pruned**
+tree walks, not flat linear scans — marquee never descends into a matched subtree
+(`canvasToolingUtils.ts`), `findChildAtPoint`/`findDropTarget` only descend into
+subtrees containing the point, and snap candidates are siblings-only in the common
+case AND already cached per drag (`DragInteraction.snapCandidates`, `types.ts`).
+Real scenes are ~40–100 nodes (per screen/variant, not one giant document).
+
+So a grid/R-tree would have bought nothing and cost real invalidation complexity:
+because `transformElementPointToCanvas` applies every ancestor's rotation, a node's
+AABB changes when any ancestor moves, which an index would have to track.
+
+What *actually* cost per frame was recomputing those ancestor chains — one node's
+corners is 4 × depth point-rotations, and there was no bounds cache anywhere. Fixed
+with a `WeakMap<CanvasDocument, Map<id, corners>>` memo inside
+`getElementTransformedCorners`, which `getElementAABB` and `isPointInElement` both
+route through. Keying on the **document** (not the node) is what makes it correct:
+a published document is immutable — every mutation shallow- or deep-clones before
+touching a node — and a node whose ancestor moved keeps its own object identity, so
+a node-keyed cache would go stale. The WeakMap frees each map with its document.
+
+Where it wins: a marquee drag never mutates the document, so after the first frame
+every candidate is a map lookup; likewise tooling redraws and hover hit-tests
+between commits. During a transient drag each frame is a new document, so it is
+neutral there (one compute per node per frame, as before).
+
+Corners are now typed `readonly` and shared between callers — do not mutate the
+returned array. Unit-tested, including that moving/rotating an ancestor re-derives
+a child's corners on the new document while the old one keeps its old geometry.
+
+Revisit an actual spatial index only if scenes reach thousands of nodes.
 
 ## ✅ DONE — P10 — Draft-mode scrollbars recompute `getSelectionAABB` over all roots on every document change
 
