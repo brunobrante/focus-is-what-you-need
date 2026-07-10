@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MutableRefObject, WheelEvent as ReactWheelEvent } from "react";
 import type { EditorState, Point, Rect } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
@@ -22,6 +22,11 @@ import {
 import { getSelectionAABB } from "@/canvas/engine/geometry/bounds";
 import { getCanvasSize } from "../canvasCoordinates";
 import type { ViewportClientRect } from "../canvasStageTypes";
+
+// Long enough to bridge the gaps between wheel events of one trackpad flick
+// (~16ms apart, but momentum scroll thins out toward the end), short enough that
+// the crisp re-projection feels immediate once the fingers stop.
+const ZOOM_GESTURE_SETTLE_MS = 140;
 
 type Params = {
   state: EditorState;
@@ -226,6 +231,27 @@ export function useViewportControls({
     viewportSubjectKey,
   ]);
 
+  // A wheel/pinch zoom arrives as a stream of events with no end signal, so the
+  // gesture is considered over once no zoom event has landed for a short while.
+  // Consumers use this to keep the cheap CSS-transform projection while the zoom
+  // streams and re-project the scene once, on settle (P1).
+  const [zoomGestureActive, setZoomGestureActive] = useState(false);
+  const zoomSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (zoomSettleTimerRef.current !== null) clearTimeout(zoomSettleTimerRef.current);
+    },
+    [],
+  );
+  const markZoomGesture = () => {
+    setZoomGestureActive(true);
+    if (zoomSettleTimerRef.current !== null) clearTimeout(zoomSettleTimerRef.current);
+    zoomSettleTimerRef.current = setTimeout(() => {
+      zoomSettleTimerRef.current = null;
+      setZoomGestureActive(false);
+    }, ZOOM_GESTURE_SETTLE_MS);
+  };
+
   const onWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     const viewport = viewportRef.current;
     if (!viewport) return;
@@ -235,6 +261,7 @@ export function useViewportControls({
     let nextViewport;
 
     if (event.ctrlKey || event.metaKey) {
+      markZoomGesture();
       const zoomLimits = getViewportZoomLimits(state.viewportMode);
       const nextZoom = clamp(
         state.zoom * Math.exp(-event.deltaY * settings.canvas.viewport.wheelZoomSensitivity),
@@ -285,5 +312,5 @@ export function useViewportControls({
     }
   };
 
-  return { onWheel };
+  return { onWheel, zoomGestureActive };
 }

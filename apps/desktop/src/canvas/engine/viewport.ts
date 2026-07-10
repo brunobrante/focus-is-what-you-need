@@ -344,21 +344,41 @@ export function snapViewportOffset(value: number, pixelRatio = globalThis.device
   return Math.round(value * safeRatio) / safeRatio;
 }
 
+/**
+ * Which projection the stage uses: laying the scene out at `renderScale = zoom`
+ * (scaled DOM — crisp text and borders, but a full restyle + relayout of every
+ * element whenever the zoom changes), or leaving it at 1× under a CSS transform
+ * (cheap — the compositor scales an already-rasterized layer, at the cost of
+ * blurry text while scaled up).
+ *
+ * `zoomGestureActive` is the "blurry while zooming, crisp on settle" trade every
+ * Figma-class editor makes (P1): a wheel/pinch zoom fires dozens of events per
+ * second, and re-projecting the whole scene per event is the dominant cost above
+ * 1× — exactly where users spend their time. So while the gesture streams we keep
+ * the compositor path and re-project once, when it settles.
+ *
+ * The size guard wins over the gesture: past `MAX_SAFE_TRANSFORMED_STAGE_SIDE`
+ * the CSS-transform path hits browser rasterization limits, so a deep zoom stays
+ * on the scaled DOM even mid-gesture.
+ */
 export function shouldUseScaledDomProjection({
   canvasSize,
   displayZoom,
   canvasRotation = 0,
+  zoomGestureActive = false,
 }: {
   canvasSize: Size;
   displayZoom: number;
   canvasRotation?: number;
+  zoomGestureActive?: boolean;
 }): boolean {
   if (canvasRotation !== 0) return false;
-  if (displayZoom >= SCALED_DOM_PROJECTION_MIN_ZOOM) return true;
-  return (
+  const exceedsSafeTransformedSide =
     canvasSize.width * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE ||
-    canvasSize.height * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE
-  );
+    canvasSize.height * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE;
+  if (zoomGestureActive && !exceedsSafeTransformedSide) return false;
+  if (displayZoom >= SCALED_DOM_PROJECTION_MIN_ZOOM) return true;
+  return exceedsSafeTransformedSide;
 }
 
 export function createViewportTransform(input: ViewportTransformInput): ViewportTransform {

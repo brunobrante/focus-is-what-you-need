@@ -352,6 +352,36 @@ test("switches DOM rendering away from giant transformed layers", () => {
   ).toBe(true);
 });
 
+test("keeps the cheap transform projection while a zoom gesture streams", () => {
+  // Mid-gesture: stay on the compositor path across the whole common zoom range
+  // instead of re-laying-out the scene per wheel event (P1).
+  expect(
+    shouldUseScaledDomProjection({
+      canvasSize: { width: 390, height: 844 },
+      displayZoom: 4,
+      zoomGestureActive: true,
+    }),
+  ).toBe(false);
+
+  // ...but the transformed-layer size guard still wins: 844 * 13 > 10_000.
+  expect(
+    shouldUseScaledDomProjection({
+      canvasSize: { width: 390, height: 844 },
+      displayZoom: 13,
+      zoomGestureActive: true,
+    }),
+  ).toBe(true);
+
+  // On settle, the same zoom re-projects at device resolution.
+  expect(
+    shouldUseScaledDomProjection({
+      canvasSize: { width: 390, height: 844 },
+      displayZoom: 4,
+      zoomGestureActive: false,
+    }),
+  ).toBe(true);
+});
+
 test("keeps rotated canvases on the matrix projection path", () => {
   expect(
     shouldUseScaledDomProjection({

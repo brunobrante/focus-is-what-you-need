@@ -44,10 +44,10 @@ NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
 NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
-**Remaining (2026-07-09, after the tractable-items pass):**
-- **Architecture perf (need runtime measurement):** P1 (zoom projection), P4's
-  selector-subscription refactor (partially done — see the item), P9 (spatial
-  index — audit says not urgent).
+**Remaining (2026-07-10, after the P1 pass):**
+- **Architecture perf (need runtime measurement):** P4's selector-subscription
+  refactor (partially done — see the item), P9 (spatial index — audit says not
+  urgent). P1 landed 2026-07-10 (gesture-scoped projection).
 - **Blocked on the SVG render target:** F3, G13, F2-borders.
 - **Deferred (needs new rebindable commands):** L16.
 - **Parity features:** G3 (font management — needs queryLocalFonts/Rust
@@ -580,7 +580,36 @@ the fallback doc independently of panel widths.
 
 Ordered by impact.
 
-## P1 — HIGH — Scaled DOM projection re-styles and re-lays-out the entire scene on every zoom frame across most of the zoom range
+## ✅ DONE — P1 — Scaled DOM projection re-styles and re-lays-out the entire scene on every zoom frame across most of the zoom range
+
+Took fix direction (a): `shouldUseScaledDomProjection` gained a
+`zoomGestureActive` input, and `useViewportControls` now raises that flag on each
+wheel/pinch zoom event, lowering it 140 ms after the last one. While the gesture
+streams, the stage stays on the CSS-transform projection (`renderScale = 1`), so
+the compositor scales an already-rasterized layer and **no** element restyles or
+relayouts; on settle the scene re-projects once at device resolution. Text is
+soft mid-zoom and snaps crisp on release — the Figma behavior, now documented in
+`UX.md`.
+
+The `MAX_SAFE_TRANSFORMED_STAGE_SIDE` guard still wins over the gesture flag: a
+deep zoom whose scaled frame would exceed the browser's safe layer size stays on
+the scaled DOM throughout. Fix direction (b) (rAF-coalescing wheel events) turned
+out to be unnecessary: with `renderScale` pinned during the gesture, every
+`ElementRenderer`/`RenderedScene` memo holds, so a wheel event only restyles the
+single stage div.
+
+Also fixed on the way: `gridCanvasRect` derived its clip region from
+`projectedStageWidth` (= `size × renderScale`), which is the unscaled size
+whenever the CSS-transform projection is active — it now uses `size ×
+displayZoom`, which is what the viewport-space grid overlay always needed. Latent
+before (the grid only draws at ≥4× where the projection was always scaled-DOM);
+a live bug the moment the gesture flips the projection.
+
+Unit-tested (`viewport.test.ts`); NOT runtime-verified here — check that a
+trackpad pinch/wheel zoom over a dense frame stays smooth and re-sharpens on
+release, and that the pixel grid (≥4×) still clips to the frame while zooming.
+
+Original note:
 
 `src/canvas/engine/viewport.ts:347-362` — `shouldUseScaledDomProjection`
 returns true whenever `displayZoom >= SCALED_DOM_PROJECTION_MIN_ZOOM`

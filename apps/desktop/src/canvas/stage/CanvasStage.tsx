@@ -184,7 +184,7 @@ export function CanvasStage({
     ancestorOverlayAvailable: ancestorFrames.length > 0,
   });
 
-  const { onWheel } = useViewportControls({
+  const { onWheel, zoomGestureActive } = useViewportControls({
     state,
     dispatch,
     viewportRef,
@@ -394,8 +394,14 @@ export function CanvasStage({
   const displayZoom = state.zoom * displayScale;
 
   const scaledDomProjection = useMemo(
-    () => shouldUseScaledDomProjection({ canvasSize, displayZoom, canvasRotation: state.document.canvas.rotation ?? 0 }),
-    [canvasSize, displayZoom, state.document.canvas.rotation],
+    () =>
+      shouldUseScaledDomProjection({
+        canvasSize,
+        displayZoom,
+        canvasRotation: state.document.canvas.rotation ?? 0,
+        zoomGestureActive,
+      }),
+    [canvasSize, displayZoom, state.document.canvas.rotation, zoomGestureActive],
   );
   // Discrete scroll indicators that appear only once the subject overflows the
   // viewport (i.e. zoomed past fit). Measured straight off the transformed stage
@@ -438,16 +444,19 @@ export function CanvasStage({
   const stageHeight = canvasSize.height;
   const projectedStageWidth = stageWidth * renderScale;
   const projectedStageHeight = stageHeight * renderScale;
-  // Stable identity so the grid overlay's effect doesn't re-run (and re-alloc its
-  // buffer) on every render from a fresh object literal (P5).
+  // The grid draws in viewport pixels, so its clip region is the canvas's on-screen
+  // box — always `size * displayZoom`, never `projectedStageWidth`, which collapses
+  // to the unscaled size whenever the CSS-transform projection is active (the whole
+  // zoom gesture, P1). Memoized for a stable identity so the overlay's effect doesn't
+  // re-run (and re-alloc its buffer) on every render from a fresh object literal (P5).
   const gridCanvasRect = useMemo(
     () => ({
       x: viewportTransform.offsetX,
       y: viewportTransform.offsetY,
-      width: projectedStageWidth,
-      height: projectedStageHeight,
+      width: stageWidth * displayZoom,
+      height: stageHeight * displayZoom,
     }),
-    [viewportTransform.offsetX, viewportTransform.offsetY, projectedStageWidth, projectedStageHeight],
+    [viewportTransform.offsetX, viewportTransform.offsetY, stageWidth, stageHeight, displayZoom],
   );
   const stageSpaceStyle = useMemo<CSSProperties>(
     () =>
