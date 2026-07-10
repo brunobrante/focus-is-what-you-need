@@ -104,11 +104,12 @@ function ExportEntryRow({
 
 export function ExportSection({
   node,
-  document,
+  getDocument,
   locked = false,
 }: {
   node: ElementNode;
-  document: CanvasDocument;
+  /** The document is only read when the user actually exports (P4). */
+  getDocument: () => CanvasDocument | null;
   locked?: boolean;
 }) {
   const [entries, setEntries] = useState<ExportEntry[]>(() => [newEntry()]);
@@ -126,6 +127,8 @@ export function ExportSection({
   const add = () => setEntries((prev) => [...prev, newEntry()]);
 
   const onExport = async () => {
+    const document = getDocument();
+    if (!document) return;
     setBusy(true);
     setNotice(null);
     try {

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
-import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType, Fill } from "@/canvas/engine/types";
+import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType, Fill, Rect } from "@/canvas/engine/types";
 import { effectTargetForType } from "@/domain/canvas/effects";
 import { borderTargetForType } from "@/domain/canvas/border";
 import { fillTargetForType } from "@/domain/canvas/fillCompile";
@@ -16,7 +16,6 @@ import { EffectsSection } from "./EffectsSection";
 import { TypographySection } from "./TypographySection";
 import { FillSection, type GradientTokenOption } from "./FillSection";
 import { ExportSection } from "./ExportSection";
-import { getAbsoluteRect, getParentSize } from "@/canvas/engine/geometry";
 import { IconLink } from "@/components/icons";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 import type { ColorToken, GradientToken } from "@/domain/system-design/types";
@@ -69,7 +68,12 @@ function MoreDisclosure({ children }: { children: ReactNode }) {
 
 type ElementTabProps = {
   node: ElementNode;
-  document: CanvasDocument;
+  /** The node's canvas-absolute rect, selected upstream (null when unresolvable). */
+  rect: Rect | null;
+  /** The parent's styles, for the Layout section's flow-child controls. */
+  parentStyles: ElementStyles | null;
+  /** Reads the live document at event time; only Export needs it (P4). */
+  getDocument: () => CanvasDocument | null;
   onUpdateName: (name: string) => void;
   onUpdateText: (text: string) => void;
   onUpdateGeometry: (patch: Partial<{ x: number; y: number; width: number; height: number }>) => void;
@@ -105,7 +109,9 @@ type ElementTabProps = {
 
 export function ElementTab({
   node,
-  document,
+  rect,
+  parentStyles,
+  getDocument,
   onUpdateName,
   onUpdateText,
   onUpdateGeometry,
@@ -128,8 +134,6 @@ export function ElementTab({
 }: ElementTabProps) {
   const isVector = node.type === "path" || node.type === "svg";
   const fillOpacity = Math.round((node.styles.fillOpacity ?? 1) * 100);
-  const rect = getAbsoluteRect(document, node.id);
-  const parentSize = getParentSize(document, node.id);
   const resolvedDesign = useResolvedSystemDesign();
   const colorTokens = useMemo<InsColorToken[]>(
     () =>
@@ -365,7 +369,7 @@ export function ElementTab({
       <LayoutSection
         styles={node.styles}
         hasChildren={node.children.length > 0}
-        parentStyles={node.parentId ? document.elements[node.parentId]?.styles ?? null : null}
+        parentStyles={parentStyles}
         isRoot={!node.parentId}
         locked={locked}
         onChange={onUpdateStyle}
@@ -478,7 +482,7 @@ export function ElementTab({
 
       {/* Key by element id so the local export entries/notice state resets on
           selection change instead of leaking to the next element (L19). */}
-      <ExportSection key={node.id} node={node} document={document} locked={locked} />
+      <ExportSection key={node.id} node={node} getDocument={getDocument} locked={locked} />
     </>
   );
 }

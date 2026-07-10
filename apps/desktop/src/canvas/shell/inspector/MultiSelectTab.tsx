@@ -26,17 +26,14 @@ import {
  */
 export function MultiSelectTab({
   nodes,
-  document,
+  getDocument,
   commitDocument,
 }: {
   nodes: ElementNode[];
-  document: CanvasDocument;
+  /** Reads the live document at event time — the panel never subscribes to it (P4). */
+  getDocument: () => CanvasDocument | null;
   commitDocument: (next: CanvasDocument) => void;
 }) {
-  const editable = nodes.filter(
-    (node) => !node.locked && !getInstanceRootId(document, node.id),
-  );
-
   const resolvedDesign = useResolvedSystemDesign();
   const colorTokens = useMemo<InsColorToken[]>(
     () =>
@@ -80,15 +77,23 @@ export function MultiSelectTab({
       ? fillColors[0]
       : null;
 
+  /** Linked instances (and their descendants) and locked nodes are never written. */
+  const editableIn = (document: CanvasDocument) =>
+    nodes.filter((node) => !node.locked && !getInstanceRootId(document, node.id));
+
   const batchGeometry = (patch: Partial<{ x: number; y: number; width: number; height: number }>) => {
+    const document = getDocument();
+    if (!document) return;
     let next = document;
-    for (const node of editable) next = updateElementGeometry(next, node.id, patch);
+    for (const node of editableIn(document)) next = updateElementGeometry(next, node.id, patch);
     if (next !== document) commitDocument(next);
   };
 
   const batchStyles = (patchFor: (node: ElementNode) => Partial<ElementStyles>) => {
+    const document = getDocument();
+    if (!document) return;
     let next = document;
-    for (const node of editable) next = updateElementStyles(next, node.id, patchFor(node));
+    for (const node of editableIn(document)) next = updateElementStyles(next, node.id, patchFor(node));
     if (next !== document) commitDocument(next);
   };
 
@@ -113,10 +118,16 @@ export function MultiSelectTab({
         {/* Align to the selection's shared bounds; distribute needs 3+ (G1). */}
         <InsRow>
           <AlignRow
-            onAlign={(edge) => commitDocument(alignElements(document, ids, edge))}
+            onAlign={(edge) => {
+              const document = getDocument();
+              if (document) commitDocument(alignElements(document, ids, edge));
+            }}
             onDistribute={
               ids.length >= 3
-                ? (axis) => commitDocument(distributeElements(document, ids, axis))
+                ? (axis) => {
+                    const document = getDocument();
+                    if (document) commitDocument(distributeElements(document, ids, axis));
+                  }
                 : undefined
             }
           />

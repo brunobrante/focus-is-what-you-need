@@ -5,7 +5,7 @@ import {
   type CanvasFeatureFlags,
   type CanvasFeatureWindowType,
 } from "@/canvas/canvasUtils";
-import { useEditorBridge, useEditorBridgeReader, type EditorBridgeValue } from "@/canvas/engine/bridge";
+import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
 import type { EditorAction } from "@/canvas/engine/store";
 import {
   alignElements,
@@ -26,9 +26,18 @@ import {
   DEFAULT_SHELL_GRID,
 } from "@/canvas/engine/actions";
 import type { BooleanOp } from "@/canvas/engine/vector/boolean";
-import type { AncestorOverlayItem, AncestorOverlayState, CanvasDocument, CanvasProperties, ElementSizing, ElementStyles } from "@/canvas/engine/types";
+import type {
+  AncestorOverlayItem,
+  AncestorOverlayState,
+  CanvasDocument,
+  CanvasProperties,
+  ElementNode,
+  ElementSizing,
+  ElementStyles,
+  Rect,
+} from "@/canvas/engine/types";
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
-import { getInstanceRootId } from "@/canvas/engine/geometry";
+import { getAbsoluteRect, getInstanceRootId } from "@/canvas/engine/geometry";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
 import { MultiSelectTab } from "./inspector/MultiSelectTab";
 import { CanvasTab } from "./inspector/CanvasTab";
@@ -50,7 +59,6 @@ type InspectorProps = {
   minWidth: number;
   maxWidth: number;
   onResize: (width: number) => void;
-  editor?: EditorBridgeValue | null;
   shellDeviceVisibility: ShellControlVisibility;
   shellBackVisibility: ShellControlVisibility;
   shellZoomVisibility: ShellControlVisibility;
@@ -77,6 +85,20 @@ type InspectorProps = {
 };
 
 const EMPTY_ANCESTOR_OVERLAY: AncestorOverlayState = { enabled: false, items: {} };
+const EMPTY_IDS: string[] = [];
+const EMPTY_NODES: ElementNode[] = [];
+
+// Equality functions for the bridge selectors below (P4). A selector that builds a
+// fresh array/object every call would defeat the bridge's identity cache and
+// re-render on every published frame — these let it bail on unchanged values.
+function sameRefs<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+function sameRect(a: Rect | null, b: Rect | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
 
 type InspectorTab = "element" | "canvas" | "shell" | "layout";
 
@@ -87,7 +109,6 @@ export function Inspector({
   minWidth,
   maxWidth,
   onResize,
-  editor: editorProp,
   isComponent = false,
   inheritParentBackground = false,
   hasParent = false,
@@ -129,13 +150,23 @@ export function Inspector({
     }
   }, [openShellTabSignal]);
 
-  const bridgeDocument = useEditorBridge((v) => v?.state.document ?? null);
+  // P4 — never subscribe to the whole document. A drag publishes a fresh document
+  // ref every frame, so a `v.state.document` selector re-renders this entire panel
+  // at 60 Hz even when the dragged element isn't the selected one. Instead each
+  // slice the body actually renders gets its own selector (with value equality
+  // where the slice is a freshly-built object), and every commit callback reads the
+  // LIVE document at event time through `readDocument()` rather than closing over a
+  // render-time snapshot — which is what made the full subscription load-bearing.
   const bridgeSelectedId = useEditorBridge((v) => v?.state.selectedIds[0] ?? null);
-  const bridgeSelectedCount = useEditorBridge((v) => v?.state.selectedIds.length ?? 0);
+  const bridgeSelectedIds = useEditorBridge((v) => v?.state.selectedIds ?? EMPTY_IDS, sameRefs);
   const bridgeCanvasStageActive = useEditorBridge((v) => v?.state.canvasStageActive ?? false);
   const bridgeActiveGradientEdit = useEditorBridge((v) => v?.state.activeGradientEdit ?? null);
   const bridgeSourceId = useEditorBridge((v) => v?.sourceId ?? null);
   const bridgeAncestorOverlay = useEditorBridge((v) => v?.state.ancestorOverlay ?? null);
+  const bridgeHasDocument = useEditorBridge((v) => v?.state.document != null);
+  const bridgeCanvas = useEditorBridge((v) => v?.state.document.canvas ?? null);
+  const bridgeShellBackground = useEditorBridge((v) => v?.state.document.shellBackground ?? null);
+  const bridgeShellGrid = useEditorBridge((v) => v?.state.document.shellGrid ?? null);
   const getEditorSnapshot = useEditorBridgeReader();
 
   // References window: the Element tab inspects the selected stack node (shared via
@@ -148,31 +179,54 @@ export function Inspector({
       ? findStackNode(referencesBridge.tree, referencesBridge.selectedNodeId)
       : null;
 
-  const document = editorProp !== undefined ? (editorProp?.state.document ?? null) : bridgeDocument;
-  const ancestorOverlay =
-    (editorProp !== undefined ? editorProp?.state.ancestorOverlay : bridgeAncestorOverlay) ?? EMPTY_ANCESTOR_OVERLAY;
-  const selectedId = editorProp !== undefined ? (editorProp?.state.selectedIds[0] ?? null) : bridgeSelectedId;
-  const selectedCount = editorProp !== undefined ? (editorProp?.state.selectedIds.length ?? 0) : bridgeSelectedCount;
-  const canvasStageActive = editorProp !== undefined ? (editorProp?.state.canvasStageActive ?? false) : bridgeCanvasStageActive;
-  const activeGradientEdit =
-    editorProp !== undefined ? (editorProp?.state.activeGradientEdit ?? null) : bridgeActiveGradientEdit;
-  const sourceId = editorProp !== undefined ? editorProp?.sourceId : bridgeSourceId;
-  const sourceLabel = windowKeyLabel(sourceId ?? "current");
-  const node = document && selectedId ? document.elements[selectedId] ?? null : null;
+  const selectedId = bridgeSelectedId;
+  // The selected node and everything the body derives from it. Each is its own
+  // selector so an unrelated element's drag — which changes the document ref but
+  // none of these values — publishes a frame that this panel ignores entirely.
+  // `rect` walks ancestors, so it must be selected from the document: an ancestor
+  // can move without the node's own ref changing.
+  const node = useEditorBridge((v) => (selectedId ? v?.state.document.elements[selectedId] ?? null : null));
+  const rect = useEditorBridge(
+    (v) => (v && selectedId ? getAbsoluteRect(v.state.document, selectedId) : null),
+    sameRect,
+  );
+  const parentStyles = useEditorBridge((v) => {
+    if (!v || !selectedId) return null;
+    const parentId = v.state.document.elements[selectedId]?.parentId;
+    return parentId ? v.state.document.elements[parentId]?.styles ?? null : null;
+  });
   // Linked instances are read-only in the inspector (Versioning.md §2). The fields stay
   // visible but locked; detaching or "go to component" is the only way to edit. This
   // holds for both an instance ROOT and any element INSIDE it (a descendant), in every
   // window — a placed/global linked component reads the same read-only way it does in
   // the Versions window. The root can still be moved/resized/detached as a whole on the
   // canvas (its node is not locked); only its editable *properties* are gated here.
-  const instanceRootId = document ? getInstanceRootId(document, selectedId) : null;
-  const isInstanceDescendant = instanceRootId != null && instanceRootId !== selectedId;
-  const elementLocked = isInstanceDescendant || node?.instanceOf != null;
+  const instanceRootId = useEditorBridge((v) => (v ? getInstanceRootId(v.state.document, selectedId) : null));
   // The master variant to open from the banner link — the root's link (works whether the
   // root itself or one of its descendants is selected).
-  const lockedInstanceVariantId = instanceRootId
-    ? document?.elements[instanceRootId]?.instanceOf?.variantId ?? null
-    : null;
+  const lockedInstanceVariantId = useEditorBridge((v) => {
+    if (!v || !instanceRootId) return null;
+    return v.state.document.elements[instanceRootId]?.instanceOf?.variantId ?? null;
+  });
+  const multiSelectNodes = useEditorBridge((v) => {
+    if (!v || v.state.selectedIds.length < 2) return EMPTY_NODES;
+    return v.state.selectedIds
+      .map((id) => v.state.document.elements[id])
+      .filter((n): n is ElementNode => Boolean(n));
+  }, sameRefs);
+
+  const ancestorOverlay = bridgeAncestorOverlay ?? EMPTY_ANCESTOR_OVERLAY;
+  const selectedCount = bridgeSelectedIds.length;
+  const canvasStageActive = bridgeCanvasStageActive;
+  const activeGradientEdit = bridgeActiveGradientEdit;
+  const hasDocument = bridgeHasDocument;
+  const canvas = bridgeCanvas;
+  const sourceLabel = windowKeyLabel(bridgeSourceId ?? "current");
+  const isInstanceDescendant = instanceRootId != null && instanceRootId !== selectedId;
+  const elementLocked = isInstanceDescendant || node?.instanceOf != null;
+
+  /** The live document, read at event time — never closed over at render (P4). */
+  const readDocument = (): CanvasDocument | null => getEditorSnapshot()?.state.document ?? null;
 
   useEffect(() => {
     if (canvasStageActive) setActiveTab("canvas");
@@ -181,9 +235,9 @@ export function Inspector({
 
   if (!open) return null;
 
-  const commitDocument = (nextDocument: CanvasDocument | null = document, selectedIds?: string[]) => {
+  const commitDocument = (nextDocument: CanvasDocument | null, selectedIds?: string[]) => {
     if (!nextDocument) return;
-    const editor = editorProp ?? getEditorSnapshot();
+    const editor = getEditorSnapshot();
     // While scrubbing a slider / native color input, route every tick through a
     // transient frame (no history entry) and remember the latest frame so the
     // release can commit it as one undo step (H3).
@@ -203,11 +257,17 @@ export function Inspector({
     });
   };
 
+  /** Apply a mutation to the live document and commit the result. */
+  const commitWith = (mutate: (live: CanvasDocument) => CanvasDocument) => {
+    const live = readDocument();
+    if (live) commitDocument(mutate(live));
+  };
+
   // Begin a scrub: snapshot the committed document as the single undo baseline.
   const onScrubStart = () => {
     if (scrubbingRef.current) return;
     scrubbingRef.current = true;
-    scrubBeforeRef.current = (editorProp ?? getEditorSnapshot())?.state.document ?? document ?? null;
+    scrubBeforeRef.current = readDocument();
     scrubLastRef.current = null;
   };
   // End a scrub: commit the last transient frame as one entry, against the baseline.
@@ -219,7 +279,7 @@ export function Inspector({
     scrubBeforeRef.current = null;
     scrubLastRef.current = null;
     if (before && last) {
-      (editorProp ?? getEditorSnapshot())?.dispatch({
+      getEditorSnapshot()?.dispatch({
         type: "commitDocument",
         document: last,
         beforeDocument: before,
@@ -228,7 +288,7 @@ export function Inspector({
   };
 
   const dispatchAncestor = (action: EditorAction) => {
-    (editorProp ?? getEditorSnapshot())?.dispatch(action);
+    getEditorSnapshot()?.dispatch(action);
   };
   const onToggleAncestorOverlay = (enabled: boolean) => {
     dispatchAncestor({ type: "setAncestorOverlayEnabled", enabled });
@@ -247,42 +307,47 @@ export function Inspector({
   };
 
   const commitCanvas = (props: Partial<CanvasProperties>) => {
-    if (!document) return;
-    commitDocument(updateCanvasProperties(document, props));
+    const live = readDocument();
+    if (!live) return;
+    commitDocument(updateCanvasProperties(live, props));
   };
 
   const commitStyle = (styles: Partial<ElementStyles>) => {
-    if (!document || !node) return;
-    commitDocument(updateElementStyles(document, node.id, styles));
+    const live = readDocument();
+    if (!live || !node) return;
+    commitDocument(updateElementStyles(live, node.id, styles));
   };
 
   // The Fill panel can change the style (`fills` / `background`) AND the image
   // `src` together; commit both in ONE document so the second mutation doesn't
   // overwrite the first (both read the same snapshot).
   const commitFill = (styles: Partial<ElementStyles>, src?: string) => {
-    if (!document || !node) return;
-    let next = updateElementStyles(document, node.id, styles);
+    const live = readDocument();
+    if (!live || !node) return;
+    let next = updateElementStyles(live, node.id, styles);
     if (src !== undefined) next = updateElementImageSource(next, node.id, src);
     commitDocument(next);
   };
 
   const commitSizing = (sizing: ElementSizing) => {
-    if (!document || !node) return;
-    commitDocument(setTextElementSizing(document, node.id, sizing));
+    const live = readDocument();
+    if (!live || !node) return;
+    commitDocument(setTextElementSizing(live, node.id, sizing));
   };
 
   const onEditPath = () => {
     if (!node) return;
-    (editorProp ?? getEditorSnapshot())?.dispatch({ type: "enterPathEdit", pathEditId: node.id });
+    getEditorSnapshot()?.dispatch({ type: "enterPathEdit", pathEditId: node.id });
   };
   const onFlattenToPath = () => {
-    if (!document || !node) return;
-    commitDocument(flattenElementToPath(document, node.id), [node.id]);
+    const live = readDocument();
+    if (!live || !node) return;
+    commitDocument(flattenElementToPath(live, node.id), [node.id]);
   };
   const onBooleanOp = (op: BooleanOp) => {
-    if (!document) return;
-    const ids = (editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [];
-    const result = applyBooleanToSelection(document, ids, op);
+    const editor = getEditorSnapshot();
+    if (!editor) return;
+    const result = applyBooleanToSelection(editor.state.document, editor.state.selectedIds, op);
     if (result) commitDocument(result.document, [result.selectedId]);
   };
 
@@ -296,7 +361,7 @@ export function Inspector({
   const headerMeta = isReferencesActive
     ? referenceNode?.component.type ?? sourceLabel
     : canvasStageActive
-      ? `${document?.canvas.width ?? 0}×${document?.canvas.height ?? 0}px`
+      ? `${canvas?.width ?? 0}×${canvas?.height ?? 0}px`
       : node
         ? elementTypeLabel(node.type)
         : sourceLabel;
@@ -361,7 +426,7 @@ export function Inspector({
               onClick={() => {
                 setActiveTab(tab.id);
                 if (tab.id === "element" && canvasStageActive) {
-                  (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active: false });
+                  getEditorSnapshot()?.dispatch({ type: "setCanvasStageActive", active: false });
                 }
               }}
               className="relative cursor-pointer border-0 bg-transparent px-2.5 py-2 text-[12px] font-medium"
@@ -390,21 +455,27 @@ export function Inspector({
           )
         ) : activeTab === "layout" && canvasFeatures && onCanvasFeatureChange ? (
           <LayoutTab canvasFeatures={canvasFeatures} onCanvasFeatureChange={onCanvasFeatureChange} />
-        ) : !document ? (
+        ) : !hasDocument || !canvas ? (
           <EmptyState title="No active canvas" body="Select a canvas window to inspect." />
         ) : activeTab === "canvas" ? (
           <CanvasTab
-            canvas={document.canvas}
+            canvas={canvas}
             active={canvasStageActive}
-            onToggleActive={(active) => (editorProp ?? getEditorSnapshot())?.dispatch({ type: "setCanvasStageActive", active })}
+            onToggleActive={(active) => getEditorSnapshot()?.dispatch({ type: "setCanvasStageActive", active })}
             onUpdate={commitCanvas}
           />
         ) : activeTab === "shell" ? (
           <ShellTab
-            background={document.shellBackground ?? "#000000"}
-            shellGrid={document.shellGrid ?? DEFAULT_SHELL_GRID}
-            onUpdateBackground={(background) => commitDocument(updateShellBackground(document, background))}
-            onUpdateGrid={(grid) => commitDocument(updateShellGrid(document, grid))}
+            background={bridgeShellBackground ?? "#000000"}
+            shellGrid={bridgeShellGrid ?? DEFAULT_SHELL_GRID}
+            onUpdateBackground={(background) => {
+              const live = readDocument();
+              if (live) commitDocument(updateShellBackground(live, background));
+            }}
+            onUpdateGrid={(grid) => {
+              const live = readDocument();
+              if (live) commitDocument(updateShellGrid(live, grid));
+            }}
             deviceVisibility={shellDeviceVisibility}
             backVisibility={shellBackVisibility}
             zoomVisibility={shellZoomVisibility}
@@ -425,10 +496,8 @@ export function Inspector({
         ) : selectedCount > 1 ? (
           <div className="flex flex-col">
             <MultiSelectTab
-              nodes={((editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [])
-                .map((id) => document.elements[id])
-                .filter((n): n is NonNullable<typeof n> => Boolean(n))}
-              document={document}
+              nodes={multiSelectNodes}
+              getDocument={readDocument}
               commitDocument={(next) => commitDocument(next)}
             />
             <div className="flex flex-col gap-2 border-t border-[#2C2C2C] px-3 py-3">
@@ -457,34 +526,37 @@ export function Inspector({
         ) : (
           <ElementTab
             node={node}
-            document={document}
-            onUpdateName={(name) => commitDocument(renameElement(document, node.id, name))}
-            onUpdateText={(text) => commitDocument(updateElementText(document, node.id, text))}
-            onUpdateGeometry={(patch) => commitDocument(updateElementGeometry(document, node.id, patch))}
-            onUpdateRotation={(rotation) => commitDocument(updateElementRotation(document, node.id, rotation))}
+            rect={rect}
+            parentStyles={parentStyles}
+            getDocument={readDocument}
+            onUpdateName={(name) => commitWith((live) => renameElement(live, node.id, name))}
+            onUpdateText={(text) => commitWith((live) => updateElementText(live, node.id, text))}
+            onUpdateGeometry={(patch) => commitWith((live) => updateElementGeometry(live, node.id, patch))}
+            onUpdateRotation={(rotation) => commitWith((live) => updateElementRotation(live, node.id, rotation))}
             onUpdateStyle={commitStyle}
             onUpdateFill={commitFill}
             onScrubStart={onScrubStart}
             onScrubEnd={onScrubEnd}
             onUpdateSizing={commitSizing}
-            onAlign={(edge) => commitDocument(alignElements(document, [node.id], edge))}
+            onAlign={(edge) => commitWith((live) => alignElements(live, [node.id], edge))}
             canvasEditFillIndex={
               activeGradientEdit?.elementId === node.id ? activeGradientEdit.fillIndex : null
             }
             onToggleCanvasEdit={(fillIndex) =>
-              (editorProp ?? getEditorSnapshot())?.dispatch({
+              getEditorSnapshot()?.dispatch({
                 type: "setActiveGradientEdit",
                 target: fillIndex === null ? null : { elementId: node.id, fillIndex },
               })
             }
             onEditPath={onEditPath}
             onFlattenToPath={onFlattenToPath}
-            onToggleLocked={(locked) => commitDocument(setElementLocked(document, node.id, locked))}
+            onToggleLocked={(locked) => commitWith((live) => setElementLocked(live, node.id, locked))}
             onToggleVisible={(visible) => {
-              const ids = (editorProp ?? getEditorSnapshot())?.state.selectedIds ?? [];
+              const editor = getEditorSnapshot();
+              if (!editor) return;
               commitDocument(
-                setElementVisible(document, node.id, visible),
-                visible ? ids : [],
+                setElementVisible(editor.state.document, node.id, visible),
+                visible ? editor.state.selectedIds : [],
               );
             }}
             locked={elementLocked}
@@ -500,7 +572,7 @@ export function Inspector({
       >
         <span>auto-save</span>
         <span className="truncate" style={{ fontFeatureSettings: '"tnum"' }}>
-          {node ? `${node.width}×${node.height} px` : document ? `${document.canvas.width}×${document.canvas.height} px` : "—"}
+          {node ? `${node.width}×${node.height} px` : canvas ? `${canvas.width}×${canvas.height} px` : "—"}
         </span>
       </div>
     </aside>

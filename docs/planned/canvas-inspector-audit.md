@@ -668,17 +668,36 @@ null and every keystroke triggers: full O(N) deep diff
 (`store.tsx:554-582`). Every other hot path passes `changedIds`. **Fix:**
 pass `changedIds: [current.nodeId]`.
 
-## ⏳ PARTIAL — P4 — Whole-inspector re-render on every document change, including 60 Hz transient drags
+## ✅ DONE — P4 — Whole-inspector re-render on every document change, including 60 Hz transient drags
 
-Done so far: `normalizeFills` is memoized on its fill inputs (transient drag
-frames share the node's styles object, so the Fill subtree's array identity
-now survives a whole drag), and P2's rAF coalescing caps the re-render rate
-at the display refresh. Remaining: the selector-based subscription refactor —
-the Inspector's commit callbacks close over the subscribed `document`, so
-narrowing the subscription without moving every callback to event-time
-snapshot reads risks committing from a stale document. Do it with React
-profiler measurements at hand (it's also less urgent now that P6 removed the
-per-commit deep clones).
+Landed in two passes. Earlier: `normalizeFills` memoized on its fill inputs, and
+P2's rAF coalescing capping the re-render rate at the display refresh.
+
+This pass closed the selector-based subscription refactor. The blocker was that
+every commit callback closed over the subscribed `document`, so narrowing the
+subscription would have committed from a stale snapshot. Fixed by inverting the
+dependency: `readDocument()` (over the existing `useEditorBridgeReader`) reads the
+LIVE document at event time, and every callback now builds its mutation from that
+instead of from a render-time value. With no callback depending on it, the
+whole-document subscription could go.
+
+The Inspector now subscribes only to the slices its body renders — the selected
+node, its absolute `rect` (ancestor-walking, so it needs its own selector), its
+parent's styles, the instance-root/locked-variant ids, the multi-select node list,
+and `canvas`/`shellBackground`/`shellGrid` — with value equality (`sameRect`,
+`sameRefs`) where a selector builds a fresh object per call, so the bridge's
+identity cache can bail. Dragging an element that is *not* selected now publishes
+a frame the panel ignores completely.
+
+`ElementTab` takes `rect`/`parentStyles`/`getDocument` instead of the document;
+`MultiSelectTab` and `ExportSection` take `getDocument` (both only ever read it in
+handlers). Two pieces of dead code fell out and were removed: the `editor` prop on
+`Inspector` (an alternate document source no call site ever passed, and the reason
+the callbacks were tangled), and `ElementTab`'s unused `getParentSize` call.
+
+NOT runtime-verified: profile a drag of a non-selected element to confirm the
+panel no longer re-renders, and check that a slider scrub, a multi-select batch
+edit, and an element export still commit against the live document.
 
 Original note:
 
