@@ -452,6 +452,21 @@ export type AnchorEditInteraction = {
   moved: boolean;
 };
 
+// Vector edit / Bend sub-tool: dragging a point on a segment to curve it. The
+// bend is always recomputed from beforeDocument with the cumulative delta.
+export type VectorBendInteraction = {
+  type: "vector-bend";
+  pointerId: number;
+  startPoint: Point;
+  elementId: string;
+  subpathIndex: number;
+  segIndex: number;
+  t: number;
+  beforeDocument: CanvasDocument;
+  lastDocument: CanvasDocument;
+  moved: boolean;
+};
+
 export type MarqueeInteraction = {
   type: "marquee";
   pointerId: number;
@@ -509,6 +524,7 @@ export type Interaction =
   | PenInteraction
   | PencilInteraction
   | AnchorEditInteraction
+  | VectorBendInteraction
   | MarqueeInteraction
   | PanInteraction
   | CanvasResizeInteraction

@@ -221,6 +221,48 @@ export function insertAnchorOnSegment(
   return next;
 }
 
+/**
+ * Bend a segment by dragging a point on it (Figma's Bend tool). The point at
+ * parameter `t` of the segment (anchor `segIndex` → `segIndex+1`) is pulled by
+ * (dx, dy) in path space; the pull is distributed onto the two facing bézier
+ * handles (from.out + to.in) by the same vector, so the curve passes through the
+ * dragged location. A straight segment gains handles and becomes a curve. The
+ * shift is applied against whatever handles the passed-in document already has, so
+ * callers must feed the pre-gesture document with the cumulative (dx, dy) delta.
+ */
+export function bendSegment(
+  doc: CanvasDocument,
+  id: string,
+  subpathIndex: number,
+  segIndex: number,
+  t: number,
+  dx: number,
+  dy: number,
+): CanvasDocument {
+  if (!getPathNode(doc, id)) return doc;
+  const next = cloneDocument(doc);
+  const sub = next.elements[id].path?.subpaths[subpathIndex];
+  if (!sub) return doc;
+  const from = sub.anchors[segIndex];
+  const to = sub.anchors[(segIndex + 1) % sub.anchors.length];
+  if (!from || !to) return doc;
+
+  // Bézier weights of the two interior control points at t: P1 = 3(1-t)²t,
+  // P2 = 3(1-t)t². Moving both by the same Δ shifts B(t) by (P1+P2)·Δ, so
+  // Δ = delta / (P1+P2) makes the curve pass exactly through the cursor.
+  const mt = 1 - t;
+  const denom = 3 * mt * mt * t + 3 * mt * t * t;
+  if (denom < 1e-6) return doc; // dragging at the very endpoints — nothing to bend
+  const shiftX = dx / denom;
+  const shiftY = dy / denom;
+
+  from.outX = (from.outX ?? 0) + shiftX;
+  from.outY = (from.outY ?? 0) + shiftY;
+  to.inX = (to.inX ?? 0) + shiftX;
+  to.inY = (to.inY ?? 0) + shiftY;
+  return next;
+}
+
 /** Remove an anchor; drops the subpath if it falls below 1 anchor. */
 export function deleteAnchor(
   doc: CanvasDocument,

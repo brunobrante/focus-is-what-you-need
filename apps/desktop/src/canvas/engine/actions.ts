@@ -11,6 +11,7 @@ export {
   appendAnchor,
   updateAnchor,
   updateHandle,
+  bendSegment,
   insertAnchorOnSegment,
   deleteAnchor,
   closeSubpath,

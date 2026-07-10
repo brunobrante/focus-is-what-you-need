@@ -21,7 +21,8 @@ import type { ToolingHit } from "../canvasHitTesting";
 import { PEN_CURSOR, PEN_REMOVE_CURSOR } from "../penCursors";
 import {
   anchorEditMove,
-  anchorEditPointerDown,
+  bendMove,
+  finishBend,
   finishAnchorEdit,
   finishPen,
   finishPencil,
@@ -30,6 +31,7 @@ import {
   pencilPointerDown,
   penPointerDown,
   penPointerMove,
+  vectorEditPointerDown,
   type VectorPointerCtx,
 } from "../canvasVectorInteraction";
 import { clearNativeTextSelection } from "../canvasStageHelpers";
@@ -399,7 +401,7 @@ export function useCanvasPointerEvents({
           hit.type === "path-empty"
         ) {
           const pePoint = getCanvasPoint(event) ?? { x: 0, y: 0 };
-          if (anchorEditPointerDown(vectorCtx(viewport), event, pePoint, hit)) return;
+          if (vectorEditPointerDown(vectorCtx(viewport), event, pePoint, hit)) return;
         }
       }
       const ctx: InteractionBeginCtx = { state, draftMode, viewport, interactionRef, setInteractionActive, getCurrentViewportSize };
@@ -560,6 +562,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "pen") { penPointerMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "pencil") { pencilMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "anchor-edit") { anchorEditMove(interaction, point, dispatch, latestDocumentRef); return; }
+    if (interaction.type === "vector-bend") { bendMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
     if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
 
@@ -682,6 +685,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "pen") { finishPen(interaction, dispatch); return; }
     if (interaction.type === "pencil") { finishPencil(interaction, dispatch); return; }
     if (interaction.type === "anchor-edit") { finishAnchorEdit(interaction, dispatch); return; }
+    if (interaction.type === "vector-bend") { finishBend(interaction, dispatch); return; }
 
     const wasCommandMode = commandModeRef.current;
     const capturedDropTarget = dropTargetRef.current;

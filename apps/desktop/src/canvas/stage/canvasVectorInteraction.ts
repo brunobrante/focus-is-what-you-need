@@ -8,6 +8,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import { roundPixel } from "@/canvas/engine/geometry";
 import {
   appendAnchor,
+  bendSegment,
   closeSubpath,
   createId,
   deleteAnchor,
@@ -31,6 +32,7 @@ import type {
   PenInteraction,
   Point,
   VectorAnchor,
+  VectorBendInteraction,
 } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
@@ -250,6 +252,29 @@ function updateSubpathAnchors(doc: CanvasDocument, id: string, anchors: VectorAn
 
 // ─── Path edit mode ─────────────────────────────────────────────────────────────
 
+/**
+ * Entry point for a pointer-down while a path is in edit mode. Routes to the
+ * active vector sub-tool (EditorState.vectorTool). "move" is the classic
+ * anchor/handle editing; the others add Figma-style tools. Sub-tools fall back to
+ * anchor-edit when the gesture doesn't match their affordance (e.g. Bend on an
+ * anchor still lets you drag that anchor).
+ */
+export function vectorEditPointerDown(
+  ctx: VectorPointerCtx,
+  event: ReactPointerEvent,
+  point: Point,
+  hit: ToolingHit,
+): boolean {
+  switch (ctx.state.vectorTool) {
+    case "bend":
+      if (bendPointerDown(ctx, event, point, hit)) return true;
+      return anchorEditPointerDown(ctx, event, point, hit);
+    case "move":
+    default:
+      return anchorEditPointerDown(ctx, event, point, hit);
+  }
+}
+
 /** Pointer down while a path is in edit mode (select tool). Returns true if consumed. */
 export function anchorEditPointerDown(
   ctx: VectorPointerCtx,
@@ -371,6 +396,71 @@ export function anchorEditMove(
 }
 
 export function finishAnchorEdit(interaction: AnchorEditInteraction, dispatch: Dispatch): void {
+  if (!interaction.moved) return;
+  const next = recomputePathBounds(interaction.lastDocument, interaction.elementId);
+  dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [interaction.elementId] });
+  dispatch({ type: "enterPathEdit", pathEditId: interaction.elementId });
+}
+
+// ─── Bend sub-tool ────────────────────────────────────────────────────────────
+
+/** Pointer down for the Bend tool: grabs a point on a segment. Returns true if consumed. */
+function bendPointerDown(
+  ctx: VectorPointerCtx,
+  event: ReactPointerEvent,
+  point: Point,
+  hit: ToolingHit,
+): boolean {
+  const { state, interactionRef, setInteractionActive, viewport } = ctx;
+  const id = state.pathEditId;
+  if (!id || !state.document.elements[id]) return false;
+  if (hit.type !== "path-segment") return false;
+  const interaction: VectorBendInteraction = {
+    type: "vector-bend",
+    pointerId: event.pointerId,
+    startPoint: point,
+    elementId: id,
+    subpathIndex: hit.subpathIndex,
+    segIndex: hit.segIndex,
+    t: hit.t,
+    beforeDocument: state.document,
+    lastDocument: state.document,
+    moved: false,
+  };
+  interactionRef.current = interaction;
+  setInteractionActive(true);
+  viewport.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  return true;
+}
+
+export function bendMove(
+  interaction: VectorBendInteraction,
+  point: Point,
+  dispatch: Dispatch,
+  latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+): void {
+  const node0 = interaction.beforeDocument.elements[interaction.elementId];
+  if (!node0) return;
+  const dx = point.x - interaction.startPoint.x;
+  const dy = point.y - interaction.startPoint.y;
+  if (Math.hypot(dx, dy) > MOVE_THRESHOLD) interaction.moved = true;
+  const rel = canvasDeltaToPathSpace(interaction.beforeDocument, node0, dx, dy);
+  const next = bendSegment(
+    interaction.beforeDocument,
+    interaction.elementId,
+    interaction.subpathIndex,
+    interaction.segIndex,
+    interaction.t,
+    rel.x,
+    rel.y,
+  );
+  interaction.lastDocument = next;
+  latestDocumentRef.current = next;
+  dispatch({ type: "setDocumentTransient", document: next, changedIds: [interaction.elementId] });
+}
+
+export function finishBend(interaction: VectorBendInteraction, dispatch: Dispatch): void {
   if (!interaction.moved) return;
   const next = recomputePathBounds(interaction.lastDocument, interaction.elementId);
   dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [interaction.elementId] });

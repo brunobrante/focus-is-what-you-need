@@ -177,6 +177,15 @@ export function useKeyboardShortcuts({
 
       if (matchesKeyCommand(event, settings, "canvas.selection.cancel")) {
         const interaction = interactionRef.current;
+        // Cancel an in-flight vector sub-tool gesture (bend) → revert, stay in edit mode.
+        if (interaction?.type === "vector-bend") {
+          const viewport = viewportRef.current;
+          if (viewport?.hasPointerCapture(interaction.pointerId)) viewport.releasePointerCapture(interaction.pointerId);
+          interactionRef.current = null;
+          setInteractionActive(false);
+          dispatch({ type: "setDocumentTransient", document: interaction.beforeDocument });
+          return;
+        }
         // Cancel an in-flight pen anchor-drag → revert to before the anchor placement.
         if (interaction?.type === "pen" || interaction?.type === "anchor-edit") {
           const viewport = viewportRef.current;
