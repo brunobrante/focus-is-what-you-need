@@ -475,6 +475,74 @@ export function InsSelect({
   );
 }
 
+export type InsSelectOption = { label: string; value: string };
+
+export type InsSelectGroup = {
+  label: string;
+  options: readonly InsSelectOption[];
+};
+
+/** `InsSelect` for options whose stored value differs from their label. */
+export function InsLabeledSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: readonly InsSelectOption[];
+}) {
+  return (
+    <div className={`${fieldClass} relative pr-6`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full min-w-0 flex-1 cursor-pointer appearance-none border-0 bg-transparent text-[12px] text-[#EDEDED] outline-none"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-[#1E1E1E]">{o.label}</option>
+        ))}
+      </select>
+      <IconChevronDown size={9} strokeWidth={2} className="pointer-events-none absolute right-2.5 text-[#7C7C7C]" />
+    </div>
+  );
+}
+
+/**
+ * `InsSelect` for lists whose label differs from its value and that read better
+ * grouped — the font picker's Standard/Installed split (G3). A native `<select>`
+ * keeps the inspector's one dropdown idiom, and type-to-search comes for free,
+ * which matters once a machine's few hundred families are in the list.
+ */
+export function InsGroupedSelect({
+  value,
+  onChange,
+  groups,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  groups: readonly InsSelectGroup[];
+}) {
+  return (
+    <div className={`${fieldClass} relative pr-6`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full min-w-0 flex-1 cursor-pointer appearance-none border-0 bg-transparent text-[12px] text-[#EDEDED] outline-none"
+      >
+        {groups.map((group) => (
+          <optgroup key={group.label} label={group.label} className="bg-[#1E1E1E]">
+            {group.options.map((o) => (
+              <option key={o.value} value={o.value} className="bg-[#1E1E1E]">{o.label}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <IconChevronDown size={9} strokeWidth={2} className="pointer-events-none absolute right-2.5 text-[#7C7C7C]" />
+    </div>
+  );
+}
+
 export function InsToggle({
   value,
   onChange,

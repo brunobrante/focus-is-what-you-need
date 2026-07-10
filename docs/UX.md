@@ -992,9 +992,8 @@ everything proportionally).
 section): a **Style token** select at the top (binds the element to a System Design
 **typography token** — G14: binding writes the token's family/weight/size as concrete
 fallbacks plus a live `typeStyleRef`; the render follows the master token, and any manual
-Font/Size/Weight edit unbinds), then **Font** (family, free text, placeholder
-"System Sans-Serif"), **Size** (px),
-**Weight** (a continuous 1–1000 number that drives a variable font's `wght` axis), **Style**
+Font/Size/Weight edit unbinds), then **Font** (a real font picker — see below), **Size** (px),
+**Weight** (a select listing only the weights the chosen family ships, named Thin…Black), **Style**
 (Normal / Italic), **Color** (an `InsColor` that can bind to a System Design color token like
 Fill), **Line** (Auto / Custom — Auto is `line-height: normal`, Custom reveals a unitless
 multiplier field), **Spacing** (letter-spacing in **%**, compiled to `em` so it survives a
@@ -1005,6 +1004,25 @@ Capitalize → `text-transform`), **Strike** (a switch — strikethrough; **unde
 the Border panel and the two decorations coexist), and **Tight box** (a switch — `text-box-trim`
 for cap/baseline-tight bounds matching the design tool; opt-in, Safari 18.2+, silently no-ops
 on older WebKit). The CSS conversions are handled in `compileTypography`.
+
+**The font picker (G3)** is shared by the Typography section and the canvas context toolbar's
+**Text style** popover, so both surfaces always offer the same families. It is a grouped
+dropdown (type-to-search comes from the native `<select>`):
+
+- **Standard** — the five stacks that ship with the app: Inter, Geist, System, Serif, Mono.
+- **Installed** — every font family installed on the machine, sorted by name. Enumerated once
+  per app run from the native side (`list_system_fonts`), because WKWebView has no
+  `queryLocalFonts`; the web build tries `queryLocalFonts` and silently keeps only the
+  Standard group when the permission is denied. Until the list arrives (a moment after the
+  panel first opens) only **Standard** is shown.
+- **Current** — a first group that appears only when the element's stored font matches no
+  entry (a font that was uninstalled, or an old hand-typed value), so switching families is
+  never a silent data loss.
+
+Picking a family **snaps the weight** to the closest one that family actually ships (choosing a
+Regular-only face from a Bold selection lands on Regular), and the chosen face is fetched
+before the next measurement so auto-fit text boxes and the editing caret never size against a
+fallback font.
 
 **Inspector → Export** (shown for every element type, collapsed by default — the **last**
 element section): per-element export of the selected node to image / vector / code, distinct

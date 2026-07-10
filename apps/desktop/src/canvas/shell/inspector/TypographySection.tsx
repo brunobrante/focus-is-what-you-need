@@ -4,9 +4,20 @@ import { tokenRef } from "@/domain/system-design/resolveTokenRef";
 import type { TypeStyleToken } from "@/domain/system-design/types";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
 import {
+  DEFAULT_FONT_STACK,
+  fontFamilyGroups,
+  nearestWeight,
+  weightLabel,
+  weightsForStack,
+} from "@/domain/canvas/fonts";
+import { loadFontFace } from "@/lib/fonts/fontFaces";
+import { useFontFamilies } from "@/lib/fonts/fontRegistry";
+import {
   clamp,
+  InsGroupedSelect,
   type InsColorToken,
   InsInput,
+  InsLabeledSelect,
   InsRow,
   InsSection,
   InsSelect,
@@ -72,6 +83,30 @@ export function TypographySection({
 }) {
   const lineHeightAuto = styles.lineHeight === undefined;
   const caseValue = styles.textTransform ?? "none";
+
+  // Font picker (G3): bundled + generic stacks, plus whatever is installed.
+  const fontFamilies = useFontFamilies();
+  const fontStack = styles.fontFamily || DEFAULT_FONT_STACK;
+  const fontWeight = resolveFontWeight(styles.fontWeight);
+  const familyGroups = useMemo(
+    () => fontFamilyGroups(fontFamilies, fontStack),
+    [fontFamilies, fontStack],
+  );
+  // Only the weights the chosen family ships; a stored weight the family does
+  // not have (a stale value, an unknown stack) stays listed so it can be read.
+  const weightOptions = useMemo(() => {
+    const available = weightsForStack(fontFamilies, fontStack);
+    const weights = available.includes(fontWeight) ? available : [...available, fontWeight].sort((a, b) => a - b);
+    return weights.map((weight) => ({ label: weightLabel(weight), value: String(weight) }));
+  }, [fontFamilies, fontStack, fontWeight]);
+
+  // Picking a family that lacks the current weight snaps to its closest one,
+  // and the face is fetched so the next text-fit measures against real metrics.
+  const applyFontFamily = (stack: string) => {
+    const weight = nearestWeight(weightsForStack(fontFamilies, stack), fontWeight);
+    void loadFontFace(stack, weight);
+    onChange({ fontFamily: stack, fontWeight: String(weight), typeStyleRef: undefined });
+  };
   // Type-style token binding (G14): bind writes typeStyleRef + the token's
   // family/weight/size as concrete fallbacks; any manual font edit clears it.
   const resolvedDesign = useResolvedSystemDesign();
@@ -108,11 +143,7 @@ export function TypographySection({
       ) : null}
 
       <InsRow label="Font">
-        <InsInput
-          value={styles.fontFamily ?? ""}
-          onChange={(fontFamily) => onChange({ fontFamily: fontFamily.trim() || undefined, typeStyleRef: undefined })}
-          placeholder="System Sans-Serif"
-        />
+        <InsGroupedSelect value={fontStack} onChange={applyFontFamily} groups={familyGroups} />
       </InsRow>
 
       <InsRow label="Size">
@@ -123,11 +154,15 @@ export function TypographySection({
         />
       </InsRow>
 
-      {/* Continuous weight (drives the `wght` axis on variable fonts). */}
+      {/* Only the weights the family ships (variable faces expose all nine). */}
       <InsRow label="Weight">
-        <InsInput
-          value={String(resolveFontWeight(styles.fontWeight))}
-          onChange={(v) => updateNumber(v, (w) => onChange({ fontWeight: String(clamp(Math.round(w), 1, 1000)), typeStyleRef: undefined }))}
+        <InsLabeledSelect
+          value={String(fontWeight)}
+          onChange={(weight) => {
+            void loadFontFace(fontStack, Number(weight));
+            onChange({ fontWeight: weight, typeStyleRef: undefined });
+          }}
+          options={weightOptions}
         />
       </InsRow>
 

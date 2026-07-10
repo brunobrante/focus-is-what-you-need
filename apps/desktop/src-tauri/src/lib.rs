@@ -10,6 +10,7 @@ use tauri::Manager;
 
 mod db;
 mod eyedropper;
+mod fonts;
 mod models;
 
 const APP_FOLDER_NAME: &str = "focus-is-what-you-need";
@@ -1208,6 +1209,7 @@ pub fn run() {
             models::run_lama,
             models::extract_colors,
             eyedropper::pick_screen_color,
+            fonts::list_system_fonts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

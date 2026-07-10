@@ -11,6 +11,9 @@ import {
   updateElementStyles,
 } from "@/canvas/engine/actions";
 import { IconUnlink } from "@/components/icons";
+import { DEFAULT_FONT_STACK, fontFamilyGroups, nearestWeight, weightsForStack } from "@/domain/canvas/fonts";
+import { loadFontFace } from "@/lib/fonts/fontFaces";
+import { useFontFamilies } from "@/lib/fonts/fontRegistry";
 import { LINKED_INSTANCE_COLOR } from "@/lib/ui/linkedColor";
 import { useDismissable } from "@/lib/hooks/useDismissable";
 import type { CanvasDocument, ElementNode, ElementStyles, Rect } from "@/canvas/engine/types";
@@ -57,16 +60,6 @@ type ContextTool = {
 type ToolbarPanel = "text-style" | "layout" | null;
 
 const FONT_SIZE_OPTIONS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 96];
-
-const DEFAULT_FONT_FAMILY = "Inter, system-ui, sans-serif";
-
-const FONT_FAMILY_OPTIONS = [
-  { label: "Inter", value: DEFAULT_FONT_FAMILY },
-  { label: "Geist", value: "'Geist Variable', system-ui, sans-serif" },
-  { label: "System", value: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
-  { label: "Serif", value: "Georgia, 'Times New Roman', serif" },
-  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-];
 
 const JUSTIFY_CONTENT_OPTIONS = [
   { label: "Start", value: "flex-start" },
@@ -165,15 +158,14 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
     ),
     [selectedFontSize],
   );
+  // Same catalog the inspector's font picker reads (G3): bundled + generic
+  // stacks, plus the machine's installed families once they are enumerated.
+  const fontFamilies = useFontFamilies();
   const selectedFontFamily =
-    selectedNode?.type === "text" ? selectedNode.styles.fontFamily ?? DEFAULT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
-  const fontFamilySelectOptions = useMemo(
-    () => (
-      FONT_FAMILY_OPTIONS.some((font) => font.value === selectedFontFamily)
-        ? FONT_FAMILY_OPTIONS
-        : [{ label: "Current", value: selectedFontFamily }, ...FONT_FAMILY_OPTIONS]
-    ),
-    [selectedFontFamily],
+    selectedNode?.type === "text" ? selectedNode.styles.fontFamily || DEFAULT_FONT_STACK : DEFAULT_FONT_STACK;
+  const fontFamilyGroupOptions = useMemo(
+    () => fontFamilyGroups(fontFamilies, selectedFontFamily),
+    [fontFamilies, selectedFontFamily],
   );
   const isRenamingSelection = renamingElementId !== null && renamingElementId === selectedId;
   const toolbarActive = props.contextToolbarModifierDown || openPanel !== null || isRenamingSelection;
@@ -351,7 +343,15 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
 
   const applyTextFontFamily = (fontFamily: string) => {
     if (!selectedId || selectedNode?.type !== "text") return;
-    commitSelectedDocument(updateElementStyles(doc, selectedId, { fontFamily }));
+    // Snap to the nearest weight the new family ships, and fetch that face so
+    // the text-fit pass measures against real metrics rather than the fallback.
+    const current = Number(selectedNode.styles.fontWeight ?? 400);
+    const fontWeight = nearestWeight(
+      weightsForStack(fontFamilies, fontFamily),
+      Number.isFinite(current) ? current : 400,
+    );
+    void loadFontFace(fontFamily, fontWeight);
+    commitSelectedDocument(updateElementStyles(doc, selectedId, { fontFamily, fontWeight: String(fontWeight) }));
     setOpenPanel(null);
   };
 
@@ -545,10 +545,14 @@ function ContextToolbarImpl(props: ContextToolbarProps) {
                       applyTextFontFamily(event.currentTarget.value);
                     }}
                   >
-                    {fontFamilySelectOptions.map((font) => (
-                      <option key={font.value} value={font.value}>
-                        {font.label}
-                      </option>
+                    {fontFamilyGroupOptions.map((group) => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.options.map((font) => (
+                          <option key={font.value} value={font.value}>
+                            {font.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>

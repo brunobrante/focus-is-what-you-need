@@ -43,13 +43,15 @@ NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
 NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
-**Remaining (2026-07-10, after the P1/P4/P9 + F2/F3/G13 pass):**
-- **Parity features:** G3 (font management), G10 (rich text).
+**Remaining (2026-07-10, after the G3 pass):**
+- **Parity features:** G10 (rich text) — its own multi-phase effort.
 - Everything else is closed. The "blocked on the SVG render target" group (F2-borders,
   F3, G13) turned out not to need it: see each item. Nothing in the audit is blocked
   on a render-target promotion any more.
-- G3 needs `queryLocalFonts`/Rust verification; G10 (rich text) is its own multi-phase
-  effort.
+- G3 is done: `queryLocalFonts` is absent from WKWebView, so font enumeration is a
+  native `list_system_fonts` command. NOT runtime-verified here — check that the
+  Installed group fills in, that picking a family snaps the weight, and that an
+  auto-width text box re-fits correctly right after a font change.
 - Done in the 2026-07-09 pass: G1 (fully), G4, G5, G6, G8, G11, G12, G14, F4,
   D3–D7, P2, P6 — see the item entries. All typechecked and
   unit-tested where tests exist, but NOT runtime-verified here; verify
@@ -955,7 +957,28 @@ settings-backed), moving `selectedIds` with the existing `constrainElement`
 clamp, coalescing repeats into one undo entry (hold-to-repeat should not
 flood history — same coalescing need as H3).
 
-## G3 — Real font management (MISSING)
+## ✅ DONE — G3 — Real font management (MISSING)
+
+Verified: `queryLocalFonts` does **not** exist in WKWebView, so enumeration went
+native — `src-tauri/src/fonts.rs#list_system_fonts` walks AppKit's
+`NSFontManager` (main-thread-dispatched like `eyedropper`, cached per process,
+Apple's 0–15 weight scale mapped to CSS steps). No new crate: `objc2-app-kit`
+already enables `NSFontManager` by default. Non-macOS returns an empty list; the
+web build tries `queryLocalFonts` and degrades silently.
+
+New pure catalog `src/domain/canvas/fonts.ts` (Standard = the 5 stacks the
+toolbar already shipped, Installed = enumerated families, plus a "Current" group
+for a stored stack the catalog doesn't know) feeding a shared registry
+(`src/lib/fonts/fontRegistry.ts`, `useFontFamilies`). `ElementStyles.fontFamily`
+keeps storing a CSS **stack**, keyed on its first family — no scene migration.
+Inspector font row and ContextToolbar's popover now read the same catalog;
+weight became a select of the family's real weights (Thin…Black) and picking a
+family snaps the weight to the nearest one it ships. Faces are warmed via
+`document.fonts` (`src/lib/fonts/fontFaces.ts`) when a font surface mounts and on
+apply, so text-fit and the M8 caret layout measure real metrics. UX.md updated;
+unit-tested (`src/domain/canvas/__tests__/fonts.test.ts`).
+
+Original note:
 
 `TypographySection.tsx` font family is a **free-text input**; ContextToolbar
 has 5 hardcoded stacks; weight is a raw 1–1000 number input. Ship a font
