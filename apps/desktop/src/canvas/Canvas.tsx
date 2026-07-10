@@ -839,7 +839,7 @@ function CanvasPageContent() {
         </Link>
       )}
       <span className="h-3.5 w-px shrink-0 bg-[var(--border)]" />
-      <span className="min-w-0 flex-1 truncate font-medium text-[var(--text)]">
+      <span className="min-w-0 truncate font-medium text-[var(--text)]">
         {componentName || screenTitle || iconName || projectName}
       </span>
       {projectType && (
@@ -847,6 +847,7 @@ function CanvasPageContent() {
           {projectType}
         </span>
       )}
+      <span className="flex-1" />
       <span className="h-3.5 w-px shrink-0 bg-[var(--border)]" />
       <SearchToggle onClick={openSearch} />
     </>

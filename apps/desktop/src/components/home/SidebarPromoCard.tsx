@@ -17,48 +17,52 @@ const DOCS_URL = "#";
 /**
  * SidebarPromoCard — the announcement card pinned to the bottom of the Home
  * sidebar. It is dismissable for the session only: there is no persisted flag,
- * so it returns on the next launch. Its footer carries the two low-weight links
- * (What's new, Feedback) that have no place in the nav proper.
+ * so it returns on the next launch. The footer carries the two low-weight links
+ * (What's new, Feedback) that have no place in the nav proper; they persist even
+ * after the card is dismissed.
  *
  * The caller owns the `mt-auto` that pins this to the bottom, so the slot keeps
  * its position once the card is dismissed.
  */
 export function SidebarPromoCard() {
   const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
 
   return (
     <div className="pt-6">
-      <div className="overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface-2)]">
-        <PromoIllustration onDismiss={() => setDismissed(true)} />
+      {!dismissed && (
+        <div className="overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface-2)]">
+          <PromoIllustration onDismiss={() => setDismissed(true)} />
 
-        <div className="px-3.5 pb-3.5 pt-3">
-          <p className="text-[13.5px] font-semibold tracking-[-0.1px] text-[var(--text)]">
-            Focus desktop app
-          </p>
-          <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--text-muted)]">
-            Available for macOS, with the full canvas and Builder offline.
-          </p>
+          <div className="px-3.5 pb-3.5 pt-3">
+            <p className="text-[13.5px] font-semibold tracking-[-0.1px] text-[var(--text)]">
+              Focus desktop app
+            </p>
+            <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--text-muted)]">
+              Available for macOS, with the full canvas and Builder offline.
+            </p>
 
-          <div className="mt-3 flex items-center gap-1.5">
-            <a
-              href={DOWNLOAD_URL}
-              className="flex h-8 flex-1 items-center justify-center rounded-[9px] bg-[var(--accent)] px-2 text-[12px] font-medium text-[var(--accent-fg)] no-underline transition-colors duration-[120ms] hover:bg-white"
-            >
-              Download
-            </a>
-            <a
-              href={DOCS_URL}
-              className="flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-[var(--surface-hover)] px-2.5 text-[12px] font-medium text-[var(--text-soft)] no-underline transition-colors duration-[120ms] hover:text-[var(--text)]"
-            >
-              Docs
-              <IconChevronRight size={9} strokeWidth={2} className="opacity-60" />
-            </a>
+            <div className="mt-3 flex items-center gap-1.5">
+              <a
+                href={DOWNLOAD_URL}
+                className="flex h-8 flex-1 items-center justify-center rounded-[9px] bg-[var(--accent)] px-2 text-[12px] font-medium text-[var(--accent-fg)] no-underline transition-colors duration-[120ms] hover:bg-white"
+              >
+                Download
+              </a>
+              <a
+                href={DOCS_URL}
+                className="flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-[var(--surface-hover)] px-2.5 text-[12px] font-medium text-[var(--text-soft)] no-underline transition-colors duration-[120ms] hover:text-[var(--text)]"
+              >
+                Docs
+                <IconChevronRight size={9} strokeWidth={2} className="opacity-60" />
+              </a>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="mt-3 flex items-center justify-center gap-2 text-[11.5px] text-[var(--text-faint)]">
+      <div
+        className={`flex items-center justify-center gap-2 text-[11.5px] text-[var(--text-faint)] ${dismissed ? "" : "mt-3"}`}
+      >
         <PromoFootLink to="/news">What&apos;s new</PromoFootLink>
         <span aria-hidden>·</span>
         <PromoFootLink to="/feedback">Feedback</PromoFootLink>
