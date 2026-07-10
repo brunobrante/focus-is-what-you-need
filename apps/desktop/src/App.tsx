@@ -10,6 +10,8 @@ import { NewProjectPage } from "@/pages/NewProjectPage";
 import { NewWorkspacePage } from "@/pages/NewWorkspacePage";
 import { NewDraftPage } from "@/pages/NewDraftPage";
 import { DraftsPage } from "@/pages/DraftsPage";
+import { NewsPage } from "@/pages/NewsPage";
+import { FeedbackPage } from "@/pages/FeedbackPage";
 import { GalleryPage } from "@/pages/GalleryPage";
 import { DetailPage } from "@/pages/DetailPage";
 import { CanvasPage } from "@/canvas/Canvas";
@@ -48,6 +50,8 @@ export default function App() {
         <Route path="/drafts" element={<DraftsPage />} />
         <Route path="/references" element={<HomeReferencesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/news" element={<NewsPage />} />
+        <Route path="/feedback" element={<FeedbackPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Route>
       <Route path="/workspace/:workspaceId" element={<WorkspaceLayout />}>

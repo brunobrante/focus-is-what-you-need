@@ -10,7 +10,7 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 
 | Route | Page | Purpose |
 |-------|------|---------|
-| _(layout)_ | HomeLayout | The Home shell — one header + sidebar + footer, declared once. `/`, `/drafts`, `/references`, and `/settings` nest under it and render through its `<Outlet />` (no chrome is copied per page) |
+| _(layout)_ | HomeLayout | The Home shell — one header + sidebar + footer, declared once. `/`, `/drafts`, `/references`, `/settings`, `/news`, and `/feedback` nest under it and render through its `<Outlet />` (no chrome is copied per page) |
 | `/` | DashboardPage | Home shell index — workspaces, loose projects, recent items |
 | `/workspaces` | WorkspacesPage | Home shell — full grid of every workspace; opening a card activates it and jumps to its project browser (`/workspace/:workspaceId/projects`) |
 | `/my-projects` | ProjectsPage | Home shell — individual (loose) projects that belong to no workspace. Distinct from `/workspace/:workspaceId/projects` (the workspace browser) |
@@ -20,6 +20,8 @@ Desktop application (Tauri + React) for screen-first component exploration and d
 | `/new-draft` | NewDraftPage | Multi-step draft (loose screen/component/icon) creation wizard |
 | `/new-workspace` | NewWorkspacePage | Multi-step workspace creation wizard (name → optional description); on finish it makes the workspace active and opens its project browser |
 | `/drafts` | DraftsPage | Loose, project-less screens, components and icons (renders inside the Home shell) |
+| `/news` | NewsPage | "What's new" changelog inside the Home shell. A blank shell — heading only — until there are releases to list |
+| `/feedback` | FeedbackPage | Bug reports and feature requests inside the Home shell. A blank shell — heading only — until the form exists |
 | `/project/:id` | GalleryPage | Project detail with tabbed sections |
 | `/project/:id/screen/:id` | DetailPage (ScreenContent) | Screen inspector and editor |
 | `/project/:id/c/:id` | DetailPage (ComponentContent) | Component inspector and editor |
