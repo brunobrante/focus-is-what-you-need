@@ -1,6 +1,13 @@
 import type { CSSProperties } from "react";
 import type { CanvasDocument, ElementNode } from "@/canvas/engine/types";
 import { escapeAttr, escapeXml, slugClass } from "@/domain/canvas/htmlScene/styleUtils";
+import { compileShapeStroke } from "@/domain/canvas/border";
+import {
+  shapeClipPath,
+  shapeOutline,
+  shapeOutlinePathData,
+  splitClipShapeStyles,
+} from "@/domain/canvas/shapeGeometry";
 import { composeElementCss } from "./elementCss";
 import { cssPropsToString, cssPropsToInline } from "./cssSerialize";
 import { svgForElement } from "./svgExport";
@@ -27,10 +34,61 @@ type EmitContext = {
   seq: number;
 };
 
+/**
+ * A clip-path shape's border, as inline SVG markup — the exporter's twin of
+ * `ClipShapeStroke` in the canvas renderer, driven by the same compiled model so the
+ * exported polygon carries the same stroke it was drawn with.
+ */
+function clipShapeStrokeMarkup(node: ElementNode): string {
+  const stroke = compileShapeStroke(node.styles);
+  const outline = shapeOutline(node.type, node.styles.borderRadius);
+  if (!stroke || !outline) return "";
+
+  const width = Math.max(node.width, 1);
+  const height = Math.max(node.height, 1);
+  const d = shapeOutlinePathData(outline, width, height);
+  const pad = stroke.strokeWidth;
+  const uid = slugClass(node.id) || "shape";
+
+  const dash = stroke.strokeDasharray ? ` stroke-dasharray="${escapeAttr(stroke.strokeDasharray)}"` : "";
+  const cap = stroke.strokeLinecap ? ` stroke-linecap="${stroke.strokeLinecap}"` : "";
+
+  let defs = "";
+  let clipAttr = "";
+  if (stroke.align === "inside") {
+    defs = `<defs><clipPath id="cp-${uid}"><path d="${d}"/></clipPath></defs>`;
+    clipAttr = ` clip-path="url(#cp-${uid})"`;
+  } else if (stroke.align === "outside") {
+    const region = `x="${-pad}" y="${-pad}" width="${width + pad * 2}" height="${height + pad * 2}"`;
+    defs =
+      `<defs><mask id="mk-${uid}" maskUnits="userSpaceOnUse" ${region}>` +
+      `<rect ${region} fill="#fff"/><path d="${d}" fill="#000"/></mask></defs>`;
+    clipAttr = ` mask="url(#mk-${uid})"`;
+  }
+
+  return (
+    `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" aria-hidden="true" ` +
+    `style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none">${defs}` +
+    `<path d="${d}" fill="none" stroke="${escapeAttr(stroke.stroke)}" ` +
+    `stroke-width="${stroke.strokeWidth}"${dash}${cap}${clipAttr}/></svg>`
+  );
+}
+
 function emitNode(ctx: EmitContext, node: ElementNode, isRoot: boolean): string {
   if (node.visible === false) return "";
   const { style, fill } = composeElementCss(node, { isRoot });
   const className = `el-${slugClass(node.name) || node.type}-${ctx.seq++}`;
+
+  // polygon/star/arrow: the clipped fill and the SVG stroke must be separate boxes,
+  // or the clip would cut a Center/Outside stroke in half (same split as the canvas).
+  const shapeClip = shapeClipPath(node.type, node.styles.borderRadius);
+  if (shapeClip) {
+    const { outer, fill: fillStyle } = splitClipShapeStyles(style, shapeClip);
+    ctx.rules.push(`.${className} {\n${cssPropsToString(outer, "  ")}\n}`);
+    const fillDiv = `<div style="${cssPropsToInline(fillStyle)}"></div>`;
+    return `<div class="${className}">${fillDiv}${clipShapeStrokeMarkup(node)}</div>`;
+  }
+
   ctx.rules.push(`.${className} {\n${cssPropsToString(style, "  ")}\n}`);
 
   let inner = "";

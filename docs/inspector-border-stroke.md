@@ -1,10 +1,34 @@
 # Inspector — Border / Stroke (Outline, Underline, text Stroke, shape Stroke)
 
-Status: **v1 shipped** — the type-aware Border / Stroke panel. Still planned/deferred:
-**Center** alignment, **per-side** widths/colors, a separate **Outline (offset)** control,
-exact **SVG dashes on rounded corners** / **mixed corners** (the SVG render-target promotion),
-**stroke alignment on vector shapes** (inside/outside), and **endpoint markers** for
-lines/arrows.
+Status: **v2 shipped** — **Center** alignment on boxes, and clip-path shapes
+(polygon/star/arrow) now carry a real border with all three alignments. Still
+planned/deferred: **per-side** widths/colors, a separate **Outline (offset)** control, exact
+**SVG dashes on rounded corners** / **mixed corners**, **stroke alignment on `path`/`svg`
+vector nodes**, and **endpoint markers** for lines/arrows.
+
+**What shipped (v2):**
+- **Center on a box needs no SVG after all.** The plan below assumed a box-shadow ring, which
+  breaks on rounded corners — but an `outline` is painted *outward from the offset edge*, so a
+  width-`w` outline at `outline-offset: -w/2` spans −w/2..+w/2 around the box edge: exactly a
+  centered stroke, with no layout shift, and the radius still followed. `compileBorder` emits
+  it; the deferral in the table below is superseded.
+- **Clip-path shapes get a real border** (F2/F3). They keep their CSS fill — gradients, image
+  fills, tile patterns all still compile to backgrounds — and the border is painted as an
+  inline SVG stroke tracing the outline the fill is cut to (`compileShapeStroke` +
+  `ClipShapeStroke` in `ElementRenderer.tsx`). Since SVG strokes are always centered, Inside
+  and Outside draw at 2× width and remove the wrong half: Inside clips to the shape, Outside
+  masks the shape out. `border-style` becomes a dash pattern scaled to the *authored* width;
+  `double` falls back to solid.
+- The clip-path itself and the stroke's `d` are now two serializations of **one** vertex list
+  (`src/domain/canvas/shapeGeometry.ts`), so the stroke can't drift from the fill. Previously
+  the clip-path was copy-pasted between `ElementRenderer` and the HTML exporter, and
+  `shapeToPath` (flatten-to-path) held a *third*, different arrow — a bare line.
+- Rendering a stroke that may cross the box edge forces a two-level DOM for these shapes: the
+  outer box keeps position/size/rotation/opacity/effects, an inner box carries the clip and
+  the fill. The effect `drop-shadow` on the outer box therefore follows fill **and** stroke.
+
+**Known gap:** the HTML exporter emits the clipped fill but not the SVG stroke — a stroked
+polygon exports unstroked.
 
 **What shipped (v1):**
 - Data: box `borderStyle` / `borderAlign`, text `textStroke*` + `underline*` in

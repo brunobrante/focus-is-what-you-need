@@ -850,22 +850,45 @@ documented shipped decision; `-webkit-backdrop-filter` twin
   clamps at `minSize`; dragging the E handle past the W edge pins at min
   size instead of flipping (Figma mirrors and swaps the handle). Draw-tool
   rubber-banding is fine (`Math.abs`); only resize sticks.
-- ✅ **DONE (shadows) — F2 — Shadows on clip-path shapes are clipped away.**
-  `ElementRenderer.tsx:127-171` — `polygon`/`star`/`arrow` get `clipPath`,
-  and `effectTargetForType` returns `"box"` for them
-  (`src/domain/canvas/effects.ts:155-160`), so effects compile to
-  `box-shadow` on the same element the clip-path clips: a drop shadow on a
-  star/arrow/polygon paints nothing. Route these shapes to
-  `filter: drop-shadow` (the vector target). Borders on the same shapes are
-  knowingly suppressed (`ElementRenderer.tsx:93-95`) — both are gaps of the
-  documented "clip-path shapes defer to an SVG render target (v2)" plan.
-- **F3 — Stroke alignment: no "center" for boxes, no alignment at all for
-  vectors.** `src/domain/canvas/border.ts` supports
-  `borderAlign: "inside" | "outside"` only (CSS `border` vs `outline`);
-  Figma's default center alignment is unavailable. Vector `<path>` strokes
-  (`ElementRenderer.tsx:520-531`) are always SVG-centered with no
-  inside/outside emulation. Depends on the HTML→SVG render-target promotion
-  (`docs/inspector-border-stroke.md`).
+- ✅ **DONE (fully) — F2 — Shadows and borders on clip-path shapes are clipped away.**
+  Shadows were fixed earlier by routing polygon/star/arrow to the vector effect
+  target (`filter: drop-shadow`). **Borders** are now fixed too: these shapes keep
+  their CSS fill — gradients, image fills and tile patterns still compile to
+  backgrounds — and the border is painted as an inline SVG stroke tracing the very
+  outline the fill is cut to (`compileShapeStroke` + `ClipShapeStroke`).
+
+  This forces a two-level DOM for them: a stroke that straddles (Center) or sits
+  outside (Outside) the edge cannot live under the clip that produces the shape. So
+  the outer box keeps position/size/rotation/opacity/effects and stays unclipped, and
+  an inner box carries the clip and the fill. The `drop-shadow` on the outer box then
+  falls from fill and stroke together.
+
+  The clip-path and the stroke's `d` are now two serializations of **one** vertex
+  list (`src/domain/canvas/shapeGeometry.ts`), so they cannot drift. Before, the
+  clip-path was copy-pasted between `ElementRenderer` and the HTML exporter, and
+  `shapeToPath` (flatten-to-path) held a *third*, different arrow — a bare line
+  rather than the 7-point block arrow that is actually drawn.
+
+  The HTML exporter emits the same two-level structure and the same stroke, so an
+  exported polygon carries the border it was drawn with. Unit-tested on both sides.
+- ✅ **DONE — F3 — Stroke alignment: no "center" for boxes, no alignment at all for
+  vectors.** Both halves, and neither needed the render-target promotion the item
+  assumed.
+  - **Box Center** turned out to be plain CSS: an `outline` is painted outward from
+    the *offset* edge, so a width-`w` outline at `outline-offset: -w/2` spans
+    −w/2..+w/2 around the box edge — exactly a centered stroke, with no layout shift
+    and the corner radius still followed. The plan's "box-shadow ring breaks on
+    rounded corners" objection doesn't apply to `outline`.
+  - **Vector alignment** (both `path` nodes and the newly-stroked clip-path shapes)
+    uses the standard SVG trick, since SVG strokes always straddle the path: draw at
+    2× width and discard the wrong half — Inside clips to the shape, Outside masks
+    the shape out. Outside additionally splits fill and stroke onto two `<path>`s,
+    because the mask that removes the stroke's inner half would erase the fill too.
+  - Alignment is only offered on a **closed** path (`pathIsClosed`): Inside/Outside
+    are defined against an interior, and clipping an open path would silently treat
+    it as closed. Open paths stay centered however they're authored.
+
+  UX.md updated (box Align gains Center; vector Stroke gains Align). Unit-tested.
 - ✅ **DONE — F4 — Radius drag is uniform-only.** Alt-drag (new rebindable
   modifier `canvas.radius.perCorner`) rounds only the grabbed ball, writing
   `styles.cornerRadii` seeded from the uniform radius; balls render at their own

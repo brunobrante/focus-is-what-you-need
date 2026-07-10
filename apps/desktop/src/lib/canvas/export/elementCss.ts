@@ -5,6 +5,7 @@ import { borderTargetForType, compileBorder } from "@/domain/canvas/border";
 import { compileTypography } from "@/domain/canvas/typography";
 import { compileAppearance } from "@/domain/canvas/appearance";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
+import { shapeClipPath } from "@/domain/canvas/shapeGeometry";
 
 // Composes the inline-style CSSProperties for one element, reusing the exact
 // same domain `compile*` functions as the live canvas renderer
@@ -14,38 +15,8 @@ import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/can
 
 export type RefResolver = (ref: string | undefined) => string | undefined;
 
-// ─── Clip-path helpers (mirror ElementRenderer) ───────────────────────────────
-
-function polygonClipPath(sides: number): string {
-  const verts: string[] = [];
-  for (let i = 0; i < sides; i++) {
-    const angle = (i / sides) * 2 * Math.PI - Math.PI / 2;
-    verts.push(`${50 + 50 * Math.cos(angle)}% ${50 + 50 * Math.sin(angle)}%`);
-  }
-  return `polygon(${verts.join(", ")})`;
-}
-
-function starClipPath(innerRadiusPercent: number): string {
-  const points = 5;
-  const outer = 50;
-  const inner = Math.max(1, Math.min(49, innerRadiusPercent));
-  const step = Math.PI / points;
-  const verts: string[] = [];
-  for (let i = 0; i < 2 * points; i++) {
-    const r = i % 2 === 0 ? outer : inner;
-    const angle = i * step - Math.PI / 2;
-    verts.push(`${50 + r * Math.cos(angle)}% ${50 + r * Math.sin(angle)}%`);
-  }
-  return `polygon(${verts.join(", ")})`;
-}
-
-const ARROW_CLIP_PATH = "polygon(0% 30%, 65% 30%, 65% 0%, 100% 50%, 65% 100%, 65% 70%, 0% 70%)";
-
 function computeClipPath(type: ElementType, borderRadius?: number): string | undefined {
-  if (type === "arrow") return ARROW_CLIP_PATH;
-  if (type === "polygon") return polygonClipPath(5);
-  if (type === "star") return starClipPath(borderRadius ?? 22.49);
-  return undefined;
+  return shapeClipPath(type, borderRadius);
 }
 
 function rotationTransform(rotation: number, width: number, height: number): string | undefined {

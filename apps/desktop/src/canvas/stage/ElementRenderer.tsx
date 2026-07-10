@@ -3,12 +3,19 @@ import type { CSSProperties } from "react";
 import { getEffectiveRotation, getVisualRect } from "@/canvas/engine/geometry";
 import type { CanvasDocument, ElementNode, ElementType } from "@/canvas/engine/types";
 import { compileEffects, effectTargetForType } from "@/domain/canvas/effects";
-import { borderTargetForType, compileBorder } from "@/domain/canvas/border";
+import { borderTargetForType, compileBorder, compileShapeStroke } from "@/domain/canvas/border";
+import {
+  shapeClipPath,
+  shapeOutline,
+  shapeOutlinePathData,
+  splitClipShapeStyles,
+} from "@/domain/canvas/shapeGeometry";
 import { compileTypography } from "@/domain/canvas/typography";
 import { compileAppearance } from "@/domain/canvas/appearance";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
 import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
+import { pathIsClosed } from "@/domain/canvas/vector";
 import { resolveTokenRef, resolveTypeStyleTokenRef } from "@/domain/system-design/resolveTokenRef";
 import type { ResolvedSystemDesign } from "@/domain/system-design/resolve";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -59,36 +66,8 @@ function withTokenBoundStyles(node: ElementNode, resolved: ResolvedSystemDesign 
 
 // ─── Clip-path helpers ────────────────────────────────────────────────────────
 
-function polygonClipPath(sides: number): string {
-  const verts: string[] = [];
-  for (let i = 0; i < sides; i++) {
-    const angle = (i / sides) * 2 * Math.PI - Math.PI / 2;
-    verts.push(`${50 + 50 * Math.cos(angle)}% ${50 + 50 * Math.sin(angle)}%`);
-  }
-  return `polygon(${verts.join(", ")})`;
-}
-
-function starClipPath(innerRadiusPercent: number): string {
-  const points = 5;
-  const outer = 50;
-  const inner = Math.max(1, Math.min(49, innerRadiusPercent));
-  const step = Math.PI / points;
-  const verts: string[] = [];
-  for (let i = 0; i < 2 * points; i++) {
-    const r = i % 2 === 0 ? outer : inner;
-    const angle = i * step - Math.PI / 2;
-    verts.push(`${50 + r * Math.cos(angle)}% ${50 + r * Math.sin(angle)}%`);
-  }
-  return `polygon(${verts.join(", ")})`;
-}
-
-const ARROW_CLIP_PATH = "polygon(0% 30%, 65% 30%, 65% 0%, 100% 50%, 65% 100%, 65% 70%, 0% 70%)";
-
 function computeClipPath(type: ElementType, borderRadius?: number): string | undefined {
-  if (type === "arrow") return ARROW_CLIP_PATH;
-  if (type === "polygon") return polygonClipPath(5);
-  if (type === "star") return starClipPath(borderRadius ?? 22.49);
-  return undefined;
+  return shapeClipPath(type, borderRadius);
 }
 
 function rotationTransform(rotation: number, width: number, height: number): string | undefined {
@@ -150,6 +129,118 @@ function borderStyleFor(
     textDecorationThickness: b.textDecorationThickness,
     textUnderlineOffset: b.textUnderlineOffset,
   };
+}
+
+// ─── Clip-path shapes: fill by clipping, border by SVG stroke ────────────────
+//
+// polygon/star/arrow are a box cut down by `clip-path`. A CSS border on such a box
+// is clipped away with everything else, which is why they carried no border at all
+// (F2) and no alignment (F3). The fix keeps the CSS fill machinery — gradients,
+// image fills, tile patterns all still compile to backgrounds — and paints the
+// border as an SVG stroke tracing the very outline the fill is cut to.
+//
+// That forces a two-level DOM: the clip must not reach the stroke, or a Center /
+// Outside stroke would be clipped in half. So the outer box keeps position, size,
+// rotation, opacity and effects (the drop-shadow then follows fill + stroke
+// together), and an inner box carries the clip and the fill.
+
+/**
+ * A stroke drawn along `d`, honoring an alignment SVG doesn't have natively.
+ *
+ * SVG strokes always straddle the path. So Inside and Outside draw at double width
+ * and then discard the wrong half: Inside clips to the shape, Outside masks the
+ * shape out. Center needs neither. The caller passes the already-doubled width.
+ *
+ * Emits `<defs>` + a `<path>`, to be embedded in a `<svg viewBox="0 0 w h">` whose
+ * box is `w × renderScale` wide — one user unit is then one scaled pixel, so
+ * `strokeWidth` tracks zoom on its own.
+ */
+function AlignedStrokePath({
+  uid,
+  d,
+  align,
+  width,
+  height,
+  ...paint
+}: {
+  uid: string;
+  d: string;
+  align: "inside" | "center" | "outside";
+  width: number;
+  height: number;
+  stroke?: string;
+  strokeWidth?: number;
+  strokeOpacity?: number;
+  strokeDasharray?: string;
+  strokeLinecap?: string;
+  strokeLinejoin?: string;
+}) {
+  const clipId = `stroke-clip-${uid}`;
+  const maskId = `stroke-mask-${uid}`;
+  // The outside half of a doubled stroke reaches `strokeWidth` past the outline;
+  // the mask region has to cover it or it would cut the stroke it exists to shape.
+  const pad = paint.strokeWidth ?? 0;
+  const region = { x: -pad, y: -pad, width: width + pad * 2, height: height + pad * 2 };
+
+  return (
+    <>
+      {align === "inside" ? (
+        <defs>
+          <clipPath id={clipId}>
+            <path d={d} />
+          </clipPath>
+        </defs>
+      ) : null}
+      {align === "outside" ? (
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" {...region}>
+            <rect {...region} fill="#fff" />
+            <path d={d} fill="#000" />
+          </mask>
+        </defs>
+      ) : null}
+      <path
+        d={d}
+        fill="none"
+        {...(paint as Record<string, unknown>)}
+        clipPath={align === "inside" ? `url(#${clipId})` : undefined}
+        mask={align === "outside" ? `url(#${maskId})` : undefined}
+      />
+    </>
+  );
+}
+
+/** The border of a clip-path shape, as an SVG stroke along its outline. */
+function ClipShapeStroke({ node, resolveRef }: { node: ElementNode; resolveRef?: RefResolver }) {
+  const stroke = compileShapeStroke(node.styles, resolveRef);
+  const outline = shapeOutline(node.type, node.styles.borderRadius);
+  if (!stroke || !outline) return null;
+
+  const width = Math.max(node.width, 1);
+  const height = Math.max(node.height, 1);
+
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden
+      focusable="false"
+      style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }}
+    >
+      <AlignedStrokePath
+        uid={node.id}
+        d={shapeOutlinePathData(outline, width, height)}
+        align={stroke.align}
+        width={width}
+        height={height}
+        stroke={stroke.stroke}
+        strokeWidth={stroke.strokeWidth}
+        strokeDasharray={stroke.strokeDasharray}
+        strokeLinecap={stroke.strokeLinecap}
+      />
+    </svg>
+  );
 }
 
 // When an element carries a typed `fills` stack the compiled background longhands
@@ -550,6 +641,14 @@ function ElementRendererImpl({
     const s = node.styles;
     const fill = s.fill ?? resolveRef?.(s.backgroundRef) ?? s.background ?? "none";
     const stroke = resolveRef?.(s.strokeRef) ?? s.stroke;
+    const width = Math.max(node.width, 1);
+    const height = Math.max(node.height, 1);
+    const d = pathToSvgPathData(node.path);
+    // Inside/Outside are defined against an interior, so an open path stays centered
+    // however it is authored — clipping it would silently treat it as closed (F3).
+    const align = pathIsClosed(node.path) ? s.strokeAlign ?? "center" : "center";
+    const strokeWidth = s.strokeWidth;
+    const hasAlignedStroke = align !== "center" && stroke !== undefined && (strokeWidth ?? 0) > 0;
     return (
       <div
         data-element-id={node.id}
@@ -560,24 +659,42 @@ function ElementRendererImpl({
         <svg
           width="100%"
           height="100%"
-          viewBox={`0 0 ${Math.max(node.width, 1)} ${Math.max(node.height, 1)}`}
+          viewBox={`0 0 ${width} ${height}`}
           // Explicit color context so `currentColor` paints (fill/stroke) resolve to
           // the theme foreground — the same tint the Icons tab shows — instead of
           // whatever UI-chrome color happens to cascade into the stage DOM.
           style={{ overflow: "visible", display: "block", color: "var(--text, #F2F2F2)" }}
         >
+          {/* An Outside stroke masks out the shape's interior, which would erase the
+              fill too — so an aligned stroke is painted on its own path, over an
+              unstroked fill. Center keeps both on one path, as before. */}
           <path
-            d={pathToSvgPathData(node.path)}
+            d={d}
             fillRule={node.path?.fillRule ?? s.fillRule}
             fill={fill}
             fillOpacity={s.fillOpacity}
-            stroke={stroke}
-            strokeWidth={s.strokeWidth}
-            strokeOpacity={s.strokeOpacity}
-            strokeLinecap={s.strokeLinecap}
-            strokeLinejoin={s.strokeLinejoin}
-            strokeDasharray={s.strokeDasharray}
+            stroke={hasAlignedStroke ? undefined : stroke}
+            strokeWidth={hasAlignedStroke ? undefined : strokeWidth}
+            strokeOpacity={hasAlignedStroke ? undefined : s.strokeOpacity}
+            strokeLinecap={hasAlignedStroke ? undefined : s.strokeLinecap}
+            strokeLinejoin={hasAlignedStroke ? undefined : s.strokeLinejoin}
+            strokeDasharray={hasAlignedStroke ? undefined : s.strokeDasharray}
           />
+          {hasAlignedStroke ? (
+            <AlignedStrokePath
+              uid={node.id}
+              d={d}
+              align={align}
+              width={width}
+              height={height}
+              stroke={stroke}
+              strokeWidth={(strokeWidth ?? 0) * 2}
+              strokeOpacity={s.strokeOpacity}
+              strokeLinecap={s.strokeLinecap}
+              strokeLinejoin={s.strokeLinejoin}
+              strokeDasharray={s.strokeDasharray}
+            />
+          ) : null}
         </svg>
       </div>
     );
@@ -636,6 +753,38 @@ function ElementRendererImpl({
   }
 
   const genericBase = detached ? detachedNodeStyle(node, canvasDocument, renderScale, resolveRef) : nodeStyle(node, false, renderScale, resolveRef);
+
+  const shapeClip = computeClipPath(node.type, node.styles.borderRadius);
+  if (shapeClip) {
+    // polygon / star / arrow: clipped fill inside, stroke outside the clip (F2/F3).
+    const { outer, fill } = splitClipShapeStyles(withFill(genericBase, compiledFill), shapeClip);
+    return (
+      <div
+        data-element-id={node.id}
+        data-node-type={node.type}
+        className={elementClassName(node, "element", false, isolatedParentId, canvasDocument.elements)}
+        style={outer}
+      >
+        <div style={fill}>
+          {fillDefs}
+          {!isIsolatedParent && node.children.map((childId) => (
+            <ElementRenderer
+              key={childId}
+              id={childId}
+              document={canvasDocument}
+              isolatedParentId={isolatedParentIdProp}
+              editingTextId={editingTextId}
+              affectedElementIds={affectedElementIds}
+              preview={preview}
+              renderScale={renderScale}
+            />
+          ))}
+        </div>
+        <ClipShapeStroke node={node} resolveRef={resolveRef} />
+      </div>
+    );
+  }
+
   return (
     <div
       data-element-id={node.id}

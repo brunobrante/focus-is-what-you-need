@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
+import { pathIsClosed } from "@/domain/canvas/vector";
 import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType, Fill, Rect } from "@/canvas/engine/types";
 import { effectTargetForType } from "@/domain/canvas/effects";
 import { borderTargetForType } from "@/domain/canvas/border";
@@ -413,6 +414,7 @@ export function ElementTab({
         target={borderTargetForType(node.type)}
         tokens={colorTokens}
         locked={locked}
+        strokeAlignAvailable={node.type === "path" && pathIsClosed(node.path)}
         onChange={onUpdateStyle}
       />
 

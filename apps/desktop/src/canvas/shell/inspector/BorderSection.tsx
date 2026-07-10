@@ -56,12 +56,15 @@ export function BorderSection({
   target,
   tokens,
   locked,
+  strokeAlignAvailable = false,
   onChange,
 }: {
   styles: ElementStyles;
   target: BorderTarget;
   tokens: InsColorToken[];
   locked: boolean;
+  /** Vector only: alignment needs an interior, so it is hidden on open paths (F3). */
+  strokeAlignAvailable?: boolean;
   onChange: (patch: Partial<ElementStyles>) => void;
 }) {
   if (target === "box") {
@@ -103,6 +106,7 @@ export function BorderSection({
             onChange={(value) => onChange({ borderAlign: value as ElementStyles["borderAlign"] })}
             options={[
               { value: "inside", label: "Inside" },
+              { value: "center", label: "Center" },
               { value: "outside", label: "Outside" },
             ]}
           />
@@ -221,6 +225,19 @@ export function BorderSection({
           suffix="%"
         />
       </InsRow>
+      {strokeAlignAvailable ? (
+        <InsRow label="Align">
+          <InsToggle
+            value={styles.strokeAlign ?? "center"}
+            onChange={(value) => onChange({ strokeAlign: value as ElementStyles["strokeAlign"] })}
+            options={[
+              { value: "inside", label: "Inside" },
+              { value: "center", label: "Center" },
+              { value: "outside", label: "Outside" },
+            ]}
+          />
+        </InsRow>
+      ) : null}
       <InsRow label="Cap">
         <InsSelect
           value={styles.strokeLinecap ?? "butt"}

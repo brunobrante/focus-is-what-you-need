@@ -72,13 +72,21 @@ export function compileBorder(
     if (width > 0) {
       const color = resolveRef?.(styles.borderColorRef) ?? styles.borderColor ?? DEFAULT_BORDER_COLOR;
       const style = styles.borderStyle ?? "solid";
-      if ((styles.borderAlign ?? "inside") === "outside") {
+      const align = styles.borderAlign ?? "inside";
+      if (align === "outside" || align === "center") {
         // Outside: an `outline` hugging the box edge and growing outward. No
         // layout growth, follows border-radius (modern WebKit), keeps dashes.
+        //
+        // Center: the same outline, pulled inward by half its width (F3). An
+        // outline is painted outward from the offset edge, so a width-`w` outline
+        // at `outline-offset: -w/2` spans −w/2..+w/2 around the box edge — exactly
+        // a centered stroke, with no layout shift and radius still followed. This
+        // is why Center needs no SVG promotion for boxes, contrary to the original
+        // plan's box-shadow-ring reading (see docs/inspector-border-stroke.md).
         out.outlineWidth = px(width);
         out.outlineStyle = style;
         out.outlineColor = color;
-        out.outlineOffset = 0;
+        out.outlineOffset = align === "center" ? -px(width) / 2 : 0;
       } else {
         // Inside: a normal border (the box already uses border-box sizing).
         out.borderWidth = px(width);
@@ -113,4 +121,63 @@ export function compileBorder(
   }
 
   return out;
+}
+
+/** A border painted as an SVG stroke along a shape's outline (F2/F3). */
+export type CompiledShapeStroke = {
+  stroke: string;
+  /** Already doubled for inside/outside, where half the stroke is clipped away. */
+  strokeWidth: number;
+  /** How the drawn stroke relates to the outline — the caller clips or masks. */
+  align: "inside" | "center" | "outside";
+  strokeDasharray?: string;
+  strokeLinecap?: "butt" | "round";
+};
+
+/**
+ * Compile a box-authored border (width/color/style/align) into the SVG stroke that
+ * traces a clip-path shape's outline — polygon, star, arrow. These shapes are drawn
+ * by clipping their box, and a CSS border on a clipped box is clipped away with it,
+ * so they carried no border at all (F2) and no alignment (F3).
+ *
+ * Inside and Outside both draw at 2× width and let the caller clip away the half
+ * that falls on the wrong side of the outline — the standard SVG trick, since SVG
+ * strokes are always centered. Center needs neither.
+ *
+ * Returns null when there is nothing to paint.
+ */
+export function compileShapeStroke(
+  styles: ElementStyles,
+  resolveRef?: (ref: string | undefined) => string | undefined,
+): CompiledShapeStroke | null {
+  const width = num(styles.borderWidth);
+  if (width <= 0) return null;
+
+  const align = styles.borderAlign ?? "inside";
+  const out: CompiledShapeStroke = {
+    stroke: resolveRef?.(styles.borderColorRef) ?? styles.borderColor ?? DEFAULT_BORDER_COLOR,
+    strokeWidth: align === "center" ? width : width * 2,
+    align,
+  };
+
+  // SVG has no `border-style`, so the CSS keywords become dash patterns scaled to
+  // the authored width (not the doubled one — the pattern must read the same at
+  // every alignment). `double` has no single-stroke equivalent; it falls back to
+  // solid rather than silently drawing something else.
+  switch (styles.borderStyle) {
+    case "dashed":
+      out.strokeDasharray = `${trimStroke(width * 3)} ${trimStroke(width * 2)}`;
+      break;
+    case "dotted":
+      out.strokeDasharray = `0 ${trimStroke(width * 2)}`;
+      out.strokeLinecap = "round";
+      break;
+    default:
+      break;
+  }
+  return out;
+}
+
+function trimStroke(value: number): number {
+  return Number(value.toFixed(3));
 }

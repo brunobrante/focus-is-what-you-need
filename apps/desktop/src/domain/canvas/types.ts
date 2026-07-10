@@ -161,10 +161,11 @@ export type ElementStyles = {
   borderColor?: string;
   // Box border (Inspector → Border/Stroke panel). `borderStyle` maps to CSS
   // border-style; `borderAlign` chooses the mechanism: Inside = `border`,
-  // Outside = `outline` (Center is deferred — it needs an SVG render target;
-  // see docs/inspector-border-stroke.md).
+  // Outside = `outline`, Center = `outline` inset by half its width. On the
+  // clip-path shapes (polygon/star/arrow) these same fields compile to an SVG
+  // stroke instead — see docs/inspector-border-stroke.md.
   borderStyle?: "solid" | "dashed" | "dotted" | "double";
-  borderAlign?: "inside" | "outside";
+  borderAlign?: "inside" | "center" | "outside";
   // System Design token bindings ($$ref, e.g. "colors:c-primary"). When set, the
   // renderer resolves the LIVE token value (reflecting the workspace master, or a
   // detached local copy); the matching string field above is the fallback. Kept

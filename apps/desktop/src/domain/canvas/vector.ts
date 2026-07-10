@@ -66,3 +66,15 @@ export function pathToSvgPathData(path: VectorPath | undefined): string {
   if (!path) return "";
   return path.subpaths.map(subpathToData).filter(Boolean).join(" ");
 }
+
+/**
+ * True when every subpath closes, so the path encloses an area.
+ *
+ * Stroke alignment is only meaningful on a closed path: Inside/Outside are defined
+ * against an interior, and clipping or masking an open path would silently treat it
+ * as closed. Open paths are pinned to Center (F3).
+ */
+export function pathIsClosed(path: VectorPath | undefined): boolean {
+  if (!path || path.subpaths.length === 0) return false;
+  return path.subpaths.every((subpath) => subpath.closed && subpath.anchors.length > 1);
+}

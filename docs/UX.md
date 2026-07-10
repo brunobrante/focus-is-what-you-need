@@ -914,9 +914,10 @@ real CSS property behind each name:
   **Color** (binds to a System Design color token like Fill), **Opacity %** (composes into the
   color as an `#RRGGBBAA` alpha; shown while the color is a plain hex literal and no token is
   bound — D3), **Style** (**solid / dashed / dotted / double**), and **Align** (**Inside** =
-  CSS `border`; **Outside** = CSS `outline` hugging the edge — keeps dashes and follows the
-  corner radius). *Center alignment, per-side widths, and a separate Outline-offset control
-  are deferred (they need an SVG render target).*
+  CSS `border`; **Center** = the same outline pulled inward by half its width, so the stroke
+  straddles the edge with no layout shift; **Outside** = CSS `outline` hugging the edge — both
+  keep dashes and follow the corner radius). *Per-side widths and a separate Outline-offset
+  control are deferred.*
 - **Text** → an **Underline** section (on/off switch, then **Style** solid/double/dotted/
   dashed/wavy, **Color**, **Thickness**, **Offset** → the `text-decoration-*` family) and a
   **Text stroke** section (**Width**, **Color** + **Opacity %** (same `#RRGGBBAA` composition
@@ -924,9 +925,14 @@ real CSS property behind each name:
   `-webkit-text-stroke`; visible width is ~half the set value on WebKit). Underline and
   text-stroke colors bind to tokens.
 - **Vector** (path / svg) → a **Stroke** section: **Color** (token-bindable), **Width**,
-  **Opacity**, **Cap** (butt/round/square), **Join** (miter/round/bevel), and **Dash** (e.g.
-  `4 2`), painted directly on the `<path>`. *clip-path shapes (polygon / star / arrow) can't
-  carry a CSS border yet — that promotion to SVG is deferred.*
+  **Opacity**, **Align** (Inside / Center / Outside), **Cap** (butt/round/square), **Join**
+  (miter/round/bevel), and **Dash** (e.g. `4 2`), painted directly on the `<path>`. **Align
+  only appears on a closed path** — Inside and Outside are defined against an interior, so an
+  open path always strokes centered.
+- **Clip-path shapes** (polygon / star / arrow) use the **Box** Border section above, but the
+  border is painted as an SVG stroke tracing the shape's real outline rather than as a CSS
+  border (which a clip-path would cut away). All three alignments work; **Style** maps to a
+  dash pattern, and **double** falls back to solid (a single stroke can't draw it).
 
 **Inspector → Effects** (shown for every element type): a single unified **Effects** list
 (Figma's model) below Appearance. It starts empty with a one-line hint and an **Add effect**
