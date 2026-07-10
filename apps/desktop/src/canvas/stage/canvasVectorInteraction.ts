@@ -18,6 +18,7 @@ import {
   insertElement,
   makePathNode,
   recomputePathBounds,
+  setAnchorWidth,
   setHandleType,
   shapeBuildSubpaths,
   translateAnchors,
@@ -39,6 +40,7 @@ import type {
   VectorBendInteraction,
   VectorLassoInteraction,
   VectorShapeBuildInteraction,
+  VectorWidthInteraction,
 } from "@/canvas/engine/types";
 import type { EditorAction } from "@/canvas/engine/store";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
@@ -277,6 +279,9 @@ export function vectorEditPointerDown(
       return anchorEditPointerDown(ctx, event, point, hit);
     case "cut":
       if (cutPointerDown(ctx, event, hit)) return true;
+      return anchorEditPointerDown(ctx, event, point, hit);
+    case "variable-width":
+      if (widthPointerDown(ctx, event, point, hit)) return true;
       return anchorEditPointerDown(ctx, event, point, hit);
     case "move":
     default:
@@ -682,6 +687,72 @@ export function finishAnchorsMove(interaction: VectorAnchorsMoveInteraction, dis
   if (!interaction.moved) return;
   const next = recomputePathBounds(interaction.lastDocument, interaction.elementId);
   dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: next, selectedIds: [interaction.elementId] });
+  dispatch({ type: "enterPathEdit", pathEditId: interaction.elementId });
+}
+
+// ─── Variable width ────────────────────────────────────────────────────────────
+
+const WIDTH_MIN = 0.05;
+const WIDTH_MAX = 8;
+
+/** Pointer down for the Variable-width tool: grabs an anchor to taper. */
+function widthPointerDown(
+  ctx: VectorPointerCtx,
+  event: ReactPointerEvent,
+  point: Point,
+  hit: ToolingHit,
+): boolean {
+  const { state, interactionRef, setInteractionActive, viewport } = ctx;
+  const id = state.pathEditId;
+  const node = id ? state.document.elements[id] : null;
+  if (!id || !node?.path || hit.type !== "path-anchor") return false;
+  const interaction: VectorWidthInteraction = {
+    type: "vector-width",
+    pointerId: event.pointerId,
+    startPoint: point,
+    elementId: id,
+    subpathIndex: hit.subpathIndex,
+    anchorIndex: hit.anchorIndex,
+    baseStrokeWidth: node.styles.strokeWidth ?? 1,
+    beforeDocument: state.document,
+    lastDocument: state.document,
+    moved: false,
+  };
+  interactionRef.current = interaction;
+  setInteractionActive(true);
+  viewport.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  return true;
+}
+
+export function widthMove(
+  interaction: VectorWidthInteraction,
+  point: Point,
+  dispatch: Dispatch,
+  latestDocumentRef: React.MutableRefObject<CanvasDocument>,
+): void {
+  const node0 = interaction.beforeDocument.elements[interaction.elementId];
+  const anchor0 = node0?.path?.subpaths[interaction.subpathIndex]?.anchors[interaction.anchorIndex];
+  if (!node0 || !anchor0) return;
+  const dx = point.x - interaction.startPoint.x;
+  const dy = point.y - interaction.startPoint.y;
+  if (Math.hypot(dx, dy) > MOVE_THRESHOLD) interaction.moved = true;
+  // Distance from the anchor to the cursor, in path space, maps to half-width:
+  // width multiplier = dist / (strokeWidth/2).
+  const cursor = canvasToPathSpace(interaction.beforeDocument, node0, point.x, point.y);
+  const dist = Math.hypot(cursor.x - anchor0.x, cursor.y - anchor0.y);
+  const half = (interaction.baseStrokeWidth || 1) / 2;
+  const m = Math.max(WIDTH_MIN, Math.min(WIDTH_MAX, dist / (half || 1)));
+  const next = setAnchorWidth(interaction.beforeDocument, interaction.elementId, interaction.subpathIndex, interaction.anchorIndex, m);
+  interaction.lastDocument = next;
+  latestDocumentRef.current = next;
+  dispatch({ type: "setDocumentTransient", document: next, changedIds: [interaction.elementId] });
+}
+
+export function finishWidth(interaction: VectorWidthInteraction, dispatch: Dispatch): void {
+  if (!interaction.moved) return;
+  // Anchor positions are unchanged, so bounds don't need recomputing.
+  dispatch({ type: "commitDocument", beforeDocument: interaction.beforeDocument, document: interaction.lastDocument, selectedIds: [interaction.elementId] });
   dispatch({ type: "enterPathEdit", pathEditId: interaction.elementId });
 }
 

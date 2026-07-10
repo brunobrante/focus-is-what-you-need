@@ -185,7 +185,8 @@ export function useKeyboardShortcuts({
           interaction?.type === "vector-bend" ||
           interaction?.type === "vector-lasso" ||
           interaction?.type === "vector-shape-build" ||
-          interaction?.type === "vector-anchors-move"
+          interaction?.type === "vector-anchors-move" ||
+          interaction?.type === "vector-width"
         ) {
           event.preventDefault();
           cancelActiveInteractionRef?.current?.();

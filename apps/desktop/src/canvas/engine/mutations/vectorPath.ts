@@ -263,6 +263,22 @@ export function bendSegment(
   return next;
 }
 
+/** Set an anchor's variable-width multiplier (1 = base strokeWidth). */
+export function setAnchorWidth(
+  doc: CanvasDocument,
+  id: string,
+  subpathIndex: number,
+  index: number,
+  width: number,
+): CanvasDocument {
+  if (!getPathNode(doc, id)) return doc;
+  const next = cloneDocument(doc);
+  const anchor = next.elements[id].path?.subpaths[subpathIndex]?.anchors[index];
+  if (!anchor) return doc;
+  anchor.width = width;
+  return next;
+}
+
 /** Translate a set of anchors by (dx, dy) in path space (multi-anchor move). */
 export function translateAnchors(
   doc: CanvasDocument,

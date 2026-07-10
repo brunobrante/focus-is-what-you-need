@@ -40,6 +40,8 @@ import {
   vectorEditPointerDown,
   vectorSelectMove,
   vectorSelectPointerDown,
+  widthMove,
+  finishWidth,
   type VectorPointerCtx,
 } from "../canvasVectorInteraction";
 import { clearNativeTextSelection } from "../canvasStageHelpers";
@@ -590,6 +592,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "vector-bend") { bendMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "vector-lasso") { vectorSelectMove(interaction, point, vectorCtx(viewportRef.current!), setLassoPoints); return; }
     if (interaction.type === "vector-shape-build") { shapeBuildMove(interaction, point, setLassoPoints); return; }
+    if (interaction.type === "vector-width") { widthMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "vector-anchors-move") { anchorsMove(interaction, point, dispatch, latestDocumentRef); return; }
     if (interaction.type === "marquee") { handleMarqueeMove(interaction, point, state.document, setMarqueeRect, dispatch); return; }
     if (interaction.type === "drag") { handleDragMove(interaction, event, point, state.document, commandModeRef, updateDropTarget, dispatch, latestDocumentRef, settings); return; }
@@ -716,6 +719,7 @@ export function useCanvasPointerEvents({
     if (interaction.type === "vector-bend") { finishBend(interaction, dispatch); return; }
     if (interaction.type === "vector-lasso") { finishVectorSelect(interaction, vectorCtx(viewport ?? viewportRef.current!), setLassoPoints); return; }
     if (interaction.type === "vector-shape-build") { finishShapeBuild(interaction, vectorCtx(viewport ?? viewportRef.current!), setLassoPoints); return; }
+    if (interaction.type === "vector-width") { finishWidth(interaction, dispatch); return; }
     if (interaction.type === "vector-anchors-move") { finishAnchorsMove(interaction, dispatch); return; }
 
     const wasCommandMode = commandModeRef.current;

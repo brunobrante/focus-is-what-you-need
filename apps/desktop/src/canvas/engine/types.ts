@@ -506,6 +506,21 @@ export type VectorShapeBuildInteraction = {
   moved: boolean;
 };
 
+// Vector edit / Variable width: dragging away from an anchor to set its width
+// multiplier (distance in path space → half-width). Recomputed from beforeDocument.
+export type VectorWidthInteraction = {
+  type: "vector-width";
+  pointerId: number;
+  startPoint: Point;
+  elementId: string;
+  subpathIndex: number;
+  anchorIndex: number;
+  baseStrokeWidth: number;
+  beforeDocument: CanvasDocument;
+  lastDocument: CanvasDocument;
+  moved: boolean;
+};
+
 export type MarqueeInteraction = {
   type: "marquee";
   pointerId: number;
@@ -567,6 +582,7 @@ export type Interaction =
   | VectorLassoInteraction
   | VectorAnchorsMoveInteraction
   | VectorShapeBuildInteraction
+  | VectorWidthInteraction
   | MarqueeInteraction
   | PanInteraction
   | CanvasResizeInteraction

@@ -16,7 +16,7 @@ import { compileAppearance } from "@/domain/canvas/appearance";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
 import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
 import { pathToSvgPathData } from "@/canvas/engine/vector/pathData";
-import { pathIsClosed } from "@/domain/canvas/vector";
+import { pathIsClosed, variableWidthOutline } from "@/domain/canvas/vector";
 import { resolveTokenRef, resolveTypeStyleTokenRef } from "@/domain/system-design/resolveTokenRef";
 import type { ResolvedSystemDesign } from "@/domain/system-design/resolve";
 import { useResolvedSystemDesign } from "@/canvas/stage/resolvedSystemDesignContext";
@@ -680,7 +680,15 @@ function ElementRendererImpl({
     // however it is authored — clipping it would silently treat it as closed (F3).
     const align = pathIsClosed(node.path) ? s.strokeAlign ?? "center" : "center";
     const strokeWidth = s.strokeWidth;
-    const hasAlignedStroke = align !== "center" && stroke !== undefined && (strokeWidth ?? 0) > 0;
+    // Variable-width stroke: SVG can't taper a stroke, so paint it as a filled
+    // outline (ribbon) computed from per-anchor widths. When present it replaces the
+    // uniform/aligned stroke entirely.
+    const widthOutline =
+      stroke !== undefined && (strokeWidth ?? 0) > 0
+        ? variableWidthOutline(node.path, strokeWidth ?? 0)
+        : null;
+    const hasAlignedStroke =
+      !widthOutline && align !== "center" && stroke !== undefined && (strokeWidth ?? 0) > 0;
     return (
       <div
         data-element-id={node.id}
@@ -705,13 +713,16 @@ function ElementRendererImpl({
             fillRule={node.path?.fillRule ?? s.fillRule}
             fill={fill}
             fillOpacity={s.fillOpacity}
-            stroke={hasAlignedStroke ? undefined : stroke}
-            strokeWidth={hasAlignedStroke ? undefined : strokeWidth}
-            strokeOpacity={hasAlignedStroke ? undefined : s.strokeOpacity}
-            strokeLinecap={hasAlignedStroke ? undefined : s.strokeLinecap}
-            strokeLinejoin={hasAlignedStroke ? undefined : s.strokeLinejoin}
-            strokeDasharray={hasAlignedStroke ? undefined : s.strokeDasharray}
+            stroke={hasAlignedStroke || widthOutline ? undefined : stroke}
+            strokeWidth={hasAlignedStroke || widthOutline ? undefined : strokeWidth}
+            strokeOpacity={hasAlignedStroke || widthOutline ? undefined : s.strokeOpacity}
+            strokeLinecap={hasAlignedStroke || widthOutline ? undefined : s.strokeLinecap}
+            strokeLinejoin={hasAlignedStroke || widthOutline ? undefined : s.strokeLinejoin}
+            strokeDasharray={hasAlignedStroke || widthOutline ? undefined : s.strokeDasharray}
           />
+          {widthOutline ? (
+            <path d={widthOutline} fill={stroke} fillOpacity={s.strokeOpacity} stroke="none" />
+          ) : null}
           {hasAlignedStroke ? (
             <AlignedStrokePath
               uid={node.id}
