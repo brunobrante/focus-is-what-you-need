@@ -3,6 +3,7 @@ import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
 import { elementTypeLabel } from "@/canvas/engine/mutations/elementCreate";
 import { canFlattenToPath } from "@/canvas/engine/vector/shapeToPath";
 import { pathIsClosed } from "@/domain/canvas/vector";
+import { commonStylesInRange, runsForContent } from "@/domain/canvas/textRuns";
 import { shapeOutline } from "@/domain/canvas/shapeGeometry";
 import type { CanvasDocument, Effect, ElementNode, ElementSizing, ElementStyles, ElementType, Fill, Rect } from "@/canvas/engine/types";
 import { effectTargetForType } from "@/domain/canvas/effects";
@@ -74,6 +75,9 @@ type ElementTabProps = {
   rect: Rect | null;
   /** The parent's styles, for the Layout section's flow-child controls. */
   parentStyles: ElementStyles | null;
+  /** The characters selected in the active text-editing session, if any (G10).
+   *  A non-empty range makes the Typography section edit those characters. */
+  textSelection?: { start: number; end: number } | null;
   /** Reads the live document at event time; only Export needs it (P4). */
   getDocument: () => CanvasDocument | null;
   onUpdateName: (name: string) => void;
@@ -113,6 +117,7 @@ export function ElementTab({
   node,
   rect,
   parentStyles,
+  textSelection = null,
   getDocument,
   onUpdateName,
   onUpdateText,
@@ -136,6 +141,25 @@ export function ElementTab({
 }: ElementTabProps) {
   const isVector = node.type === "path" || node.type === "svg";
   const fillOpacity = Math.round((node.styles.fillOpacity ?? 1) * 100);
+  // A non-empty selection inside the active text edit scopes Typography to those
+  // characters (G10): the panel reads what they have in common and writes back to
+  // the styled runs. A collapsed caret keeps editing the whole element.
+  const runSelection =
+    node.type === "text" && textSelection && textSelection.end > textSelection.start ? textSelection : null;
+  const typographyStyles = useMemo(
+    () =>
+      runSelection
+        ? {
+            ...node.styles,
+            ...commonStylesInRange(
+              runsForContent(node.content ?? "", node.runs),
+              runSelection.start,
+              runSelection.end,
+            ),
+          }
+        : node.styles,
+    [node.content, node.runs, node.styles, runSelection],
+  );
   const resolvedDesign = useResolvedSystemDesign();
   const colorTokens = useMemo<InsColorToken[]>(
     () =>
@@ -476,10 +500,11 @@ export function ElementTab({
 
       {node.type === "text" ? (
         <TypographySection
-          styles={node.styles}
+          styles={typographyStyles}
           tokens={colorTokens}
           heightFit={heightFit}
           locked={locked}
+          selectionActive={runSelection != null}
           onChange={onUpdateStyle}
         />
       ) : null}

@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import { updateElementText, updateElementTextShallow } from "@/canvas/engine/actions";
+import type { TextSelectionStore } from "@/canvas/engine/textSelectionStore";
 import type { CanvasDocument, EditorState, Point } from "@/canvas/engine/types";
 import type { Size } from "@/canvas/engine/viewport";
 import { buildViewportTransform } from "../canvasCoordinates";
@@ -25,6 +26,7 @@ type Params = {
   getCurrentViewportRect: () => ViewportClientRect;
   latestDocumentRef: MutableRefObject<CanvasDocument>;
   latestStateRef: MutableRefObject<EditorState>;
+  textSelectionStore: TextSelectionStore;
 };
 
 export function useTextEditingSession({
@@ -36,6 +38,7 @@ export function useTextEditingSession({
   getCurrentViewportRect,
   latestDocumentRef,
   latestStateRef,
+  textSelectionStore,
 }: Params): TextEditingSessionResult {
   const textEditSessionRef = useRef<TextEditSession | null>(null);
   const pendingTextEditParamsRef = useRef(new Map<string, { clientPoint: Point | null; selectAll: boolean }>());
@@ -48,6 +51,13 @@ export function useTextEditingSession({
     selectionEnd: number,
     anchorIndex?: number,
   ) => {
+    // Side effect outside the updater: StrictMode double-invokes it (M14).
+    const live = latestTextEditRef.current;
+    if (live) {
+      const from = Math.max(0, Math.min(selectionStart, live.value.length));
+      const to = Math.max(0, Math.min(selectionEnd, live.value.length));
+      textSelectionStore.set({ nodeId: live.nodeId, start: Math.min(from, to), end: Math.max(from, to) });
+    }
     setTextEdit((current) => {
       if (!current) return current;
       const start = Math.max(0, Math.min(selectionStart, current.value.length));
@@ -59,7 +69,7 @@ export function useTextEditingSession({
         anchorIndex: anchorIndex ?? end,
       };
     });
-  }, []);
+  }, [textSelectionStore]);
 
   const updateTextNodeFromTextareaInput = useCallback((
     value: string,
@@ -74,8 +84,11 @@ export function useTextEditingSession({
     // updaters, which here mutated latestDocumentRef and fired the transient
     // dispatch twice per keystroke (M14; same fix already applied to zoom and
     // pen-move). The updater below is now pure.
-    const nextDocument = updateElementTextShallow(latestDocumentRef.current, current.nodeId, value);
+    // `end` is the caret after the edit; it tells `updateElementTextShallow`
+    // which contiguous edit happened, so styled runs stay anchored (G10).
+    const nextDocument = updateElementTextShallow(latestDocumentRef.current, current.nodeId, value, end);
     latestDocumentRef.current = nextDocument;
+    textSelectionStore.set({ nodeId: current.nodeId, start: Math.min(start, end), end: Math.max(start, end) });
     // Scope the transient to the edited node (P3): without changedIds the store
     // falls back to a full O(N) deep diff + draft write + saveScene per keystroke.
     dispatch({ type: "setDocumentTransient", document: nextDocument, changedIds: [current.nodeId] });
@@ -86,13 +99,14 @@ export function useTextEditingSession({
       selectionEnd: Math.max(start, end),
       anchorIndex: end,
     } : prev));
-  }, [dispatch, latestDocumentRef]);
+  }, [dispatch, latestDocumentRef, textSelectionStore]);
 
   const commitTextEditing = useCallback(() => {
     const session = textEditSessionRef.current;
     if (!session) return;
     textEditSessionRef.current = null;
     clearNativeTextSelection();
+    textSelectionStore.set(null);
 
     const current = latestTextEditRef.current;
     const value = current?.nodeId === session.nodeId
@@ -114,7 +128,7 @@ export function useTextEditingSession({
       document: finalDocument,
       selectedIds: currentSelectedIds.includes(session.nodeId) ? currentSelectedIds : [session.nodeId],
     });
-  }, [dispatch, latestDocumentRef, latestStateRef]);
+  }, [dispatch, latestDocumentRef, latestStateRef, textSelectionStore]);
 
   const cancelTextEditing = useCallback(() => {
     const session = textEditSessionRef.current;
@@ -123,8 +137,9 @@ export function useTextEditingSession({
     latestDocumentRef.current = session.beforeDocument;
     setTextEdit(null);
     clearNativeTextSelection();
+    textSelectionStore.set(null);
     dispatch({ type: "cancelTextEditing", document: session.beforeDocument });
-  }, [dispatch, latestDocumentRef]);
+  }, [dispatch, latestDocumentRef, textSelectionStore]);
 
   const enterTextEditing = useCallback((nodeId: string, clientPoint?: Point, selectAll = false) => {
     pendingTextEditParamsRef.current.set(nodeId, { clientPoint: clientPoint ?? null, selectAll });
@@ -137,6 +152,7 @@ export function useTextEditingSession({
     if (!activeId || !activeNode || activeNode.type !== "text") {
       if (textEditSessionRef.current) commitTextEditing();
       setTextEdit(null);
+      textSelectionStore.set(null);
       return;
     }
     if (textEditSessionRef.current?.nodeId === activeId) return;
@@ -182,6 +198,11 @@ export function useTextEditingSession({
       selectionEnd: selectAllOnEnter ? value.length : caretIndex,
       anchorIndex: selectAllOnEnter ? 0 : caretIndex,
     });
+    textSelectionStore.set({
+      nodeId: activeId,
+      start: selectAllOnEnter ? 0 : caretIndex,
+      end: selectAllOnEnter ? value.length : caretIndex,
+    });
     clearNativeTextSelection();
   }, [
     commitTextEditing,
@@ -191,6 +212,7 @@ export function useTextEditingSession({
     getCurrentViewportSize,
     latestDocumentRef,
     latestStateRef,
+    textSelectionStore,
     viewportRef,
   ]);
 

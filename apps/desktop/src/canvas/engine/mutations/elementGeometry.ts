@@ -1,3 +1,4 @@
+import { runsForContent, segmentsInRange } from "@/domain/canvas/textRuns";
 import { getElementDefinition } from "../elementDefinitions";
 import type { CanvasDocument, ElementNode, ElementSizing, ElementStyles, Rect } from "../types";
 import { applyChildConstraintsInPlace } from "./elementConstraints";
@@ -97,33 +98,45 @@ function isTextFit(node: ElementNode, axis: keyof ElementSizing): boolean {
 // measuring per run instead of per character makes this O(words) instead of
 // O(len²) in `measure` calls (P7) while producing the identical break positions
 // as the previous char-by-char scan (matches `overflow-wrap: break-word`).
-function tokenizeLine(line: string): Array<{ end: number; isWs: boolean }> {
+function tokenizeLine(text: string, start: number, end: number): Array<{ end: number; isWs: boolean }> {
   const tokens: Array<{ end: number; isWs: boolean }> = [];
-  let i = 0;
+  let i = start;
   const isWsChar = (c: string) => c === " " || c === "\t";
-  while (i < line.length) {
-    const ws = isWsChar(line[i]);
-    let end = i + 1;
-    while (end < line.length && isWsChar(line[end]) === ws) end += 1;
-    tokens.push({ end, isWs: ws });
-    i = end;
+  while (i < end) {
+    const ws = isWsChar(text[i]);
+    let tokenEnd = i + 1;
+    while (tokenEnd < end && isWsChar(text[tokenEnd]) === ws) tokenEnd += 1;
+    tokens.push({ end: tokenEnd, isWs: ws });
+    i = tokenEnd;
   }
   return tokens;
 }
 
-/** Exported for the P7 equivalence test; not part of the public geometry API. */
-export function wrapLineCount(line: string, contentWidth: number, measure: (value: string) => number): number {
-  if (line.length === 0) return 1;
-  const tokens = tokenizeLine(line);
+/**
+ * How many visual lines `text[start, end)` occupies at `contentWidth`.
+ *
+ * Indices rather than a substring because widths are measured per styled run
+ * (G10), which only the absolute offsets can resolve. Exported for the P7
+ * equivalence test; not part of the public geometry API.
+ */
+export function wrapLineCount(
+  text: string,
+  start: number,
+  end: number,
+  contentWidth: number,
+  measureRange: (from: number, to: number) => number,
+): number {
+  if (end <= start) return 1;
+  const tokens = tokenizeLine(text, start, end);
   let wraps = 0;
-  let lineStart = 0;
+  let lineStart = start;
   let lastWrapAfter: number | null = null;
   let i = 0;
 
   while (i < tokens.length) {
     const tokenEnd = tokens[i].end;
     // The whole run from lineStart through this token fits → accept it.
-    if (measure(line.slice(lineStart, tokenEnd)) <= contentWidth) {
+    if (measureRange(lineStart, tokenEnd) <= contentWidth) {
       if (tokens[i].isWs) lastWrapAfter = tokenEnd;
       i += 1;
       continue;
@@ -139,7 +152,7 @@ export function wrapLineCount(line: string, contentWidth: number, measure: (valu
     // No wrap opportunity: the current word alone overflows the line — break it
     // character-by-character (break-word). Only the over-long word pays O(len²).
     let c = lineStart + 1;
-    while (c < tokenEnd && measure(line.slice(lineStart, c + 1)) <= contentWidth) c += 1;
+    while (c < tokenEnd && measureRange(lineStart, c + 1) <= contentWidth) c += 1;
     wraps += 1;
     lineStart = c;
     lastWrapAfter = null;
@@ -152,24 +165,43 @@ export function wrapLineCount(line: string, contentWidth: number, measure: (valu
 type TextFitMetrics = {
   lineHeight: number;
   contentInset: number;
-  lines: string[];
-  measure: (line: string) => number;
+  text: string;
+  /** Hard-break (`\n`) line spans, as absolute `[start, end)` offsets into `text`. */
+  lines: Array<{ start: number; end: number }>;
+  measureRange: (from: number, to: number) => number;
 };
 
 function getTextFitMetrics(node: ElementNode): TextFitMetrics {
   const fontSize = node.styles.fontSize ?? 16;
   const lineHeight = fontSize * 1.12;
-  const font = fontForNode(node);
-  const lines = (node.content ?? "").split("\n");
-  const measure = (line: string) => measureTextWidth(line, font, fontSize);
+  const text = node.content ?? "";
+  // A styled run may change family or weight mid-paragraph, so a range's width is
+  // the sum of its per-run pieces — matching how the DOM shapes one span at a time.
+  const runs = runsForContent(text, node.runs);
+  const measureRange = (from: number, to: number) =>
+    segmentsInRange(runs, from, to).reduce(
+      (width, segment) =>
+        width + measureTextWidth(text.slice(segment.start, segment.end), fontForNode(node, segment.styles), fontSize),
+      0,
+    );
+
+  const lines: Array<{ start: number; end: number }> = [];
+  let lineStart = 0;
+  for (let i = 0; i <= text.length; i += 1) {
+    if (i === text.length || text[i] === "\n") {
+      lines.push({ start: lineStart, end: i });
+      lineStart = i + 1;
+    }
+  }
+
   const padding = node.styles.padding ?? 0;
   const borderWidth = node.styles.borderWidth ?? 0;
   const contentInset = (padding + borderWidth) * 2;
-  return { lineHeight, contentInset, lines, measure };
+  return { lineHeight, contentInset, text, lines, measureRange };
 }
 
 function getFittedTextWidth(metrics: TextFitMetrics): number {
-  const contentWidth = Math.max(0, ...metrics.lines.map(metrics.measure));
+  const contentWidth = Math.max(0, ...metrics.lines.map((line) => metrics.measureRange(line.start, line.end)));
   return Math.ceil(contentWidth + metrics.contentInset);
 }
 
@@ -178,7 +210,8 @@ function getFittedTextHeight(metrics: TextFitMetrics, width: number): number {
   const visualLineCount = Math.max(
     1,
     metrics.lines.reduce(
-      (total, line) => total + wrapLineCount(line, effectiveContentWidth, metrics.measure),
+      (total, line) =>
+        total + wrapLineCount(metrics.text, line.start, line.end, effectiveContentWidth, metrics.measureRange),
       0,
     ),
   );

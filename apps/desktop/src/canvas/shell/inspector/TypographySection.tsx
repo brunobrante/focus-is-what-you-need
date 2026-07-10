@@ -73,12 +73,16 @@ export function TypographySection({
   tokens,
   heightFit,
   locked,
+  selectionActive = false,
   onChange,
 }: {
   styles: ElementStyles;
   tokens: InsColorToken[];
   heightFit: boolean;
   locked: boolean;
+  /** Characters are selected in the text editor: font/weight/style/color/spacing
+   *  and strike apply to them alone, everything else to the whole element (G10). */
+  selectionActive?: boolean;
   onChange: (patch: Partial<ElementStyles>) => void;
 }) {
   const lineHeightAuto = styles.lineHeight === undefined;
@@ -121,6 +125,12 @@ export function TypographySection({
 
   return (
     <InsSection title="Typography" disabled={locked}>
+      {selectionActive ? (
+        <p className="text-[11px] leading-4 text-[#6B6B6B]">
+          Editing the selected text. Font, weight, style, color, spacing and strike apply to the
+          selection; everything else applies to the whole text.
+        </p>
+      ) : null}
       {typeStyleTokens.length > 0 ? (
         <InsRow label="Style token">
           <InsTokenBind

@@ -1,14 +1,33 @@
-import type { CanvasDocument } from "../types";
+import { applyRunStyles, retargetRuns, runsForContent, type TextRunStyles } from "@/domain/canvas/textRuns";
+import type { CanvasDocument, ElementNode } from "../types";
 import { cloneDocument, mutateElementShallow, shallowCloneDocument } from "./coreUtils";
 import { applyTextFitSizingInPlace } from "./elementGeometry";
 
-export function updateElementText(document: CanvasDocument, id: string, content: string): CanvasDocument {
+/**
+ * The single seam that keeps `runs` anchored to `content` (G10). Every text write
+ * lands here, so styled runs survive typing, deleting and pasting without any
+ * caller doing index arithmetic. `caret` is the selection offset *after* the
+ * edit; it disambiguates repeated-character edits ("abb" → "ab").
+ */
+function setNodeText(node: ElementNode, content: string, caret?: number): void {
+  const runs = retargetRuns(node.runs, node.content ?? "", content, caret);
+  node.content = content;
+  if (runs) node.runs = runs;
+  else delete node.runs;
+}
+
+export function updateElementText(
+  document: CanvasDocument,
+  id: string,
+  content: string,
+  caret?: number,
+): CanvasDocument {
   // Shallow like every other single-node commit (P6) — history snapshots share
   // untouched nodes instead of deep-copying the whole scene per commit.
   const next = shallowCloneDocument(document);
   const node = mutateElementShallow(next, id);
   if (!node) return document;
-  node.content = content;
+  setNodeText(node, content, caret);
   applyTextFitSizingInPlace(next, id);
   return next;
 }
@@ -22,11 +41,39 @@ export function updateElementTextShallow(
   document: CanvasDocument,
   id: string,
   content: string,
+  caret?: number,
 ): CanvasDocument {
   const next = shallowCloneDocument(document);
   const node = mutateElementShallow(next, id);
   if (!node) return document;
-  node.content = content;
+  setNodeText(node, content, caret);
+  applyTextFitSizingInPlace(next, id);
+  return next;
+}
+
+/**
+ * Applies a style patch to the characters in `[start, end)` of a text element
+ * (G10). A key present with an `undefined` value clears that per-run override,
+ * falling back to the element's own style; once the whole paragraph agrees again
+ * the runs collapse away entirely.
+ */
+export function applyTextRunStyles(
+  document: CanvasDocument,
+  id: string,
+  start: number,
+  end: number,
+  patch: Partial<TextRunStyles>,
+): CanvasDocument {
+  const node = document.elements[id];
+  if (!node || node.type !== "text" || start >= end) return document;
+  const content = node.content ?? "";
+  const runs = applyRunStyles(runsForContent(content, node.runs), start, end, patch);
+
+  const next = shallowCloneDocument(document);
+  const target = mutateElementShallow(next, id);
+  if (!target) return document;
+  if (runs) target.runs = runs;
+  else delete target.runs;
   applyTextFitSizingInPlace(next, id);
   return next;
 }

@@ -3,7 +3,7 @@ export { DEFAULT_SHELL_BACKGROUND, DEFAULT_SHELL_GRID, createBlankDocument, crea
 export { createElementForTool, elementTypeLabel } from "./mutations/elementCreate";
 export { insertElement, constrainElement, constrainAll, reparentElements, moveElementToParent, deleteElements, duplicateElements, wrapElements, unwrapElement } from "./mutations/elementHierarchy";
 export { fitTextElementToContent, setTextElementSizing, updateElementGeometry, updateElementRotation, updateElementStyles } from "./mutations/elementGeometry";
-export { updateElementText, updateElementTextShallow, updateElementImageSource, renameElement, setElementLocked, setElementVisible, detachInstance } from "./mutations/elementContent";
+export { updateElementText, updateElementTextShallow, applyTextRunStyles, updateElementImageSource, renameElement, setElementLocked, setElementVisible, detachInstance } from "./mutations/elementContent";
 export { reorderElement, reorderElements, moveElementBefore, bringToFront, bringElementsToFront, sendToBack, sendElementsToBack } from "./mutations/elementOrder";
 export { alignElements, distributeElements, nudgeElements, type AlignEdge, type DistributeAxis } from "./mutations/elementAlign";
 export {

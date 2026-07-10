@@ -10,7 +10,8 @@ import {
   shapeOutlinePathData,
   splitClipShapeStyles,
 } from "@/domain/canvas/shapeGeometry";
-import { compileTypography } from "@/domain/canvas/typography";
+import { compileRunStyles, compileTypography } from "@/domain/canvas/typography";
+import { runsForContent } from "@/domain/canvas/textRuns";
 import { compileAppearance } from "@/domain/canvas/appearance";
 import { compileFills, fillTargetForType, type CompiledFill } from "@/domain/canvas/fillCompile";
 import { FillFilterDefs, FillPatternOverlay } from "@/canvas/stage/FillDefs";
@@ -65,6 +66,33 @@ function withTokenBoundStyles(node: ElementNode, resolved: ResolvedSystemDesign 
 }
 
 // ─── Clip-path helpers ────────────────────────────────────────────────────────
+
+/**
+ * A text element's body: the bare string when the paragraph is uniform, one
+ * `<span>` per styled run otherwise (G10).
+ *
+ * A `vertical-align`ed element compiles to `display: flex; flex-direction:
+ * column`, where each span would become its own flex item — its own line. The
+ * bare string gets exactly one anonymous flex item today, so in that case the
+ * spans are wrapped in a single block that reproduces it.
+ */
+function TextContent({ node }: { node: ElementNode }) {
+  const content = node.content ?? "";
+  if (!node.runs || node.runs.length === 0) return <>{content}</>;
+
+  let offset = 0;
+  const spans = runsForContent(content, node.runs).map((run) => {
+    const key = `${offset}`;
+    offset += run.text.length;
+    return run.styles ? (
+      <span key={key} style={compileRunStyles(run.styles)}>{run.text}</span>
+    ) : (
+      <span key={key}>{run.text}</span>
+    );
+  });
+
+  return node.styles.verticalAlign ? <span style={{ display: "block" }}>{spans}</span> : <>{spans}</>;
+}
 
 function computeClipPath(type: ElementType, borderRadius?: number): string | undefined {
   return shapeClipPath(type, borderRadius);
@@ -539,7 +567,7 @@ function ElementRendererImpl({
         style={withFill(base, compiledFill)}
       >
         {compiledFill?.filterDefs.length ? <FillFilterDefs defs={compiledFill.filterDefs} /> : null}
-        {node.content}
+        <TextContent node={node} />
       </div>
     );
   }

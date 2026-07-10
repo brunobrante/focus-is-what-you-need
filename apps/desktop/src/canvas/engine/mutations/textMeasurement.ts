@@ -1,3 +1,4 @@
+import type { TextRunStyles } from "@/domain/canvas/textRuns";
 import type { ElementNode } from "../types";
 
 /**
@@ -12,11 +13,16 @@ import type { ElementNode } from "../types";
  */
 export type TextWidthMeasurer = (text: string, font: string, fontSize: number) => number;
 
-export function fontForNode(node: ElementNode): string {
-  const fontWeight = node.styles.fontWeight ?? "400";
+/**
+ * The CSS `font` shorthand a slice of `node` renders with. `run` carries a styled
+ * run's overrides (G10) and wins over the element's own typography; font size is
+ * element-level by design, so a run never changes the line box.
+ */
+export function fontForNode(node: ElementNode, run?: TextRunStyles): string {
+  const fontWeight = run?.fontWeight ?? node.styles.fontWeight ?? "400";
   const fontSize = node.styles.fontSize ?? 16;
-  const fontFamily = node.styles.fontFamily || "Inter, system-ui, sans-serif";
-  return `${fontWeight} ${fontSize}px ${fontFamily}`;
+  const fontFamily = run?.fontFamily ?? node.styles.fontFamily ?? "";
+  return `${fontWeight} ${fontSize}px ${fontFamily || "Inter, system-ui, sans-serif"}`;
 }
 
 let textMeasureCanvas: HTMLCanvasElement | null = null;

@@ -1024,6 +1024,21 @@ Regular-only face from a Bold selection lands on Regular), and the chosen face i
 before the next measurement so auto-fit text boxes and the editing caret never size against a
 fallback font.
 
+**Styled text runs (G10)** — a single text element can carry mixed styling, so
+"Already have an account? **Sign in**" is one element rather than the old
+multi-element hack. While editing a text element (double-click to enter), **select a
+range of characters and the Typography section retargets to that selection**: Font,
+Weight, Style (italic), Color, Spacing and Strike apply to the selected characters
+only; every other control (Size, Line, Align, V-align, Case, Tight box) still applies
+to the whole element, since those set the line box. The panel shows a one-line note
+while a selection is active, and any control whose value differs across the selection
+reads blank until you set it. Collapse the selection (a plain caret) and the panel goes
+back to editing the whole element. Font **size** is deliberately element-level — runs
+never change the line height. Uniform paragraphs store no run data at all; a run's plain
+text always equals the element's `content`, so caret math, wrapping, auto-fit, HTML
+export and `.figx` all keep working, and a scene whose runs drift out of sync with its
+text loads as uniform (styling is lost, text never is). See `domain/canvas/textRuns.ts`.
+
 **Inspector → Export** (shown for every element type, collapsed by default — the **last**
 element section): per-element export of the selected node to image / vector / code, distinct
 from the project-level `.figx` file (which is export-only and lives in the Landing page menu).

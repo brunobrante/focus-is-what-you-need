@@ -1,6 +1,7 @@
 import type { Box } from "@/domain/canvas/geometry";
 import type { BlendMode, Effect } from "@/domain/canvas/types";
 import type { Fill } from "@/domain/canvas/fill";
+import type { TextRun } from "@/domain/canvas/textRuns";
 import type { VectorPath } from "@/domain/canvas/vector";
 
 export const HTML_CANVAS_FORMAT = "html-css-canvas";
@@ -140,6 +141,9 @@ export type HtmlCanvasNode = {
   bounds: HtmlCanvasBounds;
   style: HtmlCanvasStyle;
   text: string | null;
+  // Styled runs over `text` (G10, text nodes only). Absent when the paragraph is
+  // uniform; the concatenated run text always equals `text`.
+  textRuns?: TextRun[];
   imageUrl: string | null;
   // "path" = one editable vector node (carries `vectorPath` + `viewBox`); "svg" = a
   // sealed container whose child path nodes hold the art. Additive to the legacy

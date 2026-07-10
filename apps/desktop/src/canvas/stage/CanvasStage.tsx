@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { ancestorOverlayItemFor, resolveAncestorOverlayStyle, type AncestorFrame } from "@/canvas/canvasUtils";
-import { useEditor, useHoverStore, useNoticeStore } from "@/canvas/engine/store";
+import { useEditor, useHoverStore, useNoticeStore, useTextSelectionStore } from "@/canvas/engine/store";
 import type { AncestorOverlayState, CanvasDocument, Point, Rect } from "@/canvas/engine/types";
 import { useElementFontTokens } from "./elementFontTokensContext";
 import type { CanvasToolId } from "@/canvas/tools";
@@ -70,6 +70,7 @@ export function CanvasStage({
 }) {
   const { state, dispatch, clipboard } = useEditor();
   const hoverStore = useHoverStore();
+  const textSelectionStore = useTextSelectionStore();
   const noticeStore = useNoticeStore();
   const fontTokens = useElementFontTokens();
 
@@ -166,6 +167,7 @@ export function CanvasStage({
     getCurrentViewportRect,
     latestDocumentRef,
     latestStateRef,
+    textSelectionStore,
   });
 
   const { spacePressedRef } = useKeyboardShortcuts({

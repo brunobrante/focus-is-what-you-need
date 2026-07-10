@@ -1,3 +1,4 @@
+import { runsForContent, segmentsInRange, type TextRunStyles } from "@/domain/canvas/textRuns";
 import type { ElementNode, Rect } from "@/canvas/engine/types";
 
 export type TextLayout = {
@@ -31,15 +32,21 @@ function getMeasureContext(): CanvasRenderingContext2D | null {
   return measureCanvas?.getContext("2d") ?? null;
 }
 
-function fontForNode(node: ElementNode): string {
+/**
+ * The CSS `font` shorthand for a slice of `node`, with a styled run's overrides
+ * layered on (G10). Font size stays element-level, so runs never change the line
+ * box — only glyph widths.
+ */
+function fontForNode(node: ElementNode, run?: TextRunStyles): string {
   const style = node.styles;
   // CSS `font` shorthand order: font-style font-weight font-size family. Include
   // font-style so italic text measures with the italic metrics the DOM renders (M8).
-  const fontStyle = style.fontStyle ? `${style.fontStyle} ` : "";
-  const weight = style.fontWeight ?? "400";
+  const resolvedStyle = run?.fontStyle ?? style.fontStyle;
+  const fontStyle = resolvedStyle ? `${resolvedStyle} ` : "";
+  const weight = run?.fontWeight ?? style.fontWeight ?? "400";
   const size = style.fontSize ?? 16;
-  const family = style.fontFamily || "Inter, system-ui, sans-serif";
-  return `${fontStyle}${weight} ${size}px ${family}`;
+  const family = run?.fontFamily ?? style.fontFamily ?? "";
+  return `${fontStyle}${weight} ${size}px ${family || "Inter, system-ui, sans-serif"}`;
 }
 
 // Mirrors CSS `text-transform`; the DOM renders the transformed glyphs, so the
@@ -100,25 +107,36 @@ function computeTextLayout(node: ElementNode): TextLayout {
   const contentY = contentInset;
   const contentWidth = Math.max(1, node.width - contentInset * 2);
 
+  // `(ctx as object)` so the `in` test reads the feature without narrowing `ctx`
+  // itself to `never` in the unsupported branch (lib.dom now declares the prop).
+  const ctxSpacing = ctx != null && "letterSpacing" in (ctx as object);
   // letter-spacing: `%` → em → px, added between glyphs (M8). Prefer the native
   // ctx.letterSpacing so measureText includes it; fall back to per-char addition.
-  const letterSpacingPx =
-    typeof styles.letterSpacing === "number" && styles.letterSpacing !== 0
-      ? (styles.letterSpacing / 100) * fontSize
-      : 0;
-  const ctxSpacing = ctx != null && "letterSpacing" in ctx;
-  if (ctx) {
-    ctx.font = font;
-    if (ctxSpacing) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${letterSpacingPx}px`;
-  }
+  const letterSpacingPxFor = (run?: TextRunStyles) => {
+    const percent = run?.letterSpacing ?? styles.letterSpacing;
+    return typeof percent === "number" && percent !== 0 ? (percent / 100) * fontSize : 0;
+  };
 
   // The DOM renders the case-transformed glyphs; measure them (indices stay 1:1).
   const measuredText = applyTextTransform(text, styles.textTransform);
-  const measure = (value: string) => {
-    const base = ctx ? ctx.measureText(value).width : value.length * fontSize * 0.55;
-    return ctxSpacing || letterSpacingPx === 0 ? base : base + letterSpacingPx * value.length;
+  // Widths are summed per styled run (G10): each run is its own shaping context in
+  // the DOM (a `<span>`), so measuring them separately is what the render does too.
+  const runs = runsForContent(text, node.runs);
+  const measureSegment = (value: string, run: TextRunStyles | undefined) => {
+    const letterSpacingPx = letterSpacingPxFor(run);
+    if (!ctx) return value.length * fontSize * 0.55 + letterSpacingPx * value.length;
+    ctx.font = fontForNode(node, run);
+    if (ctxSpacing) {
+      (ctx as unknown as { letterSpacing: string }).letterSpacing = `${letterSpacingPx}px`;
+      return ctx.measureText(value).width;
+    }
+    return ctx.measureText(value).width + letterSpacingPx * value.length;
   };
-  const measureRange = (start: number, end: number) => measure(measuredText.slice(start, end));
+  const measureRange = (start: number, end: number) =>
+    segmentsInRange(runs, start, end).reduce(
+      (width, segment) => width + measureSegment(measuredText.slice(segment.start, segment.end), segment.styles),
+      0,
+    );
 
   const ranges: Array<{ start: number; end: number }> = [];
   let lineStart = 0;
@@ -202,6 +220,8 @@ function layoutKey(node: ElementNode): string {
   const s = node.styles;
   return [
     node.content ?? "",
+    // Styled runs change glyph widths, so they change every caret x (G10).
+    node.runs ? JSON.stringify(node.runs) : "",
     node.width,
     node.height, // verticalAlign offset depends on box height
     `${s.fontStyle ?? ""} ${s.fontWeight ?? "400"} ${s.fontSize ?? 16} ${s.fontFamily ?? ""}`,

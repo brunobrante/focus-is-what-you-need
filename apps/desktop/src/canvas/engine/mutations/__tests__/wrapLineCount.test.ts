@@ -57,8 +57,25 @@ const CASES = [
 
 test("optimized wrapLineCount matches the char-by-char reference (P7)", () => {
   for (const line of CASES) {
+    const measureRange = (from: number, to: number) => mono(line.slice(from, to));
     for (const width of [1, 2, 3, 4, 5, 7, 10, 20]) {
-      expect(wrapLineCount(line, width, mono)).toBe(referenceWrapLineCount(line, width, mono));
+      expect(wrapLineCount(line, 0, line.length, width, measureRange)).toBe(
+        referenceWrapLineCount(line, width, mono),
+      );
     }
+  }
+});
+
+// The measured span is addressed by absolute offsets now (G10 measures per styled
+// run), so a line in the middle of a paragraph must count the same as on its own.
+test("wrapLineCount is independent of where the line sits in the text", () => {
+  const paragraph = `prefix\n${CASES[4]}\nsuffix`;
+  const start = "prefix\n".length;
+  const end = start + CASES[4].length;
+  const measureRange = (from: number, to: number) => mono(paragraph.slice(from, to));
+  for (const width of [1, 3, 5, 10, 20]) {
+    expect(wrapLineCount(paragraph, start, end, width, measureRange)).toBe(
+      referenceWrapLineCount(CASES[4], width, mono),
+    );
   }
 });

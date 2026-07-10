@@ -2,6 +2,8 @@ import type { CSSProperties } from "react";
 import type { CanvasDocument, ElementNode } from "@/canvas/engine/types";
 import { escapeAttr, escapeXml, slugClass } from "@/domain/canvas/htmlScene/styleUtils";
 import { compileShapeStroke } from "@/domain/canvas/border";
+import { runsForContent } from "@/domain/canvas/textRuns";
+import { compileRunStyles } from "@/domain/canvas/typography";
 import {
   shapeClipPath,
   shapeOutline,
@@ -74,6 +76,25 @@ function clipShapeStrokeMarkup(node: ElementNode): string {
   );
 }
 
+/**
+ * A text element's body. Uniform paragraphs stay a bare escaped string; styled
+ * runs (G10) become inline-styled `<span>`s, mirroring the canvas renderer —
+ * including the block wrapper a vertical-aligned (flex) box needs so the spans
+ * do not each become their own flex line.
+ */
+function textMarkup(node: ElementNode): string {
+  const content = node.content ?? "";
+  if (!node.runs || node.runs.length === 0) return escapeXml(content);
+  const spans = runsForContent(content, node.runs)
+    .map((run) => {
+      const text = escapeXml(run.text);
+      if (!run.styles) return `<span>${text}</span>`;
+      return `<span style="${escapeAttr(cssPropsToInline(compileRunStyles(run.styles)))}">${text}</span>`;
+    })
+    .join("");
+  return node.styles.verticalAlign ? `<span style="display: block">${spans}</span>` : spans;
+}
+
 function emitNode(ctx: EmitContext, node: ElementNode, isRoot: boolean): string {
   if (node.visible === false) return "";
   const { style, fill } = composeElementCss(node, { isRoot });
@@ -93,7 +114,7 @@ function emitNode(ctx: EmitContext, node: ElementNode, isRoot: boolean): string 
 
   let inner = "";
   if (node.type === "text") {
-    inner = escapeXml(node.content ?? "");
+    inner = textMarkup(node);
   } else if (node.type === "image") {
     const render = fill?.imageRender;
     const src = render && (render.mode === "img" || render.mode === "video") ? render.src : node.src;

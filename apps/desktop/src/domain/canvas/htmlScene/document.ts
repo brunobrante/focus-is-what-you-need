@@ -115,6 +115,7 @@ function compactNode(node: HtmlCanvasNode): Record<string, unknown> {
   if (node.cssId !== slugId(node.name)) out.cssId = node.cssId;
   if (node.className !== slugClass(node.name)) out.className = node.className;
   if (node.text != null) out.text = node.text;
+  if (node.textRuns) out.textRuns = node.textRuns;
   if (node.imageUrl != null) out.imageUrl = node.imageUrl;
   if (node.appearance !== "rect") out.appearance = node.appearance;
   if (node.visible !== true) out.visible = node.visible;

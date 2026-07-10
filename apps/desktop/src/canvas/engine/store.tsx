@@ -13,6 +13,7 @@ import { DEFAULT_ANCESTOR_OVERLAY_ITEM } from "./types";
 import { constrainAll, createDefaultDocument } from "./actions";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
+import { createTextSelectionStore, type TextSelectionStore } from "./textSelectionStore";
 import { createNoticeStore, type CanvasNotice, type NoticeStore } from "./noticeStore";
 import { createClipboard, type Clipboard } from "./clipboard";
 import { getDraftCachePort } from "./draftCachePort";
@@ -58,6 +59,9 @@ type EditorContextValue = {
   state: EditorState;
   dispatch: Dispatch<EditorAction>;
   hoverStore: HoverStore;
+  // Caret/selection of the active text-editing session (G10). Outside the
+  // reducer so per-keystroke range changes don't republish the editor snapshot.
+  textSelectionStore: TextSelectionStore;
   noticeStore: NoticeStore;
   // Copy buffer. The canvas shell passes one shared instance to every pane so
   // copy-paste crosses Sketch/Current/Versions (Product.md [NOW], G6); an editor
@@ -550,6 +554,10 @@ export function EditorProvider({
   if (hoverStoreRef.current === null) hoverStoreRef.current = createHoverStore();
   const hoverStore = hoverStoreRef.current;
 
+  const textSelectionStoreRef = useRef<TextSelectionStore | null>(null);
+  if (textSelectionStoreRef.current === null) textSelectionStoreRef.current = createTextSelectionStore();
+  const textSelectionStore = textSelectionStoreRef.current;
+
   const noticeStoreRef = useRef<NoticeStore | null>(null);
   if (noticeStoreRef.current === null) noticeStoreRef.current = createNoticeStore();
   const noticeStore = noticeStoreRef.current;
@@ -637,8 +645,8 @@ export function EditorProvider({
   }, [onDocumentChange, persistStorage, state.document, state.transientChangedIds, storageKey]);
 
   const value = useMemo(
-    () => ({ state, dispatch, hoverStore, noticeStore, clipboard }),
-    [hoverStore, noticeStore, clipboard, state],
+    () => ({ state, dispatch, hoverStore, textSelectionStore, noticeStore, clipboard }),
+    [hoverStore, textSelectionStore, noticeStore, clipboard, state],
   );
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }
@@ -653,6 +661,10 @@ export function useEditor(): EditorContextValue {
 
 export function useHoverStore(): HoverStore {
   return useEditor().hoverStore;
+}
+
+export function useTextSelectionStore(): TextSelectionStore {
+  return useEditor().textSelectionStore;
 }
 
 export function useHoveredId(): string | null {

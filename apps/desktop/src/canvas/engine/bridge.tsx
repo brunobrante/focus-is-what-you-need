@@ -9,6 +9,7 @@ import type { Dispatch, ReactNode } from "react";
 import { useEditor } from "./store";
 import type { NoticeStore } from "./noticeStore";
 import type { Clipboard } from "./clipboard";
+import type { TextSelectionStore } from "./textSelectionStore";
 import type { EditorState } from "./types";
 
 export type EditorBridgeValue = {
@@ -18,6 +19,9 @@ export type EditorBridgeValue = {
   // Transient toolbar-notice store (e.g. "Wrapper added"). Lives on the editor,
   // surfaced here so the toolbar — rendered outside EditorProvider — can read it.
   noticeStore: NoticeStore;
+  // Caret/selection of the active text-editing session, so the Inspector — which
+  // lives outside EditorProvider — can style the selected characters (G10).
+  textSelectionStore: TextSelectionStore;
   // The editor's per-instance clipboard, so bridge consumers (layers tree paste,
   // canvas commands) act on this editor's buffer rather than a shared one (ENG-3).
   clipboard: Clipboard;

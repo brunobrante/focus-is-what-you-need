@@ -31,6 +31,8 @@ export type {
   ConstraintH,
   ConstraintV,
 };
+import type { TextRun, TextRunStyles } from "@/domain/canvas/textRuns";
+export type { TextRun, TextRunStyles };
 import type {
   Fill,
   FillType,
@@ -121,6 +123,12 @@ export type ElementNode = {
   styles: ElementStyles;
   sizing?: ElementSizing;
   content?: string;
+  /**
+   * Styled runs layered over `content` (G10); absent when the paragraph is
+   * uniform. `runsPlainText(runs) === content` always holds — see
+   * `@/domain/canvas/textRuns`.
+   */
+  runs?: TextRun[];
   src?: string;
   locked?: boolean;
   visible?: boolean;

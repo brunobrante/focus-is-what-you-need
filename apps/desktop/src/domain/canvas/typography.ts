@@ -21,11 +21,31 @@
 // an empty object — safe to spread unconditionally in the renderer.
 
 import type { CSSProperties } from "react";
+import type { TextRunStyles } from "./textRuns";
 import type { ElementStyles } from "./types";
 
 /** Whether an element type renders typography (mirrors the text render branch). */
 export function isTypographyType(type: string): boolean {
   return type === "text";
+}
+
+/**
+ * The inline style of one styled run (G10). Only the run's own overrides are
+ * emitted — everything else inherits from the text element's box, which is what
+ * makes a run a pure overlay. `line-through` is additive: an element-level
+ * underline still paints through the span.
+ */
+export function compileRunStyles(run: TextRunStyles): CSSProperties {
+  const out: CSSProperties = {};
+  if (run.fontFamily) out.fontFamily = run.fontFamily;
+  if (run.fontWeight) out.fontWeight = run.fontWeight;
+  if (run.fontStyle) out.fontStyle = run.fontStyle;
+  if (run.color) out.color = run.color;
+  if (typeof run.letterSpacing === "number" && run.letterSpacing !== 0) {
+    out.letterSpacing = `${run.letterSpacing / 100}em`;
+  }
+  if (run.lineThrough) out.textDecorationLine = "line-through";
+  return out;
 }
 
 /**

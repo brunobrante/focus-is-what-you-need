@@ -16,6 +16,7 @@ import {
   type MasterResolver,
 } from "@/lib/canvas/htmlScene";
 import { DEFAULT_SHELL_BACKGROUND } from "./actions";
+import { compactRuns, runsPlainText, type TextRun } from "@/domain/canvas/textRuns";
 import { hasPerSideWidths } from "@/domain/canvas/border";
 import { normalizeName } from "@/domain/canvas/normalizeName";
 import type {
@@ -124,6 +125,10 @@ export function canvasDocumentFromHtmlDocument(
       rotation: node.style.rotation,
       styles: stylesFromHtmlNode(node),
       content: node.text ?? undefined,
+      // Styled runs (G10). `textRunsFromHtmlNode` re-checks the runs↔text
+      // invariant, so a hand-edited scene degrades to uniform text rather than
+      // rendering spans that no longer match the content.
+      ...textRunsFromHtmlNode(node),
       src: node.imageUrl ?? undefined,
       locked: node.locked,
       visible: node.visible,
@@ -412,6 +417,14 @@ function htmlNodeFromElement(
     },
     style: mergeStyle(previous?.style, styleFromElement(element, previous?.style)),
     text: element.type === "text" ? element.content ?? null : previous?.text ?? null,
+    // Only text nodes carry runs; a uniform paragraph writes no key at all (G10).
+    ...(element.type === "text"
+      ? element.runs
+        ? { textRuns: element.runs }
+        : {}
+      : previous?.textRuns
+        ? { textRuns: previous.textRuns }
+        : {}),
     imageUrl: element.type === "image" ? element.src ?? null : previous?.imageUrl ?? null,
     appearance: appearanceFromElement(element, previous?.appearance),
     // Vector payload — persist so the path survives a save+reload (and the SVG
@@ -455,6 +468,18 @@ function htmlParentIdForCanvasElement(
   if (!node.parentId || node.parentId === htmlRootId) return null;
   if (promotedSubjectId && node.parentId === promotedSubjectId) return null;
   return node.parentId;
+}
+
+/**
+ * Hydrates `runs` only when the stored overlay still partitions the stored text
+ * exactly; otherwise the paragraph loads as uniform (text is never lost, styling
+ * may be). `compactRuns` also drops the degenerate single-unstyled-run case.
+ */
+function textRunsFromHtmlNode(node: HtmlCanvasNode): { runs?: TextRun[] } {
+  if (!node.textRuns || node.text == null) return {};
+  if (runsPlainText(node.textRuns) !== node.text) return {};
+  const runs = compactRuns(node.textRuns);
+  return runs ? { runs } : {};
 }
 
 function elementTypeFromHtmlNode(node: HtmlCanvasNode): ElementType {

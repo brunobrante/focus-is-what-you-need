@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   windowKeyLabel,
   type CanvasWindowKey,
@@ -19,6 +19,7 @@ import {
   updateElementRotation,
   updateElementStyles,
   updateElementText,
+  applyTextRunStyles,
   updateShellBackground,
   updateShellGrid,
   flattenElementToPath,
@@ -36,6 +37,8 @@ import type {
   ElementStyles,
   Rect,
 } from "@/canvas/engine/types";
+import { partitionRunStyles } from "@/domain/canvas/textRuns";
+import type { TextSelection } from "@/canvas/engine/textSelectionStore";
 import { ancestorOverlayItemFor, type AncestorFrame } from "@/canvas/canvasUtils";
 import { getAbsoluteRect, getInstanceRootId } from "@/canvas/engine/geometry";
 import { ElementTab, elementTypeLabel } from "./inspector/ElementTab";
@@ -98,6 +101,32 @@ function sameRect(a: Rect | null, b: Rect | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+/**
+ * The caret/selection of the active text-editing session (G10). It lives in a
+ * per-editor store rather than the reducer, so the bridge gives us the store and
+ * we subscribe to its value — the Inspector re-renders on a selection change, and
+ * on nothing else the store publishes.
+ */
+function useActiveTextSelection(): TextSelection | null {
+  const store = useEditorBridge((v) => v?.textSelectionStore ?? null);
+  const subscribe = useCallback(
+    (listener: () => void) => store?.subscribe(listener) ?? (() => {}),
+    [store],
+  );
+  const getSnapshot = useCallback(() => store?.get() ?? null, [store]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** The selection to style, or null when the whole element should be styled. */
+function runStyleSelection(
+  node: ElementNode | null,
+  selection: TextSelection | null,
+): { start: number; end: number } | null {
+  if (!node || node.type !== "text" || !selection) return null;
+  if (selection.nodeId !== node.id || selection.end <= selection.start) return null;
+  return { start: selection.start, end: selection.end };
 }
 
 type InspectorTab = "element" | "canvas" | "shell" | "layout";
@@ -168,6 +197,7 @@ export function Inspector({
   const bridgeShellBackground = useEditorBridge((v) => v?.state.document.shellBackground ?? null);
   const bridgeShellGrid = useEditorBridge((v) => v?.state.document.shellGrid ?? null);
   const getEditorSnapshot = useEditorBridgeReader();
+  const activeTextSelection = useActiveTextSelection();
 
   // References window: the Element tab inspects the selected stack node (shared via
   // ReferencesBridge) rather than a canvas element. When active it overrides the
@@ -315,7 +345,21 @@ export function Inspector({
   const commitStyle = (styles: Partial<ElementStyles>) => {
     const live = readDocument();
     if (!live || !node) return;
-    commitDocument(updateElementStyles(live, node.id, styles));
+    // With characters selected in the text editor, the per-run half of the patch
+    // (font, weight, italic, color, spacing, strike) styles just those characters
+    // and the rest still applies to the element (G10).
+    const selection = runStyleSelection(node, activeTextSelection);
+    if (!selection) {
+      commitDocument(updateElementStyles(live, node.id, styles));
+      return;
+    }
+    const { runPatch, elementPatch } = partitionRunStyles(styles);
+    let next = live;
+    if (Object.keys(elementPatch).length > 0) next = updateElementStyles(next, node.id, elementPatch);
+    if (Object.keys(runPatch).length > 0) {
+      next = applyTextRunStyles(next, node.id, selection.start, selection.end, runPatch);
+    }
+    commitDocument(next);
   };
 
   // The Fill panel can change the style (`fills` / `background`) AND the image
@@ -528,6 +572,7 @@ export function Inspector({
             node={node}
             rect={rect}
             parentStyles={parentStyles}
+            textSelection={runStyleSelection(node, activeTextSelection)}
             getDocument={readDocument}
             onUpdateName={(name) => commitWith((live) => renameElement(live, node.id, name))}
             onUpdateText={(text) => commitWith((live) => updateElementText(live, node.id, text))}

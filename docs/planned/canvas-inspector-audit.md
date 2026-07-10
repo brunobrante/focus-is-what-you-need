@@ -43,15 +43,17 @@ NB: the canvas geometry/overlay/resize changes are typechecked + unit-tested but
 NOT runtime-verified here (no `bun`); verify nested/rotated resize, radius,
 path-edit, rotated text editing, and resize-flip in-app.
 
-**Remaining (2026-07-10, after the G3 pass):**
-- **Parity features:** G10 (rich text) — its own multi-phase effort.
-- Everything else is closed. The "blocked on the SVG render target" group (F2-borders,
-  F3, G13) turned out not to need it: see each item. Nothing in the audit is blocked
-  on a render-target promotion any more.
-- G3 is done: `queryLocalFonts` is absent from WKWebView, so font enumeration is a
-  native `list_system_fonts` command. NOT runtime-verified here — check that the
+**Remaining (2026-07-10, after the G3 + G10 pass):**
+- **Nothing open.** Every audit item (H/M/L/P/D/F/G) is closed. The "blocked on the
+  SVG render target" group (F2-borders, F3, G13) turned out not to need it; nothing is
+  blocked on a render-target promotion.
+- G3 (fonts) is done: `queryLocalFonts` is absent from WKWebView, so font enumeration
+  is a native `list_system_fonts` command. NOT runtime-verified here — check that the
   Installed group fills in, that picking a family snaps the weight, and that an
-  auto-width text box re-fits correctly right after a font change.
+  auto-width text box re-fits right after a font change.
+- G10 (rich text) is done: styled `runs` overlay on `content`, selection-aware
+  Typography panel, per-run measurement/render/export. NOT runtime-verified here —
+  bold a mid-paragraph selection, confirm caret + wrapping, type around it, reload.
 - Done in the 2026-07-09 pass: G1 (fully), G4, G5, G6, G8, G11, G12, G14, F4,
   D3–D7, P2, P6 — see the item entries. All typechecked and
   unit-tested where tests exist, but NOT runtime-verified here; verify
@@ -1105,7 +1107,36 @@ used to shift `#RRGGBBAA` into the wrong channels *and* force `alpha: 1`, so the
 translucent border colors `BorderSection` already wrote (via `hexWithAlphaPercent`)
 painted opaque on canvas. It delegates to `parseCssColor` now.
 
-## G10 — Rich text spans (MISSING; largest structural item)
+## ✅ DONE — G10 — Rich text spans (MISSING; largest structural item)
+
+`content` stays the plain-text projection of the whole paragraph; styling is a
+new optional `runs?: TextRun[]` **overlay** on `ElementNode` (and `textRuns` on
+the storage node) that partitions `content` into styled slices. The invariant
+`runsPlainText(runs) === content` holds everywhere, so every existing consumer —
+caret/hit-test layout, wrap, auto-fit, HTML export — keeps working, and a uniform
+paragraph carries no runs (no scene bloat). No `SCHEMA_VERSION` bump needed: the
+field is additive-optional and a drifted overlay degrades to uniform on load.
+
+New pure domain module `src/domain/canvas/textRuns.ts` (compact/splice/apply/
+retarget/diff/partition helpers; the one seam every text write goes through is
+`retargetRuns`, which re-anchors runs across an arbitrary contiguous `<textarea>`
+edit via a caret-disambiguated prefix/suffix diff). Wired through:
+`updateElementText(Shallow)` (carry a caret, keep runs anchored), new
+`applyTextRunStyles` action; per-run measurement in `textMeasurement.fontForNode`,
+`elementGeometry` text-fit (indices, not substrings) and `textEditingLayout`
+(caret x per run); `ElementRenderer` + `htmlExport` emit one `<span>` per styled
+run (with the block wrapper a vertical-aligned flex box needs); adapter + document
+persist/round-trip `textRuns` defensively. The caret/selection range lives in a new
+per-editor `textSelectionStore` (outside the reducer, like hover) so the Inspector's
+Typography section retargets to the selected characters — per-run keys (font,
+weight, italic, color, spacing, strike) style the selection, element-level keys
+(size, line, align, …) still style the whole element. Unit-tested
+(`__tests__/textRuns.test.ts`, `textRunsRoundTrip.test.ts`; P7 `wrapLineCount`
+equivalence test updated to the index signature). UX.md updated. NOT
+runtime-verified here: select a range mid-paragraph, bold it, confirm the caret and
+wrapping stay correct, then type around it and reload.
+
+Original note:
 
 `content?: string` — one style per text element; mixed weight/color inside a
 paragraph ("Already have an account? **Sign in**") forces multi-element
