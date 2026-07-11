@@ -8,6 +8,7 @@ import {
   rectCenterY,
   rectRight,
   rotatePoint,
+  getLayoutUnitScale,
   snapToLayoutUnit,
   unionRects,
 } from "./transforms";
@@ -293,7 +294,14 @@ function computeElementTransformedCorners(
 // candidate's corners are a map lookup; the same holds for tooling redraws and
 // hover hit-tests between commits. Revisit an actual index only if scenes reach
 // thousands of nodes.
-const transformedCornersCache = new WeakMap<CanvasDocument, Map<string, ElementCorners | null>>();
+// Keyed by document AND the layout-unit scale in effect when the entry was built:
+// snapToLayoutUnit quantizes in layout px (canvas × renderScale), so a zoom that
+// flips the projection or changes renderScale changes the corners of the SAME
+// document. The per-document entry records its scale and is rebuilt on mismatch.
+const transformedCornersCache = new WeakMap<
+  CanvasDocument,
+  { scale: number; corners: Map<string, ElementCorners | null> }
+>();
 
 /** The element's four canvas-space corners, in local order. Treat as read-only: the
  *  array is shared between callers for the lifetime of `document`. */
@@ -301,15 +309,16 @@ export function getElementTransformedCorners(
   document: CanvasDocument,
   id: string,
 ): ElementCorners | null {
-  let perDocument = transformedCornersCache.get(document);
-  if (!perDocument) {
-    perDocument = new Map();
-    transformedCornersCache.set(document, perDocument);
+  const scale = getLayoutUnitScale();
+  let entry = transformedCornersCache.get(document);
+  if (!entry || entry.scale !== scale) {
+    entry = { scale, corners: new Map() };
+    transformedCornersCache.set(document, entry);
   }
-  const cached = perDocument.get(id);
+  const cached = entry.corners.get(id);
   if (cached !== undefined) return cached;
   const corners = computeElementTransformedCorners(document, id);
-  perDocument.set(id, corners);
+  entry.corners.set(id, corners);
   return corners;
 }
 

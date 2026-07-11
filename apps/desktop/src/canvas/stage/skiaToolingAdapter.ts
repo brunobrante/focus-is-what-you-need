@@ -119,6 +119,10 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
 
     const canvas = document.createElement("canvas");
     canvas.setAttribute("aria-hidden", "true");
+    // Debug hook: lets the alignment log find THIS canvas instead of whatever
+    // `querySelector("canvas")` hits first (the grid overlay canvas, whose 0-width
+    // backing poisoned the log's pixelScale in v7).
+    canvas.dataset.fwynToolingCanvas = "true";
     // Positioned absolutely inside the tooling host (which is `absolute; inset: 0`
     // within the `position: relative` canvas-shell), so the canvas sits exactly at
     // the viewport-container origin and is laid out by the browser. A previous
@@ -258,6 +262,16 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
       canvas.restore();
       surface.flush();
       this.lastRenderedFrame = frame;
+      // Debug hook for the alignment log: what the chrome ON SCREEN was last
+      // drawn from. The log samples this together with the DOM rects post-paint,
+      // so a genuinely stale overlay (flushed but showing an older transform)
+      // becomes measurable instead of being masked by log-scheduling skew.
+      (globalThis as Record<string, unknown>).__fwynLastToolingFrame = {
+        displayZoom: frame.viewportTransform.displayZoom,
+        offsetX: frame.viewportTransform.offsetX,
+        offsetY: frame.viewportTransform.offsetY,
+        drawnAt: performance.now(),
+      };
     } catch (error) {
       if (isContextLossError(error)) {
         this.contextLost = true;

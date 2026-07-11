@@ -492,5 +492,7 @@ export function finishMovedInteraction(
     zoom: state.zoom,
     offsetX: state.offsetX,
     offsetY: state.offsetY,
+    contentScroll: state.contentScroll,
+    viewportMode: state.viewportMode,
   });
 }

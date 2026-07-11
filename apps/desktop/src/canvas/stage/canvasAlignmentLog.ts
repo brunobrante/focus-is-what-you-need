@@ -4,9 +4,9 @@ import {
   getSelectionBox,
   unionRects,
 } from "@/canvas/engine/geometry";
-import type { CanvasDocument, Rect } from "@/canvas/engine/types";
+import { getContentAxis, getContentPages } from "@/canvas/engine/geometry/bounds";
+import type { CanvasDocument, Rect, ViewportMode } from "@/canvas/engine/types";
 import {
-  createViewportTransform,
   getCanvasDisplayScale,
   shouldUseScaledDomProjection,
   type Size,
@@ -16,7 +16,7 @@ import {
   elementToPaintViewportRect,
   snapOutlineRect,
 } from "./canvasToolingRenderer";
-import { getCanvasSize } from "./canvasCoordinates";
+import { buildViewportTransform, getCanvasSize } from "./canvasCoordinates";
 import { getTransformIds } from "./canvasToolingUtils";
 
 export type CanvasAlignmentLogInput = {
@@ -27,6 +27,10 @@ export type CanvasAlignmentLogInput = {
   zoom: number;
   offsetX: number;
   offsetY: number;
+  // Screen pages (v7): the raw transient scroll along the content axis, in canvas
+  // units. Optional so older call sites keep working; without it the log assumes 0.
+  contentScroll?: number;
+  viewportMode?: ViewportMode;
 };
 
 export type CanvasAlignmentLogContext = {
@@ -36,26 +40,47 @@ export type CanvasAlignmentLogContext = {
   viewportSize: Size;
 };
 
+// v8: delegate to the app's real transform builder so the log uses the SAME
+// device-pixel snapping the stage and the tooling adapter use — the v7 log built
+// unsnapped transforms and reported a phantom ±0.5px dom-vs-tooling delta.
 function buildTransform(
   document: CanvasDocument,
   viewportSize: Size,
   zoom: number,
   offsetX: number,
   offsetY: number,
+  viewportMode?: ViewportMode,
 ) {
-  const canvasSize = getCanvasSize(document);
-  const displayScale =
-    viewportSize.width > 0 && viewportSize.height > 0
-      ? getCanvasDisplayScale(viewportSize, canvasSize)
-      : 1;
-  return createViewportTransform({
-    displayZoom: displayScale * zoom,
-    offsetX,
-    offsetY,
-    canvasRotation: document.canvas.rotation ?? 0,
-    canvasWidth: document.canvas.width,
-    canvasHeight: document.canvas.height,
-  });
+  return buildViewportTransform(document, viewportSize, zoom, offsetX, offsetY, viewportMode ?? "frame");
+}
+
+// Mirrors the CanvasStage fold: clamp the transient scroll to the current page
+// count, convert to screen px, and shift the offset along the content axis. The
+// tooling overlay draws with this folded transform; the content surface applies
+// the same shift as a nested CSS translate. Divergence between the two is the
+// recurring "selection chrome off the element" bug this log exists to catch.
+function foldContentScroll(
+  document: CanvasDocument,
+  contentScrollRaw: number,
+  displayZoom: number,
+  offsetX: number,
+  offsetY: number,
+) {
+  const pages = getContentPages(document);
+  const axis = getContentAxis(document);
+  const maxScroll =
+    (pages - 1) * (axis === "horizontal" ? document.canvas.width : document.canvas.height);
+  const clamped = Math.min(contentScrollRaw, maxScroll);
+  const scrollPx = clamped * displayZoom;
+  return {
+    pages,
+    axis,
+    contentScrollRaw,
+    contentScrollClamped: clamped,
+    scrollPx,
+    offsetX: axis === "horizontal" ? offsetX - scrollPx : offsetX,
+    offsetY: axis === "horizontal" ? offsetY : offsetY - scrollPx,
+  };
 }
 
 function roundDebugValue(value: number): number {
@@ -125,8 +150,18 @@ function domBoxMetricsForDebug(element: HTMLElement | null) {
     clientHeight: element.clientHeight,
     scrollWidth: element.scrollWidth,
     scrollHeight: element.scrollHeight,
+    // v7: a non-zero native scroll on a clipped container (canvas-stage /
+    // canvas-shell) shifts its DOM children WITHOUT moving the tooling canvas —
+    // a prime suspect for the chrome-vs-content desync. Nothing in the app sets
+    // these; any non-zero value came from the browser (focus reveal, find, IME).
+    scrollTop: roundDebugValue(element.scrollTop),
+    scrollLeft: roundDebugValue(element.scrollLeft),
     cssWidth: getComputedStyle(element).width,
     cssHeight: getComputedStyle(element).height,
+    inlineTransform: element.style.transform || null,
+    computedTransform: getComputedStyle(element).transform,
+    inlineLeft: element.style.left || null,
+    inlineTop: element.style.top || null,
   };
 }
 
@@ -175,14 +210,45 @@ export function logCanvasAlignment(
   const { viewport, stageElement, canvasStageElement, viewportSize } = context;
 
   const canvasSize = getCanvasSize(input.document);
-  const t = buildTransform(input.document, viewportSize, input.zoom, input.offsetX, input.offsetY);
   const displayScale =
     viewportSize.width > 0 && viewportSize.height > 0
-      ? getCanvasDisplayScale(viewportSize, canvasSize)
+      ? getCanvasDisplayScale(viewportSize, canvasSize, input.viewportMode)
       : 1;
+  // v7: the tooling overlay draws with the CONTENT transform — the plain viewport
+  // offset shifted by the screen-pages scroll. Fold it here the same way
+  // CanvasStage does, so the "expected blue box" below matches what the overlay
+  // actually drew; `fold` also carries the raw/clamped scroll for the payload.
+  const fold = foldContentScroll(
+    input.document,
+    input.contentScroll ?? 0,
+    displayScale * input.zoom,
+    input.offsetX,
+    input.offsetY,
+  );
+  const t = buildTransform(
+    input.document,
+    viewportSize,
+    input.zoom,
+    fold.offsetX,
+    fold.offsetY,
+    input.viewportMode,
+  );
+  const plainT = buildTransform(
+    input.document,
+    viewportSize,
+    input.zoom,
+    input.offsetX,
+    input.offsetY,
+    input.viewportMode,
+  );
   const displayZoom = t.displayZoom;
   const offsetX = t.offsetX;
   const offsetY = t.offsetY;
+  // The content surface is the anonymous translated div CanvasStage renders as
+  // canvas-stage's only child once contentPages > 1; its inline translate is the
+  // content half of the fold. Null with a single page.
+  const contentSurfaceElement =
+    fold.pages > 1 ? (canvasStageElement?.firstElementChild as HTMLElement | null) ?? null : null;
   const scaledDomProjection = shouldUseScaledDomProjection({
     canvasSize,
     displayZoom,
@@ -194,7 +260,12 @@ export function logCanvasAlignment(
     .map((id) => elementToPaintViewportRect(input.document, id, t))
     .filter((rect): rect is Rect => rect !== null);
   const boxSelectionViewportRect = unionViewportRects(toolingRects);
-  const toolingCanvas = viewport.querySelector<HTMLCanvasElement>("canvas");
+  // v8: target the skia tooling canvas by its data tag — a bare
+  // `querySelector("canvas")` used to hit the grid overlay canvas first (0-width
+  // backing when the grid is off), poisoning pixelScale (v7 logs showed x: 0).
+  const toolingCanvas =
+    viewport.querySelector<HTMLCanvasElement>("canvas[data-fwyn-tooling-canvas]") ??
+    viewport.querySelector<HTMLCanvasElement>("canvas");
   const toolingCanvasRect = toolingCanvas?.getBoundingClientRect();
   const canvasStageViewportRect = canvasStageElement
     ? domRectRelativeToViewport(canvasStageElement, viewport)
@@ -351,10 +422,62 @@ export function logCanvasAlignment(
     cssWidth: item.css.width,
   }));
 
+  // v8: the ONLY skew-free on-screen comparison in this log. `input` state is
+  // captured at dispatch time, but this function runs post-paint (double rAF),
+  // so during a wheel-zoom stream the DOM rects measured here belong to a NEWER
+  // commit than `input` — the big mid-gesture deltas in the v7 logs were that
+  // scheduling skew, not a real desync. `__fwynLastToolingFrame` is stamped by
+  // the skia adapter at draw time, so comparing it against the DOM rects
+  // measured in the same post-paint instant answers the real question: does the
+  // chrome currently submitted to the canvas match the content currently laid
+  // out in the DOM? (A remaining gap here would mean the divergence lives below
+  // JS — the compositor presenting a stale WebGL buffer.)
+  const lastToolingFrame = (globalThis as Record<string, unknown>).__fwynLastToolingFrame as
+    | { displayZoom: number; offsetX: number; offsetY: number; drawnAt: number }
+    | undefined;
+  const firstItem = items[0];
+  const firstAbs = transformIds.length > 0 ? getAbsoluteRect(input.document, transformIds[0]) : null;
+  const onScreenChrome =
+    lastToolingFrame && firstItem?.domViewportRect && firstAbs && firstAbs.width > 0
+      ? {
+          chromeDisplayZoom: roundDebugValue(lastToolingFrame.displayZoom),
+          domImpliedScale: roundDebugValue(firstItem.domViewportRect.width / firstAbs.width),
+          deltaScale: roundDebugValue(
+            lastToolingFrame.displayZoom - firstItem.domViewportRect.width / firstAbs.width,
+          ),
+          deltaLeft: roundDebugValue(
+            firstItem.domViewportRect.x -
+              (lastToolingFrame.offsetX + firstAbs.x * lastToolingFrame.displayZoom),
+          ),
+          deltaTop: roundDebugValue(
+            firstItem.domViewportRect.y -
+              (lastToolingFrame.offsetY + firstAbs.y * lastToolingFrame.displayZoom),
+          ),
+          chromeAgeMs: roundDebugValue(performance.now() - lastToolingFrame.drawnAt),
+        }
+      : null;
+
   const payload = {
-    version: 6,
+    version: 8,
     reason: input.reason,
     interaction: input.interactionType ?? null,
+    onScreenChrome,
+    // v7: everything screen-pages. expectedSurfaceTranslatePx assumes the
+    // scaled-DOM projection (renderScale = displayZoom); during a live zoom
+    // gesture the projection is CSS-transform and the expected inline translate
+    // is `-contentScrollClamped * 1` instead — compare against
+    // dom.contentSurface.inlineTransform for whichever projection
+    // stageProjection.mode reports.
+    screenPages: {
+      pages: fold.pages,
+      axis: fold.axis,
+      contentScrollRaw: roundDebugValue(fold.contentScrollRaw),
+      contentScrollClamped: roundDebugValue(fold.contentScrollClamped),
+      scrollPx: roundDebugValue(fold.scrollPx),
+      expectedSurfaceTranslatePx: roundDebugValue(-fold.scrollPx),
+      plainOffset: { x: roundDebugValue(plainT.offsetX), y: roundDebugValue(plainT.offsetY) },
+      foldedOffset: { x: roundDebugValue(t.offsetX), y: roundDebugValue(t.offsetY) },
+    },
     runtime: {
       devicePixelRatio: roundDebugValue(globalThis.devicePixelRatio || 1),
       visualViewport: globalThis.visualViewport
@@ -426,6 +549,7 @@ export function logCanvasAlignment(
       viewport: domBoxMetricsForDebug(viewport),
       stageSpace: domBoxMetricsForDebug(stageElement),
       canvasStage: domBoxMetricsForDebug(canvasStageElement),
+      contentSurface: domBoxMetricsForDebug(contentSurfaceElement),
       toolingCanvas: toolingCanvas
         ? {
             clientRect: rectForDebug(domClientRectForDebug(toolingCanvas)),
@@ -465,8 +589,8 @@ export function logCanvasAlignment(
     boxOutlineEdges,
     items,
   };
-  console.log("[canvas alignment geometry v6]", payload);
+  console.log("[canvas alignment geometry v8]", payload);
   console.table(flatItems);
-  console.log("[canvas alignment flat v6]", JSON.stringify(flatItems, null, 2));
-  console.log("[canvas alignment payload v6]", JSON.stringify(payload, null, 2));
+  console.log("[canvas alignment flat v8]", JSON.stringify(flatItems, null, 2));
+  console.log("[canvas alignment payload v8]", JSON.stringify(payload, null, 2));
 }

@@ -275,10 +275,26 @@ export function useViewportControls({
       const currentDisplayZoom = state.zoom * displayScale;
       const nextDisplayZoom = nextZoom * displayScale;
       const cursor = { x: event.clientX - viewportRect.left, y: event.clientY - viewportRect.top };
+      // Screen pages: what sits under the cursor is the CONTENT — shifted by the
+      // page scroll — so the anchor must map through the folded transform (the
+      // same one the rendered scene and the tooling overlay use), and the new
+      // offset must re-add the scroll at the new zoom. Folding with the plain
+      // transform anchored a point `contentScroll` away along the axis, so every
+      // cmd+wheel step lurched the camera when the pages were scrolled.
+      const contentPages =
+        state.viewportMode === "draft" ? 1 : getContentPages(state.document);
+      const contentAxis = getContentAxis(state.document);
+      const contentScroll = Math.min(
+        state.contentScroll,
+        (contentPages - 1) * (contentAxis === "horizontal" ? canvasSize.width : canvasSize.height),
+      );
+      const currentScrollPx = contentScroll * currentDisplayZoom;
+      const nextScrollPx = contentScroll * nextDisplayZoom;
+      const scrollIsHorizontal = contentAxis === "horizontal";
       const currentTransform = createViewportTransform({
         displayZoom: currentDisplayZoom,
-        offsetX: snapViewportOffset(state.offsetX),
-        offsetY: snapViewportOffset(state.offsetY),
+        offsetX: snapViewportOffset(state.offsetX - (scrollIsHorizontal ? currentScrollPx : 0)),
+        offsetY: snapViewportOffset(state.offsetY - (scrollIsHorizontal ? 0 : currentScrollPx)),
         canvasRotation: state.document.canvas.rotation ?? 0,
         canvasWidth: canvasSize.width,
         canvasHeight: canvasSize.height,
@@ -287,13 +303,17 @@ export function useViewportControls({
       // Anchor the zoom under the cursor, clamped to the navigable region so you
       // can zoom into any part of it (the whole device when the simulator is on),
       // not just the component — otherwise zooming over the device area snaps the
-      // anchor to the component edge and the view lurches toward center.
+      // anchor to the component edge and the view lurches toward center. With
+      // screen pages the content region extends past the frame along the content
+      // axis, so the clamp bounds stretch by the extra pages.
       const anchorBounds = navigableBounds ?? { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height };
+      const pagesExtraX = scrollIsHorizontal ? (contentPages - 1) * canvasSize.width : 0;
+      const pagesExtraY = scrollIsHorizontal ? 0 : (contentPages - 1) * canvasSize.height;
       const clampedCursorCanvas = state.viewportMode === "draft"
         ? cursorCanvas
         : {
-            x: clamp(cursorCanvas.x, anchorBounds.x, anchorBounds.x + anchorBounds.width),
-            y: clamp(cursorCanvas.y, anchorBounds.y, anchorBounds.y + anchorBounds.height),
+            x: clamp(cursorCanvas.x, anchorBounds.x, anchorBounds.x + anchorBounds.width + pagesExtraX),
+            y: clamp(cursorCanvas.y, anchorBounds.y, anchorBounds.y + anchorBounds.height + pagesExtraY),
           };
       const nextBaseTransform = createViewportTransform({
         displayZoom: nextDisplayZoom,
@@ -304,7 +324,11 @@ export function useViewportControls({
         canvasHeight: canvasSize.height,
       });
       const nextBaseCursor = canvasPointToViewport(clampedCursorCanvas, nextBaseTransform);
-      nextViewport = { zoom: nextZoom, offsetX: cursor.x - nextBaseCursor.x, offsetY: cursor.y - nextBaseCursor.y };
+      nextViewport = {
+        zoom: nextZoom,
+        offsetX: cursor.x - nextBaseCursor.x + (scrollIsHorizontal ? nextScrollPx : 0),
+        offsetY: cursor.y - nextBaseCursor.y + (scrollIsHorizontal ? 0 : nextScrollPx),
+      };
     } else if (
       getContentPages(state.document) > 1 &&
       isModifierCommandActive(event, settings, "canvas.viewport.wheelPageScroll")

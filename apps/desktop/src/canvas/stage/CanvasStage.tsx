@@ -16,6 +16,7 @@ import {
   viewportChanged,
 } from "@/canvas/engine/viewport";
 import { getAbsoluteRect, getContentAxis, getContentPages, getSelectionAABB } from "@/canvas/engine/geometry/bounds";
+import { setLayoutUnitScale } from "@/canvas/engine/geometry/transforms";
 import { CanvasContextMenu } from "./CanvasContextMenu";
 import { CanvasToolingLayer } from "./CanvasToolingLayer";
 import type { CanvasToolingRef } from "./CanvasToolingLayer";
@@ -304,6 +305,8 @@ export function CanvasStage({
         zoom: currentState.zoom,
         offsetX: currentState.offsetX,
         offsetY: currentState.offsetY,
+        contentScroll: currentState.contentScroll,
+        viewportMode: currentState.viewportMode,
       });
     };
     debugGlobal.__logCanvasAlignment = logCurrentAlignment;
@@ -322,8 +325,10 @@ export function CanvasStage({
       zoom: state.zoom,
       offsetX: state.offsetX,
       offsetY: state.offsetY,
+      contentScroll: state.contentScroll,
+      viewportMode: state.viewportMode,
     });
-  }, [selectedIdsKey, state.canvasStageActive, state.document, state.offsetX, state.offsetY, state.zoom, canvasAlignmentDebugEnabled]);
+  }, [selectedIdsKey, state.canvasStageActive, state.document, state.offsetX, state.offsetY, state.zoom, state.contentScroll, canvasAlignmentDebugEnabled]);
 
   // The viewport transform is memoized from state + measured size; pointer
   // handlers reuse it instead of rebuilding it per event (STAGE-3). Defined
@@ -484,6 +489,13 @@ export function CanvasStage({
   }, [draftContentBounds, displayZoom, viewportTransform.offsetX, viewportTransform.offsetY, viewportSize.width, viewportSize.height]);
   const scroll = draftMode ? draftScroll : elementScroll;
   const renderScale = scaledDomProjection ? displayZoom : 1;
+  // Mirror the stage's layout scale into the geometry module BEFORE children
+  // render: snapToLayoutUnit emulates the browser's 1/64-px LayoutUnit floor on
+  // the value the DOM actually lays out (canvas × renderScale). A module write
+  // during render is deliberate — it must be visible to the tooling layer's
+  // render pass in this same commit, and it is idempotent (safe under
+  // StrictMode's double render).
+  setLayoutUnitScale(renderScale);
   const stageWidth = canvasSize.width;
   const stageHeight = canvasSize.height;
   const projectedStageWidth = stageWidth * renderScale;

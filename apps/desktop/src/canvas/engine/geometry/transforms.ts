@@ -25,9 +25,28 @@ export function roundPixel(value: number): number {
  * difference becomes a visible viewport pixel offset between the DOM element and the
  * canvas overlay outline. Applying the same snap in JS makes the canvas-space rect
  * match exactly what the browser paints.
+ *
+ * The browser quantizes the value it LAYS OUT — which is `canvasValue × renderScale`
+ * (the scaled-DOM projection writes pre-multiplied px into style.left/top). Snapping
+ * the raw canvas value and multiplying afterwards amplifies the 1/64 floor by the
+ * zoom: at 256x that is a ~4px chrome-vs-element offset, growing linearly with zoom
+ * (the recurring "selection box off the element" bug). So the snap happens in layout
+ * px and is expressed back in canvas units; `setLayoutUnitScale` mirrors the stage's
+ * current renderScale (1 while the CSS-transform projection is active).
  */
+let layoutUnitScale = 1;
+
+export function setLayoutUnitScale(scale: number): void {
+  layoutUnitScale = scale > 0 ? scale : 1;
+}
+
+export function getLayoutUnitScale(): number {
+  return layoutUnitScale;
+}
+
 export function snapToLayoutUnit(value: number): number {
-  return Math.floor(value * 64) / 64;
+  const step = 64 * layoutUnitScale;
+  return Math.floor(value * step) / step;
 }
 
 export function roundAngle(value: number): number {
