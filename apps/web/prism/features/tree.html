@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Never lose the way back — Prism</title>
+  <meta name="description" content="Prism navigation: whole screen, one isolated child, that child's children beside it — repeat, without ever losing the path home.">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='46' y='10' width='8' height='80' rx='4' fill='%238b6cff'/></svg>">
+  <script>document.documentElement.classList.remove('no-js');</script>
+</head>
+<body data-page="feature" class="fpage" style="--fc:#34e8a9">
+
+  <div id="gl" aria-hidden="true"></div>
+  <div class="ambient" aria-hidden="true"></div>
+
+  <header class="nav solid" id="nav">
+    <a class="wordmark" href="../index.html" data-transition data-hue-link="#34e8a9" aria-label="Prism — home">PR<span class="slit"></span>SM</a>
+    <nav class="nav-links">
+      <a class="nav-link" href="../index.html#features" data-transition data-hue-link="#34e8a9">All features</a>
+      <a class="btn btn--ghost" href="../index.html#access" data-transition data-hue-link="#34e8a9">Get early access</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="fp-hero">
+      <p class="fp-kicker"><span class="idx">03 / 05</span> · Navigation</p>
+      <h1>
+        <span class="line-mask"><span class="line-inner">Never lose</span></span>
+        <span class="line-mask"><span class="line-inner"><span class="hueword">the way back.</span></span></span>
+      </h1>
+      <p class="fp-lede">Every screen is a tree, and Prism is a visual decomposition tool for walking it: <strong>whole screen → one isolated child → its children beside it → deeper.</strong> The parent is the spine of the product, not optional metadata.</p>
+    </section>
+
+    <section class="fp-band">
+      <span class="fp-band-label">The problem</span>
+      <div>
+        <h2 data-reveal>Design tools make you hunt</h2>
+        <p data-reveal>Pan, zoom, squint, repeat. On an endless plane, reaching the thing you need to touch is a search problem — and “jump to element” features are bandaids on a UX that is still, at its core, a hunt.</p>
+        <p data-reveal>Every minute spent locating a layer is a minute of context leaking away. And once you're deep in nested groups, good luck remembering how you got there.</p>
+      </div>
+    </section>
+
+    <section class="fp-band">
+      <span class="fp-band-label">The approach</span>
+      <div>
+        <h2 data-reveal>The tree is the map</h2>
+        <p data-reveal>Open a screen and you read the complete composition — every section already in place. Click a section and it becomes <strong>the subject</strong>: shown alone, at its true, intrinsic size, never mixed back into the screen. Its children appear adjacent, ready to be opened next.</p>
+        <blockquote class="fp-quote" data-reveal>“I started at Home, clicked Header, inspected Logo — and I never lost track of where I was.”</blockquote>
+      </div>
+    </section>
+
+    <section class="fp-band">
+      <span class="fp-band-label">Componentization at work</span>
+      <div>
+        <span class="law-chip" data-reveal>Law · hierarchy is always preserved</span>
+        <h2 data-reveal>One rhythm, any depth</h2>
+        <p data-reveal>Because components form automatically, the tree you navigate is always the true structure — there is no separate layers panel to fall out of sync with reality. Every node knows its screen, its parent, and its children, and every view is fed by that same tree:</p>
+        <ul class="fp-list">
+          <li data-reveal><strong>True-size snapshots</strong> — a component previews at its real, intrinsic dimensions. Never a generic ratio, never a meaning-changing crop.</li>
+          <li data-reveal><strong>Children beside the subject</strong> — the next level inward is always one glance, one click away.</li>
+          <li data-reveal><strong>The path home never breaks</strong> — however deep you drill, every step back to the screen is preserved and visible.</li>
+        </ul>
+        <div class="fp-diagram" data-reveal>
+<svg viewBox="0 0 640 300" fill="none">
+            <rect class="d-line" x="30" y="60" width="120" height="200" rx="10" stroke-width="1"/>
+            <rect class="d-hue" data-draw x="45" y="80" width="90" height="30" rx="5" stroke-width="1.5"/>
+            <rect class="d-line" x="45" y="122" width="90" height="50" rx="5" stroke-width="1"/>
+            <rect class="d-line" x="45" y="184" width="90" height="26" rx="5" stroke-width="1"/>
+            <text class="d-text" x="34" y="46">home — whole screen</text>
+            <path class="d-hue" data-draw d="M 150 95 C 200 95, 200 140, 250 140" stroke-width="1.5"/>
+            <rect class="d-hue" data-draw x="250" y="100" width="160" height="80" rx="10" stroke-width="1.5"/>
+            <text class="d-text hue" x="266" y="90">header — the subject, alone</text>
+            <path class="d-line" data-draw d="M 410 140 C 450 140, 450 90, 490 90" stroke-width="1"/>
+            <path class="d-line" data-draw d="M 410 140 C 450 140, 450 160, 490 160" stroke-width="1"/>
+            <path class="d-line" data-draw d="M 410 140 C 450 140, 450 230, 490 230" stroke-width="1"/>
+            <rect class="d-line" x="490" y="70" width="110" height="40" rx="8" stroke-width="1"/>
+            <rect class="d-line" x="490" y="140" width="110" height="40" rx="8" stroke-width="1"/>
+            <rect class="d-line" x="490" y="210" width="110" height="40" rx="8" stroke-width="1"/>
+            <text class="d-text" x="506" y="94">logo</text>
+            <text class="d-text" x="506" y="164">copy</text>
+            <text class="d-text" x="506" y="234">search</text>
+            <text class="d-text hue" x="34" y="286">home → header → …   the breadcrumb never breaks</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="fp-result">
+      <p class="eyebrow" data-reveal>The result</p>
+      <h2>
+        <span class="line-mask"><span class="line-inner">Ten levels deep,</span></span>
+        <span class="line-mask"><span class="line-inner"><em>one glance from home.</em></span></span>
+      </h2>
+      <p data-reveal>A new person opens Prism and, with no explanation, understands the screen, its parts, and how to go deeper — and never once feels the urge to organize a canvas before creating.</p>
+    </section>
+
+    <section class="fp-next">
+      <a href="ownership.html" data-transition data-hue-link="#ffb454" style="--nc:#ffb454">
+        <span class="k">Next — 04 / 05</span>
+        <span class="t">Link & Own</span>
+      </a>
+    </section>
+
+    <footer class="footer">
+      <a class="wordmark" href="../index.html" data-transition data-hue-link="#34e8a9" aria-label="Prism">PR<span class="slit"></span>SM</a>
+      <nav class="footer-links">
+        <a href="../index.html#why" data-transition data-hue-link="#34e8a9">Why</a>
+        <a href="../index.html#features" data-transition data-hue-link="#34e8a9">Features</a>
+        <a href="../index.html#compared" data-transition data-hue-link="#34e8a9">Compared</a>
+      </nav>
+      <span>© 2026 Prism — built around one rule.</span>
+    </footer>
+  </main>
+
+  <div class="veil" id="veil" aria-hidden="true">
+    <div class="veil-panel"></div>
+    <div class="veil-beam"></div>
+    <span class="veil-word">One thing at a time</span>
+  </div>
+
+  <script src="../js/vendor/gsap.min.js"></script>
+  <script src="../js/vendor/ScrollTrigger.min.js"></script>
+  <script src="../js/vendor/lenis.min.js"></script>
+  <script src="../js/main.js"></script>
+  <script type="importmap">{ "imports": { "three": "../js/vendor/three.module.min.js" } }</script>
+  <script type="module" src="../js/hero.js"></script>
+</body>
+</html>

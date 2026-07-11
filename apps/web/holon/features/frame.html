@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The frame is the canvas — Holon</title>
+<meta name="description" content="In Holon you edit inside the bounds of the thing you opened. 1× is the floor — there is no outside.">
+<link rel="stylesheet" href="../css/fonts.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='6' fill='none' stroke='%23f2efe6' stroke-opacity='.4' stroke-width='2'/%3E%3Crect x='10' y='10' width='12' height='12' rx='3' fill='%23ff5a2d'/%3E%3C/svg%3E">
+</head>
+<body data-page="feature">
+
+<div class="veil" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav scrolled">
+  <a class="logo" data-transition href="../index.html">
+    <svg class="mark" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+      <rect class="m-outer" x="3" y="3" width="50" height="50" rx="10"/>
+      <rect class="m-mid" x="13" y="13" width="30" height="30" rx="7"/>
+      <rect class="m-core" x="22" y="22" width="12" height="12" rx="4"/>
+    </svg>
+    Holon
+  </a>
+  <nav class="nav-links">
+    <a href="../index.html#why">Why</a>
+    <a href="../index.html#law">The Law</a>
+    <a href="../index.html#journey">The Journey</a>
+    <a href="../index.html#compare">Compare</a>
+    <a class="btn btn-sm" href="../index.html#cta"><span>Get early access</span></a>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="fd-hero">
+    <div>
+      <a class="back" data-transition href="../index.html">
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M13 5H2m0 0 3.5-3.5M2 5l3.5 3.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        Back to Holon
+      </a>
+      <p class="kicker" data-reveal>Deep dive · 03</p>
+      <h1>
+        <span class="line-mask"><span class="line-inner">The frame is</span></span>
+        <span class="line-mask"><span class="line-inner">the <em class="accent" style="font-style:normal">canvas</em>.</span></span>
+      </h1>
+      <p class="fd-lede" data-reveal>Holon has no free, infinite main canvas. The thing you opened is the surface you paint on — and its bounds are the point, not a limitation.</p>
+    </div>
+  </section>
+
+  <div class="fd-body">
+    <div class="fd-block" data-reveal>
+      <span class="fb-k">The problem</span>
+      <div><h2>Infinite space, zero certainty</h2><p>A free canvas lets you touch everything, which means you focus on nothing. Elements drift where they shouldn&#8217;t, edits leak into neighbors, and the tool never tells you where your subject <em>ends</em>.</p><p>Editing &#8220;in the open&#8221; feels powerful for five minutes. Then you spend the session managing the openness.</p></div>
+    </div>
+    <div class="fd-block" data-reveal>
+      <span class="fb-k">The approach</span>
+      <div><h2>Open it, and its bounds become the world</h2><p>Whatever you open — a screen or the smallest button — its top element becomes the <strong>frame</strong>: the fixed surface you create on. Everything you make lives inside it. There is nothing to edit outside it, so there is nothing outside to worry about.</p><p>You edit a component by explicitly opening it — never by reaching into it from the whole screen. Focus and certainty, by construction.</p><div class="law-quote">You cannot zoom out below 1&times;. At 1&times; the frame already fills the canvas — there is no &#8220;out there.&#8221; [LAW]</div></div>
+    </div>
+    <div class="fd-block" data-reveal>
+      <span class="fb-k">The model</span>
+      <div><h2>Room to work, guides to trust</h2><p>Zooming in enlarges the navigable region around the frame so you&#8217;re not editing jammed into corners — elbow room as a convenience of zoom, not a free canvas through the back door. Pan and zoom stay clamped to your subject&#8217;s bounds.</p><p>And when you edit a component in isolation, you can project <strong>grid guides derived from its ancestors</strong> onto the frame — so even alone, you stay aligned with the parent context you can&#8217;t currently see.</p></div>
+    </div>
+    <div class="fd-block" data-reveal>
+      <span class="fb-k">The result</span>
+      <div><h2>Bounded decisions, better ones</h2><p>Every edit happens inside a known boundary, with the parent&#8217;s constraints visible when you want them. Nothing drifts, nothing leaks, and the question &#8220;where am I allowed to go?&#8221; always has an answer.</p><p>Focused windows handle the rest: a Versions canvas for side-by-side comparison, a References canvas for inspiration, and Sketch — one deliberately free scratchpad, quarantined from the real structure.</p></div>
+    </div>
+  </div>
+
+  <section class="fd-next">
+    <p class="n-k">Next deep dive</p>
+    <a class="n-title" data-transition href="ownership.html">Yours, linked, or let go &rarr;</a>
+  </section>
+</main>
+
+<footer class="footer">
+  <span class="f-logo">
+    <svg class="mark" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+      <rect class="m-outer" x="3" y="3" width="50" height="50" rx="10"/>
+      <rect class="m-mid" x="13" y="13" width="30" height="30" rx="7"/>
+      <rect class="m-core" x="22" y="22" width="12" height="12" rx="4"/>
+    </svg>
+    Holon
+  </span>
+  <span>Every part is a whole. &copy; 2026 Holon — a concept.</span>
+</footer>
+
+<script src="../js/vendor/gsap.min.js"></script>
+<script src="../js/vendor/ScrollTrigger.min.js"></script>
+<script src="../js/vendor/lenis.min.js"></script>
+<script src="../js/main.js"></script>
+</body>
+</html>

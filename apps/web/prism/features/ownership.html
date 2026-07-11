@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ownership is never ambiguous — Prism</title>
+  <meta name="description" content="One mechanism for all reuse in Prism: linkable, linked instance, detach — for components, design tokens, and references alike.">
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='46' y='10' width='8' height='80' rx='4' fill='%238b6cff'/></svg>">
+  <script>document.documentElement.classList.remove('no-js');</script>
+</head>
+<body data-page="feature" class="fpage" style="--fc:#ffb454">
+
+  <div id="gl" aria-hidden="true"></div>
+  <div class="ambient" aria-hidden="true"></div>
+
+  <header class="nav solid" id="nav">
+    <a class="wordmark" href="../index.html" data-transition data-hue-link="#ffb454" aria-label="Prism — home">PR<span class="slit"></span>SM</a>
+    <nav class="nav-links">
+      <a class="nav-link" href="../index.html#features" data-transition data-hue-link="#ffb454">All features</a>
+      <a class="btn btn--ghost" href="../index.html#access" data-transition data-hue-link="#ffb454">Get early access</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="fp-hero">
+      <p class="fp-kicker"><span class="idx">04 / 05</span> · Reuse & versions</p>
+      <h1>
+        <span class="line-mask"><span class="line-inner">Ownership is</span></span>
+        <span class="line-mask"><span class="line-inner"><span class="hueword">never ambiguous.</span></span></span>
+      </h1>
+      <p class="fp-lede">Prism shares everything the same way — components, design tokens, references. <strong>Mark it linkable. Place it as a live instance. Detach it to own it.</strong> Three verbs, everywhere, with guarantees.</p>
+    </section>
+
+    <section class="fp-band">
+      <span class="fp-band-label">The problem</span>
+      <div>
+        <h2 data-reveal>Reuse, the haunted version</h2>
+        <p data-reveal>You duplicate a card and the copies drift apart. You reuse an instance and someone edits the master, silently changing ten screens. You delete a “copy” and the original vanishes with it. Tokens follow one sharing model, components another, assets a third.</p>
+        <p data-reveal>Canvas tools make reuse a game of memory: <em>which one of these is real?</em></p>
+      </div>
+    </section>
+
+    <section class="fp-band">
+      <span class="fp-band-label">The approach</span>
+      <div>
+        <h2 data-reveal>Three verbs, one mechanism</h2>
+        <p data-reveal>A workspace component, a brand token, a reference image — anything marked <strong>linkable</strong> can be placed into a lower scope as a <strong>linked instance</strong>: a live window to its master, never a secret copy. Editing happens at the master's home, always; a back button round-trips you there and back. <strong>Detach</strong> converts an instance into an independent, fully-owned local copy.</p>
+        <blockquote class="fp-quote" data-reveal>You can always tell whether you're looking at a reference or the real thing — and where the real thing lives.</blockquote>
+      </div>
+    </section>
+
+    <section class="fp-band">
+      <span class="fp-band-label">Componentization at work</span>
+      <div>
+        <span class="law-chip" data-reveal>Law · ownership and origin are never ambiguous</span>
+        <h2 data-reveal>Versions that keep their promises</h2>
+        <p data-reveal>The same honesty runs through versioning. A version is always a copy of the frame — you choose how its components relate to the originals:</p>
+        <ul class="fp-list">
+          <li data-reveal><strong>Linked version</strong> — inner components become live instances of the originals. Edit a master once, see it everywhere.</li>
+          <li data-reveal><strong>Copy version</strong> — fully independent, by law. Its components are re-created as its own; deleting one can never touch what it was copied from.</li>
+          <li data-reveal><strong>Promotion moves the crown</strong> — make any version the main and the components move with it. The new main truly owns its content; the old main becomes a version that references it.</li>
+          <li data-reveal><strong>No silent breakage</strong> — unlink or delete a shared item and Prism asks, per placement, whether to keep an owned copy there or remove it.</li>
+        </ul>
+        <div class="fp-diagram" data-reveal>
+<svg viewBox="0 0 640 300" fill="none">
+            <rect class="d-hue" data-draw x="40" y="100" width="170" height="90" rx="12" stroke-width="1.5"/>
+            <text class="d-text hue" x="56" y="128">master · its home</text>
+            <rect class="d-hue" data-draw x="66" y="142" width="118" height="28" rx="14" stroke-width="1.5"/>
+            <path class="d-hue" data-draw d="M 210 125 C 290 110, 320 80, 400 68" stroke-dasharray="3 5" stroke-width="1.5"/>
+            <rect class="d-line" x="400" y="40" width="170" height="70" rx="12" stroke-dasharray="4 5" stroke-width="1"/>
+            <text class="d-text" x="416" y="66">instance · linked</text>
+            <rect class="d-line" x="426" y="76" width="118" height="22" rx="11" stroke-width="1"/>
+            <path class="d-line" data-draw d="M 210 165 C 290 180, 300 210, 360 224" stroke-width="1"/>
+            <path class="d-line" d="M 372 228 L 388 232" stroke-width="1" stroke-dasharray="2 8"/>
+            <rect class="d-hue" data-draw x="400" y="196" width="170" height="70" rx="12" stroke-width="1.5"/>
+            <text class="d-text hue" x="416" y="222">detached · owned here</text>
+            <rect class="d-hue" data-draw x="426" y="232" width="118" height="22" rx="11" stroke-width="1.5"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="fp-result">
+      <p class="eyebrow" data-reveal>The result</p>
+      <h2>
+        <span class="line-mask"><span class="line-inner">Reuse without</span></span>
+        <span class="line-mask"><span class="line-inner"><em>the haunting.</em></span></span>
+      </h2>
+      <p data-reveal>Change a master button and watch every linked screen follow. Detach one and know — with certainty — that it's yours alone. Nothing drifts, nothing breaks silently, nothing is secretly shared.</p>
+    </section>
+
+    <section class="fp-next">
+      <a href="builder.html" data-transition data-hue-link="#ff5c8a" style="--nc:#ff5c8a">
+        <span class="k">Next — 05 / 05</span>
+        <span class="t">The Builder</span>
+      </a>
+    </section>
+
+    <footer class="footer">
+      <a class="wordmark" href="../index.html" data-transition data-hue-link="#ffb454" aria-label="Prism">PR<span class="slit"></span>SM</a>
+      <nav class="footer-links">
+        <a href="../index.html#why" data-transition data-hue-link="#ffb454">Why</a>
+        <a href="../index.html#features" data-transition data-hue-link="#ffb454">Features</a>
+        <a href="../index.html#compared" data-transition data-hue-link="#ffb454">Compared</a>
+      </nav>
+      <span>© 2026 Prism — built around one rule.</span>
+    </footer>
+  </main>
+
+  <div class="veil" id="veil" aria-hidden="true">
+    <div class="veil-panel"></div>
+    <div class="veil-beam"></div>
+    <span class="veil-word">One thing at a time</span>
+  </div>
+
+  <script src="../js/vendor/gsap.min.js"></script>
+  <script src="../js/vendor/ScrollTrigger.min.js"></script>
+  <script src="../js/vendor/lenis.min.js"></script>
+  <script src="../js/main.js"></script>
+  <script type="importmap">{ "imports": { "three": "../js/vendor/three.module.min.js" } }</script>
+  <script type="module" src="../js/hero.js"></script>
+</body>
+</html>

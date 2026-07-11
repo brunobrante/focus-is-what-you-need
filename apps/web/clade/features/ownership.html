@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ownership — Clade · Plate 04</title>
+<meta name="description" content="Components, design tokens, references — everything Clade shares flows through one mechanism: linkable → instance → detach.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23171a12'/><path d='M9 8v16M9 12h8a3 3 0 0 1 3 3v9M9 20h6' stroke='%23d9ff4d' stroke-width='2.4' fill='none' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="../css/fonts.css">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-page="feature">
+
+<div class="wipe" id="wipe" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<header class="nav" id="nav">
+  <a class="nav-logo" href="../index.html">
+    <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5v22M7 11h11a4 4 0 0 1 4 4v12M7 21h8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+    <span>Clade</span>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="../index.html#why">Manifesto</a>
+    <a href="../index.html#law">The Law</a>
+    <a href="../index.html#compare">Compare</a>
+    <a href="../index.html#features">Field Guide</a>
+  </nav>
+  <a class="nav-cta" href="../index.html#cta">Open Clade</a>
+</header>
+
+<main id="main">
+  <section class="feat-hero">
+    <p class="overline"><span class="fig">Plate 04</span> one mechanism, three verbs</p>
+    <h1 class="feat-title">
+        <span class="line-mask"><span class="line-inner">Threads you</span></span>
+        <span class="line-mask"><span class="line-inner"><em>can trust.</em></span></span>
+    </h1>
+    <p class="feat-tag">Components, design tokens, references — everything Clade shares flows through one mechanism: linkable → instance → detach.</p>
+    <svg class="feat-glyph-big" viewBox="0 0 64 64" aria-hidden="true"><circle cx="16" cy="16" r="8"/><circle cx="48" cy="44" r="8"/><path d="M22 22c10 2 16 10 20 16" stroke-dasharray="4 5"/></svg>
+  </section>
+
+    <section class="feat-section">
+      <p class="overline">the problem</p>
+      <div class="feat-grid">
+        <p class="feat-quote">In most tools you can’t tell a copy from a reference <em>until one breaks.</em></p>
+        <div class="feat-body">
+          <p>Overrides on top of overrides. Detached instances that look attached. A library update that silently rewrites forty screens on a Tuesday. Canvas tools blur the line between the real thing and its reflections — and you find out which is which at the worst moment.</p>
+          <p>Deleting a shared component is a small act of vandalism: somewhere, someone’s file just lost a piece.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="feat-section">
+      <p class="overline">the clade way</p>
+      <div class="feat-grid">
+        <p class="feat-quote">Mark it linkable. Place an instance. Or detach — and <em>own it.</em></p>
+        <div class="feat-body">
+          <p>A master marked <b>linkable</b> can be placed anywhere below it as a <b>linked instance</b> — a live reference, read-only by design. It shows the master’s content; it cannot lie to you. To edit, you go to the master at its home, and a back button rounds the trip exactly to where you were.</p>
+          <p><b>Detach</b> cuts the thread: the instance becomes a true local copy, fully yours, connected to nothing. The same three verbs work for components, tokens, and references alike.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="feat-section feat-dissolve">
+      <p class="overline">how the component model dissolves it</p>
+      <div class="feat-grid">
+        <p class="feat-quote">Nobody’s screen breaks <em>silently.</em></p>
+        <div class="feat-body">
+          <p>Unlink or delete a master that is still placed elsewhere, and Clade asks — <b>per instance</b> — what should happen there: keep a copy (detach, the default) or delete it too. Every place gets a deliberate answer; no place gets a surprise.</p>
+          <p>Ownership and origin are never ambiguous: you can always tell whether you’re looking at a reference or the real thing, and where the real thing lives.</p>
+        </div>
+      </div>
+      <div class="feat-diagram"><div class="diagram-tree"><span class="dnode moss">master</span><span class="darrow">⟶</span><span class="dnode ultra">linked instance</span><span class="darrow">✂</span><span class="dnode moss">owned copy</span></div></div>
+    </section>
+
+    <section class="feat-section">
+      <p class="overline">the result</p>
+      <p class="feat-quote">Reuse without fear.</p>
+      <div class="feat-results"><span class="chip">Instance vs copy — visible at a glance</span><span class="chip">Masters edited at home, round-trip back</span><span class="chip">Per-instance choice on unlink/delete</span><span class="chip">Same verbs for components, tokens, references</span></div>
+    </section>
+
+  <nav class="feat-next" aria-label="More plates">
+    <a href="../index.html#features" data-transition>
+      <span class="mono-note">← back to</span>
+      <span class="feat-next-title">The field guide</span>
+    </a>
+    <a href="versions.html" data-transition style="text-align:right">
+      <span class="mono-note">next plate →</span>
+      <span class="feat-next-title">Versions</span>
+    </a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <a class="nav-logo" href="../index.html">
+    <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5v22M7 11h11a4 4 0 0 1 4 4v12M7 21h8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+    <span>Clade</span>
+  </a>
+  <p class="mono-note">© 2026 Clade — set in stone: the screen is the source of truth.</p>
+</footer>
+
+<script src="../js/vendor/gsap.min.js"></script>
+<script src="../js/vendor/ScrollTrigger.min.js"></script>
+<script src="../js/vendor/lenis.min.js"></script>
+<script src="../js/main.js"></script>
+</body>
+</html>

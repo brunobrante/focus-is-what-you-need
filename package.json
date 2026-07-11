@@ -9,7 +9,10 @@
 		"desktop:dev": "cd apps/desktop && bunx tauri dev",
 		"desktop:build": "cd apps/desktop && bunx tauri build",
 		"web:dev": "cd apps/desktop && bunx vite",
-		"web:build": "cd apps/desktop && bunx vite build"
+		"web:build": "cd apps/desktop && bunx vite build",
+		"web:clade": "python3 -m http.server 8741 --directory apps/web/clade",
+		"web:holon": "python3 -m http.server 8742 --directory apps/web/holon",
+		"web:prism": "python3 -m http.server 8743 --directory apps/web/prism"
 	},
 	"dependencies": {
 "shadcn": "4.7.0",

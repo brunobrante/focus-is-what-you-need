@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Clade — Every screen is a tree</title>
+<meta name="description" content="Clade is a screen-first design tool with no infinite canvas. Components form automatically from structure; you edit every branch in perfect isolation.">
+<meta name="theme-color" content="#f0ede3">
+<meta property="og:title" content="Clade — Every screen is a tree">
+<meta property="og:description" content="The design tool with no infinite canvas. Components are born, not made — and you edit every branch in perfect isolation.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23171a12'/><path d='M9 8v16M9 12h8a3 3 0 0 1 3 3v9M9 20h6' stroke='%23d9ff4d' stroke-width='2.4' fill='none' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{"imports":{"three":"./js/vendor/three.module.js"}}</script>
+</head>
+<body data-page="index">
+
+<div class="wipe" id="wipe" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<header class="nav" id="nav">
+  <a class="nav-logo" href="index.html" aria-label="Clade home">
+    <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5v22M7 11h11a4 4 0 0 1 4 4v12M7 21h8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+    <span>Clade</span>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#why">Manifesto</a>
+    <a href="#law">The Law</a>
+    <a href="#journey">Rhythm</a>
+    <a href="#compare">Compare</a>
+    <a href="#features">Field Guide</a>
+  </nav>
+  <a class="nav-cta" href="#cta">Open Clade</a>
+</header>
+
+<main id="main">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="hero">
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div class="hero-labels" id="hero-labels" aria-hidden="true"></div>
+    <div class="hero-stage">
+    <div class="hero-content">
+      <p class="overline hero-overline"><span class="fig">Fig. 1</span> a field guide to your interface</p>
+      <h1 class="hero-title">
+        <span class="line-mask"><span class="line-inner">Every</span></span>
+        <span class="line-mask"><span class="line-inner">screen</span></span>
+        <span class="line-mask"><span class="line-inner">is a <em>tree.</em></span></span>
+      </h1>
+      <p class="hero-sub">Clade is a design tool with no infinite canvas. You start from the whole
+      screen, it splits into the components you actually built, and you edit each
+      one alone — at true size, never losing the way back.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-ink" href="#cta">Start from a screen</a>
+        <a class="btn btn-ghost" href="#why">Why no canvas?</a>
+      </div>
+    </div>
+    <div class="hero-hint" aria-hidden="true"><span class="hint-line"></span><span>scroll to dissect</span></div>
+    </div>
+  </section>
+
+  <!-- ============ MANIFESTO ============ -->
+  <section class="why" id="why">
+    <div class="section-head">
+      <p class="overline">The problem — observed in the wild</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner">The infinite canvas is</span></span>
+        <span class="line-mask"><span class="line-inner">where <em>focus</em> goes to die.</span></span>
+      </h2>
+    </div>
+    <div class="why-body">
+      <p class="lede">Every canvas tool hands you an endless sheet and calls it freedom.
+      Then the sheet becomes your job. You arrange. You tidy. You pan for miles to
+      reach one button. You start projects staring into a blank void that offers no
+      structure at all — because keeping structure was never the tool's problem.
+      <em>It was yours.</em></p>
+      <div class="strike-board" aria-label="Old habits replaced by new ones">
+        <div class="strike-row"><s class="strike-word" data-strike>Arrange</s><span class="strike-swap">Open</span></div>
+        <div class="strike-row"><s class="strike-word" data-strike>Tidy</s><span class="strike-swap">Focus</span></div>
+        <div class="strike-row"><s class="strike-word" data-strike>Pan</s><span class="strike-swap">Edit</span></div>
+        <div class="strike-row"><s class="strike-word" data-strike>Hunt</s><span class="strike-swap">Done</span></div>
+      </div>
+      <p class="why-close"><em>“Focus is what you need. That is the whole point.”</em><span class="mono-note">— Product.md, set in stone</span></p>
+    </div>
+  </section>
+
+  <!-- ============ THE LAW ============ -->
+  <section class="law" id="law">
+    <div class="section-head">
+      <p class="overline">Law Nº 8 · componentization</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner">If an element has a child,</span></span>
+        <span class="line-mask"><span class="line-inner">it <em>is</em> a component.</span></span>
+      </h2>
+      <p class="lede">There is no “create component” ritual in Clade. Structure is the
+      declaration: the moment you nest, the component exists — openable, editable,
+      alone. A lone text is just an element. Honest structure, nothing to maintain.</p>
+    </div>
+    <div class="law-stage">
+      <div class="code-card" aria-label="Code being typed">
+        <div class="code-bar"><i></i><i></i><i></i><span class="code-file">structure.html</span></div>
+        <pre class="code-body"><code id="law-code"></code><span class="caret" id="law-caret"></span></pre>
+      </div>
+      <svg class="law-arrow" viewBox="0 0 120 60" aria-hidden="true">
+        <path id="law-arrow-path" d="M4 30 H100" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path id="law-arrow-head" d="M96 20 L112 30 L96 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+      <div class="formed-card" id="formed-card" aria-label="Component formed automatically">
+        <div class="formed-frame">
+          <div class="formed-btn"><span>Button</span></div>
+        </div>
+        <div class="formed-meta">
+          <span class="tag tag-moss">component</span>
+          <span class="mono-note">formed automatically · 0 clicks</span>
+        </div>
+        <div class="stamp" id="law-stamp">no ceremony</div>
+      </div>
+    </div>
+    <p class="law-foot mono-note">an element with no children is not a component — it’s just an element. the tree stays honest.</p>
+  </section>
+
+  <!-- ============ THE TURN ============ -->
+  <section class="turn" id="turn" aria-hidden="true">
+    <svg class="turn-svg" viewBox="0 0 200 300" preserveAspectRatio="xMidYMid meet">
+      <path id="turn-path" d="M100 0 V150 H200" fill="none" stroke="currentColor" stroke-width="2"/>
+      <circle id="turn-node" cx="100" cy="150" r="5" fill="currentColor"/>
+    </svg>
+    <p class="turn-note mono-note">a cladogram reads left to right.<br>so, briefly, does this page.</p>
+  </section>
+
+  <!-- ============ HORIZONTAL JOURNEY ============ -->
+  <section class="journey" id="journey">
+    <div class="journey-pin" id="journey-pin">
+      <div class="journey-track" id="journey-track">
+
+        <article class="panel" data-panel="0">
+          <div class="panel-copy">
+            <p class="overline">The rhythm · i</p>
+            <h3 class="h-panel">Open a screen.<br><em>Read everything.</em></h3>
+            <p>The whole composition, every child already in place. No panning
+            around to discover what exists — one look and you know the layout.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="crumbs" aria-hidden="true"><span class="crumb is-on">Home</span></div>
+            <div class="mock-phone">
+              <div class="mock-header" data-hot><span class="mock-dot"></span><span class="mock-line w40"></span><span class="mock-pill"></span></div>
+              <div class="mock-hero"><span class="mock-line w60"></span><span class="mock-line w30 thin"></span></div>
+              <div class="mock-cards"><i></i><i></i><i></i></div>
+              <div class="mock-list"><i></i><i></i></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel" data-panel="1">
+          <div class="panel-copy">
+            <p class="overline">The rhythm · ii</p>
+            <h3 class="h-panel">Click a child.<br><em>It becomes the subject.</em></h3>
+            <p>Header, alone, at its true size — not highlighted inside the noise,
+            but isolated from it. The frame is your whole world now.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="crumbs" aria-hidden="true"><span class="crumb">Home</span><span class="crumb-sep">/</span><span class="crumb is-on">Header</span></div>
+            <div class="mock-iso">
+              <div class="mock-header big"><span class="mock-dot"></span><span class="mock-line w40"></span><span class="mock-pill"></span></div>
+              <span class="dim-tag dim-w mono-note">390</span>
+              <span class="dim-tag dim-h mono-note">64</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel" data-panel="2">
+          <div class="panel-copy">
+            <p class="overline">The rhythm · iii</p>
+            <h3 class="h-panel">Its children line up<br><em>beside it.</em></h3>
+            <p>Logo. Nav. Search. The next level in, already waiting — drill as deep
+            as the design goes, one focused subject at a time.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="crumbs" aria-hidden="true"><span class="crumb">Home</span><span class="crumb-sep">/</span><span class="crumb is-on">Header</span><span class="crumb-sep">/</span><span class="crumb dim">…</span></div>
+            <div class="mock-kids">
+              <div class="mock-kid"><span class="mock-dot big"></span><span class="kid-tag mono-note">Logo</span></div>
+              <div class="mock-kid"><span class="mock-line w70"></span><span class="mock-line w50 thin"></span><span class="kid-tag mono-note">Nav</span></div>
+              <div class="mock-kid"><span class="mock-pill big"></span><span class="kid-tag mono-note">Search</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel panel-last" data-panel="3">
+          <div class="panel-copy">
+            <p class="overline">The rhythm · iv</p>
+            <h3 class="h-panel">And the path home<br><em>never breaks.</em></h3>
+            <p>The parent is the spine of the product, not optional metadata. You
+            always know exactly where you are — and the way back is one crumb away.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="big-crumbs" aria-hidden="true">
+              <span>Home</span><b>/</b><span>Header</span><b>/</b><span class="lit">Logo</span>
+            </div>
+            <p class="mono-note stage-note">“…and I never lost track of where I was.”</p>
+          </div>
+        </article>
+
+      </div>
+      <svg class="journey-branch" id="journey-branch" aria-hidden="true" preserveAspectRatio="none"></svg>
+    </div>
+  </section>
+
+  <!-- ============ THE FRAME / 1x ============ -->
+  <section class="framelaw" id="frame">
+    <div class="section-head">
+      <p class="overline">Law Nº 10 · the frame</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner"><em>1×</em> is the floor.</span></span>
+      </h2>
+      <p class="lede">The opened frame <em>is</em> the canvas. At 100% it already fills your
+      view — there is nothing further out to see, so Clade won’t pretend there is.
+      Zoom in and the room around the frame grows, giving your hands margin. Zoom
+      out… and the frame politely refuses. Focus, enforced by physics.</p>
+    </div>
+    <div class="frame-stage" id="frame-stage">
+      <div class="frame-demo" id="frame-demo">
+        <div class="frame-demo-inner">
+          <span class="mock-line w50"></span>
+          <span class="mock-line w70 thin"></span>
+          <div class="mock-cards"><i></i><i></i></div>
+        </div>
+        <span class="frame-corner tl"></span><span class="frame-corner tr"></span>
+        <span class="frame-corner bl"></span><span class="frame-corner br"></span>
+      </div>
+      <div class="zoom-readout mono-note"><span id="zoom-val">1.00×</span><span id="zoom-msg">the frame fills the view</span></div>
+    </div>
+    <p class="law-foot mono-note">parent grids: guides derived from ancestors keep you aligned with the context you can’t see.</p>
+  </section>
+
+  <!-- ============ OWNERSHIP ============ -->
+  <section class="own" id="ownership">
+    <div class="section-head">
+      <p class="overline">One mechanism · three verbs</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner">Linkable. Instance.</span></span>
+        <span class="line-mask"><span class="line-inner"><em>Detach.</em></span></span>
+      </h2>
+      <p class="lede">Everything Clade shares — components, design tokens, references —
+      flows through one mechanism. Mark a master <b>linkable</b>. Place it anywhere as a
+      live <b>instance</b>, read-only by design. Need to make it yours? <b>Detach</b>: the
+      thread is cut, a true copy is born, and nobody’s file breaks silently.</p>
+    </div>
+    <div class="own-stage" id="own-stage">
+      <svg class="own-threads" id="own-threads" aria-hidden="true" preserveAspectRatio="none"></svg>
+      <div class="own-card own-master" id="own-master">
+        <div class="own-chip"></div>
+        <span class="tag tag-moss">master</span>
+        <span class="mono-note">lives here · workspace</span>
+      </div>
+      <div class="own-card own-inst" id="own-inst-a">
+        <div class="own-chip"></div>
+        <span class="tag tag-link">linked</span>
+        <span class="mono-note">read-only · project “iOS 19”</span>
+      </div>
+      <div class="own-card own-inst" id="own-inst-b" data-detach>
+        <div class="own-chip"></div>
+        <span class="tag tag-link" id="detach-tag">linked</span>
+        <span class="mono-note" id="detach-note">read-only · screen “Home”</span>
+        <div class="scissors" id="scissors" aria-hidden="true">✂</div>
+      </div>
+    </div>
+    <p class="own-close"><em>“Ownership and origin are never ambiguous.”</em>
+    <span class="mono-note">you always know if it’s the real thing — and where the real thing lives.</span></p>
+  </section>
+
+  <!-- ============ VERSIONS ============ -->
+  <section class="vers" id="versions">
+    <div class="section-head">
+      <p class="overline">Versions</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner">The crown <em>moves</em> —</span></span>
+        <span class="line-mask"><span class="line-inner">and everything moves with it.</span></span>
+      </h2>
+      <p class="lede">Keep as many versions of a screen or component as you like — linked
+      to the master, or copied and fully free. Promote any one to main and it truly
+      <b>owns</b> its components; the old main becomes just another version pointing at the
+      new. No secret dependencies. No version that empties another by dying.</p>
+    </div>
+    <div class="vers-stage" id="vers-stage">
+      <div class="vers-card" data-vers="0">
+        <span class="crown" id="crown-a">♛</span>
+        <span class="vers-name">Home</span><span class="mono-note vers-role" data-role>main</span>
+        <div class="vers-dots"><i></i><i></i><i></i></div>
+      </div>
+      <div class="vers-card" data-vers="1">
+        <span class="crown" id="crown-b">♛</span>
+        <span class="vers-name">Home · v2</span><span class="mono-note vers-role" data-role>linked version</span>
+        <div class="vers-dots"><i></i><i></i><i></i></div>
+      </div>
+      <div class="vers-card" data-vers="2">
+        <span class="vers-name">Home · copy</span><span class="mono-note vers-role">independent</span>
+        <div class="vers-dots"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <p class="law-foot mono-note">promotion is never a label swap — the main is always the owner; versions only reference it.</p>
+  </section>
+
+  <!-- ============ BUILDER (dark) ============ -->
+  <section class="builder" id="builder">
+    <div class="section-head">
+      <p class="overline">The Builder · a side tool, on purpose</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner">From a flat picture</span></span>
+        <span class="line-mask"><span class="line-inner">to a <em>living stack.</em></span></span>
+      </h2>
+      <p class="lede">Feed it any static UI — a Dribbble shot, a Behance frame, a paused
+      video. Cut the screen out; keep cutting buttons, text, sections. Every cut
+      remembers where it came from, and together they rebuild the original as a
+      <b>stack</b> — a tree you can share whole, or piece by piece, into any project.</p>
+    </div>
+    <div class="builder-stage" id="builder-stage">
+      <div class="stack3d" id="stack3d">
+        <div class="cut cut-0"><span class="cut-tag mono-note">screen · main</span></div>
+        <div class="cut cut-1"><span class="cut-tag mono-note">cut · header</span></div>
+        <div class="cut cut-2"><span class="cut-tag mono-note">cut · card</span></div>
+        <div class="cut cut-3"><span class="cut-tag mono-note">cut · button</span></div>
+      </div>
+    </div>
+    <div class="builder-chips">
+      <span class="chip-dark">background remove</span>
+      <span class="chip-dark">upscale</span>
+      <span class="chip-dark">remove element</span>
+      <span class="chip-dark">video frames → screens</span>
+      <span class="chip-dark">variants keep the original</span>
+    </div>
+  </section>
+
+  <!-- ============ COMPARE (dark, pinned) ============ -->
+  <section class="compare" id="compare">
+    <div class="compare-pin" id="compare-pin">
+      <p class="overline compare-over">A field comparison</p>
+      <div class="compare-caption">
+        <p class="cap cap-a" id="cap-a">This is you, in an infinite canvas,<br>looking for one button.</p>
+        <p class="cap cap-b" id="cap-b">This is the same design, <em>as a tree.</em></p>
+      </div>
+      <div class="chaos" id="chaos" aria-hidden="true"></div>
+      <svg class="tree-lines" id="tree-lines" aria-hidden="true" preserveAspectRatio="none"></svg>
+      <div class="compare-hud mono-note">
+        <span id="hud-timer">searching · 00:00</span>
+        <span id="hud-found">found: Home / Header / Actions / Button · 3 clicks</span>
+      </div>
+      <h2 class="compare-verdict" id="compare-verdict">Not a better canvas.<br><em>The end of the canvas.</em></h2>
+    </div>
+    <div class="compare-chips">
+      <div class="comp-chip"><b>vs Figma</b><span>components are a ceremony; the canvas is your chore.</span></div>
+      <div class="comp-chip"><b>vs Framer</b><span>a site builder wearing a design tool.</span></div>
+      <div class="comp-chip"><b>vs Penpot</b><span>open source, same infinite mess.</span></div>
+      <div class="comp-chip"><b>vs Paper</b><span>a lovely canvas. still a canvas.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ FIELD GUIDE / FEATURES ============ -->
+  <section class="guide" id="features">
+    <div class="section-head">
+      <p class="overline">The field guide</p>
+      <h2 class="h-display">
+        <span class="line-mask"><span class="line-inner">Six plates.</span></span>
+        <span class="line-mask"><span class="line-inner">One <em>philosophy.</em></span></span>
+      </h2>
+    </div>
+    <div class="plates">
+      <a class="plate" href="features/components.html" data-transition>
+        <span class="plate-num mono-note">Plate 01</span>
+        <svg class="plate-glyph" viewBox="0 0 64 64"><rect x="8" y="8" width="48" height="48" rx="6"/><rect x="18" y="26" width="28" height="14" rx="4"/></svg>
+        <h3>Auto-components</h3><p>Born, not made.</p>
+        <span class="plate-go" aria-hidden="true">→</span>
+      </a>
+      <a class="plate" href="features/frame.html" data-transition>
+        <span class="plate-num mono-note">Plate 02</span>
+        <svg class="plate-glyph" viewBox="0 0 64 64"><rect x="12" y="10" width="40" height="44" rx="4"/><path d="M4 10h8M4 54h8M52 10h8M52 54h8"/></svg>
+        <h3>The Frame</h3><p>Paint inside the lines.</p>
+        <span class="plate-go" aria-hidden="true">→</span>
+      </a>
+      <a class="plate" href="features/navigation.html" data-transition>
+        <span class="plate-num mono-note">Plate 03</span>
+        <svg class="plate-glyph" viewBox="0 0 64 64"><path d="M10 8v48M10 20h20a6 6 0 0 1 6 6v22M10 40h14"/><circle cx="48" cy="48" r="5"/></svg>
+        <h3>Navigation</h3><p>Drill, don’t pan.</p>
+        <span class="plate-go" aria-hidden="true">→</span>
+      </a>
+      <a class="plate" href="features/ownership.html" data-transition>
+        <span class="plate-num mono-note">Plate 04</span>
+        <svg class="plate-glyph" viewBox="0 0 64 64"><circle cx="16" cy="16" r="8"/><circle cx="48" cy="44" r="8"/><path d="M22 22c10 2 16 10 20 16" stroke-dasharray="4 5"/></svg>
+        <h3>Ownership</h3><p>Threads you can trust.</p>
+        <span class="plate-go" aria-hidden="true">→</span>
+      </a>
+      <a class="plate" href="features/versions.html" data-transition>
+        <span class="plate-num mono-note">Plate 05</span>
+        <svg class="plate-glyph" viewBox="0 0 64 64"><rect x="8" y="20" width="20" height="28" rx="3"/><rect x="36" y="20" width="20" height="28" rx="3"/><path d="M28 12l4-6 4 6 5-3-2 8H25l-2-8z"/></svg>
+        <h3>Versions</h3><p>Crowns that move.</p>
+        <span class="plate-go" aria-hidden="true">→</span>
+      </a>
+      <a class="plate" href="features/builder.html" data-transition>
+        <span class="plate-num mono-note">Plate 06</span>
+        <svg class="plate-glyph" viewBox="0 0 64 64"><rect x="10" y="26" width="36" height="28" rx="3"/><rect x="18" y="16" width="36" height="28" rx="3" stroke-dasharray="4 4"/></svg>
+        <h3>The Builder</h3><p>Cut pictures into trees.</p>
+        <span class="plate-go" aria-hidden="true">→</span>
+      </a>
+    </div>
+    <div class="guide-strip">
+      <p class="mono-note">also in the box —</p>
+      <div class="strip-chips">
+        <span class="chip"><b>Fast Edit</b> cosmetic edits in a modal; structure stays sacred</span>
+        <span class="chip"><b>Sketch</b> one free canvas, quarantined, per project</span>
+        <span class="chip"><b>References</b> moodboards that follow you into the frame</span>
+        <span class="chip"><b>System Design</b> tokens that link like components</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="cta" id="cta">
+    <h2 class="h-display cta-title">
+      <span class="line-mask"><span class="line-inner">Stop gardening</span></span>
+      <span class="line-mask"><span class="line-inner">your canvas.</span></span>
+      <span class="line-mask"><span class="line-inner"><em>Grow the tree.</em></span></span>
+    </h2>
+    <form class="cta-form" onsubmit="return false" aria-label="Request early access">
+      <input type="email" placeholder="you@studio.com" aria-label="Email address" required>
+      <button class="btn btn-ink" type="submit">Request the field guide</button>
+    </form>
+    <p class="mono-note cta-note">early access, spring 2027 · no spam — just plates</p>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <a class="nav-logo" href="index.html">
+    <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5v22M7 11h11a4 4 0 0 1 4 4v12M7 21h8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+    <span>Clade</span>
+  </a>
+  <nav class="footer-links" aria-label="Footer">
+    <a href="features/components.html" data-transition>Auto-components</a>
+    <a href="features/frame.html" data-transition>The Frame</a>
+    <a href="features/navigation.html" data-transition>Navigation</a>
+    <a href="features/ownership.html" data-transition>Ownership</a>
+    <a href="features/versions.html" data-transition>Versions</a>
+    <a href="features/builder.html" data-transition>The Builder</a>
+  </nav>
+  <p class="mono-note">© 2026 Clade — set in stone: the screen is the source of truth.</p>
+</footer>
+
+<script src="js/vendor/gsap.min.js"></script>
+<script src="js/vendor/ScrollTrigger.min.js"></script>
+<script src="js/vendor/lenis.min.js"></script>
+<script src="js/main.js"></script>
+<script type="module" src="js/hero.js"></script>
+</body>
+</html>

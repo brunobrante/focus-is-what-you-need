@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holon — Every part is a whole</title>
+<meta name="description" content="Holon is a screen-first design tool with no infinite canvas. Open a screen, watch it decompose into real components, and edit each one alone — in perfect focus.">
+<link rel="preload" href="fonts/cabinet-grotesk-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/switzer-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='6' fill='none' stroke='%23f2efe6' stroke-opacity='.4' stroke-width='2'/%3E%3Crect x='10' y='10' width='12' height='12' rx='3' fill='%23ff5a2d'/%3E%3C/svg%3E">
+<script type="importmap">{ "imports": { "three": "./js/vendor/three.module.js" } }</script>
+</head>
+<body data-page="home">
+
+<div class="preloader" aria-hidden="true">
+  <svg class="mark" viewBox="0 0 56 56" fill="none">
+    <rect class="m-outer" x="3" y="3" width="50" height="50" rx="10"/>
+    <rect class="m-mid" x="13" y="13" width="30" height="30" rx="7"/>
+    <rect class="m-core" x="22" y="22" width="12" height="12" rx="4"/>
+  </svg>
+</div>
+<div class="veil" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav">
+  <a class="logo" href="index.html">
+    <svg class="mark" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+      <rect class="m-outer" x="3" y="3" width="50" height="50" rx="10"/>
+      <rect class="m-mid" x="13" y="13" width="30" height="30" rx="7"/>
+      <rect class="m-core" x="22" y="22" width="12" height="12" rx="4"/>
+    </svg>
+    Holon
+  </a>
+  <nav class="nav-links">
+    <a href="#why">Why</a>
+    <a href="#law">The Law</a>
+    <a href="#journey">The Journey</a>
+    <a href="#compare">Compare</a>
+    <a class="btn btn-sm" href="#cta"><span>Get early access</span></a>
+  </nav>
+</header>
+
+<main id="main">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="hero">
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div class="hero-inner">
+      <p class="kicker" data-reveal>Holon — a screen-first design tool</p>
+      <h1>
+        <span class="line-mask"><span class="line-inner">Every part</span></span>
+        <span class="line-mask"><span class="line-inner">is a <em class="accent" style="font-style:normal">whole</em>.</span></span>
+      </h1>
+      <p class="lede" data-reveal>Holon replaces the infinite canvas with something better: <strong>structure</strong>. Open a screen, watch it decompose into the components it&rsquo;s really made of, and edit each one alone — at true size, in perfect focus.</p>
+      <div class="hero-ctas" data-reveal>
+        <a class="btn" href="#journey"><span>See how it works</span></a>
+        <a class="btn btn-ghost" href="#why"><span>Why no canvas?</span></a>
+        <span class="hero-scroll">Scroll
+          <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 1v11m0 0L1.5 7.5M6 12l4.5-4.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        </span>
+      </div>
+    </div>
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span>No infinite canvas <i>◆</i></span><span>No manual components <i>◆</i></span><span>No hunting for layers <i>◆</i></span><span>No blank-sheet dread <i>◆</i></span><span>Focus is what you need <i>◆</i></span>
+        <span>No infinite canvas <i>◆</i></span><span>No manual components <i>◆</i></span><span>No hunting for layers <i>◆</i></span><span>No blank-sheet dread <i>◆</i></span><span>Focus is what you need <i>◆</i></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHY ============ -->
+  <section class="section why" id="why">
+    <span class="section-label"><em>01</em> The problem</span>
+    <div class="manifesto">
+      <p class="kicker" data-reveal>Why Holon exists</p>
+      <h2 data-lines>
+        <span class="line-mask"><span class="line-inner">The infinite canvas promises freedom.</span></span>
+        <span class="line-mask"><span class="line-inner"><span class="dim">It delivers housekeeping.</span></span></span>
+      </h2>
+      <p class="why-cost" data-reveal>You came to design. Instead you pan, zoom, arrange, align, and tidy — because a free canvas makes organization <em>your</em> job. You can&rsquo;t edit one thing in isolation without a ceremony. You hunt for what you need. And a blank infinite sheet gives you nothing to begin from. The price of all of it is the only thing that matters:</p>
+      <p class="closer" data-lines>
+        <span class="line-mask"><span class="line-inner"><b class="accent">Focus</b> is what</span></span>
+        <span class="line-mask"><span class="line-inner">you need.</span></span>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ LAW ============ -->
+  <section class="section law" id="law">
+    <span class="section-label"><em>02</em> The law of formation</span>
+    <div class="law-grid">
+      <div>
+        <p class="kicker" data-reveal>Componentization, automatic</p>
+        <h2 data-lines>
+          <span class="line-mask"><span class="line-inner">If it has a child,</span></span>
+          <span class="line-mask"><span class="line-inner">it&rsquo;s a <em class="accent" style="font-style:normal">component</em>.</span></span>
+        </h2>
+        <p data-reveal>In Holon you never declare a component. No selecting, no right-click ritual, no <strong>&#8984;&#8997;K</strong>. The moment an element contains another element, it <strong>is</strong> a component — openable, editable, versionable, on its own.</p>
+        <p data-reveal>The tree you navigate is never a diagram someone had to maintain. It&rsquo;s the honest structure you actually built — atoms, molecules, organisms — formed <strong>for</strong> you as you work, not <strong>by</strong> you after hours.</p>
+        <a class="deep panel-deep" data-reveal data-transition href="features/components.html">Read the deep dive
+          <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 5h11m0 0L8.5 1.5M12 5 8.5 8.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        </a>
+      </div>
+      <div class="code-stage" data-reveal>
+        <div class="code-card" id="code-card">
+          <span class="cl"><span class="tag">&lt;div</span> <span class="attr">id</span>=<span class="val">"card"</span><span class="tag">&gt;</span></span>
+          <span class="cl">  <span class="code-line-hl" id="hl-btn"><span class="tag">&lt;div</span> <span class="attr">id</span>=<span class="val">"button"</span><span class="tag">&gt;</span></span></span>
+          <span class="cl">    <span class="tag">&lt;div</span> <span class="attr">id</span>=<span class="val">"label"</span><span class="tag">&gt;</span><span class="txt">Buy now</span><span class="tag">&lt;/div&gt;</span></span>
+          <span class="cl">  <span class="tag">&lt;/div&gt;</span></span>
+          <span class="cl"><span class="tag">&lt;/div&gt;</span></span>
+        </div>
+        <div class="formed" id="formed">
+          <span class="dot"></span>
+          <span><span class="t">Component formed</span><br><span class="s">button — 1 child &middot; openable in isolation</span></span>
+        </div>
+      </div>
+    </div>
+    <div class="law-note" data-reveal>
+      <b>[LAW]</b> A childless element is just an element. Structure is the only ceremony.
+    </div>
+  </section>
+
+  <!-- ============ JOURNEY (horizontal) ============ -->
+  <section class="journey" id="journey">
+    <div class="journey-head">
+      <span class="section-label"><em>03</em> The rhythm</span>
+      <p class="kicker" data-reveal>How navigation must feel</p>
+      <h2 data-lines>
+        <span class="line-mask"><span class="line-inner">One level</span></span>
+        <span class="line-mask"><span class="line-inner">at a time. <em class="outline-text" style="font-style:normal">Deeper.</em></span></span>
+      </h2>
+      <p class="turn" data-reveal>The page turns sideways here
+        <svg id="turn-arrow" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v13m0 0L3.5 9.5M9 15l5.5-5.5" stroke="var(--ember)" stroke-width="1.6"/></svg>
+      </p>
+    </div>
+    <div class="journey-pin">
+      <div class="journey-track" id="journey-track">
+
+        <div class="panel">
+          <div class="panel-copy">
+            <p class="panel-num">01 / THE SCREEN</p>
+            <h3>Start whole.</h3>
+            <p>Open a screen and read the <strong>entire composition</strong> at once — header, hero, featured list, all in place. No panning to find it. The screen is just the top-level component: the root of a tree that already knows its own structure.</p>
+            <a class="deep" data-transition href="features/navigation.html">The navigation model
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 5h11m0 0L8.5 1.5M12 5 8.5 8.5" stroke="currentColor" stroke-width="1.4"/></svg>
+            </a>
+          </div>
+          <div class="panel-stage">
+            <div class="mock" data-mock>
+              <div class="m-h"><span class="c"></span><span class="l"></span><span class="o"></span></div>
+              <div class="m-hero"></div>
+              <div class="m-row"><span class="card"></span><span class="card"></span></div>
+              <div class="m-row"><span class="card"></span><span class="card"></span><span class="card"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-copy">
+            <p class="panel-num">02 / THE SUBJECT</p>
+            <h3>Click into focus.</h3>
+            <p>Click <strong>Header</strong> and Header becomes the subject — shown <strong>alone, at its true size</strong>, never mixed back into the screen. Its children line up beside it, ready for the next step inward. One subject. Zero noise.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="stage-focus">
+              <div class="subject">
+                <span class="tag-lab">Subject &middot; Header</span>
+                <div class="m-h" style="width:clamp(220px,24vw,340px)"><span class="c"></span><span class="l"></span><span class="o"></span></div>
+              </div>
+              <div class="kids">
+                <div class="kid"><span class="sw"></span>Logo</div>
+                <div class="kid"><span class="sw"></span>Header copy</div>
+                <div class="kid"><span class="sw"></span>Search button</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-copy">
+            <p class="panel-num">03 / THE DESCENT</p>
+            <h3>Go deeper.</h3>
+            <p>Logo. Copy. Search. Each child opens <strong>on its own</strong>, and reveals its own children beside it — as deep as the design goes. The rhythm never changes: whole &rarr; child &rarr; that child&rsquo;s children. Repeat.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="stage-focus">
+              <div class="subject">
+                <span class="tag-lab">Subject &middot; Search button</span>
+                <div class="m-h" style="width:clamp(180px,18vw,260px)"><span class="c" style="background:var(--ember);border-color:transparent"></span><span class="l"></span></div>
+              </div>
+              <div class="kids">
+                <div class="kid"><span class="sw"></span>Icon</div>
+                <div class="kid"><span class="sw"></span>Placeholder text</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-copy">
+            <p class="panel-num">04 / THE SPINE</p>
+            <h3>Never lose the path.</h3>
+            <p>Parent isn&rsquo;t metadata in Holon — it&rsquo;s the <strong>spine of the product</strong>. Every node knows its screen, its parent, and its children, and the way back is always one glance away. You went three levels deep and never got lost.</p>
+          </div>
+          <div class="panel-stage">
+            <div class="crumbs">
+              <span class="past">Home</span><span class="sep">/</span><span class="past">Header</span><span class="sep">/</span><span class="here">Search</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="journey-rail" id="journey-rail" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+    </div>
+  </section>
+
+  <!-- ============ FRAME ============ -->
+  <section class="section framesec" id="frame">
+    <span class="section-label"><em>04</em> The surface</span>
+    <div class="frame-grid">
+      <div>
+        <p class="kicker" data-reveal>Bounded by design</p>
+        <h2 data-lines>
+          <span class="line-mask"><span class="line-inner">The frame</span></span>
+          <span class="line-mask"><span class="line-inner">is the canvas.</span></span>
+        </h2>
+        <p data-reveal>Whatever you open — a screen, a button, anything between — its top element becomes <strong>the frame: the surface you paint on</strong>. Everything you create lives inside it. There is nothing to edit outside it, so there is nothing outside to distract you.</p>
+        <p data-reveal>Zoom in and Holon gives you elbow room around the frame. Zoom out and it stops at <strong>1&times;</strong> — because at 1&times; your subject already fills the canvas. There is no &ldquo;out there.&rdquo; That&rsquo;s the point.</p>
+        <p class="floor-line" data-reveal><b>1&times; is the floor.</b> Try it &rarr;</p>
+        <a class="deep panel-deep" data-reveal data-transition href="features/frame.html">Read the deep dive
+          <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 5h11m0 0L8.5 1.5M12 5 8.5 8.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        </a>
+      </div>
+      <div class="zoom-stage" data-reveal>
+        <div class="zoom-frame" id="zoom-frame">
+          <div class="zf-b"></div><div class="zf-b"></div><div class="zf-b"></div>
+        </div>
+        <div class="zoom-toast" id="zoom-toast">1&times; is the floor — nothing exists out there</div>
+        <div class="zoom-ui">
+          <button id="zoom-out" aria-label="Zoom out">&minus;</button>
+          <span class="zl" id="zoom-label">1.0&times;</span>
+          <button id="zoom-in" aria-label="Zoom in">+</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OWNERSHIP ============ -->
+  <section class="section own" id="ownership">
+    <span class="section-label"><em>05</em> Ownership</span>
+    <div class="own-head">
+      <p class="kicker k-blue" data-reveal>Linkable &middot; instance &middot; detach</p>
+      <h2 data-lines>
+        <span class="line-mask"><span class="line-inner">One mechanism for</span></span>
+        <span class="line-mask"><span class="line-inner">everything <em class="accent-blue" style="font-style:normal">shared</em>.</span></span>
+      </h2>
+      <p class="own-sub" data-reveal>Components, design tokens, references — when Holon shares something downward, it always shares it the same way. Three verbs, everywhere. And ownership is <strong>never ambiguous</strong>: you always know whether you&rsquo;re holding the master or its reflection.</p>
+    </div>
+    <div class="own-stage">
+      <svg class="own-svg" id="own-svg" preserveAspectRatio="none" aria-hidden="true">
+        <path class="thread" id="thread-1" d=""/>
+        <path class="thread-cut" id="thread-2" d=""/>
+      </svg>
+      <div class="own-grid">
+        <div class="own-card master" data-reveal>
+          <span class="oc-badge">Master</span>
+          <h4>Button / Primary</h4>
+          <p>Lives at its home — the workspace. Marked <strong>linkable</strong>, so any project or screen below can place it.</p>
+          <span class="oc-chip"><i></i>Owned &middot; editable here</span>
+        </div>
+        <div class="own-card instance" data-reveal>
+          <span class="oc-badge">Linked instance</span>
+          <h4>Button / Primary</h4>
+          <p>A live reference, not a copy. Read-only in place — edit the master and every instance follows. One click takes you to its home, and a back button returns you exactly here.</p>
+          <span class="oc-chip"><i></i>Linked &middot; edit at the master</span>
+        </div>
+        <div class="own-card detached" data-reveal>
+          <span class="oc-badge">Detached</span>
+          <h4>Button / Primary</h4>
+          <p>The thread is cut. Now a fully independent local copy, owned by this screen. Change it, break it, version it — the master never feels a thing.</p>
+          <span class="oc-chip"><i></i>Owned &middot; no longer connected</span>
+        </div>
+      </div>
+    </div>
+    <div class="own-verbs" data-reveal>
+      <span class="verb"><b>Link</b>&nbsp;it anywhere</span>
+      <span class="verb"><b>Edit</b>&nbsp;at the master</span>
+      <span class="verb"><b>Detach</b>&nbsp;to own it</span>
+    </div>
+    <p class="own-caption" data-reveal>Deleting a shared master? Holon asks, per instance: keep a copy, or let it go. Nothing ever silently breaks. <a data-transition href="features/ownership.html">Read the deep dive</a></p>
+  </section>
+
+  <!-- ============ TRIO ============ -->
+  <section class="section trio" id="more">
+    <span class="section-label"><em>06</em> The supporting cast</span>
+    <div class="trio-head">
+      <p class="kicker" data-reveal>Focused windows, focused jobs</p>
+      <h2 data-lines>
+        <span class="line-mask"><span class="line-inner">Everything else earns its place.</span></span>
+      </h2>
+    </div>
+    <div class="trio-grid">
+      <div class="trio-card" data-reveal>
+        <p class="tc-k">Sketch</p>
+        <h3>Freedom, quarantined.</h3>
+        <p>One window keeps the giant free sheet — same tools, no frame, per project, local to you. Experiment wildly, then copy the good parts into the real structure. Nothing escapes on its own.</p>
+        <p class="tc-foot">Scratchpad &middot; never auto-promoted</p>
+      </div>
+      <div class="trio-card" data-reveal>
+        <p class="tc-k">Fast Edit</p>
+        <h3>Cosmetics at the speed of thought.</h3>
+        <p>Open any screen or component in a modal and change text, color, background, border, radius — done. It edits the real scene, but structure and geometry stay untouchable. When you need more, the canvas is the tool.</p>
+        <p class="tc-foot">Real edits &middot; surface only</p>
+      </div>
+      <div class="trio-card" data-reveal>
+        <p class="tc-k">Versions</p>
+        <h3>Copies that keep their word.</h3>
+        <p>Version any screen or component — <strong>linked</strong> to follow the masters, or <strong>copy</strong> to own every part outright. Promote any version to main and the components move with the crown. Never just a label swap.</p>
+        <p class="tc-foot">Linked or copy &middot; promotion re-homes</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BUILDER ============ -->
+  <section class="section builder" id="builder-sec">
+    <span class="section-label"><em>07</em> The Builder</span>
+    <div class="builder-grid">
+      <div>
+        <p class="kicker" data-reveal>From inspiration to structure</p>
+        <h2 data-lines>
+          <span class="line-mask"><span class="line-inner">Cut any shot</span></span>
+          <span class="line-mask"><span class="line-inner">into a <em class="accent" style="font-style:normal">stack</em>.</span></span>
+        </h2>
+        <p data-reveal>That screen you saved from Dribbble is a flat, dead image. The Builder brings it to life: cut out the screen, then the header, the button, the list — every cut lands <strong>exactly where it came from</strong>, and together they rebuild the original as a <strong>stack</strong>: a reference with real structure.</p>
+        <p data-reveal>Link a whole stack — or a single cut — into any project, screen, or component. Pull frames from a <strong>video</strong> and turn them into screens. Inspiration finally speaks the same language as your work.</p>
+        <div class="builder-chips" data-reveal>
+          <span class="b-chip"><b>AI</b> background remove</span>
+          <span class="b-chip"><b>AI</b> upscale</span>
+          <span class="b-chip"><b>AI</b> remove element</span>
+          <span class="b-chip">video frames &rarr; screens</span>
+          <span class="b-chip">every edit keeps the original</span>
+        </div>
+        <a class="deep panel-deep" data-reveal data-transition href="features/builder.html">Read the deep dive
+          <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 5h11m0 0L8.5 1.5M12 5 8.5 8.5" stroke="currentColor" stroke-width="1.4"/></svg>
+        </a>
+      </div>
+      <div class="stack-stage" data-reveal>
+        <div class="stack" id="stack">
+          <div class="cut cut-screen" data-z="0"><span class="cut-lab">Screen</span></div>
+          <div class="cut cut-header" data-z="1"><span class="cut-lab">Header</span></div>
+          <div class="cut cut-hero" data-z="2"><span class="cut-lab">Hero</span></div>
+          <div class="cut cut-button" data-z="3"><span class="cut-lab">Button</span></div>
+          <div class="cut cut-list" data-z="1"><span class="cut-lab">List</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMPARE ============ -->
+  <section class="compare" id="compare">
+    <div class="compare-pin">
+      <span class="section-label"><em>08</em> The honest comparison</span>
+      <div class="compare-head">
+        <p class="kicker" data-reveal>Holon vs the infinite canvas</p>
+        <h2 data-lines>
+          <span class="line-mask"><span class="line-inner"><span class="them">They give you a canvas.</span></span></span>
+          <span class="line-mask"><span class="line-inner">We give you <em class="accent" style="font-style:normal">structure</em>.</span></span>
+        </h2>
+      </div>
+      <div class="compare-body">
+        <div class="chaos-stage" id="chaos-stage">
+          <div class="stage-cap">
+            <span class="cap cap-them" id="cap-them">Their canvas, 11:47 PM</span>
+            <span class="cap cap-us" id="cap-us" style="opacity:0">Holon — same design, zero housekeeping</span>
+          </div>
+          <div class="tree-outline" id="tree-outline"></div>
+        </div>
+        <div class="compare-rows" id="cmp-rows">
+          <div class="cmp-row" data-cmp><span class="rk">Starting a project</span><span class="them-c">A blank, infinite sheet</span><span class="us-c">A <b>screen</b>, ready to decompose</span></div>
+          <div class="cmp-row" data-cmp><span class="rk">Making a component</span><span class="them-c">Select, name, declare — a ceremony</span><span class="us-c"><b>Automatic.</b> Has a child? It&rsquo;s a component</span></div>
+          <div class="cmp-row" data-cmp><span class="rk">Editing one part</span><span class="them-c">Reach into the noise of the whole board</span><span class="us-c">Open it <b>alone, at true size</b></span></div>
+          <div class="cmp-row" data-cmp><span class="rk">Finding anything</span><span class="them-c">Pan, zoom, scroll, hunt</span><span class="us-c"><b>Walk the tree</b> — one level at a time</span></div>
+          <div class="cmp-row" data-cmp><span class="rk">Keeping it organized</span><span class="them-c">Your unpaid night job</span><span class="us-c"><b>The product&rsquo;s job.</b> Structure forms as you build</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="section cta" id="cta">
+    <div>
+      <p class="kicker" data-reveal style="justify-content:center">Early access</p>
+      <h2 data-lines>
+        <span class="line-mask"><span class="line-inner">Stop arranging.</span></span>
+        <span class="line-mask"><span class="line-inner">Start <em class="accent" style="font-style:normal">making</em>.</span></span>
+      </h2>
+      <p class="cta-sub" data-reveal>Holon is being built in the open. Leave your email and be first through the door when the tree unlocks.</p>
+      <div data-reveal>
+        <a class="btn" href="#"><span>Request early access</span></a>
+      </div>
+      <div class="cta-word" aria-hidden="true">H<b>O</b>LON</div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <span class="f-logo">
+    <svg class="mark" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+      <rect class="m-outer" x="3" y="3" width="50" height="50" rx="10"/>
+      <rect class="m-mid" x="13" y="13" width="30" height="30" rx="7"/>
+      <rect class="m-core" x="22" y="22" width="12" height="12" rx="4"/>
+    </svg>
+    Holon
+  </span>
+  <nav>
+    <a data-transition href="features/components.html">Components</a>
+    <a data-transition href="features/navigation.html">Navigation</a>
+    <a data-transition href="features/frame.html">The Frame</a>
+    <a data-transition href="features/ownership.html">Ownership</a>
+    <a data-transition href="features/builder.html">The Builder</a>
+  </nav>
+  <span>Every part is a whole. &copy; 2026 Holon — a concept.</span>
+</footer>
+
+<script src="js/vendor/gsap.min.js"></script>
+<script src="js/vendor/ScrollTrigger.min.js"></script>
+<script src="js/vendor/lenis.min.js"></script>
+<script src="js/main.js"></script>
+<script type="module" src="js/hero.js"></script>
+</body>
+</html>

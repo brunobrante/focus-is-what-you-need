@@ -13,6 +13,24 @@
       "runtimeExecutable": "bun",
       "runtimeArgs": ["run", "--cwd", "canvas", "dev", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "web-clade",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8741", "--directory", "apps/web/clade"],
+      "port": 8741
+    },
+    {
+      "name": "web-holon",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8742", "--directory", "apps/web/holon"],
+      "port": 8742
+    },
+    {
+      "name": "web-prism",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8743", "--directory", "apps/web/prism"],
+      "port": 8743
     }
   ]
 }
