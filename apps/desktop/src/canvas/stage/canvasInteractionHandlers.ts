@@ -244,7 +244,13 @@ export function handleDragMove(
   let changedIds = interaction.transformIds;
   if (isModifierCommandActive(event, settings, "canvas.drag.reparent")) {
     commandModeRef.current = true;
-    const canvasBounds: Rect = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
+    // Screen pages: the reparent clamp spans the whole content, not page 1.
+    const canvasBounds: Rect = interaction.contentBounds ?? {
+      x: 0,
+      y: 0,
+      width: document.canvas.width,
+      height: document.canvas.height,
+    };
     move = computeDragMoveCommandFromScreenDelta(interaction, screenDelta, canvasBounds);
     const committed = commitDragMove(interaction, move.delta, { clampBounds: canvasBounds });
     const excludeIds =
@@ -418,8 +424,11 @@ export function finishDrawInteraction(
       // pre-fit size), clamped inside the frame.
       applyTextFitSizingInPlace(next, node.id);
       const canvas = next.canvas;
-      node.x = roundPixel(clamp(interaction.startPoint.x - node.width / 2, 0, Math.max(0, canvas.width - node.width)));
-      node.y = roundPixel(clamp(interaction.startPoint.y - node.height / 2, 0, Math.max(0, canvas.height - node.height)));
+      // Screen pages: clamp within the full content rect, not just page 1.
+      const contentWidth = interaction.contentBounds?.width ?? canvas.width;
+      const contentHeight = interaction.contentBounds?.height ?? canvas.height;
+      node.x = roundPixel(clamp(interaction.startPoint.x - node.width / 2, 0, Math.max(0, contentWidth - node.width)));
+      node.y = roundPixel(clamp(interaction.startPoint.y - node.height / 2, 0, Math.max(0, contentHeight - node.height)));
     }
     dispatch({
       type: "commitDocument",
@@ -446,7 +455,8 @@ export function finishMovedInteraction(
   if (interaction.type === "drag") {
     const targetId =
       capturedDropTarget?.intent === "insert" ? capturedDropTarget.targetId : null;
-    const canvasBounds: Rect = {
+    // Screen pages: the drop clamp spans the whole content, not page 1.
+    const canvasBounds: Rect = interaction.contentBounds ?? {
       x: 0,
       y: 0,
       width: interaction.beforeDocument.canvas.width,

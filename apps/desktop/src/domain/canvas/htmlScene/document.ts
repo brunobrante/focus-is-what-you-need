@@ -121,6 +121,12 @@ function compactNode(node: HtmlCanvasNode): Record<string, unknown> {
   if (node.visible !== true) out.visible = node.visible;
   if (node.locked !== false) out.locked = node.locked;
   if (node.instanceOf != null) out.instanceOf = node.instanceOf;
+  // Screen pages (subject/root frames). `normalizeNode` preserves them via
+  // spread; only emit the expanded state — a single page is the default.
+  if (node.contentPages && node.contentPages > 1) {
+    out.contentPages = node.contentPages;
+    out.contentAxis = node.contentAxis ?? "vertical";
+  }
   // Vector payload (path/svg nodes). `normalizeNode` preserves them via spread, so
   // emitting them here is the only thing needed to persist a vector round-trip.
   if (node.viewBox) out.viewBox = node.viewBox;

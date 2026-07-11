@@ -27,7 +27,10 @@ import type { ReferenceStackSummary } from "@/lib/references/stackTypes";
 // boot), `instance_usage` (derived from scene graphJSON on save), and `asset_blobs`
 // (binaries out of the records hot path). Nuke-and-reseed produces every row fresh
 // with a short id + envelope; the edge graph is reconciled right after seeding.
-export const SCHEMA_VERSION = 29;
+// v30: screen pages. Scene subject/root nodes may carry `contentPages` +
+// `contentAxis` (frame window stays fixed; content stretches N device-sizes
+// along one axis). Additive fields — reseed just guarantees a clean baseline.
+export const SCHEMA_VERSION = 30;
 
 export type Meta = {
   schemaVersion: number;

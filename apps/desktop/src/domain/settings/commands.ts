@@ -119,6 +119,7 @@ export const CANVAS_COMMAND_GROUPS: Array<{
       { id: "canvas.vector.removeAnchor", label: "Remove anchor point", group: "Modifiers", type: "modifier" },
       { id: "canvas.radius.perCorner", label: "Round a single corner", group: "Modifiers", type: "modifier" },
       { id: "canvas.drag.duplicate", label: "Duplicate while dragging", group: "Modifiers", type: "modifier" },
+      { id: "canvas.viewport.wheelPageScroll", label: "Scroll screen pages while wheeling", group: "Modifiers", type: "modifier" },
     ],
   },
   {

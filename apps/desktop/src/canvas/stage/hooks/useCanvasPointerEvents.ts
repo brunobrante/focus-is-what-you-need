@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { getCommonParentId, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
+import { getCommonParentId, getContentAxis, getContentPages, getContentRootBounds, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/canvas/engine/hitTesting";
 import { insertSvgDocument, insertSvgPathsAsRoot } from "@/canvas/engine/actions";
 import { parseSvg } from "@/canvas/engine/vector/svgImport";
@@ -45,7 +45,7 @@ import {
   type VectorPointerCtx,
 } from "../canvasVectorInteraction";
 import { clearNativeTextSelection } from "../canvasStageHelpers";
-import { isPointInsideCanvas } from "../canvasCoordinates";
+import { isPointInsideVisibleWindow } from "../canvasCoordinates";
 import {
   getFallbackCanvasBounds,
   getDragBox,
@@ -60,6 +60,7 @@ import type { NoticeStore } from "@/canvas/engine/noticeStore";
 import type { CanvasAlignmentLogInput } from "../canvasAlignmentLog";
 import {
   type InteractionBeginCtx,
+  extendRootBoundsForPages,
   startPanInteraction,
   startRadiusInteraction,
   startResizeInteraction,
@@ -453,7 +454,7 @@ export function useCanvasPointerEvents({
     const point = getCanvasPoint(event);
     if (!point || !viewport) return;
 
-    if (!draftMode && !isPointInsideCanvas(point, state.document)) {
+    if (!draftMode && !isPointInsideVisibleWindow(point, state.document, state.contentScroll, getContentAxis(state.document))) {
       if (isSelectionTool(state.tool)) {
         dispatch({ type: "setSelected", selectedIds: [] });
         interactionRef.current = { type: "marquee", pointerId: event.pointerId, startPoint: point, currentPoint: point, moved: false };
@@ -498,7 +499,7 @@ export function useCanvasPointerEvents({
       node.width = 0;
       node.height = 0;
       const next = insertElement(state.document, node);
-      interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, elementSizeScale, fontTokens, beforeDocument: state.document, lastDocument: next, moved: false };
+      interactionRef.current = { type: "draw", pointerId: event.pointerId, startPoint: point, tool: state.tool, elementId: node.id, elementSizeScale, fontTokens, beforeDocument: state.document, lastDocument: next, moved: false, contentBounds: draftMode ? undefined : getContentRootBounds(state.document) };
       setInteractionActive(true);
       dispatch({ type: "setDocumentTransient", document: next, changedIds: [node.id] });
       viewport.setPointerCapture(event.pointerId);
@@ -547,9 +548,13 @@ export function useCanvasPointerEvents({
     const commonParentId = getCommonParentId(state.document, transformIds);
     const parentBounds = draftMode
       ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])
-      : commonParentId === undefined
-        ? getFallbackCanvasBounds(state.document)
-        : getParentBounds(state.document, transformIds[0]);
+      : extendRootBoundsForPages(
+          commonParentId === undefined
+            ? getFallbackCanvasBounds(state.document)
+            : getParentBounds(state.document, transformIds[0]),
+          state.document,
+          transformIds[0],
+        );
 
     interactionRef.current = {
       type: "drag",
@@ -569,6 +574,8 @@ export function useCanvasPointerEvents({
       currentDelta: { x: 0, y: 0 },
       startScreenPoint: { x: event.clientX, y: event.clientY },
       startWorldToScreenMatrix: startTransform.matrix,
+      contentBounds:
+        draftMode || getContentPages(state.document) <= 1 ? undefined : getContentRootBounds(state.document),
     };
     setInteractionActive(true);
     event.preventDefault();

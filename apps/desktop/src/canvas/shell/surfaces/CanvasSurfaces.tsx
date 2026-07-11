@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Monitor, Smartphone } from "lucide-react";
+import { Monitor, MoveHorizontal, MoveVertical, Smartphone } from "lucide-react";
+import { IconPlus } from "@/components/icons";
+import { ScreenPagesPreview } from "./ScreenPagesPreview";
 import {
   IconChevronLeft,
   IconGrid, IconScreen, IconWindow,
@@ -9,7 +11,8 @@ import { EditorBridgePublisher } from "@/canvas/engine/bridge";
 import { EditorProvider, useEditor } from "@/canvas/engine/store";
 import type { Clipboard } from "@/canvas/engine/clipboard";
 import { LiveInstanceRefresh } from "./LiveInstanceRefresh";
-import type { CanvasDocument } from "@/canvas/engine/types";
+import type { CanvasDocument, ContentAxis } from "@/canvas/engine/types";
+import { getContentPages } from "@/canvas/engine/geometry";
 import type { ProjectType } from "@/lib/data/types";
 import { getViewportZoomLimits } from "@/canvas/engine/viewport";
 import { ZoomControl, type ZoomSetter } from "../ZoomControl";
@@ -370,8 +373,13 @@ export function CanvasSurface({
               hasAncestors={hasAncestors}
               shellDeviceVisibility={shellDeviceVisibility}
               shellZoomVisibility={shellZoomVisibility}
+              allowScreenPages={!draftMode && !isIconSubject}
             />
           ) : null}
+          {/* Pages work for screens AND components (the frame is the window in
+              both); only icon masters (fixed 24×24 artboards) and the freeform
+              draft canvas opt out. */}
+          {!draftMode && !isIconSubject ? <ScreenPagesPreview /> : null}
         </EditorProvider>
       ) : (
         <div className="grid h-full w-full place-items-center text-[12px] text-[#777]">
@@ -444,15 +452,18 @@ function SurfaceCanvasControls({
   hasAncestors,
   shellDeviceVisibility,
   shellZoomVisibility,
+  allowScreenPages,
 }: {
   projectType: ProjectType;
   isComponent: boolean;
   hasAncestors: boolean;
   shellDeviceVisibility: ShellControlVisibility;
   shellZoomVisibility: ShellControlVisibility;
+  allowScreenPages?: boolean;
 }) {
   const { state, dispatch } = useEditor();
   const [localHovered, setLocalHovered] = useState(false);
+  const pages = getContentPages(state.document);
 
   const setZoom: ZoomSetter = (next) => {
     const zoom = typeof next === "function" ? next(state.zoom) : next;
@@ -465,7 +476,7 @@ function SurfaceCanvasControls({
 
   return (
     <div
-      className="absolute bottom-3 left-3 z-[10] flex items-center gap-2"
+      className="absolute bottom-3 left-3 z-[20] flex items-center gap-2"
       onMouseEnter={() => setLocalHovered(true)}
       onMouseLeave={() => setLocalHovered(false)}
     >
@@ -482,6 +493,63 @@ function SurfaceCanvasControls({
         <div style={zoomStyle}>
           <ZoomControl zoom={state.zoom} setZoom={setZoom} limits={getViewportZoomLimits(state.viewportMode)} />
         </div>
+      )}
+      {allowScreenPages && <AddPageButton pages={pages} dispatch={dispatch} />}
+    </div>
+  );
+}
+
+// The screen-pages "+" pill. With no extra pages yet the direction is still
+// free, so the click opens a small drop to pick vertical or horizontal; once
+// pages exist the direction is locked to the current axis and the click adds
+// straight away.
+function AddPageButton({ pages, dispatch }: { pages: number; dispatch: ReturnType<typeof useEditor>["dispatch"] }) {
+  const [axisMenuOpen, setAxisMenuOpen] = useState(false);
+
+  const addPage = (axis?: ContentAxis) => {
+    setAxisMenuOpen(false);
+    dispatch({ type: "setContentPages", pages: pages + 1, ...(axis ? { axis } : {}) });
+  };
+
+  return (
+    <div
+      className="relative flex items-center gap-1 rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-[3px]"
+      style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.4)" }}
+    >
+      <button
+        type="button"
+        aria-label="Adicionar página"
+        onClick={() => (pages > 1 ? addPage() : setAxisMenuOpen((open) => !open))}
+        className="grid h-[26px] w-[26px] place-items-center rounded-md text-[#CFCFCF] transition-colors duration-[100ms] hover:bg-[#2A2A2A]"
+      >
+        <IconPlus size={15} strokeWidth={2} />
+      </button>
+      {axisMenuOpen && (
+        <>
+          {/* Click-away catcher: closes the drop without touching the canvas. */}
+          <div className="fixed inset-0 z-[29]" onPointerDown={() => setAxisMenuOpen(false)} />
+          <div
+            className="absolute bottom-[calc(100%+6px)] left-0 z-[30] flex min-w-[148px] flex-col rounded-lg border border-[#2C2C2C] bg-[#1A1A1A] p-1"
+            style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.5)" }}
+          >
+            <button
+              type="button"
+              onClick={() => addPage("vertical")}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12px] text-[#CFCFCF] transition-colors duration-[100ms] hover:bg-[#2A2A2A] hover:text-white"
+            >
+              <MoveVertical size={13} strokeWidth={1.8} />
+              Vertical
+            </button>
+            <button
+              type="button"
+              onClick={() => addPage("horizontal")}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12px] text-[#CFCFCF] transition-colors duration-[100ms] hover:bg-[#2A2A2A] hover:text-white"
+            >
+              <MoveHorizontal size={13} strokeWidth={1.8} />
+              Horizontal
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

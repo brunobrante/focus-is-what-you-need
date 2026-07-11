@@ -174,5 +174,10 @@ function mergeSubjectIntoInstance(
     visible: instanceNode.visible,
     locked: instanceNode.locked,
     instanceOf: instanceNode.instanceOf,
+    // Screen pages stay on the MASTER's subject: in context an instance shows
+    // the fixed window at scroll 0 and its box clips (the subject style's
+    // overflow above) — the instance node itself never owns pages.
+    contentPages: undefined,
+    contentAxis: undefined,
   };
 }

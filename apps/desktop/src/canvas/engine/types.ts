@@ -156,6 +156,11 @@ export type CanvasProperties = {
   borderColor?: string;
   opacity?: number;
   padding?: number;
+  // Screen pages (persisted). The frame keeps its fixed width×height (the
+  // window); the content stretches `contentPages` device-sizes along
+  // `contentAxis`. Absent (or 1) = plain single-page frame. Optional + additive.
+  contentPages?: number;
+  contentAxis?: ContentAxis;
 };
 
 export type CanvasDocument = {
@@ -221,6 +226,10 @@ export const DEFAULT_ANCESTOR_OVERLAY_ITEM: AncestorOverlayItem = {
   keepRadius: true,
 };
 
+// Screen pages: the axis the expanded content grows along. Chosen when the
+// first extra page is added; a single-page screen has no meaningful axis.
+export type ContentAxis = "vertical" | "horizontal";
+
 export type EditorState = {
   document: CanvasDocument;
   viewportMode: ViewportMode;
@@ -273,6 +282,13 @@ export type EditorState = {
   // overlay) or null when there is no overlay. Transient — never persisted.
   viewportSize: Size;
   navigableBounds: Rect | null;
+  // Screen pages: the page count and axis are persisted on the DOCUMENT
+  // (`canvas.contentPages` / `canvas.contentAxis` — see getContentPages/
+  // getContentAxis), so undo/redo restores them together with the elements.
+  // Only the scroll position is editor state: `contentScroll` (canvas units
+  // along the content axis, 0..(pages-1)*axisSize) is how far the content is
+  // scrolled inside the fixed window. Transient — reset when a subject mounts.
+  contentScroll: number;
   // Transient (session-only) config for the parent-frames overlay. Reset whenever
   // a new subject mounts a fresh editor, so it never persists to the document.
   ancestorOverlay: AncestorOverlayState;
@@ -352,6 +368,10 @@ export type DragInteraction = BaseInteraction & {
   // commit/undo and Escape-cancel remove the clones entirely.
   duplicated?: boolean;
   historyBeforeDocument?: CanvasDocument;
+  // Screen pages: full content rect (device size × pages along the content axis)
+  // captured at drag start, so the Cmd-reparent clamp doesn't snap page-2+
+  // elements back into page 1.
+  contentBounds?: Rect;
 };
 
 export type ResizeInteraction = BaseInteraction & {
@@ -407,6 +427,10 @@ export type DrawInteraction = {
   beforeDocument: CanvasDocument;
   lastDocument: CanvasDocument;
   moved: boolean;
+  // Screen pages: full content rect (device size × pages along the content axis)
+  // captured at draw start, so click-created elements (text) clamp to the
+  // content, not page 1.
+  contentBounds?: Rect;
 };
 
 // Pen tool: click-to-place anchors, drag to pull symmetric bezier handles, click

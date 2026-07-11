@@ -15,7 +15,7 @@ import {
   shouldUseScaledDomProjection,
   viewportChanged,
 } from "@/canvas/engine/viewport";
-import { getAbsoluteRect, getSelectionAABB } from "@/canvas/engine/geometry/bounds";
+import { getAbsoluteRect, getContentAxis, getContentPages, getSelectionAABB } from "@/canvas/engine/geometry/bounds";
 import { CanvasContextMenu } from "./CanvasContextMenu";
 import { CanvasToolingLayer } from "./CanvasToolingLayer";
 import type { CanvasToolingRef } from "./CanvasToolingLayer";
@@ -333,6 +333,35 @@ export function CanvasStage({
     [state.document.canvas.height, state.document.canvas.rotation, state.document.canvas.width, state.offsetX, state.offsetY, state.viewportMode, state.zoom, viewportSize],
   );
 
+  // Screen pages: the frame keeps its device size (the fixed window), while the
+  // content scrolls inside it by `contentScroll` canvas units along the content
+  // axis. Everything that lives in content space — hit-testing, tooling handles,
+  // text/gradient overlays — must use a transform shifted by the scroll so it
+  // stays glued to the moved content. The frame box (stageSpace) and the grid
+  // keep the plain transform, so the window itself never moves. At scroll 0 this
+  // is identical to `viewportTransform`.
+  const contentPages = draftMode ? 1 : getContentPages(state.document);
+  const contentAxis = getContentAxis(state.document);
+  // Defensive clamp: an undo can shrink the page count while the transient
+  // scroll still points past the new content end.
+  const contentScroll = draftMode
+    ? 0
+    : Math.min(
+        state.contentScroll,
+        (contentPages - 1) * (contentAxis === "horizontal" ? state.document.canvas.width : state.document.canvas.height),
+      );
+  const contentViewportTransform = useMemo(() => {
+    if (contentScroll === 0) return viewportTransform;
+    const displayScale =
+      viewportSize.width > 0 && viewportSize.height > 0
+        ? getCanvasDisplayScale(viewportSize, canvasSize, state.viewportMode)
+        : 1;
+    const scrollPx = contentScroll * state.zoom * displayScale;
+    const offsetX = contentAxis === "horizontal" ? state.offsetX - scrollPx : state.offsetX;
+    const offsetY = contentAxis === "horizontal" ? state.offsetY : state.offsetY - scrollPx;
+    return buildViewportTransform(state.document, viewportSize, state.zoom, offsetX, offsetY, state.viewportMode);
+  }, [contentScroll, contentAxis, viewportTransform, viewportSize, canvasSize, state.viewportMode, state.zoom, state.document, state.offsetX, state.offsetY]);
+
   const {
     marqueeRect,
     lassoPoints,
@@ -351,7 +380,7 @@ export function CanvasStage({
     state,
     dispatch,
     draftMode,
-    viewportTransform,
+    viewportTransform: contentViewportTransform,
     viewportRef,
     toolingRef,
     interactionRef,
@@ -564,19 +593,55 @@ export function CanvasStage({
                   : state.document.canvas.borderRadius * renderScale,
               boxShadow: getStageBoxShadow(state.document.canvas, renderScale),
               opacity: state.document.canvas.opacity ?? undefined,
+              // The fixed device window clips its scrollable content (only once
+              // expanded — a single page keeps the previous overflow: visible so
+              // outside strokes / shadows aren't clipped).
+              overflow: contentPages > 1 ? "hidden" : undefined,
               "--zoom": displayZoom,
             } as CSSProperties}
           >
-            <RenderedScene
-              draftMode={false}
-              document={state.document}
-              canvasStageActive={state.canvasStageActive}
-              isolatedParentId={state.isolatedParentId}
-              editingTextId={state.editingTextId}
-              affectedElementIds={affectedElementIds}
-              transientTransformIds={transientTransformIds}
-              renderScale={renderScale}
-            />
+            {contentPages > 1 ? (
+              // Content surface: longer than the window along the content axis,
+              // slid by the scroll. Its `transform` makes it the containing block
+              // for the absolute elements, so their coordinates stay natural —
+              // only the surface moves.
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: projectedStageWidth * (contentAxis === "horizontal" ? contentPages : 1),
+                  height: projectedStageHeight * (contentAxis === "horizontal" ? 1 : contentPages),
+                  transform:
+                    contentAxis === "horizontal"
+                      ? `translateX(${-contentScroll * renderScale}px)`
+                      : `translateY(${-contentScroll * renderScale}px)`,
+                  willChange: "transform",
+                }}
+              >
+                <RenderedScene
+                  draftMode={false}
+                  document={state.document}
+                  canvasStageActive={state.canvasStageActive}
+                  isolatedParentId={state.isolatedParentId}
+                  editingTextId={state.editingTextId}
+                  affectedElementIds={affectedElementIds}
+                  transientTransformIds={transientTransformIds}
+                  renderScale={renderScale}
+                />
+              </div>
+            ) : (
+              <RenderedScene
+                draftMode={false}
+                document={state.document}
+                canvasStageActive={state.canvasStageActive}
+                isolatedParentId={state.isolatedParentId}
+                editingTextId={state.editingTextId}
+                affectedElementIds={affectedElementIds}
+                transientTransformIds={transientTransformIds}
+                renderScale={renderScale}
+              />
+            )}
           </div>
         )}
       </div>
@@ -608,7 +673,7 @@ export function CanvasStage({
         scaleToolActive={state.tool === "scale"}
         canvasStageActive={state.canvasStageActive}
         guides={state.guides}
-        viewportTransform={viewportTransform}
+        viewportTransform={contentViewportTransform}
         suppressHover={interactionActive}
         interactionType={interactionActive ? (interactionRef.current?.type ?? null) : null}
         radiusDragCorner={(() => {
@@ -621,13 +686,14 @@ export function CanvasStage({
         dropTarget={dropTarget}
         onCommitDocument={commitContextToolbarDocument}
         settings={settings}
+        contentScroll={contentScroll}
       />
 
       <TextEditingTextarea
         textEdit={textEdit}
         document={state.document}
         viewportRef={viewportRef}
-        viewportTransform={viewportTransform}
+        viewportTransform={contentViewportTransform}
         onSelectionChange={syncTextSelection}
         onInputValue={updateTextNodeFromTextareaInput}
         onCommit={commitTextEditing}
@@ -638,12 +704,12 @@ export function CanvasStage({
       <TextEditingOverlay
         textEdit={textEdit}
         document={state.document}
-        viewportTransform={viewportTransform}
+        viewportTransform={contentViewportTransform}
       />
 
       <GradientEditOverlay
         state={state}
-        viewportTransform={viewportTransform}
+        viewportTransform={contentViewportTransform}
         dispatch={dispatch}
       />
 

@@ -4,13 +4,14 @@ import {
   angleBetweenPoints,
   getAbsoluteRect,
   getCommonParentId,
+  getContentRootBounds,
   getParentBounds,
   getSelectionBox,
   rectCenterX,
   rectCenterY,
 } from "@/canvas/engine/geometry";
 import { getElementDefinition } from "@/canvas/engine/elementDefinitions";
-import type { EditorState, Point, ResizeHandle } from "@/canvas/engine/types";
+import type { CanvasDocument, EditorState, Point, Rect, ResizeHandle } from "@/canvas/engine/types";
 import { getCanvasDisplayScale } from "@/canvas/engine/viewport";
 import type { Size } from "@/canvas/engine/viewport";
 import type { Interaction } from "./canvasInteractionTypes";
@@ -105,9 +106,13 @@ export function startResizeInteraction(
     commonParentId,
     parentBounds: draftMode
       ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])
-      : transformIds[0]
-        ? getParentBounds(state.document, transformIds[0])
-        : getFallbackCanvasBounds(state.document),
+      : extendRootBoundsForPages(
+          transformIds[0]
+            ? getParentBounds(state.document, transformIds[0])
+            : getFallbackCanvasBounds(state.document),
+          state.document,
+          transformIds[0],
+        ),
     moved: false,
     lastDocument: state.document,
     lastGuides: [],
@@ -159,9 +164,13 @@ export function startRotateInteraction(
     commonParentId,
     parentBounds: draftMode
       ? getInteractionParentBounds(state.document, state.viewportMode, commonParentId, transformIds[0])
-      : transformIds[0]
-        ? getParentBounds(state.document, transformIds[0])
-        : getFallbackCanvasBounds(state.document),
+      : extendRootBoundsForPages(
+          transformIds[0]
+            ? getParentBounds(state.document, transformIds[0])
+            : getFallbackCanvasBounds(state.document),
+          state.document,
+          transformIds[0],
+        ),
     center,
     startAngle: angleBetweenPoints(center, point),
     startRotations,
@@ -204,4 +213,19 @@ export function startRadiusInteraction(
   setInteractionActive(true);
   viewport.classList.add("is-radius-dragging");
   viewport.setPointerCapture(event.pointerId);
+}
+
+// Screen pages: a root element (the frame's own child) may be dragged/resized
+// across the expanded content, so its clamp bounds grow to the full content
+// rect (device size × pages along the document's content axis). A nested child
+// keeps its real parent bounds — only top-level elements scroll across pages.
+export function extendRootBoundsForPages(
+  bounds: Rect,
+  document: CanvasDocument,
+  transformId: string | undefined,
+): Rect {
+  const element = transformId ? document.elements[transformId] : undefined;
+  if (element && element.parentId) return bounds;
+  const content = getContentRootBounds(document);
+  return content.width > bounds.width || content.height > bounds.height ? content : bounds;
 }

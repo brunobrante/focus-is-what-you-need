@@ -6,6 +6,7 @@ import { mutateElementShallow, shallowCloneDocument } from "./coreUtils";
 import {
   clamp,
   clampRotatedRectToBounds,
+  getContentRootBounds,
   getParentBounds,
   getParentSize,
   MIN_ELEMENT_SIZE,
@@ -15,10 +16,13 @@ import {
 } from "../geometry";
 import { fontForNode, measureTextWidth } from "./textMeasurement";
 
+// Screen pages: ROOT elements clamp to the expanded content rect (device size ×
+// pages along the document's content axis), not the single-page window. Nested
+// elements always clamp to their real parent.
 export function clampNodeToParentBounds(document: CanvasDocument, id: string): void {
   const node = document.elements[id];
   if (!node) return;
-  const parentBounds = getParentBounds(document, id);
+  const parentBounds = !node.parentId ? getContentRootBounds(document) : getParentBounds(document, id);
   const clamped = clampRotatedRectToBounds(
     { x: parentBounds.x + node.x, y: parentBounds.y + node.y, width: node.width, height: node.height },
     node.rotation,
@@ -36,7 +40,10 @@ export function updateElementGeometry(document: CanvasDocument, id: string, patc
   const node = mutateElementShallow(next, id);
   if (!node) return document;
   const oldSize = { width: node.width, height: node.height };
-  const parentSize = getParentSize(next, id);
+  const contentBounds = getContentRootBounds(next);
+  const parentSize = !node.parentId
+    ? { width: contentBounds.width, height: contentBounds.height }
+    : getParentSize(next, id);
   const c = getElementDefinition(node.type).capabilities.constraints;
   const minW = c.width.min;
   const maxW = Math.min(parentSize.width, c.width.max ?? parentSize.width);

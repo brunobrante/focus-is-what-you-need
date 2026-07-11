@@ -62,6 +62,7 @@ export function getFallbackCanvasBounds(document: CanvasDocument): Rect {
   return { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
 }
 
+
 export function getSurfaceCreationBounds(document: CanvasDocument, _viewportMode: ViewportMode): Rect {
   return getFallbackCanvasBounds(document);
 }

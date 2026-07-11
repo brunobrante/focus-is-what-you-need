@@ -1,4 +1,4 @@
-import type { CanvasDocument, Point, ViewportMode } from "@/canvas/engine/types";
+import type { CanvasDocument, ContentAxis, Point, ViewportMode } from "@/canvas/engine/types";
 import {
   canvasPointToViewport,
   createViewportTransform,
@@ -22,6 +22,26 @@ export function isPointInsideCanvas(point: Point, document: CanvasDocument): boo
     point.y >= 0 &&
     point.x <= document.canvas.width &&
     point.y <= document.canvas.height
+  );
+}
+
+// Screen pages: pointer points arrive in content coordinates (the scroll-shifted
+// transform), so "inside the frame" means inside the visible window — the
+// device-sized slice starting at `contentScroll` along the content axis. With one
+// page / scroll 0 this is exactly `isPointInsideCanvas`.
+export function isPointInsideVisibleWindow(
+  point: Point,
+  document: CanvasDocument,
+  contentScroll: number,
+  axis: ContentAxis,
+): boolean {
+  const scrollX = axis === "horizontal" ? contentScroll : 0;
+  const scrollY = axis === "horizontal" ? 0 : contentScroll;
+  return (
+    point.x >= scrollX &&
+    point.x <= scrollX + document.canvas.width &&
+    point.y >= scrollY &&
+    point.y <= scrollY + document.canvas.height
   );
 }
 

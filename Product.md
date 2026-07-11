@@ -151,7 +151,8 @@ element of that subject:
 The frame is **the surface you paint on**. It is the canvas. The rules:
 
 - You can only create and place elements **inside the frame**. There is nothing
-  to edit outside it.
+  to edit outside it. (When the frame has pages, "inside the frame" means inside
+  its **content** — see "Screen pages" below.)
 - The frame is fixed in place while open — a component already occupies a fixed
   position inside its parent, so its boundary is fixed.
 - **You edit a component by explicitly opening it** ("edit" it on its own), never
@@ -167,6 +168,60 @@ The frame is **the surface you paint on**. It is the canvas. The rules:
 When you edit a component in isolation, you can turn on a **grid/guides derived
 from its ancestors**, so even alone you can tell how far you can go and stay
 aligned with the parent context you cannot currently see.
+
+---
+
+## Screen pages — fixed window, scrollable content **[LAW]**
+
+The canvas is deliberately not free: the frame cannot grow and there is no
+infinite canvas. Real screens still scroll, though — a mobile screen is one
+device tall on the outside and several device-heights of content on the inside.
+**Pages** resolve that tension without giving up the bounded frame.
+
+**Window ≠ content are TWO SIZES on the SAME node — the frame — not two boxes.**
+
+- The **window** is the frame's fixed size (the device on a screen; the box of a
+  component). It is the footprint: what the parent sees, what clips. It never
+  changes while open.
+- The **content** is what lives inside and can be longer than the window along
+  **one axis** (vertical or horizontal, chosen when the first extra page is
+  added). It is what scrolls behind the window.
+
+There is intentionally **no "Window" entity**. Wrapping the frame in a container
+node (`Window → Frame → elements`) was considered and rejected: it would break
+the "Screen is the top Component" law (a screen would become two nodes),
+duplicate nodes in every scrollable component, and complicate nesting, instances
+and versioning for nothing. The thing that clips-and-contains is what a
+component box already *is* — a second box would be redundant.
+
+**How it works (the technique).** In the DOM this is one extra render surface,
+not structure:
+
+```
+.canvas-stage      → window: fixed device size, overflow: hidden
+  content surface  → content: N pages long, slides by -scroll
+```
+
+The content surface is a **number** (pages × frame size), not a user element and
+not an entity — for an empty page it is just the frame's background stretched.
+Tools keep working untouched because they operate in canvas coordinates: the
+scroll is a transform offset, and window vs layout are orthogonal — the window
+only does `overflow + fixed size`, while absolute/flex/grid live in the content
+underneath it.
+
+The rules:
+
+- The window is fixed while open (position and size of the opening).
+- Content ⊇ window; it grows only on the enabled axis, **quantized in whole
+  pages** (multiples of the frame size). No free growth — this reinforces the
+  product's core stance against the infinite canvas.
+- Elements live in the **content**: the frame law's placement boundary is the
+  content, not the window.
+- In context / as an instance, a paged component renders at its **window size,
+  clipped, at scroll 0** — the parent always sees the footprint.
+- Per "Screen = Component", pages work identically for screens and components.
+  The page count and axis persist with the frame; the scroll position is view
+  state and is never saved.
 
 ---
 

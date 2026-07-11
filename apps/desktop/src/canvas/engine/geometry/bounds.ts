@@ -1,4 +1,4 @@
-import type { CanvasDocument, ElementNode, Point, Rect } from "../types";
+import type { CanvasDocument, ContentAxis, ElementNode, Point, Rect } from "../types";
 import {
   bboxFromPoints,
   clamp,
@@ -418,6 +418,29 @@ export function canvasToElementLocal(
   if (!pc) return null;
   const q = { x: pc.x - node.x, y: pc.y - node.y };
   return rotatePoint(q, { x: node.width / 2, y: node.height / 2 }, -node.rotation);
+}
+
+// ── Screen pages (content axis) ───────────────────────────────────────────────
+// The frame keeps its fixed device size (the window the parent sees); the
+// persisted `canvas.contentPages`/`canvas.contentAxis` stretch the CONTENT that
+// many device-sizes along one axis. Root elements live in the content, so their
+// placement clamps use `getContentRootBounds` instead of the window rect.
+
+export function getContentPages(document: CanvasDocument): number {
+  return Math.max(1, document.canvas.contentPages ?? 1);
+}
+
+export function getContentAxis(document: CanvasDocument): ContentAxis {
+  return document.canvas.contentAxis ?? "vertical";
+}
+
+export function getContentRootBounds(document: CanvasDocument): Rect {
+  const pages = getContentPages(document);
+  const bounds = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
+  if (pages <= 1) return bounds;
+  return getContentAxis(document) === "horizontal"
+    ? { ...bounds, width: document.canvas.width * pages }
+    : { ...bounds, height: document.canvas.height * pages };
 }
 
 export function getParentBounds(document: CanvasDocument, id: string): Rect {

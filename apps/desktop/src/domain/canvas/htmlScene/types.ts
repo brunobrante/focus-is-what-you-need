@@ -153,6 +153,11 @@ export type HtmlCanvasNode = {
   locked: boolean;
   // Non-null only on linked instance nodes. Plain content nodes leave this null.
   instanceOf: HtmlCanvasInstanceRef | null;
+  // Screen pages (subject/root frames only). The frame's bounds stay the fixed
+  // window; the CONTENT stretches `contentPages` device-sizes along
+  // `contentAxis`. Optional + additive; absent (or 1) = plain single-page frame.
+  contentPages?: number;
+  contentAxis?: "vertical" | "horizontal";
   // ── Vector fields (appearance "path"/"svg" only; absent otherwise) ──
   // Intrinsic authoring box; anchors in `vectorPath` live in this space and the
   // node bounds stretch it (mirrors the engine ElementNode.viewBox/path pair).

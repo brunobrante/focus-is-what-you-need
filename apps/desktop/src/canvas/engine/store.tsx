@@ -8,9 +8,10 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { Dispatch, ReactNode } from "react";
-import type { AncestorOverlayItem, CanvasDocument, EditorState, Rect, Size, SnapGuide, Tool, VectorEditTool, ViewportMode } from "./types";
+import type { AncestorOverlayItem, CanvasDocument, ContentAxis, EditorState, Rect, Size, SnapGuide, Tool, VectorEditTool, ViewportMode } from "./types";
 import { DEFAULT_ANCESTOR_OVERLAY_ITEM } from "./types";
-import { constrainAll, createDefaultDocument } from "./actions";
+import { constrainAll, createDefaultDocument, shallowCloneDocument } from "./actions";
+import { getContentAxis, getContentPages } from "./geometry";
 import { documentsEqual, limitHistory } from "./history";
 import { createHoverStore, type HoverStore } from "./hoverStore";
 import { createTextSelectionStore, type TextSelectionStore } from "./textSelectionStore";
@@ -28,6 +29,8 @@ export type EditorAction =
   | { type: "setZoom"; zoom: number }
   | { type: "setViewport"; zoom?: number; offsetX?: number; offsetY?: number }
   | { type: "setViewportMetrics"; viewportSize: Size; navigableBounds: Rect | null }
+  | { type: "setContentPages"; pages: number; axis?: ContentAxis }
+  | { type: "setContentScroll"; scroll: number }
   | { type: "setAncestorOverlayEnabled"; enabled: boolean }
   | { type: "updateAncestorOverlayItem"; id: string; patch: Partial<AncestorOverlayItem> }
   | { type: "setSelected"; selectedIds: string[] }
@@ -214,8 +217,15 @@ function stateForDocument(document: CanvasDocument, viewportMode: ViewportMode):
     activeGradientEdit: null,
     viewportSize: { width: 0, height: 0 },
     navigableBounds: null,
+    contentScroll: 0,
     ancestorOverlay: { enabled: false, items: {} },
   };
+}
+
+// Screen pages: the device dimension the content grows along, from the
+// document's persisted axis.
+function contentAxisSize(document: CanvasDocument): number {
+  return getContentAxis(document) === "horizontal" ? document.canvas.width : document.canvas.height;
 }
 
 type Handler<A extends EditorAction> = (state: EditorState, action: A) => EditorState;
@@ -269,6 +279,36 @@ const handlers: { [K in EditorAction["type"]]: Handler<Extract<EditorAction, { t
     const boundsChanged = !rectsEqual(state.navigableBounds, action.navigableBounds);
     if (!sizeChanged && !boundsChanged) return state;
     return { ...state, viewportSize: action.viewportSize, navigableBounds: action.navigableBounds };
+  },
+  setContentPages(state, action) {
+    const pages = Math.max(1, Math.round(action.pages));
+    // The axis can only be (re)chosen while expanding — once pages exist, adds
+    // and removals keep the current axis; collapsing to one page frees it again.
+    const axis = action.axis ?? getContentAxis(state.document);
+    if (pages === getContentPages(state.document) && axis === getContentAxis(state.document)) return state;
+    // Pages live on the document (persisted with the scene), so this is a real
+    // history commit — undo restores the page count together with the elements.
+    const next = shallowCloneDocument(state.document);
+    next.canvas = {
+      ...next.canvas,
+      contentPages: pages > 1 ? pages : undefined,
+      contentAxis: pages > 1 ? axis : undefined,
+    };
+    const maxScroll = (pages - 1) * contentAxisSize(next);
+    const contentScroll = Math.max(0, Math.min(maxScroll, state.contentScroll));
+    return {
+      ...state,
+      document: next,
+      contentScroll,
+      past: limitHistory([...state.past, state.document]),
+      future: [],
+    };
+  },
+  setContentScroll(state, action) {
+    const maxScroll = (getContentPages(state.document) - 1) * contentAxisSize(state.document);
+    const scroll = Math.max(0, Math.min(maxScroll, action.scroll));
+    if (scroll === state.contentScroll) return state;
+    return { ...state, contentScroll: scroll };
   },
   setAncestorOverlayEnabled(state, action) {
     if (state.ancestorOverlay.enabled === action.enabled) return state;

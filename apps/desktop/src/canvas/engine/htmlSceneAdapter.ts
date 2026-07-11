@@ -177,6 +177,10 @@ export function canvasDocumentFromHtmlDocument(
         : root
           ? Math.max(root.style.paddingX, root.style.paddingY)
           : undefined,
+      // Screen pages: the frame's expanded content, persisted on the scene's
+      // subject/root node.
+      contentPages: canvasRoot?.contentPages,
+      contentAxis: canvasRoot?.contentAxis,
     },
     shellBackground: DEFAULT_SHELL_BACKGROUND,
     rootIds,
@@ -345,6 +349,8 @@ function htmlSubjectNodeFromCanvas(
     },
     style,
     locked: previous.locked !== false,
+    contentPages: document.canvas.contentPages,
+    contentAxis: document.canvas.contentAxis,
   };
 }
 
@@ -389,6 +395,8 @@ function htmlRootNodeFromCanvas(
     visible: true,
     locked: false,
     instanceOf: null,
+    contentPages: document.canvas.contentPages,
+    contentAxis: document.canvas.contentAxis,
   };
 }
 

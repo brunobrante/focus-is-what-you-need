@@ -86,6 +86,9 @@ const modifierCommands: Record<CanvasModifierCommandId, ModifierBinding> = {
   // pinch as a ctrl-wheel, which is read raw at the call site and is not a
   // policy choice — this binding only covers the deliberate modifier.
   "canvas.viewport.wheelZoom": "mod",
+  // Held while wheeling over an expanded screen to scroll its pages (the content
+  // inside the fixed frame window) instead of panning the view.
+  "canvas.viewport.wheelPageScroll": "alt",
   "canvas.text.extendSelection": "shift",
 };
 

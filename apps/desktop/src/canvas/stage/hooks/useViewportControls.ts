@@ -4,7 +4,7 @@ import type { EditorState, Point, Rect } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
 import type { GlobalSettings } from "@/domain/settings/types";
-import { clamp } from "@/canvas/engine/geometry";
+import { clamp, getContentAxis, getContentPages } from "@/canvas/engine/geometry";
 import {
   canvasPointToViewport,
   centerViewportOnPoint,
@@ -305,6 +305,24 @@ export function useViewportControls({
       });
       const nextBaseCursor = canvasPointToViewport(clampedCursorCanvas, nextBaseTransform);
       nextViewport = { zoom: nextZoom, offsetX: cursor.x - nextBaseCursor.x, offsetY: cursor.y - nextBaseCursor.y };
+    } else if (
+      getContentPages(state.document) > 1 &&
+      isModifierCommandActive(event, settings, "canvas.viewport.wheelPageScroll")
+    ) {
+      // Screen pages: held modifier + wheel scrolls the content inside the fixed
+      // frame window (same scroll the pages rail drives) instead of panning the
+      // view. Delta arrives in screen px; convert to canvas units so the scroll
+      // speed tracks the cursor regardless of zoom. On the horizontal axis a
+      // trackpad's sideways swipe (deltaX) drives it when dominant; a plain
+      // mouse wheel (deltaY only) still works.
+      const displayScale = getCanvasDisplayScale(containerSize, canvasSize, state.viewportMode);
+      const displayZoom = Math.max(state.zoom * displayScale, 0.0001);
+      const delta =
+        getContentAxis(state.document) === "horizontal" && Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+      dispatch({ type: "setContentScroll", scroll: state.contentScroll + delta / displayZoom });
+      return;
     } else {
       nextViewport = { zoom: state.zoom, offsetX: state.offsetX - event.deltaX, offsetY: state.offsetY - event.deltaY };
     }

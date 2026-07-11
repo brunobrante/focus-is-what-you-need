@@ -71,6 +71,10 @@ export type CanvasToolingLayerProps = {
   dropTarget: CanvasDropTarget | null;
   onCommitDocument: (document: CanvasDocument, selectedIds?: string[]) => void;
   settings?: GlobalSettings;
+  // Screen pages: current content scroll (canvas units along the content axis).
+  // Any change — the rail, its scrub drag, or modifier+wheel — dismisses the
+  // context toolbar.
+  contentScroll?: number;
 };
 
 function computeTransformIds(doc: CanvasDocument, selectedIds: string[]): string[] {
@@ -219,13 +223,24 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         setContextToolbarModifierDown(false);
         setParentDistanceModifierDown(false);
       };
+      // Wheeling with the toolbar modifier held is a scroll gesture (page scroll
+      // shares the same default modifier) — dismiss the toolbar instead of leaving
+      // it floating over the moving content. It comes back on the next press,
+      // since the held key fires no new keydown.
+      const onWheel = (event: WheelEvent) => {
+        if (isModifierCommandActive(event, settings, "canvas.selection.contextToolbar")) {
+          setContextToolbarModifierDown(false);
+        }
+      };
       window.addEventListener("keydown", onKeyDown);
       window.addEventListener("keyup", onKeyUp);
       window.addEventListener("blur", onBlur);
+      window.addEventListener("wheel", onWheel, { passive: true });
       return () => {
         window.removeEventListener("keydown", onKeyDown);
         window.removeEventListener("keyup", onKeyUp);
         window.removeEventListener("blur", onBlur);
+        window.removeEventListener("wheel", onWheel);
       };
     }, [settings]);
 
@@ -237,6 +252,14 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       setContextToolbarModifierDown(false);
       setParentDistanceModifierDown(false);
     }, [props.editingTextId]);
+
+    // Screen pages: any content scroll (rail wheel, rail scrub, modifier+wheel)
+    // dismisses the context toolbar — it would float over the moving content.
+    // Setting false when already false is a no-op, so this only costs on real
+    // scroll changes; the toolbar returns on the next modifier press.
+    useEffect(() => {
+      setContextToolbarModifierDown(false);
+    }, [props.contentScroll]);
 
     const overlaySize = useMemo(() => ({
       width: hostRect.width,

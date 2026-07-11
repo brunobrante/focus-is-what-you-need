@@ -4,10 +4,12 @@ import {
   getAbsoluteCenter,
   getAbsoluteRect,
   getCommonParentId,
+  getContentRootBounds,
   getDescendantIds,
   getEffectiveRotation,
   getParentSize,
   getSelectionBox,
+  isInsideInstance,
   MIN_ELEMENT_SIZE,
   normalizeAngle,
   rotatePoint,
@@ -21,10 +23,15 @@ import { DEFAULT_SHELL_BACKGROUND } from "./documentDefaults";
 // Mutates `document.elements[id]` in place. The caller is responsible for owning
 // `document` (e.g. via a single top-level `cloneDocument`) so this never leaks into
 // a shared document.
+// Screen pages: ROOT elements clamp to the expanded content rect (device size ×
+// pages along the document's content axis), not the single-page window.
 export function constrainElementInPlace(document: CanvasDocument, id: string): void {
   const node = document.elements[id];
   if (!node) return;
-  const parentSize = getParentSize(document, id);
+  const contentBounds = getContentRootBounds(document);
+  const parentSize = !node.parentId
+    ? { width: contentBounds.width, height: contentBounds.height }
+    : getParentSize(document, id);
   node.rotation = roundAngle(normalizeAngle(node.rotation ?? 0));
   node.width = Math.min(Math.max(node.width, MIN_ELEMENT_SIZE), parentSize.width);
   node.height = Math.min(Math.max(node.height, MIN_ELEMENT_SIZE), parentSize.height);
@@ -57,11 +64,23 @@ export function constrainAll(document: CanvasDocument): CanvasDocument {
     const node = next.elements[id];
     if (!node) return;
     constrainElementInPlace(next, id);
+    // Screen pages: a linked instance's inlined children are read-only master
+    // content, valid in the MASTER's content space — a master with pages puts
+    // them past the instance's footprint on purpose (the box clips them).
+    // Clamping would squash page-2+ content into the window, so stop here.
+    if (node.instanceOf) return;
     for (const childId of node.children) clampSubtree(childId);
   };
   for (const rootId of next.rootIds) clampSubtree(rootId);
-  // Any element unreachable from a root (defensive) still gets clamped.
-  for (const id of Object.keys(next.elements)) clampSubtree(id);
+  // Any element unreachable from a root (defensive) still gets clamped — except
+  // instance-inlined content, which is master-truth (see above).
+  for (const id of Object.keys(next.elements)) {
+    if (!visited.has(id) && isInsideInstance(next, id)) {
+      visited.add(id);
+      continue;
+    }
+    clampSubtree(id);
+  }
   return next;
 }
 

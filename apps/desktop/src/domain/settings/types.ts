@@ -61,6 +61,7 @@ export type CanvasModifierCommandId =
   | "canvas.radius.perCorner"
   | "canvas.drag.duplicate"
   | "canvas.viewport.wheelZoom"
+  | "canvas.viewport.wheelPageScroll"
   | "canvas.text.extendSelection";
 
 export type CanvasCommandId = CanvasKeyCommandId | CanvasModifierCommandId;
