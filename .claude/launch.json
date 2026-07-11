@@ -9,12 +9,6 @@
       "port": 47329
     },
     {
-      "name": "canvas",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "--cwd", "canvas", "dev", "--port", "5173"],
-      "port": 5173
-    },
-    {
       "name": "web-clade",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8741", "--directory", "apps/web/clade"],
