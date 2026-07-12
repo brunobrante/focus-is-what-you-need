@@ -9,7 +9,10 @@ import {
 } from "@/lib/storage/repos/components.repo";
 import { linkifyChildComponentsInGraph } from "@/domain/canvas/graphTransforms";
 import { upsertScene } from "@/lib/storage/repos/scenes.repo";
-import { htmlGraphJSONFromCanvasDocument } from "@/canvas/engine/htmlSceneAdapter";
+import {
+  canvasDocumentFromHtmlGraphJSON,
+  htmlGraphJSONFromCanvasDocument,
+} from "@/canvas/engine/htmlSceneAdapter";
 import type { CanvasDocument } from "@/canvas/engine/types";
 import type { ComponentRow, ScreenRow } from "@/lib/storage/schema";
 import {
@@ -20,15 +23,65 @@ import {
   fullComponentPathForCanvasNode,
 } from "@/canvas/canvasUtils";
 
+/**
+ * Screen pages (`contentPages`/`contentAxis`) are master-truth on a component's
+ * OWN variant scene — authored only in the component's isolated editor. But a
+ * component also lives as a node inside its parent, and the parent's save
+ * re-derives the component scene from that node via `canvasDocumentForNode`,
+ * which carries no page fields (they are document-level, not on `ElementNode`).
+ * Without this guard that re-derivation overwrites the component scene and
+ * silently drops its pages. So we transplant the pages the component's own
+ * editor authored onto the freshly re-derived graph before writing — the parent
+ * occurrence never authors pages.
+ */
+export function withPreservedContentPages(
+  existingGraphJSON: string | null | undefined,
+  incomingGraphJSON: string,
+  fallbackName: string,
+): string {
+  const existing = canvasDocumentFromHtmlGraphJSON(existingGraphJSON ?? null, {
+    promoteSubjectRoot: true,
+  });
+  const pages = existing?.canvas.contentPages ?? 1;
+  if (pages <= 1) return incomingGraphJSON;
+
+  const incoming = canvasDocumentFromHtmlGraphJSON(incomingGraphJSON, {
+    promoteSubjectRoot: true,
+  });
+  // The re-derived graph already carries pages (author kept them via its own
+  // editor path) — leave it untouched.
+  if (!incoming || (incoming.canvas.contentPages ?? 1) > 1) return incomingGraphJSON;
+
+  const merged: CanvasDocument = {
+    ...incoming,
+    canvas: {
+      ...incoming.canvas,
+      contentPages: pages,
+      contentAxis: existing?.canvas.contentAxis,
+    },
+  };
+  // Serialize with the incoming graph as `previous` so the page fields land on
+  // the same subject/root node the adapter already picks, and every other node
+  // (tag/cssId/className) stays byte-stable.
+  return htmlGraphJSONFromCanvasDocument(merged, incomingGraphJSON, fallbackName);
+}
+
 export async function upsertComponentSceneIfChanged(
   component: ComponentRow,
   graphJSON: string,
 ): Promise<void> {
   const existingScene = await readSceneByOwner("variant", component.activeVariantId);
-  if (existingScene?.graphJSON === graphJSON) return;
+  // Re-derivation from the parent carries no screen-pages fields; keep the ones
+  // the component's own editor authored on its scene (master-truth).
+  const nextGraphJSON = withPreservedContentPages(
+    existingScene?.graphJSON,
+    graphJSON,
+    component.name,
+  );
+  if (existingScene?.graphJSON === nextGraphJSON) return;
   // Fire-and-forget into the save queue; ancestor propagation runs lazily at
   // idle inside the persistence adapter (no synchronous depth walk).
-  saveScene({ ownerType: "variant", ownerId: component.activeVariantId, graphJSON });
+  saveScene({ ownerType: "variant", ownerId: component.activeVariantId, graphJSON: nextGraphJSON });
 }
 
 export async function createOrFindComponent(input: {

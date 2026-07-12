@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import {
   createBlankHtmlCanvasDocument,
+  ensureHtmlCanvasSubjectRoot,
   serializeHtmlCanvasDocument,
 } from "@/lib/canvas/htmlScene";
 import {
@@ -20,6 +21,18 @@ function blankScene(): string {
   );
 }
 
+// A real promoted-subject scene: a "<name> Canvas" wrapper around a full-bleed
+// subject frame, so `getSubjectWrapperChild` actually promotes and the page
+// fields exercise the subject-node write path (not the plain root).
+function wrappedScene(): string {
+  return serializeHtmlCanvasDocument(
+    ensureHtmlCanvasSubjectRoot(
+      createBlankHtmlCanvasDocument({ name: "Card", width: 342, height: 220 }),
+      { wrapperName: "Card Canvas" },
+    ),
+  );
+}
+
 test("contentPages/contentAxis round-trip through the scene format (plain root)", () => {
   const base = canvasDocumentFromHtmlGraphJSON(blankScene())!;
   base.canvas = { ...base.canvas, contentPages: 3, contentAxis: "vertical" };
@@ -32,10 +45,10 @@ test("contentPages/contentAxis round-trip through the scene format (plain root)"
 });
 
 test("contentPages/contentAxis round-trip through the promoted-subject format", () => {
-  const base = canvasDocumentFromHtmlGraphJSON(blankScene(), { promoteSubjectRoot: true })!;
+  const base = canvasDocumentFromHtmlGraphJSON(wrappedScene(), { promoteSubjectRoot: true })!;
   base.canvas = { ...base.canvas, contentPages: 2, contentAxis: "horizontal" };
 
-  const json = htmlGraphJSONFromCanvasDocument(base, blankScene(), "Component");
+  const json = htmlGraphJSONFromCanvasDocument(base, wrappedScene(), "Card");
   const reloaded = canvasDocumentFromHtmlGraphJSON(json, { promoteSubjectRoot: true })!;
 
   expect(getContentPages(reloaded)).toBe(2);
