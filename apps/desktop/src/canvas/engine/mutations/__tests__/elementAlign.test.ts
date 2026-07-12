@@ -60,6 +60,24 @@ test("single-element align uses the parent/canvas frame (G1)", () => {
   expect(out.elements.a.x).toBe(0); // canvas left
 });
 
+test("single root aligns within the passed window slice on a paged frame", () => {
+  // A vertical 2-page frame scrolled to page 2 (window y ∈ [500, 1000)).
+  const doc = docOf([rect("a", 30, 700, 40, 40)]);
+  const windowRect = { x: 0, y: 500, width: 500, height: 500 };
+  const top = alignElements(doc, ["a"], "top", windowRect);
+  expect(top.elements.a.y).toBe(500); // the visible window's top, not page 1's 0
+  const bottom = alignElements(doc, ["a"], "bottom", windowRect);
+  expect(bottom.elements.a.y + bottom.elements.a.height).toBe(1000); // window bottom
+  const vcenter = alignElements(doc, ["a"], "vcenter", windowRect);
+  expect(vcenter.elements.a.y + vcenter.elements.a.height / 2).toBeCloseTo(750); // window center
+});
+
+test("omitting the window rect keeps aligning to page 1 (back-compat)", () => {
+  const doc = docOf([rect("a", 30, 700, 40, 40)]);
+  const out = alignElements(doc, ["a"], "top");
+  expect(out.elements.a.y).toBe(0); // frame origin — unchanged default
+});
+
 test("distribute horizontal equalizes gaps, extremes fixed (G1)", () => {
   // widths 20,20,20; span from x0 to x120 (last right). total 60, 2 gaps → gap 30.
   const doc = docOf([rect("a", 0, 0, 20, 20), rect("b", 30, 0, 20, 20), rect("c", 100, 0, 20, 20)]);

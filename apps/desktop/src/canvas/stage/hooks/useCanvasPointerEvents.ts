@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { getCommonParentId, getContentAxis, getContentPages, getContentRootBounds, getInstanceRootId, getParentBounds, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
+import { getCommonParentId, getContentAxis, getContentPages, getContentRootBounds, getInstanceRootId, getParentBounds, getVisibleWindowRect, isInsideInstance, roundPixel } from "@/canvas/engine/geometry";
 import { getElementIdFromTarget, isEditableTarget } from "@/canvas/engine/hitTesting";
 import { insertSvgDocument, insertSvgPathsAsRoot } from "@/canvas/engine/actions";
 import { parseSvg } from "@/canvas/engine/vector/svgImport";
@@ -254,14 +254,19 @@ export function useCanvasPointerEvents({
         dispatch({ type: "commitDocument", document: nextDocument, selectedIds: pathIds });
         return;
       }
-      const cx = doc.canvas.width / 2 - parsed.viewBox.width / 2;
-      const cy = doc.canvas.height / 2 - parsed.viewBox.height / 2;
+      // Center on the visible window slice (contentScroll along the content axis),
+      // not always page 1 — so a paste while looking at page 3 lands in view.
+      const windowRect = draftMode
+        ? { x: 0, y: 0, width: doc.canvas.width, height: doc.canvas.height }
+        : getVisibleWindowRect(doc, latestStateRef.current.contentScroll);
+      const cx = windowRect.x + windowRect.width / 2 - parsed.viewBox.width / 2;
+      const cy = windowRect.y + windowRect.height / 2 - parsed.viewBox.height / 2;
       const { document: nextDocument, svgId } = insertSvgDocument(doc, parsed, roundPixel(cx), roundPixel(cy));
       dispatch({ type: "commitDocument", document: nextDocument, selectedIds: [svgId] });
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [dispatch, latestStateRef, isIconSubject]);
+  }, [dispatch, latestStateRef, isIconSubject, draftMode]);
 
   // The free-space cursor is normally rewritten only on pointer move, so switching
   // tools without moving the mouse would leave a stale cursor (e.g. the pen cursor

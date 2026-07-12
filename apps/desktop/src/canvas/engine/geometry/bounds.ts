@@ -452,6 +452,21 @@ export function getContentRootBounds(document: CanvasDocument): Rect {
     : { ...bounds, height: document.canvas.height * pages };
 }
 
+// The device-sized slice currently visible in the window, in content coordinates:
+// origin shifted by `contentScroll` along the content axis. This is where the user
+// is actually looking, so window-aware placement (SVG paste, align-to-frame on a
+// root element) centers here instead of always on page 1. One page / no scroll
+// gives the plain frame rect at the origin.
+export function getVisibleWindowRect(document: CanvasDocument, contentScroll: number): Rect {
+  const pages = getContentPages(document);
+  const bounds = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
+  if (pages <= 1) return bounds;
+  const axis = getContentAxis(document);
+  const axisSize = axis === "horizontal" ? document.canvas.width : document.canvas.height;
+  const scroll = Math.max(0, Math.min(contentScroll, (pages - 1) * axisSize));
+  return axis === "horizontal" ? { ...bounds, x: scroll } : { ...bounds, y: scroll };
+}
+
 export function getParentBounds(document: CanvasDocument, id: string): Rect {
   const node = document.elements[id];
   if (!node?.parentId) {

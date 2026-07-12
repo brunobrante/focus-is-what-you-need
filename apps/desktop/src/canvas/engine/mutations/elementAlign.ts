@@ -28,12 +28,14 @@ function movableIds(document: CanvasDocument, ids: string[]): string[] {
 }
 
 /** Absolute-space content rect a single-selected element aligns within: its
- *  parent's content area, or the canvas frame for a root element. */
-function parentContentRect(document: CanvasDocument, id: string): Rect | null {
+ *  parent's content area, or the frame for a root element. On a paged frame the
+ *  caller passes the visible window slice as `frameRect` so a root element aligns
+ *  to what the user is looking at, not always to page 1. */
+function parentContentRect(document: CanvasDocument, id: string, frameRect: Rect | null): Rect | null {
   const node = document.elements[id];
   if (!node) return null;
   if (!node.parentId) {
-    return { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
+    return frameRect ?? { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
   }
   const parent = document.elements[node.parentId];
   const parentRect = getAbsoluteRect(document, node.parentId);
@@ -67,6 +69,10 @@ export function alignElements(
   document: CanvasDocument,
   ids: string[],
   edge: AlignEdge,
+  // The frame to align a single ROOT element within. On a paged frame the caller
+  // passes the visible window slice (getVisibleWindowRect); omitted / null falls
+  // back to the whole frame at the origin (page 1) — the prior behavior.
+  frameRect: Rect | null = null,
 ): CanvasDocument {
   // Every present element contributes to the reference bounds (locked ones act as
   // fixed anchors); only movable ones are repositioned.
@@ -82,7 +88,7 @@ export function alignElements(
 
   const bounds =
     present.length === 1
-      ? parentContentRect(document, present[0])
+      ? parentContentRect(document, present[0], frameRect)
       : unionRects([...rects.values()]);
   if (!bounds) return document;
 

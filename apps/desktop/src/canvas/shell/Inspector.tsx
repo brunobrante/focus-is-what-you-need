@@ -6,6 +6,7 @@ import {
   type CanvasFeatureWindowType,
 } from "@/canvas/canvasUtils";
 import { useEditorBridge, useEditorBridgeReader } from "@/canvas/engine/bridge";
+import { getVisibleWindowRect } from "@/canvas/engine/geometry";
 import type { EditorAction } from "@/canvas/engine/store";
 import {
   alignElements,
@@ -583,7 +584,18 @@ export function Inspector({
             onScrubStart={onScrubStart}
             onScrubEnd={onScrubEnd}
             onUpdateSizing={commitSizing}
-            onAlign={(edge) => commitWith((live) => alignElements(live, [node.id], edge))}
+            onAlign={(edge) =>
+              commitWith((live) =>
+                alignElements(
+                  live,
+                  [node.id],
+                  edge,
+                  // Read the transient scroll lazily (no re-render subscription) so a
+                  // root element aligns to the window the user is looking at.
+                  getVisibleWindowRect(live, getEditorSnapshot()?.state.contentScroll ?? 0),
+                ),
+              )
+            }
             canvasEditFillIndex={
               activeGradientEdit?.elementId === node.id ? activeGradientEdit.fillIndex : null
             }

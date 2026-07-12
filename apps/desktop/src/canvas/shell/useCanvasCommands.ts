@@ -14,6 +14,7 @@ import {
   type AlignEdge,
   type DistributeAxis,
 } from "@/canvas/engine/actions";
+import { getVisibleWindowRect } from "@/canvas/engine/geometry";
 import type { EditorBridgeValue } from "@/canvas/engine/bridge";
 
 /**
@@ -73,7 +74,15 @@ export function useCanvasCommands(
       // Align a single element within its parent frame, or a multi-selection within
       // its shared bounds (G1). Distribute needs 3+ elements.
       align: (edge: AlignEdge) => {
-        if (selectedIds.length >= 1) commit(alignElements(state.document, selectedIds, edge));
+        if (selectedIds.length >= 1)
+          commit(
+            alignElements(
+              state.document,
+              selectedIds,
+              edge,
+              getVisibleWindowRect(state.document, state.contentScroll),
+            ),
+          );
       },
       distribute: (axis: DistributeAxis) => {
         if (selectedIds.length >= 3) commit(distributeElements(state.document, selectedIds, axis));
