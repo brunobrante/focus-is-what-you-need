@@ -351,34 +351,71 @@ export function snapViewportOffset(value: number, pixelRatio = globalThis.device
  * (cheap — the compositor scales an already-rasterized layer, at the cost of
  * blurry text while scaled up).
  *
- * `zoomGestureActive` is the "blurry while zooming, crisp on settle" trade every
- * Figma-class editor makes (P1): a wheel/pinch zoom fires dozens of events per
- * second, and re-projecting the whole scene per event is the dominant cost above
- * 1× — exactly where users spend their time. So while the gesture streams we keep
- * the compositor path and re-project once, when it settles.
+ * This is the SETTLED choice only. A streaming wheel/pinch zoom no longer flips
+ * the projection (it used to drop to the 1×-layout CSS transform, whose
+ * stretched raster visibly detached the selection chrome from the content):
+ * `resolveFrozenGestureScale` below keeps the scaled-DOM layout frozen for the
+ * duration of the gesture instead.
  *
- * The size guard wins over the gesture: past `MAX_SAFE_TRANSFORMED_STAGE_SIDE`
- * the CSS-transform path hits browser rasterization limits, so a deep zoom stays
- * on the scaled DOM even mid-gesture.
+ * The size guard: past `MAX_SAFE_TRANSFORMED_STAGE_SIDE` the CSS-transform path
+ * hits browser rasterization limits, so a deep zoom must use the scaled DOM.
  */
 export function shouldUseScaledDomProjection({
   canvasSize,
   displayZoom,
   canvasRotation = 0,
-  zoomGestureActive = false,
 }: {
   canvasSize: Size;
   displayZoom: number;
   canvasRotation?: number;
-  zoomGestureActive?: boolean;
 }): boolean {
   if (canvasRotation !== 0) return false;
-  const exceedsSafeTransformedSide =
-    canvasSize.width * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE ||
-    canvasSize.height * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE;
-  if (zoomGestureActive && !exceedsSafeTransformedSide) return false;
   if (displayZoom >= SCALED_DOM_PROJECTION_MIN_ZOOM) return true;
-  return exceedsSafeTransformedSide;
+  return (
+    canvasSize.width * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE ||
+    canvasSize.height * displayZoom > MAX_SAFE_TRANSFORMED_STAGE_SIDE
+  );
+}
+
+// Bound on the compositor-only corrective scale a frozen zoom gesture may reach
+// before the layout re-anchors at the live zoom. 2 = one octave: a long zoom run
+// re-lays-out once per doubling instead of once per wheel tick, and the stretched
+// raster never degrades past 2× (or shrinks past 0.5×).
+export const GESTURE_REANCHOR_MAX_CORRECTIVE_SCALE = 2;
+
+/**
+ * Frozen-scale zoom gesture policy. While a wheel/pinch zoom streams over the
+ * scaled-DOM projection, the stage keeps the layout scale it had when the
+ * gesture started and reaches the live zoom with a compositor-only
+ * translate+scale — re-laying-out a 10k–100k px stage per wheel tick makes
+ * WebKit present stale tiles for a few frames while the (GPU) selection chrome
+ * updates instantly, which is exactly the "chrome detaches from the content
+ * while zooming" desync. Returns the layout scale to freeze at, or null when no
+ * freeze applies (gesture idle, or the projection is not scaled-DOM). When the
+ * corrective factor (displayZoom / frozen) drifts past the re-anchor bound, the
+ * freeze re-anchors at the live zoom — one relayout per octave.
+ */
+export function resolveFrozenGestureScale({
+  zoomGestureActive,
+  scaledDomProjection,
+  displayZoom,
+  previousFrozenScale,
+  lastCommittedRenderScale,
+}: {
+  zoomGestureActive: boolean;
+  scaledDomProjection: boolean;
+  displayZoom: number;
+  previousFrozenScale: number | null;
+  lastCommittedRenderScale: number | null;
+}): number | null {
+  if (!zoomGestureActive || !scaledDomProjection || displayZoom <= 0) return null;
+  const frozen = previousFrozenScale ?? lastCommittedRenderScale ?? displayZoom;
+  if (frozen <= 0) return displayZoom;
+  const corrective = displayZoom / frozen;
+  return corrective > GESTURE_REANCHOR_MAX_CORRECTIVE_SCALE ||
+    corrective < 1 / GESTURE_REANCHOR_MAX_CORRECTIVE_SCALE
+    ? displayZoom
+    : frozen;
 }
 
 export function createViewportTransform(input: ViewportTransformInput): ViewportTransform {

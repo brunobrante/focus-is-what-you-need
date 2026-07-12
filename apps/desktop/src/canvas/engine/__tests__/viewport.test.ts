@@ -17,6 +17,7 @@ import {
   getFitZoomForRegion,
   getInitialZoomForCanvas,
   getInitialZoomForSubjectSize,
+  resolveFrozenGestureScale,
   screenDeltaToWorldDelta,
   shouldUseScaledDomProjection,
   snapViewportOffset,
@@ -352,34 +353,90 @@ test("switches DOM rendering away from giant transformed layers", () => {
   ).toBe(true);
 });
 
-test("keeps the cheap transform projection while a zoom gesture streams", () => {
-  // Mid-gesture: stay on the compositor path across the whole common zoom range
-  // instead of re-laying-out the scene per wheel event (P1).
+test("freezes the layout scale while a zoom gesture streams (P1)", () => {
+  // Gesture idle, or a projection that is not scaled-DOM: no freeze.
   expect(
-    shouldUseScaledDomProjection({
-      canvasSize: { width: 390, height: 844 },
-      displayZoom: 4,
-      zoomGestureActive: true,
-    }),
-  ).toBe(false);
-
-  // ...but the transformed-layer size guard still wins: 844 * 13 > 10_000.
-  expect(
-    shouldUseScaledDomProjection({
-      canvasSize: { width: 390, height: 844 },
-      displayZoom: 13,
-      zoomGestureActive: true,
-    }),
-  ).toBe(true);
-
-  // On settle, the same zoom re-projects at device resolution.
-  expect(
-    shouldUseScaledDomProjection({
-      canvasSize: { width: 390, height: 844 },
-      displayZoom: 4,
+    resolveFrozenGestureScale({
       zoomGestureActive: false,
+      scaledDomProjection: true,
+      displayZoom: 12,
+      previousFrozenScale: 10,
+      lastCommittedRenderScale: 10,
     }),
-  ).toBe(true);
+  ).toBe(null);
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: false,
+      displayZoom: 12,
+      previousFrozenScale: null,
+      lastCommittedRenderScale: 1,
+    }),
+  ).toBe(null);
+
+  // First gesture tick: freeze at the layout scale already on screen, so even
+  // the first wheel event costs no relayout.
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: true,
+      displayZoom: 12.5,
+      previousFrozenScale: null,
+      lastCommittedRenderScale: 10,
+    }),
+  ).toBe(10);
+
+  // Streaming ticks keep the frozen scale while the corrective factor stays
+  // within [0.5, 2]...
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: true,
+      displayZoom: 19.9,
+      previousFrozenScale: 10,
+      lastCommittedRenderScale: 10,
+    }),
+  ).toBe(10);
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: true,
+      displayZoom: 5.1,
+      previousFrozenScale: 10,
+      lastCommittedRenderScale: 10,
+    }),
+  ).toBe(10);
+
+  // ...and re-anchor at the live zoom once per octave in either direction.
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: true,
+      displayZoom: 21,
+      previousFrozenScale: 10,
+      lastCommittedRenderScale: 10,
+    }),
+  ).toBe(21);
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: true,
+      displayZoom: 4.9,
+      previousFrozenScale: 10,
+      lastCommittedRenderScale: 10,
+    }),
+  ).toBe(4.9);
+
+  // No committed layout yet (first render mid-gesture): anchor at the live zoom.
+  expect(
+    resolveFrozenGestureScale({
+      zoomGestureActive: true,
+      scaledDomProjection: true,
+      displayZoom: 3,
+      previousFrozenScale: null,
+      lastCommittedRenderScale: null,
+    }),
+  ).toBe(3);
 });
 
 test("keeps rotated canvases on the matrix projection path", () => {

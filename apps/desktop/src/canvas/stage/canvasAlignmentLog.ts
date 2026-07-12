@@ -463,11 +463,11 @@ export function logCanvasAlignment(
     interaction: input.interactionType ?? null,
     onScreenChrome,
     // v7: everything screen-pages. expectedSurfaceTranslatePx assumes the
-    // scaled-DOM projection (renderScale = displayZoom); during a live zoom
-    // gesture the projection is CSS-transform and the expected inline translate
-    // is `-contentScrollClamped * 1` instead — compare against
-    // dom.contentSurface.inlineTransform for whichever projection
-    // stageProjection.mode reports.
+    // settled scaled-DOM projection (renderScale = displayZoom); during a live
+    // zoom gesture the layout is FROZEN at the gesture-start scale and the stage
+    // carries a corrective translate+scale (see resolveFrozenGestureScale), so
+    // the expected inline translate is `-contentScrollClamped * frozenScale`
+    // instead — read the frozen scale off dom.stageSpace.inlineTransform.
     screenPages: {
       pages: fold.pages,
       axis: fold.axis,

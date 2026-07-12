@@ -12,6 +12,7 @@ import {
   centerViewportOnPoint,
   getCanvasDisplayScale,
   getInitialZoomForSubjectSize,
+  resolveFrozenGestureScale,
   shouldUseScaledDomProjection,
   viewportChanged,
 } from "@/canvas/engine/viewport";
@@ -442,15 +443,17 @@ export function CanvasStage({
   );
   const displayZoom = state.zoom * displayScale;
 
+  // The settled projection choice. The gesture no longer flips the projection
+  // (the old `zoomGestureActive` fast path dropped to a 1×-layout CSS transform);
+  // instead a streaming zoom freezes the scaled-DOM layout below.
   const scaledDomProjection = useMemo(
     () =>
       shouldUseScaledDomProjection({
         canvasSize,
         displayZoom,
         canvasRotation: state.document.canvas.rotation ?? 0,
-        zoomGestureActive,
       }),
-    [canvasSize, displayZoom, state.document.canvas.rotation, zoomGestureActive],
+    [canvasSize, displayZoom, state.document.canvas.rotation],
   );
   // Discrete scroll indicators that appear only once the subject overflows the
   // viewport (i.e. zoomed past fit). Measured straight off the transformed stage
@@ -488,7 +491,37 @@ export function CanvasStage({
     };
   }, [draftContentBounds, displayZoom, viewportTransform.offsetX, viewportTransform.offsetY, viewportSize.width, viewportSize.height]);
   const scroll = draftMode ? draftScroll : elementScroll;
-  const renderScale = scaledDomProjection ? displayZoom : 1;
+  // Frozen-scale zoom gesture (P1). A streaming wheel/pinch zoom used to either
+  // re-lay-out the whole scaled-DOM scene on every wheel tick (above the safe
+  // transformed side) or drop to the 1×-layout CSS-transform path (below it).
+  // Both visibly detach the selection chrome from the content while the gesture
+  // streams: the per-tick relayout of a 10k–100k px stage makes WebKit present
+  // stale tiles for a few frames while the skia chrome updates instantly, and
+  // the 1× raster stretched `displayZoom`× puts the element's PAINTED edge up to
+  // ~half a source pixel × zoom away from its geometry — exactly where the
+  // chrome draws. (The v8 alignment log proved every post-paint JS metric
+  // aligned; the divergence lives in the raster pipeline.) So: while the gesture
+  // streams, keep the layout at the scale it had when the gesture started and
+  // reach the live zoom/offset with a compositor-only translate+scale on the
+  // stage; re-project once, on settle (policy in resolveFrozenGestureScale).
+  // Ref writes during render are deliberate and idempotent (StrictMode-safe):
+  // the frozen scale must be visible to this same render pass.
+  const lastCommittedRenderScaleRef = useRef<number | null>(null);
+  const frozenGestureScaleRef = useRef<number | null>(null);
+  frozenGestureScaleRef.current = resolveFrozenGestureScale({
+    zoomGestureActive,
+    scaledDomProjection,
+    displayZoom,
+    previousFrozenScale: frozenGestureScaleRef.current,
+    lastCommittedRenderScale: lastCommittedRenderScaleRef.current,
+  });
+  const gestureFrozenScale = frozenGestureScaleRef.current;
+  const gestureCorrectiveScale =
+    gestureFrozenScale !== null ? displayZoom / gestureFrozenScale : 1;
+  const renderScale = scaledDomProjection ? gestureFrozenScale ?? displayZoom : 1;
+  useEffect(() => {
+    lastCommittedRenderScaleRef.current = renderScale;
+  });
   // Mirror the stage's layout scale into the geometry module BEFORE children
   // render: snapToLayoutUnit emulates the browser's 1/64-px LayoutUnit floor on
   // the value the DOM actually lays out (canvas × renderScale). A module write
@@ -514,39 +547,56 @@ export function CanvasStage({
     }),
     [viewportTransform.offsetX, viewportTransform.offsetY, stageWidth, stageHeight, displayZoom],
   );
-  const stageSpaceStyle = useMemo<CSSProperties>(
-    () =>
-      scaledDomProjection
-        ? ({
-            width: projectedStageWidth,
-            height: projectedStageHeight,
-            left: viewportTransform.offsetX,
-            top: viewportTransform.offsetY,
-            transform: "none",
-            transformOrigin: "0 0",
-            backfaceVisibility: "visible",
-            imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
-            "--zoom": displayZoom,
-          } as CSSProperties)
-        : ({
-            width: stageWidth,
-            height: stageHeight,
-            transform: viewportTransform.cssTransform,
-            transformOrigin: "0 0",
-            backfaceVisibility: "hidden",
-            imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
-            "--zoom": displayZoom,
-          } as CSSProperties),
-    [
-      scaledDomProjection,
-      projectedStageWidth,
-      projectedStageHeight,
-      stageWidth,
-      stageHeight,
-      viewportTransform,
-      displayZoom,
-    ],
-  );
+  const stageSpaceStyle = useMemo<CSSProperties>(() => {
+    if (!scaledDomProjection) {
+      return {
+        width: stageWidth,
+        height: stageHeight,
+        transform: viewportTransform.cssTransform,
+        transformOrigin: "0 0",
+        backfaceVisibility: "hidden",
+        imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
+        "--zoom": displayZoom,
+      } as CSSProperties;
+    }
+    if (gestureFrozenScale !== null) {
+      // Mid zoom gesture: the layout stays at the frozen scale (projectedStage*
+      // already uses it via renderScale); only this compositor transform tracks
+      // the live zoom/offset, so a wheel tick costs no relayout and no restyle.
+      return {
+        width: projectedStageWidth,
+        height: projectedStageHeight,
+        left: 0,
+        top: 0,
+        transform: `translate(${viewportTransform.offsetX}px, ${viewportTransform.offsetY}px) scale(${gestureCorrectiveScale})`,
+        transformOrigin: "0 0",
+        backfaceVisibility: "visible",
+        imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
+        "--zoom": displayZoom,
+      } as CSSProperties;
+    }
+    return {
+      width: projectedStageWidth,
+      height: projectedStageHeight,
+      left: viewportTransform.offsetX,
+      top: viewportTransform.offsetY,
+      transform: "none",
+      transformOrigin: "0 0",
+      backfaceVisibility: "visible",
+      imageRendering: displayZoom >= 8 ? "pixelated" : "auto",
+      "--zoom": displayZoom,
+    } as CSSProperties;
+  }, [
+    scaledDomProjection,
+    gestureFrozenScale,
+    gestureCorrectiveScale,
+    projectedStageWidth,
+    projectedStageHeight,
+    stageWidth,
+    stageHeight,
+    viewportTransform,
+    displayZoom,
+  ]);
 
   return (
     <div
