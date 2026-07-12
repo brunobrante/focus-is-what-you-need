@@ -635,7 +635,98 @@ export function useCanvasPointerEvents({
     }
   };
 
-  useEffect(() => clearPendingMove, []);
+  // ── Screen pages: auto-scroll at the window edge while dragging ────────────
+  // While a drag/draw/resize holds near the visible window's leading/trailing
+  // edge (content axis only), advance `contentScroll` at a ramped rate so the
+  // object crosses into the next page instead of vanishing into the clip. The
+  // gesture runs in content coordinates, so re-running the move after each scroll
+  // keeps the element glued under the cursor. Only meaningful with expanded pages.
+  const EDGE_SCROLL_ZONE_FRACTION = 0.12; // of the window along the content axis
+  const EDGE_SCROLL_MAX_SPEED = 24; // canvas units per frame at full ramp
+
+  const edgeScrollRafRef = useRef<number | null>(null);
+  const lastGestureEventRef = useRef<ReactPointerEvent<HTMLDivElement> | null>(null);
+
+  const edgeScrollSupportsInteraction = (interaction: Interaction): boolean =>
+    (interaction.type === "drag" || interaction.type === "draw" || interaction.type === "resize") &&
+    !draftMode &&
+    getContentPages(latestDocumentRef.current) > 1;
+
+  // Signed content-unit scroll step for this frame (0 when the pointer is not in
+  // an edge zone). Uses the pointer's CONTENT coordinate, which already folds in
+  // the live scroll, so "near the window edge" is measured against the current
+  // window slice — and keeps holding as the content moves under a still cursor.
+  const edgeScrollStep = (event: ReactPointerEvent<HTMLDivElement>): number => {
+    const document = latestDocumentRef.current;
+    const axis = getContentAxis(document);
+    const axisSize = axis === "horizontal" ? document.canvas.width : document.canvas.height;
+    const point = getCanvasPoint(event);
+    if (!point) return 0;
+    const scroll = latestStateRef.current.contentScroll;
+    const pos = axis === "horizontal" ? point.x : point.y;
+    const fromStart = pos - scroll; // distance past the window's leading edge
+    const fromEnd = scroll + axisSize - pos; // distance before the trailing edge
+    const zone = axisSize * EDGE_SCROLL_ZONE_FRACTION;
+    const ramp = (d: number) => {
+      const t = Math.max(0, Math.min(1, 1 - d / zone));
+      return t * t; // ease-in: gentle inside the zone, fast at the very edge
+    };
+    if (fromStart < zone) return -EDGE_SCROLL_MAX_SPEED * ramp(fromStart);
+    if (fromEnd < zone) return EDGE_SCROLL_MAX_SPEED * ramp(fromEnd);
+    return 0;
+  };
+
+  // Recreated every render so the rAF loop always runs with fresh closures
+  // (latest content transform + document). Returns true when it scrolled.
+  const edgeScrollTickRef = useRef<() => boolean>(() => false);
+  edgeScrollTickRef.current = (): boolean => {
+    const interaction = interactionRef.current;
+    const event = lastGestureEventRef.current;
+    if (!interaction || !event || !edgeScrollSupportsInteraction(interaction)) return false;
+    const step = edgeScrollStep(event);
+    if (step === 0) return false;
+    const document = latestDocumentRef.current;
+    const axis = getContentAxis(document);
+    const axisSize = axis === "horizontal" ? document.canvas.width : document.canvas.height;
+    const maxScroll = (getContentPages(document) - 1) * axisSize;
+    const current = latestStateRef.current.contentScroll;
+    const next = Math.max(0, Math.min(maxScroll, current + step));
+    if (next === current) return false; // already at the content start/end
+    dispatch({ type: "setContentScroll", scroll: next });
+    // Re-run the move so the dragged element tracks the revealed content.
+    processInteractionMove(event, interaction);
+    return true;
+  };
+
+  // Stable across renders: touches only refs, so the self-rescheduling rAF chain
+  // always reads the freshest tick without capturing a stale closure.
+  const runEdgeScroll = () => {
+    edgeScrollRafRef.current = null;
+    if (edgeScrollTickRef.current()) {
+      edgeScrollRafRef.current = requestAnimationFrame(runEdgeScroll);
+    }
+  };
+
+  const stopEdgeScroll = () => {
+    if (edgeScrollRafRef.current !== null) {
+      cancelAnimationFrame(edgeScrollRafRef.current);
+      edgeScrollRafRef.current = null;
+    }
+    lastGestureEventRef.current = null;
+  };
+
+  // Called on each gesture pointermove: remember the event and run the loop only
+  // while the pointer sits in an edge zone (it stops itself when it leaves).
+  const updateEdgeScroll = (event: ReactPointerEvent<HTMLDivElement>, interaction: Interaction) => {
+    if (!edgeScrollSupportsInteraction(interaction)) { stopEdgeScroll(); return; }
+    lastGestureEventRef.current = event;
+    if (edgeScrollStep(event) === 0) { stopEdgeScroll(); return; }
+    if (edgeScrollRafRef.current === null) {
+      edgeScrollRafRef.current = requestAnimationFrame(runEdgeScroll);
+    }
+  };
+
+  useEffect(() => () => { clearPendingMove(); stopEdgeScroll(); }, []);
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (textInteraction.handleTextDragMove(event)) return;
@@ -675,6 +766,10 @@ export function useCanvasPointerEvents({
 
     if (interaction.pointerId !== event.pointerId) return;
 
+    // Screen pages: ramp the content scroll when the pointer holds near a window
+    // edge, so a drag can carry the element into the next page hands-free.
+    updateEdgeScroll(event, interaction);
+
     // rAF-coalesce the gesture path (P2): keep only the newest event and process
     // once per frame. The stale-interaction guard drops a frame queued for a
     // gesture that ended/was cancelled before the rAF fired.
@@ -696,6 +791,7 @@ export function useCanvasPointerEvents({
     // Apply the last coalesced move before finishing, so the commit reflects
     // the final pointer position (P2).
     flushPendingMove();
+    stopEdgeScroll();
 
     const interaction = interactionRef.current;
     if (!interaction || interaction.pointerId !== event.pointerId) return;
@@ -759,6 +855,7 @@ export function useCanvasPointerEvents({
   // drop-target highlight or command-mode flag survives. Pen/anchor/draw have
   // their own dedicated cancel paths in useKeyboardShortcuts and are left alone.
   const cancelActiveInteraction = (): boolean => {
+    stopEdgeScroll();
     const interaction = interactionRef.current;
     // Lasso/Paint/Shape-build carry no document to revert — drop gesture + overlay.
     if (interaction?.type === "vector-lasso" || interaction?.type === "vector-shape-build") {
