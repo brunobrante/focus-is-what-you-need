@@ -269,6 +269,10 @@ export function useViewportControls({
     const viewportRect = getCurrentViewportRect();
     const canvasSize = getCanvasSize(state.document);
     let nextViewport;
+    // Offset clamp region for this wheel. The zoom branch widens it by the extra
+    // pages so a cursor-anchored zoom while scrolled isn't pulled off its anchor;
+    // pan keeps the plain navigable region.
+    let clampBounds: Rect | null | undefined = navigableBounds;
 
     // `ctrlKey` on a wheel event is WebKit's trackpad-pinch encoding, not a key the
     // user chose to hold, so it stays raw; only the deliberate modifier is bound.
@@ -338,6 +342,22 @@ export function useViewportControls({
         offsetX: cursor.x - nextBaseCursor.x + (scrollIsHorizontal ? nextScrollPx : 0),
         offsetY: cursor.y - nextBaseCursor.y + (scrollIsHorizontal ? 0 : nextScrollPx),
       };
+      // The window offset above folds in the scroll (nextScrollPx, which scales
+      // with zoom), so clamp against the content region — the frame plus the extra
+      // pages along the content axis, the same extension the anchor uses — else the
+      // clamp trims the fold and the anchored content point drifts under the cursor.
+      // Only above min zoom: at min zoom clampViewportState force-centers, and a
+      // widened region would center on the content middle instead of the frame.
+      // No-op at one page (pagesExtra = 0).
+      clampBounds =
+        state.viewportMode !== "draft" && contentPages > 1 && nextZoom > zoomLimits.min + 1e-6
+          ? {
+              x: anchorBounds.x,
+              y: anchorBounds.y,
+              width: anchorBounds.width + pagesExtraX,
+              height: anchorBounds.height + pagesExtraY,
+            }
+          : navigableBounds;
     } else if (
       getContentPages(state.document) > 1 &&
       isModifierCommandActive(event, settings, "canvas.viewport.wheelPageScroll")
@@ -362,7 +382,7 @@ export function useViewportControls({
       nextViewport = { zoom: state.zoom, offsetX: state.offsetX - event.deltaX, offsetY: state.offsetY - event.deltaY };
     }
 
-    const clampedViewport = clampViewportState(nextViewport, containerSize, canvasSize, false, state.viewportMode, navigableBounds);
+    const clampedViewport = clampViewportState(nextViewport, containerSize, canvasSize, false, state.viewportMode, clampBounds);
     if (viewportChanged(clampedViewport, { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY })) {
       dispatch({ type: "setViewport", zoom: clampedViewport.zoom, offsetX: clampedViewport.offsetX, offsetY: clampedViewport.offsetY });
     }
