@@ -364,8 +364,17 @@ export function CanvasStage({
         ? getCanvasDisplayScale(viewportSize, canvasSize, state.viewportMode)
         : 1;
     const scrollPx = contentScroll * state.zoom * displayScale;
-    const offsetX = contentAxis === "horizontal" ? state.offsetX - scrollPx : state.offsetX;
-    const offsetY = contentAxis === "horizontal" ? state.offsetY : state.offsetY - scrollPx;
+    // The DOM slides the content along the frame's LOCAL axis inside the rotated
+    // stage, so the screen-space offset shift is the local scroll vector rotated
+    // by the canvas rotation — otherwise hit-testing and handles drift when
+    // rotation ≠ 0. At rotation 0 this reduces to the plain per-axis shift.
+    const rotation = ((state.document.canvas.rotation ?? 0) * Math.PI) / 180;
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const localX = contentAxis === "horizontal" ? -scrollPx : 0;
+    const localY = contentAxis === "horizontal" ? 0 : -scrollPx;
+    const offsetX = state.offsetX + (cos * localX - sin * localY);
+    const offsetY = state.offsetY + (sin * localX + cos * localY);
     return buildViewportTransform(state.document, viewportSize, state.zoom, offsetX, offsetY, state.viewportMode);
   }, [contentScroll, contentAxis, viewportTransform, viewportSize, canvasSize, state.viewportMode, state.zoom, state.document, state.offsetX, state.offsetY]);
 
