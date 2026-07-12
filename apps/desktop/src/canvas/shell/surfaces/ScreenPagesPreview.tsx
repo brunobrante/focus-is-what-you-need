@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useEditor } from "@/canvas/engine/store";
 import { deleteElements, mutateElementShallow, shallowCloneDocument } from "@/canvas/engine/actions";
 import { getContentAxis, getContentPages } from "@/canvas/engine/geometry";
+import { useContentScrollSnap } from "@/canvas/stage/hooks/useContentScrollSnap";
 import { ElementRenderer } from "@/canvas/stage/ElementRenderer";
 import { ConfirmActionModal, type ConfirmActionModalHandle } from "@/components/modals/ConfirmActionModal";
 
@@ -25,6 +26,13 @@ export function ScreenPagesPreview() {
   const railRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const confirmRef = useRef<ConfirmActionModalHandle>(null);
+  // Snap-to-page: ease the continuous scroll to the nearest page boundary once a
+  // scrub or wheel settles, so the rail never rests half a page.
+  const { snapNow, scheduleSnap, cancelSnap } = useContentScrollSnap(
+    () => state.document,
+    () => state.contentScroll,
+    (scroll) => dispatch({ type: "setContentScroll", scroll }),
+  );
 
   const pages = getContentPages(state.document);
   const horizontal = getContentAxis(state.document) === "horizontal";
@@ -144,8 +152,10 @@ export function ScreenPagesPreview() {
       style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.5)" }}
       onClick={(event) => event.stopPropagation()}
       onWheel={(event) => {
+        cancelSnap();
         const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
         dispatch({ type: "setContentScroll", scroll: state.contentScroll + delta });
+        scheduleSnap();
       }}
     >
       <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#6E6E6E]">Páginas</span>
@@ -154,6 +164,7 @@ export function ScreenPagesPreview() {
         className="relative cursor-pointer select-none overflow-hidden rounded-[3px]"
         style={{ width: railWidth, height: railHeight }}
         onPointerDown={(event) => {
+          cancelSnap();
           draggingRef.current = true;
           event.currentTarget.setPointerCapture(event.pointerId);
           scrubTo(event.clientX, event.clientY);
@@ -164,6 +175,7 @@ export function ScreenPagesPreview() {
         onPointerUp={(event) => {
           draggingRef.current = false;
           event.currentTarget.releasePointerCapture(event.pointerId);
+          snapNow();
         }}
       >
         {/* Live miniature of the whole content — the real scene renderer scaled

@@ -5,6 +5,7 @@ import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import { isModifierCommandActive } from "@/domain/settings/resolve";
 import type { GlobalSettings } from "@/domain/settings/types";
 import { clamp, getContentAxis, getContentPages } from "@/canvas/engine/geometry";
+import { useContentScrollSnap } from "./useContentScrollSnap";
 import {
   canvasPointToViewport,
   centerViewportOnPoint,
@@ -70,6 +71,14 @@ export function useViewportControls({
     el.addEventListener("wheel", block, { passive: false });
     return () => el.removeEventListener("wheel", block);
   }, [viewportRef]);
+
+  // Snap-to-page: after a modifier+wheel page-scroll settles, ease the content to
+  // the nearest page boundary (free scroll is untouched during the gesture).
+  const { scheduleSnap, cancelSnap } = useContentScrollSnap(
+    () => state.document,
+    () => state.contentScroll,
+    (scroll) => dispatch({ type: "setContentScroll", scroll }),
+  );
 
   useLayoutEffect(() => {
     const canvasSize = getCanvasSize(state.document);
@@ -345,7 +354,9 @@ export function useViewportControls({
         getContentAxis(state.document) === "horizontal" && Math.abs(event.deltaX) > Math.abs(event.deltaY)
           ? event.deltaX
           : event.deltaY;
+      cancelSnap();
       dispatch({ type: "setContentScroll", scroll: state.contentScroll + delta / displayZoom });
+      scheduleSnap();
       return;
     } else {
       nextViewport = { zoom: state.zoom, offsetX: state.offsetX - event.deltaX, offsetY: state.offsetY - event.deltaY };
