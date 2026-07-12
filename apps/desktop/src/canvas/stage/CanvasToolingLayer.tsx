@@ -75,6 +75,10 @@ export type CanvasToolingLayerProps = {
   // Any change — the rail, its scrub drag, or modifier+wheel — dismisses the
   // context toolbar.
   contentScroll?: number;
+  // Screen pages: the on-screen window rect (overlay space) to clip all chrome to
+  // when the frame has 2+ pages, so handles/outlines of scrolled-out content don't
+  // float over the stage background. Null on single-page frames (no clip).
+  windowClipRect?: Rect | null;
 };
 
 function computeTransformIds(doc: CanvasDocument, selectedIds: string[]): string[] {
@@ -716,6 +720,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
         top: hostRect.top,
         width: overlaySize.width,
         height: overlaySize.height,
+        clipRect: props.windowClipRect ?? null,
         outlines: renderData.outlines,
         ghosts: renderData.ghosts,
         resizeBox: renderData.resizeBox,
@@ -739,6 +744,7 @@ const CanvasToolingLayerImpl = forwardRef<CanvasToolingRef, CanvasToolingLayerPr
       props.guides,
       props.marqueeRect,
       props.lasso,
+      props.windowClipRect,
       renderData,
       sizeLabel,
       t,

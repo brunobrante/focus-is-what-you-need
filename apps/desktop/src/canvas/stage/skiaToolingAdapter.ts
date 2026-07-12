@@ -53,6 +53,7 @@ function framesEqual(a: ToolingRenderFrame, b: ToolingRenderFrame): boolean {
     a.top === b.top &&
     a.width === b.width &&
     a.height === b.height &&
+    a.clipRect === b.clipRect &&
     a.outlines === b.outlines &&
     a.ghosts === b.ghosts &&
     a.resizeBox === b.resizeBox &&
@@ -187,6 +188,14 @@ export class SkiaToolingAdapter implements ToolingRendererAdapter {
       canvas.clear(ck.TRANSPARENT);
       canvas.save();
       canvas.scale(this.size.resolution, this.size.resolution);
+
+      // Screen pages: clip all chrome to the on-screen window so handles/outlines
+      // of content scrolled out of the visible slice don't paint over the stage.
+      // Coordinates are overlay-space (CSS px), matching the post-scale canvas.
+      if (frame.clipRect) {
+        const { x, y, width, height } = frame.clipRect;
+        canvas.clipRect(ck.XYWHRect(x, y, width, height), ck.ClipOp.Intersect, true);
+      }
 
       for (const ghost of frame.ghosts) {
         drawGhost(ck, canvas, pool, ghost, this.getGhostShadowPaint(ck));

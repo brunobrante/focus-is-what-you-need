@@ -112,6 +112,10 @@ export type ToolingRenderFrame = {
   top: number;
   width: number;
   height: number;
+  // Screen pages: when set, every piece of chrome is clipped to this overlay-space
+  // rect (the on-screen window) so handles/outlines of elements scrolled out of the
+  // visible window slice don't float over the stage background. Null = no clip.
+  clipRect?: Rect | null;
   outlines: ToolingOutlineCommand[];
   ghosts: ToolingGhostCommand[];
   resizeBox: ToolingBoxCommand | null;

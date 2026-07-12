@@ -9,6 +9,7 @@ import { isInsertTool } from "@/canvas/engine/types";
 import { DEFAULT_GLOBAL_SETTINGS } from "@/domain/settings/defaults";
 import type { GlobalSettings } from "@/domain/settings/types";
 import {
+  canvasRectToViewport,
   centerViewportOnPoint,
   getCanvasDisplayScale,
   getInitialZoomForSubjectSize,
@@ -367,6 +368,21 @@ export function CanvasStage({
     const offsetY = contentAxis === "horizontal" ? state.offsetY : state.offsetY - scrollPx;
     return buildViewportTransform(state.document, viewportSize, state.zoom, offsetX, offsetY, state.viewportMode);
   }, [contentScroll, contentAxis, viewportTransform, viewportSize, canvasSize, state.viewportMode, state.zoom, state.document, state.offsetX, state.offsetY]);
+
+  // Screen pages: the on-screen window rect the tooling layer clips its chrome to,
+  // so handles/outlines of content scrolled outside the visible slice don't float
+  // over the stage. Built from the PLAIN transform (the window never scrolls) and
+  // padded by the resize-handle reach so chrome of elements flush against the
+  // visible edge survives. Null on single-page frames — no clip.
+  const windowClipRect = useMemo<Rect | null>(() => {
+    if (contentPages <= 1) return null;
+    const rect = canvasRectToViewport(
+      { x: 0, y: 0, width: canvasSize.width, height: canvasSize.height },
+      viewportTransform,
+    );
+    const pad = 16;
+    return { x: rect.x - pad, y: rect.y - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 };
+  }, [contentPages, canvasSize.width, canvasSize.height, viewportTransform]);
 
   const {
     marqueeRect,
@@ -749,6 +765,7 @@ export function CanvasStage({
         onCommitDocument={commitContextToolbarDocument}
         settings={settings}
         contentScroll={contentScroll}
+        windowClipRect={windowClipRect}
       />
 
       <TextEditingTextarea
